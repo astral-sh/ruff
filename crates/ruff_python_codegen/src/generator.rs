@@ -1,16 +1,19 @@
 //! Generate Python source code from an abstract syntax tree (AST).
 
+use ruff_python_ast::{
+    self as ast, ArgOrKeyword, FStringPartView, FStringValue, NodeList, StringValue, Suite,
+    TStringValue,
+};
 use std::fmt::Write;
 use std::ops::Deref;
 
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
-    self as ast, Alias, AnyStringFlags, ArgOrKeyword, BoolOp, BytesLiteralFlags, CmpOp,
-    Comprehension, ConversionFlag, DebugText, ExceptHandler, Expr, Identifier, MatchCase, Operator,
-    Parameter, Parameters, Pattern, PatternOrKeyword, Singleton, Stmt, StringFlags, Suite,
-    TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
+    Alias, AnyStringFlags, BoolOp, BytesLiteralFlags, CmpOp, ConversionFlag, DebugText,
+    ExceptHandler, Expr, Identifier, InterpolatedStringElement, InterpolatedStringFormatSpec,
+    MappingPatternItem, MatchCase, Number, Operator, Parameter, ParameterWithDefault, Parameters,
+    Pattern, Singleton, Stmt, StringFlags, StringLiteral, TypeParam, TypeParams, WithItem,
 };
-use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
 use ruff_source_file::LineEnding;
 
@@ -136,14 +139,14 @@ impl<'a> Generator<'a> {
         self
     }
 
-    /// Generate source code from a [`Stmt`].
-    pub fn stmt(mut self, stmt: &Stmt) -> String {
+    /// Generates source for a statement in an AST.
+    pub fn stmt(mut self, stmt: Stmt<'_>) -> String {
         self.unparse_stmt(stmt);
         self.generate()
     }
 
-    /// Generate source code from an [`Expr`].
-    pub fn expr(mut self, expr: &Expr) -> String {
+    /// Generates source for a subtree in a parsed module.
+    pub fn expr(mut self, expr: Expr<'_>) -> String {
         self.unparse_expr(expr, 0);
         self.generate()
     }
@@ -160,7 +163,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn body(&mut self, stmts: &[Stmt]) {
+    fn body(&mut self, stmts: Suite<'_>) {
         self.indent_depth = self.indent_depth.saturating_add(1);
         for stmt in stmts {
             self.unparse_stmt(stmt);
@@ -178,7 +181,7 @@ impl<'a> Generator<'a> {
         self.buffer += s;
     }
 
-    fn p_id(&mut self, s: &Identifier) {
+    fn p_id(&mut self, s: Identifier<'_>) {
         self.p(s.as_str());
     }
 
@@ -239,13 +242,13 @@ impl<'a> Generator<'a> {
         self.buffer
     }
 
-    pub fn unparse_suite(&mut self, suite: &Suite) {
+    pub fn unparse_suite(&mut self, suite: Suite<'_>) {
         for stmt in suite {
             self.unparse_stmt(stmt);
         }
     }
 
-    fn unparse_stmt(&mut self, ast: &Stmt) {
+    fn unparse_stmt(&mut self, ast: Stmt<'_>) {
         macro_rules! statement {
             ($body:block) => {{
                 self.newline();
@@ -255,8 +258,8 @@ impl<'a> Generator<'a> {
             }};
         }
 
-        match ast {
-            Stmt::FunctionDef(ast::StmtFunctionDef {
+        match ast.fields() {
+            ast::StmtFields::FunctionDef(ast::StmtFunctionDefFields {
                 is_async,
                 name,
                 parameters,
@@ -270,11 +273,11 @@ impl<'a> Generator<'a> {
                 for decorator in decorator_list {
                     statement!({
                         self.p("@");
-                        self.unparse_expr(&decorator.expression, precedence::MAX);
+                        self.unparse_expr(decorator.expression(), precedence::MAX);
                     });
                 }
                 statement!({
-                    if *is_async {
+                    if is_async {
                         self.p("async ");
                     }
                     self.p("def ");
@@ -296,20 +299,19 @@ impl<'a> Generator<'a> {
                     self.newlines(2);
                 }
             }
-            Stmt::ClassDef(ast::StmtClassDef {
+            ast::StmtFields::ClassDef(ast::StmtClassDefFields {
                 name,
                 arguments,
                 body,
                 decorator_list,
                 type_params,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 for decorator in decorator_list {
                     statement!({
                         self.p("@");
-                        self.unparse_expr(&decorator.expression, precedence::MAX);
+                        self.unparse_expr(decorator.expression(), precedence::MAX);
                     });
                 }
                 statement!({
@@ -329,13 +331,13 @@ impl<'a> Generator<'a> {
                                 }
                                 ArgOrKeyword::Keyword(keyword) => {
                                     self.p_delim(&mut first, ", ");
-                                    if let Some(arg) = &keyword.arg {
+                                    if let Some(arg) = keyword.arg() {
                                         self.p_id(arg);
                                         self.p("=");
                                     } else {
                                         self.p("**");
                                     }
-                                    self.unparse_expr(&keyword.value, precedence::MAX);
+                                    self.unparse_expr(keyword.value(), precedence::MAX);
                                 }
                             }
                         }
@@ -348,11 +350,7 @@ impl<'a> Generator<'a> {
                     self.newlines(2);
                 }
             }
-            Stmt::Return(ast::StmtReturn {
-                value,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::StmtFields::Return(ast::StmtReturnFields { value, node: _ }) => {
                 statement!({
                     if let Some(expr) = value {
                         self.p("return ");
@@ -362,11 +360,7 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Delete(ast::StmtDelete {
-                targets,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::StmtFields::Delete(ast::StmtDeleteFields { targets, node: _ }) => {
                 statement!({
                     self.p("del ");
                     let mut first = true;
@@ -376,7 +370,7 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+            ast::StmtFields::Assign(ast::StmtAssignFields { targets, value, .. }) => {
                 statement!({
                     for target in targets {
                         self.unparse_expr(target, precedence::ASSIGN);
@@ -385,12 +379,11 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(value, precedence::ASSIGN);
                 });
             }
-            Stmt::AugAssign(ast::StmtAugAssign {
+            ast::StmtFields::AugAssign(ast::StmtAugAssignFields {
                 target,
                 op,
                 value,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 statement!({
                     self.unparse_expr(target, precedence::AUG_ASSIGN);
@@ -414,16 +407,15 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(value, precedence::AUG_ASSIGN);
                 });
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign {
+            ast::StmtFields::AnnAssign(ast::StmtAnnAssignFields {
                 target,
                 annotation,
                 value,
                 simple,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 statement!({
-                    let need_parens = matches!(target.as_ref(), Expr::Name(_)) && !simple;
+                    let need_parens = target.is_name_expr() && !simple;
                     self.p_if(need_parens, "(");
                     self.unparse_expr(target, precedence::ANN_ASSIGN);
                     self.p_if(need_parens, ")");
@@ -435,7 +427,7 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::For(ast::StmtFor {
+            ast::StmtFields::For(ast::StmtForFields {
                 is_async,
                 target,
                 iter,
@@ -444,7 +436,7 @@ impl<'a> Generator<'a> {
                 ..
             }) => {
                 statement!({
-                    if *is_async {
+                    if is_async {
                         self.p("async ");
                     }
                     self.p("for ");
@@ -461,12 +453,11 @@ impl<'a> Generator<'a> {
                     self.body(orelse);
                 }
             }
-            Stmt::While(ast::StmtWhile {
+            ast::StmtFields::While(ast::StmtWhileFields {
                 test,
                 body,
                 orelse,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 statement!({
                     self.p("while ");
@@ -481,12 +472,11 @@ impl<'a> Generator<'a> {
                     self.body(orelse);
                 }
             }
-            Stmt::If(ast::StmtIf {
+            ast::StmtFields::If(ast::StmtIfFields {
                 test,
                 body,
                 elif_else_clauses,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 statement!({
                     self.p("if ");
@@ -496,7 +486,7 @@ impl<'a> Generator<'a> {
                 self.body(body);
 
                 for clause in elif_else_clauses {
-                    if let Some(test) = &clause.test {
+                    if let Some(test) = clause.test() {
                         statement!({
                             self.p("elif ");
                             self.unparse_expr(test, precedence::IF);
@@ -507,17 +497,17 @@ impl<'a> Generator<'a> {
                             self.p("else:");
                         });
                     }
-                    self.body(&clause.body);
+                    self.body(clause.body());
                 }
             }
-            Stmt::With(ast::StmtWith {
+            ast::StmtFields::With(ast::StmtWithFields {
                 is_async,
                 items,
                 body,
                 ..
             }) => {
                 statement!({
-                    if *is_async {
+                    if is_async {
                         self.p("async ");
                     }
                     self.p("with ");
@@ -530,11 +520,10 @@ impl<'a> Generator<'a> {
                 });
                 self.body(body);
             }
-            Stmt::Match(ast::StmtMatch {
+            ast::StmtFields::Match(ast::StmtMatchFields {
                 subject,
                 cases,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 statement!({
                     self.p("match ");
@@ -549,10 +538,9 @@ impl<'a> Generator<'a> {
                     self.indent_depth = self.indent_depth.saturating_sub(1);
                 }
             }
-            Stmt::TypeAlias(ast::StmtTypeAlias {
+            ast::StmtFields::TypeAlias(ast::StmtTypeAliasFields {
                 name,
-                range: _,
-                node_index: _,
+                node: _,
                 type_params,
                 value,
             }) => {
@@ -566,11 +554,10 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(value, precedence::ASSIGN);
                 });
             }
-            Stmt::Raise(ast::StmtRaise {
+            ast::StmtFields::Raise(ast::StmtRaiseFields {
                 exc,
                 cause,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 statement!({
                     self.p("raise");
@@ -584,14 +571,13 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Try(ast::StmtTry {
+            ast::StmtFields::Try(ast::StmtTryFields {
                 body,
                 handlers,
                 orelse,
                 finalbody,
                 is_star,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 statement!({
                     self.p("try:");
@@ -600,7 +586,7 @@ impl<'a> Generator<'a> {
 
                 for handler in handlers {
                     statement!({
-                        self.unparse_except_handler(handler, *is_star);
+                        self.unparse_except_handler(handler, is_star);
                     });
                 }
 
@@ -617,12 +603,7 @@ impl<'a> Generator<'a> {
                     self.body(finalbody);
                 }
             }
-            Stmt::Assert(ast::StmtAssert {
-                test,
-                msg,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::StmtFields::Assert(ast::StmtAssertFields { test, msg, node: _ }) => {
                 statement!({
                     self.p("assert ");
                     self.unparse_expr(test, precedence::ASSERT);
@@ -632,14 +613,13 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Import(ast::StmtImport {
+            ast::StmtFields::Import(ast::StmtImportFields {
                 names,
                 is_lazy,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 statement!({
-                    if *is_lazy {
+                    if is_lazy {
                         self.p("lazy ");
                     }
                     self.p("import ");
@@ -650,21 +630,20 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::ImportFrom(ast::StmtImportFrom {
+            ast::StmtFields::ImportFrom(ast::StmtImportFromFields {
                 module,
                 names,
                 level,
                 is_lazy,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 statement!({
-                    if *is_lazy {
+                    if is_lazy {
                         self.p("lazy ");
                     }
                     self.p("from ");
-                    if *level > 0 {
-                        for _ in 0..*level {
+                    if level > 0 {
+                        for _ in 0..level {
                             self.p(".");
                         }
                     }
@@ -679,11 +658,7 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Global(ast::StmtGlobal {
-                names,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::StmtFields::Global(ast::StmtGlobalFields { names, node: _ }) => {
                 statement!({
                     self.p("global ");
                     let mut first = true;
@@ -693,11 +668,7 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Nonlocal(ast::StmtNonlocal {
-                names,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::StmtFields::Nonlocal(ast::StmtNonlocalFields { names, node: _ }) => {
                 statement!({
                     self.p("nonlocal ");
                     let mut first = true;
@@ -707,31 +678,31 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Expr(ast::StmtExpr {
-                value,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::StmtFields::Expr(ast::StmtExprFields { value, node: _ }) => {
                 statement!({
                     self.unparse_expr(value, precedence::EXPR);
                 });
             }
-            Stmt::Pass(_) => {
+            ast::StmtFields::Pass(_) => {
                 statement!({
                     self.p("pass");
                 });
             }
-            Stmt::Break(_) => {
+            ast::StmtFields::Break(_) => {
                 statement!({
                     self.p("break");
                 });
             }
-            Stmt::Continue(_) => {
+            ast::StmtFields::Continue(_) => {
                 statement!({
                     self.p("continue");
                 });
             }
-            Stmt::IpyEscapeCommand(ast::StmtIpyEscapeCommand { kind, value, .. }) => {
+            ast::StmtFields::IpyEscapeCommand(ast::StmtIpyEscapeCommandFields {
+                kind,
+                value,
+                ..
+            }) => {
                 statement!({
                     self.p(&format!("{kind}{value}"));
                 });
@@ -739,14 +710,13 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_except_handler(&mut self, ast: &ExceptHandler, star: bool) {
-        match ast {
-            ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+    fn unparse_except_handler(&mut self, ast: ExceptHandler<'_>, star: bool) {
+        match ast.fields() {
+            ast::ExceptHandlerFields::ExceptHandler(ast::ExceptHandlerExceptHandlerFields {
                 type_,
                 name,
                 body,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 self.p("except");
                 if star {
@@ -766,26 +736,20 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_pattern(&mut self, ast: &Pattern) {
-        match ast {
-            Pattern::MatchValue(ast::PatternMatchValue {
-                value,
-                range: _,
-                node_index: _,
-            }) => {
+    fn unparse_pattern(&mut self, ast: Pattern<'_>) {
+        match ast.fields() {
+            ast::PatternFields::MatchValue(ast::PatternMatchValueFields { value, node: _ }) => {
                 self.unparse_expr(value, precedence::MAX);
             }
-            Pattern::MatchSingleton(ast::PatternMatchSingleton {
+            ast::PatternFields::MatchSingleton(ast::PatternMatchSingletonFields {
                 value,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
-                self.unparse_singleton(*value);
+                self.unparse_singleton(value);
             }
-            Pattern::MatchSequence(ast::PatternMatchSequence {
+            ast::PatternFields::MatchSequence(ast::PatternMatchSequenceFields {
                 patterns,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 self.p("[");
                 let mut first = true;
@@ -795,18 +759,18 @@ impl<'a> Generator<'a> {
                 }
                 self.p("]");
             }
-            Pattern::MatchMapping(mapping) => {
+            ast::PatternFields::MatchMapping(ast::PatternMatchMappingFields { items, .. }) => {
                 self.p("{");
                 let mut first = true;
-                for item in &mapping.items {
+                for item in items {
                     self.p_delim(&mut first, ", ");
                     match item {
-                        ast::MappingPatternItem::Entry { key, pattern } => {
+                        MappingPatternItem::Entry { key, pattern } => {
                             self.unparse_expr(key, precedence::MAX);
                             self.p(": ");
                             self.unparse_pattern(pattern);
                         }
-                        ast::MappingPatternItem::Rest(rest) => {
+                        MappingPatternItem::Rest(rest) => {
                             self.p("**");
                             self.p_id(rest);
                         }
@@ -814,33 +778,28 @@ impl<'a> Generator<'a> {
                 }
                 self.p("}");
             }
-            Pattern::MatchClass(ast::PatternMatchClass {
+            ast::PatternFields::MatchClass(ast::PatternMatchClassFields {
                 cls,
                 arguments,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 self.unparse_expr(cls, precedence::MAX);
                 self.p("(");
                 let mut first = true;
-                for pattern_or_keyword in &arguments.items {
+                for argument in arguments.items() {
                     self.p_delim(&mut first, ", ");
-                    match pattern_or_keyword {
-                        PatternOrKeyword::Pattern(pattern) => self.unparse_pattern(pattern),
-                        PatternOrKeyword::Keyword(keyword) => {
-                            self.p_id(&keyword.attr);
+                    match argument {
+                        ast::PatternOrKeyword::Pattern(pattern) => self.unparse_pattern(pattern),
+                        ast::PatternOrKeyword::Keyword(keyword) => {
+                            self.p_id(keyword.attr());
                             self.p("=");
-                            self.unparse_pattern(&keyword.pattern);
+                            self.unparse_pattern(keyword.pattern());
                         }
                     }
                 }
                 self.p(")");
             }
-            Pattern::MatchStar(ast::PatternMatchStar {
-                name,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::PatternFields::MatchStar(ast::PatternMatchStarFields { name, node: _ }) => {
                 self.p("*");
                 if let Some(name) = name {
                     self.p_id(name);
@@ -848,11 +807,10 @@ impl<'a> Generator<'a> {
                     self.p("_");
                 }
             }
-            Pattern::MatchAs(ast::PatternMatchAs {
+            ast::PatternFields::MatchAs(ast::PatternMatchAsFields {
                 pattern,
                 name,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 if let Some(pattern) = pattern {
                     self.unparse_pattern(pattern);
@@ -864,11 +822,7 @@ impl<'a> Generator<'a> {
                     self.p("_");
                 }
             }
-            Pattern::MatchOr(ast::PatternMatchOr {
-                patterns,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::PatternFields::MatchOr(ast::PatternMatchOrFields { patterns, node: _ }) => {
                 let mut first = true;
                 for pattern in patterns {
                     self.p_delim(&mut first, " | ");
@@ -878,18 +832,18 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_match_case(&mut self, ast: &MatchCase) {
+    fn unparse_match_case(&mut self, ast: MatchCase<'_>) {
         self.p("case ");
-        self.unparse_pattern(&ast.pattern);
-        if let Some(guard) = &ast.guard {
+        self.unparse_pattern(ast.pattern());
+        if let Some(guard) = ast.guard() {
             self.p(" if ");
             self.unparse_expr(guard, precedence::MAX);
         }
         self.p(":");
-        self.body(&ast.body);
+        self.body(ast.body());
     }
 
-    fn unparse_type_params(&mut self, type_params: &TypeParams) {
+    fn unparse_type_params(&mut self, type_params: TypeParams<'_>) {
         self.p("[");
         let mut first = true;
         for type_param in type_params {
@@ -899,9 +853,9 @@ impl<'a> Generator<'a> {
         self.p("]");
     }
 
-    fn unparse_type_param(&mut self, ast: &TypeParam) {
-        match ast {
-            TypeParam::TypeVar(TypeParamTypeVar {
+    fn unparse_type_param(&mut self, ast: TypeParam<'_>) {
+        match ast.fields() {
+            ast::TypeParamFields::TypeVar(ast::TypeParamTypeVarFields {
                 name,
                 bound,
                 default,
@@ -917,7 +871,11 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(expr, precedence::MAX);
                 }
             }
-            TypeParam::TypeVarTuple(TypeParamTypeVarTuple { name, default, .. }) => {
+            ast::TypeParamFields::TypeVarTuple(ast::TypeParamTypeVarTupleFields {
+                name,
+                default,
+                ..
+            }) => {
                 self.p("*");
                 self.p_id(name);
                 if let Some(expr) = default {
@@ -925,7 +883,11 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(expr, precedence::MAX);
                 }
             }
-            TypeParam::ParamSpec(TypeParamParamSpec { name, default, .. }) => {
+            ast::TypeParamFields::ParamSpec(ast::TypeParamParamSpecFields {
+                name,
+                default,
+                ..
+            }) => {
                 self.p("**");
                 self.p_id(name);
                 if let Some(expr) = default {
@@ -936,7 +898,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_expr(&mut self, ast: &Expr, level: u8) {
+    fn unparse_expr(&mut self, ast: Expr<'_>, level: u8) {
         macro_rules! opprec {
             ($opty:ident, $x:expr, $enu:path, $($var:ident($op:literal, $prec:ident)),*$(,)?) => {
                 match $x {
@@ -959,12 +921,11 @@ impl<'a> Generator<'a> {
                 ret
             }};
         }
-        match ast {
-            Expr::BoolOp(ast::ExprBoolOp {
+        match ast.fields() {
+            ast::ExprFields::BoolOp(ast::ExprBoolOpFields {
                 op,
                 values,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 let (op, prec) = opprec!(bin, op, BoolOp, And("and", AND), Or("or", OR));
                 group_if!(prec, {
@@ -975,11 +936,10 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Expr::Named(ast::ExprNamed {
+            ast::ExprFields::Named(ast::ExprNamedFields {
                 target,
                 value,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 group_if!(precedence::NAMED_EXPR, {
                     self.unparse_expr(target, precedence::NAMED_EXPR);
@@ -987,12 +947,11 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(value, precedence::NAMED_EXPR + 1);
                 });
             }
-            Expr::BinOp(ast::ExprBinOp {
+            ast::ExprFields::BinOp(ast::ExprBinOpFields {
                 left,
                 op,
                 right,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 let rassoc = matches!(op, Operator::Pow);
                 let (op, prec) = opprec!(
@@ -1019,11 +978,10 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(right, prec + u8::from(!rassoc));
                 });
             }
-            Expr::UnaryOp(ast::ExprUnaryOp {
+            ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
                 op,
                 operand,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 let (op, prec) = opprec!(
                     un,
@@ -1039,11 +997,10 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(operand, prec);
                 });
             }
-            Expr::Lambda(ast::ExprLambda {
+            ast::ExprFields::Lambda(ast::ExprLambdaFields {
                 parameters,
                 body,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 group_if!(precedence::LAMBDA, {
                     self.p("lambda");
@@ -1055,12 +1012,11 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(body, precedence::LAMBDA);
                 });
             }
-            Expr::If(ast::ExprIf {
+            ast::ExprFields::If(ast::ExprIfFields {
                 test,
                 body,
                 orelse,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 group_if!(precedence::IF_EXP, {
                     self.unparse_expr(body, precedence::IF_EXP + 1);
@@ -1070,12 +1026,13 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(orelse, precedence::IF_EXP);
                 });
             }
-            Expr::Dict(dict) => {
+            ast::ExprFields::Dict(ast::ExprDictFields { items, .. }) => {
                 self.p("{");
                 let mut first = true;
-                for ast::DictItem { key, value } in dict {
+                for item in items {
+                    let value = item.value();
                     self.p_delim(&mut first, ", ");
-                    if let Some(key) = key {
+                    if let Some(key) = item.key() {
                         self.unparse_expr(key, precedence::COMMA);
                         self.p(": ");
                         self.unparse_expr(value, precedence::COMMA);
@@ -1086,47 +1043,44 @@ impl<'a> Generator<'a> {
                 }
                 self.p("}");
             }
-            Expr::Set(set) => {
-                if set.is_empty() {
+            ast::ExprFields::Set(ast::ExprSetFields { elts, .. }) => {
+                if elts.is_empty() {
                     self.p("set()");
                 } else {
                     self.p("{");
                     let mut first = true;
-                    for item in set {
+                    for item in elts {
                         self.p_delim(&mut first, ", ");
                         self.unparse_expr(item, precedence::COMMA);
                     }
                     self.p("}");
                 }
             }
-            Expr::ListComp(ast::ExprListComp {
+            ast::ExprFields::ListComp(ast::ExprListCompFields {
                 elt,
                 generators,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 self.p("[");
                 self.unparse_expr(elt, precedence::COMPREHENSION_ELEMENT);
                 self.unparse_comp(generators);
                 self.p("]");
             }
-            Expr::SetComp(ast::ExprSetComp {
+            ast::ExprFields::SetComp(ast::ExprSetCompFields {
                 elt,
                 generators,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 self.p("{");
                 self.unparse_expr(elt, precedence::COMPREHENSION_ELEMENT);
                 self.unparse_comp(generators);
                 self.p("}");
             }
-            Expr::DictComp(ast::ExprDictComp {
+            ast::ExprFields::DictComp(ast::ExprDictCompFields {
                 key,
                 value,
                 generators,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 self.p("{");
                 if let Some(key) = key {
@@ -1139,33 +1093,24 @@ impl<'a> Generator<'a> {
                 self.unparse_comp(generators);
                 self.p("}");
             }
-            Expr::Generator(ast::ExprGenerator {
+            ast::ExprFields::Generator(ast::ExprGeneratorFields {
                 elt,
                 generators,
                 parenthesized: _,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 self.p("(");
                 self.unparse_expr(elt, precedence::COMPREHENSION_ELEMENT);
                 self.unparse_comp(generators);
                 self.p(")");
             }
-            Expr::Await(ast::ExprAwait {
-                value,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::ExprFields::Await(ast::ExprAwaitFields { value, node: _ }) => {
                 group_if!(precedence::AWAIT, {
                     self.p("await ");
                     self.unparse_expr(value, precedence::MAX);
                 });
             }
-            Expr::Yield(ast::ExprYield {
-                value,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::ExprFields::Yield(ast::ExprYieldFields { value, node: _ }) => {
                 group_if!(precedence::YIELD, {
                     self.p("yield");
                     if let Some(value) = value {
@@ -1174,21 +1119,17 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Expr::YieldFrom(ast::ExprYieldFrom {
-                value,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::ExprFields::YieldFrom(ast::ExprYieldFromFields { value, node: _ }) => {
                 group_if!(precedence::YIELD_FROM, {
                     self.p("yield from ");
                     self.unparse_expr(value, precedence::MAX);
                 });
             }
-            Expr::Compare(compare) => {
+            ast::ExprFields::Compare(ast::ExprCompareFields { operands, ops, .. }) => {
                 group_if!(precedence::CMP, {
                     let new_lvl = precedence::CMP + 1;
-                    self.unparse_expr(compare.first_operand(), new_lvl);
-                    for (_, op, cmp) in compare.iter() {
+                    self.unparse_expr(operands.at(0), new_lvl);
+                    for (op, cmp) in ops.iter().zip(operands.slice(1..)) {
                         let op = match op {
                             CmpOp::Eq => " == ",
                             CmpOp::NotEq => " != ",
@@ -1206,22 +1147,19 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Expr::Call(ast::ExprCall {
+            ast::ExprFields::Call(ast::ExprCallFields {
                 func,
                 arguments,
-                range_start: _,
-                node_index: _,
+                node: _,
             }) => {
                 self.unparse_expr(func, precedence::MAX);
                 self.p("(");
-                if let Some(Expr::Generator(ast::ExprGenerator {
-                    elt,
-                    generators,
-                    range: _,
-                    node_index: _,
-                    parenthesized: _,
-                })) = arguments.as_single_positional()
+                if let Some(argument) = arguments.as_single_positional()
+                    && let Some(generator) = argument.as_generator_expr()
                 {
+                    let ast::ExprGeneratorFields {
+                        elt, generators, ..
+                    } = generator.fields();
                     // Ensure that a single generator doesn't get double-parenthesized.
                     self.unparse_expr(elt, precedence::COMMA);
                     self.unparse_comp(generators);
@@ -1236,13 +1174,13 @@ impl<'a> Generator<'a> {
                             }
                             ArgOrKeyword::Keyword(keyword) => {
                                 self.p_delim(&mut first, ", ");
-                                if let Some(arg) = &keyword.arg {
+                                if let Some(arg) = keyword.arg() {
                                     self.p_id(arg);
                                     self.p("=");
-                                    self.unparse_expr(&keyword.value, precedence::COMMA);
+                                    self.unparse_expr(keyword.value(), precedence::COMMA);
                                 } else {
                                     self.p("**");
-                                    self.unparse_expr(&keyword.value, precedence::MAX);
+                                    self.unparse_expr(keyword.value(), precedence::MAX);
                                 }
                             }
                         }
@@ -1250,40 +1188,40 @@ impl<'a> Generator<'a> {
                 }
                 self.p(")");
             }
-            Expr::FString(ast::ExprFString { value, .. }) => {
+            ast::ExprFields::FString(ast::ExprFStringFields { value, .. }) => {
                 self.unparse_f_string_value(value);
             }
-            Expr::TString(ast::ExprTString { value, .. }) => {
+            ast::ExprFields::TString(ast::ExprTStringFields { value, .. }) => {
                 self.unparse_t_string_value(value);
             }
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+            ast::ExprFields::StringLiteral(ast::ExprStringLiteralFields { value, .. }) => {
                 self.unparse_string_literal_value(value);
             }
-            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
+            ast::ExprFields::BytesLiteral(ast::ExprBytesLiteralFields { value, .. }) => {
                 let mut first = true;
                 for bytes_literal in value {
                     self.p_delim(&mut first, " ");
-                    self.p_bytes_repr(&bytes_literal.value, bytes_literal.flags);
+                    self.p_bytes_repr(bytes_literal.value(), bytes_literal.flags());
                 }
             }
             #[expect(clippy::eq_op)]
-            Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
+            ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields { value, .. }) => {
                 static INF_STR: &str = "1e309";
                 assert_eq!(f64::MAX_10_EXP, 308);
 
                 match value {
-                    ast::Number::Int(i) => {
+                    Number::Int(i) => {
                         self.p(&format!("{i}"));
                     }
-                    ast::Number::Float(fp) => {
+                    Number::Float(fp) => {
                         if fp.is_infinite() {
                             self.p(INF_STR);
                         } else {
-                            self.p(&ruff_python_literal::float::to_string(*fp));
+                            self.p(&ruff_python_literal::float::to_string(fp));
                         }
                     }
-                    ast::Number::Complex { real, imag } => {
-                        let value = if *real == 0.0 {
+                    Number::Complex { real, imag } => {
+                        let value = if real == 0.0 {
                             format!("{imag}j")
                         } else {
                             format!("({real}{imag:+}j)")
@@ -1296,20 +1234,20 @@ impl<'a> Generator<'a> {
                     }
                 }
             }
-            Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => {
-                self.p(if *value { "True" } else { "False" });
+            ast::ExprFields::BooleanLiteral(ast::ExprBooleanLiteralFields { value, .. }) => {
+                self.p(if value { "True" } else { "False" });
             }
-            Expr::NoneLiteral(_) => {
+            ast::ExprFields::NoneLiteral(_) => {
                 self.p("None");
             }
-            Expr::EllipsisLiteral(_) => {
+            ast::ExprFields::EllipsisLiteral(_) => {
                 self.p("...");
             }
-            Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
-                if let Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: ast::Number::Int(_),
+            ast::ExprFields::Attribute(ast::ExprAttributeFields { value, attr, .. }) => {
+                if let ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
+                    value: Number::Int(_),
                     ..
-                }) = value.as_ref()
+                }) = value.fields()
                 {
                     self.p("(");
                     self.unparse_expr(value, precedence::MAX);
@@ -1320,28 +1258,28 @@ impl<'a> Generator<'a> {
                 }
                 self.p_id(attr);
             }
-            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            ast::ExprFields::Subscript(ast::ExprSubscriptFields { value, slice, .. }) => {
                 self.unparse_expr(value, precedence::MAX);
                 self.p("[");
                 self.unparse_expr(slice, precedence::SUBSCRIPT);
                 self.p("]");
             }
-            Expr::Starred(ast::ExprStarred { value, .. }) => {
+            ast::ExprFields::Starred(ast::ExprStarredFields { value, .. }) => {
                 self.p("*");
                 self.unparse_expr(value, precedence::MAX);
             }
-            Expr::Name(ast::ExprName { id, .. }) => self.p(id.as_str()),
-            Expr::List(list) => {
+            ast::ExprFields::Name(ast::ExprNameFields { id, .. }) => self.p(id.as_str()),
+            ast::ExprFields::List(ast::ExprListFields { elts, .. }) => {
                 self.p("[");
                 let mut first = true;
-                for item in list {
+                for item in elts {
                     self.p_delim(&mut first, ", ");
                     self.unparse_expr(item, precedence::COMMA);
                 }
                 self.p("]");
             }
-            Expr::Tuple(tuple) => {
-                if tuple.is_empty() {
+            ast::ExprFields::Tuple(ast::ExprTupleFields { elts, .. }) => {
+                if elts.is_empty() {
                     self.p("()");
                 } else {
                     let lvl = match self.mode {
@@ -1350,20 +1288,19 @@ impl<'a> Generator<'a> {
                     };
                     group_if!(lvl, {
                         let mut first = true;
-                        for item in tuple {
+                        for item in elts {
                             self.p_delim(&mut first, ", ");
                             self.unparse_expr(item, precedence::COMMA);
                         }
-                        self.p_if(tuple.len() == 1, ",");
+                        self.p_if(elts.len() == 1, ",");
                     });
                 }
             }
-            Expr::Slice(ast::ExprSlice {
+            ast::ExprFields::Slice(ast::ExprSliceFields {
                 lower,
                 upper,
                 step,
-                range: _,
-                node_index: _,
+                node: _,
             }) => {
                 if let Some(lower) = lower {
                     self.unparse_expr(lower, precedence::SLICE);
@@ -1377,7 +1314,11 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(step, precedence::SLICE);
                 }
             }
-            Expr::IpyEscapeCommand(ast::ExprIpyEscapeCommand { kind, value, .. }) => {
+            ast::ExprFields::IpyEscapeCommand(ast::ExprIpyEscapeCommandFields {
+                kind,
+                value,
+                ..
+            }) => {
                 self.p(&format!("{kind}{value}"));
             }
         }
@@ -1391,14 +1332,14 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_parameters(&mut self, parameters: &Parameters) {
+    fn unparse_parameters(&mut self, parameters: Parameters<'_>) {
         let mut first = true;
         let slash_after = parameters
             .roles()
             .rposition(|role| role == ast::ParameterRole::PositionalOnly);
         let mut seen_star = false;
 
-        for (index, item) in parameters.items.iter().enumerate() {
+        for (index, item) in parameters.items().iter().enumerate() {
             self.p_delim(&mut first, ", ");
             match item {
                 ast::ParameterItem::PositionalOnly(p) => {
@@ -1430,45 +1371,45 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_parameter(&mut self, parameter: &Parameter) {
-        self.p_id(&parameter.name);
-        if let Some(ann) = &parameter.annotation {
+    fn unparse_parameter(&mut self, parameter: Parameter<'_>) {
+        self.p_id(parameter.name());
+        if let Some(ann) = parameter.annotation() {
             self.p(": ");
             self.unparse_expr(ann, precedence::COMMA);
         }
     }
 
-    fn unparse_parameter_with_default(&mut self, parameter_with_default: &ParameterWithDefault) {
-        self.unparse_parameter(&parameter_with_default.parameter);
-        if let Some(default) = &parameter_with_default.default {
+    fn unparse_parameter_with_default(&mut self, parameter_with_default: ParameterWithDefault<'_>) {
+        self.unparse_parameter(parameter_with_default.parameter());
+        if let Some(default) = parameter_with_default.default() {
             self.p("=");
             self.unparse_expr(default, precedence::COMMA);
         }
     }
 
-    fn unparse_comp(&mut self, generators: &[Comprehension]) {
+    fn unparse_comp(&mut self, generators: NodeList<'_, ruff_python_ast::kind::Comprehension>) {
         for comp in generators {
-            self.p(if comp.is_async {
+            self.p(if comp.is_async() {
                 " async for "
             } else {
                 " for "
             });
-            self.unparse_expr(&comp.target, precedence::COMPREHENSION_TARGET);
+            self.unparse_expr(comp.target(), precedence::COMPREHENSION_TARGET);
             self.p(" in ");
-            self.unparse_expr(&comp.iter, precedence::COMPREHENSION);
-            for cond in &comp.ifs {
+            self.unparse_expr(comp.iter(), precedence::COMPREHENSION);
+            for cond in comp.ifs() {
                 self.p(" if ");
                 self.unparse_expr(cond, precedence::COMPREHENSION);
             }
         }
     }
 
-    fn unparse_string_literal(&mut self, string_literal: &ast::StringLiteral) {
-        let ast::StringLiteral { value, flags, .. } = string_literal;
-        self.p_str_repr(value, *flags);
+    fn unparse_string_literal(&mut self, string_literal: StringLiteral<'_>) {
+        let ast::StringLiteralFields { value, flags, .. } = string_literal.fields();
+        self.p_str_repr(value, flags);
     }
 
-    fn unparse_string_literal_value(&mut self, value: &ast::StringLiteralValue) {
+    fn unparse_string_literal_value(&mut self, value: StringValue<'_>) {
         let mut first = true;
         for string_literal in value {
             self.p_delim(&mut first, " ");
@@ -1476,16 +1417,16 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_f_string_value(&mut self, value: &ast::FStringValue) {
+    fn unparse_f_string_value(&mut self, value: FStringValue<'_>) {
         let mut first = true;
         for f_string_part in value {
             self.p_delim(&mut first, " ");
             match f_string_part {
-                ast::FStringPartRef::Literal(string_literal) => {
+                FStringPartView::Literal(string_literal) => {
                     self.unparse_string_literal(string_literal);
                 }
-                ast::FStringPartRef::FString(f_string) => {
-                    self.unparse_interpolated_string(&f_string.elements, f_string.flags.into());
+                FStringPartView::FString(f_string) => {
+                    self.unparse_interpolated_string(f_string.elements(), f_string.flags().into());
                 }
             }
         }
@@ -1493,7 +1434,7 @@ impl<'a> Generator<'a> {
 
     fn unparse_interpolated_string_body(
         &mut self,
-        values: &[ast::InterpolatedStringElement],
+        values: NodeList<'_, ruff_python_ast::kind::InterpolatedStringElement>,
         flags: AnyStringFlags,
     ) {
         for value in values {
@@ -1503,10 +1444,10 @@ impl<'a> Generator<'a> {
 
     fn unparse_interpolated_element(
         &mut self,
-        val: &Expr,
-        debug_text: Option<&DebugText>,
+        val: Expr<'_>,
+        debug_text: Option<DebugText<'_>>,
         conversion: ConversionFlag,
-        spec: Option<&ast::InterpolatedStringFormatSpec>,
+        spec: Option<InterpolatedStringFormatSpec<'_>>,
         flags: AnyStringFlags,
     ) {
         let mut generator = Generator::new(self.indent, self.line_ending);
@@ -1537,7 +1478,7 @@ impl<'a> Generator<'a> {
 
         if let Some(spec) = spec {
             self.p(":");
-            self.unparse_f_string_specifier(&spec.elements, flags);
+            self.unparse_f_string_specifier(spec.elements(), flags);
         }
 
         self.p("}");
@@ -1545,28 +1486,28 @@ impl<'a> Generator<'a> {
 
     fn unparse_interpolated_string_element(
         &mut self,
-        element: &ast::InterpolatedStringElement,
+        element: InterpolatedStringElement<'_>,
         flags: AnyStringFlags,
     ) {
-        match element {
-            ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
-                value,
-                ..
-            }) => {
+        match element.fields() {
+            ast::InterpolatedStringElementFields::Literal(
+                ast::InterpolatedStringLiteralElementFields { value, .. },
+            ) => {
                 self.unparse_interpolated_string_literal_element(value, flags);
             }
-            ast::InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
+            ast::InterpolatedStringElementFields::Interpolation(
+                ast::InterpolatedElementFields {
+                    expression,
+                    debug_text,
+                    conversion,
+                    format_spec,
+                    node: _,
+                },
+            ) => self.unparse_interpolated_element(
                 expression,
                 debug_text,
                 conversion,
                 format_spec,
-                range: _,
-                node_index: _,
-            }) => self.unparse_interpolated_element(
-                expression,
-                debug_text.as_ref(),
-                *conversion,
-                format_spec.as_deref(),
                 flags,
             ),
         }
@@ -1591,7 +1532,7 @@ impl<'a> Generator<'a> {
 
     fn unparse_f_string_specifier(
         &mut self,
-        values: &[ast::InterpolatedStringElement],
+        values: NodeList<'_, ruff_python_ast::kind::InterpolatedStringElement>,
         flags: AnyStringFlags,
     ) {
         self.unparse_interpolated_string_body(values, flags);
@@ -1601,7 +1542,7 @@ impl<'a> Generator<'a> {
     /// surrounding quote style.
     fn unparse_interpolated_string(
         &mut self,
-        values: &[ast::InterpolatedStringElement],
+        values: NodeList<'_, ruff_python_ast::kind::InterpolatedStringElement>,
         flags: AnyStringFlags,
     ) {
         self.p(flags.prefix().as_str());
@@ -1613,25 +1554,25 @@ impl<'a> Generator<'a> {
         self.p(flags.quote_str());
     }
 
-    fn unparse_t_string_value(&mut self, value: &ast::TStringValue) {
+    fn unparse_t_string_value(&mut self, value: TStringValue<'_>) {
         let mut first = true;
         for t_string in value {
             self.p_delim(&mut first, " ");
-            self.unparse_interpolated_string(&t_string.elements, t_string.flags.into());
+            self.unparse_interpolated_string(t_string.elements(), t_string.flags().into());
         }
     }
 
-    fn unparse_alias(&mut self, alias: &Alias) {
-        self.p_id(&alias.name);
-        if let Some(asname) = &alias.asname {
+    fn unparse_alias(&mut self, alias: Alias<'_>) {
+        self.p_id(alias.name());
+        if let Some(asname) = alias.asname() {
             self.p(" as ");
             self.p_id(asname);
         }
     }
 
-    fn unparse_with_item(&mut self, with_item: &WithItem) {
-        self.unparse_expr(&with_item.context_expr, precedence::MAX);
-        if let Some(optional_vars) = &with_item.optional_vars {
+    fn unparse_with_item(&mut self, with_item: WithItem<'_>) {
+        self.unparse_expr(with_item.context_expr(), precedence::MAX);
+        if let Some(optional_vars) = with_item.optional_vars() {
             self.p(" as ");
             self.unparse_expr(optional_vars, precedence::MAX);
         }
@@ -1640,7 +1581,7 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::{Mod, ModModule};
+
     use ruff_python_parser::{self, Mode, ParseOptions, parse_module};
     use ruff_source_file::LineEnding;
 
@@ -1690,15 +1631,12 @@ mod tests {
         let line_ending = LineEnding::default();
         let parsed =
             ruff_python_parser::parse(contents, ParseOptions::from(Mode::Ipython)).unwrap();
-        let Mod::Module(ModModule { body, .. }) = parsed.into_syntax() else {
-            panic!("Source code didn't return ModModule")
-        };
-        let [stmt] = body.as_slice() else {
-            panic!("Expected only one statement in source code")
-        };
-        let mut generator = Generator::new(&indentation, line_ending);
-        generator.unparse_stmt(stmt);
-        generator.generate()
+        let module = parsed.syntax().as_module().expect("expected module");
+        let [stmt] = module
+            .body()
+            .as_array()
+            .expect("expected a single statement");
+        Generator::new(&indentation, line_ending).stmt(stmt)
     }
 
     macro_rules! assert_round_trip {

@@ -7,7 +7,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
-use ruff_python_ast::PythonVersion;
+use ruff_python_ast::{AnyParameter, PythonVersion};
 
 /// ## What it does
 /// Checks for uses of `typing.NoReturn` (and `typing_extensions.NoReturn`) for
@@ -56,7 +56,7 @@ impl Violation for ParameterAnnotatedWithNoReturn {
 }
 
 /// PYI050
-pub(crate) fn no_return_argument_annotation(checker: &Checker, parameters: &ast::Parameters) {
+pub(crate) fn no_return_argument_annotation(checker: &Checker, parameters: ast::Parameters<'_>) {
     // Ex) def func(arg: NoReturn): ...
     // Ex) def func(arg: NoReturn, /): ...
     // Ex) def func(*, arg: NoReturn): ...
@@ -64,7 +64,7 @@ pub(crate) fn no_return_argument_annotation(checker: &Checker, parameters: &ast:
     // Ex) def func(**kwargs: NoReturn): ...
     for annotation in parameters
         .iter_source_order()
-        .filter_map(ast::AnyParameterRef::annotation)
+        .filter_map(AnyParameter::annotation)
     {
         if is_no_return(annotation, checker) {
             checker.report_diagnostic(
@@ -81,7 +81,7 @@ pub(crate) fn no_return_argument_annotation(checker: &Checker, parameters: &ast:
     }
 }
 
-fn is_no_return(expr: &ast::Expr, checker: &Checker) -> bool {
+fn is_no_return(expr: ast::Expr<'_>, checker: &Checker) -> bool {
     checker.match_maybe_stringized_annotation(expr, |expr| {
         checker.semantic().match_typing_expr(expr, "NoReturn")
     })

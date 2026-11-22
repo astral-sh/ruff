@@ -1,10 +1,11 @@
-use ruff_python_ast as ast;
-use ruff_python_ast::ExceptHandler;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{Arguments, Expr, Stmt, visitor};
+use ruff_python_ast::{
+    Arguments, ExceptHandlerKind, Expr, ExprKind, Stmt, StmtKind, Suite, visitor,
+};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
+use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
 use crate::settings::LinterSettings;
@@ -16,10 +17,11 @@ pub(crate) fn is_underscore_prefixed_public_member(qualified_name: &QualifiedNam
 }
 
 /// Returns the value of the `name` parameter to, e.g., a `TypeVar` constructor.
-pub(super) fn type_param_name(arguments: &Arguments) -> Option<&str> {
+pub(super) fn type_param_name(arguments: Arguments<'_>) -> Option<&str> {
     // Handle both `TypeVar("T")` and `TypeVar(name="T")`.
     let name_param = arguments.find_argument_value("name", 0)?;
-    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &name_param {
+    if let Some(string_literal) = name_param.as_string_literal_expr() {
+        let value = string_literal.value();
         Some(value.to_str())
     } else {
         None
@@ -32,15 +34,12 @@ pub(super) fn in_dunder_method(
     settings: &LinterSettings,
 ) -> bool {
     let scope = semantic.current_scope();
-    let ScopeKind::Function(ast::StmtFunctionDef {
-        name,
-        decorator_list,
-        ..
-    }) = scope.kind
-    else {
+    let ScopeKind::Function(stmt_function_def) = scope.kind else {
         return false;
     };
-    if name != dunder_name {
+    let name = stmt_function_def.name();
+    let decorator_list = stmt_function_def.decorator_list();
+    if *name != *dunder_name {
         return false;
     }
     let Some(parent) = semantic.first_non_type_parent_scope(scope) else {
@@ -49,7 +48,7 @@ pub(super) fn in_dunder_method(
 
     matches!(
         function_type::classify(
-            name,
+            &name,
             decorator_list,
             parent,
             semantic,
@@ -95,85 +94,94 @@ impl<'a> SequenceIndexVisitor<'a> {
 }
 
 impl SequenceIndexVisitor<'_> {
-    fn is_assignment(&self, expr: &Expr) -> bool {
+    fn is_assignment(&self, expr: Expr<'_>) -> bool {
         // If we see the sequence, a subscript, or the index being modified, we'll stop emitting
         // diagnostics.
-        match expr {
-            Expr::Name(ast::ExprName { id, .. }) => {
+        match expr.classify() {
+            ExprKind::Name(expr_name) => {
+                let id = expr_name.id();
+
                 id == self.sequence_name || id == self.index_name || id == self.value_name
             }
-            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+            ExprKind::Subscript(expr_subscript) => {
+                let value = expr_subscript.value();
+                let slice = expr_subscript.slice();
+
+                let Some(name_node) = value.as_name_expr() else {
                     return false;
                 };
+                let id = name_node.id();
                 if id == self.sequence_name {
-                    let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() else {
+                    let Some(name_node) = slice.as_name_expr() else {
                         return false;
                     };
+                    let id = name_node.id();
                     if id == self.index_name {
                         return true;
                     }
                 }
                 false
             }
-            Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
-                elts.iter().any(|elt| self.is_assignment(elt))
-            }
+            ExprKind::Tuple(tuple) => tuple.elts().iter().any(|elt| self.is_assignment(elt)),
+            ExprKind::List(list) => list.elts().iter().any(|elt| self.is_assignment(elt)),
             _ => false,
         }
     }
 }
 
 impl Visitor<'_> for SequenceIndexVisitor<'_> {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+    fn visit_stmt(&mut self, stmt: Stmt<'_>) {
         if self.modified {
             return;
         }
-        match stmt {
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+        match stmt.classify() {
+            StmtKind::Assign(stmt_assign) => {
+                let targets = stmt_assign.targets();
+                let value = stmt_assign.value();
+
                 self.modified = targets.iter().any(|target| self.is_assignment(target));
                 self.visit_expr(value);
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
+            StmtKind::AnnAssign(stmt_ann_assign) => {
+                let target = stmt_ann_assign.target();
+                let value = stmt_ann_assign.value();
+
                 if let Some(value) = value {
                     self.modified = self.is_assignment(target);
                     self.visit_expr(value);
                 }
             }
-            Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
+            StmtKind::AugAssign(stmt_aug_assign) => {
+                let target = stmt_aug_assign.target();
+                let value = stmt_aug_assign.value();
+
                 self.modified = self.is_assignment(target);
                 self.visit_expr(value);
             }
-            Stmt::Delete(ast::StmtDelete { targets, .. }) => {
+            StmtKind::Delete(stmt_delete) => {
+                let targets = stmt_delete.targets();
+
                 self.modified = targets.iter().any(|target| self.is_assignment(target));
             }
-            _ => visitor::walk_stmt(self, stmt),
+            kind => visitor::walk_stmt(self, kind),
         }
     }
 
-    fn visit_expr(&mut self, expr: &Expr) {
+    fn visit_expr(&mut self, expr: Expr<'_>) {
         if self.modified {
             return;
         }
-        if let Expr::Subscript(ast::ExprSubscript {
-            value,
-            slice,
-            range,
-            ..
-        }) = expr
+        let kind = expr.classify();
+        if let ExprKind::Subscript(subscript) = kind
+            && let Some(sequence) = subscript.value().as_name_expr()
+            && sequence.id() == self.sequence_name
+            && let Some(index) = subscript.slice().as_name_expr()
+            && index.id() == self.index_name
         {
-            if let Expr::Name(ast::ExprName { id, .. }) = &**value {
-                if id == self.sequence_name {
-                    if let Expr::Name(ast::ExprName { id, .. }) = &**slice {
-                        if id == self.index_name {
-                            self.accesses.push(*range);
-                        }
-                    }
-                }
-            }
+            self.accesses.push(subscript.range());
         }
 
-        visitor::walk_expr(self, expr);
+        visitor::walk_expr(self, kind);
     }
 }
 
@@ -332,71 +340,59 @@ pub(super) fn is_known_dunder_method(method: &str) -> bool {
     }
 }
 
-pub(super) fn num_statements(stmts: &[Stmt]) -> usize {
+pub(super) fn num_statements(stmts: Suite<'_>) -> usize {
     let mut count = 0;
     for stmt in stmts {
-        match stmt {
-            Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
+        match stmt.classify() {
+            StmtKind::If(stmt_if) => {
                 count += 1;
-                count += num_statements(body);
-                for clause in elif_else_clauses {
+                count += num_statements(stmt_if.body());
+                for clause in stmt_if.elif_else_clauses() {
                     count += 1;
-                    count += num_statements(&clause.body);
+                    count += num_statements(clause.body());
                 }
             }
-            Stmt::For(ast::StmtFor { body, orelse, .. }) => {
-                count += num_statements(body);
-                count += num_statements(orelse);
+            StmtKind::For(stmt_for) => {
+                count += num_statements(stmt_for.body());
+                count += num_statements(stmt_for.orelse());
             }
-            Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+            StmtKind::While(stmt_while) => {
                 count += 1;
-                count += num_statements(body);
-                count += num_statements(orelse);
+                count += num_statements(stmt_while.body());
+                count += num_statements(stmt_while.orelse());
             }
-            Stmt::Match(ast::StmtMatch { cases, .. }) => {
+            StmtKind::Match(stmt_match) => {
                 count += 1;
-                for case in cases {
+                for case in stmt_match.cases() {
                     count += 1;
-                    count += num_statements(&case.body);
+                    count += num_statements(case.body());
                 }
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
+            StmtKind::Try(stmt_try) => {
                 count += 1;
-                count += num_statements(body);
+                count += num_statements(stmt_try.body());
+                let orelse = stmt_try.orelse();
                 if !orelse.is_empty() {
                     count += 1 + num_statements(orelse);
                 }
+                let finalbody = stmt_try.finalbody();
                 if !finalbody.is_empty() {
                     // Unclear why, but follow Pylint's convention.
                     count += 2 + num_statements(finalbody);
                 }
+                let handlers = stmt_try.handlers();
                 if handlers.len() > 1 {
                     count += 1;
                 }
                 for handler in handlers {
                     count += 1;
-                    let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                        body, ..
-                    }) = handler;
-                    count += num_statements(body);
+                    let ExceptHandlerKind::ExceptHandler(handler) = handler.classify();
+                    count += num_statements(handler.body());
                 }
             }
-            Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
-            | Stmt::With(ast::StmtWith { body, .. }) => {
-                count += 1;
-                count += num_statements(body);
-            }
-            Stmt::Return(_) => {}
+            StmtKind::FunctionDef(function) => count += 1 + num_statements(function.body()),
+            StmtKind::With(with) => count += 1 + num_statements(with.body()),
+            StmtKind::Return(_) => {}
             _ => {
                 count += 1;
             }
@@ -409,14 +405,9 @@ pub(super) fn num_statements(stmts: &[Stmt]) -> usize {
 mod tests {
     use anyhow::Result;
 
-    use ruff_python_ast::Suite;
     use ruff_python_parser::parse_module;
 
     use super::num_statements;
-
-    fn parse_suite(source: &str) -> Result<Suite> {
-        Ok(parse_module(source)?.into_suite())
-    }
 
     #[test]
     fn pass() -> Result<()> {
@@ -424,8 +415,8 @@ mod tests {
 def f():
     pass
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 2);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 2);
         Ok(())
     }
 
@@ -438,8 +429,8 @@ def f():
     else:
         print()
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 5);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 5);
         Ok(())
     }
 
@@ -453,8 +444,8 @@ def f():
         if a:
             print()
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 6);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 6);
         Ok(())
     }
 
@@ -467,8 +458,8 @@ def f():
     elif a:
         print()
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 5);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 5);
         Ok(())
     }
 
@@ -485,8 +476,8 @@ def f():
     else:
         print()
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 9);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 9);
         Ok(())
     }
 
@@ -500,8 +491,8 @@ def f():
         case _:
             pass
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 6);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 6);
         Ok(())
     }
 
@@ -529,8 +520,8 @@ async def f():
             import time
             pass
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 19);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 19);
         Ok(())
     }
 
@@ -541,8 +532,8 @@ def f():
     for i in range(10):
         pass
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 2);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 2);
         Ok(())
     }
 
@@ -555,8 +546,8 @@ def f():
     else:
         print()
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 3);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 3);
         Ok(())
     }
 
@@ -570,8 +561,8 @@ def f():
 
     print()
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 5);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 5);
         Ok(())
     }
 
@@ -588,8 +579,8 @@ def f():
 
     print()
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 3);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 3);
         Ok(())
     }
 
@@ -599,8 +590,8 @@ def f():
 def f():
     return
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 1);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 1);
         Ok(())
     }
 
@@ -615,8 +606,8 @@ def f():
             print()
 
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 6);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 6);
         Ok(())
     }
 
@@ -629,8 +620,8 @@ def f():
     except Exception:
         raise
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 5);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 5);
         Ok(())
     }
 
@@ -645,8 +636,8 @@ def f():
     else:
         print()
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 7);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 7);
         Ok(())
     }
 
@@ -663,8 +654,8 @@ def f():
     finally:
         pass
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 10);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 10);
         Ok(())
     }
 
@@ -679,8 +670,8 @@ def f():
     except Exception:
         raise
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 8);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 8);
         Ok(())
     }
 
@@ -697,8 +688,8 @@ def f():
     finally:
         print()
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 11);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 11);
         Ok(())
     }
 
@@ -709,8 +700,8 @@ def f():
     for i in range(10):
         yield i
 ";
-        let stmts = parse_suite(source)?;
-        assert_eq!(num_statements(&stmts), 2);
+        let parsed = parse_module(source)?;
+        assert_eq!(num_statements(parsed.suite()), 2);
         Ok(())
     }
 }

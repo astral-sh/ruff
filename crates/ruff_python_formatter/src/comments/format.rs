@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use ruff_formatter::{FormatError, FormatOptions, SourceCode, format_args, write};
-use ruff_python_ast::{AnyNodeRef, NodeKind, PySourceType};
+use ruff_python_ast::{NodeKind, PySourceType, SyntaxNode};
 use ruff_python_trivia::{
     CommentLinePosition, find_trailing_pragma_offset, lines_after, lines_after_ignoring_trivia,
     lines_before,
@@ -16,7 +16,7 @@ use crate::statement::suite::should_insert_blank_line_after_class_in_stub_file;
 /// Formats the leading comments of a node.
 pub(crate) fn leading_node_comments<'a, T>(node: T) -> FormatLeadingComments<'a>
 where
-    T: Into<AnyNodeRef<'a>>,
+    T: Into<SyntaxNode<'a>>,
 {
     FormatLeadingComments::Node(node.into())
 }
@@ -28,7 +28,7 @@ pub(crate) const fn leading_comments(comments: &[SourceComment]) -> FormatLeadin
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum FormatLeadingComments<'a> {
-    Node(AnyNodeRef<'a>),
+    Node(SyntaxNode<'a>),
     Comments(&'a [SourceComment]),
 }
 
@@ -71,7 +71,7 @@ pub(crate) fn leading_alternate_branch_comments<'a, T>(
     last_node: Option<T>,
 ) -> FormatLeadingAlternateBranchComments<'a>
 where
-    T: Into<AnyNodeRef<'a>>,
+    T: Into<SyntaxNode<'a>>,
 {
     FormatLeadingAlternateBranchComments {
         comments,
@@ -81,7 +81,7 @@ where
 
 pub(crate) struct FormatLeadingAlternateBranchComments<'a> {
     comments: &'a [SourceComment],
-    last_node: Option<AnyNodeRef<'a>>,
+    last_node: Option<SyntaxNode<'a>>,
 }
 
 impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
@@ -195,7 +195,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingComments<'_> {
 /// Formats the dangling comments of `node`.
 pub(crate) fn dangling_node_comments<'a, T>(node: T) -> FormatDanglingComments<'a>
 where
-    T: Into<AnyNodeRef<'a>>,
+    T: Into<SyntaxNode<'a>>,
 {
     FormatDanglingComments::Node(node.into())
 }
@@ -205,7 +205,7 @@ pub(crate) fn dangling_comments(comments: &[SourceComment]) -> FormatDanglingCom
 }
 
 pub(crate) enum FormatDanglingComments<'a> {
-    Node(AnyNodeRef<'a>),
+    Node(SyntaxNode<'a>),
     Comments(&'a [SourceComment]),
 }
 

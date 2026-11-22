@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::StmtWith;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -60,15 +60,15 @@ impl Violation for UselessWithLock {
 }
 
 /// PLW2101
-pub(crate) fn useless_with_lock(checker: &Checker, with: &ast::StmtWith) {
-    for item in &with.items {
-        let Some(call) = item.context_expr.as_call_expr() else {
+pub(crate) fn useless_with_lock(checker: &Checker, with: StmtWith<'_>) {
+    for item in with.items() {
+        let Some(call) = item.context_expr().as_call_expr() else {
             continue;
         };
 
         if !checker
             .semantic()
-            .resolve_qualified_name(call.func.as_ref())
+            .resolve_qualified_name(call.func())
             .is_some_and(|qualified_name| {
                 matches!(
                     qualified_name.segments(),

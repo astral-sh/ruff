@@ -3,13 +3,14 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 use ruff_python_ast as ast;
+use ruff_python_ast::AstNode;
 use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 
 use ruff_index::{FrozenIndexVec, IndexSlice};
-use ruff_python_ast::{HasNodeIndex, NodeIndex};
+use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -366,16 +367,22 @@ pub struct NarrowingAliasPredicate<'db> {
 }
 
 impl<'db> SemanticIndex<'db> {
+    /// Returns the use recorded for this node in its enclosing scope.
+    /// Use [`Self::try_expression_use_id`] for an expression that might not load a tracked place.
+    #[track_caller]
+    pub fn scoped_use_id(&self, node: impl Into<ExpressionNodeKey>) -> ast_ids::ScopedUseId {
+        self.ast_ids
+            .try_use_id(node)
+            .expect("node must have a recorded use")
+    }
+
     /// Returns the recorded use of an expression, if it loads a tracked place.
-    pub fn try_expression_use_id(
-        &self,
-        expression: ast::ExprRef<'_>,
-    ) -> Option<ast_ids::ScopedUseId> {
+    pub fn try_expression_use_id(&self, expression: ast::Expr<'_>) -> Option<ast_ids::ScopedUseId> {
         self.ast_ids.try_use_id(expression)
     }
 
     /// Returns the [`PlaceUse`](ast_ids::PlaceUse) for an expression that reads an indexed place.
-    pub fn expression_place_use(&self, expr: ast::ExprRef<'_>) -> Option<ast_ids::PlaceUse> {
+    pub fn expression_place_use(&self, expr: ast::Expr<'_>) -> Option<ast_ids::PlaceUse> {
         self.ast_ids.place_use(expr)
     }
 
@@ -419,11 +426,6 @@ impl<'db> SemanticIndex<'db> {
         self.imported_modules.iter()
     }
 
-    #[track_caller]
-    fn ast_ids(&self) -> &AstIds {
-        &self.ast_ids
-    }
-
     /// Returns the ID of the `expression`'s enclosing scope.
     #[track_caller]
     pub fn expression_scope_id<E>(&self, expression: &E) -> FileScopeId
@@ -465,12 +467,11 @@ impl<'db> SemanticIndex<'db> {
             .annotations
             .partition_point(|index| module.get_by_index(*index).start() <= expression.start())
             .checked_sub(1)?;
-        let ast::AnyRootNodeRef::Expr(annotation) = module.get_by_index(self.annotations[index])
-        else {
-            return None;
-        };
+        let annotation = module
+            .get_by_index(self.annotations[index])
+            .cast::<ast::Expr>()?;
         if annotation.range().contains_range(expression.range()) {
-            self.try_expression_scope_id(annotation)
+            self.try_expression_scope_id(&annotation)
         } else {
             None
         }
@@ -595,7 +596,7 @@ impl<'db> SemanticIndex<'db> {
     /// its definition.
     pub fn unannotated_collection_initializer(
         &self,
-        collection_use: &ast::Expr,
+        collection_use: ast::Expr<'_>,
     ) -> Option<Definition<'db>> {
         self.collections_by_use.get(&collection_use.into()).copied()
     }
@@ -640,11 +641,11 @@ impl<'db> SemanticIndex<'db> {
     ///
     /// See `SemanticIndexBuilder::visit_boolean_test` for details on how we compute
     /// and store the required data for answering this query during semantic indexing.
-    pub fn is_boolean_test_root(&self, expression: &ast::Expr) -> bool {
-        self.try_expression_scope_id(expression)
+    pub fn is_boolean_test_root(&self, expression: ast::Expr<'_>) -> bool {
+        self.try_expression_scope_id(&expression)
             .is_some_and(|scope| {
                 self.use_def_map(scope)
-                    .is_boolean_test_root(expression.node_index().load())
+                    .is_boolean_test_root(expression.node_index())
             })
     }
 
@@ -696,7 +697,7 @@ impl<'db> SemanticIndex<'db> {
     /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_node`, if any.
     pub fn try_definitions(
         &self,
-        definition_node: ast::AnyNodeRef<'_>,
+        definition_node: ruff_python_ast::SyntaxNode<'_>,
     ) -> Option<&[Definition<'db>]> {
         let definition_key = DefinitionNodeKey::from_node_ref(definition_node);
         self.definitions_by_node.get(definition_key)
@@ -1159,22 +1160,20 @@ pub type PossiblyNarrowedPlaces = FxHashSet<ScopedPlaceId>;
 /// Implemented by types for which the semantic index tracks their scope.
 pub trait HasTrackedScope: ast::HasNodeIndex {}
 
-impl HasTrackedScope for ast::Expr {}
-impl HasTrackedScope for ast::ExprRef<'_> {}
-impl HasTrackedScope for &ast::ExprRef<'_> {}
+impl HasTrackedScope for ast::Expr<'_> {}
 
 // An identifier between expressions in the same scope inherits that scope.
-impl HasTrackedScope for ast::Identifier {}
+impl HasTrackedScope for ast::Identifier<'_> {}
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_ast::{ExprKind, StmtKind};
     use std::{assert_matches, cell::Cell};
 
     use ruff_db::{
         files::{File, system_path_to_file},
         parsed::ParsedModuleRef,
     };
-    use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
     use test_case::test_case;
 
@@ -1182,7 +1181,7 @@ mod tests {
     use super::*;
 
     use crate::{
-        ast_ids::{HasScopedUseId, ScopedUseId},
+        ast_ids::ScopedUseId,
         db::tests::{TestDb, TestDbBuilder},
         definition::{
             DefinitionKind, DefinitionState, LambdaParameterDefinitionNodeKind,
@@ -1600,7 +1599,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let index = semantic_index(&db, file);
         let module = parsed_module(&db, file.python_file(&db)).load(&db);
         for stmt in module.suite() {
-            let ast::Stmt::FunctionDef(function) = stmt else {
+            let Some(function) = stmt.as_function_def_stmt() else {
                 panic!("expected a function");
             };
             let scope = index.node_scope(NodeWithScopeRef::Function(function));
@@ -1625,9 +1624,9 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                 }
             }
             assert_eq!(use_def, &reference.finish());
-            for parameter in function.parameters.iter() {
+            for parameter in function.parameters().iter() {
                 let definition = index.expect_single_definition(parameter);
-                let symbol = table.symbol_id(parameter.name()).unwrap();
+                let symbol = table.symbol_id(parameter.name().as_str()).unwrap();
                 assert_eq!(use_def.first_public_binding(symbol), Some(definition));
                 assert_eq!(
                     use_def.first_public_declaration(symbol),
@@ -1774,16 +1773,18 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let module = parsed_module(&db, program_file(&db, file).python_file(&db)).load(&db);
         let syntax = module.syntax();
-        let element = syntax.body[0]
+        let element = syntax
+            .body()
+            .at(0)
             .as_expr_stmt()
             .unwrap()
-            .value
+            .value()
             .as_list_comp_expr()
             .unwrap()
-            .elt
+            .elt()
             .as_name_expr()
             .unwrap();
-        let element_use_id = element.scoped_use_id(&db, program_file(&db, file));
+        let element_use_id = index.scoped_use_id(element);
 
         let binding = use_def.first_binding_at_use(element_use_id).unwrap();
         let DefinitionKind::Comprehension(comprehension) = binding.kind(&db) else {
@@ -2059,29 +2060,23 @@ class C[T]:
         let module = parsed_module(&db, program_file(&db, file).python_file(&db)).load(&db);
         let scope = global_scope(&db, program_file(&db, file));
         let ast = module.syntax();
-        let ast::Stmt::Expr(ast::StmtExpr {
-            value: x_use_expr, ..
-        }) = &ast.body[1]
-        else {
+        let StmtKind::Expr(expr_node) = ast.body().at(1).classify() else {
             panic!("should be an expr")
         };
-        let ast::Expr::Name(x_use_expr_name) = x_use_expr.as_ref() else {
+        let x_use_expr = expr_node.value();
+        let ExprKind::Name(x_use_expr_name) = x_use_expr.classify() else {
             panic!("expected a Name");
         };
-        let x_use_id = x_use_expr_name.scoped_use_id(&db, program_file(&db, file));
+        let x_use_id = semantic_index(&db, program_file(&db, file)).scoped_use_id(x_use_expr_name);
         let use_def = use_def_map(&db, scope);
         let binding = use_def.first_binding_at_use(x_use_id).unwrap();
         let DefinitionKind::Assignment(assignment) = binding.kind(&db) else {
             panic!("should be an assignment definition")
         };
-        let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-            value: ast::Number::Int(num),
-            ..
-        }) = assignment.value(&module)
-        else {
+        let Some(num) = assignment.value(&module).as_int_literal() else {
             panic!("should be a number literal")
         };
-        assert_eq!(*num, 1);
+        assert_eq!(num, 1);
     }
 
     #[test]
@@ -2096,28 +2091,28 @@ class C[T]:
         let module = parsed_module(&db, program_file(&db, file).python_file(&db)).load(&db);
         let ast = module.syntax();
 
-        let x_stmt = ast.body[0].as_ann_assign_stmt().unwrap();
-        let x = x_stmt.target.as_ref();
+        let x_stmt = ast.body().at(0).as_ann_assign_stmt().unwrap();
+        let x = x_stmt.target();
 
-        assert_eq!(index.expression_scope(x).kind(), ScopeKind::Module);
-        assert_eq!(index.expression_scope_id(x), FileScopeId::global());
+        assert_eq!(index.expression_scope(&x).kind(), ScopeKind::Module);
+        assert_eq!(index.expression_scope_id(&x), FileScopeId::global());
         assert_matches!(
-            x_stmt.annotation.as_ref(),
-            ast::Expr::Attribute(attribute)
-                if index.try_expression_scope_id(&attribute.attr) == Some(FileScopeId::global())
+            x_stmt.annotation().classify(),
+            ExprKind::Attribute(attribute)
+                if index.try_expression_scope_id(&attribute.attr()) == Some(FileScopeId::global())
         );
-        assert_eq!(index.annotation_parent_scope_id(&module, x), None);
+        assert_eq!(index.annotation_parent_scope_id(&module, &x), None);
         assert_eq!(
-            index.annotation_parent_scope_id(&module, x_stmt.annotation.as_ref()),
+            index.annotation_parent_scope_id(&module, &x_stmt.annotation()),
             Some(FileScopeId::global())
         );
 
-        let def = ast.body[1].as_function_def_stmt().unwrap();
-        let y_stmt = def.body[0].as_assign_stmt().unwrap();
-        let y = &y_stmt.targets[0];
+        let def = ast.body().at(1).as_function_def_stmt().unwrap();
+        let y_stmt = def.body().at(0).as_assign_stmt().unwrap();
+        let y = y_stmt.targets().at(0);
 
-        assert_eq!(index.expression_scope(y).kind(), ScopeKind::Function);
-        assert_eq!(index.annotation_parent_scope_id(&module, y), None);
+        assert_eq!(index.expression_scope(&y).kind(), ScopeKind::Function);
+        assert_eq!(index.annotation_parent_scope_id(&module, &y), None);
     }
 
     #[test]

@@ -1,5 +1,4 @@
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::ExprSet;
+use ruff_python_ast::{ExprSet, SyntaxNode};
 use ruff_text_size::Ranged;
 
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, parenthesized};
@@ -8,13 +7,9 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct FormatExprSet;
 
-impl FormatNodeRule<ExprSet> for FormatExprSet {
-    fn fmt_fields(&self, item: &ExprSet, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprSet {
-            range: _,
-            node_index: _,
-            elts,
-        } = item;
+impl FormatNodeRule<ruff_python_ast::kind::ExprSet> for FormatExprSet {
+    fn fmt_fields(&self, item: ExprSet<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let elts = item.elts();
         // That would be a dict expression
         assert!(!elts.is_empty());
         // Avoid second mutable borrow of f
@@ -33,10 +28,10 @@ impl FormatNodeRule<ExprSet> for FormatExprSet {
     }
 }
 
-impl NeedsParentheses for ExprSet {
+impl NeedsParentheses for ExprSet<'_> {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        _parent: SyntaxNode,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
         OptionalParentheses::Never

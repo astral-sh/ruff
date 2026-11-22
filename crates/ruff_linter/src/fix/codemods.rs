@@ -11,8 +11,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec};
 use unicode_normalization::UnicodeNormalization;
 
-use ruff_python_ast::Stmt;
 use ruff_python_ast::name::UnqualifiedName;
+use ruff_python_ast::{Stmt, StmtKind};
 use ruff_python_codegen::Stylist;
 use ruff_text_size::Ranged;
 
@@ -41,20 +41,20 @@ impl<'a, T: Codegen<'a>> CodegenStylist<'a> for T {
 /// Returns `Ok(None)` if the statement is empty after removing the imports.
 pub(crate) fn remove_imports<'a>(
     member_names: impl Iterator<Item = &'a str>,
-    stmt: &Stmt,
+    stmt: Stmt<'_>,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Option<String>> {
-    let names = match stmt {
-        Stmt::Import(import) => &import.names,
-        Stmt::ImportFrom(import) => &import.names,
+    let names = match stmt.classify() {
+        StmtKind::Import(import) => import.names(),
+        StmtKind::ImportFrom(import) => import.names(),
         _ => bail!("Expected import statement"),
     };
     let mut member_names = member_names.peekable();
     // Deleting the only named import leaves no formatting to preserve.
-    if let [alias] = names.as_slice()
-        && alias.name.as_str() != "*"
-        && member_names.peek().copied() == Some(alias.name.as_str())
+    if let Some([alias]) = names.as_array()
+        && alias.name().as_str() != "*"
+        && member_names.peek().copied() == Some(alias.name().as_str())
     {
         return Ok(None);
     }
@@ -147,7 +147,7 @@ pub(crate) fn remove_imports<'a>(
 /// Returns the modified import statement.
 pub(crate) fn retain_imports(
     member_names: &[&str],
-    stmt: &Stmt,
+    stmt: Stmt<'_>,
     contents: &str,
     stylist: &Stylist,
 ) -> Result<String> {

@@ -1,4 +1,4 @@
-use ruff_python_ast::Stmt;
+use ruff_python_ast::Suite;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
@@ -6,7 +6,7 @@ use crate::rules::refurb;
 use crate::rules::{flake8_pie, flake8_pyi};
 
 /// Run lint rules over a suite of [`Stmt`] syntax nodes.
-pub(crate) fn suite(suite: &[Stmt], checker: &Checker) {
+pub(crate) fn suite(suite: Suite<'_>, checker: &Checker) {
     if checker.is_rule_enabled(Rule::UnnecessaryPlaceholder) {
         flake8_pie::rules::unnecessary_placeholder(checker, suite);
     }

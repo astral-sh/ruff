@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, ExprCall};
+use ruff_python_ast::{self as ast, Expr};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -47,17 +47,8 @@ impl Violation for UnnecessaryListCall {
 }
 
 /// C411
-pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprCall) {
-    let ExprCall {
-        func,
-        arguments,
-        range_start: _,
-        node_index: _,
-    } = call;
-
-    let Some(argument) =
-        helpers::exactly_one_argument_with_matching_function("list", func, arguments)
-    else {
+pub(crate) fn unnecessary_list_call(checker: &Checker, &expr: &Expr<'_>, call: ast::ExprCall<'_>) {
+    let Some(argument) = helpers::exactly_one_argument_with_matching_function("list", call) else {
         return;
     };
     if !argument.is_list_comp_expr() {

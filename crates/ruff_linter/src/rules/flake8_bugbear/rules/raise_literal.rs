@@ -39,7 +39,7 @@ impl Violation for RaiseLiteral {
 }
 
 /// B016
-pub(crate) fn raise_literal(checker: &Checker, expr: &Expr) {
+pub(crate) fn raise_literal(checker: &Checker, expr: Expr<'_>) {
     if expr.is_literal_expr() {
         checker.report_diagnostic(RaiseLiteral, expr.range());
     }

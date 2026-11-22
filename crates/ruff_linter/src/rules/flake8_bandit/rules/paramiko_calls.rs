@@ -40,7 +40,7 @@ impl Violation for ParamikoCall {
 }
 
 /// S601
-pub(crate) fn paramiko_call(checker: &Checker, func: &Expr, qualified_name: &QualifiedName) {
+pub(crate) fn paramiko_call(checker: &Checker, func: Expr<'_>, qualified_name: &QualifiedName) {
     if matches!(qualified_name.segments(), ["paramiko", "exec_command"]) {
         checker.report_diagnostic(ParamikoCall, func.range());
     }

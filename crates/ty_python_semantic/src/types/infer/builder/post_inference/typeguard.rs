@@ -1,4 +1,4 @@
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 
 use super::function::CheckedFunction;
 use crate::DisplaySettings;
@@ -15,12 +15,12 @@ pub(crate) fn check_type_guard_definition<'db>(
     context: &InferContext<'db, '_>,
     ty: Type<'db>,
     checked_function: Option<CheckedFunction<'db>>,
-    node: &ast::StmtFunctionDef,
+    node: ast::StmtFunctionDef<'_>,
 ) {
     let Type::FunctionLiteral(function) = ty else {
         return;
     };
-    let Some(returns_expr) = node.returns.as_deref() else {
+    let Some(returns_expr) = node.returns() else {
         return;
     };
 

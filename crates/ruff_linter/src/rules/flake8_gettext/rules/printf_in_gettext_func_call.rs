@@ -66,11 +66,12 @@ impl Violation for PrintfInGettextCall {
 /// INT003
 pub(crate) fn printf_in_gettext_func_call(
     checker: &Checker,
-    func: &Expr,
-    arguments: &ast::Arguments,
+    func: Expr<'_>,
+    arguments: ast::Arguments<'_>,
 ) {
+    let args = arguments.args();
     // Check first argument (singular)
-    if let Some(first) = arguments.args().next() {
+    if let Some(first) = args.first() {
         if is_printf_format(first) {
             checker.report_diagnostic(PrintfInGettextCall { is_plural: false }, first.range());
         }
@@ -78,7 +79,7 @@ pub(crate) fn printf_in_gettext_func_call(
 
     // Check second argument (plural) for ngettext calls
     if is_ngettext_call(checker, func)
-        && let Some(second) = arguments.args().nth(1)
+        && let Some(second) = args.get(1)
         && is_printf_format(second)
     {
         checker.report_diagnostic(PrintfInGettextCall { is_plural: true }, second.range());
@@ -87,12 +88,12 @@ pub(crate) fn printf_in_gettext_func_call(
 
 /// Return `true` if `expr` is a printf-style formatting expression, such as
 /// `"%s" % 123`.
-fn is_printf_format(expr: &Expr) -> bool {
-    let Expr::BinOp(ast::ExprBinOp {
+fn is_printf_format(expr: Expr<'_>) -> bool {
+    let ast::ExprFields::BinOp(ast::ExprBinOpFields {
         op: Operator::Mod,
         left,
         ..
-    }) = expr
+    }) = expr.fields()
     else {
         return false;
     };

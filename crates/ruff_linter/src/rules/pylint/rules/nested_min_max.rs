@@ -1,11 +1,12 @@
-use ruff_python_ast::{self as ast, Arguments, Expr};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{Arguments, BuildId, Builder, Expr};
+use ruff_text_size::Ranged;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::fix::syntax;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -100,11 +101,11 @@ impl Violation for NestedMinMax {
 impl MinMax {
     /// Converts a function call [`Expr`] into a [`MinMax`] if it is a call to `min` or `max`.
     fn try_from_call(
-        func: &Expr,
-        arguments: &Arguments,
+        func: Expr<'_>,
+        arguments: Arguments<'_>,
         semantic: &SemanticModel,
     ) -> Option<MinMax> {
-        if arguments.keywords().next().is_some() {
+        if !arguments.keywords().is_empty() {
             return None;
         }
         match semantic.resolve_builtin_symbol(func)? {
@@ -124,55 +125,39 @@ impl std::fmt::Display for MinMax {
     }
 }
 
-/// Collect a new set of arguments to by either accepting existing args as-is or
-/// collecting child arguments, if it's a call to the same function.
+/// Flattens calls to the same builtin, unpacking the iterable in a single-argument call.
 fn collect_nested_args(
+    builder: &mut Builder,
     min_max: MinMax,
-    arguments: &Arguments,
+    arguments: Arguments<'_>,
     semantic: &SemanticModel,
-) -> Vec<Expr> {
-    fn inner(
-        min_max: MinMax,
-        arguments: &Arguments,
-        semantic: &SemanticModel,
-        new_args: &mut Vec<Expr>,
-    ) {
-        for arg in arguments.args() {
-            if let Expr::Call(ast::ExprCall {
-                func,
-                arguments,
-                range_start: _,
-                node_index: _,
-            }) = arg
+    flattened: &mut Vec<BuildId<ruff_python_ast::kind::Expr>>,
+) {
+    for arg in arguments.args() {
+        if let Some(call) = arg.as_call_expr()
+            && MinMax::try_from_call(call.func(), call.arguments(), semantic) == Some(min_max)
+        {
+            let arguments = call.arguments();
+            if let Some(single) = arguments.as_single_positional()
+                && !single.is_starred_expr()
             {
-                if MinMax::try_from_call(func, arguments, semantic) == Some(min_max) {
-                    if let [ast::Argument::Positional(arg)] = arguments.items.as_slice() {
-                        if arg.as_starred_expr().is_none() {
-                            let new_arg = Expr::Starred(ast::ExprStarred {
-                                value: Box::new(arg.clone()),
-                                ctx: ast::ExprContext::Load,
-                                range: TextRange::default(),
-                                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                            });
-                            new_args.push(new_arg);
-                            continue;
-                        }
-                    }
-                    inner(min_max, arguments, semantic, new_args);
-                    continue;
-                }
+                let value = builder.copy_node(single);
+                flattened.push(syntax::starred(builder, value));
+            } else {
+                collect_nested_args(builder, min_max, arguments, semantic, flattened);
             }
-            new_args.push(arg.clone());
+        } else {
+            flattened.push(builder.copy_node(arg));
         }
     }
-
-    let mut new_args = Vec::with_capacity(arguments.len());
-    inner(min_max, arguments, semantic, &mut new_args);
-    new_args
 }
-
 /// PLW3301
-pub(crate) fn nested_min_max(checker: &Checker, expr: &Expr, func: &Expr, arguments: &Arguments) {
+pub(crate) fn nested_min_max(
+    checker: &Checker,
+    &expr: &Expr<'_>,
+    func: Expr<'_>,
+    arguments: Arguments<'_>,
+) {
     // It's only safe to flatten nested calls if the outer call has more than one argument.
     // When the outer call has a single argument, flattening would change the semantics by
     // changing the shape of the call from treating the inner result as an iterable (or a scalar)
@@ -184,32 +169,28 @@ pub(crate) fn nested_min_max(checker: &Checker, expr: &Expr, func: &Expr, argume
     let Some(min_max) = MinMax::try_from_call(func, arguments, checker.semantic()) else {
         return;
     };
-    if arguments.args().any(|arg| {
-        let Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) = arg
-        else {
+    if arguments.args().iter().any(|arg| {
+        let Some(call) = arg.as_call_expr() else {
             return false;
         };
-        MinMax::try_from_call(func, arguments, checker.semantic()) == Some(min_max)
+        MinMax::try_from_call(call.func(), call.arguments(), checker.semantic()) == Some(min_max)
     }) {
         let mut diagnostic =
             checker.report_diagnostic(NestedMinMax { func: min_max }, expr.range());
-        let flattened_expr = Expr::Call(ast::ExprCall {
-            func: Box::new(func.clone()),
-            arguments: Arguments {
-                items: collect_nested_args(min_max, arguments, checker.semantic())
-                    .into_iter()
-                    .map(ast::Argument::Positional)
-                    .collect(),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            },
-            range_start: ruff_text_size::TextSize::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        });
+        let mut builder = Builder::default();
+        let mut flattened = Vec::with_capacity(arguments.len());
+        collect_nested_args(
+            &mut builder,
+            min_max,
+            arguments,
+            checker.semantic(),
+            &mut flattened,
+        );
+        let items = builder.list(flattened).into();
+        let func = builder.copy_node(func);
+        let replacement = syntax::call(&mut builder, func, items);
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            checker.generator().expr(&flattened_expr),
+            checker.generator().expr(builder.get(replacement)),
             expr.range(),
         )));
     }

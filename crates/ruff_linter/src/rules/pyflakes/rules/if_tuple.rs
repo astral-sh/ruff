@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, StmtIf};
+use ruff_python_ast::{ExprKind, StmtIf};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::stmt_if::if_elif_branches;
@@ -41,12 +41,12 @@ impl Violation for IfTuple {
 }
 
 /// F634
-pub(crate) fn if_tuple(checker: &Checker, stmt_if: &StmtIf) {
+pub(crate) fn if_tuple(checker: &Checker, stmt_if: StmtIf<'_>) {
     for branch in if_elif_branches(stmt_if) {
-        let Expr::Tuple(tuple) = &branch.test else {
+        let ExprKind::Tuple(tuple) = branch.test.classify() else {
             continue;
         };
-        if tuple.is_empty() {
+        if tuple.elts().is_empty() {
             continue;
         }
         checker.report_diagnostic(IfTuple, branch.test.range());

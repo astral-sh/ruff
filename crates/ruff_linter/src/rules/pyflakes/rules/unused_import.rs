@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{self as ast, StmtKind};
 use ruff_python_semantic::{
     AnyImport, Binding, BindingFlags, BindingId, BindingKind, Exceptions, Imported, NodeId, Scope,
     ScopeId, SemanticModel, SubmoduleImport,
@@ -292,7 +292,7 @@ fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
 }
 
 /// Find the `Expr` for top-level `__all__` bindings.
-fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> {
+fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<ast::Expr<'a>> {
     semantic
         .global_scope()
         .get_all("__all__")
@@ -302,10 +302,17 @@ fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> 
                 BindingKind::Export(_) => binding.statement(semantic),
                 _ => None,
             }?;
-            match stmt {
-                Stmt::Assign(ast::StmtAssign { value, .. }) => Some(&**value),
-                Stmt::AnnAssign(ast::StmtAnnAssign { value, .. }) => value.as_deref(),
-                Stmt::AugAssign(ast::StmtAugAssign { value, .. }) => Some(&**value),
+            match stmt.classify() {
+                StmtKind::Assign(stmt_assign) => {
+                    let value = stmt_assign.value();
+                    Some(value)
+                }
+                StmtKind::AnnAssign(stmt_ann_assign) => stmt_ann_assign.value(),
+                StmtKind::AugAssign(stmt_aug_assign) => {
+                    let value = stmt_aug_assign.value();
+
+                    Some(value)
+                }
                 _ => None,
             }
         })
@@ -607,7 +614,7 @@ fn fix_by_reexporting<'a>(
     checker: &Checker,
     node_id: NodeId,
     imports: impl IntoIterator<Item = &'a ImportBinding<'a>>,
-    dunder_all_exprs: &[&ast::Expr],
+    dunder_all_exprs: &[ast::Expr<'_>],
 ) -> Result<Fix> {
     let statement = checker.semantic().statement(node_id);
 
@@ -625,8 +632,8 @@ fn fix_by_reexporting<'a>(
 
     let edits = match dunder_all_exprs {
         [] => fix::edits::make_redundant_alias(imports.into_iter(), statement),
-        [dunder_all] => {
-            fix::edits::add_to_dunder_all(imports.into_iter(), dunder_all, checker.stylist())
+        args if let Some([dunder_all]) = args.as_array() => {
+            fix::edits::add_to_dunder_all(imports.into_iter(), *dunder_all, checker.stylist())
         }
         _ => bail!("Cannot offer a fix when there are multiple __all__ definitions"),
     };
@@ -831,7 +838,7 @@ fn expand_to_qualified_name_attribute<'b>(
 
     let name = expr.as_name_expr()?;
 
-    builder.push(&name.id);
+    builder.push(name.id());
 
     while let Some(node_id) = semantic.parent_expression_id(expr_id) {
         let Some(expr) = semantic.expression(node_id) else {
@@ -840,7 +847,7 @@ fn expand_to_qualified_name_attribute<'b>(
         let Some(expr_attr) = expr.as_attribute_expr() else {
             break;
         };
-        builder.push(expr_attr.attr.as_str());
+        builder.push(expr_attr.attr().as_str());
         expr_id = node_id;
     }
     Some(builder.build())

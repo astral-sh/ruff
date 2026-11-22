@@ -69,8 +69,8 @@ pub(crate) fn constant_imported_as_non_constant(
     checker: &Checker,
     name: &str,
     asname: &str,
-    alias: &Alias,
-    stmt: &Stmt,
+    alias: Alias<'_>,
+    stmt: Stmt<'_>,
     ignore_names: &IgnoreNames,
 ) {
     if !str::is_cased_uppercase(name) {

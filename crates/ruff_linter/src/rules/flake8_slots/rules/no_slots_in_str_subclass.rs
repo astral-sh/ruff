@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::{Arguments, Stmt, StmtClassDef};
+use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::{SemanticModel, analyze::class::is_enumeration};
 
 use crate::Violation;
@@ -51,18 +51,23 @@ impl Violation for NoSlotsInStrSubclass {
 }
 
 /// SLOT000
-pub(crate) fn no_slots_in_str_subclass(checker: &Checker, stmt: &Stmt, class: &StmtClassDef) {
+pub(crate) fn no_slots_in_str_subclass(
+    checker: &Checker,
+    stmt: Stmt<'_>,
+    class: ast::StmtClassDef<'_>,
+) {
     // https://github.com/astral-sh/ruff/issues/14535
     if checker.source_type.is_stub() {
         return;
     }
-    let Some(arguments) = class.arguments.as_deref() else {
+    let Some(arguments) = class.arguments() else {
         return;
     };
+    let bases = arguments.args();
 
     let semantic = checker.semantic();
 
-    if !is_str_subclass(arguments, semantic) {
+    if !is_str_subclass(bases, semantic) {
         return;
     }
 
@@ -71,7 +76,7 @@ pub(crate) fn no_slots_in_str_subclass(checker: &Checker, stmt: &Stmt, class: &S
         return;
     }
 
-    if has_slots(&class.body) {
+    if has_slots(class.body()) {
         return;
     }
 
@@ -79,8 +84,11 @@ pub(crate) fn no_slots_in_str_subclass(checker: &Checker, stmt: &Stmt, class: &S
 }
 
 /// Return `true` if the class is a subclass of `str`.
-fn is_str_subclass(arguments: &Arguments, semantic: &SemanticModel) -> bool {
-    arguments
-        .args()
+fn is_str_subclass(
+    bases: ast::FilteredNodes<'_, ruff_python_ast::kind::Expr>,
+    semantic: &SemanticModel,
+) -> bool {
+    bases
+        .iter()
         .any(|base| semantic.match_builtin_expr(base, "str"))
 }

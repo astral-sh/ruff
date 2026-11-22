@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::StmtFunctionDef;
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::visibility;
 use ruff_text_size::Ranged;
@@ -100,20 +100,20 @@ impl Violation for AsyncFunctionWithTimeout {
 }
 
 /// ASYNC109
-pub(crate) fn async_function_with_timeout(checker: &Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn async_function_with_timeout(checker: &Checker, function_def: StmtFunctionDef<'_>) {
     // Detect `async` calls with a `timeout` argument.
-    if !function_def.is_async {
+    if !function_def.is_async() {
         return;
     }
 
     // If the function doesn't have a `timeout` parameter, avoid raising the diagnostic.
-    let Some(timeout) = function_def.parameters.find("timeout") else {
+    let Some(timeout) = function_def.parameters().find("timeout") else {
         return;
     };
 
     // Ignore methods decorated with `@typing.override`, since changing the signature
     // would make the override invalid.
-    if visibility::is_override(&function_def.decorator_list, checker.semantic()) {
+    if visibility::is_override(function_def.decorator_list(), checker.semantic()) {
         return;
     }
 

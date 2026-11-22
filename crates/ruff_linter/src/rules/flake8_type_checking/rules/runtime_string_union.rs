@@ -90,8 +90,8 @@ impl Violation for RuntimeStringUnion {
 /// TC010
 pub(crate) fn runtime_string_union(
     checker: &Checker,
-    expr: &Expr,
-    annotation_expr: &ast::ExprStringLiteral,
+    expr: Expr<'_>,
+    annotation_expr: ast::ExprStringLiteral<'_>,
 ) {
     // The union is only problematic at runtime. Even though stub files are never
     // executed, some of the nodes still end up having a runtime execution context
@@ -100,13 +100,14 @@ pub(crate) fn runtime_string_union(
     }
 
     // Are we actually part of a union?
-    let Some(Expr::BinOp(ast::ExprBinOp {
-        op: Operator::BitOr,
-        ..
-    })) = checker.semantic().current_expression_parent()
-    else {
+    if checker
+        .semantic()
+        .current_expression_parent()
+        .and_then(Expr::as_bin_op_expr)
+        .is_none_or(|binary| binary.op() != Operator::BitOr)
+    {
         return;
-    };
+    }
 
     let strategy = if quotes_are_unremovable(checker.semantic(), expr, checker.target_version()) {
         Strategy::ExtendQuotes

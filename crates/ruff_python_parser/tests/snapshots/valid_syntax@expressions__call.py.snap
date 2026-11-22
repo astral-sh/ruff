@@ -412,6 +412,8 @@ Module(
                                     range: 219..231,
                                     items: [
                                         DictItem {
+                                            range: 220..224,
+                                            node_index: NodeIndex(None),
                                             key: Some(
                                                 NumberLiteral(
                                                     ExprNumberLiteral {
@@ -434,6 +436,8 @@ Module(
                                             ),
                                         },
                                         DictItem {
+                                            range: 226..230,
+                                            node_index: NodeIndex(None),
                                             key: Some(
                                                 NumberLiteral(
                                                     ExprNumberLiteral {

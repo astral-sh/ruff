@@ -56,8 +56,8 @@ pub(crate) fn camelcase_imported_as_lowercase(
     checker: &Checker,
     name: &str,
     asname: &str,
-    alias: &Alias,
-    stmt: &Stmt,
+    alias: Alias<'_>,
+    stmt: Stmt<'_>,
     ignore_names: &IgnoreNames,
 ) {
     if helpers::is_camelcase(name) && ruff_python_stdlib::str::is_cased_lowercase(asname) {

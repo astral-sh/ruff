@@ -1,4 +1,5 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{Expr, ExprKind};
+use ruff_text_size::Ranged;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
@@ -110,8 +111,10 @@ fn is_t_suffixed_type_alias(name: &str) -> bool {
 }
 
 /// PYI042
-pub(crate) fn snake_case_type_alias(checker: &Checker, target: &Expr) {
-    if let Expr::Name(ast::ExprName { id, range, .. }) = target {
+pub(crate) fn snake_case_type_alias(checker: &Checker, target: Expr<'_>) {
+    if let ExprKind::Name(name_node) = target.classify() {
+        let id = name_node.id();
+        let range = name_node.range();
         if !is_snake_case_type_alias(id) {
             return;
         }
@@ -120,14 +123,16 @@ pub(crate) fn snake_case_type_alias(checker: &Checker, target: &Expr) {
             SnakeCaseTypeAlias {
                 name: id.to_string(),
             },
-            *range,
+            range,
         );
     }
 }
 
 /// PYI043
-pub(crate) fn t_suffixed_type_alias(checker: &Checker, target: &Expr) {
-    if let Expr::Name(ast::ExprName { id, range, .. }) = target {
+pub(crate) fn t_suffixed_type_alias(checker: &Checker, target: Expr<'_>) {
+    if let ExprKind::Name(name_node) = target.classify() {
+        let id = name_node.id();
+        let range = name_node.range();
         if !is_t_suffixed_type_alias(id) {
             return;
         }
@@ -136,7 +141,7 @@ pub(crate) fn t_suffixed_type_alias(checker: &Checker, target: &Expr) {
             TSuffixedTypeAlias {
                 name: id.to_string(),
             },
-            *range,
+            range,
         );
     }
 }

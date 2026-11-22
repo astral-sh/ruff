@@ -135,34 +135,23 @@ fn prepare_implementations_finder_for_goto_target<'a>(
         | GotoTarget::Call {
             callable: expression,
             ..
-        } if matches!(
-            expression,
-            ruff_python_ast::ExprRef::Name(_) | ruff_python_ast::ExprRef::Attribute(_)
-        ) =>
-        {
-            goto_target
-                .expression_definitions(model, ImportAliasResolution::ResolveAliases)
-                .and_then(|definitions| {
-                    ImplementationsFinder::for_class_reference(
-                        db,
-                        &env,
-                        definitions.iter().as_slice(),
-                    )
-                })
-                .or_else(|| match expression {
-                    ruff_python_ast::ExprRef::Attribute(attribute) => {
-                        ImplementationsFinder::for_attribute(model, attribute)
-                    }
-                    _ => None,
-                })
-        }
+        } if expression.is_name_expr() || expression.is_attribute_expr() => goto_target
+            .expression_definitions(model, ImportAliasResolution::ResolveAliases)
+            .and_then(|definitions| {
+                ImplementationsFinder::for_class_reference(db, &env, definitions.iter().as_slice())
+            })
+            .or_else(|| {
+                expression
+                    .as_attribute_expr()
+                    .and_then(|attribute| ImplementationsFinder::for_attribute(model, attribute))
+            }),
         GotoTarget::StringAnnotationSubexpr { .. } => goto_target
             .definitions(model, ImportAliasResolution::ResolveAliases)
             .and_then(|definitions| {
                 ImplementationsFinder::for_class_reference(db, &env, definitions.iter().as_slice())
             }),
-        GotoTarget::FunctionDef(function) => ImplementationsFinder::for_method(model, function),
-        GotoTarget::ClassDef(class) => ImplementationsFinder::for_class(model, class),
+        GotoTarget::FunctionDef(function) => ImplementationsFinder::for_method(model, *function),
+        GotoTarget::ClassDef(class) => ImplementationsFinder::for_class(model, *class),
         _ => None,
     }
 }

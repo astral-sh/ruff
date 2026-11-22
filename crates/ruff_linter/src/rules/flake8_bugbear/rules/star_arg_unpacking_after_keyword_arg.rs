@@ -1,6 +1,5 @@
-use ruff_python_ast::{Argument, Arguments, Expr};
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{ArgOrKeyword, Arguments};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -58,13 +57,16 @@ impl Violation for StarArgAfterKeyword {
 }
 
 /// B026
-pub(crate) fn star_arg_unpacking_after_keyword_arg(checker: &Checker, arguments: &Arguments) {
-    let mut items = arguments.items.iter();
-    if items.any(|item| matches!(item, Argument::Keyword(_))) {
-        for item in items {
-            if let Argument::Positional(Expr::Starred(starred)) = item {
-                checker.report_diagnostic(StarArgAfterKeyword, starred.range());
-            }
+pub(crate) fn star_arg_unpacking_after_keyword_arg(checker: &Checker, arguments: Arguments<'_>) {
+    let mut items = arguments.iter_source_order();
+    let Some(_) = items.find(|item| matches!(item, ArgOrKeyword::Keyword(_))) else {
+        return;
+    };
+    for item in items {
+        if let ArgOrKeyword::Arg(arg) = item
+            && arg.is_starred_expr()
+        {
+            checker.report_diagnostic(StarArgAfterKeyword, arg.range());
         }
     }
 }

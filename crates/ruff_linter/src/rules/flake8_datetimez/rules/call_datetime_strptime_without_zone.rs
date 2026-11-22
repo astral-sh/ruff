@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprKind, FStringPartView, Keyword};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
@@ -90,7 +90,7 @@ impl Violation for CallDatetimeStrptimeWithoutZone {
 /// DTZ007
 pub(crate) fn call_datetime_strptime_without_zone(
     checker: &Checker,
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     qualified_name: &QualifiedName,
 ) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
@@ -109,24 +109,26 @@ pub(crate) fn call_datetime_strptime_without_zone(
     }
 
     // Does the `strptime` call contain a format string with a timezone specifier?
-    if let Some(expr) = call.arguments.args().nth(1) {
-        match expr {
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
-                if value.to_str().contains("%z") =>
+    if let Some(expr) = call.arguments().args().get(1) {
+        match expr.classify() {
+            ExprKind::StringLiteral(expr_string_literal)
+                if expr_string_literal.value().to_str().contains("%z") =>
             {
                 return;
             }
-            Expr::FString(ast::ExprFString { value, .. }) => {
+            ExprKind::FString(expr_f_string) => {
+                let value = expr_f_string.value();
+
                 for f_string_part in value {
                     match f_string_part {
-                        ast::FStringPartRef::Literal(string) => {
+                        FStringPartView::Literal(string) => {
                             if string.contains("%z") {
                                 return;
                             }
                         }
-                        ast::FStringPartRef::FString(f_string) => {
+                        FStringPartView::FString(f_string) => {
                             if f_string
-                                .elements
+                                .elements()
                                 .literals()
                                 .any(|literal| literal.contains("%z"))
                             {
@@ -150,21 +152,29 @@ pub(crate) fn call_datetime_strptime_without_zone(
 }
 
 fn find_antipattern(
-    grandparent: Option<&Expr>,
-    parent: Option<&Expr>,
+    grandparent: Option<Expr<'_>>,
+    parent: Option<Expr<'_>>,
 ) -> Option<DatetimeModuleAntipattern> {
-    let Some(Expr::Call(ast::ExprCall { arguments, .. })) = grandparent else {
+    let Some(arguments) = grandparent
+        .and_then(Expr::as_call_expr)
+        .map(ast::ExprCall::arguments)
+    else {
         return Some(DatetimeModuleAntipattern::NoTzArgumentPassed);
     };
-    let Some(Expr::Attribute(ast::ExprAttribute { attr, .. })) = parent else {
+    let Some(attr) = parent
+        .and_then(Expr::as_attribute_expr)
+        .map(ast::ExprAttribute::attr)
+    else {
         return Some(DatetimeModuleAntipattern::NoTzArgumentPassed);
     };
     if attr != "replace" {
         return Some(DatetimeModuleAntipattern::NoTzArgumentPassed);
     }
-    match arguments.find_keyword("tzinfo") {
+    match arguments.find_keyword("tzinfo").map(Keyword::fields) {
         // Ex) `datetime.strptime(...).replace(tzinfo=None)`
-        Some(keyword) if keyword.value.is_none_literal_expr() => {
+        Some(ast::KeywordFields { value, .. })
+            if let ExprKind::NoneLiteral(_) = value.classify() =>
+        {
             Some(DatetimeModuleAntipattern::NonePassedToTzArgument)
         }
         // Ex) `datetime.strptime(...).replace(tzinfo=...)`

@@ -62,7 +62,7 @@ impl Violation for NumpyLegacyRandom {
 }
 
 /// NPY002
-pub(crate) fn legacy_random(checker: &Checker, expr: &Expr, qualified_name: &QualifiedName) {
+pub(crate) fn legacy_random(checker: &Checker, expr: Expr<'_>, qualified_name: &QualifiedName) {
     if !checker.semantic().seen_module(Modules::NUMPY) {
         return;
     }

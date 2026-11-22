@@ -1,11 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::pep_604_union;
-use ruff_python_ast::{self as ast, Expr, ExprContext};
+use ruff_python_ast::{Builder, Expr, ExprKind};
 use ruff_python_semantic::analyze::typing::traverse_union;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
+use super::union_with_replacement;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::fix::syntax;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -70,7 +71,7 @@ impl Violation for UnnecessaryLiteralUnion {
 }
 
 /// PYI030
-pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
+pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, &expr: &Expr<'a>) {
     let mut literal_exprs = Vec::new();
     let mut other_exprs = Vec::new();
 
@@ -79,19 +80,19 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
     let mut total_literals = 0;
 
     // Split members into `literal_exprs` if they are a `Literal` annotation  and `other_exprs` otherwise
-    let mut collect_literal_expr = |expr: &'a Expr, _parent: &'a Expr| {
-        if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
+    let mut collect_literal_expr = |expr: Expr<'a>, _parent: Expr<'a>| {
+        if let ExprKind::Subscript(subscript_node) = expr.classify() {
+            let value = subscript_node.value();
+            let slice = subscript_node.slice();
             if checker.semantic().match_typing_expr(value, "Literal") {
                 total_literals += 1;
 
                 if literal_subscript.is_none() {
-                    literal_subscript = Some(value.as_ref());
+                    literal_subscript = Some(value);
                 }
 
-                let slice = &**slice;
-
                 // flatten already-unioned literals to later union again
-                if let Expr::Tuple(tuple) = slice {
+                if let ExprKind::Tuple(tuple) = slice.classify() {
                     for item in tuple {
                         literal_exprs.push(item);
                     }
@@ -113,7 +114,7 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
     if union_subscript.is_some_and(|subscript| {
         !checker
             .semantic()
-            .match_typing_expr(&subscript.value, "Union")
+            .match_typing_expr(subscript.value(), "Union")
     }) {
         return;
     }
@@ -137,49 +138,16 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
     );
 
     diagnostic.set_fix({
-        let literal = Expr::Subscript(ast::ExprSubscript {
-            value: Box::new(literal_subscript.clone()),
-            slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                elts: literal_exprs.into_iter().cloned().collect(),
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                ctx: ExprContext::Load,
-                parenthesized: true,
-            })),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            ctx: ExprContext::Load,
-        });
-
-        let edit = if other_exprs.is_empty() {
-            Edit::range_replacement(checker.generator().expr(&literal), expr.range())
-        } else {
-            let elts: Vec<Expr> = std::iter::once(literal)
-                .chain(other_exprs.into_iter().cloned())
-                .collect();
-
-            let content = if let Some(union) = union_subscript {
-                checker
-                    .generator()
-                    .expr(&Expr::Subscript(ast::ExprSubscript {
-                        value: union.value.clone(),
-                        slice: Box::new(Expr::Tuple(ast::ExprTuple {
-                            elts,
-                            range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                            ctx: ExprContext::Load,
-                            parenthesized: true,
-                        })),
-                        range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                        ctx: ExprContext::Load,
-                    }))
-            } else {
-                checker.generator().expr(&pep_604_union(&elts))
-            };
-            Edit::range_replacement(content, expr.range())
-        };
-
+        let mut builder = Builder::default();
+        let value = builder.copy_node(literal_subscript);
+        let elts = builder.copy_nodes(literal_exprs);
+        let literal = syntax::subscript_tuple(&mut builder, value, elts);
+        let replacement =
+            union_with_replacement(&mut builder, literal, other_exprs, union_subscript);
+        let edit = Edit::range_replacement(
+            checker.generator().expr(builder.get(replacement)),
+            expr.range(),
+        );
         if checker.comment_ranges().intersects(expr.range()) {
             Fix::unsafe_edit(edit)
         } else {

@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast};
+
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -43,34 +44,30 @@ impl AlwaysFixableViolation for UnnecessaryRangeStart {
 }
 
 /// PIE808
-pub(crate) fn unnecessary_range_start(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn unnecessary_range_start(checker: &Checker, call: ast::ExprCall<'_>) {
     // A third positional argument supplies the step.
-    let Some([start, _]) = call.arguments.as_positional_array() else {
+    let Some([start, _]) = call.arguments().as_positional_array() else {
         return;
     };
 
     // Verify that the `start` argument is the literal `0`.
-    let Expr::NumberLiteral(ast::ExprNumberLiteral {
-        value: ast::Number::Int(value),
-        ..
-    }) = start
-    else {
+    let Some(value) = start.as_int_literal() else {
         return;
     };
-    if *value != 0 {
+    if value != 0 {
         return;
     }
 
     // Verify that the call is to the `range` builtin.
-    if !checker.semantic().match_builtin_expr(&call.func, "range") {
+    if !checker.semantic().match_builtin_expr(call.func(), "range") {
         return;
     }
 
     let mut diagnostic = checker.report_diagnostic(UnnecessaryRangeStart, start.range());
     diagnostic.try_set_fix(|| {
         remove_argument(
-            start,
-            &call.arguments,
+            &start,
+            call.arguments(),
             Parentheses::Preserve,
             checker.source(),
             checker.tokens(),

@@ -2,6 +2,7 @@ pub(crate) use fastapi_non_annotated_dependency::*;
 pub(crate) use fastapi_redundant_response_model::*;
 pub(crate) use fastapi_unused_path_parameter::*;
 
+use ruff_python_ast::ExprKind;
 mod fastapi_non_annotated_dependency;
 mod fastapi_redundant_response_model;
 mod fastapi_unused_path_parameter;
@@ -12,28 +13,33 @@ use ruff_python_semantic::analyze::typing;
 
 /// Returns `true` if the function is a FastAPI route.
 pub(crate) fn is_fastapi_route(
-    function_def: &ast::StmtFunctionDef,
+    function_def: ast::StmtFunctionDef<'_>,
     semantic: &SemanticModel,
 ) -> bool {
     function_def
-        .decorator_list
+        .decorator_list()
         .iter()
         .any(|decorator| is_fastapi_route_decorator(decorator, semantic).is_some())
 }
 
 /// Returns `true` if the decorator is indicative of a FastAPI route.
 pub(crate) fn is_fastapi_route_decorator<'a>(
-    decorator: &'a ast::Decorator,
+    decorator: ast::Decorator<'a>,
     semantic: &'a SemanticModel,
-) -> Option<&'a ast::ExprCall> {
-    let call = decorator.expression.as_call_expr()?;
+) -> Option<ast::ExprCall<'a>> {
+    let call = decorator.expression().as_call_expr()?;
     is_fastapi_route_call(call, semantic).then_some(call)
 }
 
-pub(crate) fn is_fastapi_route_call(call_expr: &ast::ExprCall, semantic: &SemanticModel) -> bool {
-    let ast::Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = &*call_expr.func else {
+pub(crate) fn is_fastapi_route_call(
+    call_expr: ast::ExprCall<'_>,
+    semantic: &SemanticModel,
+) -> bool {
+    let ExprKind::Attribute(attribute) = call_expr.func().classify() else {
         return false;
     };
+    let attr = attribute.attr();
+    let value = attribute.value();
 
     if !matches!(
         attr.as_str(),

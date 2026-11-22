@@ -16,7 +16,7 @@ use ruff_linter::linter::check_path;
 use ruff_linter::settings::{DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, flags};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{Locator, UnresolvedRuleSelector};
-use ruff_python_ast::{Mod, PySourceType};
+use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{PyFormatContext, QuoteStyle, format_module_ast, pretty_comments};
 use ruff_python_index::Indexer;
@@ -506,7 +506,7 @@ impl Workspace {
     pub fn parse(&self, contents: &str) -> Result<String, Error> {
         let parsed = parse_unchecked(contents, ParseOptions::from(Mode::Module));
 
-        Ok(format!("{:#?}", parsed.into_syntax()))
+        Ok(format!("{:#?}", parsed.syntax()))
     }
 
     pub fn tokens(&self, contents: &str) -> Result<String, Error> {
@@ -522,7 +522,7 @@ pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
 
 struct ParsedModule<'a> {
     source_code: &'a str,
-    parsed: Parsed<Mod>,
+    parsed: Parsed<ruff_python_ast::kind::Mod>,
     trivia_ranges: TriviaRanges,
 }
 

@@ -1,5 +1,5 @@
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::{AnyNodeRef, ElifElseClause, StmtIf};
+use ruff_python_ast::{ElifElseClause, StmtIf, SyntaxNode};
 use ruff_text_size::Ranged;
 
 use crate::expression::maybe_parenthesize_expression;
@@ -11,15 +11,11 @@ use crate::statement::suite::SuiteKind;
 #[derive(Default)]
 pub struct FormatStmtIf;
 
-impl FormatNodeRule<StmtIf> for FormatStmtIf {
-    fn fmt_fields(&self, item: &StmtIf, f: &mut PyFormatter) -> FormatResult<()> {
-        let StmtIf {
-            range: _,
-            node_index: _,
-            test,
-            body,
-            elif_else_clauses,
-        } = item;
+impl FormatNodeRule<ruff_python_ast::kind::StmtIf> for FormatStmtIf {
+    fn fmt_fields(&self, item: StmtIf<'_>, f: &mut PyFormatter) -> FormatResult<()> {
+        let test = item.test();
+        let body = item.body();
+        let elif_else_clauses = item.elif_else_clauses();
 
         let comments = f.context().comments().clone();
         let trailing_colon_comment = comments.dangling(item);
@@ -47,7 +43,7 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
                 Some(last_node),
                 SuiteKind::other(clause == elif_else_clauses.last().unwrap()),
             )?;
-            last_node = clause.body.last().unwrap().into();
+            last_node = clause.body().last().unwrap().into();
         }
 
         Ok(())
@@ -57,17 +53,13 @@ impl FormatNodeRule<StmtIf> for FormatStmtIf {
 /// Extracted so we can implement `FormatElifElseClause` but also pass in `last_node` from
 /// `FormatStmtIf`
 pub(crate) fn format_elif_else_clause(
-    item: &ElifElseClause,
+    item: ElifElseClause<'_>,
     f: &mut PyFormatter,
-    last_node: Option<AnyNodeRef>,
+    last_node: Option<SyntaxNode>,
     suite_kind: SuiteKind,
 ) -> FormatResult<()> {
-    let ElifElseClause {
-        range: _,
-        node_index: _,
-        test,
-        body,
-    } = item;
+    let test = item.test();
+    let body = item.body();
 
     let comments = f.context().comments().clone();
     let trailing_colon_comment = comments.dangling(item);

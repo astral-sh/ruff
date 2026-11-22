@@ -1,7 +1,7 @@
 use anyhow::{Context, Ok, Result};
 
 use ruff_python_ast as ast;
-use ruff_python_ast::Expr;
+use ruff_python_ast::ExprKind;
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::Binding;
@@ -14,7 +14,7 @@ use crate::cst::matchers::{match_call_mut, match_dict, transform_expression};
 /// Generate a [`Edit`] to remove unused keys from format dict.
 pub(super) fn remove_unused_format_arguments_from_dict(
     unused_arguments: &[usize],
-    dict: &ast::ExprDict,
+    dict: ast::ExprDict<'_>,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
@@ -38,7 +38,7 @@ pub(super) fn remove_unused_format_arguments_from_dict(
 /// Generate a [`Edit`] to remove unused keyword arguments from a `format` call.
 pub(super) fn remove_unused_keyword_arguments_from_format_call(
     unused_arguments: &[usize],
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
@@ -66,7 +66,7 @@ pub(super) fn remove_unused_keyword_arguments_from_format_call(
 /// Generate a [`Edit`] to remove unused positional arguments from a `format` call.
 pub(crate) fn remove_unused_positional_arguments_from_format_call(
     unused_arguments: &[usize],
-    call: &ast::ExprCall,
+    call: ast::ExprCall<'_>,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
@@ -76,10 +76,10 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
     //
     // However, if the `format` call has other effects, like escaping `{{` to `{` or would raise a
     // `KeyError` for a missing field name, we preserve the empty call to avoid changing behavior.
-    if unused_arguments.len() == call.arguments.len()
-        && let Expr::Attribute(attribute) = &*call.func
-        && let Expr::StringLiteral(string_expr) = &*attribute.value
-        && !string_expr.value.to_str().contains(['{', '}'])
+    if unused_arguments.len() == call.arguments().len()
+        && let ExprKind::Attribute(attribute) = call.func().classify()
+        && let ExprKind::StringLiteral(string_expr) = attribute.value().classify()
+        && !string_expr.value().to_str().contains(['{', '}'])
     {
         return Ok(Edit::range_replacement(
             locator.slice(string_expr).to_string(),

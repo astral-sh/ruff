@@ -1,4 +1,4 @@
-use ruff_python_ast::{HasNodeIndex, NodeIndex};
+use ruff_python_ast::{AstNode, HasNodeIndex, NodeIndex};
 
 use crate::ast_node_ref::AstNodeRef;
 
@@ -12,11 +12,15 @@ impl NodeKey {
         self.0
     }
 
+    pub(crate) fn from_view<'ast>(node: impl AstNode<'ast>) -> Self {
+        Self(node.node_index())
+    }
+
     pub fn from_node<N>(node: N) -> Self
     where
         N: HasNodeIndex,
     {
-        NodeKey(node.node_index().load())
+        NodeKey(node.node_index())
     }
 
     pub(crate) fn from_node_ref<T>(node_ref: &AstNodeRef<T>) -> Self {

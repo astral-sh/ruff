@@ -77,8 +77,8 @@ impl Violation for UselessFinally {
 }
 
 /// RUF072
-pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
-    let finalbody = &try_stmt.finalbody;
+pub(crate) fn useless_finally(checker: &Checker, try_stmt: StmtTry<'_>) {
+    let finalbody = try_stmt.finalbody();
 
     if !is_stub_body(finalbody) {
         return;
@@ -116,12 +116,12 @@ pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
         return;
     }
 
-    let is_bare_try_finally = try_stmt.handlers.is_empty() && try_stmt.orelse.is_empty();
+    let is_bare_try_finally = try_stmt.handlers().is_empty() && try_stmt.orelse().is_empty();
 
     if is_bare_try_finally {
         // bare `try/finally: pass` — unwrap the try body
         let (Some(first_body_stmt), Some(last_body_stmt)) =
-            (try_stmt.body.first(), try_stmt.body.last())
+            (try_stmt.body().first(), try_stmt.body().last())
         else {
             return;
         };
@@ -129,7 +129,7 @@ pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
         let body_full_end = source.full_line_end(last_body_stmt.end());
         let finally_full_end = source.full_line_end(last_finalbody_stmt.end());
 
-        let edit = if indentation(source, first_body_stmt).is_none() {
+        let edit = if indentation(source, &first_body_stmt).is_none() {
             // The body starts on the same line as `try:`, as in `try: foo()`. Replace
             // everything from the `try` keyword onwards with the body, which keeps the
             // indentation of the `try` statement.
@@ -139,7 +139,7 @@ pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
                 finally_full_end,
             )
         } else {
-            let try_indentation = indentation(source, try_stmt).unwrap_or_default();
+            let try_indentation = indentation(source, &try_stmt).unwrap_or_default();
 
             let Ok(adjusted) = crate::fix::edits::adjust_indentation(
                 TextRange::new(source.line_start(first_body_stmt.start()), body_full_end),
@@ -166,24 +166,24 @@ pub(crate) fn useless_finally(checker: &Checker, try_stmt: &StmtTry) {
 
 /// Returns the end offset of the clause preceding `finally` and the last
 /// statement in that clause's body (used for comment indentation checks)
-fn preceding_clause_info(try_stmt: &StmtTry) -> (TextSize, Option<&Stmt>) {
-    if let Some(last) = try_stmt.orelse.last() {
+fn preceding_clause_info(try_stmt: StmtTry<'_>) -> (TextSize, Option<Stmt<'_>>) {
+    if let Some(last) = try_stmt.orelse().last() {
         return (last.end(), Some(last));
     }
-    if let Some(handler) = try_stmt.handlers.last() {
-        let last_stmt = handler.as_except_handler().and_then(|h| h.body.last());
+    if let Some(handler) = try_stmt.handlers().last() {
+        let last_stmt = handler.as_except_handler().and_then(|h| h.body().last());
         return (handler.end(), last_stmt);
     }
-    match try_stmt.body.last() {
+    match try_stmt.body().last() {
         Some(last) => (last.end(), Some(last)),
         None => (try_stmt.start(), None),
     }
 }
 
 fn finally_contains_comments(
-    preceding_stmt: Option<&Stmt>,
+    preceding_stmt: Option<Stmt<'_>>,
     preceding_end: TextSize,
-    finalbody_stmt: &Stmt,
+    finalbody_stmt: Stmt<'_>,
     finally_range: TextRange,
     checker: &Checker,
 ) -> bool {
@@ -206,14 +206,14 @@ fn finally_contains_comments(
 
 /// Returns `true` if the `finally` clause header has a leading own-line comment
 fn finally_has_preceding_comment(
-    preceding_stmt: &Stmt,
+    preceding_stmt: Stmt<'_>,
     preceding_end: TextSize,
     finally_range: TextRange,
     checker: &Checker,
 ) -> bool {
     let (tokens, source) = (checker.tokens(), checker.source());
     let before_finally_full_end = source.full_line_end(preceding_end);
-    let preceding_indentation = indentation(source, preceding_stmt)
+    let preceding_indentation = indentation(source, &preceding_stmt)
         .unwrap_or_default()
         .text_len();
 
@@ -239,12 +239,12 @@ fn finally_has_preceding_comment(
 
 /// Returns `true` if the `finally` branch has a trailing own-line comment
 fn finally_has_trailing_comment(
-    last_finally_stmt: &Stmt,
+    last_finally_stmt: Stmt<'_>,
     finally_full_end: TextSize,
     checker: &Checker,
 ) -> bool {
     let (tokens, source) = (checker.tokens(), checker.source());
-    let preceding_indentation = indentation(source, last_finally_stmt)
+    let preceding_indentation = indentation(source, &last_finally_stmt)
         .unwrap_or_default()
         .text_len();
 
