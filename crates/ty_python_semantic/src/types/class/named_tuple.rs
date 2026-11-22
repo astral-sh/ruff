@@ -9,15 +9,17 @@ use crate::{
     Db,
     place::{Place, PlaceAndQualifiers},
     types::{
-        BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
-        KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Parameters,
+        BindingContext, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
+        GenericContext, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Parameters,
         PropertyInstanceType, SelfTypeVarOrigin, Signature, SubclassOfType, Type, TypeContext,
-        TypeMapping,
+        TypeMapping, UnionBuilder,
+        callable::CallableTypeKind,
         class::{DynamicClassHeaderAnchor, DynamicClassScopeOffset, dynamic_class_header_range},
         definition_expression_type,
         infer::InferenceFlags,
         member::Member,
         mro::Mro,
+        signatures::CallableSignature,
         tuple::{FixedLengthTuple, TupleSpec, TupleSpecBuilder, TupleType},
     },
 };
@@ -63,6 +65,24 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             let first_parameter = Parameter::positional_or_keyword(Name::new_static("_cls"))
                 .with_annotated_type(SubclassOfType::from(db, env, self_typevar));
 
+            let signature =
+                |parameters| Signature::new_generic(Some(generic_context), parameters, self_ty);
+            if let ClassLiteral::DynamicNamedTuple(named_tuple) = class.class_literal(db)
+                && !named_tuple.has_known_fields(db)
+            {
+                let parameters = partial_constructor_parameters(
+                    db,
+                    env,
+                    &first_parameter,
+                    named_tuple.spec(db).fields(db),
+                );
+                return Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(parameters.into_iter().map(signature)),
+                    CallableTypeKind::FunctionLike,
+                )));
+            }
+
             let parameters = std::iter::once(first_parameter).chain(fields.map(|field| {
                 Parameter::positional_or_keyword(field.name)
                     .with_annotated_type(field.ty)
@@ -70,11 +90,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                     .with_definition(field.definition)
             }));
 
-            let signature = Signature::new_generic(
-                Some(generic_context),
-                Parameters::standard(parameters),
-                self_ty,
-            );
+            let signature = signature(Parameters::standard(parameters));
             Some(Type::function_like_callable(db, signature))
         }
         "__match_args__" => {
@@ -176,6 +192,10 @@ impl<'db> FunctionalNamedTupleField<'db> {
         }
     }
 
+    const fn is_variadic(&self) -> bool {
+        matches!(self, Self::Variadic(_))
+    }
+
     pub(in crate::types) fn ty(&self) -> Type<'db> {
         match self {
             Self::Named(field) => field.ty,
@@ -198,6 +218,115 @@ fn field_tuple<'db>(
         }
     }
     TupleType::new(db, env, &tuple.build())
+}
+
+/// Synthesize overloads for the ways a caller can divide the fields between positional and
+/// keyword arguments. For example, with `[*fields, ("last", bytes)]`, either the positional
+/// arguments end in a `bytes`, or the caller must supply `last` as a keyword.
+fn partial_constructor_parameters<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    receiver: &Parameter<'db>,
+    fields: &[FunctionalNamedTupleField<'db>],
+) -> Vec<Parameters<'db>> {
+    const MAX_PRECISE_SPLITS: usize = 32;
+
+    let first_variadic = fields
+        .iter()
+        .position(FunctionalNamedTupleField::is_variadic)
+        .unwrap_or(fields.len());
+    let parameters = |fixed: &[_], variadic: &[_], keywords: &[_]| {
+        parameters_for_split(db, env, receiver.clone(), fixed, variadic, keywords)
+    };
+    let mut overloads = Vec::new();
+    for split in (0..=fields.len()).rev() {
+        let (positional, keywords) = fields.split_at(split);
+        // Moving a named field into the fixed prefix still lets the caller pass it by keyword.
+        if split < first_variadic
+            && let Some(FunctionalNamedTupleField::Named(_)) = keywords.first()
+        {
+            continue;
+        }
+        // The split after a variadic segment allows any number of its fields positionally,
+        // including zero. The split before it only adds an overload if the preceding segment
+        // is also variadic and can contribute its own type to both `*args` and `**kwargs`.
+        if let Some(FunctionalNamedTupleField::Variadic(_)) = keywords.first()
+            && !positional
+                .last()
+                .is_some_and(FunctionalNamedTupleField::is_variadic)
+        {
+            continue;
+        }
+        // Each overload can contain a parameter per field. To avoid quadratic growth, combine
+        // the remaining splits into one overload. It requires the named fields after the split
+        // as keywords and accepts arbitrary positional and keyword arguments for earlier fields.
+        if overloads.len() == MAX_PRECISE_SPLITS && !positional.is_empty() {
+            let prefix = [FunctionalNamedTupleField::Variadic(Type::unknown())];
+            overloads.push(parameters(&[], &prefix, keywords));
+            break;
+        }
+        let (fixed, variadic) = positional.split_at(first_variadic.min(split));
+        overloads.push(parameters(fixed, variadic, keywords));
+    }
+    overloads
+}
+
+/// Build one constructor overload. The positional fields consist of a fixed prefix followed
+/// by `variadic`, which starts at the first variable-length segment and runs up to the split.
+fn parameters_for_split<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    receiver: Parameter<'db>,
+    fixed: &[FunctionalNamedTupleField<'db>],
+    variadic: &[FunctionalNamedTupleField<'db>],
+    keywords: &[FunctionalNamedTupleField<'db>],
+) -> Parameters<'db> {
+    let mut parameters = vec![receiver];
+    // To pass an unnamed field positionally, the caller must also pass every earlier
+    // field positionally. The following named fields can be passed either way.
+    let last_unnamed = fixed.iter().rposition(|f| f.as_named().is_none());
+    for (index, field) in fixed.iter().enumerate() {
+        let name = field.as_named().map(|f| f.name.clone());
+        let parameter = match name {
+            Some(name) if last_unnamed.is_none_or(|last| index > last) => {
+                Parameter::positional_or_keyword(name)
+            }
+            name => Parameter::positional_only(name),
+        };
+        parameters.push(parameter.with_annotated_type(field.ty()));
+    }
+    if let [FunctionalNamedTupleField::Variadic(ty)] = variadic {
+        parameters.push(Parameter::variadic(Name::new_static("args")).with_annotated_type(*ty));
+    } else if !variadic.is_empty() {
+        // A starred annotation describes the arguments together. For example,
+        // `*args: *tuple[*tuple[Unknown, ...], bytes]` requires a final `bytes`.
+        parameters.push(
+            Parameter::variadic(Name::new_static("args"))
+                .with_annotated_type(Type::tuple(field_tuple(db, env, variadic)))
+                .with_starred_annotation(),
+        );
+    }
+
+    // The split after a variadic segment also covers splits within it, so its fields
+    // can be supplied through both `*args` and `**kwargs`.
+    let mut keyword_types = UnionBuilder::new(db, env);
+    if let Some(FunctionalNamedTupleField::Variadic(ty)) = variadic.last() {
+        keyword_types = keyword_types.add(*ty);
+    }
+    for field in keywords {
+        if let Some(field) = field.as_named() {
+            parameters
+                .push(Parameter::keyword_only(field.name.clone()).with_annotated_type(field.ty));
+        } else {
+            // We cannot require a particular keyword for an indeterminate name.
+            keyword_types = keyword_types.add(field.ty());
+        }
+    }
+    if let Some(ty) = keyword_types.try_build() {
+        parameters
+            .push(Parameter::keyword_variadic(Name::new_static("kwargs")).with_annotated_type(ty));
+    }
+    Parameters::standard(parameters)
 }
 
 /// A namedtuple created via the functional form `namedtuple(name, fields)` or
@@ -435,8 +564,10 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         // When fields are unknown, handle constructor and field-specific methods specially.
         if !self.has_known_fields(db) {
             match name {
-                // For constructors, return a gradual signature that accepts any arguments.
-                "__new__" | "__init__" => {
+                "__new__" | "__init__"
+                    if let [FunctionalNamedTupleField::Variadic(ty)] = self.spec(db).fields(db)
+                        && ty.is_unknown() =>
+                {
                     let signature = Signature::new(Parameters::gradual_form(), instance_ty);
                     return Some(Type::function_like_callable(db, signature));
                 }
