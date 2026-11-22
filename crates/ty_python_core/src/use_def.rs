@@ -812,11 +812,6 @@ pub struct UseDefMap<'db> {
     /// Interned [`Declarations`] values.
     interned_declarations: Arc<RetainedDeclarations>,
 
-    /// Tracks the reachability constraint for statements and certain sub-expressions
-    /// (e.g. ternary branches, boolean operator operands), keyed by their text range.
-    /// Used to suppress diagnostics in unreachable code.
-    range_reachability: Box<[(TextRange, RangeInfo)]>,
-
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
     /// [`Declarations`] to know whether this binding is permitted by the live declarations and
     /// imported qualifiers.
@@ -846,24 +841,67 @@ pub struct UseDefMap<'db> {
     /// Collection fields omitted when they would all be empty.
     extra: Option<Box<UseDefMapExtra>>,
 
-    /// Whether or not the end of the scope is reachable.
-    ///
-    /// This is used to check if the function can implicitly return `None`.
-    /// For example:
-    /// ```py
-    /// def f(cond: bool) -> int | None:
-    ///     if cond:
-    ///        return 1
-    ///
-    /// def g() -> int:
-    ///     if True:
-    ///        return 1
-    /// ```
-    ///
-    /// Function `f` may implicitly return `None`, but `g` cannot.
-    ///
-    /// This is used by `is_end_of_scope_reachable` in the `ty_python_semantic` crate.
-    end_of_scope_reachability: ScopedReachabilityConstraintId,
+    reachability: ScopeReachability,
+}
+
+/// How to find containing ranges without changing their evaluation order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+enum RangeSearch {
+    /// Nested expressions or evaluation out of source order can require a full scan.
+    Linear,
+    /// Both the start offsets and the end offsets are nondecreasing.
+    Binary,
+}
+
+/// Reachability within a scope and at its end.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+struct ScopeReachability {
+    /// Ranges of statements and certain sub-expressions, such as ternary branches
+    /// and boolean operands, in evaluation order.
+    ranges: Box<[(TextRange, RangeInfo)]>,
+    search: RangeSearch,
+    end_of_scope: ScopedReachabilityConstraintId,
+}
+
+impl ScopeReachability {
+    fn new(
+        mut ranges: Vec<(TextRange, RangeInfo)>,
+        end_of_scope: ScopedReachabilityConstraintId,
+    ) -> Self {
+        // Default ranges kept non-contiguous ranges with the same reachability from merging.
+        ranges.retain(|(_, info)| *info != RangeInfo::default());
+        let search =
+            if ranges.is_sorted_by(|(a, _), (b, _)| a.start() <= b.start() && a.end() <= b.end()) {
+                RangeSearch::Binary
+            } else {
+                RangeSearch::Linear
+            };
+        Self {
+            ranges: ranges.into_boxed_slice(),
+            search,
+            end_of_scope,
+        }
+    }
+
+    /// Returns information about each retained range that fully contains `range`.
+    fn ranges_containing(&self, range: TextRange) -> impl Iterator<Item = &RangeInfo> {
+        let candidates = match self.search {
+            RangeSearch::Linear => &self.ranges[..],
+            RangeSearch::Binary => {
+                // The containing ranges form a contiguous slice. Skip those that end
+                // too early, then stop before those that start too late.
+                let first = self
+                    .ranges
+                    .partition_point(|(entry, _)| entry.end() < range.end());
+                let remaining = &self.ranges[first..];
+                let count = remaining.partition_point(|(entry, _)| entry.start() <= range.start());
+                &remaining[..count]
+            }
+        };
+        candidates
+            .iter()
+            .filter_map(move |(entry, info)| entry.contains_range(range).then_some(info))
+    }
 }
 
 /// Shares equivalent scope-local binding and declaration tables within a file.
@@ -917,7 +955,7 @@ impl StubParameterLayout {
     fn instantiate<'db>(
         &self,
         parameters: Vec<StubParameter<'db>>,
-        builder: &mut UseDefMapBuilder<'db>,
+        reachability: ScopeReachability,
     ) -> UseDefMap<'db> {
         UseDefMap {
             all_definitions: RetainedDefinitions {
@@ -929,11 +967,10 @@ impl StubParameterLayout {
             constraint_tables: None,
             interned_bindings: Arc::clone(&self.bindings),
             interned_declarations: Arc::clone(&self.declarations),
-            range_reachability: builder.finish_ranges(),
             definitions_by_definition: FrozenMap::default(),
             symbol_states: self.symbols.clone(),
             extra: None,
-            end_of_scope_reachability: builder.reachability,
+            reachability,
         }
     }
 }
@@ -954,7 +991,9 @@ impl UseDefMapInterner {
             .as_ref()
             .and_then(|shape| self.stub_layouts.get(shape))
         {
-            return Arc::new(layout.instantiate(parameters, &mut builder));
+            let reachability =
+                ScopeReachability::new(builder.range_reachability, builder.reachability);
+            return Arc::new(layout.instantiate(parameters, reachability));
         }
 
         builder.record_stub_parameters(parameters);
@@ -1063,13 +1102,39 @@ impl<'db> UseDefMap<'db> {
     pub fn range_reachability(
         &self,
     ) -> impl Iterator<Item = (TextRange, ScopedReachabilityConstraintId)> + '_ {
-        self.range_reachability
+        self.reachability
+            .ranges
             .iter()
-            .map(|&(range, RangeInfo { reachability, .. })| (range, reachability))
+            .map(|(range, info)| (*range, info.reachability))
     }
 
+    /// Returns the constraints on ranges that fully contain `range`, in evaluation order.
+    /// If any constraint is false, `range` is unreachable.
+    pub fn reachability_constraints_for(
+        &self,
+        range: TextRange,
+    ) -> impl Iterator<Item = ScopedReachabilityConstraintId> + '_ {
+        self.reachability
+            .ranges_containing(range)
+            .map(|info| info.reachability)
+    }
+
+    /// The constraint that determines whether control can reach the end of this scope.
+    ///
+    /// In a function, this determines whether it can implicitly return `None`.
+    /// Here `f` can implicitly return `None`, but `g` cannot.
+    ///
+    /// ```python
+    /// def f(cond: bool) -> int | None:
+    ///     if cond:
+    ///         return 1
+    ///
+    /// def g() -> int:
+    ///     if True:
+    ///         return 1
+    /// ```
     pub fn end_of_scope_reachability(&self) -> ScopedReachabilityConstraintId {
-        self.end_of_scope_reachability
+        self.reachability.end_of_scope
     }
 
     /// Definitions relevant to usage analysis, including standalone declarations.
@@ -1186,7 +1251,8 @@ impl<'db> UseDefMap<'db> {
     }
 
     pub(crate) fn is_range_in_type_checking_block(&self, range: TextRange) -> bool {
-        self.range_reachability
+        self.reachability
+            .ranges
             .iter()
             .take_while(|(entry_range, _)| entry_range.start() <= range.start())
             .any(|&(entry_range, block)| {
@@ -3354,16 +3420,8 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    /// Drops the default ranges that served as barriers between non-contiguous ranges
-    /// with the same reachability while building the map.
-    fn finish_ranges(&mut self) -> Box<[(TextRange, RangeInfo)]> {
-        let mut ranges = std::mem::take(&mut self.range_reachability);
-        ranges.retain(|(_, info)| *info != RangeInfo::default());
-        ranges.into_boxed_slice()
-    }
-
     pub(super) fn finish(mut self: Box<Self>) -> UseDefMap<'db> {
-        let range_reachability = self.finish_ranges();
+        let reachability = ScopeReachability::new(self.range_reachability, self.reachability);
         let pending = self.pending_reachability.current;
         for state in self
             .symbol_states
@@ -3471,16 +3529,17 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.reachability_constraints,
             );
         }
-        for &(_, RangeInfo { reachability, .. }) in &range_reachability {
-            self.reachability_constraints.mark_used(reachability);
+        for (_, info) in &reachability.ranges {
+            self.reachability_constraints.mark_used(info.reachability);
         }
+        self.reachability_constraints
+            .mark_used(reachability.end_of_scope);
         for enclosing_snapshot in &enclosing_snapshots {
             // Bindings are already marked above.
             if let InternedEnclosingSnapshotId::Constraint(constraint) = enclosing_snapshot {
                 self.narrowing_constraints.mark_used(*constraint);
             }
         }
-        self.reachability_constraints.mark_used(self.reachability);
         let multi_bindings_by_use = MultiBindingsByUse::from_map(self.multi_bindings_by_use);
         let loop_headers = self.loop_headers;
         let mut boolean_test_roots = self.boolean_test_roots;
@@ -3525,11 +3584,10 @@ impl<'db> UseDefMapBuilder<'db> {
             constraint_tables,
             interned_bindings: Arc::new(interned_bindings),
             interned_declarations: Arc::new(interned_declarations),
-            range_reachability,
             symbol_states,
             definitions_by_definition,
             extra,
-            end_of_scope_reachability: self.reachability,
+            reachability,
         }
     }
 
