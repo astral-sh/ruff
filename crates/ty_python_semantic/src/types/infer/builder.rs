@@ -11767,6 +11767,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_unary_expression(&mut self, unary: &ast::ExprUnaryOp) -> Type<'db> {
         let operand_type = self.infer_expression(&unary.operand, TypeContext::default());
+
+        // Either sign preserves the built-in float type of a literal. The `float` return
+        // annotation on `__pos__` and `__neg__` would also admit `int`.
+        if matches!(unary.op, ast::UnaryOp::UAdd | ast::UnaryOp::USub)
+            && let ast::Expr::NumberLiteral(literal) = unary.operand.as_ref()
+            && matches!(literal.value, ast::Number::Float(_))
+        {
+            return operand_type;
+        }
+
         self.infer_unary_expression_type(unary, operand_type, None)
     }
 
