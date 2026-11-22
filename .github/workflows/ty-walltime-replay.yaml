@@ -23,11 +23,11 @@ jobs:
       matrix:
         include:
           - bench: pandas_stubs
-            rev: "25f16f85ba633d318a90cb841ad8d75eee1f9212"
+            rev: "bb18253b84c44d4c9517564415b27377ae8c14f0"
           - bench: fastapi
-            rev: "983bf82b74ac600890f6f5f1e6f969b3ab94d7b6"
+            rev: "0fc43484015ce7a570f8588053ff8a684ff44d85"
           - bench: scikit_learn
-            rev: "13a28d76b96908a66578e67d8a5c8ff020b019a7"
+            rev: "b09f331a3a48dcce09c88df02bf1474b6e9b20dd"
     timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
