@@ -1,5 +1,5 @@
 use crate::ProgramEnvironment;
-use itertools::Either;
+use itertools::{Either, Itertools};
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
@@ -11,8 +11,8 @@ use crate::place::{
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
 use crate::types::{
-    ApplyTypeMappingVisitor, InstanceProjection, PromotionKind, PromotionMode, Type, TypeContext,
-    TypeMapping, TypePair, TypeQualifiers,
+    ApplyTypeMappingVisitor, InstanceProjection, LiteralValueType, PromotionKind, PromotionMode,
+    Type, TypeContext, TypeMapping, TypePair, TypeQualifiers,
 };
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet, Program};
@@ -1065,6 +1065,20 @@ impl<'db> IntersectionType<'db> {
             builder.add_negative_in_place(negative.resolve_type_alias(db));
         }
         builder.build()
+    }
+
+    /// Return the literal if this intersection consists of a dynamic type and a literal,
+    /// as in `Any & Literal["a"]`.
+    fn gradual_literal(self, db: &'db dyn Db) -> Option<LiteralValueType<'db>> {
+        match self.iter_positive(db).collect_tuple()? {
+            (Type::Dynamic(_), Type::LiteralValue(literal))
+            | (Type::LiteralValue(literal), Type::Dynamic(_))
+                if self.negative(db).is_empty() =>
+            {
+                Some(literal)
+            }
+            _ => None,
+        }
     }
 
     /// Return the compact enum-complement view of this intersection, if it has one.

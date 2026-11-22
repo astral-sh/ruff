@@ -325,10 +325,12 @@ def _(
     distinct: Intersection[Any, Literal["a"]] | Intersection[Literal["b"], Any],
     same: Intersection[Literal["a"], Any] | Intersection[Any, Literal["a"]],
     broader: Intersection[Literal["a"], Any] | Intersection[Any, LiteralString],
+    mixed: Intersection[Any, LiteralString] | Intersection[Any, Literal[1]],
 ):
     reveal_type(distinct)  # revealed: (Any & Literal["a"]) | (Literal["b"] & Any)
     reveal_type(same)  # revealed: Literal["a"] & Any
     reveal_type(broader)  # revealed: Any & LiteralString
+    reveal_type(mixed)  # revealed: (Any & LiteralString) | (Any & Literal[1])
 ```
 
 ## Unions of literals with `AlwaysTruthy` and `AlwaysFalsy`
