@@ -1809,24 +1809,13 @@ impl<'db> IntersectionBuilder<'db> {
                     self.add_positive_impl::<L>(*pos, seen_aliases)?;
                 }
                 let negatives = other.negative(db);
-                if negatives.len() > 1
-                    && let [inner] = &mut self.intersections[..]
-                    && let Some(Type::LiteralValue(first)) = negatives.iter().next()
-                    && inner.negative.iter().chain(negatives).all(|ty| {
-                        ty.as_literal_value().is_some_and(|literal| {
-                            literal.is_concrete_builtin() && literal.has_same_flags(*first)
-                        })
-                    })
+                if let [inner] = &mut self.intersections[..]
+                    && inner.try_extend_literal_exclusions(db, &self.env, negatives)
                 {
-                    // Distinct built-in literal exclusions never simplify each other. With
-                    // matching flags, set membership also detects equal literal values.
-                    for neg in negatives {
-                        inner.add_negative_impl(db, &self.env, *neg, true);
-                    }
-                } else {
-                    for neg in negatives {
-                        self.add_negative_impl::<L>(*neg, seen_aliases)?;
-                    }
+                    return ControlFlow::Continue(());
+                }
+                for neg in negatives {
+                    self.add_negative_impl::<L>(*neg, seen_aliases)?;
                 }
             }
             Type::EnumComplement(complement) => {
@@ -2464,6 +2453,38 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
     }
 
+    /// Merges concrete literal exclusions, or leaves the builder unchanged and returns false.
+    ///
+    /// Two such exclusions can only simplify one another when their values match. Set membership
+    /// detects equal values if all literals also have the same promotion and recursion flags.
+    fn try_extend_literal_exclusions(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        exclusions: &NegativeIntersectionElements<'db>,
+    ) -> bool {
+        if exclusions.len() < 2 {
+            return false;
+        }
+        let Some(Type::LiteralValue(first)) = exclusions.iter().next() else {
+            return false;
+        };
+        if !exclusions.iter().chain(&self.negative).all(|ty| {
+            ty.as_literal_value().is_some_and(|literal| {
+                literal.is_concrete_builtin() && literal.has_same_flags(*first)
+            })
+        }) {
+            return false;
+        }
+
+        for &ty in exclusions {
+            if !self.try_simplify_negative(db, env, ty) && !self.negative.contains(&ty) {
+                self.insert_negative(db, env, ty);
+            }
+        }
+        true
+    }
+
     /// Adds a negative type to this intersection.
     fn add_negative(
         &mut self,
@@ -2471,31 +2492,74 @@ impl<'db> InnerIntersectionBuilder<'db> {
         env: &ProgramEnvironment<'db>,
         new_negative: Type<'db>,
     ) {
-        self.add_negative_impl(db, env, new_negative, false);
+        if self.try_simplify_negative(db, env, new_negative) {
+            return;
+        }
+
+        let new_negative_enum = new_negative.resolve_type_alias(db).as_enum_literal();
+        let mut to_remove = SmallVec::<[usize; 1]>::new();
+        for (index, existing_negative) in self.negative.iter().enumerate() {
+            if let Some(new_enum) = new_negative_enum
+                && existing_negative
+                    .resolve_type_alias(db)
+                    .as_enum_literal()
+                    .is_some_and(|existing_enum| {
+                        existing_enum.enum_class(db) == new_enum.enum_class(db)
+                    })
+            {
+                if existing_negative.resolve_type_alias(db).as_enum_literal() == Some(new_enum) {
+                    return;
+                }
+                continue;
+            }
+
+            match simplify_intersection_pair(
+                db,
+                env,
+                *existing_negative,
+                new_negative,
+                IntersectionPolarity::Negative,
+            ) {
+                IntersectionSimplification::Unchanged => {}
+                IntersectionSimplification::SecondRedundant => return,
+                IntersectionSimplification::FirstRedundant => to_remove.push(index),
+                IntersectionSimplification::Disjoint => {
+                    *self = Self::default();
+                    self.positive.insert(Type::Never);
+                    return;
+                }
+            }
+        }
+        for index in to_remove.into_iter().rev() {
+            self.negative.swap_remove_index(index);
+        }
+
+        self.insert_negative(db, env, new_negative);
     }
 
-    fn add_negative_impl(
+    /// Applies reductions that take precedence over pairwise comparisons, such as
+    /// `bool & ~Literal[True]` becoming `Literal[False]`. Returns true if the type was handled.
+    fn try_simplify_negative(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         new_negative: Type<'db>,
-        literal_exclusions: bool,
-    ) {
+    ) -> bool {
         // `Never & ~T` -> `Never`.
         if self.positive.contains(&Type::Never) {
-            return;
+            return true;
         }
 
         // `Divergent & ~T` -> `Divergent`.
         if self.positive.iter().any(Type::is_divergent) && !new_negative.is_pending_narrowing() {
             debug_assert_eq!(self.positive.len(), 1, "`Divergent` should be alone");
-            return;
+            return true;
         }
 
         if let Some(negated_divergent) = new_negative.resolve_type_alias(db).negated_divergent() {
             *self = Self::default();
             self.positive.insert(negated_divergent);
-            return;
+            return true;
         }
 
         let contains_bool = || {
@@ -2553,105 +2617,68 @@ impl<'db> InnerIntersectionBuilder<'db> {
             Type::AlwaysFalsy if self.contains_positive(db, Type::literal_string()) => {
                 self.add_negative(db, env, Type::string_literal(db, ""));
             }
-            _ => {
-                let new_negative_enum = new_negative.resolve_type_alias(db).as_enum_literal();
-                let mut to_remove = SmallVec::<[usize; 1]>::new();
-                let negatives = if literal_exclusions {
-                    if self.negative.contains(&new_negative) {
-                        return;
-                    }
-                    &NegativeIntersectionElements::Empty
-                } else {
-                    &self.negative
-                };
-                for (index, existing_negative) in negatives.iter().enumerate() {
-                    if let Some(new_enum) = new_negative_enum
-                        && existing_negative
-                            .resolve_type_alias(db)
-                            .as_enum_literal()
-                            .is_some_and(|existing_enum| {
-                                existing_enum.enum_class(db) == new_enum.enum_class(db)
-                            })
-                    {
-                        if existing_negative.resolve_type_alias(db).as_enum_literal()
-                            == Some(new_enum)
-                        {
-                            return;
-                        }
-                        continue;
-                    }
+            _ => return false,
+        }
+        true
+    }
 
-                    match simplify_intersection_pair(
-                        db,
-                        env,
-                        *existing_negative,
-                        new_negative,
-                        IntersectionPolarity::Negative,
-                    ) {
-                        IntersectionSimplification::Unchanged => {}
-                        IntersectionSimplification::SecondRedundant => return,
-                        IntersectionSimplification::FirstRedundant => to_remove.push(index),
-                        IntersectionSimplification::Disjoint => {
-                            *self = Self::default();
-                            self.positive.insert(Type::Never);
-                            return;
-                        }
+    /// Checks an exclusion against the positive elements and inserts it if still needed.
+    /// The caller has already simplified it against the existing exclusions.
+    fn insert_negative(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        new_negative: Type<'db>,
+    ) {
+        let new_negative_enum = new_negative.resolve_type_alias(db).as_enum_literal();
+        let mut to_remove = SmallVec::<[usize; 1]>::new();
+        for (index, existing_positive) in self.positive.iter().enumerate() {
+            if let Some(new_enum) = new_negative_enum {
+                if let Some(existing_enum) =
+                    existing_positive.resolve_type_alias(db).as_enum_literal()
+                    && existing_enum.enum_class(db) == new_enum.enum_class(db)
+                {
+                    if existing_enum == new_enum {
+                        *self = Self::default();
+                        self.positive.insert(Type::Never);
                     }
-                }
-                for index in to_remove.into_iter().rev() {
-                    self.negative.swap_remove_index(index);
+                    return;
                 }
 
-                let mut to_remove = SmallVec::<[usize; 1]>::new();
-                for (index, existing_positive) in self.positive.iter().enumerate() {
-                    if let Some(new_enum) = new_negative_enum {
-                        if let Some(existing_enum) =
-                            existing_positive.resolve_type_alias(db).as_enum_literal()
-                            && existing_enum.enum_class(db) == new_enum.enum_class(db)
-                        {
-                            if existing_enum == new_enum {
-                                *self = Self::default();
-                                self.positive.insert(Type::Never);
-                            }
-                            return;
-                        }
-
-                        if existing_positive
-                            .resolve_type_alias(db)
-                            .as_nominal_instance()
-                            .is_some_and(|instance| {
-                                instance.class_literal(db, env) == new_enum.enum_class(db)
-                            })
-                        {
-                            continue;
-                        }
-                    }
-
-                    match simplify_intersection_pair(
-                        db,
-                        env,
-                        *existing_positive,
-                        new_negative,
-                        IntersectionPolarity::Mixed,
-                    ) {
-                        IntersectionSimplification::Unchanged => {}
-                        IntersectionSimplification::SecondRedundant => return,
-                        IntersectionSimplification::FirstRedundant => to_remove.push(index),
-                        IntersectionSimplification::Disjoint => {
-                            *self = Self::default();
-                            self.positive.insert(Type::Never);
-                            return;
-                        }
-                    }
+                if existing_positive
+                    .resolve_type_alias(db)
+                    .as_nominal_instance()
+                    .is_some_and(|instance| {
+                        instance.class_literal(db, env) == new_enum.enum_class(db)
+                    })
+                {
+                    continue;
                 }
+            }
 
-                for index in to_remove.into_iter().rev() {
-                    self.positive.swap_remove_index(index);
+            match simplify_intersection_pair(
+                db,
+                env,
+                *existing_positive,
+                new_negative,
+                IntersectionPolarity::Mixed,
+            ) {
+                IntersectionSimplification::Unchanged => {}
+                IntersectionSimplification::SecondRedundant => return,
+                IntersectionSimplification::FirstRedundant => to_remove.push(index),
+                IntersectionSimplification::Disjoint => {
+                    *self = Self::default();
+                    self.positive.insert(Type::Never);
+                    return;
                 }
-
-                self.negative.insert(new_negative);
             }
         }
+
+        for index in to_remove.into_iter().rev() {
+            self.positive.swap_remove_index(index);
+        }
+
+        self.negative.insert(new_negative);
     }
 
     /// Tries to simplify any constrained typevars in the intersection.
@@ -3197,6 +3224,17 @@ mod tests {
             .add_negative(one)
             .add_negative(two)
             .build();
+
+        // Merge into a set that already contains one of the incoming literals.
+        let zero = Type::int_literal(0);
+        let merged = IntersectionBuilder::new(db, &env)
+            .add_negative(zero)
+            .add_negative(one)
+            .add_positive(exclusions)
+            .build();
+        assert!(
+            matches!(merged, Type::Intersection(i) if i.iter_negative(db).eq([zero, one, two]))
+        );
 
         // Keep the first exclusion even if the duplicate has different literal flags.
         for first in [
