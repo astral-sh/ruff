@@ -25,11 +25,7 @@ Module(
                     parameters: Parameters {
                         range: 7..9,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: Some(
                         Starred(
@@ -79,11 +75,7 @@ Module(
                     parameters: Parameters {
                         range: 30..32,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: Some(
                         Starred(
@@ -133,11 +125,7 @@ Module(
                     parameters: Parameters {
                         range: 55..57,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: Some(
                         Yield(

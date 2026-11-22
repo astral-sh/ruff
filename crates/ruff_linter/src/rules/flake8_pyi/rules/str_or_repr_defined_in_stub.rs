@@ -1,4 +1,5 @@
 use ruff_python_ast as ast;
+use ruff_python_ast::ParameterRole;
 use ruff_python_ast::Stmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -70,10 +71,18 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: &Stmt) {
 
     // It is a violation only if the method signature matches that of `object.__str__`
     // or `object.__repr__` exactly and the method is not decorated as abstract.
-    if !parameters.kwonlyargs.is_empty()
-        || (parameters.args.len() + parameters.posonlyargs.len()) > 1
-    {
-        return;
+    let mut seen_positional = false;
+    for role in parameters.roles() {
+        match role {
+            ParameterRole::KeywordOnly => return,
+            ParameterRole::PositionalOnly | ParameterRole::PositionalOrKeyword => {
+                if seen_positional {
+                    return;
+                }
+                seen_positional = true;
+            }
+            ParameterRole::Vararg | ParameterRole::Kwarg => {}
+        }
     }
 
     if is_abstract(decorator_list, checker.semantic()) {

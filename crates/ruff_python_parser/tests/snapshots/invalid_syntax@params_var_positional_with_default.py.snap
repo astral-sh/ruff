@@ -25,38 +25,37 @@ Module(
                     parameters: Parameters {
                         range: 7..17,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 8..9,
-                                node_index: NodeIndex(None),
-                                parameter: Parameter {
+                        items: [
+                            PositionalOrKeyword(
+                                ParameterWithDefault {
                                     range: 8..9,
                                     node_index: NodeIndex(None),
-                                    name: Identifier {
-                                        id: Name("a"),
+                                    parameter: Parameter {
                                         range: 8..9,
+                                        node_index: NodeIndex(None),
+                                        name: Identifier {
+                                            id: Name("a"),
+                                            range: 8..9,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                            ),
+                            Vararg(
+                                Parameter {
+                                    range: 11..16,
+                                    node_index: NodeIndex(None),
+                                    name: Identifier {
+                                        id: Name("args"),
+                                        range: 12..16,
                                         node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },
-                                default: None,
-                            },
+                            ),
                         ],
-                        vararg: Some(
-                            Parameter {
-                                range: 11..16,
-                                node_index: NodeIndex(None),
-                                name: Identifier {
-                                    id: Name("args"),
-                                    range: 12..16,
-                                    node_index: NodeIndex(None),
-                                },
-                                annotation: None,
-                            },
-                        ),
-                        kwonlyargs: [],
-                        kwarg: None,
                     },
                     returns: None,
                     body: [

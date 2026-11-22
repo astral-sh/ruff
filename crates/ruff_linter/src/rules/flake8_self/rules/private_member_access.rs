@@ -231,12 +231,7 @@ fn is_method_receiver(
         return false;
     };
 
-    let Some(first_parameter) = function
-        .parameters
-        .posonlyargs
-        .first()
-        .or_else(|| function.parameters.args.first())
-    else {
+    let Some(first_parameter) = function.parameters.iter_positional_params().next() else {
         return false;
     };
 
