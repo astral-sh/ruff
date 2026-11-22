@@ -1,5 +1,5 @@
 use ruff_index::{IndexVec, newtype_index};
-use ruff_python_ast::{AstNode, Expr, Stmt, SyntaxNode};
+use ruff_python_ast::{Ast, AstNode, Expr, Stmt, SyntaxNode};
 
 use crate::BranchId;
 
@@ -30,6 +30,16 @@ pub struct Nodes<'a> {
 }
 
 impl<'a> Nodes<'a> {
+    pub(crate) fn for_ast(ast: &Ast) -> Self {
+        // Only statements and expressions need parent links. Reserving three quarters of
+        // the rows covers most files without allocating an entry for every identifier and
+        // argument list. Quoted annotations can add nodes from outside this arena.
+        let capacity = ast.len() - ast.len() / 4;
+        Self {
+            entries: IndexVec::with_capacity(capacity),
+        }
+    }
+
     /// Inserts a new AST node into the tree and returns its unique ID.
     #[inline]
     pub(crate) fn insert(
