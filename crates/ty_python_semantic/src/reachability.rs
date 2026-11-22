@@ -607,7 +607,7 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
         PredicateNode::OrPatternAlternative(scope) => scope,
         PredicateNode::SubjectElementPattern(subject_element) => subject_element.pattern.scope(db),
         PredicateNode::IsNonEmptyIterable(expression) => expression.scope(db),
-        PredicateNode::StarImportPlaceholder(star_import) => star_import.scope(db),
+        PredicateNode::StarImportPlaceholder(star_import) => star_import.import.scope(db),
     }
 }
 
@@ -2075,9 +2075,9 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
             analyze_non_empty_iterable(db, iterable).negate_if(!predicate.is_positive)
         }
         PredicateNode::StarImportPlaceholder(star_import) => {
-            let place_table = place_table(db, star_import.scope(db));
-            let symbol = place_table.symbol(star_import.symbol_id(db));
-            let program_file = star_import.referenced_file(db);
+            let place_table = place_table(db, star_import.import.scope(db));
+            let symbol = place_table.symbol(star_import.symbol_id);
+            let program_file = star_import.import.referenced_file(db);
             let requires_explicit_reexport = match dunder_all_names(db, program_file) {
                 Some(all_names) => {
                     if all_names.contains(symbol.name()) {
