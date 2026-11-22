@@ -524,7 +524,8 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
 /// With memoization, each pattern is analyzed exactly once.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    cycle_initial = |_, _, _| Truthiness::Uninhabited,
+    cycle_fn = |_, _, previous: &Truthiness, current, _| previous.union(current),
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {

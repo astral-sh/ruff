@@ -936,3 +936,33 @@ def _(val, IntOrStr: type[int | str]):
         case IntOrStr():
             print(f"Matched as {IntOrStr}: {val!r}")
 ```
+
+## Assignments inside loop cases
+
+We report possibly undefined names without panicking when the match subject and another name read
+before the match are assigned only inside a loop's case.
+
+```py
+def unbound_subject():
+    for item in [1]:
+        foo  # error: [possibly-unresolved-reference]
+        match subject:  # error: [possibly-unresolved-reference]
+            case {}:
+                foo = 0
+                subject = 0
+```
+
+An assignment inside an unreachable case does not change the subject's type.
+
+```py
+def unreachable_assignment():
+    subject = 0
+    foo = 0
+    for item in [1]:
+        foo
+        match subject:
+            case {}:
+                foo = 1
+                subject = {}
+    reveal_type(subject)  # revealed: Literal[0]
+```
