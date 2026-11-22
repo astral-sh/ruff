@@ -54,7 +54,7 @@ pub(crate) fn unnecessary_range_start(checker: &Checker, call: ast::ExprCall<'_>
     let Some(value) = start.as_int_literal() else {
         return;
     };
-    if *value != 0 {
+    if value != 0 {
         return;
     }
 

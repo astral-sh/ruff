@@ -335,7 +335,7 @@ impl<'a> From<ast::Identifier<'a>> for ComparableText<'a> {
     }
 }
 
-struct ComparableNumber<'a>(&'a ast::Number);
+struct ComparableNumber<'a>(ast::Number<'a>);
 
 impl fmt::Debug for ComparableNumber<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -367,7 +367,7 @@ impl Eq for ComparableNumber<'_> {}
 
 impl Hash for ComparableNumber<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        std::mem::discriminant(self.0).hash(state);
+        std::mem::discriminant(&self.0).hash(state);
         match self.0 {
             ast::Number::Int(value) => value.hash(state),
             ast::Number::Float(value) => value.to_bits().hash(state),
@@ -2131,7 +2131,7 @@ enum HashableReal {
 }
 
 impl HashableReal {
-    fn from_int(value: &ast::Int) -> Option<Self> {
+    fn from_int(value: ast::Int<&str>) -> Option<Self> {
         value.as_u64().map(i128::from).map(Self::Integer)
     }
 
@@ -2226,11 +2226,11 @@ impl<'a> From<Expr<'a>> for HashableExpr<'a> {
                 ast::ExprKind::NumberLiteral(number) => match number.value() {
                     Number::Int(int) => HashableReal::from_int(int).map(HashableNumber::real),
                     Number::Float(float) => {
-                        Some(HashableNumber::real(HashableReal::from_float(*float)))
+                        Some(HashableNumber::real(HashableReal::from_float(float)))
                     }
                     Number::Complex { real, imag } => Some(HashableNumber::complex(
-                        HashableReal::from_float(*real),
-                        HashableReal::from_float(*imag),
+                        HashableReal::from_float(real),
+                        HashableReal::from_float(imag),
                     )),
                 },
                 ast::ExprKind::UnaryOp(unary) => match unary.op() {
@@ -2249,11 +2249,11 @@ impl<'a> From<Expr<'a>> for HashableExpr<'a> {
                     else {
                         return None;
                     };
-                    let complex_real = HashableReal::from_float(*complex_real);
+                    let complex_real = HashableReal::from_float(complex_real);
                     if !complex_real.is_zero() {
                         return None;
                     }
-                    let mut imag = HashableReal::from_float(*imag);
+                    let mut imag = HashableReal::from_float(imag);
                     if op.is_sub() {
                         imag.negate();
                     }

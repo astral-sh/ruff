@@ -54,10 +54,7 @@ pub(crate) fn snmp_insecure_version(
         ["pysnmp", "hlapi", .., "CommunityData"]
     ) {
         if let Some(keyword) = call.arguments().find_keyword("mpModel") {
-            if matches!(
-                keyword.value().as_int_literal(),
-                Some(&Int::ZERO | &Int::ONE)
-            ) {
+            if matches!(keyword.value().as_int_literal(), Some(Int::ZERO | Int::ONE)) {
                 checker.report_diagnostic(SnmpInsecureVersion, keyword.range());
             }
         }

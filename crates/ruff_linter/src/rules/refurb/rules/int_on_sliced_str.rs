@@ -95,8 +95,8 @@ pub(crate) fn int_on_sliced_str(checker: &Checker, call: ast::ExprCall<'_>) {
 
     // The base must be a number literal with a value of 2, 8, or 16.
     let Some(base_u8) = base
-        .as_number_literal_expr()
-        .and_then(|base| base.value().as_int())
+        .as_int_literal()
+        .as_ref()
         .and_then(ruff_python_ast::Int::as_u8)
     else {
         return;
@@ -117,8 +117,7 @@ pub(crate) fn int_on_sliced_str(checker: &Checker, call: ast::ExprCall<'_>) {
     }
     if expr_slice
         .lower()
-        .and_then(ruff_python_ast::Expr::as_number_literal_expr)
-        .and_then(|expr| expr.value().as_int())
+        .and_then(ruff_python_ast::Expr::as_int_literal)
         .is_none_or(|expr| expr.as_u8() != Some(2))
     {
         return;

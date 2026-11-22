@@ -46,7 +46,7 @@ impl AllowedValue {
                 if let Number::Float(value) = number.value() =>
             {
                 let value = match unary_op {
-                    None | Some(UnaryOp::UAdd) => *value,
+                    None | Some(UnaryOp::UAdd) => value,
                     Some(UnaryOp::USub) => -value,
                     Some(UnaryOp::Invert | UnaryOp::Not) => return false,
                 };

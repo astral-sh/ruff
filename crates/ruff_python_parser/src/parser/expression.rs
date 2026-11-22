@@ -604,7 +604,7 @@ impl<'src> Parser<'src> {
                 let value = self.bump_int();
                 id::Expr::from(
                     build::ExprNumberLiteral {
-                        value: Number::Int(value),
+                        value: Number::Int(value.as_borrowed()),
                         range: self.node_range(start),
                     }
                     .emit(&mut self.storage),

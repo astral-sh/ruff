@@ -78,7 +78,7 @@ pub(crate) fn nunique_constant_series_check(checker: &Checker, compare: ExprComp
     }
 
     // Right should be the integer 1.
-    if right.as_int_literal() != Some(&Int::ONE) {
+    if right.as_int_literal() != Some(Int::ONE) {
         return;
     }
 

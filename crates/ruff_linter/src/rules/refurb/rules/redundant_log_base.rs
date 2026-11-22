@@ -142,7 +142,7 @@ fn is_number_literal(expr: Expr<'_>, value: i8) -> bool {
             return number.as_i8().is_some_and(|number| number == value);
         } else if let Number::Float(number) = number_literal.value() {
             #[expect(clippy::float_cmp)]
-            return *number == f64::from(value);
+            return number == f64::from(value);
         }
     }
     false

@@ -99,8 +99,8 @@ impl<'a> Expr<'a> {
 
     /// Returns the value of an integer literal.
     #[inline]
-    pub fn as_int_literal(self) -> Option<&'a crate::Int> {
-        self.as_number_literal_expr()?.value().as_int()
+    pub fn as_int_literal(self) -> Option<crate::Int<&'a str>> {
+        self.as_number_literal_expr()?.int_value()
     }
 
     pub fn as_literal_expr(self) -> Option<LiteralExpression<'a>> {

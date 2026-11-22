@@ -87,7 +87,7 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: ast::ExprSubsc
         return;
     };
 
-    if *int != 2 {
+    if int != 2 {
         return;
     }
 

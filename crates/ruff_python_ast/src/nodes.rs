@@ -1185,10 +1185,12 @@ impl From<TStringFlags> for AnyStringFlags {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
+/// A numeric literal returned by value. Only integers larger than [`u64::MAX`]
+/// borrow their spelling from the tree.
+#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub enum Number {
-    Int(int::Int),
+pub enum Number<'a> {
+    Int(int::Int<&'a str>),
     Float(f64),
     Complex { real: f64, imag: f64 },
 }

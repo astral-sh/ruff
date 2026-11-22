@@ -95,7 +95,7 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: StmtFor<'_>) {
             else {
                 continue;
             };
-            if !(value.as_int_literal() == Some(&Int::ZERO)
+            if !(value.as_int_literal() == Some(Int::ZERO)
                 || matches!(
                     ResolvedPythonType::from(value),
                     ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
@@ -166,7 +166,7 @@ pub(crate) fn enumerate_for_loop(checker: &Checker, for_stmt: StmtFor<'_>) {
 /// the name of the index variable.
 fn match_index_increment(stmt: Stmt<'_>) -> Option<ExprName<'_>> {
     let increment = stmt.as_aug_assign_stmt()?;
-    if increment.op() == Operator::Add && increment.value().as_int_literal() == Some(&Int::ONE) {
+    if increment.op() == Operator::Add && increment.value().as_int_literal() == Some(Int::ONE) {
         increment.target().as_name_expr()
     } else {
         None

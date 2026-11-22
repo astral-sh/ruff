@@ -56,21 +56,21 @@ impl Truthiness {
                 let value = literal.value();
                 match value {
                     Number::Int(int) => {
-                        if *int == 0 {
+                        if int == 0 {
                             Self::Falsey
                         } else {
                             Self::Truthy
                         }
                     }
                     Number::Float(float) => {
-                        if *float == 0.0 {
+                        if float == 0.0 {
                             Self::Falsey
                         } else {
                             Self::Truthy
                         }
                     }
                     Number::Complex { real, imag, .. } => {
-                        if *real == 0.0 && *imag == 0.0 {
+                        if real == 0.0 && imag == 0.0 {
                             Self::Falsey
                         } else {
                             Self::Truthy

@@ -140,7 +140,7 @@ fn enumerate_items<'a>(
     // If the `enumerate` call has a non-zero `start`, don't omit.
     if !arguments
         .find_argument_value("start", 1)
-        .is_none_or(|expr| expr.as_int_literal() == Some(&Int::ZERO))
+        .is_none_or(|expr| expr.as_int_literal() == Some(Int::ZERO))
     {
         return None;
     }

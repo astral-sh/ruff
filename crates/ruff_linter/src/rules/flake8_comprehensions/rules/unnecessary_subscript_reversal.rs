@@ -73,7 +73,7 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &Checker, call: ast::ExprC
     let Some(val) = operand.as_int_literal() else {
         return;
     };
-    if *val != 1 {
+    if val != 1 {
         return;
     }
     let Some(function_name) = checker.semantic().resolve_builtin_symbol(call.func()) else {

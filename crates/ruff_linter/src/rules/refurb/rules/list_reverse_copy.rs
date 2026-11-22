@@ -174,8 +174,8 @@ fn extract_name_from_sliced_reversed(expr: Expr<'_>) -> Option<ExprName<'_>> {
         return None;
     };
     if operand
-        .as_number_literal_expr()
-        .and_then(|num| num.value().as_int())
+        .as_int_literal()
+        .as_ref()
         .and_then(Int::as_u8)
         .is_none_or(|value| value != 1)
     {

@@ -107,7 +107,7 @@ pub(crate) fn long_sleep_not_forever(checker: &Checker, call: ast::ExprCall<'_>)
         Number::Float(float_value) =>
         {
             #[expect(clippy::cast_precision_loss)]
-            if *float_value <= one_day_in_secs as f64 {
+            if float_value <= one_day_in_secs as f64 {
                 return;
             }
         }

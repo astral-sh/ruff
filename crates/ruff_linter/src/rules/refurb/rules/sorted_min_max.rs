@@ -112,7 +112,7 @@ pub(crate) fn sorted_min_max(checker: &Checker, subscript: ast::ExprSubscript<'_
         ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
             value: Number::Int(index),
             ..
-        }) if *index == 0 => Index::First,
+        }) if index == 0 => Index::First,
 
         // [-1]
         ast::ExprFields::UnaryOp(ast::ExprUnaryOpFields {
@@ -125,7 +125,7 @@ pub(crate) fn sorted_min_max(checker: &Checker, subscript: ast::ExprSubscript<'_
                 ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
                     value: Number::Int(index),
                     ..
-                }) if *index == 1 => Index::Last,
+                }) if index == 1 => Index::Last,
                 _ => return,
             }
         }

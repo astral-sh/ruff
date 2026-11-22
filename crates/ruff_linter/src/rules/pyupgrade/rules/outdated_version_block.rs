@@ -205,7 +205,7 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: StmtIf<'_>) {
 
 /// Returns true if the `check_version` is always less than the [`PythonVersion`].
 fn version_always_less_than(
-    check_version: &[Int],
+    check_version: &[Int<&str>],
     py_version: PythonVersion,
     or_equal: bool,
 ) -> Result<bool> {
@@ -435,13 +435,8 @@ fn fix_always_true_branch(
 }
 
 /// Return the version tuple as a sequence of [`Int`] values.
-fn extract_version(elts: NodeList<'_, ast::kind::Expr>) -> Option<Vec<Int>> {
-    let mut version: Vec<Int> = vec![];
-    for elt in elts {
-        let int = elt.as_int_literal()?;
-        version.push(int.clone());
-    }
-    Some(version)
+fn extract_version(elts: NodeList<'_, ast::kind::Expr>) -> Option<Vec<Int<&str>>> {
+    elts.iter().map(Expr::as_int_literal).collect()
 }
 
 /// Returns `true` if the expression is related to `sys.version_info`.

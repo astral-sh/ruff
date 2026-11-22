@@ -85,7 +85,7 @@ fn match_slice_info(expr: Expr<'_>) -> Option<SliceInfo> {
 
     // Avoid false positives for slices with a step.
     if let Some(step) = step {
-        if step.as_int_literal() != Some(&Int::ONE) {
+        if step.as_int_literal() != Some(Int::ONE) {
             return None;
         }
     }

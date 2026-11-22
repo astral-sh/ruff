@@ -90,6 +90,7 @@ fn nfkc_normalizes_dotted_names() {
 }
 #[test]
 fn number_values() {
+    let big: ast::Int = "123456789123456789123456789123456789".parse().unwrap();
     let cases = [
         ("1E400", Number::Float(f64::INFINITY)),
         (
@@ -101,7 +102,7 @@ fn number_values() {
         ),
         (
             "123_456_789_123_456_789_123_456_789_123_456_789",
-            Number::Int("123456789123456789123456789123456789".parse().unwrap()),
+            Number::Int(big.as_borrowed()),
         ),
         (
             "000_123_456_789_123_456_789_123_456_789_123_456_789J",
@@ -121,7 +122,7 @@ fn number_values() {
             );
         };
 
-        assert_eq!(number.value(), &expected, "source: {source:?}");
+        assert_eq!(number.value(), expected, "source: {source:?}");
     }
 }
 

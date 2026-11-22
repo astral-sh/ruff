@@ -2892,18 +2892,23 @@ impl Builder {
     fn push_expr_number_literal(
         &mut self,
         range: ruff_text_size::TextRange,
-        [value]: [u64; 1],
+        value: crate::Number<'_>,
     ) -> BuildId<crate::kind::ExprNumberLiteral> {
         let mut row = Row::new(NodeKind::ExprNumberLiteral);
-        row.set_expr_number_literal_value(split_words(value)[0]);
+        let (value, kind) = self.store_number(value);
+        row.set_expr_number_literal_number_kind(kind as u8);
+        row.set_expr_number_literal_value(value);
         self.push(row, range)
     }
 }
 impl<'a> crate::ExprNumberLiteral<'a> {
     #[inline]
-    pub fn value(self) -> &'a crate::Number {
-        let word = u64::from(self.syntax_node().row.expr_number_literal_value());
-        &self.syntax_node().ast.numbers[split_words(word)[0] as usize]
+    pub fn value(self) -> crate::Number<'a> {
+        let word = self.syntax_node().row.expr_number_literal_value();
+        self.syntax_node().ast.read_number(
+            word,
+            self.syntax_node().row.expr_number_literal_number_kind(),
+        )
     }
 }
 impl NodeType for crate::kind::ExprBooleanLiteral {
@@ -5346,7 +5351,7 @@ impl Builder {
             .cast(),
             AnyNode::ExprNumberLiteral(node) => build::ExprNumberLiteral {
                 range: node.range(),
-                value: node.value().clone(),
+                value: node.value(),
             }
             .emit(self)
             .cast(),
@@ -6979,7 +6984,7 @@ impl<'a> TypeParamKind<'a> {
 }
 pub mod build {
     use super::super::Emit;
-    use super::{ABSENT, AstNodeId, BuildId, Builder, Word, offset};
+    use super::{ABSENT, AstNodeId, BuildId, Builder, Word};
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct DebugText<'a> {
         pub leading: &'a str,
@@ -8483,20 +8488,16 @@ pub mod build {
         }
     }
     #[derive(Debug)]
-    pub struct ExprNumberLiteral {
+    pub struct ExprNumberLiteral<'a> {
         pub range: ruff_text_size::TextRange,
-        pub value: crate::Number,
+        pub value: crate::Number<'a>,
     }
-    impl Emit for ExprNumberLiteral {
+    impl Emit for ExprNumberLiteral<'_> {
         type Output = crate::kind::ExprNumberLiteral;
         #[inline]
         fn emit(self, builder: &mut Builder) -> BuildId<Self::Output> {
-            let value = {
-                let slot = offset(builder.ast.numbers.len());
-                builder.ast.numbers.push(self.value);
-                u64::from(slot)
-            };
-            builder.push_expr_number_literal(self.range, [value])
+            let value = self.value;
+            builder.push_expr_number_literal(self.range, value)
         }
     }
     #[derive(Debug)]
@@ -10248,7 +10249,7 @@ pub(crate) mod fields {
     #[derive(Clone, Copy)]
     pub struct ExprNumberLiteralFields<'a> {
         pub node: crate::ExprNumberLiteral<'a>,
-        pub value: &'a crate::Number,
+        pub value: crate::Number<'a>,
     }
     impl Ranged for ExprNumberLiteralFields<'_> {
         #[inline]

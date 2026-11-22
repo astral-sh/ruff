@@ -248,11 +248,11 @@ pub(crate) fn compare(checker: &Checker, compare: ast::ExprCompare<'_>) {
             if is_sys(subscript.value(), "version_info", checker.semantic()) =>
         {
             if let Some(i) = subscript.slice().as_int_literal() {
-                if *i == 0 {
+                if i == 0 {
                     if let (operator @ (CmpOp::Eq | CmpOp::NotEq), Some(n)) =
                         (op, right.as_int_literal())
                     {
-                        if *n == 3 && checker.is_rule_enabled(Rule::SysVersionInfo0Eq3) {
+                        if n == 3 && checker.is_rule_enabled(Rule::SysVersionInfo0Eq3) {
                             checker.report_diagnostic(
                                 SysVersionInfo0Eq3 {
                                     eq: matches!(operator, CmpOp::Eq),
@@ -261,7 +261,7 @@ pub(crate) fn compare(checker: &Checker, compare: ast::ExprCompare<'_>) {
                             );
                         }
                     }
-                } else if *i == 1 {
+                } else if i == 1 {
                     if let (CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE, Some(_)) =
                         (op, right.as_int_literal())
                     {

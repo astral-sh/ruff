@@ -223,10 +223,10 @@ impl ExpectedComparator {
                 ..
             }) => {
                 if let Some(upper) = upper.as_int_literal() {
-                    if *upper == 1 {
+                    if upper == 1 {
                         return Some(ExpectedComparator::MajorTuple);
                     }
-                    if *upper == 2 {
+                    if upper == 2 {
                         return Some(ExpectedComparator::MajorMinorTuple);
                     }
                 }

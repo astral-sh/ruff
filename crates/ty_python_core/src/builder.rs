@@ -2213,7 +2213,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 ast::ExprFields::NumberLiteral(ast::ExprNumberLiteralFields {
                     value: Number::Int(n),
                     ..
-                }) => Some(*n != 0),
+                }) => Some(n != 0),
                 ast::ExprFields::EllipsisLiteral(_) => Some(true),
                 ast::ExprFields::Lambda(_) | ast::ExprFields::Generator(_) => Some(true),
                 ast::ExprFields::NoneLiteral(_) => Some(false),

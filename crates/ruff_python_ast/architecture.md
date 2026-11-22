@@ -97,7 +97,14 @@ A dictionary display stores a list of `DictItem` IDs. Each item holds its option
 value. In `{**mapping}` the entry starts at `**` and its only child is `mapping`. Every AST list
 element occupies one four-byte word. Side-table offsets have their own encoding and can start at
 zero. UTF-8 text and arbitrary byte strings have separate buffers, so a bytes literal can contain
-any byte without affecting text decoding. Number values have their own side table.
+any byte without affecting text decoding.
+
+Number literals store integers through `u64::MAX` and floats in the first eight bytes
+of the row. A byte after the value identifies its representation. For larger integers,
+the row holds the offset and length of the digits in the text buffer. Complex values
+use four extra words for the two floating-point components. Reading a number returns
+a value by copy. Only a large integer borrows its spelling from the arena.
+
 Identifiers with the same spelling
 share a four-byte index into the parse's name table. Each distinct spelling is a `Name` backed
 by `CharStr`, which stores short names inline. The parser emits unescaped literals from the source and

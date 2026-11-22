@@ -491,7 +491,7 @@ impl Parser<'_> {
                     build::PatternMatchValue {
                         value: id::Expr::from(
                             build::ExprNumberLiteral {
-                                value: Number::Int(value),
+                                value: Number::Int(value.as_borrowed()),
                                 range,
                             }
                             .emit(&mut self.storage),

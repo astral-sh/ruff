@@ -330,11 +330,10 @@ def field_codec(field: Field, nodes: set[str]) -> WireField:
         return codec(4, "u32", f"u64::from({value})", "split_words(word)[0]")
     if inner == "Number":
         return codec(
-            4,
-            "&'a crate::Number",
-            f"{{ let slot = offset(builder.ast.numbers.len()); builder.ast.numbers.push({value}); u64::from(slot) }}",
-            "&self.syntax_node().ast.numbers[split_words(word)[0] as usize]",
-            build_type="crate::Number",
+            8,
+            "crate::Number<'a>",
+            value,
+            "self.syntax_node().ast.read_number(word, self.syntax_node().row.expr_number_literal_number_kind())",
         )
     if inner == "DebugText":
         assert field.optional
@@ -355,8 +354,9 @@ class InlineField:
     width: int
 
 
-# These derived values are read without following the node's children.
-CACHED_FIELDS = {
+# Extra inline storage used by the literal field codecs.
+ADDITIONAL_INLINE_FIELDS = {
+    "ExprNumberLiteral": [InlineField("number_kind", 8, 1)],
     "ExprStringLiteral": [
         InlineField("text_offset", 8, 4),
         InlineField("text_len", 12, 2),
@@ -370,7 +370,7 @@ def layout(
     """Place naturally aligned fields in fifteen bytes, spilling fields into extra if needed."""
     reserved = {
         i
-        for field in CACHED_FIELDS.get(node, [])
+        for field in ADDITIONAL_INLINE_FIELDS.get(node, [])
         for i in range(field.offset, field.offset + field.width)
     }
 
@@ -712,8 +712,6 @@ def copy_field(field: Field, nodes: set[str]) -> str:
         )
     if inner == "Name":
         return f"self.intern_name({value}.as_str())"
-    if inner == "Number":
-        return f"{value}.clone()"
     if inner == "DebugText":
         return f"{value}.map(crate::DebugText::parts)"
     if inner == "str":
@@ -952,7 +950,7 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         "use crate::NodeKind;",
     ]
     initializers = [
-        "pub mod build { use super::{BuildId, AstNodeId, Builder, ABSENT, Word, offset}; use super::super::Emit;",
+        "pub mod build { use super::{BuildId, AstNodeId, Builder, ABSENT, Word}; use super::super::Emit;",
         """#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         pub struct DebugText<'a> {
             pub leading: &'a str,
@@ -1030,7 +1028,7 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                 for f in fields
                 if f.name in offsets
             ),
-            *CACHED_FIELDS.get(n.name, []),
+            *ADDITIONAL_INLINE_FIELDS.get(n.name, []),
         ]
         if extra_offset is not None:
             schemas[n.name].append(InlineField("extra_offset", extra_offset, 4))
@@ -1061,8 +1059,15 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
         method = f"push_{to_snake_case(n.name)}"
         parameters = ", ".join(f.name for f in fields)
         borrows_literal = any("'a" in field.build_type for field in fields)
+        if n.name == "ExprNumberLiteral":
+            # The numeric payload and its tag are separate fields in the row.
+            parameters_decl = "value: crate::Number<'_>"
+            arguments = "value"
+        else:
+            parameters_decl = f"[{parameters}]: [u64; {len(fields)}]"
+            arguments = f"[{parameters}]"
         out.append(
-            f"impl Builder {{ #[inline] fn {method}(&mut self, range: ruff_text_size::TextRange, [{parameters}]: [u64; {len(fields)}]) -> BuildId<crate::kind::{n.name}> {{"
+            f"impl Builder {{ #[inline] fn {method}(&mut self, range: ruff_text_size::TextRange, {parameters_decl}) -> BuildId<crate::kind::{n.name}> {{"
         )
         default = ", Default" if n.name == "Parameters" else ""
         lifetime = "<'a>" if borrows_literal else ""
@@ -1076,9 +1081,13 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
             f"}} impl Emit for {constructor} {{ type Output = crate::kind::{n.name}; #[inline] fn emit(self, builder: &mut Builder) -> BuildId<Self::Output> {{"
         )
         initializers.extend(f"let {field.name} = {field.encode};" for field in fields)
-        initializers.append(f"builder.{method}(self.range, [{parameters}]) }} }}")
+        initializers.append(f"builder.{method}(self.range, {arguments}) }} }}")
         mutable = "mut " if fields else ""
         out.append(f"let {mutable}row = Row::new(NodeKind::{n.name});")
+        if n.name == "ExprNumberLiteral":
+            out.append(
+                "let (value, kind) = self.store_number(value); row.set_expr_number_literal_number_kind(kind as u8);"
+            )
         for f in fields:
             if f.name in offsets:
                 value = {

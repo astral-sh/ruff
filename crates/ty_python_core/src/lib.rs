@@ -2076,7 +2076,7 @@ class C[T]:
         let Some(num) = assignment.value(&module).as_int_literal() else {
             panic!("should be a number literal")
         };
-        assert_eq!(*num, 1);
+        assert_eq!(num, 1);
     }
 
     #[test]

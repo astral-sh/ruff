@@ -1217,11 +1217,11 @@ impl<'a> Generator<'a> {
                         if fp.is_infinite() {
                             self.p(INF_STR);
                         } else {
-                            self.p(&ruff_python_literal::float::to_string(*fp));
+                            self.p(&ruff_python_literal::float::to_string(fp));
                         }
                     }
                     Number::Complex { real, imag } => {
-                        let value = if *real == 0.0 {
+                        let value = if real == 0.0 {
                             format!("{imag}j")
                         } else {
                             format!("({real}{imag:+}j)")

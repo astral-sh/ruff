@@ -184,7 +184,8 @@ node_payloads! {
         value: u64 at 0 => expr_bytes_literal_value, set_expr_bytes_literal_value;
     }
     ExprNumberLiteral(expr_number_literal) {
-        value: u32 at 0 => expr_number_literal_value, set_expr_number_literal_value;
+        value: u64 at 0 => expr_number_literal_value, set_expr_number_literal_value;
+        number_kind: u8 at 8 => expr_number_literal_number_kind, set_expr_number_literal_number_kind;
     }
     ExprBooleanLiteral(expr_boolean_literal) {
         value: u8 at 0 => expr_boolean_literal_value, set_expr_boolean_literal_value;

@@ -178,9 +178,9 @@ pub(crate) fn subscript(checker: &Checker, value: Expr<'_>, slice: Expr<'_>) {
         match slice.classify() {
             ExprKind::Slice(slice) if slice.lower().is_none() && slice.step().is_none() => {
                 if let Some(i) = slice.upper().and_then(Expr::as_int_literal) {
-                    if *i == 1 && checker.is_rule_enabled(Rule::SysVersionSlice1) {
+                    if i == 1 && checker.is_rule_enabled(Rule::SysVersionSlice1) {
                         checker.report_diagnostic(SysVersionSlice1, value.range());
-                    } else if *i == 3 && checker.is_rule_enabled(Rule::SysVersionSlice3) {
+                    } else if i == 3 && checker.is_rule_enabled(Rule::SysVersionSlice3) {
                         checker.report_diagnostic(SysVersionSlice3, value.range());
                     }
                 }

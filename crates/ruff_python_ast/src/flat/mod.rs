@@ -16,9 +16,7 @@ use rustc_hash::FxBuildHasher;
 use thin_vec::ThinVec;
 
 use crate::kind::Any;
-use crate::{
-    MAX_REAL_INDEX, NodeIndex, NodeIndexError, NodeKind, Number, sub_ast_level, sub_indices,
-};
+use crate::{MAX_REAL_INDEX, NodeIndex, NodeIndexError, NodeKind, sub_ast_level, sub_indices};
 
 mod children;
 mod generated;
@@ -549,7 +547,6 @@ pub struct Ast {
     // Most files have no bytes literals. Keep only a pointer in the AST and store
     // the length and capacity alongside the bytes when the buffer is allocated.
     bytes: ThinVec<u8>,
-    numbers: Vec<Number>,
     keys: RowKeys,
 }
 
@@ -567,7 +564,6 @@ impl Ast {
             text: String::new(),
             names: Vec::new(),
             bytes: ThinVec::new(),
-            numbers: Vec::new(),
             keys: RowKeys::Unindexed,
         }
     }
@@ -671,7 +667,6 @@ pub struct Checkpoint {
     text: usize,
     names: usize,
     bytes: usize,
-    numbers: usize,
 }
 
 impl Default for Builder {
@@ -761,7 +756,6 @@ impl Builder {
             text: self.ast.text.len(),
             names: self.ast.names.len(),
             bytes: self.ast.bytes.len(),
-            numbers: self.ast.numbers.len(),
         }
     }
 
@@ -784,7 +778,6 @@ impl Builder {
             }
         }
         self.ast.bytes.truncate(checkpoint.bytes);
-        self.ast.numbers.truncate(checkpoint.numbers);
     }
 
     fn node_count(&self) -> usize {
@@ -1111,7 +1104,6 @@ impl<T> Tree<T> {
         self.ast.text.shrink_to_fit();
         self.ast.names.shrink_to_fit();
         self.ast.bytes.shrink_to_fit();
-        self.ast.numbers.shrink_to_fit();
     }
 
     fn required_node_indices(&self) -> usize {
