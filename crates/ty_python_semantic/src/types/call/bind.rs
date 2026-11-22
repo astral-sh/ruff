@@ -3639,42 +3639,31 @@ impl<'db> OverloadFilter<'db> {
         cached(db, self).unwrap_or_else(|| self.compute_covering_prefix_len(db))
     }
 
-    /// Does the first participating argument rule out every prefix tested in step 5?
+    /// Can we rule out assigning `object` to the union without building it?
     ///
-    /// A dynamic argument's top materialization is `object`. If the corresponding parameters
-    /// only admit narrower nominal types or protocols requiring members `object` lacks,
-    /// no union of these parameters can cover that argument. Other types, such as
-    /// intersections with negations, may cover `object` collectively.
-    fn first_slot_rules_out_coverage(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
-        let candidates = self.candidates(db);
-        // Only the first slot is guaranteed to stay aligned when empty unions are
-        // omitted from the tuples. Even the last candidate can supply a variadic argument.
-        if !candidates.iter().all(|candidate| {
-            candidate.slots.first().is_some_and(|slot| {
-                slot.variadic_argument.is_none() && slot.argument.is_non_divergent_dynamic()
-            })
-        }) {
-            return false;
-        }
-
-        // The last parameter is never part of a tested prefix.
-        let mut pending: SmallVec<[_; 4]> = candidates[..candidates.len() - 1]
-            .iter()
-            .map(|candidate| candidate.slots[0].parameter)
-            .collect();
-        let mut seen = FxHashSet::default();
-        while let Some(ty) = pending.pop() {
+    /// Checking assignability to each parameter separately isn't enough.
+    /// For example, neither `int` nor `~int` accepts `object`, but their union does.
+    fn union_excludes_object(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut parameters: impl Iterator<Item = Type<'db>>,
+    ) -> bool {
+        let mut pending = SmallVec::<[_; 4]>::new();
+        let mut seen_aliases = FxHashSet::default();
+        while let Some(ty) = pending.pop().or_else(|| parameters.next()) {
             match ty {
-                Type::NominalInstance(instance) if !instance.is_object() => {}
-                Type::ProtocolInstance(protocol)
-                    if !protocol.is_equivalent_to_object(db)
-                        && !has_all_protocol_members_defined(db, env, Type::object(), protocol) => {
-                }
                 Type::Union(union) => pending.extend_from_slice(union.elements(db)),
                 Type::TypeAlias(alias) if !alias.is_recursive(db) => {
-                    if seen.insert(alias) {
+                    if seen_aliases.insert(alias) {
                         pending.push(alias.value_type(db));
                     }
+                }
+                Type::NominalInstance(instance) if !instance.is_object() => continue,
+                Type::ProtocolInstance(protocol)
+                    if !protocol.is_equivalent_to_object(db)
+                        && !has_all_protocol_members_defined(db, env, Type::object(), protocol) =>
+                {
+                    continue;
                 }
                 _ => return false,
             }
@@ -3685,7 +3674,22 @@ impl<'db> OverloadFilter<'db> {
     fn compute_covering_prefix_len(self, db: &'db dyn Db) -> usize {
         let env = &ProgramEnvironment::from_program(self.program(db));
         let candidates = self.candidates(db);
-        if self.first_slot_rules_out_coverage(db, env) {
+        let longest_prefix = &candidates[..candidates.len() - 1];
+
+        // Only the first participating slot stays aligned when we omit empty unions below.
+        // Even the last candidate can supply a variadic argument.
+        let first_argument_is_dynamic = candidates.iter().all(|candidate| {
+            candidate.slots.first().is_some_and(|slot| {
+                slot.variadic_argument.is_none() && slot.argument.is_non_divergent_dynamic()
+            })
+        });
+
+        // A dynamic argument requires a prefix that accepts `object`. If even the longest
+        // proper prefix rules it out, keep all overloads.
+        let first_parameters = longest_prefix
+            .iter()
+            .map(|candidate| candidate.slots[0].parameter);
+        if first_argument_is_dynamic && Self::union_excludes_object(db, env, first_parameters) {
             return candidates.len();
         }
 
@@ -3701,7 +3705,7 @@ impl<'db> OverloadFilter<'db> {
             .take(max_slot_count)
             .collect::<Vec<_>>();
 
-        for (index, current) in candidates.iter().enumerate().take(candidates.len() - 1) {
+        for (index, current) in longest_prefix.iter().enumerate() {
             let mut union_argument_type_builders =
                 std::iter::repeat_with(|| UnionBuilder::new(db, env))
                     .take(max_slot_count)

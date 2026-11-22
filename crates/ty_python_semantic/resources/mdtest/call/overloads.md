@@ -1979,7 +1979,7 @@ def f(a: Foo, b: list[str], c: list[LiteralString], e):
     reveal_type(a.join(e))  # revealed: Unknown
 ```
 
-### A protocol that accepts `object`
+### Protocols and dynamic arguments
 
 The top materialization of `Any` is `object`. Since `object` is assignable to `Hashable`, the first
 overload covers the argument even though some subclasses of `object` are unhashable.
@@ -1997,6 +1997,25 @@ def f(x: object) -> int | str:
 
 def _(x: Any):
     reveal_type(f(x))  # revealed: int
+```
+
+In contrast, `object` lacks the `__len__` method required by `Sized`. Neither `Sized` nor
+`Sized | int` covers the argument, so the third overload makes the return type ambiguous.
+
+```py
+from collections.abc import Sized
+
+@overload
+def g(x: Sized) -> int: ...
+@overload
+def g(x: int) -> int: ...
+@overload
+def g(x: None) -> str: ...
+def g(x: object) -> int | str:
+    return 0
+
+def _(x: Any):
+    reveal_type(g(x))  # revealed: Unknown
 ```
 
 ### Multiple arguments
