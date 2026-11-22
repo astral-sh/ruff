@@ -186,6 +186,7 @@ impl AddAssign for FixMap {
 pub(crate) fn lint_path(
     path: &Path,
     package: Option<PackageRoot<'_>>,
+    package_roots: &FxHashMap<&Path, Option<PackageRoot<'_>>>,
     project: &Project,
     overrides: &ConfigArguments,
     cache: Option<&Cache>,
@@ -306,6 +307,9 @@ pub(crate) fn lint_path(
             ));
         }
     };
+    let package = script.as_ref().map_or(package, |script| {
+        script.package_root(path, &project.settings.linter, package, package_roots)
+    });
     let settings = script.as_ref().map_or(settings, |script| {
         &script.settings(&project.settings).linter
     });

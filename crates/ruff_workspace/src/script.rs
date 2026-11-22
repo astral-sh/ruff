@@ -6,12 +6,16 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use pep440_rs::VersionSpecifiers;
+use rustc_hash::FxHashMap;
 use serde::Deserialize;
 
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::system::SystemPathBuf;
 use ruff_linter::fs;
+use ruff_linter::package::PackageRoot;
+use ruff_linter::packaging::detect_package_root;
 use ruff_linter::preview::is_script_metadata_enabled;
+use ruff_linter::settings::LinterSettings;
 use ruff_python_ast::SourceType;
 use ruff_python_ast::script::ScriptTag;
 use ruff_ranged_value::{ValueSource, ValueSourceGuard};
@@ -47,6 +51,55 @@ impl Script {
             ScriptSettings::Declared(Some(settings)) => settings,
             ScriptSettings::Undeclared | ScriptSettings::Declared(None) => project,
         }
+    }
+
+    /// Resolve the script's package root when its namespace settings differ from the project.
+    pub fn package_root<'a>(
+        &self,
+        path: &'a Path,
+        project_settings: &LinterSettings,
+        package: Option<PackageRoot<'a>>,
+        package_roots: &FxHashMap<&Path, Option<PackageRoot<'_>>>,
+    ) -> Option<PackageRoot<'a>> {
+        // FIXME: Resolver::package_roots runs before inline script settings are read. Its
+        // discovery cache records whether a directory is a package, including whether it
+        // matches the active namespace-packages setting, but shares that answer across
+        // configurations. The subsequent pass also marks nested roots using one map for all
+        // configurations, so both cached membership and nested roots can be incorrect when
+        // projects disagree about namespace packages.
+        //
+        // We recompute this script's root with its own namespace settings, but can only
+        // check whether it is nested under roots from that earlier discovery pass. If, for
+        // example, pkg/run.py declares pkg as a namespace package, that script-specific
+        // root is not added to the map used to classify pkg/sub/__init__.py. Conversely,
+        // roots discovered under another project's settings can affect this script's nested
+        // classification. This can produce incorrect package-related diagnostics or fixes.
+        let ScriptSettings::Declared(Some(settings)) = &self.settings else {
+            return package;
+        };
+
+        let namespaces = &settings.linter.namespace_packages;
+        if *namespaces == project_settings.namespace_packages {
+            return package;
+        }
+
+        let root = detect_package_root(path.parent()?, namespaces)?;
+        if let Some(package) = package.filter(|package| package.path() == root) {
+            return Some(package);
+        }
+
+        let nested = path.ends_with("__init__.py")
+            && path.parent() == Some(root)
+            && package_roots
+                .values()
+                .flatten()
+                .any(|outer| outer.path() != root && root.starts_with(outer.path()));
+
+        Some(if nested {
+            PackageRoot::nested(root)
+        } else {
+            PackageRoot::root(root)
+        })
     }
 }
 

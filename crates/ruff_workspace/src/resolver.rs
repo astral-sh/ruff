@@ -296,6 +296,11 @@ fn is_package_with_cache<'a>(
     namespace_packages: &[PathBuf],
     package_cache: &mut FxHashMap<&'a Path, bool>,
 ) -> bool {
+    // FIXME: Package membership depends on namespace_packages, but this cache is shared
+    // across configurations and keyed only by directory. Fixing the cache alone is not
+    // sufficient: the global nested-root pass in Resolver::package_roots can then
+    // overwrite roots discovered under other configurations, causing incorrect lint
+    // fixes (for example, TID252).
     *package_cache
         .entry(path)
         .or_insert_with(|| is_package(path, namespace_packages))

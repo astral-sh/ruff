@@ -4206,6 +4206,78 @@ fn script_with_tool_ruff_uses_inline_rules() -> Result<()> {
 }
 
 #[test]
+fn inline_script_namespace_packages() -> Result<()> {
+    let test = CliTest::with_file(
+        "ruff.toml",
+        r#"
+            preview = true
+            namespace-packages = ['pkg']
+            lint.select = ['N999']
+        "#,
+    )?;
+    test.write_file(
+        "pkg/Invalid-Name.py",
+        r#"
+            # /// script
+            # tool.ruff.lint.select = ['N999']
+            # tool.ruff.namespace-packages = ['.']
+            # ///
+        "#,
+    )?;
+    test.write_file(
+        "pkg/Other-Name.py",
+        r"
+            # /// script
+            # tool.ruff.lint.select = ['N999']
+            # ///
+        ",
+    )?;
+    assert_cmd_snapshot!(test.check_command().arg("pkg"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    pkg/Invalid-Name.py:1:1: invalid-module-name: Invalid module name: 'Invalid-Name'
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn inline_script_nested_package_root() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "ruff.toml",
+            r"
+                preview = true
+                namespace-packages = ['acme']
+                lint.select = ['INP001']
+            ",
+        ),
+        ("acme/__init__.py", ""),
+        (
+            "acme/plugins/pkg/__init__.py",
+            r"
+                # /// script
+                # tool.ruff.lint.select = ['INP001']
+                # ///
+            ",
+        ),
+    ])?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "acme"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    acme/plugins/pkg/__init__.py:1:1: implicit-namespace-package: File `acme/plugins/pkg/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `acme/plugins`.
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
 fn explicit_config_overrides_script_settings() -> Result<()> {
     let test = CliTest::with_files([
         (

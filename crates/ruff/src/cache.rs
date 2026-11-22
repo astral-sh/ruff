@@ -510,6 +510,7 @@ mod tests {
     use filetime::{FileTime, set_file_mtime};
     use itertools::Itertools;
     use ruff_python_ast::SourceType;
+    use rustc_hash::FxHashMap;
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
@@ -584,6 +585,7 @@ mod tests {
                 let mut diagnostics = lint_path(
                     &path,
                     Some(PackageRoot::root(&package_root)),
+                    &FxHashMap::default(),
                     &project,
                     &overrides,
                     Some(&cache),
@@ -634,6 +636,7 @@ mod tests {
             got_diagnostics += lint_path(
                 &path,
                 Some(PackageRoot::root(&package_root)),
+                &FxHashMap::default(),
                 &project,
                 &overrides,
                 Some(&cache),
@@ -1073,6 +1076,7 @@ mod tests {
             lint_path(
                 &self.package_root.join(path),
                 Some(PackageRoot::root(&self.package_root)),
+                &FxHashMap::default(),
                 &self.project,
                 &ConfigArguments::default(),
                 Some(cache),

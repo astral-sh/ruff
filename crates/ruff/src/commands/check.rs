@@ -109,6 +109,7 @@ pub(crate) fn check(
                 lint_path(
                     path,
                     package,
+                    &package_roots,
                     project,
                     config_arguments,
                     cache,
@@ -199,6 +200,7 @@ pub(crate) fn check(
 fn lint_path(
     path: &Path,
     package: Option<PackageRoot<'_>>,
+    package_roots: &FxHashMap<&Path, Option<PackageRoot<'_>>>,
     project: &Project,
     overrides: &ConfigArguments,
     cache: Option<&Cache>,
@@ -210,6 +212,7 @@ fn lint_path(
         crate::diagnostics::lint_path(
             path,
             package,
+            package_roots,
             project,
             overrides,
             cache,
