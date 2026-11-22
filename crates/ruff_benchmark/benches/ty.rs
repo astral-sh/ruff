@@ -2116,6 +2116,17 @@ fn benchmark_literal_match_fallthrough(criterion: &mut Criterion) {
     );
 }
 
+/// Each failed case adds another literal exclusion to the type of `opcode`.
+fn benchmark_int_match_fallthrough(criterion: &mut Criterion) {
+    let mut code = String::from("def decode(opcode: int) -> int:\n    match opcode:\n");
+    for opcode in 0..128 {
+        writeln!(code, "        case {opcode}: return {opcode}").unwrap();
+    }
+    code.push_str("    return opcode\n");
+
+    benchmark_micro_case(criterion, "ty_micro[int_match_fallthrough]", &code);
+}
+
 /// Benchmarks guarded `match` fallthrough over a gradual literal subject.
 ///
 /// This generates a large version of this Python shape:
@@ -3041,6 +3052,7 @@ criterion_group!(
     benchmark_class_or_pattern_captures,
     benchmark_large_isinstance_narrowing,
     benchmark_literal_match_fallthrough,
+    benchmark_int_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
     benchmark_enum_union_equality,

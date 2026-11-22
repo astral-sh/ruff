@@ -1808,8 +1808,24 @@ impl<'db> IntersectionBuilder<'db> {
                 for pos in other.positive(db) {
                     self.add_positive_impl::<L>(*pos, seen_aliases)?;
                 }
-                for neg in other.negative(db) {
-                    self.add_negative_impl::<L>(*neg, seen_aliases)?;
+                let negatives = other.negative(db);
+                if let [inner] = &mut self.intersections[..]
+                    && inner.can_use_set_membership(negatives)
+                {
+                    // Distinct built-in literal exclusions never simplify each other. With
+                    // matching flags, set membership also detects equal literal values.
+                    for neg in negatives {
+                        inner.add_negative_impl(
+                            db,
+                            &self.env,
+                            *neg,
+                            ExclusionComparison::SetMembership,
+                        );
+                    }
+                } else {
+                    for neg in negatives {
+                        self.add_negative_impl::<L>(*neg, seen_aliases)?;
+                    }
                 }
             }
             Type::EnumComplement(complement) => {
@@ -1962,6 +1978,14 @@ impl<'db> IntersectionBuilder<'db> {
     }
 }
 
+/// How to compare an incoming exclusion with the existing exclusions.
+#[derive(Copy, Clone)]
+enum ExclusionComparison {
+    Pairwise,
+    /// Exact duplicates are redundant, and distinct exclusions cannot simplify each other.
+    SetMembership,
+}
+
 /// The signs of a pair of intersection elements. For `Mixed`, the first is positive.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::SalsaValue)]
 enum IntersectionPolarity {
@@ -1989,20 +2013,8 @@ fn simplify_intersection_pair<'db>(
     // Built-in literal values have no inference dependencies, so these simplifications cannot
     // participate in a cycle and do not need an interned pair or a tracked relation query.
     if let (Type::LiteralValue(first), Type::LiteralValue(second)) = (first, second)
-        && matches!(
-            first.kind(),
-            LiteralValueTypeKind::Int(_)
-                | LiteralValueTypeKind::Bool(_)
-                | LiteralValueTypeKind::String(_)
-                | LiteralValueTypeKind::Bytes(_)
-        )
-        && matches!(
-            second.kind(),
-            LiteralValueTypeKind::Int(_)
-                | LiteralValueTypeKind::Bool(_)
-                | LiteralValueTypeKind::String(_)
-                | LiteralValueTypeKind::Bytes(_)
-        )
+        && first.is_concrete_builtin()
+        && second.is_concrete_builtin()
     {
         return match (polarity, first.kind() == second.kind()) {
             (IntersectionPolarity::Positive, true) => {
@@ -2106,6 +2118,22 @@ struct InnerIntersectionBuilder<'db> {
 }
 
 impl<'db> InnerIntersectionBuilder<'db> {
+    /// Whether set membership can replace pairwise simplification for these exclusions.
+    fn can_use_set_membership(&self, incoming: &NegativeIntersectionElements<'db>) -> bool {
+        // Only scan the existing set if we can reuse the result across multiple insertions.
+        if incoming.len() <= 1 {
+            return false;
+        }
+        let Some(Type::LiteralValue(first)) = incoming.iter().next() else {
+            return false;
+        };
+        self.negative.iter().chain(incoming).all(|ty| {
+            ty.as_literal_value().is_some_and(|literal| {
+                literal.is_concrete_builtin() && literal.has_same_flags(*first)
+            })
+        })
+    }
+
     fn contains_never(&self) -> bool {
         self.positive.contains(&Type::Never)
     }
@@ -2466,6 +2494,16 @@ impl<'db> InnerIntersectionBuilder<'db> {
         env: &ProgramEnvironment<'db>,
         new_negative: Type<'db>,
     ) {
+        self.add_negative_impl(db, env, new_negative, ExclusionComparison::Pairwise);
+    }
+
+    fn add_negative_impl(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        new_negative: Type<'db>,
+        comparison: ExclusionComparison,
+    ) {
         // `Never & ~T` -> `Never`.
         if self.positive.contains(&Type::Never) {
             return;
@@ -2541,7 +2579,16 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 let new_negative_enum = new_negative.resolve_type_alias(db).as_enum_literal();
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
-                for (index, existing_negative) in self.negative.iter().enumerate() {
+                let negatives = match comparison {
+                    ExclusionComparison::Pairwise => &self.negative,
+                    ExclusionComparison::SetMembership => {
+                        if self.negative.contains(&new_negative) {
+                            return;
+                        }
+                        &NegativeIntersectionElements::Empty
+                    }
+                };
+                for (index, existing_negative) in negatives.iter().enumerate() {
                     if let Some(new_enum) = new_negative_enum
                         && existing_negative
                             .resolve_type_alias(db)
