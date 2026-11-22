@@ -1,7 +1,5 @@
 use std::fmt::{Display, Write};
 
-use thin_vec::ThinVec;
-
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
@@ -3605,7 +3603,7 @@ impl<'src> Parser<'src> {
         }
 
         let retained = self.parameter_scratch.drain_snapshot(snapshot);
-        let mut items = ThinVec::with_capacity(retained.len());
+        let mut items = Vec::with_capacity(retained.len());
         for (i, item) in retained.enumerate() {
             match item {
                 ast::ParameterItem::PositionalOrKeyword(param)

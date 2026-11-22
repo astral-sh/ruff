@@ -3378,7 +3378,7 @@ impl ParameterItem {
 pub struct Parameters {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub items: ThinVec<ParameterItem>,
+    pub items: Vec<ParameterItem>,
 }
 
 impl Parameters {
@@ -4146,7 +4146,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<StmtTry>(), 64);
         assert_eq!(std::mem::size_of::<Mod>(), 32);
         assert_eq!(std::mem::size_of::<Pattern>(), 64);
-        assert_eq!(std::mem::size_of::<Parameters>(), 24);
+        assert_eq!(std::mem::size_of::<Parameters>(), 40);
         assert_eq!(std::mem::size_of::<Arguments>(), 32);
         assert_eq!(std::mem::size_of::<Expr>(), 56);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
