@@ -35,7 +35,7 @@ use ty_python_core::{
 };
 
 pub(crate) use implicit_globals::{
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol,
+    GlobalDeclarations, module_type_implicit_global_declaration, module_type_implicit_global_symbol,
 };
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize)]
@@ -528,6 +528,24 @@ pub(crate) fn global_symbol<'db>(
     explicit_global_symbol(db, file, name).or_fall_back_to(db, &env, || {
         module_type_implicit_global_symbol(db, file, name)
     })
+}
+
+/// Whether member lookup could call a module-level `__getattr__`.
+///
+/// Only an explicit global can supply this hook (see [`imported_symbol`]).
+/// Checking the symbol table avoids inferring the hook or any of the module's exports.
+pub(crate) fn module_may_define_getattr<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    module: Module<'db>,
+) -> bool {
+    let Some(file) = module.file(db) else {
+        return false;
+    };
+    let file = ProgramFile::new(db, file, env.program(db));
+    place_table(db, global_scope(db, file))
+        .symbol_id("__getattr__")
+        .is_some()
 }
 
 /// Infers the public type of an imported symbol.
@@ -2424,15 +2442,34 @@ pub(crate) mod implicit_globals {
         })
     }
 
+    /// Checks for potential declarations of module globals without inferring their types.
+    pub(crate) struct GlobalDeclarations<'db> {
+        implicit: &'db [Name],
+    }
+
+    impl<'db> GlobalDeclarations<'db> {
+        pub(crate) fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+            Self {
+                implicit: module_type_symbols(db, env),
+            }
+        }
+
+        /// Includes explicit declarations even if they don't reach a particular binding.
+        pub(crate) fn may_declare(&self, symbol: &Symbol) -> bool {
+            symbol.is_declared() || self.implicitly_declares(symbol.name())
+        }
+
+        fn implicitly_declares(&self, name: &str) -> bool {
+            self.implicit.iter().any(|member| member == name)
+        }
+    }
+
     pub(crate) fn module_type_implicit_global_declaration<'db>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        if !module_type_symbols(db, env)
-            .iter()
-            .any(|module_type_member| module_type_member == name)
-        {
+        if !GlobalDeclarations::new(db, env).implicitly_declares(name) {
             return Place::Undefined.into();
         }
         let Some(module_type_scope) = module_type_body_scope(db, env) else {
@@ -2529,10 +2566,7 @@ pub(crate) mod implicit_globals {
             // when absolutely necessary is that this function is used in a very hot path (name resolution
             // in `infer.rs`). We use less idiomatic (and much more verbose) code here as a micro-optimisation.
             _ => {
-                if !module_type_symbols(db, &env)
-                    .iter()
-                    .any(|module_type_member| &**module_type_member == name)
-                {
+                if !GlobalDeclarations::new(db, &env).implicitly_declares(name) {
                     return Place::Undefined.into();
                 }
                 KnownClass::ModuleType
@@ -2584,7 +2618,7 @@ pub(crate) mod implicit_globals {
             .collect()
     }
 
-    pub(crate) fn module_type_symbols<'db>(
+    fn module_type_symbols<'db>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> &'db [ast::name::Name] {
