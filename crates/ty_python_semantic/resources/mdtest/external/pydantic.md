@@ -571,7 +571,7 @@ class RetargetedValidator(InheritedBeforeValidatedParent):
     def coerce_child(cls, value: object) -> object:
         return value
 
-# revealed: (self: RetargetedValidator, *, child: Child | Mapping[str, Any], left: Any, right: Any, **extra: Any) -> None
+# revealed: (self: RetargetedValidator, /, *, child: Child | Mapping[str, Any], left: Any, right: Any, **extra: Any) -> None
 reveal_type(RetargetedValidator.__init__)
 ```
 
