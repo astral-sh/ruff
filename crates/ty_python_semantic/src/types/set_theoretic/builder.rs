@@ -1185,6 +1185,14 @@ impl<'db> UnionBuilder<'db> {
         match (left, right) {
             (Type::ClassLiteral(_), Type::ClassLiteral(_))
             | (Type::ModuleLiteral(_), Type::ModuleLiteral(_)) => true,
+            // Distributing `Any & Literal["a", "b"]` produces one intersection per
+            // value. Each intersection is still bounded by its literal.
+            (Type::Intersection(left), Type::Intersection(right))
+                if let Some(left) = left.gradual_literal(db)
+                    && let Some(right) = right.gradual_literal(db) =>
+            {
+                left.is_disjoint_from(db, right)
+            }
             (Type::Intersection(left), Type::Intersection(right)) => {
                 let class_guard = |ty: IntersectionType<'db>| {
                     let Ok(Type::ClassLiteral(_)) = ty.iter_positive(db).exactly_one() else {
