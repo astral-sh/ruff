@@ -3043,7 +3043,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .receiver_constraints()
                 .is_some_and(|constraints| constraints.requires_lazy_evaluation(db, &checker))
         }) {
-            checker.typevar_evaluation = TypeVarEvaluation::Lazy;
+            checker.typevar_evaluation = if self.is_eager_assignability()
+                || self.typevar_evaluation == TypeVarEvaluation::LazyWithEagerBounds
+            {
+                TypeVarEvaluation::LazyWithEagerBounds
+            } else {
+                TypeVarEvaluation::Lazy
+            };
         }
         let check_parameters_and_return = || {
             let result = checker.check_signature_pair_inner(db, source, target);
@@ -3063,8 +3069,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     checker.check_signature_pair_inner(db, &fixed(source), &fixed(target))
                 });
             }
-            if checker.typevar_evaluation == TypeVarEvaluation::Lazy
-                && target.parameters.is_gradual()
+            if matches!(
+                checker.typevar_evaluation,
+                TypeVarEvaluation::Lazy | TypeVarEvaluation::LazyWithEagerBounds
+            ) && target.parameters.is_gradual()
                 && !source.parameters.is_top()
                 && result.is_never_satisfied(db, env, checker.inferable)
             {

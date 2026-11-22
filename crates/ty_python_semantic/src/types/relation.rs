@@ -208,6 +208,13 @@ pub(crate) enum TypeVarEvaluation {
     /// Collect constraints on the variables in scope.
     Lazy,
 
+    /// Collect a bound method's parameter and return constraints. Before projection
+    /// removes `T`, check `L ≤ T` against `T`'s declared bound or, for a concrete
+    /// `L`, its declared choices.
+    /// Receiver comparisons use `Lazy` because the receiver can approximate a whole
+    /// family of specializations, only some of which the base method accepts.
+    LazyWithEagerBounds,
+
     /// Derive constraints from existing bounds, preserving exclusions on source typevars
     /// and the identities of captured binders already in scope.
     LazyForSolver,
@@ -215,7 +222,10 @@ pub(crate) enum TypeVarEvaluation {
 
 impl TypeVarEvaluation {
     pub(super) const fn is_lazy(self) -> bool {
-        matches!(self, Self::Lazy | Self::LazyForSolver)
+        matches!(
+            self,
+            Self::Lazy | Self::LazyWithEagerBounds | Self::LazyForSolver
+        )
     }
 }
 
@@ -1604,6 +1614,64 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
+    fn collect_typevar_lower_bound(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let env = self.env;
+        let lower = if self.relation.is_subtyping() {
+            source.top_materialization(db, env)
+        } else {
+            source
+        };
+        let inferred = ConstraintSet::constrain_typevar_lower_bound(
+            db,
+            env,
+            self.constraints,
+            self.provenance,
+            self.inferable,
+            bound_typevar,
+            lower,
+        );
+        self.check_declared_typevar_bounds(db, source, bound_typevar, inferred)
+    }
+
+    pub(super) fn check_declared_typevar_bounds(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        inferred: ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        let env = self.env;
+        if self.typevar_evaluation == TypeVarEvaluation::LazyWithEagerBounds
+            && let Some(domain) = bound_typevar.typevar(db).bound_or_constraints(db, env)
+        {
+            let mut eager = self.clone();
+            eager.typevar_evaluation = TypeVarEvaluation::Eager;
+            return inferred.and(db, self.constraints, || match domain {
+                TypeVarBoundOrConstraints::UpperBound(bound) => {
+                    eager.check_type_pair(db, source, bound)
+                }
+                // A receiver restriction can narrow a class type variable to a different
+                // choice for each specialization. TODO: Preserve the declared choices
+                // through projection so we can check them together with the receiver.
+                TypeVarBoundOrConstraints::Constraints(_) if source.has_typevar(db, env) => {
+                    self.always()
+                }
+                TypeVarBoundOrConstraints::Constraints(choices) => choices
+                    .elements(db)
+                    .iter()
+                    .when_any(db, self.constraints, |&choice| {
+                        eager.check_type_pair(db, source, choice)
+                    }),
+            });
+        }
+        inferred
+    }
+
     pub(super) const fn is_eager_assignability(&self) -> bool {
         self.relation.is_assignability()
             && matches!(self.typevar_evaluation, TypeVarEvaluation::Eager)
@@ -2447,20 +2515,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             if let Type::TypeVar(bound_typevar) = target
                 && bound_typevar.is_inferable(db, self.inferable)
             {
-                let lower = if self.relation.is_subtyping() {
-                    source.top_materialization(db, env)
-                } else {
-                    source
-                };
-                return ConstraintSet::constrain_typevar_lower_bound(
-                    db,
-                    env,
-                    self.constraints,
-                    self.provenance,
-                    self.inferable,
-                    bound_typevar,
-                    lower,
-                );
+                return self.collect_typevar_lower_bound(db, source, bound_typevar);
             }
         }
 

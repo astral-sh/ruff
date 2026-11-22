@@ -2012,7 +2012,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     } else {
                         (ty, ty)
                     };
-                    ConstraintSet::constrain_typevar(
+                    let inferred = ConstraintSet::constrain_typevar(
                         db,
                         env,
                         self.constraints,
@@ -2021,7 +2021,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         typevar,
                         lower,
                         upper,
-                    )
+                    );
+                    self.check_declared_typevar_bounds(db, ty, typevar, inferred)
                 } else {
                     self.check_type_pair(db, target_type, source_type).and(
                         db,
