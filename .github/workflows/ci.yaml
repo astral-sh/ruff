@@ -996,16 +996,16 @@ jobs:
           git log -1 --oneline
           cargo build --profile=profiling --bin=ty
           git checkout --detach "$GITHUB_SHA"
-      - name: Count timeouts on main at 5 and 10 seconds
+      - name: Count timeouts on main at 6 and 8 seconds
         env:
           FUZZ_CORPUS: ${{ steps.corpus.outputs.path }}
         run: |
           nproc
           lscpu | sed -n 's/^Model name: */CPU: /p'
           mkdir ty-fuzz-timeout-results
-          for pass in 5-a 5-b 10; do
+          for pass in 6 8; do
             echo "::group::Timeout pass $pass"
-            PY_FUZZER_CHECK_TIMEOUT_SECONDS="${pass%%-*}" uv run \
+            PY_FUZZER_CHECK_TIMEOUT_SECONDS="$pass" uv run \
               --python="$PYTHON_VERSION" --project=./python/py-fuzzer --locked \
               python -c 'from fuzz import parse_args, run_fuzzer; raise SystemExit(2 if run_fuzzer(parse_args()) == 2 else 0)' \
               --bin=ty --test-executable="$PWD/target/profiling/ty" --quiet \
