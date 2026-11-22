@@ -3232,6 +3232,31 @@ def invalid() -> Root:
     return (1, None, (None, ((("bad", None, None), None),)))  # error: [invalid-explicit-return]
 ```
 
+Generic aliases can share several recursive references. Following these references preserves the
+specialized leaf type, including when a path returns to the original alias.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+A = tuple[T, "A[T] | None", "B[T] | None", "C[T] | None", "D[T] | None"]
+B = tuple[T, "A[T] | None", "B[T] | None", "C[T] | None", "D[T] | None"]
+C = tuple[T, "A[T] | None", "B[T] | None", "C[T] | None", "D[T] | None"]
+D = tuple[T, "A[T] | None", "B[T] | None", "C[T] | None", "D[T] | None"]
+
+def inspect(value: A[int]):
+    reveal_type(value[0])  # revealed: int
+    branch = value[2]
+    if branch is not None:
+        reveal_type(branch[0])  # revealed: int
+        shared = branch[4]
+        if shared is not None:
+            reveal_type(shared[0])  # revealed: int
+            root = shared[1]
+            if root is not None:
+                reveal_type(root[0])  # revealed: int
+```
+
 ### Shared references with changing type arguments
 
 Each alias binds its own type parameter. Traversing a branch wraps that parameter in a list, whether
@@ -3517,8 +3542,8 @@ for tree in (legacy(1), modern(1)):
     if isinstance(tree, tuple):
         reveal_type(tree[0])  # revealed: Tree[Literal[1]]
 
-reveal_type([legacy(1)])  # revealed: list[int | tuple[int | tuple[Tree[Literal[1]]]]]
-reveal_type([modern(1)])  # revealed: list[int | tuple[int | tuple[Tree[Literal[1]]]]]
+reveal_type([legacy(1)])  # revealed: list[int | tuple[Tree[Literal[1]]]]
+reveal_type([modern(1)])  # revealed: list[int | tuple[Tree[Literal[1]]]]
 take([legacy(1)])
 take([modern(1)])
 annotated: list[Tree[int]] = [legacy(1), modern(1)]
@@ -3570,6 +3595,72 @@ def inspect(container: Container):
     if isinstance(tree, list):
         reveal_type(tree[0])  # revealed: Growing[list[int]]
         reveal_type(tree[0][0])  # revealed: int | Growing[list[list[int]]]
+```
+
+### Captured type variables in recursive aliases
+
+TODO: Specializing a class should also substitute its parameters in the body of a recursive alias.
+Currently, specialization only updates the alias's arguments, leaving captured variables unchanged.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+V = TypeVar("V")
+
+class Container[U]:
+    Tree = tuple[V, "Container.Tree[tuple[V, U]] | None"]
+    value: Tree[int]
+
+def compare(source: Container[str], target: Container[bytes]):
+    child = source.value[1]
+    if child is not None:
+        reveal_type(child[0])  # revealed: tuple[int, U@Container]
+    other_child = target.value[1]
+    if other_child is not None:
+        reveal_type(other_child[0])  # revealed: tuple[int, U@Container]
+    # error: [static-assert-error]
+    static_assert(not is_subtype_of(TypeOf[source.value], TypeOf[target.value]))
+```
+
+### Methods in recursive aliases
+
+TODO: Specializing a recursive alias that contains a method should specialize both its receiver and
+its inferred return type. Currently, the method retains its unspecialized owner.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+return-type-inference = "always"
+```
+
+```py
+from ty_extensions._internal import TypeOf
+
+class Container[U]:
+    member: U
+
+    def get(self):
+        return self.member
+
+    Methods = tuple[TypeOf[get], "Container.Methods"]
+    methods: Methods
+
+    def nested(self: "Container[list[U]]"):
+        # error: [invalid-argument-type]
+        reveal_type(self.methods[1][0](self))  # revealed: U@Container | Unknown
+
+def inspect(value: Container[int]):
+    # error: [invalid-argument-type]
+    reveal_type(value.methods[1][0](value))  # revealed: U@Container | Unknown
 ```
 
 ### Type parameters used only in recursive references
@@ -3671,6 +3762,28 @@ def inspect(value: Growing[int]):
         reveal_type(value)  # revealed: list[Growing[list[int]]]
         reveal_type(value[0])  # revealed: Growing[list[int]]
         reveal_type(value[0][0])  # revealed: int | Growing[list[list[int]]]
+```
+
+### Comparing growing recursive aliases through unions
+
+Comparisons terminate when recursive steps increase the type arguments and the recursive reference
+is part of a union on either or both sides. We currently cannot prove these assignability relations.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Left = tuple[T, "Left[list[T]] | None"]
+Right = tuple[T, "Right[list[T]] | None"]
+NonOptional = tuple[T, "NonOptional[list[T]]"]
+
+def compare_optional(value: Left[int]) -> Right[int]:
+    # TODO: These aliases are equivalent.
+    return value  # error: [invalid-return-type]
+
+def compare_non_optional(value: NonOptional[int]) -> Right[int]:
+    # TODO: NonOptional[int] is a subtype of Right[int].
+    return value  # error: [invalid-return-type]
 ```
 
 ### Projection through a recursive alias argument
