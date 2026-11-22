@@ -111,6 +111,22 @@ static COLOUR_SCIENCE: Benchmark = Benchmark::new(RealWorldProject {
 static FASTAPI: Benchmark = Benchmark::new(RealWorldProject {
     name: "fastapi",
     repository: "https://github.com/fastapi/fastapi",
+    commit: "a82e5f2fac102a8b12c0795da80b2cb1d2a8b016",
+    paths: &["fastapi"],
+    dependencies: &[
+        "annotated-doc",
+        "pydantic",
+        "starlette",
+        "typing-extensions",
+        "typing-inspection",
+    ],
+    max_dep_date: TY_ECOSYSTEM_PIN,
+    python_version: SupportedPythonVersion::Py311,
+});
+
+static FASTAPI_OCTOBER: Benchmark = Benchmark::new(RealWorldProject {
+    name: "fastapi-october",
+    repository: "https://github.com/fastapi/fastapi",
     commit: "7a0a3f0b286c6c865cf4398ea0e957a87b8bffa4",
     paths: &["fastapi"],
     dependencies: &[
@@ -268,6 +284,11 @@ fn altair(bencher: Bencher) {
 #[bench(sample_size = 2, sample_count = 3)]
 fn fastapi(bencher: Bencher) {
     run_single_threaded(bencher, &FASTAPI);
+}
+
+#[bench(sample_size = 2, sample_count = 3)]
+fn fastapi_october(bencher: Bencher) {
+    run_single_threaded(bencher, &FASTAPI_OCTOBER);
 }
 
 #[bench(sample_size = 2, sample_count = 3)]
