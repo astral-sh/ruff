@@ -6138,6 +6138,36 @@ def leaf(entry: tuple[V, V]) -> V:
     return subtree(entry)
 ```
 
+## Recursive protocol bound with a generic method
+
+`Node.label` accepts a `str` and returns another `Node` with its label. Matching `Tree.label`
+specializes its method variable `V` to `str` and checks `Tree` against `Node` again. `Twig.label`
+returns the wrong label type even though the recursive part matches.
+
+```py
+from typing import Protocol, TypeVar
+
+class Node(Protocol):
+    def label(self, value: str) -> tuple["Node", str]: ...
+
+V = TypeVar("V")
+T = TypeVar("T", bound=Node)
+
+class Tree:
+    def label(self, value: V) -> tuple["Tree", V]:
+        return self, value
+
+class Twig:
+    def label(self, value: V) -> tuple["Twig", bytes]:
+        return self, b""
+
+def keep(node: T) -> T:
+    return node
+
+reveal_type(keep(Tree()))  # revealed: Tree
+keep(Twig())  # error: [invalid-argument-type]
+```
+
 ## Generic property setters implementing protocols
 
 These deliberately contrived setters could use `object` and `int` directly instead of method-scoped

@@ -1387,13 +1387,10 @@ impl<'db> HasIdentity<'db>
     type Id = (TypeIdentity<'db>, TypeIdentity<'db>, TypeRelation, bool);
 
     fn is_same_active_visit(&self, other: &Self) -> bool {
-        // Eager comparisons treated the same type pair as a recursive revisit before
-        // inferable variables became part of the cache key.
-        self.0 == other.0
-            && self.1 == other.1
-            && self.2 == other.2
-            && self.3 == other.3
-            && (!self.3.is_lazy() || self.4 == other.4)
+        // Comparing a generic method adds its local binders to the inference scope.
+        // Returning to the same type pair still closes the cycle. Completed results
+        // retain the full scope in their cache key.
+        self.0 == other.0 && self.1 == other.1 && self.2 == other.2 && self.3 == other.3
     }
 
     fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
