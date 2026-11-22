@@ -329,7 +329,7 @@ impl<'db> ClassLiteral<'db> {
     }
 }
 
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 fn enum_class_literal<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -1006,7 +1006,7 @@ fn try_register_alias<'db>(
 }
 
 /// List all members of an enum.
-#[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| Some(EnumMetadata::empty()), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _, _| Some(EnumMetadata::empty()), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn enum_metadata<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,

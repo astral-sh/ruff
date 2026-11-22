@@ -130,7 +130,7 @@ pub(crate) fn infer_narrowing_constraints<'db>(
 
 #[salsa::tracked(
     returns(as_ref),
-    cycle_initial=|_, _, _| None,
+    cycle_initial=|_, _, _, _| None,
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn all_narrowing_constraints_for_pattern<'db>(
@@ -147,7 +147,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, _, _| ExpressionNarrowingConstraints::Inferred { positive: None, negative: None },
+    cycle_initial=|_, _, _, _| ExpressionNarrowingConstraints::Inferred { positive: None, negative: None },
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn all_narrowing_constraints_for_expression<'db>(
@@ -176,7 +176,7 @@ fn all_narrowing_constraints_for_expression<'db>(
 
 #[salsa::tracked(
     returns(as_ref),
-    cycle_initial=|_, _, _| None,
+    cycle_initial=|_, _, _, _| None,
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn all_negative_narrowing_constraints_for_pattern<'db>(
@@ -193,7 +193,7 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
 
 #[salsa::tracked(
     returns(as_ref),
-    cycle_initial=|_, _, _, _| None,
+    cycle_initial=|_, _, _, _, _| None,
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn all_narrowing_constraints_for_subject_element_pattern<'db>(
@@ -475,7 +475,7 @@ struct PatternSuccessAnalyzer<'db, 'pattern> {
 /// ```
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| PatternSuccessTypes::cycle_initial(Type::divergent(id)),
+    cycle_initial=|_, id, _, _| PatternSuccessTypes::cycle_initial(Type::divergent(id)),
     cycle_fn=|db: &'db dyn Db, cycle, previous: &PatternSuccessTypes<'db>, result: PatternSuccessTypes<'db>, pattern: PatternPredicate<'db>| {
         let env = ProgramEnvironment::from_scope(pattern.subject(db).scope(db));
         result.cycle_normalized(db, &env, previous, cycle)

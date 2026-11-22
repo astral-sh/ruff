@@ -930,7 +930,7 @@ fn already_inherited<'db>(
     clippy::needless_pass_by_value,
     reason = "Salsa requires owned query keys, and lint expectations cannot observe diagnostics from the generated function"
 )]
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 fn conflicting_parent_member<'db>(
     db: &'db dyn Db,
     program: Program<'db>,
@@ -988,7 +988,7 @@ fn conflicting_parent_member<'db>(
     clippy::needless_pass_by_value,
     reason = "Salsa requires owned query keys, and lint expectations cannot observe diagnostics from the generated function"
 )]
-#[salsa::tracked(returns(clone), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(clone), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 fn cached_inherited_attribute<'db>(
     db: &'db dyn Db,
     program: Program<'db>,

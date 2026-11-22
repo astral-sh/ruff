@@ -52,7 +52,7 @@ fn is_union_type_operand(ty: Type<'_>) -> bool {
 ///
 /// Literals of the same class share this lookup. If the method exists, we still bind
 /// it to each literal separately.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn has_in_place_operator<'db>(
     db: &'db dyn Db,
     program: Program<'db>,

@@ -2040,7 +2040,7 @@ impl KnownComparisonSemantics {
 }
 
 /// Classify the implementation once per class so every enum member can reuse it.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 fn class_comparison_semantics<'db>(
     db: &'db dyn Db,
     program: Program<'db>,

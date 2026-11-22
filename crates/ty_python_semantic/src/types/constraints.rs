@@ -3746,7 +3746,7 @@ impl<'db> Type<'db> {
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, _, _, _, _, _, _| CandidateSolutions::Unsatisfiable,
+    cycle_initial=|_, _, _, _, _, _, _, _| CandidateSolutions::Unsatisfiable,
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn assignable_solutions_impl<'db>(
@@ -3775,7 +3775,7 @@ fn assignable_solutions_impl<'db>(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _| true,
+    cycle_initial = |_, _, _, _| true,
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn is_possibly_constraint_set_assignable<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {

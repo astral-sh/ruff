@@ -2713,7 +2713,7 @@ impl<'db> TypeVarInference<'db> {
     pub(crate) fn merged_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|db, _, inference: TypeVarInference<'db>| {
+            cycle_initial=|db, _, _, inference: TypeVarInference<'db>| {
                 inference.generic_context(db).unknown_specialization(db, None)
             },
             cycle_fn=|db, cycle: &salsa::Cycle, previous: &Specialization<'db>, current: Specialization<'db>, inference: TypeVarInference<'db>| {

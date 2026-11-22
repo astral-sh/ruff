@@ -223,7 +223,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// The RHS type of a PEP-695 style type alias with specialization applied.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent_alias(id),
+        cycle_initial=|_, id, _, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_definition(alias.definition(db));
             value.cycle_normalized(db, &env, *previous, cycle)
@@ -238,7 +238,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent_alias(id),
+        cycle_initial=|_, id, _, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_definition(alias.definition(db));
             value.cycle_normalized(db, &env, *previous, cycle)
@@ -280,7 +280,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         }
     }
 
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let definition = self.definition(db);
         let DefinitionKind::TypeAlias(type_alias_stmt_node) = definition.kind(db) else {
@@ -345,7 +345,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// Computed lazily from the definition with specialization applied.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent_alias(id),
+        cycle_initial=|_, id, _, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_definition(alias.definition(db));
             value.cycle_normalized(db, &env, *previous, cycle)
@@ -362,7 +362,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent_alias(id),
+        cycle_initial=|_, id, _, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_definition(alias.definition(db));
             value.cycle_normalized(db, &env, *previous, cycle)
@@ -404,7 +404,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         )
     }
 
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let definition = self.definition(db);
         let file = definition.program_file(db);
@@ -471,7 +471,7 @@ fn apply_type_alias_specialization<'db>(
 /// inferred body in the key leaves its inference and unguarded cycle recovery in the caller.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _, _| Type::divergent(id),
+    cycle_initial=|_, id, _, _, _| Type::divergent(id),
     cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, specialization: Specialization<'db>, _| {
         let env = ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
         value.cycle_normalized_impl(db, &env, *previous, cycle)
@@ -532,7 +532,7 @@ impl<'db> TypeAliasType<'db> {
     fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, id, _, ()| AliasCycleSummary { cycle: Some(Type::divergent_alias(id)), ..AliasCycleSummary::default() },
+            cycle_initial=|_, id, _, _, ()| AliasCycleSummary { cycle: Some(Type::divergent_alias(id)), ..AliasCycleSummary::default() },
             heap_size=ruff_memory_usage::heap_size
         )]
         fn cycle_summary<'db>(
@@ -645,7 +645,7 @@ impl<'db> TypeAliasType<'db> {
     /// without losing its materialization polarity.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, alias: TypeAliasType<'db>, _| Type::TypeAlias(alias),
+        cycle_initial=|_, _, _, alias: TypeAliasType<'db>, _| Type::TypeAlias(alias),
         heap_size=ruff_memory_usage::heap_size
     )]
     fn materialized_value_type(
@@ -929,7 +929,7 @@ impl<'db> TypeAliasType<'db> {
     /// formal `T` still describes `list[T]`, not the specialized `list[int]`.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
+        cycle_initial=|_, _, _, _, _| VarianceTerm::BIVARIANT,
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(in crate::types) fn variance_equation(

@@ -253,7 +253,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     #[salsa::tracked(
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
-        cycle_initial=|db, _, self_: DynamicNamedTupleLiteral<'db>| Mro::from_error(
+        cycle_initial=|db, _, _, self_: DynamicNamedTupleLiteral<'db>| Mro::from_error(
             db,
             &ProgramEnvironment::from_scope(self_.scope(db)),
             ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(self_)),
@@ -448,7 +448,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     fn spec(self, db: &'db dyn Db) -> NamedTupleSpec<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|db, _, _| NamedTupleSpec::unknown(db),
+            cycle_initial=|db, _, _, _| NamedTupleSpec::unknown(db),
             heap_size=ruff_memory_usage::heap_size
         )]
         fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> NamedTupleSpec<'db> {

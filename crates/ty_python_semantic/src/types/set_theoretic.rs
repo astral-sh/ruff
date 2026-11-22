@@ -145,7 +145,7 @@ impl<'db> UnionType<'db> {
     ) -> Type<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_initial=|_, id, _, _| Type::divergent(id),
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
                 result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
             },
@@ -252,7 +252,7 @@ impl<'db> UnionType<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_initial=|_, id, _, _, _| Type::divergent(id),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, program| {
             result.cycle_normalized(db, &ProgramEnvironment::from_program(program), *previous, cycle)
         },
@@ -1171,7 +1171,7 @@ impl<'db> IntersectionType<'db> {
     ) -> Type<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_initial=|_, id, _, _| Type::divergent(id),
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
                 result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
             },
@@ -1197,7 +1197,7 @@ impl<'db> IntersectionType<'db> {
     ) -> Type<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_initial=|_, id, _, _| Type::divergent(id),
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
                 result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
             },

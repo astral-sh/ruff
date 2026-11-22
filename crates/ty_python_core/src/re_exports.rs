@@ -35,7 +35,7 @@ use crate::{Db, ProgramFile};
 
 #[salsa::tracked(
     returns(deref),
-    cycle_initial=|_, _, _| Box::default(),
+    cycle_initial=|_, _, _, _| Box::default(),
     heap_size=ruff_memory_usage::heap_size)
 ]
 pub(super) fn exported_names(db: &dyn Db, file: ProgramFile<'_>) -> Box<[Name]> {

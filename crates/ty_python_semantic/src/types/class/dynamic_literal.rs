@@ -197,7 +197,7 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
         /// Inner cached function for deferred inference of bases.
         /// Only called for assigned calls where inference was deferred.
-        #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(deref), cycle_initial=|_, _, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
         fn deferred_explicit_bases<'db>(
             db: &'db dyn Db,
             definition: Definition<'db>,
@@ -281,7 +281,7 @@ impl<'db> DynamicClassLiteral<'db> {
     /// See <https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass>
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _| Ok(ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown())),
+        cycle_initial=|_, _, _, _| Ok(ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown())),
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(in crate::types) fn try_metaclass(
@@ -477,7 +477,7 @@ impl<'db> DynamicClassLiteral<'db> {
     /// an error (duplicate bases or C3 linearization failure).
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|db, _, self_: DynamicClassLiteral<'db>| {
+        cycle_initial=|db, _, _, self_: DynamicClassLiteral<'db>| {
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::Dynamic(self_))),
                 ClassBase::object(db, &ProgramEnvironment::from_scope(self_.scope(db))),
