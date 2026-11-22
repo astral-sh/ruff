@@ -560,6 +560,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         fields_arg: &ast::Expr,
     ) -> NamedTupleSpec<'db> {
+        let spec = self.infer_typing_namedtuple_spec(fields_arg);
+        let names = spec.fields(self.db()).iter().map(|field| &field.name);
+        self.check_invalid_namedtuple_field_names(names, fields_arg, NamedTupleKind::Typing);
+        spec
+    }
+
+    fn infer_typing_namedtuple_spec(&mut self, fields_arg: &ast::Expr) -> NamedTupleSpec<'db> {
         #[derive(Debug, Copy, Clone, PartialEq, Eq)]
         enum SequenceKind {
             List,
@@ -574,15 +581,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::List(list) => (&list.elts, SequenceKind::List),
             ast::Expr::Tuple(tuple) => (&tuple.elts, SequenceKind::Tuple),
             _ => {
-                self.infer_expression(fields_arg, TypeContext::default());
-                if let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg) {
-                    let mut diagnostic = builder.into_diagnostic(
-                        "Invalid argument to parameter `fields` of `NamedTuple()`",
-                    );
-                    diagnostic
-                        .set_primary_annotation_message("`fields` must be a literal list or tuple");
-                }
-                return NamedTupleSpec::unknown(db);
+                let ty = self.infer_expression(fields_arg, TypeContext::default());
+                return NamedTupleSpec::from_fields_type(db, self.scope(), ty).unwrap_or_else(
+                    |reason| {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(
+                                "Invalid argument to parameter `fields` of `NamedTuple()`",
+                            );
+                            diagnostic.set_primary_annotation_message(reason);
+                        }
+                        NamedTupleSpec::unknown(db)
+                    },
+                );
             }
         };
 
@@ -673,7 +685,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             self.store_expression_type(element, element_type);
 
-            let Some(name) = name_type.as_string_literal() else {
+            let Some(name) = name_type.resolve_type_alias(db).as_string_literal() else {
                 for element in &elements[(i + 1)..] {
                     self.infer_expression(element, TypeContext::default());
                 }
@@ -710,10 +722,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             fields.push(field);
         }
 
-        let names: Vec<Name> = fields.iter().map(|f| f.name.clone()).collect();
-
-        self.check_invalid_namedtuple_field_names(&names, fields_arg, NamedTupleKind::Typing);
-
         let spec = NamedTupleSpec::known(db, fields.into_boxed_slice());
         self.store_expression_type(
             fields_arg,
@@ -723,15 +731,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     /// Report diagnostics for invalid field names in a namedtuple definition.
-    fn check_invalid_namedtuple_field_names(
+    fn check_invalid_namedtuple_field_names<'a>(
         &self,
-        field_names: &[Name],
+        field_names: impl IntoIterator<Item = &'a Name>,
         fields_arg: &ast::Expr,
         kind: NamedTupleKind,
     ) {
-        for (i, field_name) in field_names.iter().enumerate() {
-            // Check for duplicate field names.
-            if field_names[..i].iter().any(|f| f == field_name)
+        let mut seen_names = FxHashSet::default();
+        for field_name in field_names {
+            if !seen_names.insert(field_name)
                 && let Some(builder) = self.context.report_lint(&INVALID_NAMED_TUPLE, fields_arg)
             {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
