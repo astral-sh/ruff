@@ -662,7 +662,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_expression_types(inference.expressions.iter().copied());
         self.declarations.extend(inference.declarations(definition));
 
-        if !matches!(self.region, InferenceRegion::Scope(..)) {
+        if self.region.collects_bindings() {
             self.bindings.extend(inference.bindings(definition));
         }
 
@@ -751,7 +751,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_expression_types(inference.expressions.iter().copied());
         self.declarations.extend(inference.declarations());
 
-        if !matches!(self.region, InferenceRegion::Scope(..)) {
+        if self.region.collects_bindings() {
             self.bindings.extend(inference.bindings());
         }
 
@@ -790,7 +790,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_expression_without_bindings(inference);
 
         if let Some(extra) = &inference.extra
-            && !matches!(self.region, InferenceRegion::Scope(..))
+            && self.region.collects_bindings()
         {
             self.bindings.extend(extra.bindings.iter().copied());
         }
@@ -888,7 +888,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .or_insert(constraints.clone());
         }
 
-        if !matches!(self.region, InferenceRegion::Scope(..)) {
+        if self.region.collects_bindings() {
             self.bindings.extend(
                 inference
                     .bindings
@@ -3066,7 +3066,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let shared_value = self.index.expression(value.as_ref());
 
-        if !matches!(self.region, InferenceRegion::Scope(..)) {
+        if self.region.collects_bindings() {
             // The statement owns every binding created while evaluating its shared value,
             // including assignment expressions in lambda defaults.
             let inference = infer_expression_types(self.db(), shared_value, TypeContext::default());
@@ -12952,7 +12952,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.called_functions.extend(called_functions);
         self.legacy_aliases.extend(legacy_aliases);
 
-        if !matches!(self.region, InferenceRegion::Scope(..)) {
+        if self.region.collects_bindings() {
             self.bindings
                 .extend(bindings.iter().map(|(def, ty)| (*def, *ty)));
         }

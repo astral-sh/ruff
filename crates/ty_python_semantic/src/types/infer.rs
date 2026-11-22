@@ -998,6 +998,12 @@ pub(crate) enum InferenceRegion<'db> {
 }
 
 impl<'db> InferenceRegion<'db> {
+    /// Whether to collect binding types from nested inference regions.
+    /// Scope inference leaves these types to the individual definition queries.
+    fn collects_bindings(self) -> bool {
+        !matches!(self, Self::Scope(..))
+    }
+
     fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self {
             InferenceRegion::Statement(statement) => statement.scope(db),
