@@ -102,7 +102,9 @@ use crate::types::function::{
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, bind_typevar, typing_self,
 };
-use crate::types::infer::builder::binary_expressions::BinaryInferenceState;
+use crate::types::infer::builder::binary_expressions::{
+    BinaryInferenceState, has_in_place_operator,
+};
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{
@@ -5290,6 +5292,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            Type::LiteralValue(literal)
+                if let Some(class) = literal.kind().known_class()
+                    && !has_in_place_operator(db, env.program(db), class, op) =>
+            {
+                let value_ty = infer_value_ty(self, TypeContext::default());
+                binary_return_ty(self, value_ty, state)
+            }
+
             _ => {
                 if let Some(typed_dict_update_ty) = self
                     .try_infer_typed_dict_pep_584_augmented_assignment(
@@ -5305,24 +5315,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let ast_arguments = [ArgOrKeyword::Arg(value_expr)];
                 let mut call_arguments = CallArguments::positional([Type::unknown()]);
 
-                // If one integer literal lacks `__ior__`, so do the other integer literals
-                // in the union. A method that exists still needs to bind to each receiver.
-                let literal_class = target_type
-                    .as_literal_value_kind()
-                    .and_then(LiteralValueTypeKind::known_class);
-                let method =
-                    if literal_class.is_some() && literal_class == state.missing_in_place_method {
-                        Place::Undefined.into()
-                    } else {
-                        target_type.member_lookup_with_policy(
-                            db,
-                            env,
-                            op.in_place_dunder(),
-                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                        )
-                    };
-                let call = self.infer_and_try_call_dunder_member(
-                    method,
+                let call = self.infer_and_try_call_dunder(
+                    target_type,
+                    op.in_place_dunder(),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                     ArgumentsIter::synthesized(&ast_arguments),
                     &mut call_arguments,
                     &mut |builder, (_, _, tcx)| infer_value_ty(builder, tcx),
@@ -5338,7 +5334,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Ok(outcome.return_type(db, env))
                     }
                     Err(CallDunderError::MethodNotAvailable) => {
-                        state.missing_in_place_method = literal_class;
                         let value_ty = infer_value_ty(self, TypeContext::default());
                         binary_return_ty(self, value_ty, state)
                     }
