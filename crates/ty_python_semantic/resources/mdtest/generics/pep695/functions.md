@@ -3941,9 +3941,9 @@ explicit: Box[int] = unwrap(find(copy(copy(lambda x: x.missing)), None))
 
 ## A repeated bound in the context for a type variable with a default
 
-Both parameters are required and accept the same sources of `T`. If the second argument is `None`,
-only the first argument can constrain `T`. Its expected element type `int` should still take
-precedence over the default `str`.
+Both parameters are required and accept the same sources of `T`. If the second argument is `None` or
+`False`, only the first argument can constrain `T`. Its expected element type `int` should still
+take precedence over the default `str`.
 
 ```toml
 [environment]
@@ -3954,16 +3954,14 @@ python-version = "3.13"
 from collections.abc import Callable, Iterable, Sized
 from typing import overload
 
-type Source[T] = Iterable[T] | Callable[[], T] | None
+type Source[T] = Iterable[T] | Callable[[], T]
 
 @overload
-def head[T: Sized](values: Source[T], other: Source[T]) -> T: ...
+def head[T: Sized](values: Source[T] | None, other: Source[T] | None) -> T: ...
 @overload
-def head[N: int](values: N, other: None) -> N: ...
+def head[T: Sized](values: Source[T] | bool, other: Source[T] | bool) -> T: ...
 def head(values, other):
-    if isinstance(values, int):
-        return values
-    source = values if values is not None else other
+    source = other if values is None or isinstance(values, bool) else values
     if callable(source):
         return source()
     return next(iter(source or ()))
@@ -3971,8 +3969,11 @@ def head(values, other):
 def empty[T = str]() -> list[list[list[T]]]:
     return [[[]]]
 
-def head_row() -> Iterable[int]:
+def head_with_none() -> Iterable[int]:
     return head(head(empty(), None), None)
+
+def head_with_false() -> Iterable[int]:
+    return head(head(empty(), False), False)
 ```
 
 ## Nested calls with optional return context

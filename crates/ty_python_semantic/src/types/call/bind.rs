@@ -8510,11 +8510,12 @@ impl<'db> ArgumentContextSpecialization<'db> {
                     ty == Type::TypeVar(typevar)
                 })
             };
-            let mut branches = union
-                .elements(db)
+            let alternatives = union.elements(db);
+            let branches = alternatives
                 .iter()
-                .filter(|&&ty| contains_variable(ty));
-            if branches.nth(1).is_none() {
+                .filter(|&&ty| contains_variable(ty))
+                .count();
+            if branches < 2 {
                 continue;
             }
             let parameters = overload.signature.parameters();
@@ -8529,8 +8530,11 @@ impl<'db> ArgumentContextSpecialization<'db> {
                         .expected_type
                         .unwrap_or_else(|| parameters[other.index].annotated_type());
                     if ty == parameter_type {
-                        // A nullable operand may be absent even when supplied explicitly.
-                        !union.elements(db).iter().any(|ty| ty.is_none(db))
+                        // A bare `T` can use the operand itself as evidence. If `T`
+                        // occurs only inside containers, a separate alternative
+                        // (e.g. `None`) supplies no information about their elements.
+                        branches == alternatives.len()
+                            || union.contains_member(db, Type::TypeVar(typevar))
                     } else {
                         union.contains_member(db, ty) && contains_variable(ty)
                     }
