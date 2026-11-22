@@ -17,6 +17,7 @@ PLW0406 Module `import_self.module` imports itself
 2 | from import_self import module
   |                         ^^^^^^
 3 | from . import module
+4 | from import_self.module import foo, bar
   |
 
 PLW0406 Module `import_self.module` imports itself
@@ -26,3 +27,27 @@ PLW0406 Module `import_self.module` imports itself
 2 | from import_self import module
 3 | from . import module
   |               ^^^^^^
+4 | from import_self.module import foo, bar
+5 | from .module import foo as alias
+  |
+
+PLW0406 Module `import_self.module` imports itself
+ --> module.py:4:32
+  |
+2 | from import_self import module
+3 | from . import module
+4 | from import_self.module import foo, bar
+  |                                ^^^
+5 | from .module import foo as alias
+6 | from .sibling import foo
+  |
+
+PLW0406 Module `import_self.module` imports itself
+ --> module.py:5:21
+  |
+3 | from . import module
+4 | from import_self.module import foo, bar
+5 | from .module import foo as alias
+  |                     ^^^^^^^^^^^^
+6 | from .sibling import foo
+  |

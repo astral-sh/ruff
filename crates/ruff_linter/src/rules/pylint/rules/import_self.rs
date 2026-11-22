@@ -69,6 +69,19 @@ pub(crate) fn import_from_self(
         return;
     };
 
+    if module.is_some()
+        && imported_module_path.split('.').eq(module_path)
+        && let Some(alias) = names.first()
+    {
+        checker.report_diagnostic(
+            ImportSelf {
+                name: imported_module_path.into_owned(),
+            },
+            alias.range(),
+        );
+        return;
+    }
+
     if imported_module_path
         .split('.')
         .eq(&module_path[..module_path.len() - 1])
