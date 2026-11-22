@@ -101,9 +101,13 @@ impl PredicateOrLiteral<'_> {
     }
 }
 
-/// A stable key for call-completion queries. Creating it while building predicates lets cached
-/// queries use its ID directly, without looking up its components in Salsa's intern table again.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+/// A call-completion query key owned by the semantic index that creates its expressions.
+///
+/// Creating it while building predicates lets cached queries use its ID directly, without looking
+/// up its components in Salsa's intern table again.
+///
+/// Tracking the key keeps unrelated revisions from collecting it and invalidating that index.
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct CallableAndCallExpr<'db> {
     #[returns(copy)]
     pub callable: Expression<'db>,
