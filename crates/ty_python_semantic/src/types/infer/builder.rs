@@ -12684,16 +12684,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         }
 
-        // TODO: Support return type inference for async functions and generators
-        if function.is_async
-            || self
-                .scope()
-                .file_scope_id(db)
-                .is_generator_function(self.index)
-        {
-            return None;
-        }
-
         let env = self.program_environment();
         let mut return_type = UnionBuilder::new(db, env);
 

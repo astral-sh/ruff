@@ -1257,6 +1257,42 @@ pub struct FunctionType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for FunctionType<'_> {}
 
+/// Keep callable wrappers outside the type normalized during return-inference cycles. A
+/// recursive return union can converge, while the same union nested in a generic argument
+/// would lose its non-recursive members during normalization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct InferredReturnType<'db> {
+    ty: Type<'db>,
+    wrapper: Option<KnownClass>,
+    gradual: bool,
+}
+
+impl<'db> InferredReturnType<'db> {
+    fn plain(ty: Type<'db>) -> Self {
+        Self {
+            ty,
+            wrapper: None,
+            gradual: false,
+        }
+    }
+
+    fn into_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        let ty = match self.wrapper {
+            Some(KnownClass::AsyncGeneratorType) => KnownClass::AsyncGeneratorType
+                .to_specialized_instance(db, env, &[Type::any(), Type::any()]),
+            Some(wrapper) => {
+                wrapper.to_specialized_instance(db, env, &[Type::any(), Type::any(), self.ty])
+            }
+            None => self.ty,
+        };
+        if self.gradual {
+            UnionType::from_two_elements(db, env, ty, Type::unknown())
+        } else {
+            ty
+        }
+    }
+}
+
 pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     function: FunctionType<'db>,
@@ -1805,9 +1841,7 @@ impl<'db> FunctionType<'db> {
             return Cow::Borrowed(signature);
         };
 
-        // Decorators and signature transformations can supply a return type without an annotation.
-        if !overload.return_ty.is_unknown()
-            || !db.analysis_settings(self.file(db)).return_type_inference.is_active()
+        if !db.analysis_settings(self.file(db)).return_type_inference.is_active()
             || self.has_explicit_return_annotation(db)
             // We never infer return types in stubs
             || self.file(db).is_stub(db)
@@ -1815,6 +1849,28 @@ impl<'db> FunctionType<'db> {
             // We should not replace the `@overload`'s return type with the inferred type from the implementation.
             || !self.overloads_and_implementation(db).0.is_empty()
         {
+            return Cow::Borrowed(signature);
+        }
+
+        // Async signatures wrap an unannotated return in CoroutineType before body inference.
+        // Preserve any other return type supplied by decorators or signature transformations.
+        if !overload.return_ty.is_unknown() {
+            let env = ProgramEnvironment::from_file(self.program_file(db));
+            let uninferred_coroutine = KnownClass::CoroutineType.to_specialized_instance(
+                db,
+                &env,
+                &[Type::any(), Type::any(), Type::unknown()],
+            );
+            if overload.return_ty != uninferred_coroutine {
+                return Cow::Borrowed(signature);
+            }
+        }
+
+        let env = ProgramEnvironment::from_file(self.program_file(db));
+        let return_type = self.inferred_return_type(db).into_type(db, &env);
+        if return_type.is_unknown() {
+            // Excluded bodies, such as abstract methods, must retain their original signature,
+            // including the coroutine wrapper of an async function.
             return Cow::Borrowed(signature);
         }
         let mut overload = overload.clone();
@@ -1837,8 +1893,7 @@ impl<'db> FunctionType<'db> {
             )?;
             Some(declared.specialize(db, fresh.map(Type::TypeVar).collect::<Vec<_>>()))
         });
-        overload.return_ty = self
-            .inferred_return_type(db)
+        overload.return_ty = return_type
             .apply_optional_specialization(db, method_renaming)
             .apply_optional_specialization(db, self.class_specialization(db));
         Cow::Owned(CallableSignature::single(overload))
@@ -1846,14 +1901,15 @@ impl<'db> FunctionType<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, function: FunctionType<'db>| {
+        cycle_initial=|_, id, _| InferredReturnType::plain(Type::divergent(id)),
+        cycle_fn=|db, cycle, previous: &InferredReturnType<'db>, mut result: InferredReturnType<'db>, function: FunctionType<'db>| {
             let env = ProgramEnvironment::from_scope(function.literal(db).last_definition.body_scope(db));
-            result.cycle_normalized(db, &env, *previous, cycle)
+            result.ty = result.ty.cycle_normalized(db, &env, previous.ty, cycle);
+            result
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
-    fn inferred_return_type(self, db: &'db dyn Db) -> Type<'db> {
+    fn inferred_return_type(self, db: &'db dyn Db) -> InferredReturnType<'db> {
         let scope = self.literal(db).last_definition.body_scope(db);
         let env = ProgramEnvironment::from_scope(scope);
         let index = semantic_index(db, scope.program_file(db));
@@ -1863,12 +1919,7 @@ impl<'db> FunctionType<'db> {
         // Do not perform return type inference for functions in `if TYPE_CHECKING` blocks.
         if index.is_in_type_checking_block(scope.file_scope_id(db), function.node(&module).range())
         {
-            return Type::unknown();
-        }
-
-        // TODO: Infer return types for async functions and generator functions
-        if function.node(&module).is_async || scope.file_scope_id(db).is_generator_function(index) {
-            return Type::unknown();
+            return InferredReturnType::plain(Type::unknown());
         }
 
         // Abstract methods often have a no-op body, and even if they contain an implementation,
@@ -1876,33 +1927,53 @@ impl<'db> FunctionType<'db> {
         // implementations are often not a reliable indicator of the actual contract that subclass
         // methods are expected to fulfill.
         if self.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD) {
-            return Type::unknown();
+            return InferredReturnType::plain(Type::unknown());
         }
+
+        let infer_return_type = || {
+            let is_async = function.node(&module).is_async;
+            let wrapper = if scope.file_scope_id(db).is_generator_function(index) {
+                if is_async {
+                    Some(KnownClass::AsyncGeneratorType)
+                } else {
+                    Some(KnownClass::GeneratorType)
+                }
+            } else if is_async {
+                Some(KnownClass::CoroutineType)
+            } else {
+                None
+            };
+            InferredReturnType {
+                ty: infer_complete_scope_types(db, scope).return_type(),
+                wrapper,
+                gradual: false,
+            }
+        };
 
         let Some(class_definition) = index.class_definition_of_method(scope.file_scope_id(db))
         else {
             // For free functions, we simply use the type inferred from the function body.
-            return infer_complete_scope_types(db, scope)
-                .return_type()
-                .apply_type_mapping(
-                    db,
-                    &env,
-                    &TypeMapping::GeneralizeLocalTypes(scope),
-                    TypeContext::default(),
-                );
+            let mut return_type = infer_return_type();
+            return_type.ty = return_type.ty.apply_type_mapping(
+                db,
+                &env,
+                &TypeMapping::GeneralizeLocalTypes(scope),
+                TypeContext::default(),
+            );
+            return return_type;
         };
         if self
             .literal(db)
             .last_definition
             .is_exempt_from_return_type_inference(db)
         {
-            return Type::unknown();
+            return InferredReturnType::plain(Type::unknown());
         }
         let class = original_class_type(db, class_definition);
 
         // Protocol methods follow the same logic as abstract methods (see reasoning above).
         if class.is_some_and(|class| class.is_protocol(db)) {
-            return Type::unknown();
+            return InferredReturnType::plain(Type::unknown());
         }
 
         // We currently skip return type inference for the `__call__` method of metaclasses.
@@ -1914,26 +1985,27 @@ impl<'db> FunctionType<'db> {
                 })
             })
         {
-            return Type::unknown();
+            return InferredReturnType::plain(Type::unknown());
         }
 
-        let mut return_type = infer_complete_scope_types(db, scope).return_type();
+        let mut return_type = infer_return_type();
         if let Some(inherited) = self.inherited_return_annotation(db) {
-            return_type = inherited;
+            return_type = InferredReturnType::plain(inherited);
         } else if !self.has_known_decorator(db, FunctionDecorators::FINAL)
             && !class.is_some_and(|class| class.is_final(db))
         {
             // For non-final methods on non-final classes, we include `Unknown` in the return type
             // to allow subclasses to widen the return type if necessary.
-            return_type = UnionType::from_two_elements(db, &env, return_type, Type::unknown());
+            return_type.gradual = true;
         }
 
-        return_type.apply_type_mapping(
+        return_type.ty = return_type.ty.apply_type_mapping(
             db,
             &env,
             &TypeMapping::GeneralizeLocalTypes(scope),
             TypeContext::default(),
-        )
+        );
+        return_type
     }
 
     #[salsa::tracked(

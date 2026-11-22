@@ -6314,3 +6314,47 @@ T = TypeVar("T")
 def metadata(value: T) -> None:
     annotated: Annotated[int, list[T]([value])]  # ok
 ```
+
+## Inferred async and generator returns
+
+Inferred return values retain the function's type parameters and the specialization of the owning
+class.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+return-type-inference = "always"
+```
+
+```py
+from typing import Generic, TypeVar, final
+
+T = TypeVar("T")
+
+async def asynchronous(value: T):
+    return value
+
+def generator(value: T):
+    yield None
+    return value
+
+@final
+class Box(Generic[T]):
+    value: T
+
+    async def asynchronous(self):
+        return self.value
+
+    def generator(self):
+        yield None
+        return self.value
+
+reveal_type(asynchronous(1))  # revealed: CoroutineType[Any, Any, Literal[1]]
+reveal_type(generator("a"))  # revealed: GeneratorType[Any, Any, Literal["a"]]
+
+def consume(box: Box[str]) -> None:
+    reveal_type(box.asynchronous())  # revealed: CoroutineType[Any, Any, str]
+    reveal_type(box.generator())  # revealed: GeneratorType[Any, Any, str]
+```

@@ -373,27 +373,297 @@ def _(x: int):
 
 ## Generators
 
+The final return value of a generator is separate from the values it yields. Yield and send types
+remain uninferred.
+
 ```py
 def yields_and_returns():
     yield "yield"
     return "return"
 
-# TODO: should ideally be `GeneratorType[Literal["yield"], Any, Literal["return"]]`
-# once we also support yield-type inference. With return type inference alone, we
-# should at least infer `GeneratorType[Any, Any, Literal["return"]]`.
-reveal_type(yields_and_returns())  # revealed: Unknown
+reveal_type(yields_and_returns())  # revealed: GeneratorType[Any, Any, Literal["return"]]
+
+def delegate():
+    result = yield from yields_and_returns()
+    reveal_type(result)  # revealed: Literal["return"]
+    wrong: int = result  # error: [invalid-assignment]
+    return result
+
+reveal_type(delegate())  # revealed: GeneratorType[Any, Any, Literal["return"]]
+```
+
+## Unknown generator return values
+
+An unknown final return value does not make the generator object itself unknown.
+
+```py
+def generator(value):
+    yield 1
+    return value
+
+reveal_type(generator(1))  # revealed: GeneratorType[Any, Any, Unknown]
+```
+
+## Generator return paths
+
+Reachable returns contribute to the final return type, including an implicit `None`. A nested
+function's returns belong to its own scope.
+
+```py
+def optional(flag: bool):
+    yield 1
+    if flag:
+        return "done"
+
+def nested():
+    def inner():
+        return "inner"
+    yield inner()
+    return 1
+    return "unreachable"
+
+def never_returns():
+    yield 1
+    raise RuntimeError
+
+reveal_type(optional(True))  # revealed: GeneratorType[Any, Any, Literal["done"] | None]
+reveal_type(nested())  # revealed: GeneratorType[Any, Any, Literal[1]]
+reveal_type(never_returns())  # revealed: GeneratorType[Any, Any, Never]
+reveal_type(1)  # revealed: Literal[1]
 ```
 
 ## Asynchronous functions
 
-For async functions, the inferred return type will be wrapped in `CoroutineType`:
+For async functions, the inferred return value is wrapped in `CoroutineType`. Awaiting the coroutine
+exposes that value.
 
 ```py
 async def async_func():
     return 1
 
+reveal_type(async_func())  # revealed: CoroutineType[Any, Any, Literal[1]]
+
+async def consume() -> None:
+    reveal_type(await async_func())  # revealed: Literal[1]
+    wrong: str = await async_func()  # error: [invalid-assignment]
+
 # TODO: should be `def async_func() -> CoroutineType[Any, Any, Literal[1]]`
 reveal_type(async_func)  # revealed: def async_func() -> CoroutineType[Any, Any, Unknown]
+```
+
+## Asynchronous return paths
+
+Calling an async function creates a coroutine even when its body always raises. An implicit return
+contributes `None` to the awaited result.
+
+```py
+async def optional(flag: bool):
+    if flag:
+        return "done"
+
+async def never_returns():
+    raise RuntimeError
+
+reveal_type(optional(True))  # revealed: CoroutineType[Any, Any, Literal["done"] | None]
+reveal_type(never_returns())  # revealed: CoroutineType[Any, Any, Never]
+reveal_type(1)  # revealed: Literal[1]
+
+async def consume() -> None:
+    reveal_type(await optional(True))  # revealed: Literal["done"] | None
+```
+
+## Asynchronous generators
+
+An async generator returns an `AsyncGeneratorType`, rather than a coroutine. It has no final
+return-value type parameter; its yield and send types remain uninferred.
+
+```py
+async def values():
+    yield 1
+    return
+
+reveal_type(values())  # revealed: AsyncGeneratorType[Any, Any]
+
+async def consume() -> None:
+    async for value in values():
+        reveal_type(value)  # revealed: Any
+    await values()  # error: [invalid-await]
+```
+
+## Recursive async and generator returns
+
+Return inference follows recursive awaits and generator delegation while keeping their wrappers.
+
+```py
+async def async_recursive(n: int):
+    if n <= 0:
+        return 0
+    return await async_recursive(n - 1)
+
+def generator_recursive(n: int):
+    if n <= 0:
+        return 0
+    yield n
+    return (yield from generator_recursive(n - 1))
+
+reveal_type(async_recursive(3))  # revealed: CoroutineType[Any, Any, Literal[0]]
+reveal_type(generator_recursive(3))  # revealed: GeneratorType[Any, Any, Literal[0]]
+```
+
+## Mutually recursive async returns
+
+Awaited return values can depend on more than one function in a cycle.
+
+```py
+async def left(n: int):
+    if n <= 0:
+        return 1
+    return await right(n - 1)
+
+async def right(n: int):
+    if n <= 0:
+        return "a"
+    return await left(n - 1)
+
+reveal_type(left(3))  # revealed: CoroutineType[Any, Any, Literal[1, "a"]]
+reveal_type(right(3))  # revealed: CoroutineType[Any, Any, Literal["a", 1]]
+```
+
+## Async context manager return inference
+
+An inferred `__aenter__` result also determines the value bound by `async with`.
+
+```py
+from typing import final
+
+@final
+class Manager:
+    async def __aenter__(self):
+        return "resource"
+
+    async def __aexit__(self, *args) -> None:
+        pass
+
+async def consume() -> None:
+    async with Manager() as resource:
+        reveal_type(resource)  # revealed: Literal["resource"]
+        wrong: int = resource  # error: [invalid-assignment]
+```
+
+## Annotated async and generator returns
+
+Explicit annotations take precedence over the inferred body result.
+
+```py
+from typing import Generator
+
+async def annotated_async() -> int:
+    return 1
+
+def annotated_generator() -> Generator[str, None, int]:
+    yield "item"
+    return 1
+
+reveal_type(annotated_async())  # revealed: CoroutineType[Any, Any, int]
+reveal_type(annotated_generator())  # revealed: Generator[str, None, int]
+```
+
+## Async and generator methods
+
+Final methods can have precise inferred returns. Other methods retain the gradual widening used for
+ordinary methods, and an inherited annotation takes precedence over the implementation.
+
+```py
+from typing import Generator, final
+
+class Base:
+    async def asynchronous(self) -> int:
+        return 1
+
+    def generator(self) -> Generator[str, None, int]:
+        yield "item"
+        return 1
+
+class Child(Base):
+    async def asynchronous(self):
+        return 2
+
+    def generator(self):
+        yield "item"
+        return 2
+
+class Methods:
+    @final
+    async def precise(self):
+        return 1
+
+    @final
+    def precise_generator(self):
+        yield "item"
+        return 1
+
+    async def gradual(self):
+        return 1
+
+reveal_type(Child().asynchronous())  # revealed: CoroutineType[Any, Any, int]
+reveal_type(Child().generator())  # revealed: Generator[str, None, int]
+reveal_type(Methods().precise())  # revealed: CoroutineType[Any, Any, Literal[1]]
+reveal_type(Methods().precise_generator())  # revealed: GeneratorType[Any, Any, Literal[1]]
+reveal_type(Methods().gradual())  # revealed: CoroutineType[Any, Any, Literal[1]] | Unknown
+```
+
+## Excluded async bodies
+
+Abstract methods, protocol methods, and functions defined under `TYPE_CHECKING` do not infer their
+return values from their bodies. Async calls still retain their coroutine wrapper.
+
+```py
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Protocol
+
+class Abstract(ABC):
+    @abstractmethod
+    async def value(self):
+        return 1
+
+class Interface(Protocol):
+    async def value(self):
+        return 1
+
+if TYPE_CHECKING:
+    async def value():
+        return 1
+
+def consume(abstract: Abstract, interface: Interface) -> None:
+    reveal_type(abstract.value())  # revealed: CoroutineType[Any, Any, Unknown]
+    reveal_type(interface.value())  # revealed: CoroutineType[Any, Any, Unknown]
+    reveal_type(value())  # revealed: CoroutineType[Any, Any, Unknown]
+```
+
+## Disabled async and generator return inference
+
+With return inference disabled, unannotated async functions retain an unknown awaited result and
+generator functions retain an unknown call result.
+
+```toml
+[analysis]
+return-type-inference = "never"
+```
+
+```py
+async def asynchronous():
+    return 1
+
+def generator():
+    yield 1
+    return "done"
+
+async def async_generator():
+    yield 1
+
+reveal_type(asynchronous())  # revealed: CoroutineType[Any, Any, Unknown]
+reveal_type(generator())  # revealed: Unknown
+reveal_type(async_generator())  # revealed: Unknown
 ```
 
 ## Decorated functions

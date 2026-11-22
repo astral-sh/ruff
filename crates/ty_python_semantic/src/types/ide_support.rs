@@ -44,8 +44,7 @@ pub fn inlay_hint_return_type<'db>(
     model: &SemanticModel<'db>,
     function: &ast::StmtFunctionDef,
 ) -> Option<Type<'db>> {
-    // TODO: Remove the async check once return-type inference supports async functions,
-    // using the awaited return type for the hint instead of the coroutine type.
+    // TODO: Support async return hints, unwrapping coroutine results for the annotation.
     if function.returns.is_some() || function.is_async {
         return None;
     }

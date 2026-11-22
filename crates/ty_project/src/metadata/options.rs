@@ -1733,8 +1733,8 @@ pub struct AnalysisOptions {
     /// Lambda functions are not affected by this setting and their return type will always
     /// be inferred.
     ///
-    /// Return types for generator functions and asynchronous functions are currently not
-    /// inferred, but we plan to change this soon.
+    /// For generator functions, return type inference determines the final return value.
+    /// The types of yielded values and values sent into generators are not inferred.
     ///
     /// Functions in stubs and `if TYPE_CHECKING` blocks are never considered for return type
     /// inference.
