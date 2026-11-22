@@ -2,7 +2,7 @@ use crate::codes::Category;
 use crate::fix::edits::fresh_binding_name;
 use crate::fix::syntax;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Builder, Expr, ExprCall, ExprKind, ListId, build};
+use ruff_python_ast::{Builder, Expr, ExprCallFields, ExprKind, ListId, build};
 use ruff_python_semantic::{SemanticModel, analyze::typing::is_mutable_expr};
 use ruff_text_size::Ranged;
 
@@ -68,8 +68,8 @@ impl Violation for MutableFromkeysValue {
 }
 
 /// RUF024
-pub(crate) fn mutable_fromkeys_value(checker: &Checker, call: ExprCall<'_>) {
-    let ExprKind::Attribute(attribute) = call.func().classify() else {
+pub(crate) fn mutable_fromkeys_value(checker: &Checker, call: &ExprCallFields<'_>) {
+    let ExprKind::Attribute(attribute) = call.func.classify() else {
         return;
     };
     let value = attribute.value();
@@ -85,7 +85,7 @@ pub(crate) fn mutable_fromkeys_value(checker: &Checker, call: ExprCall<'_>) {
     }
 
     // Check that the value parameter is a mutable object.
-    let Some([keys, value]) = call.arguments().args().as_array() else {
+    let Some([keys, value]) = call.arguments.args().as_array() else {
         return;
     };
     if !is_mutable_expr(value, semantic) {

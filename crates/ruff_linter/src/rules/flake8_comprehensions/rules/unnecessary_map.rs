@@ -95,9 +95,10 @@ impl Violation for UnnecessaryMap {
 }
 
 /// C417
-pub(crate) fn unnecessary_map(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn unnecessary_map(checker: &Checker, call_fields: &ast::ExprCallFields<'_>) {
+    let call = call_fields.node;
     let semantic = checker.semantic();
-    let (func, arguments) = (call.func(), call.arguments());
+    let (func, arguments) = (call_fields.func, call_fields.arguments);
 
     let Some(object_type) = ObjectType::from(func, semantic) else {
         return;

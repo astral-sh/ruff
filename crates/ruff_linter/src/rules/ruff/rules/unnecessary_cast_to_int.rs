@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprKind};
 use ruff_python_edits::unwrapped_call_argument;
 use ruff_python_semantic::SemanticModel;
@@ -58,8 +59,9 @@ impl AlwaysFixableViolation for UnnecessaryCastToInt {
 }
 
 /// RUF046
-pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call: ExprCall<'_>) {
-    let Some(argument) = single_argument_to_int_call(call, checker.semantic()) else {
+pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call_fields: &ExprCallFields<'_>) {
+    let call = call_fields.node;
+    let Some(argument) = single_argument_to_int_call(call_fields, checker.semantic()) else {
         return;
     };
 
@@ -114,10 +116,10 @@ pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call: ExprCall<'_>) {
         }
     };
 
-    let edit = Edit::range_replacement(content, call.range());
+    let edit = Edit::range_replacement(content, call_fields.range());
     let fix = Fix::applicable_edit(edit, applicability);
     checker
-        .report_diagnostic(UnnecessaryCastToInt, call.range())
+        .report_diagnostic(UnnecessaryCastToInt, call_fields.range())
         .set_fix(fix);
 }
 
@@ -147,11 +149,11 @@ fn call_applicability(checker: &Checker, inner_call: ExprCall<'_>) -> Option<App
 }
 
 fn single_argument_to_int_call<'a>(
-    call: ExprCall<'a>,
+    call: &ExprCallFields<'a>,
     semantic: &SemanticModel,
 ) -> Option<Expr<'a>> {
-    let func = call.func();
-    let arguments = call.arguments();
+    let func = call.func;
+    let arguments = call.arguments;
 
     if !semantic.match_builtin_expr(func, "int") {
         return None;

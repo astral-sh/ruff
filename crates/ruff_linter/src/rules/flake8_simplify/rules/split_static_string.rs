@@ -93,10 +93,10 @@ impl Violation for SplitStaticString {
 pub(crate) fn split_static_string(
     checker: &Checker,
     attr: &str,
-    call: ast::ExprCall<'_>,
+    call: &ast::ExprCallFields<'_>,
     str_value: StringValue<'_>,
 ) {
-    let arguments = call.arguments();
+    let arguments = call.arguments;
 
     let maxsplit_arg = arguments.find_argument_value("maxsplit", 1);
     let Some(maxsplit_value) = get_maxsplit_value(maxsplit_arg) else {

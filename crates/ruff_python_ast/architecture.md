@@ -60,6 +60,10 @@ Use `SyntaxNode` for an untyped row. Calling `node.cast::<Stmt>()` returns a sta
 when the row contains one. The source-order visitor receives an `AnyNode` on entry and exit
 so it can match on the concrete variant. It can walk both parsed and constructed trees.
 
+For `f(x)`, the linter's general call dispatcher resolves the callee and arguments once
+and passes a reference to the resulting `ExprCallFields` to the rules that use them. The
+`node` field retains the original call for rules that need its range or identity.
+
 ## Row layout
 
 Each node occupies a 16-byte row and an eight-byte source range. The first 15 bytes of the

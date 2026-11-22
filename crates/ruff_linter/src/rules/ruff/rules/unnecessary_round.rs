@@ -49,13 +49,13 @@ impl AlwaysFixableViolation for UnnecessaryRound {
 }
 
 /// RUF057
-pub(crate) fn unnecessary_round(checker: &Checker, call: ast::ExprCall<'_>) {
-    if !checker.semantic().match_builtin_expr(call.func(), "round") {
+pub(crate) fn unnecessary_round(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    if !checker.semantic().match_builtin_expr(call.func, "round") {
         return;
     }
 
     let Some((rounded, rounded_value, ndigits_value)) =
-        rounded_and_ndigits(call.arguments(), checker.semantic())
+        rounded_and_ndigits(call.arguments, checker.semantic())
     else {
         return;
     };
@@ -103,7 +103,7 @@ pub(crate) fn unnecessary_round(checker: &Checker, call: ast::ExprCall<'_>) {
         .current_expression_parent()
         .map_or_else(|| checker.semantic().current_statement().into(), Into::into);
     let content = unwrapped_call_argument(
-        call,
+        call.node,
         rounded,
         Some(parent),
         checker.tokens(),

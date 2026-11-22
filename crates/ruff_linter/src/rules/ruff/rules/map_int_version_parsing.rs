@@ -47,7 +47,7 @@ impl Violation for MapIntVersionParsing {
 }
 
 /// RUF048
-pub(crate) fn map_int_version_parsing(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn map_int_version_parsing(checker: &Checker, call: &ast::ExprCallFields<'_>) {
     let semantic = checker.semantic();
 
     let Some((first, second)) = map_call_with_two_arguments(semantic, call) else {
@@ -61,10 +61,10 @@ pub(crate) fn map_int_version_parsing(checker: &Checker, call: ast::ExprCall<'_>
 
 fn map_call_with_two_arguments<'a>(
     semantic: &SemanticModel,
-    call: ast::ExprCall<'a>,
+    call: &ast::ExprCallFields<'a>,
 ) -> Option<(Expr<'a>, Expr<'a>)> {
-    let [first, second] = call.arguments().as_positional_array()?;
-    if !semantic.match_builtin_expr(call.func(), "map") {
+    let [first, second] = call.arguments.as_positional_array()?;
+    if !semantic.match_builtin_expr(call.func, "map") {
         return None;
     }
 

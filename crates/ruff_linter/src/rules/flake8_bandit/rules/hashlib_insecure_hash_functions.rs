@@ -90,7 +90,11 @@ impl Violation for HashlibInsecureHashFunction {
 }
 
 /// S324
-pub(crate) fn hashlib_insecure_hash_functions(checker: &Checker, call: ast::ExprCall<'_>) {
+pub(crate) fn hashlib_insecure_hash_functions(
+    checker: &Checker,
+    call_fields: &ast::ExprCallFields<'_>,
+) {
+    let call = call_fields.node;
     if !checker
         .semantic()
         .seen_module(Modules::HASHLIB | Modules::CRYPT)
@@ -100,7 +104,7 @@ pub(crate) fn hashlib_insecure_hash_functions(checker: &Checker, call: ast::Expr
 
     if let Some(weak_hash_call) = checker
         .semantic()
-        .resolve_qualified_name(call.func())
+        .resolve_qualified_name(call_fields.func)
         .and_then(|qualified_name| match qualified_name.segments() {
             ["hashlib", "new"] => Some(WeakHashCall::Hashlib {
                 call: HashlibCall::New,

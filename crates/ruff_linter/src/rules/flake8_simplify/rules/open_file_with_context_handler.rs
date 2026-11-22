@@ -1,4 +1,4 @@
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::{Expr, ExprKind, StmtKind};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -226,10 +226,10 @@ fn is_immediately_closed(semantic: &SemanticModel) -> bool {
 }
 
 /// SIM115
-pub(crate) fn open_file_with_context_handler(checker: &Checker, call: ExprCall<'_>) {
+pub(crate) fn open_file_with_context_handler(checker: &Checker, call: &ExprCallFields<'_>) {
     let semantic = checker.semantic();
 
-    if !is_open_call(semantic, call.func()) {
+    if !is_open_call(semantic, call.func) {
         return;
     }
 
@@ -270,5 +270,5 @@ pub(crate) fn open_file_with_context_handler(checker: &Checker, call: ExprCall<'
         return;
     }
 
-    checker.report_diagnostic(OpenFileWithContextHandler, call.func().range());
+    checker.report_diagnostic(OpenFileWithContextHandler, call.func.range());
 }

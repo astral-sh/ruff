@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::ExprCallFields;
 use ruff_python_ast::ExprKind;
 use ruff_text_size::Ranged;
 
@@ -48,12 +48,12 @@ impl Violation for ImplicitCwd {
 }
 
 /// FURB177
-pub(crate) fn no_implicit_cwd(checker: &Checker, call: ExprCall<'_>) {
-    if !call.arguments().is_empty() {
+pub(crate) fn no_implicit_cwd(checker: &Checker, call: &ExprCallFields<'_>) {
+    if !call.arguments.is_empty() {
         return;
     }
 
-    let ExprKind::Attribute(attribute) = call.func().classify() else {
+    let ExprKind::Attribute(attribute) = call.func.classify() else {
         return;
     };
     let attr = attribute.attr();

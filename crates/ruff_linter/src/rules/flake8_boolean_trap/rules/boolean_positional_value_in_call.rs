@@ -54,12 +54,12 @@ impl Violation for BooleanPositionalValueInCall {
 }
 
 /// FBT003
-pub(crate) fn boolean_positional_value_in_call(checker: &Checker, call: ast::ExprCall<'_>) {
-    if allow_boolean_trap(call, checker) {
+pub(crate) fn boolean_positional_value_in_call(checker: &Checker, call: &ast::ExprCallFields<'_>) {
+    if allow_boolean_trap(call.node, checker) {
         return;
     }
     for arg in call
-        .arguments()
+        .arguments
         .args()
         .iter()
         .filter(|arg| arg.is_boolean_literal_expr())
