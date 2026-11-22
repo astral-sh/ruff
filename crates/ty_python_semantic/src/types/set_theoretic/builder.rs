@@ -1809,14 +1809,8 @@ impl<'db> IntersectionBuilder<'db> {
                     self.add_positive_impl::<L>(*pos, seen_aliases)?;
                 }
                 let negatives = other.negative(db);
-                if negatives.len() > 1
-                    && let [inner] = &mut self.intersections[..]
-                    && let Some(Type::LiteralValue(first)) = negatives.iter().next()
-                    && inner.negative.iter().chain(negatives).all(|ty| {
-                        ty.as_literal_value().is_some_and(|literal| {
-                            literal.is_concrete_builtin() && literal.has_same_flags(*first)
-                        })
-                    })
+                if let [inner] = &mut self.intersections[..]
+                    && inner.can_use_set_membership(negatives)
                 {
                     // Distinct built-in literal exclusions never simplify each other. With
                     // matching flags, set membership also detects equal literal values.
@@ -2124,6 +2118,22 @@ struct InnerIntersectionBuilder<'db> {
 }
 
 impl<'db> InnerIntersectionBuilder<'db> {
+    /// Whether set membership can replace pairwise simplification for these exclusions.
+    fn can_use_set_membership(&self, incoming: &NegativeIntersectionElements<'db>) -> bool {
+        // Only scan the existing set if we can reuse the result across multiple insertions.
+        if incoming.len() <= 1 {
+            return false;
+        }
+        let Some(Type::LiteralValue(first)) = incoming.iter().next() else {
+            return false;
+        };
+        self.negative.iter().chain(incoming).all(|ty| {
+            ty.as_literal_value().is_some_and(|literal| {
+                literal.is_concrete_builtin() && literal.has_same_flags(*first)
+            })
+        })
+    }
+
     fn contains_never(&self) -> bool {
         self.positive.contains(&Type::Never)
     }
