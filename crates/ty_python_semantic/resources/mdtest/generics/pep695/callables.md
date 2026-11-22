@@ -1379,6 +1379,31 @@ def _[F: Restricted[int]](callback: F):
     wrong: Callable[[int], bytes] = callback  # error: [invalid-assignment]
 ```
 
+## Overloaded methods on a bounded type variable
+
+Both overloads accept any receiver, so together they cover the protocol's input union even when the
+receiver is `T`. The bound method's return type must account for both overloads.
+
+```py
+from typing import Callable, Protocol, overload
+
+class Parser:
+    @overload
+    def parse(self: object, value: int, /) -> int: ...
+    @overload
+    def parse(self: object, value: str, /) -> str: ...
+    def parse(self: object, value: int | str, /) -> int | str:
+        return value
+
+class SupportsParse(Protocol):
+    def parse(self, value: int | str, /) -> int | str: ...
+
+def check[T: Parser](parser: T):
+    impl: SupportsParse = parser  # ok
+    parse: Callable[[int | str], int | str] = parser.parse  # ok
+    wrong: Callable[[int | str], int] = parser.parse  # error: [invalid-assignment]
+```
+
 ## Constructor bounds in callable inference
 
 The signature of a class constructor can be inferred from a type variable with an upper bound of

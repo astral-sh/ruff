@@ -609,7 +609,7 @@ impl<'db> Type<'db> {
         if let (Type::Callable(source), Type::Callable(target)) = (self, target)
             && !source
                 .signatures(db)
-                .may_explain_relation_to(target.signatures(db))
+                .may_explain_relation_to(db, target.signatures(db))
         {
             return ErrorContextTree::new(relation);
         }

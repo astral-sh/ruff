@@ -116,10 +116,7 @@ fn merge_receiver_constraints<'db>(
     first: Option<&ReceiverConstraints<'db>>,
     second: Option<&ReceiverConstraints<'db>>,
 ) -> Option<ReceiverConstraints<'db>> {
-    match (
-        first.filter(|constraints| !constraints.is_trivially_always_satisfied()),
-        second.filter(|constraints| !constraints.is_trivially_always_satisfied()),
-    ) {
+    match (first, second) {
         (None, None) => None,
         (Some(constraints), None) | (None, Some(constraints)) => Some((*constraints).clone()),
         (Some(first), Some(second)) => Some(ReceiverConstraints {
@@ -576,17 +573,19 @@ impl<'db> CallableSignature<'db> {
     /// The checker suppresses notes while trying individual source overloads. For a target such
     /// as `Callable[[int | bytes], str]`, the aggregate check can still explain which member of
     /// the overloads' combined return type is incompatible with `str`.
-    pub(super) fn may_explain_relation_to(&self, target: &Self) -> bool {
+    pub(super) fn may_explain_relation_to(&self, db: &'db dyn Db, target: &Self) -> bool {
         if self.overloads.len() <= 1 {
             return true;
         }
 
         target.iter().any(|signature| {
-            signature.supports_overload_aggregation()
+            signature.supports_overload_aggregation(db, TypeVarSet::None)
                 && signature
                     .single_required_positional_parameter_type()
                     .is_some_and(Type::is_union)
-        }) && self.iter().all(Signature::supports_overload_aggregation)
+        }) && self
+            .iter()
+            .all(|signature| signature.supports_overload_aggregation(db, TypeVarSet::None))
     }
 
     pub(super) fn when_constraint_set_assignable_from<'c>(
@@ -715,22 +714,30 @@ struct ReceiverConstraints<'db> {
 }
 
 impl<'db> ReceiverConstraints<'db> {
-    fn new(relations: impl IntoIterator<Item = (Type<'db>, Type<'db>)>) -> Self {
-        Self {
-            impossible: false,
-            relations: relations.into_iter().collect(),
-        }
+    fn new(
+        impossible: bool,
+        relations: impl IntoIterator<Item = (Type<'db>, Type<'db>)>,
+    ) -> Option<Self> {
+        let constraints = Self {
+            impossible,
+            // Drop relations that hold even for subtyping. Keep direct type variables because
+            // even an upper bound of `object` or a lower bound of `Never` can inform inference.
+            relations: relations
+                .into_iter()
+                .filter(|&(receiver, annotation)| !Self::is_trivial(receiver, annotation, |_| true))
+                .collect(),
+        };
+        (impossible || !constraints.relations.is_empty()).then_some(constraints)
     }
 
-    fn impossible() -> Self {
-        Self {
-            impossible: true,
-            relations: Box::new([]),
-        }
-    }
-
-    fn is_trivially_always_satisfied(&self) -> bool {
-        !self.impossible && self.relations.is_empty()
+    fn is_trivial(
+        receiver: Type<'db>,
+        annotation: Type<'db>,
+        is_inferable: impl Fn(BoundTypeVarInstance<'db>) -> bool,
+    ) -> bool {
+        (receiver == Type::Never || annotation == Type::object())
+            && !matches!(receiver, Type::TypeVar(var) if is_inferable(var))
+            && !matches!(annotation, Type::TypeVar(var) if is_inferable(var))
     }
 
     fn apply_type_mapping(
@@ -740,20 +747,13 @@ impl<'db> ReceiverConstraints<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Option<Self> {
-        let mapped = Self {
-            impossible: self.impossible,
-            relations: self
-                .relations
-                .iter()
-                .map(|&(receiver, annotation)| {
-                    (
-                        receiver.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                        annotation.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                    )
-                })
-                .collect(),
-        };
-        (!mapped.is_trivially_always_satisfied()).then_some(mapped)
+        let relations = self.relations.iter().map(|&(receiver, annotation)| {
+            (
+                receiver.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                annotation.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            )
+        });
+        Self::new(self.impossible, relations)
     }
 
     fn requires_lazy_evaluation(
@@ -1378,10 +1378,20 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Aggregation compares parameter and return types. A receiver constraint imposes an
-    /// additional obligation, and a `ParamSpec` value has no meaningful return type.
-    fn supports_overload_aggregation(&self) -> bool {
-        self.receiver_constraints().is_none() && !self.is_paramspec_value()
+    /// Aggregation checks only parameter and return types. A receiver check must hold
+    /// unconditionally and contribute no inference bounds. A `ParamSpec` value has no
+    /// meaningful return type.
+    fn supports_overload_aggregation(&self, db: &'db dyn Db, inferable: TypeVarSet<'db>) -> bool {
+        !self.is_paramspec_value()
+            && self.receiver_constraints().is_none_or(|constraints| {
+                !constraints.impossible
+                    && constraints.relations.iter().all(|&(receiver, annotation)| {
+                        ReceiverConstraints::is_trivial(receiver, annotation, |var| {
+                            var.is_inferable(db, inferable)
+                                || var.is_inferable(db, self.inferable_typevars(db))
+                        })
+                    })
+            })
     }
 
     /// Restrict the base signature to positional calls for parameters whose keyword name
@@ -1572,6 +1582,8 @@ impl<'db> Signature<'db> {
                 || (parameter.is_variadic() && !parameter.has_starred_annotation()))
                 && !parameter.inferred_annotation
         });
+        // If no parameter can receive the implicit positional argument, keep the signature
+        // for bound-method diagnostics but make it incompatible with callable contracts.
         let impossible_receiver = binding_parameters.is_standard()
             && !removed_receiver
             && !first_parameter.is_some_and(Parameter::is_variadic);
@@ -1603,11 +1615,8 @@ impl<'db> Signature<'db> {
                 TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context))
             }
         };
-        let receiver_constraint = if impossible_receiver {
-            // Keep the signature for bound-method diagnostics, but make it incompatible with
-            // callable contracts: no parameter can receive the implicit positional argument.
-            Some(ReceiverConstraints::impossible())
-        } else {
+        let receiver_constraint = ReceiverConstraints::new(
+            impossible_receiver,
             explicit_receiver.map(|parameter| {
                 let receiver = receiver_type.unwrap_or_else(|| {
                     Type::TypeVar(BoundTypeVarInstance::synthetic_self(
@@ -1628,9 +1637,9 @@ impl<'db> Signature<'db> {
                 } else {
                     parameter.annotated_type()
                 };
-                ReceiverConstraints::new([(receiver, annotation)])
-            })
-        };
+                (receiver, annotation)
+            }),
+        );
         let receiver_constraints =
             merge_receiver_constraints(self.receiver_constraints(), receiver_constraint.as_ref());
         if let Some(self_type) = typing_self_type
@@ -2564,10 +2573,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_signatures: &[Signature<'db>],
         target_signature: &Signature<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
-        if !target_signature.supports_overload_aggregation()
+        if !target_signature.supports_overload_aggregation(db, self.inferable)
             || !source_signatures
                 .iter()
-                .all(Signature::supports_overload_aggregation)
+                .all(|signature| signature.supports_overload_aggregation(db, self.inferable))
         {
             return None;
         }
@@ -2968,9 +2977,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         let may_contain_typevars = |signature: &Signature<'db>| {
             signature.generic_context.is_some()
-                || signature
-                    .receiver_constraints()
-                    .is_some_and(|constraints| !constraints.is_trivially_always_satisfied())
+                || signature.receiver_constraints().is_some()
                 || std::iter::once(signature.return_ty)
                     .chain(signature.parameters.iter().map(Parameter::annotated_type))
                     .any(|ty| {
@@ -6754,23 +6761,47 @@ mod tests {
 
     #[test]
     fn always_satisfied_receiver_constraints_are_discarded() {
-        let always = ReceiverConstraints::new([]);
-        assert!(merge_receiver_constraints(Some(&always), None).is_none());
-        assert!(merge_receiver_constraints(None, Some(&always)).is_none());
+        let always = ReceiverConstraints::new(
+            false,
+            [(Type::any(), Type::object()), (Type::Never, Type::any())],
+        );
+        assert!(always.is_none());
+        let impossible = ReceiverConstraints::new(true, []);
+        assert!(impossible.is_some());
+        assert_eq!(
+            merge_receiver_constraints(always.as_ref(), impossible.as_ref()),
+            impossible
+        );
     }
 
     #[test]
     fn gradual_receiver_constraints_are_retained() {
-        let gradual = ReceiverConstraints::new([(Type::any(), Type::any())]);
-        assert!(!gradual.is_trivially_always_satisfied());
+        let gradual = ReceiverConstraints::new(false, [(Type::any(), Type::any())]);
+        assert!(gradual.is_some());
+        assert_eq!(merge_receiver_constraints(gradual.as_ref(), None), gradual);
         assert_eq!(
-            merge_receiver_constraints(Some(&gradual), None),
-            Some(gradual.clone())
+            merge_receiver_constraints(gradual.as_ref(), gradual.as_ref()),
+            gradual
         );
-        assert_eq!(
-            merge_receiver_constraints(Some(&gradual), Some(&gradual)),
-            Some(gradual)
-        );
+    }
+
+    #[test]
+    fn materialization_can_discharge_receiver_constraints() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let gradual = ReceiverConstraints::new(false, [(Type::any(), Type::any())]).unwrap();
+        for kind in [MaterializationKind::Top, MaterializationKind::Bottom] {
+            assert!(
+                gradual
+                    .apply_type_mapping(
+                        &db,
+                        &TypeMapping::Materialize(kind),
+                        TypeContext::default(),
+                        &ApplyTypeMappingVisitor::new(&env),
+                    )
+                    .is_none()
+            );
+        }
     }
 
     #[test]
