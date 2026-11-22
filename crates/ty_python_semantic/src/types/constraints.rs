@@ -2146,13 +2146,28 @@ impl<'db> UpperBound<'db> {
 
         // Assigning the union of the fixed members to each direct variable makes the entire
         // union equal to that witness.
-        // Every other upper clause must accept it with its existing type variables held fixed.
         let witness = UnionType::from_elements(db, env, fixed_members);
-        let accepts_witness = |clause: Type<'db>| {
-            clause.as_typevar().is_some_and(is_unbounded_variable)
-                || witness
-                    .when_constraint_set_assignable_to_owned(db, env, clause, TypeVarSet::None)
-                    .query(|_, when| when.is_always_satisfied(db, env, TypeVarSet::None))
+        let accepts_witness = |mut clause: Type<'db>| {
+            if clause.as_typevar().is_some_and(is_unbounded_variable) {
+                return true;
+            }
+
+            // Try the same witness inside upper clauses. For example, when
+            // R implements SupportsMul[R, R], setting T = U = R proves
+            // R | T ≤ SupportsMul[T, U]. Solving this relation recursively can
+            // keep nesting SupportsMul in its own result type.
+            let (variables, _) = clause.free_typevars(db, env);
+            if let Some(context) = GenericContext::try_from_typevar_instances(
+                db,
+                env,
+                variables.iter(db).filter(|&var| is_unbounded_variable(var)),
+            ) {
+                clause =
+                    clause.apply_specialization(db, context.repeat_specialization(db, witness));
+            }
+            witness
+                .when_constraint_set_assignable_to_owned(db, env, clause, TypeVarSet::None)
+                .query(|_, when| when.is_always_satisfied(db, env, TypeVarSet::None))
         };
         self.iter_clauses(source).all(|clause| match clause {
             Type::Intersection(intersection) if intersection.negative(db).is_empty() => {
@@ -2172,6 +2187,8 @@ impl<'db> UpperBound<'db> {
         source: EvidenceSource,
         lower: Type<'db>,
     ) -> bool {
+        // TODO: Detect recursive bound comparisons that keep growing, so termination
+        // doesn't depend on finding a common specialization here.
         if inferable != TypeVarSet::None
             && let Type::Union(lower) = lower
             && self.has_common_specialization(db, env, inferable, source, lower)

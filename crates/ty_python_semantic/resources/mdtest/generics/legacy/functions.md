@@ -1441,6 +1441,54 @@ def f(value: T):
     reveal_type(value + value)  # revealed: Unknown
 ```
 
+## A bounded receiver implementing an operator protocol
+
+The bound defines the available operators. Their generic receiver is the caller's `R`, so the
+products and their sum retain that type.
+
+```py
+from operator import mul
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Ring(Protocol):
+    def __mul__(self: T, other: T, /) -> T: ...
+    def __add__(self: T, other: T, /) -> T: ...
+
+R = TypeVar("R", bound=Ring)
+
+def dot(left: list[R], right: list[R], start: R) -> R:
+    reveal_type(mul(start, start))  # revealed: R@dot
+    result = sum(map(mul, left, right), start)
+    reveal_type(result)  # revealed: R@dot
+    return result
+```
+
+An alias for a nominal bound also preserves the receiver type, even when the protocol parameter is
+optional. The bound still restricts the other operand to `int`.
+
+```py
+from _typeshed import SupportsMul
+from typing_extensions import TypeAliasType
+
+class Scalable:
+    def __mul__(self: T, factor: int, /) -> T:
+        return self
+
+ScalableAlias = TypeAliasType("ScalableAlias", Scalable)
+S = TypeVar("S", bound=ScalableAlias)
+
+def twice(value: SupportsMul[int, T] | None) -> T:
+    assert value is not None
+    return value * 2
+
+def scale(value: S) -> S:
+    mul(value, "bad")  # error: [no-matching-overload]
+    reveal_type(twice(value))  # revealed: S@scale
+    return mul(value, 2)
+```
+
 ## Unary operators on bounded type variables
 
 When a unary method returns `Self`, the operator preserves the operand's type variable.

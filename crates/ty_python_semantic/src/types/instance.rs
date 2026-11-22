@@ -870,6 +870,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         &self,
         db: &'db dyn Db,
         ty: Type<'db>,
+        receiver: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
         // Explicit protocol inheritance establishes subtyping even when a subclass overrides
@@ -1048,7 +1049,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let structurally_satisfied = if let Type::ProtocolInstance(source_protocol) = ty {
             self.check_protocol_interface_pair(
                 db,
-                ty,
+                receiver,
                 source_protocol.interface(db),
                 protocol.interface(db),
             )
@@ -1064,7 +1065,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .members(db)
                 .sorted_by_cached_key(|member| member.structural_member_priority(db, env))
                 .when_all(db, self.constraints, |member| {
-                    self.type_satisfies_protocol_member(db, ty, &member)
+                    self.type_satisfies_protocol_member(db, receiver, &member)
                 })
         };
         if let Some(context) = self.report_context()
@@ -1988,7 +1989,7 @@ impl<'db> ProtocolInstanceType<'db> {
                 &materialization_visitor,
             );
             checker
-                .check_type_satisfies_protocol(db, receiver, protocol)
+                .check_type_satisfies_protocol(db, receiver, receiver, protocol)
                 .is_always_satisfied(db, &env, TypeVarSet::None)
         }
 

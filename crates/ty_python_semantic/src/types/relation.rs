@@ -1695,10 +1695,25 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     fn check_source_typevar_bounds(
         &self,
         db: &'db dyn Db,
+        source: Type<'db>,
         bound_or_constraints: TypeVarBoundOrConstraints<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         match bound_or_constraints {
+            // Use the upper bound to find the implementation, but bind its methods to the
+            // original receiver. Otherwise a method returning Self widens to the bound.
+            TypeVarBoundOrConstraints::UpperBound(bound)
+                if let Type::ProtocolInstance(protocol) = target
+                    && let bound @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)) =
+                        bound.resolve_type_alias(db)
+                    && bound != target =>
+            {
+                self.with_recursion_guard(db, source, target, || {
+                    self.check_type_satisfies_protocol(db, bound, source, protocol)
+                })
+            }
+            // TODO: Preserve the original receiver when checking each arm of a union
+            // bound or each declared constraint, so `Self` stays tied to the caller.
             TypeVarBoundOrConstraints::UpperBound(bound) => self.check_type_pair(db, bound, target),
             TypeVarBoundOrConstraints::Constraints(constraints) => constraints
                 .elements(db)
@@ -1774,11 +1789,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     // For `U: (int, str)` matched against `T | int`, checking each choice
                     // infers `str` when we can't prove `U ≤ (U & str) | int`. Also retain
                     // `U & str ≤ T` so an invariant `list[U]` context can select `T = U`.
-                    return self.check_source_typevar_bounds(db, domain, target).or(
-                        db,
-                        self.constraints,
-                        constrain_remaining,
-                    );
+                    return self
+                        .check_source_typevar_bounds(db, source, domain, target)
+                        .or(db, self.constraints, constrain_remaining);
                 }
             }
             return constrain_remaining();
@@ -1839,7 +1852,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         && let Some(bound_or_constraints) =
                             typevar.typevar(db).bound_or_constraints(db, self.env) =>
                 {
-                    self.check_source_typevar_bounds(db, bound_or_constraints, target)
+                    // A nominal or protocol bound exposes no union to distribute. Comparing
+                    // it again against the entire union widens the receiver in protocol arms.
+                    if let TypeVarBoundOrConstraints::UpperBound(bound) = bound_or_constraints
+                        && matches!(
+                            bound.resolve_type_alias(db),
+                            Type::NominalInstance(_) | Type::ProtocolInstance(_)
+                        )
+                    {
+                        return self.never();
+                    }
+                    self.check_source_typevar_bounds(db, source, bound_or_constraints, target)
                 }
                 Type::Intersection(intersection)
                     if self.should_expand_intersection(db, intersection) =>
@@ -3098,7 +3121,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         self.check_callables_vs_callable(db, &callables, target_callable)
                     })
                 } else {
-                    self.check_source_typevar_bounds(db, bound_or_constraints, target)
+                    self.check_source_typevar_bounds(db, source, bound_or_constraints, target)
                 }
             }
 
@@ -3277,7 +3300,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (_, Type::ProtocolInstance(target_proto)) => {
                 self.with_recursion_guard(db, source, target, || {
-                    self.check_type_satisfies_protocol(db, source, target_proto)
+                    self.check_type_satisfies_protocol(db, source, source, target_proto)
                 })
             }
 
