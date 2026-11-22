@@ -115,9 +115,6 @@ static FASTAPI: Benchmark = Benchmark::new(RealWorldProject {
     paths: &["fastapi"],
     dependencies: &[
         "annotated-doc",
-        // This FastAPI revision requires opentelemetry-api>=1.44.0 at runtime.
-        // For this static check, ty reported the same diagnostics with 1.42.1
-        // (from TY_ECOSYSTEM_PIN) as with 1.44.0.
         "opentelemetry-api",
         "pydantic",
         "starlette",
