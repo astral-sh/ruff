@@ -1826,6 +1826,15 @@ impl<'db> IntersectionBuilder<'db> {
                             ExclusionComparison::SetMembership,
                         );
                     }
+                } else if negatives.len() >= 16
+                    && let [inner] = &mut self.intersections[..]
+                    && inner.negative.is_empty()
+                    && inner.positive.iter().eq(other.positive(db))
+                    && can_resume_intersection(db, self.env.program(db), other)
+                {
+                    // We rebuilt the same positives. The cached check says the remaining
+                    // exclusions would also survive pairwise simplification in order.
+                    inner.negative = negatives.clone();
                 } else {
                     for neg in negatives {
                         self.add_negative_impl::<L>(*neg, seen_aliases)?;
@@ -2115,6 +2124,55 @@ fn simplify_intersection_pair_impl<'db>(
     IntersectionSimplification::Unchanged
 }
 
+/// Would replaying this intersection into an empty builder preserve both ordered sets?
+///
+/// Substitution can produce intersections that still need simplification. Check by replaying
+/// the same operations, tracking their dependencies, and reuse the proof for shared prefixes.
+#[salsa::tracked(returns(copy), cycle_result=|_, _, _, _| false, heap_size=ruff_memory_usage::heap_size)]
+fn can_resume_intersection<'db>(
+    db: &'db dyn Db,
+    program: crate::Program<'db>,
+    intersection: IntersectionType<'db>,
+) -> bool {
+    let env = ProgramEnvironment::from_program(program);
+    let positive = intersection.positive(db);
+    let negative = intersection.negative(db);
+
+    // Alias expansion and distribution depend on the surrounding builder.
+    if positive.iter().chain(negative).any(|ty| {
+        ty.is_alias_like()
+            || matches!(
+                ty,
+                Type::Union(_) | Type::Intersection(_) | Type::EnumComplement(_)
+            )
+    }) {
+        return false;
+    }
+
+    // Dropping the lowest set bit finds a shared prefix in logarithmic recursion depth.
+    let prefix_len = negative.len() & (negative.len() - 1);
+    let mut builder = if prefix_len == 0 {
+        let mut builder = InnerIntersectionBuilder::default();
+        for ty in positive {
+            builder.add_positive(db, &env, *ty);
+        }
+        builder
+    } else {
+        let prefix = NegativeIntersectionElements::Multiple(
+            negative.iter().copied().take(prefix_len).collect(),
+        );
+        let prefix = IntersectionType::new(db, positive.clone(), prefix);
+        if !can_resume_intersection(db, program, prefix) {
+            return false;
+        }
+        InnerIntersectionBuilder::from_intersection(db, prefix)
+    };
+    for ty in negative.iter().skip(prefix_len) {
+        builder.add_negative(db, &env, *ty);
+    }
+    builder.positive == *positive && builder.negative == *negative
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 struct InnerIntersectionBuilder<'db> {
     positive: FxOrderSet<Type<'db>>,
@@ -2122,6 +2180,13 @@ struct InnerIntersectionBuilder<'db> {
 }
 
 impl<'db> InnerIntersectionBuilder<'db> {
+    fn from_intersection(db: &'db dyn Db, intersection: IntersectionType<'db>) -> Self {
+        Self {
+            positive: intersection.positive(db).clone(),
+            negative: intersection.negative(db).clone(),
+        }
+    }
+
     /// Whether set membership can replace pairwise simplification for these exclusions.
     fn can_use_set_membership(&self, incoming: &NegativeIntersectionElements<'db>) -> bool {
         // Only scan the existing set if we can reuse the result across multiple insertions.
