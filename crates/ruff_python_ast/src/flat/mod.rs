@@ -13,6 +13,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::name::Name;
 use hashbrown::HashTable;
 use rustc_hash::FxBuildHasher;
+use thin_vec::ThinVec;
 
 use crate::kind::Any;
 use crate::{
@@ -545,7 +546,9 @@ pub struct Ast {
     extra: Vec<u32>,
     text: String,
     names: Vec<Name>,
-    bytes: Vec<u8>,
+    // Most files have no bytes literals. Keep only a pointer in the AST and store
+    // the length and capacity alongside the bytes when the buffer is allocated.
+    bytes: ThinVec<u8>,
     numbers: Vec<Number>,
     keys: RowKeys,
 }
@@ -563,7 +566,7 @@ impl Ast {
             extra: Vec::new(),
             text: String::new(),
             names: Vec::new(),
-            bytes: Vec::new(),
+            bytes: ThinVec::new(),
             numbers: Vec::new(),
             keys: RowKeys::Unindexed,
         }

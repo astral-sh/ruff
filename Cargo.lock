@@ -3465,6 +3465,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "thin-vec",
  "thiserror 2.0.21",
 ]
 
