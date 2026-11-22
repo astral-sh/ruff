@@ -1534,7 +1534,7 @@ fn non_recursive_protocol_interface<'db>(
 /// checked separately after generic inference.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial = |_, _, _, _| OwnedConstraintSet::always(),
+    cycle_initial = |_, _, _, _, _| OwnedConstraintSet::always(),
     heap_size = ruff_memory_usage::heap_size,
 )]
 fn non_recursive_protocol_constraints<'db>(
@@ -1945,7 +1945,7 @@ impl<'db> ProtocolInstanceType<'db> {
     /// Such a protocol is therefore an equivalent type to `object`, which would in fact be
     /// normalised to `object`.
     pub(super) fn is_equivalent_to_object(self, db: &'db dyn Db) -> bool {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, ()| true, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, ()| true, heap_size=ruff_memory_usage::heap_size)]
         fn is_equivalent_to_object_inner<'db>(
             db: &'db dyn Db,
             protocol: ProtocolInstanceType<'db>,

@@ -414,7 +414,7 @@ impl<'db> SequentMap<'db> {
 
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _, _| SequentMap::default(),
+            cycle_initial=|_, _, _, _, _| SequentMap::default(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn for_constraint_inner<'db>(
@@ -478,7 +478,7 @@ impl<'db> SequentMap<'db> {
 
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _, _, _| SequentMap::default(),
+            cycle_initial=|_, _, _, _, _, _| SequentMap::default(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn for_constraint_pair_inner<'db>(

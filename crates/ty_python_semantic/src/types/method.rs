@@ -274,7 +274,7 @@ impl<'db> BoundMethodType<'db> {
     /// Returns `None` if the wrapped value cannot be converted to callables.
     #[salsa::tracked(
         returns(as_ref),
-        cycle_initial=|db, _, _| Some(CallableTypes::one(CallableType::bottom(db))),
+        cycle_initial=|db, _, _, _| Some(CallableTypes::one(CallableType::bottom(db))),
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(crate) fn callables(self, db: &'db dyn Db) -> Option<CallableTypes<'db>> {

@@ -149,7 +149,7 @@ pub(super) fn class_member_with_symbol<'db>(
 /// A subclass assignment such as `items = []` retains an inherited `items: list[int]`
 /// declaration. Both initializer inference and public member lookup use that declaration,
 /// while an explicit annotation or a new method definition supplies its own public type.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn inherited_class_body_declaration<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,

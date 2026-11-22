@@ -1526,7 +1526,7 @@ fn source_scopes_for_lexical_path<'db>(
 )]
 #[salsa::tracked(
     returns(deref),
-    cycle_initial=|_, _, _, _| Box::default(),
+    cycle_initial=|_, _, _, _, _| Box::default(),
     heap_size=ruff_memory_usage::heap_size
 )]
 fn fixture_exposures_for_name_in_scope<'db>(

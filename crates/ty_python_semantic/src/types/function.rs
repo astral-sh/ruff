@@ -478,7 +478,7 @@ impl<'db> OverloadLiteral<'db> {
     /// Overload sets ending at different declarations share their earlier links.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _| None,
+        cycle_initial=|_, _, _, _| None,
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn previous_overload_in_chain(self, db: &'db dyn Db) -> Option<OverloadLiteral<'db>> {
@@ -612,7 +612,7 @@ impl<'db> OverloadLiteral<'db> {
     /// than one overload set.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|_, _, _| Signature::bottom(),
+        cycle_initial=|_, _, _, _| Signature::bottom(),
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(super) fn public_overload_signature(self, db: &'db dyn Db) -> Signature<'db> {
@@ -958,7 +958,7 @@ impl<'db> FunctionLiteral<'db> {
     ) -> (&'db [OverloadLiteral<'db>], Option<OverloadLiteral<'db>>) {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _| (Box::default(), None),
+            cycle_initial=|_, _, _, _| (Box::default(), None),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn overloads_and_implementation_inner<'db>(
@@ -1846,7 +1846,7 @@ impl<'db> FunctionType<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_initial=|_, id, _, _| Type::divergent(id),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, function: FunctionType<'db>| {
             let env = ProgramEnvironment::from_scope(function.literal(db).last_definition.body_scope(db));
             result.cycle_normalized(db, &env, *previous, cycle)
@@ -1938,7 +1938,7 @@ impl<'db> FunctionType<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _| None,
+        cycle_initial=|_, _, _, _| None,
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn inherited_return_annotation(self, db: &'db dyn Db) -> Option<Type<'db>> {
@@ -1996,7 +1996,7 @@ impl<'db> FunctionType<'db> {
     /// computed signature changes. Updated signatures are already stored on the interned function.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|db, id, function: FunctionType<'db>| {
+        cycle_initial=|db, id, _, function: FunctionType<'db>| {
             let env = ProgramEnvironment::from_scope(
                 function.literal(db).last_definition.body_scope(db),
             );
@@ -2027,7 +2027,7 @@ impl<'db> FunctionType<'db> {
     /// the caller's environment. Recursive `TypeOf` annotations remain named references.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
+        cycle_initial=|_, _, _, _, _| VarianceTerm::BIVARIANT,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(in crate::types) fn variance_equation(
@@ -2050,7 +2050,7 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|_, _, _|Signature::bottom(),
+        cycle_initial=|_, _, _, _|Signature::bottom(),
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
@@ -2071,7 +2071,7 @@ impl<'db> FunctionType<'db> {
     /// return-position `Callable` stay bound to the function or move to the returned callable.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|_, _, _, _|Signature::bottom(),
+        cycle_initial=|_, _, _, _, _|Signature::bottom(),
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(super) fn last_definition_raw_signature(

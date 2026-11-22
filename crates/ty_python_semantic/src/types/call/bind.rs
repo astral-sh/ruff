@@ -9316,7 +9316,7 @@ impl<'db> Binding<'db> {
         /// with the same generic context and inferred arguments has the same parameter context.
         #[salsa::tracked(
             returns(as_ref),
-            cycle_initial = |_, _, _| None,
+            cycle_initial = |_, _, _, _| None,
             heap_size = ruff_memory_usage::heap_size,
         )]
         fn inferred_parameter_context<'db>(

@@ -262,7 +262,7 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Returns whether this class synthesizes slots through a dataclass or named tuple.
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| false)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| false)]
     pub(super) fn has_generated_slots(self, db: &'db dyn Db) -> bool {
         CodeGeneratorKind::from_class(db, self.into()).is_some_and(|field_policy| {
             matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
@@ -284,7 +284,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// dictionary literals are resolved from the indexed reaching assignment.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|_, _, _| SlotDefinition::DynamicOrNone,
+        cycle_initial=|_, _, _, _| SlotDefinition::DynamicOrNone,
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn slot_definition(self, db: &'db dyn Db) -> SlotDefinition {
@@ -447,7 +447,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// Here, `Child` has both slots and can also store additional dictionary-backed attributes.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|_, _, _| InstanceLayout::unknown(),
+        cycle_initial=|_, _, _, _| InstanceLayout::unknown(),
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn instance_layout(self, db: &'db dyn Db) -> InstanceLayout {

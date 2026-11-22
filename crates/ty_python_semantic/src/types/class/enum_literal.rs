@@ -193,7 +193,7 @@ impl<'db> DynamicEnumLiteral<'db> {
     #[salsa::tracked(
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
-        cycle_initial=|db, _, self_: DynamicEnumLiteral<'db>| {
+        cycle_initial=|db, _, _, self_: DynamicEnumLiteral<'db>| {
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::DynamicEnum(self_))),
                 ClassBase::object(db, &ProgramEnvironment::from_scope(self_.scope(db))),

@@ -331,7 +331,7 @@ impl<'db> RecursiveType<'db> {
     pub(super) fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|db, _, recursive: RecursiveType<'db>, ()| AliasCycleSummary::from_type(db, Type::divergent_alias(recursive.cycle(db).0), None),
+            cycle_initial=|db, _, _, recursive: RecursiveType<'db>, ()| AliasCycleSummary::from_type(db, Type::divergent_alias(recursive.cycle(db).0), None),
             heap_size=ruff_memory_usage::heap_size
         )]
         fn cycle_summary_impl<'db>(
@@ -556,7 +556,7 @@ impl<'db> RecursiveType<'db> {
     /// Share the closed, specialized body across mappings with different visitors.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, recursive: RecursiveType<'db>| Type::Recursive(recursive),
+        cycle_initial=|_, _, _, recursive: RecursiveType<'db>| Type::Recursive(recursive),
         heap_size=ruff_memory_usage::heap_size
     )]
     fn unfolded_body(self, db: &'db dyn Db) -> Type<'db> {
@@ -874,7 +874,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 /// preserving the requested materialization polarity.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, _, recursive: RecursiveType<'db>| Type::Recursive(recursive),
+    cycle_initial=|_, _, _, recursive: RecursiveType<'db>| Type::Recursive(recursive),
     heap_size=ruff_memory_usage::heap_size
 )]
 fn materialized_unfold<'db>(db: &'db dyn Db, recursive: RecursiveType<'db>) -> Type<'db> {

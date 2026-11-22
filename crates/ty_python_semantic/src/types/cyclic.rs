@@ -359,7 +359,7 @@ impl<'db> RecursiveDefinition<'db> {
     fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _, ()| true,
+            cycle_initial=|_, _, _, _, ()| true,
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn may_have_unbounded_specialization_inner<'db>(

@@ -89,7 +89,7 @@ impl<'db> ModelMetadata<'db> {
         self.config(db).frozen.is_enabled()
     }
 
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(in crate::types) fn generated_hash(
         self,
         db: &'db dyn Db,
@@ -784,7 +784,7 @@ pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, _, _| ModelConfig::unknown(),
+    cycle_initial=|_, _, _, _| ModelConfig::unknown(),
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelConfig {

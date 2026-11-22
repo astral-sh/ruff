@@ -272,7 +272,7 @@ impl<'db> TypedDictType<'db> {
     pub(crate) fn openness(self, db: &'db dyn Db) -> TypedDictOpenness<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _| TypedDictOpenness::ImplicitlyOpen,
+            cycle_initial=|_, _, _, _| TypedDictOpenness::ImplicitlyOpen,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn class_based_openness<'db>(
@@ -539,7 +539,7 @@ impl<'db> TypedDictType<'db> {
         // being collected, e.g. through `typing.Self` in a `TypedDict` field.
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _| TypedDictSchema::default(),
+            cycle_initial=|_, _, _, _| TypedDictSchema::default(),
             heap_size=ruff_memory_usage::heap_size
         )]
         fn class_based_items<'db>(db: &'db dyn Db, class: ClassType<'db>) -> TypedDictSchema<'db> {
@@ -1440,7 +1440,7 @@ impl<'db> VarianceInferable<'db> for TypedDictType<'db> {
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial = |_, _, _|TypedDictSchema::default(),
+    cycle_initial = |_, _, _, _|TypedDictSchema::default(),
     heap_size = ruff_memory_usage::heap_size
 )]
 pub(super) fn deferred_functional_typed_dict_schema<'db>(
@@ -1505,7 +1505,7 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
 /// ```
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _| TypedDictOpenness::ImplicitlyOpen,
+    cycle_initial = |_, _, _, _| TypedDictOpenness::ImplicitlyOpen,
     heap_size = ruff_memory_usage::heap_size
 )]
 pub(super) fn deferred_functional_typed_dict_openness<'db>(

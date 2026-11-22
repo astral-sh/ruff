@@ -1282,7 +1282,7 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
+    cycle_initial=|_, id, _, _, _, _, _| Place::bound(Type::divergent(id)).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, scope: ScopeId<'db>, _, _, _| {
         let env = ProgramEnvironment::from_scope(scope);
         place.cycle_normalized(db, &env, *previous, cycle)
@@ -1606,7 +1606,7 @@ fn symbol_impl<'db>(
 /// Pre-computed reachability analysis for loop-back bindings in a loop header.
 #[salsa::tracked(
     returns(clone),
-    cycle_initial=|db, _, definition: Definition<'db>| {
+    cycle_initial=|db, _, _, definition: Definition<'db>| {
         loop_header_reachability_impl(db, definition, Some(&mut FxHashMap::default()))
     },
     cycle_fn=loop_header_reachability_cycle_recover,
@@ -2593,7 +2593,7 @@ pub(crate) mod implicit_globals {
 
     #[salsa::tracked(
         returns(deref),
-        cycle_initial=|_, _, _| smallvec::SmallVec::default(),
+        cycle_initial=|_, _, _, _| smallvec::SmallVec::default(),
         heap_size=ruff_memory_usage::heap_size
     )]
     fn module_type_symbols_inner<'db>(

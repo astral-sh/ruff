@@ -266,7 +266,11 @@ impl<'db> TupleType<'db> {
     // N.B. If this method is not Salsa-tracked, we take 10 minutes to check
     // `static-frame` as part of the ecosystem analysis. This is because it's called
     // from `NominalInstanceType::class()`, which is a very hot method.
-    #[salsa::tracked(returns(copy), cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|db, id, _, input| to_class_type_cycle_initial(db, id, input),
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
         let env = &ProgramEnvironment::from_program(self.program(db));
         let tuple_class = KnownClass::Tuple

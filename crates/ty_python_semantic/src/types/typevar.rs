@@ -653,7 +653,7 @@ impl<'db> TypeVarInstance<'db> {
     #[salsa::tracked(
         returns(copy),
         cycle_fn=lazy_bound_cycle_recover,
-        cycle_initial=|_, _, _| None,
+        cycle_initial=|_, _, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
     fn lazy_bound_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
@@ -694,7 +694,7 @@ impl<'db> TypeVarInstance<'db> {
     #[salsa::tracked(
         returns(copy),
         cycle_fn=lazy_constraints_cycle_recover,
-        cycle_initial=|_, _, _| None,
+        cycle_initial=|_, _, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
     fn lazy_constraints_unchecked(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
@@ -757,7 +757,7 @@ impl<'db> TypeVarInstance<'db> {
 
     /// Returns the "unchecked" default type of a type variable instance.
     /// `lazy_default` checks if the default type is not self-referential.
-    #[salsa::tracked(returns(copy), cycle_initial=|_, id, _| Some(Type::divergent(id)), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, id, _, _| Some(Type::divergent(id)), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
     fn lazy_default_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
         fn convert_type_to_paramspec_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
             let parameters = match ty {
@@ -1996,7 +1996,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> (TypeVarSet<'db>, bool) {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| (TypeVarSet::None, false), heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| (TypeVarSet::None, false), heap_size=ruff_memory_usage::heap_size)]
         fn non_atomic_free_typevars<'db>(
             db: &'db dyn Db,
             program: Program<'db>,
@@ -2216,7 +2216,7 @@ impl<'db> TypeVarSet<'db> {
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _| Some(Type::divergent(id)),
+    cycle_initial=|_, id, _, _| Some(Type::divergent(id)),
     cycle_fn=bound_typevar_default_type_cycle_recover,
     heap_size=ruff_memory_usage::heap_size
 )]
