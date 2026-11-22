@@ -67,6 +67,7 @@ ExitCode = NewType("ExitCode", int)
 
 TY_TARGET_PLATFORM: Final = "linux"
 CHECK_TIMEOUT_SECONDS: Final = 5
+TIMEOUT_RETRY_FACTOR: Final = 1.5
 
 # Reserve time within the budget for CI job setup before the first step,
 # the final summary and any issue report, and steps after fuzzing.
@@ -105,9 +106,10 @@ def run_executable(
     command: Sequence[str | Path],
     *,
     successful_exit_codes: Collection[int],
+    timeout_seconds: float,
     input: str | None = None,
 ) -> Success | Failure:
-    """Run a command with a five-second timeout and classify its outcome.
+    """Run a command with the given timeout and classify its outcome.
 
     Return `Success` with the elapsed time for exit codes in
     `successful_exit_codes`, `Failure.ERROR` for other exit codes, and
@@ -138,7 +140,7 @@ def run_executable(
     ) as process:
         started = time.monotonic()
         try:
-            process.communicate(input=input, timeout=CHECK_TIMEOUT_SECONDS)
+            process.communicate(input=input, timeout=timeout_seconds)
         except BaseException as error:
             timed_out = isinstance(error, subprocess.TimeoutExpired)
             # Ctrl+C can interrupt communicate() while the checker is still running;
@@ -168,7 +170,9 @@ def run_executable(
         return Failure.ERROR
 
 
-def check_ty(code: str, *, ty_executable: Path) -> Success | Failure:
+def check_ty(
+    code: str, *, ty_executable: Path, timeout_seconds: float
+) -> Success | Failure:
     """Type-check the input with ty and return its outcome.
 
     A completed check can report diagnostics and still count as successful.
@@ -185,10 +189,14 @@ def check_ty(code: str, *, ty_executable: Path) -> Success | Failure:
             "--python-platform",
             TY_TARGET_PLATFORM,
         ]
-        return run_executable(command, successful_exit_codes=(0, 1, 2))
+        return run_executable(
+            command, successful_exit_codes=(0, 1, 2), timeout_seconds=timeout_seconds
+        )
 
 
-def check_ruff(code: str, *, ruff_executable: Path) -> Success | Failure:
+def check_ruff(
+    code: str, *, ruff_executable: Path, timeout_seconds: float
+) -> Success | Failure:
     """Run Ruff on the input with lint rules disabled and return its outcome."""
     command: list[str | Path] = [
         ruff_executable,
@@ -203,18 +211,28 @@ def check_ruff(code: str, *, ruff_executable: Path) -> Success | Failure:
         "--preview",
         "-",
     ]
-    return run_executable(command, successful_exit_codes=(0,), input=code)
+    return run_executable(
+        command, successful_exit_codes=(0,), timeout_seconds=timeout_seconds, input=code
+    )
 
 
 def check_code(
-    code: str, *, executable: Executable, executable_path: Path
+    code: str,
+    *,
+    executable: Executable,
+    executable_path: Path,
+    timeout_seconds: float = CHECK_TIMEOUT_SECONDS,
 ) -> Success | Failure:
     """Return the outcome of checking the input with Ruff or ty."""
     match executable:
         case Executable.RUFF:
-            return check_ruff(code, ruff_executable=executable_path)
+            return check_ruff(
+                code, ruff_executable=executable_path, timeout_seconds=timeout_seconds
+            )
         case Executable.TY:
-            return check_ty(code, ty_executable=executable_path)
+            return check_ty(
+                code, ty_executable=executable_path, timeout_seconds=timeout_seconds
+            )
         case _ as unreachable:
             assert_never(unreachable)
 
@@ -264,14 +282,17 @@ class DetectedFailure:
         """
         if self.kind is Failure.TIMEOUT:
             tool_name = "Ruff" if executable is Executable.RUFF else "ty"
-            description = f"{tool_name} **timed out** on this seed ({CHECK_TIMEOUT_SECONDS} s cutoff)."
             # Runs that check a single build, such as the daily Ruff job,
             # have no baseline duration to report.
-            if self.baseline_seconds is not None:
-                description += (
-                    f" The baseline build completed in {self.baseline_seconds:.3f} s."
-                )
-            return description
+            if self.baseline_seconds is None:
+                return f"{tool_name} **timed out** on this seed ({CHECK_TIMEOUT_SECONDS} s cutoff)."
+            cutoff = self.baseline_seconds * TIMEOUT_RETRY_FACTOR
+            return (
+                f"{tool_name} **timed out** on the original input. "
+                f"The baseline build completed in {self.baseline_seconds:.3f} s. "
+                f"The test build failed to finish within {cutoff:.3f} s "
+                f"({TIMEOUT_RETRY_FACTOR} times the baseline runtime)."
+            )
         if executable is Executable.TY:
             return "ty **panicked or overflowed** on this seed."
         return "Ruff reported a **parser error** on this seed."
@@ -339,25 +360,39 @@ class FuzzResult:
 
 
 def find_reportable_failure(code: str, args: ResolvedCliArgs) -> DetectedFailure | None:
-    """Return a failure if the test executable fails and any configured baseline passes."""
+    """Check the input on the test build and return any failure.
+
+    If a baseline is configured, only report failures on inputs it passes.
+    If the test build times out on such an input, retry it with a cutoff of
+    1.5 times the baseline runtime and use the outcome of the retry. This
+    filters out small slowdowns that happen to cross the initial cutoff.
+    """
     test = check_code(
         code, executable=args.executable, executable_path=args.test_executable_path
     )
     if isinstance(test, Success):
         return None
 
-    baseline_seconds = None
-    if args.baseline_executable_path is not None:
-        baseline = check_code(
+    if args.baseline_executable_path is None:
+        return DetectedFailure(kind=test, baseline_seconds=None)
+
+    baseline = check_code(
+        code, executable=args.executable, executable_path=args.baseline_executable_path
+    )
+    if isinstance(baseline, Failure):
+        return None
+
+    if test is Failure.TIMEOUT:
+        test = check_code(
             code,
             executable=args.executable,
-            executable_path=args.baseline_executable_path,
+            executable_path=args.test_executable_path,
+            timeout_seconds=baseline.elapsed_seconds * TIMEOUT_RETRY_FACTOR,
         )
-        if isinstance(baseline, Failure):
+        if isinstance(test, Success):
             return None
-        baseline_seconds = baseline.elapsed_seconds
 
-    return DetectedFailure(kind=test, baseline_seconds=baseline_seconds)
+    return DetectedFailure(kind=test, baseline_seconds=baseline.elapsed_seconds)
 
 
 def fuzz_code(
@@ -892,9 +927,10 @@ def parse_args() -> ResolvedCliArgs:
         "--only-new-bugs",
         action="store_true",
         help=(
-            "Only report bugs if they exist on the current branch, "
-            "but *didn't* exist on the released version "
-            "installed into the Python environment we're running in"
+            "Only report failures on inputs that pass on the baseline build "
+            "(see `--baseline-executable`). Report a timeout only if the test build "
+            f"times out at {CHECK_TIMEOUT_SECONDS} seconds and again with a cutoff "
+            f"of {TIMEOUT_RETRY_FACTOR} times the baseline runtime."
         ),
     )
     parser.add_argument(
