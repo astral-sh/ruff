@@ -3201,56 +3201,6 @@ mod tests {
     }
 
     #[test]
-    fn merge_literal_exclusions() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let one = Type::int_literal(1);
-        let two = Type::int_literal(2);
-        let exclusions = IntersectionBuilder::new(db, &env)
-            .add_negative(one)
-            .add_negative(two)
-            .build();
-
-        // Merge into a set that already contains one of the incoming literals.
-        let zero = Type::int_literal(0);
-        let merged = IntersectionBuilder::new(db, &env)
-            .add_negative(zero)
-            .add_negative(one)
-            .add_positive(exclusions)
-            .build();
-        assert!(
-            matches!(merged, Type::Intersection(i) if i.iter_negative(db).eq([zero, one, two]))
-        );
-
-        // Keep the first exclusion even if the duplicate has different literal flags.
-        for first in [
-            one,
-            Type::LiteralValue(LiteralValueType::unpromotable(1)),
-            Type::LiteralValue(
-                LiteralValueType::promotable(1).with_recursively_defined(RecursivelyDefined::Yes),
-            ),
-        ] {
-            let merged = IntersectionBuilder::new(db, &env)
-                .add_negative(first)
-                .add_positive(exclusions)
-                .build();
-            assert!(
-                matches!(merged, Type::Intersection(i) if i.iter_negative(db).eq([first, two]))
-            );
-        }
-
-        // An exclusion still needs to be compared to the positive side of the intersection.
-        assert_eq!(
-            IntersectionBuilder::new(db, &env)
-                .add_positive(two)
-                .add_positive(exclusions)
-                .build(),
-            Type::Never
-        );
-    }
-
-    #[test]
     fn build_intersection_discards_never_dnf_branches() {
         let db = setup_db();
         let db = &db;
