@@ -844,14 +844,22 @@ pub struct UseDefMap<'db> {
     reachability: ScopeReachability,
 }
 
+/// How to find containing ranges without changing their evaluation order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+enum RangeSearch {
+    /// Nested expressions or evaluation out of source order can require a full scan.
+    Linear,
+    /// Both the start offsets and the end offsets are nondecreasing.
+    Binary,
+}
+
 /// Reachability within a scope and at its end.
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 struct ScopeReachability {
     /// Ranges of statements and certain sub-expressions, such as ternary branches
     /// and boolean operands, in evaluation order.
     ranges: Box<[(TextRange, RangeInfo)]>,
-    /// Whether both the start offsets and the end offsets are nondecreasing.
-    endpoints_sorted: bool,
+    search: RangeSearch,
     end_of_scope: ScopedReachabilityConstraintId,
 }
 
@@ -862,29 +870,33 @@ impl ScopeReachability {
     ) -> Self {
         // Default ranges kept non-contiguous ranges with the same reachability from merging.
         ranges.retain(|(_, info)| *info != RangeInfo::default());
-        let endpoints_sorted =
-            ranges.is_sorted_by(|(a, _), (b, _)| a.start() <= b.start() && a.end() <= b.end());
+        let search =
+            if ranges.is_sorted_by(|(a, _), (b, _)| a.start() <= b.start() && a.end() <= b.end()) {
+                RangeSearch::Binary
+            } else {
+                RangeSearch::Linear
+            };
         Self {
             ranges: ranges.into_boxed_slice(),
-            endpoints_sorted,
+            search,
             end_of_scope,
         }
     }
 
     /// Returns information about each retained range that fully contains `range`.
     fn ranges_containing(&self, range: TextRange) -> impl Iterator<Item = &RangeInfo> {
-        // Straight-line code can have a separate range after every call. When both endpoints
-        // are sorted, the containing ranges form a contiguous slice. Nested expressions or
-        // evaluation out of source order can require scanning the whole scope.
-        let candidates = if self.endpoints_sorted {
-            let first = self
-                .ranges
-                .partition_point(|(entry, _)| entry.end() < range.end());
-            let remaining = &self.ranges[first..];
-            let count = remaining.partition_point(|(entry, _)| entry.start() <= range.start());
-            &remaining[..count]
-        } else {
-            &self.ranges
+        let candidates = match self.search {
+            RangeSearch::Linear => &self.ranges[..],
+            RangeSearch::Binary => {
+                // The containing ranges form a contiguous slice. Skip those that end
+                // too early, then stop before those that start too late.
+                let first = self
+                    .ranges
+                    .partition_point(|(entry, _)| entry.end() < range.end());
+                let remaining = &self.ranges[first..];
+                let count = remaining.partition_point(|(entry, _)| entry.start() <= range.start());
+                &remaining[..count]
+            }
         };
         candidates
             .iter()
