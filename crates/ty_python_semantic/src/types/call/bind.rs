@@ -3228,11 +3228,8 @@ impl<'db> Bindings<'db> {
                         let Type::TypeVar(typevar) = typevar.project_type_form(db, env) else {
                             continue;
                         };
-                        let Type::NominalInstance(inferable) = inferable.project_type_form(db, env)
-                        else {
-                            continue;
-                        };
-                        let Some(inferable) = inferable_typevars_from_tuple(db, env, &inferable)
+                        let Some(inferable) =
+                            overload.constraint_solver_scope(db, env, tracked, *inferable)
                         else {
                             continue;
                         };
@@ -3268,11 +3265,8 @@ impl<'db> Bindings<'db> {
                         let [Some(inferable)] = overload.parameter_types() else {
                             continue;
                         };
-                        let Type::NominalInstance(inferable) = inferable.project_type_form(db, env)
-                        else {
-                            continue;
-                        };
-                        let Some(inferable) = inferable_typevars_from_tuple(db, env, &inferable)
+                        let Some(inferable) =
+                            overload.constraint_solver_scope(db, env, tracked, *inferable)
                         else {
                             continue;
                         };
@@ -3320,11 +3314,8 @@ impl<'db> Bindings<'db> {
                         let [Some(inferable)] = overload.parameter_types() else {
                             continue;
                         };
-                        let Type::NominalInstance(inferable) = inferable.project_type_form(db, env)
-                        else {
-                            continue;
-                        };
-                        let Some(inferable) = inferable_typevars_from_tuple(db, env, &inferable)
+                        let Some(inferable) =
+                            overload.constraint_solver_scope(db, env, tracked, *inferable)
                         else {
                             continue;
                         };
@@ -8988,6 +8979,30 @@ pub(crate) struct Binding<'db> {
 }
 
 impl<'db> Binding<'db> {
+    fn constraint_solver_scope(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        tracked: InternedConstraintSet<'db>,
+        inferable: Type<'db>,
+    ) -> Option<TypeVarSet<'db>> {
+        let Type::NominalInstance(instance) = inferable.project_type_form(db, env) else {
+            return None;
+        };
+        let inferable = inferable_typevars_from_tuple(db, env, &instance)?;
+        if !tracked
+            .constraints(db)
+            .query(|_, set| set.has_inferable_subjects(db, inferable))
+        {
+            self.errors.push(BindingError::InternalCallError(
+                "`inferable` must include every type variable constrained by this set",
+            ));
+            self.set_return_type(Type::unknown());
+            return None;
+        }
+        Some(inferable)
+    }
+
     /// Checks the getter invoked by `property.__get__`, retaining its error and recovery type.
     fn check_property_getter(
         &mut self,

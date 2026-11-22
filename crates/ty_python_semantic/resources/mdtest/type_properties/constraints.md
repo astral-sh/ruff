@@ -1439,6 +1439,42 @@ def bounded[A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, X]() -> None:
     reveal_type(choices.is_never_satisfied(inferable=tuple[A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R]))
 ```
 
+## Solver scope
+
+Solving a constraint set and checking its satisfiability require every variable that receives a
+bound to be inferable.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def noninferable_only[I, N]() -> None:
+    constraints = ConstraintSet.range(int, N, int)
+    # error: [not-callable] "`inferable` must include every type variable constrained by this set"
+    constraints.solutions(inferable=tuple[I])
+    constraints.is_always_satisfied(inferable=tuple[I])  # error: [not-callable]
+    constraints.is_never_satisfied(inferable=tuple[I])  # error: [not-callable]
+```
+
+`I ≤ N` gives `I` an upper bound and `N` a lower bound. Filtering the results to one variable with
+`solutions_for` still requires solving for both.
+
+```py
+def related[I, N]() -> None:
+    constraints = ConstraintSet.lower_bound(I, N)
+    constraints.solutions_for(I, inferable=tuple[I])  # error: [not-callable]
+    constraints.solutions_for(N, inferable=tuple[N])  # error: [not-callable]
+```
+
+A variable can stay fixed if its constraint drops out of the formula.
+
+```py
+def simplified[I, N]() -> None:
+    kept = ConstraintSet.equality(I, int)
+    discarded = ConstraintSet.equality(N, str)
+    constraints = kept | (kept & discarded)
+    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[Solution[I=int]]
+```
+
 ## Bounds containing type variables
 
 ### Union bounds containing fixed variables

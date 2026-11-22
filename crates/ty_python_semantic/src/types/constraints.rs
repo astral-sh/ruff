@@ -744,6 +744,25 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.node == ALWAYS_TRUE
     }
 
+    /// Checks the scope supplied to the internal solver test helpers. A fixed variable may
+    /// appear inside a bound, but it cannot be the subject of a reachable constraint.
+    pub(super) fn has_inferable_subjects(
+        self,
+        db: &'db dyn Db,
+        inferable: TypeVarSet<'db>,
+    ) -> bool {
+        let storage = self.builder.storage.borrow();
+        let constraints = self.node.atomic_constraints(&storage);
+        let captures = inferable.captured_typevars(db, &storage, || constraints.iter().copied());
+        let scope = inferable.merge(db, captures);
+        constraints.iter().all(|&id| {
+            storage
+                .atomic_constraint_data(id)
+                .subjects()
+                .all(|subject| subject.is_inferable(db, scope))
+        })
+    }
+
     /// Returns whether this constraint set mentions the given type-variable identity.
     pub(super) fn mentions_typevar(self, typevar: BoundTypeVarInstance<'db>) -> bool {
         let storage = self.builder.storage.borrow();
