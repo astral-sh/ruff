@@ -124,6 +124,39 @@ static FASTAPI: Benchmark = Benchmark::new(RealWorldProject {
     python_version: SupportedPythonVersion::Py311,
 });
 
+static FASTAPI_PRE_TELEMETRY: Benchmark = Benchmark::new(RealWorldProject {
+    name: "fastapi-pre_telemetry",
+    repository: "https://github.com/fastapi/fastapi",
+    commit: "95f8322ee1dcda7ceace7b1c4f6c9915b36d748f",
+    paths: &["fastapi"],
+    dependencies: &[
+        "annotated-doc",
+        "pydantic",
+        "starlette",
+        "typing-extensions",
+        "typing-inspection",
+    ],
+    max_dep_date: TY_ECOSYSTEM_PIN,
+    python_version: SupportedPythonVersion::Py311,
+});
+
+static FASTAPI_SAME_SOURCE_JUNE: Benchmark = Benchmark::new(RealWorldProject {
+    name: "fastapi-same_source_june",
+    repository: "https://github.com/fastapi/fastapi",
+    commit: "7a0a3f0b286c6c865cf4398ea0e957a87b8bffa4",
+    paths: &["fastapi"],
+    dependencies: &[
+        "annotated-doc",
+        "opentelemetry-api",
+        "pydantic",
+        "starlette",
+        "typing-extensions",
+        "typing-inspection",
+    ],
+    max_dep_date: TY_ECOSYSTEM_PIN,
+    python_version: SupportedPythonVersion::Py311,
+});
+
 static FASTAPI_OCTOBER: Benchmark = Benchmark::new(RealWorldProject {
     name: "fastapi-october",
     repository: "https://github.com/fastapi/fastapi",
@@ -284,6 +317,16 @@ fn altair(bencher: Bencher) {
 #[bench(sample_size = 2, sample_count = 3)]
 fn fastapi(bencher: Bencher) {
     run_single_threaded(bencher, &FASTAPI);
+}
+
+#[bench(sample_size = 2, sample_count = 3)]
+fn fastapi_pre_telemetry(bencher: Bencher) {
+    run_single_threaded(bencher, &FASTAPI_PRE_TELEMETRY);
+}
+
+#[bench(sample_size = 2, sample_count = 3)]
+fn fastapi_same_source_june(bencher: Bencher) {
+    run_single_threaded(bencher, &FASTAPI_SAME_SOURCE_JUNE);
 }
 
 #[bench(sample_size = 2, sample_count = 3)]
