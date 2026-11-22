@@ -2792,9 +2792,12 @@ def _(handlers: list[Callable[[str], str]]):
 ## A repeated bound in the context for a lambda
 
 The result of `unwrap` and the box returned by `find` must both be instances of `Item`. The lambda
-needs the complete context to infer the type of the nested attribute.
+needs the same parameter type when it is passed through generic calls. Both union members carry the
+repeated bound. Passing `None` for the optional default supplies no information about the callback
+parameter.
 
 ```py
+from copy import copy
 from typing import Callable, Generic, TypeVar, overload
 
 class Item: ...
@@ -2806,10 +2809,10 @@ class Box(Generic[T]):
     item: T
 
 @overload
-def find(condition: Callable[[ItemT], bool]) -> ItemT: ...
+def find(condition: Callable[[ItemT], bool] | Box[ItemT], default: ItemT | None = None) -> ItemT: ...
 @overload
-def find(condition: str) -> Item: ...
-def find(condition):
+def find(condition: list[T], default: None = None) -> T: ...
+def find(condition, default=None):
     raise NotImplementedError
 
 def unwrap(box: Box[ItemT]) -> ItemT:
@@ -2817,6 +2820,40 @@ def unwrap(box: Box[ItemT]) -> ItemT:
 
 # revealed: Box[Box[int] & Item] & Item
 result: Box[int] = unwrap(find(lambda x: reveal_type(x).item.item == 42))
+# error: [missing-attribute] "Object of type `Box[Box[int] & Item] & Item` has no attribute `missing`"
+wrapped: Box[int] = unwrap(find(copy(lambda x: x.missing)))
+# error: [missing-attribute] "Object of type `Box[Box[int] & Item] & Item` has no attribute `missing`"
+explicit: Box[int] = unwrap(find(copy(copy(lambda x: x.missing)), None))
+```
+
+## A repeated bound in the context for a type variable with a default
+
+Both arguments can constrain `T`, but only the iterable arm passes the expected type down to
+`empty`. The expected element type `int` should still take precedence over the default `str`.
+
+```py
+from collections.abc import Iterable, Sized
+from typing import overload
+from typing_extensions import TypeVar
+
+T = TypeVar("T", bound=Sized)
+N = TypeVar("N", bound=int)
+V = TypeVar("V", default=str)
+
+@overload
+def head(values: Iterable[T] | None, other: Iterable[T] | None) -> T: ...
+@overload
+def head(values: N, other: None) -> N: ...
+def head(values, other):
+    if isinstance(values, int):
+        return values
+    return next(iter(values or other or ()))
+
+def empty() -> list[list[list[V]]]:
+    return [[[]]]
+
+def head_row() -> Iterable[int]:
+    return head(head(empty(), None), None)
 ```
 
 ## Nested calls with optional return context

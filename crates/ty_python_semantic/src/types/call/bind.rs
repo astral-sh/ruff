@@ -8446,21 +8446,26 @@ struct ArgumentContextSpecialization<'db> {
 }
 
 impl<'db> ArgumentContextSpecialization<'db> {
-    /// Stop propagating a bound that recurs inside its own intersection.
+    /// Limit the growth of repeated intersections when inferring nested overloaded calls.
     ///
-    /// An overload like `def dot[T: Scalar](a: Vector[T], ...) -> T` can infer
-    /// `Vector[...] & Scalar` for T from an expected vector type. Passing this
-    /// down to a nested call gives `Vector[Vector[...] & Scalar] & Scalar`,
-    /// with a distinct hint for each combination of possible wrappers.
+    /// An overload like `def dot[T: Scalar](a: Vector[T] | Sequence[T], ...) -> T`
+    /// can infer `Vector[...] & Scalar` for T from an expected vector type.
+    /// Narrowing the next call against each union member produces both
+    /// `Vector[Vector[...] & Scalar] & Scalar` and `Sequence[Vector[...] & Scalar] & Scalar`.
+    /// Each additional call turns one hint into two.
     ///
-    /// Keep a single intersection, which can supply useful context. If the
-    /// bound repeats, let the arguments supply evidence for that variable.
-    /// The final inference and validity checks still use the original bounds.
+    /// Drop the repeating hint only if multiple union members propagate it and
+    /// another operand can constrain the same type. For example, `b: Vector[T]`
+    /// can supply a vector's element type. An unrelated parameter such as
+    /// `default: T | None` can mention `T` without supplying that evidence.
     fn specialization_for_nested_call(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         kind: TypeContextKind,
+        overload: &Binding<'db>,
+        parameter_index: usize,
+        parameter_type: Type<'db>,
     ) -> Specialization<'db> {
         let generic = self.specialization.generic_context(db);
         let mut hints = Cow::Borrowed(self.specialization.types(db));
@@ -8494,7 +8499,38 @@ impl<'db> ArgumentContextSpecialization<'db> {
                     })
                 })
             });
-            if repeated {
+            if !repeated {
+                continue;
+            }
+            let Some(union) = parameter_type.expand_top_level_aliases(db, env).as_union() else {
+                return self.specialization;
+            };
+            let contains_variable = |ty| {
+                any_over_type_including_alias_arguments(db, env, ty, |ty| {
+                    ty == Type::TypeVar(typevar)
+                })
+            };
+            let mut branches = union
+                .elements(db)
+                .iter()
+                .filter(|&&ty| contains_variable(ty));
+            if branches.nth(1).is_none() {
+                continue;
+            }
+            let parameters = overload.signature.parameters();
+            let has_other_operand = overload
+                .argument_matches
+                .iter()
+                .filter(|matched| matched.matched)
+                .flat_map(|matched| &matched.parameters)
+                .filter(|other| other.index != parameter_index)
+                .any(|other| {
+                    let ty = other
+                        .expected_type
+                        .unwrap_or_else(|| parameters[other.index].annotated_type());
+                    ty == parameter_type || (union.contains_member(db, ty) && contains_variable(ty))
+                });
+            if has_other_operand {
                 hints.to_mut()[index] = Type::Dynamic(DynamicType::UnspecializedTypeVar);
             }
         }
@@ -9207,13 +9243,19 @@ impl<'db> Binding<'db> {
                 tcx_kind = parameter_tcx_kind;
             }
 
-            let specialization = if nested_overload_argument
-                && call_expression_tcx.expected_type().is_some()
-            {
-                ordinary_context.specialization_for_nested_call(db, env, call_expression_tcx.kind())
-            } else {
-                ordinary_context.specialization
-            };
+            let specialization =
+                if nested_overload_argument && call_expression_tcx.expected_type().is_some() {
+                    ordinary_context.specialization_for_nested_call(
+                        db,
+                        env,
+                        call_expression_tcx.kind(),
+                        self,
+                        matched_parameter.index,
+                        parameter_type,
+                    )
+                } else {
+                    ordinary_context.specialization
+                };
             let nested_context = || {
                 self.inference?;
                 let (union, nested) =
