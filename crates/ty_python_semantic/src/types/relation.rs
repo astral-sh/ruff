@@ -3403,44 +3403,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::LiteralValue(literal), Type::NominalInstance(instance))
                 if let Some(value) = literal.as_string() =>
             {
-                let target_class = instance.class(db, env);
+                self.check_sequence_literal(db, instance.class(db, env), KnownClass::Str, || {
+                    let chars: FxHashSet<char> = value.value(db).chars().collect();
 
-                if target_class.is_known(db, KnownClass::Str) {
-                    return self.always();
-                }
-
-                if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db, env)
-                    && !sequence_class
-                        .iter_mro(db, None)
-                        .filter_map(ClassBase::into_class)
-                        .map(|class| class.class_literal(db))
-                        .contains(&target_class.class_literal(db))
-                {
-                    return self.never();
-                }
-
-                let chars: FxHashSet<char> = value.value(db).chars().collect();
-
-                let spec = match chars.len() {
-                    0 => Type::Never,
-                    1 => Type::single_char_string_literal(db, *chars.iter().next().unwrap()),
-                    _ => {
-                        // Optimisation: since we know this union will only include string-literal types,
-                        // avoid eagerly creating string-literal types when unnecessary, and avoid going
-                        // via the union-builder.
-                        let union_elements: Box<[Type<'db>]> = chars
-                            .iter()
-                            .map(|c| Type::single_char_string_literal(db, *c))
-                            .collect();
-                        Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
+                    match chars.len() {
+                        0 => Type::Never,
+                        1 => Type::single_char_string_literal(db, *chars.iter().next().unwrap()),
+                        _ => {
+                            // Optimisation: since we know this union will only include string-literal types,
+                            // avoid eagerly creating string-literal types when unnecessary, and avoid going
+                            // via the union-builder.
+                            let union_elements: Box<[Type<'db>]> = chars
+                                .iter()
+                                .map(|c| Type::single_char_string_literal(db, *c))
+                                .collect();
+                            Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
+                        }
                     }
-                };
-
-                KnownClass::Sequence
-                    .to_specialized_class_type(db, env, &[spec])
-                    .when_some_and(db, self.constraints, |sequence| {
-                        self.check_class_pair(db, sequence, target_class)
-                    })
+                })
             }
 
             (Type::LiteralValue(literal), _) if literal.is_string() => self.never(),
@@ -3450,43 +3430,23 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::LiteralValue(literal), Type::NominalInstance(instance))
                 if let Some(value) = literal.as_bytes() =>
             {
-                let target_class = instance.class(db, env);
+                self.check_sequence_literal(db, instance.class(db, env), KnownClass::Bytes, || {
+                    let ints: FxHashSet<i64> = value
+                        .value(db)
+                        .iter()
+                        .map(|byte| i64::from(*byte))
+                        .collect();
 
-                if target_class.is_known(db, KnownClass::Bytes) {
-                    return self.always();
-                }
-
-                if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db, env)
-                    && !sequence_class
-                        .iter_mro(db, None)
-                        .filter_map(ClassBase::into_class)
-                        .map(|class| class.class_literal(db))
-                        .contains(&target_class.class_literal(db))
-                {
-                    return self.never();
-                }
-
-                let ints: FxHashSet<i64> = value
-                    .value(db)
-                    .iter()
-                    .map(|byte| i64::from(*byte))
-                    .collect();
-
-                let spec = match ints.len() {
-                    0 => Type::Never,
-                    1 => Type::int_literal(*ints.iter().next().unwrap()),
-                    _ => {
-                        let union_elements: Box<[Type<'db>]> =
-                            ints.iter().map(|int| Type::int_literal(*int)).collect();
-                        Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
+                    match ints.len() {
+                        0 => Type::Never,
+                        1 => Type::int_literal(*ints.iter().next().unwrap()),
+                        _ => {
+                            let union_elements: Box<[Type<'db>]> =
+                                ints.iter().map(|int| Type::int_literal(*int)).collect();
+                            Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
+                        }
                     }
-                };
-
-                KnownClass::Sequence
-                    .to_specialized_class_type(db, env, &[spec])
-                    .when_some_and(db, self.constraints, |sequence| {
-                        self.check_class_pair(db, sequence, target_class)
-                    })
+                })
             }
 
             (Type::LiteralValue(literal), _) if literal.is_bytes() => self.never(),
@@ -3745,6 +3705,35 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // subtypes of any other variants
             (Type::NominalInstance(_), _) => self.never(),
         }
+    }
+
+    fn check_sequence_literal(
+        &self,
+        db: &'db dyn Db,
+        target_class: ClassType<'db>,
+        literal_class: KnownClass,
+        element_type: impl FnOnce() -> Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let env = self.env;
+        if target_class.is_known(db, literal_class) {
+            return self.always();
+        }
+
+        if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db, env)
+            && !sequence_class
+                .iter_mro(db, None)
+                .filter_map(ClassBase::into_class)
+                .map(|class| class.class_literal(db))
+                .contains(&target_class.class_literal(db))
+        {
+            return self.never();
+        }
+
+        KnownClass::Sequence
+            .to_specialized_class_type(db, env, &[element_type()])
+            .when_some_and(db, self.constraints, |sequence| {
+                self.check_class_pair(db, sequence, target_class)
+            })
     }
 
     pub(super) fn check_property_instance_pair(
