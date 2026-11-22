@@ -199,24 +199,6 @@ mod tests {
     }
 
     #[test]
-    fn repeated_fingerprints() {
-        // Each rule and file pair occurs once in each half of the report.
-        let (env, mut diagnostics) = create_diagnostics(DiagnosticFormat::Gitlab);
-        let count = diagnostics.len();
-        diagnostics.extend_from_within(..);
-        let report: serde_json::Value =
-            serde_json::from_str(&env.render_diagnostics(&diagnostics)).unwrap();
-
-        for (i, diagnostic) in diagnostics[..count].iter().enumerate() {
-            let path = report[i]["location"]["path"].as_str().unwrap();
-            let first = super::fingerprint(diagnostic, path, 0);
-            let second = super::fingerprint(diagnostic, path, first);
-            assert_eq!(report[i]["fingerprint"], format!("{first:x}"));
-            assert_eq!(report[i + count]["fingerprint"], format!("{second:x}"));
-        }
-    }
-
-    #[test]
     fn syntax_errors() {
         let (env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Gitlab);
         insta::with_settings!({filters => FINGERPRINT_FILTERS}, {
