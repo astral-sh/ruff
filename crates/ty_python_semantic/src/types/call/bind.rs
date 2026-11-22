@@ -8313,8 +8313,40 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let (sub_arguments, sources) =
             select_paramspec_arguments(db, self.env, self.arguments, self.argument_matches, prefix);
 
-        let bindings = match callable
-            .bindings(db, self.env)
+        let mut bindings = callable.bindings(db, self.env);
+        // TODO: Remove this fallback once https://github.com/astral-sh/ruff/pull/30566
+        // lands. The outer call will then solve for its result using the forwarded arguments.
+        //
+        // The outer result can still refer to the callback's type variables. Give that
+        // result to the existing argument check so it can apply its usual return context
+        // and literal promotion rules. Overloads may have different return types.
+        let mut free_in_result = None;
+        if let Ok(callable) = bindings.iter_flat_mut().exactly_one()
+            && let [binding] = callable.overloads.as_mut_slice()
+            && let Some(context) = binding.signature.generic_context
+        {
+            let free = self.return_ty.free_typevars(db, self.env).0;
+            if context.variables(db).any(|var| var.is_inferable(db, free))
+                // An indeterminate unpack may change which argument binds to a parameter.
+                && sub_arguments.iter().all(|arg| match arg {
+                    CallArgument::Variadic(arg) => arg
+                        .sequence(db, self.env)
+                        .is_some_and(|seq| seq.as_fixed_length().is_some()),
+                    CallArgument::Keywords(arg) => arg.is_complete(),
+                    _ => true,
+                })
+                // Substitution would also specialize the callback if the wrapper returns P.
+                // Enforcing the wrapper's own bounds requires solving both calls together.
+                && !self.signature.return_ty.free_typevars(db, self.env).0.iter(db).any(|var| {
+                    var.is_same_typevar_as(db, paramspec)
+                        || var.typevar(db).bound_or_constraints(db, self.env).is_some()
+                })
+            {
+                binding.set_return_type(self.return_ty);
+                free_in_result = Some(free);
+            }
+        }
+        let bindings = match bindings
             .match_parameters(db, self.env, &sub_arguments)
             .check_types(
                 db,
@@ -8324,7 +8356,23 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 self.call_expression_tcx,
                 &[],
             ) {
-            Ok(bindings) => bindings,
+            Ok(bindings) => {
+                // An unsolved variable with no default would become Unknown and could
+                // hide an incompatible assignment.
+                if let Some(free) = free_in_result
+                    && let Some(callable) = bindings.single_element()
+                    && let [binding] = callable.overloads()
+                    && let Some(inference) = binding.inference
+                    && inference.generic_context(db).variables(db).all(|var| {
+                        !var.is_inferable(db, free)
+                            || inference.has_inferred_type(db, var.identity(db))
+                            || var.default_type(db).is_some()
+                    })
+                {
+                    self.return_ty = binding.return_type();
+                }
+                bindings
+            }
             Err(CallError(_, bindings)) => *bindings,
         };
 

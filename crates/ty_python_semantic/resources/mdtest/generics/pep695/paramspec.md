@@ -1615,6 +1615,82 @@ def word[**P](f: Callable[P, str]) -> Word[P]:
 reveal_type(return_type_of(word))  # revealed: str
 ```
 
+### Returning the result of a forwarded generic call
+
+The forwarded argument specializes the identity function's `T`. The result keeps its type when
+stored in a local variable.
+
+```py
+from collections.abc import Callable
+
+def invoke[**P, R](fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return fn(*args, **kwargs)
+
+def identity[T](x: T) -> T:
+    return x
+
+items: list[int] = [invoke(identity, 1)]  # ok
+value = invoke(identity, 1)
+reveal_type(value)  # revealed: Literal[1]
+good: int = value  # ok
+bad: str = invoke(identity, 1)  # error: [invalid-assignment]
+wrong: list[str] = [value]  # error: [invalid-assignment]
+```
+
+When `T` occurs in an invariant position, the forwarded call promotes the literal just like a direct
+call.
+
+```py
+def boxed[T](x: T) -> list[T]:
+    return [x]
+
+reveal_type(invoke(boxed, 1))  # revealed: list[int]
+nested: list[list[int]] = [invoke(boxed, 1)]  # ok
+wide: list[object] = invoke(boxed, 1)  # ok
+```
+
+If the wrapper also returns the callback, it remains generic.
+
+```py
+def both[**P, R](fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> tuple[Callable[P, R], R]:
+    return fn, fn(*args, **kwargs)
+
+kept, _ = both(identity, 1)
+reveal_type(kept("ok"))  # revealed: Literal["ok"]
+```
+
+A variable-length unpack can be empty, in which case `first` returns the trailing string.
+
+```py
+def first[T](x: T, *rest: object) -> T:
+    return x
+
+def unpack(xs: tuple[int, ...]):
+    n: int = invoke(first, *xs, "fallback")  # error: [invalid-assignment]
+```
+
+### Forwarding a recursive call
+
+Passing `x` back to the same function preserves the caller's `T`. Passing an unrelated argument does
+not justify returning the result as `T`.
+
+```py
+from collections.abc import Callable
+
+def invoke[**P, R](fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return fn(*args, **kwargs)
+
+def once[T](x: T, repeat: bool = True) -> T:
+    if repeat:
+        return invoke(once, x, False)  # ok
+    return x
+
+def changed[T](x: T, repeat: bool = True) -> T:
+    if repeat:
+        return invoke(changed, 1, False)  # error: [invalid-explicit-return]
+    return x
+```
+
 ### Nested parameter captures in a decorator
 
 `run` calls the decorated identity with an `int`. Matching its required callable signature
