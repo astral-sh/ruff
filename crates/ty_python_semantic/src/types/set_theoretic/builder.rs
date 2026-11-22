@@ -1812,6 +1812,10 @@ impl<'db> IntersectionBuilder<'db> {
                 if let [inner] = &mut self.intersections[..]
                     && inner.can_use_set_membership(negatives)
                 {
+                    if inner.can_copy_literal_exclusions(db, &self.env, negatives) {
+                        inner.negative = negatives.clone();
+                        return ControlFlow::Continue(());
+                    }
                     // Distinct built-in literal exclusions never simplify each other. With
                     // matching flags, set membership also detects equal literal values.
                     for neg in negatives {
@@ -2485,6 +2489,44 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.positive.insert(new_positive);
             }
         }
+    }
+
+    /// Whether all the distinct built-in literals in `exclusions` would survive insertion.
+    ///
+    /// A nominal instance overlaps a built-in literal if the literal's class is a subclass of
+    /// the instance's class. Consecutive literals of the same class need only one such check.
+    /// Excluding a boolean from `bool` can also narrow it to the opposite literal.
+    fn can_copy_literal_exclusions(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        exclusions: &NegativeIntersectionElements<'db>,
+    ) -> bool {
+        if !self.negative.is_empty() {
+            return false;
+        }
+        let mut positives = self.positive.iter();
+        let Some(positive) = positives.next() else {
+            return true;
+        };
+        let Type::NominalInstance(instance) = positive else {
+            return false;
+        };
+        if positives.next().is_some() || instance.has_known_class(db, KnownClass::Bool) {
+            return false;
+        }
+
+        let class = instance.class(db, env);
+        exclusions
+            .iter()
+            .map(|ty| {
+                ty.as_literal_value_kind()
+                    .and_then(LiteralValueTypeKind::known_class)
+            })
+            .dedup()
+            .all(|excluded| {
+                excluded.is_some_and(|excluded| excluded.is_subclass_of(db, env, class))
+            })
     }
 
     /// Adds a negative type to this intersection.
