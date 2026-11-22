@@ -47,23 +47,24 @@ Module(
                                                 arguments: PatternArguments {
                                                     range: 23..26,
                                                     node_index: NodeIndex(None),
-                                                    patterns: [
-                                                        MatchAs(
-                                                            PatternMatchAs {
-                                                                node_index: NodeIndex(None),
-                                                                range: 24..25,
-                                                                pattern: None,
-                                                                name: Some(
-                                                                    Identifier {
-                                                                        id: Name("x"),
-                                                                        range: 24..25,
-                                                                        node_index: NodeIndex(None),
-                                                                    },
-                                                                ),
-                                                            },
+                                                    items: [
+                                                        Pattern(
+                                                            MatchAs(
+                                                                PatternMatchAs {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 24..25,
+                                                                    pattern: None,
+                                                                    name: Some(
+                                                                        Identifier {
+                                                                            id: Name("x"),
+                                                                            range: 24..25,
+                                                                            node_index: NodeIndex(None),
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            ),
                                                         ),
                                                     ],
-                                                    keywords: [],
                                                 },
                                             },
                                         ),
