@@ -15,6 +15,7 @@
 
 use crate::types::typevar::TypeVarSet;
 use crate::{Program, ProgramEnvironment};
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::hash::Hash;
 use std::num::{NonZeroI32, NonZeroUsize};
@@ -294,12 +295,20 @@ impl<'db> TupleType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        Some(Self::new_internal(
-            db,
-            env.program(db),
-            self.tuple(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-        ))
+        let program = env.program(db);
+        let normalized = match self.tuple(db) {
+            Tuple::Fixed(tuple) => {
+                let normalized = tuple.recursive_type_normalized_impl(db, env, div, nested)?;
+                if matches!(normalized, Cow::Borrowed(_)) && self.program(db) == program {
+                    return Some(self);
+                }
+                Tuple::Fixed(normalized.into_owned())
+            }
+            Tuple::Variable(tuple) => {
+                Tuple::Variable(tuple.recursive_type_normalized_impl(db, env, div, nested)?)
+            }
+        };
+        Some(Self::new_internal(db, program, normalized))
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -1020,25 +1029,20 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
-    ) -> Option<Self> {
-        if nested {
-            Some(Self::from_elements(
-                self.0
-                    .iter()
-                    .map(|ty| ty.recursive_type_normalized_impl(db, env, div, true))
-                    .collect::<Option<Box<[_]>>>()?,
-            ))
-        } else {
-            Some(Self::from_elements(
-                self.0
-                    .iter()
-                    .map(|ty| {
-                        ty.recursive_type_normalized_impl(db, env, div, true)
-                            .unwrap_or(div)
-                    })
-                    .collect::<Box<[_]>>(),
-            ))
+    ) -> Option<Cow<'_, Self>> {
+        let mut tuple = Cow::Borrowed(self);
+        for (index, element) in self.0.iter().enumerate() {
+            let normalized = element.recursive_type_normalized_impl(db, env, div, true);
+            let normalized = if nested {
+                normalized?
+            } else {
+                normalized.unwrap_or(div)
+            };
+            if normalized != *element {
+                tuple.to_mut().0[index] = normalized;
+            }
         }
+        Some(tuple)
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -2680,23 +2684,6 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
                     db, env, elements,
                 ))
             }))
-    }
-
-    fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        match self {
-            Tuple::Fixed(tuple) => Some(Tuple::Fixed(
-                tuple.recursive_type_normalized_impl(db, env, div, nested)?,
-            )),
-            Tuple::Variable(tuple) => Some(Tuple::Variable(
-                tuple.recursive_type_normalized_impl(db, env, div, nested)?,
-            )),
-        }
     }
 
     fn apply_type_mapping_impl<'a>(
