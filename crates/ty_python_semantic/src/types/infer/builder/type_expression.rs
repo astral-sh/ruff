@@ -18,7 +18,7 @@ use crate::types::diagnostic::{
     report_invalid_concatenate_last_arg, report_missing_type_arguments,
     report_unsupported_binary_operation,
 };
-use crate::types::infer::legacy_type_alias::{non_alias_assignment, referenced_name_definition};
+use crate::types::infer::legacy_type_alias::{non_alias_assignment, quoted_union_definition};
 use crate::types::infer::{
     CyclicTypeAliasError, InferenceFlags, LegacyTypeAliasInference, TypeExpressionFlags,
     infer_legacy_type_alias, legacy_type_alias_definition, legacy_type_alias_parameters,
@@ -447,50 +447,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && !self.is_in_type_checking_block(self.scope(), expression)
     }
 
-    /// Resolve a quoted name bound to a local `Union` or `Optional` through the alias query.
-    /// In `State = Union[DictState, ListState]`, both containers can refer to `"State"`.
-    /// Loading the union's runtime value first re-enters both definitions before the
-    /// alias query can bind the recursive references.
-    fn quoted_union_alias(
-        &mut self,
-        name: &ast::ExprName,
-        expression: &ast::Expr,
-    ) -> Option<Type<'db>> {
-        let db = self.db();
-        let scope = self.scope();
-        let definition = referenced_name_definition(
-            db,
-            self.program_file(),
-            name,
-            Some(scope.file_scope_id(db)),
-        )?;
-        if definition.scope(db) != scope {
-            return None;
-        }
-        let subscript = definition
-            .kind(db)
-            .value(self.module())?
-            .as_subscript_expr()?;
-        if !is_dotted_name(&subscript.value) {
-            return None;
-        }
-        let (base, _) = TypeInferenceBuilder::for_definition(
-            db,
-            self.program_environment(),
-            definition,
-            self.module(),
-        )
-        .finish_implicit_alias_reference(definition, &subscript.value);
-        // A single argument like `Union[Old]` evaluates to the argument itself.
-        // Keep the normal name load for its use-site diagnostics (e.g. deprecations).
-        match base {
-            Type::SpecialForm(SpecialFormType::Union) if subscript.slice.is_tuple_expr() => {}
-            Type::SpecialForm(SpecialFormType::Optional) => {}
-            _ => return None,
-        }
-        self.infer_bare_alias_reference(None, Some(definition), expression)
-    }
-
     /// Infer the type of a type expression without storing the result.
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
         let db = self.db();
@@ -505,7 +461,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => {
                     if self.in_string_annotation()
-                        && let Some(ty) = self.quoted_union_alias(name, expression)
+                        && let Some(definition) = quoted_union_definition(db, self.scope(), name)
+                        && let Some(ty) =
+                            self.infer_bare_alias_reference(None, Some(definition), expression)
                     {
                         return ty;
                     }

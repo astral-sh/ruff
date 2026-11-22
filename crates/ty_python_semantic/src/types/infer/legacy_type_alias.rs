@@ -9,7 +9,7 @@ use ruff_python_ast::{self as ast, visitor as ast_visitor};
 use ruff_text_size::Ranged;
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::place::PlaceExpr;
-use ty_python_core::scope::FileScopeId;
+use ty_python_core::scope::{FileScopeId, ScopeId};
 use ty_python_core::{
     BindingWithConstraintsIterator, BoundnessAnalysis, ProgramFile, global_scope, place_table,
     semantic_index, use_def_map,
@@ -296,9 +296,57 @@ fn forwarding_alias_definition<'db>(
     }
 }
 
+/// Resolve a quoted reference to a local `Union` or `Optional` without loading its value.
+///
+/// In `State = Union[DictState, ListState]`, both containers can refer to `"State"`.
+/// Loading the union's runtime value re-enters both definitions before the alias
+/// query can bind the recursive references.
+pub(super) fn quoted_union_definition<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    name: &ast::ExprName,
+) -> Option<Definition<'db>> {
+    let definition = referenced_name_definition(
+        db,
+        scope.program_file(db),
+        name,
+        Some(scope.file_scope_id(db)),
+    )?;
+    (definition.scope(db) == scope
+        && matches!(
+            definition.kind(db),
+            DefinitionKind::Assignment(_) | DefinitionKind::AnnotatedAssignment(_)
+        )
+        && has_union_constructor(db, definition))
+    .then_some(definition)
+}
+
+/// Check the constructor once per assignment. Mutually recursive aliases can
+/// refer to the same definition many times while inferring a single annotation.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| false, heap_size=ruff_memory_usage::heap_size)]
+fn has_union_constructor<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+    let module = parsed_module(db, definition.python_file(db)).load(db);
+    let Some(ast::Expr::Subscript(subscript)) = definition.kind(db).value(&module) else {
+        return false;
+    };
+    if !is_dotted_name(&subscript.value) {
+        return false;
+    }
+    let env = ProgramEnvironment::from_definition(definition);
+    let (base, _) = TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+        .finish_implicit_alias_reference(definition, &subscript.value);
+    // `Union[Old]` evaluates to the argument itself. Keep the normal name load
+    // for its use-site diagnostics (e.g. deprecations).
+    match base {
+        Type::SpecialForm(SpecialFormType::Union) => subscript.slice.is_tuple_expr(),
+        Type::SpecialForm(SpecialFormType::Optional) => true,
+        _ => false,
+    }
+}
+
 /// Resolve a name to its unique reachable definition. Names parsed from a string annotation
 /// use the enclosing string's scope because they have no use site in the semantic index.
-pub(super) fn referenced_name_definition<'db>(
+fn referenced_name_definition<'db>(
     db: &'db dyn Db,
     file: ProgramFile<'db>,
     name: &ast::ExprName,
