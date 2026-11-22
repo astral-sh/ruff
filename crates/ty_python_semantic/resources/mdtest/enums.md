@@ -2105,6 +2105,22 @@ reveal_type(Permissions.WRITE.value)  # revealed: Literal[8]
 reveal_type(Sequential.SECOND.value)  # revealed: Literal[5]
 ```
 
+A functional enum can also supply a custom `_generate_next_value_` to its subclasses.
+
+```py
+from typing import Literal
+
+def generate(name: str, start: int, count: int, last_values: list[object]) -> Literal[42]:
+    return 42
+
+Base = Enum("Base", {"_generate_next_value_": generate})
+
+class Child(Base):
+    A = auto()
+
+reveal_type(Child.A.value)  # revealed: Literal[42]
+```
+
 ### `auto()` before Python 3.11
 
 With integer values, `auto()` adds one to the last declared value. A descending sequence can
@@ -3190,6 +3206,79 @@ Perm = Flag("Perm", (("READ", auto()), ("WRITE", auto())), start=3)
 
 reveal_type(Perm.READ.value)  # revealed: Literal[1]
 reveal_type(Perm.WRITE.value)  # revealed: Literal[2]
+```
+
+### Nonmember attributes
+
+Only enum members contribute to `auto()` numbering. A value wrapped in `nonmember` remains
+accessible as an ordinary class attribute.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, auto, member, nonmember
+from typing import assert_type
+from ty_extensions._internal import enum_members
+
+Filtered = Enum("Filtered", {"FIRST": 5, "skip": nonmember(100), "NEXT": auto()})
+reveal_type(enum_members(Filtered))  # revealed: tuple[Literal["FIRST"], Literal["NEXT"]]
+reveal_type(Filtered.NEXT.value)  # revealed: Literal[6]
+assert_type(Filtered.skip, int)
+```
+
+A nonmember named `value` shadows the inherited `Enum.value` property on instances.
+
+```py
+WithValue = Enum("WithValue", {"value": nonmember("label"), "FIRST": auto()})
+assert_type(WithValue.value, str)
+assert_type(WithValue.FIRST.value, str)
+```
+
+Functions supplied in a list of pairs become methods. An explicit `member(auto())` still receives
+the next number.
+
+```py
+def label(self: Enum) -> str:
+    return self.name
+
+WithMethod = Enum("WithMethod", [("FIRST", 5), ("label", label), ("NEXT", member(auto()))])
+reveal_type(enum_members(WithMethod))  # revealed: tuple[Literal["FIRST"], Literal["NEXT"]]
+reveal_type(WithMethod.NEXT.value)  # revealed: Literal[6]
+assert_type(WithMethod.FIRST.label(), str)
+```
+
+If an entry could be either a member or a method, the member names and the next value are uncertain.
+
+```py
+def uncertain(flag: bool):
+    Mixed = Enum("Mixed", {"ENTRY": 10 if flag else label, "NEXT": auto()})
+    reveal_type(enum_members(Mixed))  # revealed: Unknown
+    reveal_type(Mixed.NEXT.value)  # revealed: Unknown
+```
+
+Names listed in `_ignore_` are removed from the enum namespace. Only `FIRST` contributes to the
+value of `NEXT` here.
+
+```py
+Ignored = Enum(
+    "Ignored",
+    {"label": nonmember("red"), "_ignore_": "label skip", "FIRST": 5, "skip": 100, "NEXT": auto()},
+)
+reveal_type(Ignored.NEXT.value)  # revealed: Literal[6]
+Ignored.skip  # error: [missing-attribute]
+Ignored.label  # error: [missing-attribute]
+```
+
+In the names-only form, Python assigns a value to each name before deciding which names become
+members.
+
+```py
+Generated = Enum("Generated", "FIRST __note__ NEXT")
+reveal_type(Generated.__note__)  # revealed: Literal[2]
+reveal_type(Generated.NEXT.value)  # revealed: Literal[3]
 ```
 
 ### Duplicate member names

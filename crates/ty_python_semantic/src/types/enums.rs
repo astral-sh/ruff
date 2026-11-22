@@ -244,7 +244,7 @@ pub(crate) struct EnumMetadata<'db> {
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
 
-pub(super) fn class_defines_property<'db>(
+pub(super) fn class_overrides_enum_attribute<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     class: ClassLiteral<'db>,
@@ -260,6 +260,13 @@ pub(super) fn class_defines_property<'db>(
         };
         if base.known(db).is_some_and(KnownClass::is_builtin_enum_base) {
             return false;
+        }
+        // A functional enum's ordinary class attribute shadows Enum.name or Enum.value.
+        if matches!(name, "name" | "value")
+            && let ClassLiteral::DynamicEnum(enum_class) = base.class_literal(db)
+            && enum_class.nonmember(db, name).is_some()
+        {
+            return true;
         }
         if let Some(member) = base
             .own_class_member(db, env, None, name)
@@ -440,7 +447,7 @@ fn special_member_for_enum_complement<'db>(
     name: &str,
 ) -> Option<PlaceAndQualifiers<'db>> {
     if matches!(name, "name" | "_name_" | "value" | "_value_")
-        && !class_defines_property(db, env, complement.enum_class(db), name)
+        && !class_overrides_enum_attribute(db, env, complement.enum_class(db), name)
         && complement.rest(db).iter().all(Type::is_dynamic)
         && let Some(member_ty) = complement.member_type(db, env, name)
     {
@@ -1076,7 +1083,13 @@ fn enum_value_generator<'db>(
         return EnumValueGenerator::Opaque;
     };
     match base.class_literal(db) {
-        ClassLiteral::DynamicEnum(base) => EnumValueGenerator::Builtin(base.base_class(db)),
+        ClassLiteral::DynamicEnum(base) => match base.nonmember(db, "_generate_next_value_") {
+            Some(Type::FunctionLiteral(function)) => EnumValueGenerator::Custom(function),
+            None if base.spec(db).has_known_members(db) => {
+                EnumValueGenerator::Builtin(base.base_class(db))
+            }
+            _ => EnumValueGenerator::Opaque,
+        },
         ClassLiteral::Static(base) => enum_value_generator(db, base),
         _ => EnumValueGenerator::Opaque,
     }
@@ -1129,9 +1142,11 @@ pub(crate) fn enum_metadata<'db>(
             };
             let mut members = FxIndexMap::default();
             let mut aliases = FxHashMap::default();
+            let mut aliases_are_known = true;
+            let has_custom_generator = enum_lit.nonmember(db, "_generate_next_value_").is_some();
             let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();
             for (name, ty) in spec.members(db) {
-                if value_construction
+                match value_construction
                     .alias_detection_value(db, &env, *ty, false)
                     .and_then(|alias_value_ty| {
                         try_register_alias(alias_value_ty, name, &mut enum_values, &mut aliases)
@@ -1139,10 +1154,12 @@ pub(crate) fn enum_metadata<'db>(
                             .or_else(|| {
                                 try_register_alias(*ty, name, &mut enum_values, &mut aliases)
                             })
-                    })
-                    == Some(true)
-                {
-                    continue;
+                    }) {
+                    Some(true) => continue,
+                    None if has_custom_generator && spec.members(db).len() > 1 => {
+                        aliases_are_known = false;
+                    }
+                    _ => {}
                 }
                 members.insert(name.clone(), *ty);
             }
@@ -1151,7 +1168,7 @@ pub(crate) fn enum_metadata<'db>(
             return Some(EnumMetadata {
                 members,
                 aliases,
-                aliases_are_known: true,
+                aliases_are_known,
                 auto_members: FxHashSet::default(),
                 value_annotation: None,
                 value_construction,
@@ -1189,14 +1206,16 @@ pub(crate) fn enum_metadata<'db>(
     // still shadows methods from classes later in the MRO.
     let data_type = inherited_enum_data_type(db, &env, ClassLiteral::Static(class));
     let user_defined_init = custom_enum_method(db, scope_id, "__init__")
-        .or_else(|| inherited_user_defined_enum_method(db, &env, class, "__init__"));
+        .or_else(|| inherited_user_defined_enum_method(db, &env, class, &["__init__"]));
     let init = resolve_enum_method(user_defined_init, || {
         inherited_known_enum_method(db, &env, class, "__init__")
     });
     // CPython checks `__new_member__` and then `__new__` on each enum base before continuing
     // through the MRO or falling back to the data-type constructor.
     let user_defined_new = custom_enum_method(db, scope_id, "__new__")
-        .or_else(|| inherited_user_defined_enum_new(db, &env, class))
+        .or_else(|| {
+            inherited_user_defined_enum_method(db, &env, class, &["__new_member__", "__new__"])
+        })
         .or_else(|| inherited_user_defined_mixin_new(db, class));
     let new = resolve_enum_method(user_defined_new, || {
         inherited_known_enum_method(db, &env, class, "__new__")
@@ -1227,7 +1246,6 @@ pub(crate) fn enum_metadata<'db>(
         metaclass_may_transform_values,
     };
 
-    let vendored_stdlib = env.program(db).custom_stdlib_search_path(db).is_none();
     let mut aliases = FxHashMap::default();
 
     // A name can be read before it becomes a member. Generate values in assignment order.
@@ -1282,9 +1300,7 @@ pub(crate) fn enum_metadata<'db>(
                         }) && is_reachable(db, use_def_map, binding.reachability_constraint)
                     })
             };
-            let known_class = ty
-                .as_nominal_instance()
-                .and_then(|instance| instance.known_class(db));
+            let known_class = enum_marker_class(db, &env, ty);
             let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
             if known_class != Some(KnownClass::Member)
                 && declarations.any_reachable(db, |declaration| {
@@ -1309,11 +1325,7 @@ pub(crate) fn enum_metadata<'db>(
                 Some(KnownClass::Nonmember) => return None,
 
                 // enum.member
-                Some(KnownClass::Member) => ty
-                    .member(db, &env, "value")
-                    .place
-                    .ignore_possibly_undefined()
-                    .unwrap_or(Type::unknown()),
+                Some(KnownClass::Member) => enum_wrapper_value(db, &env, ty),
 
                 // enum.auto
                 Some(KnownClass::Auto) => {
@@ -1334,34 +1346,10 @@ pub(crate) fn enum_metadata<'db>(
                     auto_values.insert(name.clone(), value);
                     value
                 }
-                // Bundled scalar and tuple types cannot be descriptors. Custom stubs and
-                // enum member literals still need descriptor lookup.
-                Some(KnownClass::Tuple) if vendored_stdlib => ty,
-                _ if vendored_stdlib && matches!(ty, Type::LiteralValue(literal) if !literal.is_enum()) => ty,
-                _ if matches!(ty, Type::Callable(_) | Type::FunctionLiteral(_)) => return None,
-                _ => {
-                    let dunder_get = ty
-                        .member_lookup_with_policy(
-                            db,
-                            &env,
-                            "__get__",
-                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                        )
-                        .place;
-
-                    match dunder_get {
-                        Place::Undefined
-                        | Place::Defined(DefinedPlace {
-                            ty: Type::Dynamic(_),
-                            ..
-                        }) => ty,
-
-                        Place::Defined(_) => {
-                            // Descriptors are not considered members.
-                            return None;
-                        }
-                    }
+                _ if matches!(ty, Type::Callable(_)) || is_enum_descriptor(db, &env, ty) => {
+                    return None;
                 }
+                _ => ty,
             };
 
             // The generator sees the assigned value even if this member becomes an alias.
@@ -1614,30 +1602,37 @@ fn custom_enum_method<'db>(
     }
 }
 
-/// Looks up the first user-defined enum method in the MRO.
+/// Looks up a user-defined enum method in MRO order, checking the supplied names on each base.
 fn inherited_user_defined_enum_method<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     class: StaticClassLiteral<'db>,
-    name: &str,
+    names: &[&str],
 ) -> Option<EnumMethodBinding<'db>> {
-    iter_parent_enum_classes(db, env, class)
-        .filter(|base| base.known(db).is_none())
-        .find_map(|base| custom_enum_method(db, base.body_scope(db), name))
-}
-
-/// Looks up the first user-defined enum member constructor in the MRO.
-fn inherited_user_defined_enum_new<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    class: StaticClassLiteral<'db>,
-) -> Option<EnumMethodBinding<'db>> {
-    iter_parent_enum_classes(db, env, class)
-        .filter(|base| base.known(db).is_none())
-        .find_map(|base| {
-            let scope = base.body_scope(db);
-            custom_enum_method(db, scope, "__new_member__")
-                .or_else(|| custom_enum_method(db, scope, "__new__"))
+    class
+        .iter_mro(db, None)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .find_map(|base| match base.class_literal(db) {
+            ClassLiteral::Static(base)
+                if base.known(db).is_none() && is_enum_class_by_inheritance(db, env, base) =>
+            {
+                names
+                    .iter()
+                    .find_map(|name| custom_enum_method(db, base.body_scope(db), name))
+            }
+            ClassLiteral::DynamicEnum(base) => names
+                .iter()
+                .find_map(|name| base.nonmember(db, name))
+                .map(|ty| match ty {
+                    Type::FunctionLiteral(function) => EnumMethodBinding::Function(function),
+                    _ => EnumMethodBinding::Opaque,
+                })
+                // An unknown namespace can supply a hook and shadow a later base's method.
+                .or_else(|| {
+                    (!base.spec(db).has_known_members(db)).then_some(EnumMethodBinding::Opaque)
+                }),
+            _ => None,
         })
 }
 
@@ -1762,6 +1757,76 @@ pub(crate) fn is_enum_class_by_inheritance<'db>(
         .is_subtype_of(db, env, KnownClass::EnumType.to_subclass_of(db, env))
 }
 
+/// Enum namespaces keep descriptors as ordinary class attributes.
+pub(super) fn is_enum_descriptor<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    // Bundled scalar and tuple types have no descriptor methods. Enum member literals,
+    // tuple subclasses and types from custom stubs still need descriptor lookup.
+    let builtin_value = match ty {
+        Type::LiteralValue(literal) => !literal.is_enum(),
+        Type::NominalInstance(instance) => instance.known_class(db) == Some(KnownClass::Tuple),
+        _ => false,
+    };
+    if builtin_value && env.program(db).custom_stdlib_search_path(db).is_none() {
+        return false;
+    }
+
+    matches!(ty, Type::FunctionLiteral(_))
+        || ["__get__", "__set__", "__delete__"]
+            .into_iter()
+            .any(|method| {
+                let place = ty
+                    .member_lookup_with_policy(
+                        db,
+                        env,
+                        method,
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    )
+                    .place;
+                place.is_definitely_bound() && place.raw_type().is_some_and(|ty| !ty.is_dynamic())
+            })
+}
+
+/// Identify instances of the markers consumed by the enum namespace, including subclasses.
+pub(super) fn enum_marker_class<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<KnownClass> {
+    let instance = ty.as_nominal_instance()?;
+    let is_marker = |class: &KnownClass| {
+        matches!(
+            class,
+            KnownClass::Auto | KnownClass::Member | KnownClass::Nonmember
+        )
+    };
+    if let Some(class) = instance.known_class(db) {
+        return Some(class).filter(is_marker);
+    }
+    instance
+        .class(db, env)
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|class| class.known(db))
+        .find(is_marker)
+}
+
+/// Both `enum.member` and `enum.nonmember` store their argument in `value`.
+pub(super) fn enum_wrapper_value<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    wrapper: Type<'db>,
+) -> Type<'db> {
+    wrapper
+        .member(db, env, "value")
+        .place
+        .ignore_possibly_undefined()
+        .unwrap_or(Type::unknown())
+}
+
 /// Extracts the inner value type from an `enum.nonmember()` wrapper.
 ///
 /// At runtime, the enum metaclass unwraps `nonmember(value)`, so accessing the attribute
@@ -1773,15 +1838,6 @@ pub(crate) fn try_unwrap_nonmember_value<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> Option<Type<'db>> {
-    match ty {
-        Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Nonmember) => {
-            Some(
-                ty.member(db, env, "value")
-                    .place
-                    .ignore_possibly_undefined()
-                    .unwrap_or(Type::unknown()),
-            )
-        }
-        _ => None,
-    }
+    (enum_marker_class(db, env, ty) == Some(KnownClass::Nonmember))
+        .then(|| enum_wrapper_value(db, env, ty))
 }
