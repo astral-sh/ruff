@@ -66,7 +66,9 @@ Seed = NewType("Seed", int)
 ExitCode = NewType("ExitCode", int)
 
 TY_TARGET_PLATFORM: Final = "linux"
-CHECK_TIMEOUT_SECONDS: Final = 5
+CHECK_TIMEOUT_SECONDS: Final = int(
+    os.environ.get("PY_FUZZER_CHECK_TIMEOUT_SECONDS", "5")
+)
 TIMEOUT_RETRY_FACTOR: Final = 1.5
 
 # Reserve time within the budget for CI job setup before the first step,
@@ -1116,6 +1118,72 @@ def parse_args() -> ResolvedCliArgs:
         save_failures=args.save_failures,
         minimize_failures=args.minimize_failures is not None,
     )
+
+
+def time_ty_seed(
+    seed: int, executable: Path, code: str, repeat: int
+) -> dict[str, int | float | str]:
+    """Measure a check in a worker with no other child processes running."""
+    before = os.times()
+    started = time.monotonic()
+    outcome = check_ty(code, ty_executable=executable, timeout_seconds=60)
+    after = os.times()
+    return {
+        "seed": seed,
+        "repeat": repeat,
+        "lines": len(code.splitlines()),
+        "outcome": outcome.value if isinstance(outcome, Failure) else "completed",
+        "wall_seconds": (
+            outcome.elapsed_seconds
+            if isinstance(outcome, Success)
+            else time.monotonic() - started
+        ),
+        "cpu_seconds": (
+            after.children_user
+            - before.children_user
+            + (after.children_system - before.children_system)
+        ),
+    }
+
+
+def measure_ty_timeouts() -> None:
+    """Repeat checks on timed-out inputs and a sample of successful seeds."""
+    parser = argparse.ArgumentParser(description=measure_ty_timeouts.__doc__)
+    parser.add_argument("results", type=Path)
+    parser.add_argument("executable", type=absolute_path)
+    parser.add_argument("--corpus-dir", type=Path)
+    args = parser.parse_args()
+
+    timed_out: dict[int, Path] = {}
+    failed: set[int] = set()
+    for path in args.results.glob("pass-*/*.json"):
+        seed = int(path.stem)
+        failed.add(seed)
+        if json.loads(path.read_text(encoding="utf-8"))["kind"] == "timeout":
+            timed_out[seed] = path.with_suffix(".py")
+
+    sources = {
+        seed: path.read_text(encoding="utf-8") for seed, path in timed_out.items()
+    }
+    for seed in range(100):
+        if seed not in failed:
+            sources[seed] = (
+                (args.corpus_dir / f"{seed}.py").read_text(encoding="utf-8")
+                if args.corpus_dir is not None
+                else generate_random_code(Seed(seed))
+            )
+
+    # Leave CPU headroom to see whether a slow seed stays slow with fewer
+    # competing checks.
+    workers = max(1, (os.process_cpu_count() or 1) // 2)
+    with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as pool:
+        for repeat in (1, 2):
+            futures = [
+                pool.submit(time_ty_seed, seed, args.executable, sources[seed], repeat)
+                for seed in sorted(sources)
+            ]
+            for future in concurrent.futures.as_completed(futures):
+                print(json.dumps(future.result()), flush=True)
 
 
 def main() -> NoReturn:

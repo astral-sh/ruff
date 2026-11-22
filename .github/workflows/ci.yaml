@@ -950,8 +950,8 @@ jobs:
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && (needs.determine_changes.outputs.ty == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
     outputs:
-      failures: ${{ steps.upload-failures.outputs.artifact-id }}
-      status: ${{ steps.upload-status.outputs.artifact-id }}
+      failures: ""
+      status: ""
     permissions:
       actions: read
       contents: read
@@ -987,84 +987,52 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           seeds: ${{ env.FUZZ_CORPUS_SEEDS }}
-      - name: Fuzz
-        id: fuzz
+      - name: Build ty from main
+        env:
+          CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
+          MEASURED_MAIN: dffb1c0134214cd79e6e81af3f55ec8bc5b152f0
+        run: |
+          git checkout --detach "$MEASURED_MAIN"
+          git log -1 --oneline
+          cargo build --profile=profiling --bin=ty
+          git checkout --detach "$GITHUB_SHA"
+      - name: Count timeouts on main at 5 and 10 seconds
         env:
           FUZZ_CORPUS: ${{ steps.corpus.outputs.path }}
-          FORCE_COLOR: 1
-          MERGE_BASE: ${{ needs.determine_changes.outputs.comparison_base }}
-          # Line-tables-only debug info: faster builds, backtraces still work.
-          CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
         run: |
-          echo "new commit"
-          git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
-          cargo build --profile=profiling --bin=ty
-          mv target/profiling/ty ty-new
-
-          git checkout -b old_commit "$MERGE_BASE"
-          echo "old commit (merge base)"
-          git rev-list --format=%s --max-count=1 old_commit
-          cargo build --profile=profiling --bin=ty
-          mv target/profiling/ty ty-old
-
-          git checkout --detach "$GITHUB_SHA"
-
-          (
-            uv run \
-            --python="${PYTHON_VERSION}" \
-            --project=./python/py-fuzzer \
-            --locked \
-            fuzz \
-            --test-executable=ty-new \
-            --baseline-executable=ty-old \
-            --only-new-bugs \
-            --output-format=github \
-            --save-failures=ty-fuzz-failures \
-            ${FUZZ_CORPUS:+--corpus-dir="$FUZZ_CORPUS"} \
-            --budget-minutes="${FUZZ_JOB_TIMEOUT_MINUTES}" \
-            --job-started-at="${FUZZ_JOB_STARTED_AT}" \
-            --bin=ty \
-            "$FUZZ_CORPUS_SEEDS"
-          )
-      - name: Upload failing inputs and ty binaries
-        id: upload-failures
-        if: ${{ failure() && steps.fuzz.outcome == 'failure' && hashFiles('ty-fuzz-failures/*.py') != '' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: ty-fuzz-failures
-          path: |
-            ty-fuzz-failures/*.py
-            ty-fuzz-failures/*.json
-            ty-new
-            ty-old
-          compression-level: 1
-          retention-days: 7
-          overwrite: true
-      - name: Prepare fuzz status messages
-        id: status
-        if: >-
-          !cancelled() && (steps.fuzz.outcome == 'success' || steps.upload-failures.outputs.artifact-id != '') &&
-          github.repository == 'astral-sh/ruff' && github.event.pull_request.head.repo.full_name == github.repository
+          nproc
+          lscpu | sed -n 's/^Model name: */CPU: /p'
+          mkdir ty-fuzz-timeout-results
+          for pass in 5-a 5-b 10; do
+            echo "::group::Timeout pass $pass"
+            PY_FUZZER_CHECK_TIMEOUT_SECONDS="${pass%%-*}" uv run \
+              --python="$PYTHON_VERSION" --project=./python/py-fuzzer --locked \
+              python -c 'from fuzz import parse_args, run_fuzzer; raise SystemExit(2 if run_fuzzer(parse_args()) == 2 else 0)' \
+              --bin=ty --test-executable="$PWD/target/profiling/ty" --quiet \
+              --save-failures="ty-fuzz-timeout-results/pass-$pass" \
+              ${FUZZ_CORPUS:+--corpus-dir="$FUZZ_CORPUS"} \
+              --budget-minutes="$FUZZ_JOB_TIMEOUT_MINUTES" \
+              --job-started-at="$FUZZ_JOB_STARTED_AT" "$FUZZ_CORPUS_SEEDS"
+            echo "::endgroup::"
+          done
+      - name: Measure wall and CPU time for timed-out seeds
         env:
-          FUZZ_OUTCOME: ${{ steps.fuzz.outcome }}
-          FAILURES_URL: ${{ steps.upload-failures.outputs.artifact-url }}
+          FUZZ_CORPUS: ${{ steps.corpus.outputs.path }}
         run: |
-          mkdir "$RUNNER_TEMP/ty-fuzz-status"
-          cd "$RUNNER_TEMP/ty-fuzz-status"
-          if [[ "$FUZZ_OUTCOME" == "success" ]]; then
-            echo 'The fuzzer found no new ty panics or timeouts.' > status.md
-          else
-            echo '⚠️ Panic or timeout detected. Minimization in progress…' > status.md
-            printf 'Minimization report unavailable. [Download the failing inputs](%s).\n' "$FAILURES_URL" > ty-fuzz-report.md
-          fi
-      - name: Upload the fuzz status messages
-        id: upload-status
-        if: ${{ !cancelled() && steps.status.outcome == 'success' }}
+          uv run --python="$PYTHON_VERSION" --project=./python/py-fuzzer --locked \
+            python -c 'from fuzz import measure_ty_timeouts; measure_ty_timeouts()' \
+            ty-fuzz-timeout-results target/profiling/ty \
+            ${FUZZ_CORPUS:+--corpus-dir="$FUZZ_CORPUS"} \
+            | tee ty-fuzz-timeout-results/rechecks.jsonl
+      - name: Upload timeout measurements
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ty-fuzz-status
-          path: ${{ runner.temp }}/ty-fuzz-status
-          overwrite: true
+          name: ty-fuzz-timeout-results
+          path: |
+            ty-fuzz-timeout-results/*/*.json
+            ty-fuzz-timeout-results/rechecks.jsonl
+          if-no-files-found: error
 
   notify-ty-fuzz:
     needs: fuzz-ty
