@@ -554,13 +554,41 @@ duplicate_fields = (("x", int), ("x", str))
 Duplicate = NamedTuple("Duplicate", duplicate_fields)
 ```
 
-As in an ordinary annotation, a variable holding a string cannot stand in for a type:
+### Functional syntax with indeterminate fields in a tuple variable
+
+The name of the only field is unknown, but its annotation is `int`. ty infers `tuple[int]` as the
+base class, so it can check indexing. ty infers `Unknown` for `record.x` because it cannot tell
+whether `x` names the field.
+
+```py
+from typing import NamedTuple
+from ty_extensions._internal import reveal_mro
+
+def make_record(name: str):
+    fields = ((name, int),)
+    Record = NamedTuple("Record", fields)  # error: [invalid-named-tuple]
+    # revealed: (<class 'Record'>, <class 'tuple[int]'>, <class 'Sequence[int]'>, <class 'Reversible[int]'>, <class 'Collection[int]'>, <class 'Iterable[int]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+    reveal_mro(Record)
+    record = Record(1)
+    reveal_type(record.x)  # revealed: Unknown
+    reveal_type(record[0])  # revealed: int
+    record[1]  # error: [index-out-of-bounds]
+```
+
+A string in an indirect field definition could be a forward reference. ty reports an error and uses
+`Unknown` for the field type without interpreting the string as an annotation. Since `x` is the only
+field, ty can diagnose access to `y`.
 
 ```py
 NAME = "int"
 fields = (("x", NAME),)
 # error: [invalid-named-tuple] "Cannot determine the type of field `x` from `Literal["int"]`"
 Indirect = NamedTuple("Indirect", fields)
+# revealed: (<class 'Indirect'>, <class 'tuple[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(Indirect)
+reveal_type(Indirect(1).x)  # revealed: Unknown
+reveal_type(Indirect(1)[0])  # revealed: Unknown
+Indirect(1).y  # error: [missing-attribute]
 ```
 
 ### Functional syntax with Final variable field names
@@ -584,8 +612,8 @@ N(x="", y="")
 
 ### Functional syntax with variadic tuple fields
 
-When fields are passed as a variadic tuple (e.g., `tuple[..., *tuple[T, ...]]`), we cannot determine
-the exact field count statically. In this case, we fall back to unknown fields:
+A tuple passed through a variable can have a known first field and a variable number of additional
+fields.
 
 ```toml
 [environment]
@@ -596,22 +624,31 @@ python-version = "3.11"
 from typing import NamedTuple
 from ty_extensions._internal import reveal_mro
 
-# Variadic tuple - we can't determine the exact fields statically.
-def get_fields() -> tuple[tuple[str, type[int]], *tuple[tuple[str, type[str]], ...]]:
-    return (("x", int), ("y", str))
+def more_fields() -> tuple[tuple[str, type], ...]:
+    return (("y", str),)
 
-fields = get_fields()
-# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a list literal or a fixed-length tuple"
+fields = (("x", int), *more_fields())
+# error: [invalid-named-tuple] "Cannot determine the number of fields"
 NT = NamedTuple("NT", fields)
-
-# Fields are unknown, so attribute access returns Any and MRO has Unknown tuple.
-reveal_type(NT)  # revealed: <class 'NT'>
-# revealed: (<class 'NT'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
-reveal_mro(NT)
-reveal_type(NT(1, "a").x)  # revealed: Any
 ```
 
-Similarly for `collections.namedtuple`:
+ty infers `int` for the first field and for `record.x`. The return type of `more_fields` leaves the
+remaining names and annotations unknown.
+
+```py
+reveal_type(NT)  # revealed: <class 'NT'>
+# revealed: (<class 'NT'>, <class 'tuple[int, *tuple[Unknown, ...]]'>, <class 'Sequence[int | Unknown]'>, <class 'Reversible[int | Unknown]'>, <class 'Collection[int | Unknown]'>, <class 'Iterable[int | Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(NT)
+record = NT(1, "a")
+reveal_type(record.x)  # revealed: int
+reveal_type(record.y)  # revealed: Unknown
+x, y = record
+reveal_type(x)  # revealed: int
+reveal_type(y)  # revealed: Unknown
+```
+
+`collections.namedtuple` takes field names without annotations. Field access yields `Any` when the
+names come from a variadic tuple.
 
 ```py
 import collections
@@ -718,8 +755,8 @@ reveal_type(url)  # revealed: Url
 
 ### Functional syntax with list variable fields
 
-When fields are passed via a list variable (not a literal), the field names cannot be determined
-statically. Attribute access returns `Any` and the constructor accepts any arguments:
+The inferred type of the list below loses the individual field names, so field access returns
+`Unknown`.
 
 ```py
 from typing import NamedTuple
@@ -727,18 +764,17 @@ from typing_extensions import Self
 
 fields = [("host", str), ("port", int)]
 
-# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a list literal or a fixed-length tuple"
+# error: [invalid-named-tuple]
 class Url(NamedTuple("Url", fields)):
     def with_port(self, port: int) -> Self:
-        # Fields are unknown, so attribute access returns Any.
-        reveal_type(self.host)  # revealed: Any
-        reveal_type(self.port)  # revealed: Any
-        reveal_type(self.unknown)  # revealed: Any
+        reveal_type(self.host)  # revealed: Unknown
+        reveal_type(self.port)  # revealed: Unknown
+        reveal_type(self.unknown)  # revealed: Unknown
         return self._replace(port=port)
 ```
 
-When constructing a namedtuple directly with dynamically-defined fields, keyword arguments are
-accepted because the constructor uses a gradual signature:
+When `collections.namedtuple` receives a dynamically computed string of field names, the constructor
+uses a gradual signature that accepts arbitrary keyword arguments.
 
 ```py
 import collections
