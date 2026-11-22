@@ -322,10 +322,6 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// An expression cache shared across builders during multi-inference.
     expression_cache: Option<Rc<RefCell<ExpressionCache<'db>>>>,
 
-    /// The last unary operation that needed neither a receiver override nor a diagnostic.
-    /// Keeping it local to this builder lets recursive return types change between iterations.
-    last_unary_result: Option<(ast::UnaryOp, Type<'db>, Type<'db>)>,
-
     /// Reachability evaluations reused while inferring this region.
     ///
     /// Most inference regions never evaluate reachability, so allocate the cache lazily. Speculative
@@ -577,7 +573,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions: FxHashMap::default(),
             comparison_truthiness: FxHashMap::default(),
             expression_cache: None,
-            last_unary_result: None,
             reachability_cache: OnceCell::new(),
             qualifiers: FxHashMap::default(),
             type_expression_flags: FxHashMap::default(),
@@ -11762,6 +11757,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_unary_expression(&mut self, unary: &ast::ExprUnaryOp) -> Type<'db> {
         let operand_type = self.infer_expression(&unary.operand, TypeContext::default());
+
+        // Either sign preserves the built-in float type of a literal. The `float` return
+        // annotation on `__pos__` and `__neg__` would also admit `int`.
+        if matches!(unary.op, ast::UnaryOp::UAdd | ast::UnaryOp::USub)
+            && let ast::Expr::NumberLiteral(literal) = unary.operand.as_ref()
+            && matches!(literal.value, ast::Number::Float(_))
+        {
+            return operand_type;
+        }
+
         self.infer_unary_expression_type(unary, operand_type, None)
     }
 
@@ -11774,15 +11779,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let env = self.program_environment();
         let op = unary.op;
-        let mut fallback_unary_expression_type = || {
-            if receiver.is_none()
-                && let Some((last_op, last_operand, result)) = self.last_unary_result
-                && last_op == op
-                && last_operand == operand_type
-            {
-                return result;
-            }
-
+        let fallback_unary_expression_type = || {
             let unary_dunder_method = match op {
                 ast::UnaryOp::Invert => "__invert__",
                 ast::UnaryOp::UAdd => "__pos__",
@@ -11794,9 +11791,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             match operand_type.try_call_unary_dunder(db, env, unary_dunder_method, receiver) {
                 Ok(outcome) => {
-                    if receiver.is_none() && outcome.deprecated_functions.is_empty() {
-                        self.last_unary_result = Some((op, operand_type, outcome.return_type));
-                    }
                     self.report_deprecated_functions(unary, outcome.deprecated_functions);
                     outcome.return_type
                 }
@@ -11904,7 +11898,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ast::UnaryOp::Not => unreachable!(),
                 };
 
-                match tvar.typevar(db).bound_or_constraints(db, env) {
+                match tvar.typevar(self.db()).bound_or_constraints(db, env) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         // Call the dunder method for every constraint up front so deprecation
                         // reporting doesn't depend on whether any constraint fails.
@@ -12293,7 +12287,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
-            last_unary_result: _,
             reachability_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -12362,7 +12355,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
-            last_unary_result: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
@@ -12487,7 +12479,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings,
             called_functions,
             expression_cache: _,
-            last_unary_result: _,
             reachability_cache: _,
             declarations: _,
             deferred: _,
@@ -12558,7 +12549,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
-            last_unary_result: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
@@ -12768,7 +12758,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Builder only state
             expression_cache: _,
-            last_unary_result: _,
             reachability_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
@@ -12832,7 +12821,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state,
             typevar_binding_context,
             ref expression_cache,
-            last_unary_result: _,
             ref reachability_cache,
             ref return_types_and_ranges,
             ref dataclass_field_specifiers,
@@ -12929,7 +12917,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
-            last_unary_result: _,
             reachability_cache: _,
             typevar_binding_context: _,
             deferred_state: _,

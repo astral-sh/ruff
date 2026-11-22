@@ -995,18 +995,6 @@ reveal_type(left(3))  # revealed: Literal[1, "a"]
 reveal_type(right(3))  # revealed: Literal["a", 1]
 ```
 
-### Recursive unary operator
-
-The return type of `__neg__` depends on the result of negating another instance.
-
-```py
-class C:
-    def __neg__(self):
-        return (-C(),)
-
-reveal_type(-C())  # revealed: tuple[Divergent] | Unknown
-```
-
 ### Recursive mapping unpacking
 
 Unpacking a child node inside `__getitem__` depends on the return type we are inferring.

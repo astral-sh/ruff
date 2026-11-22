@@ -1,5 +1,25 @@
 # Invert, UAdd, USub
 
+## Float literals
+
+Either sign preserves the type of a float literal.
+
+```py
+reveal_type(0.5)  # revealed: float*
+reveal_type(-0.5)  # revealed: float*
+reveal_type(+1e3)  # revealed: float*
+~0.5  # error: [unsupported-operator]
+```
+
+For a variable of the same type, we use the operator's declared return type.
+
+```py
+x = 0.5
+reveal_type(x)  # revealed: float*
+reveal_type(-x)  # revealed: float
+reveal_type(+x)  # revealed: float
+```
+
 ## Instance
 
 ```py
