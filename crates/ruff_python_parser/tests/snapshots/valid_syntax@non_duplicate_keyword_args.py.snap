@@ -81,28 +81,29 @@ Module(
                             arguments: Arguments {
                                 range: 19..24,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [
-                                    Keyword {
-                                        range: 20..23,
-                                        node_index: NodeIndex(None),
-                                        arg: Some(
-                                            Identifier {
-                                                id: Name("x"),
-                                                range: 20..21,
-                                                node_index: NodeIndex(None),
-                                            },
-                                        ),
-                                        value: NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 22..23,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
-                                        ),
-                                    },
+                                items: [
+                                    Keyword(
+                                        Keyword {
+                                            range: 20..23,
+                                            node_index: NodeIndex(None),
+                                            arg: Some(
+                                                Identifier {
+                                                    id: Name("x"),
+                                                    range: 20..21,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                            ),
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 22..23,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
                                 ],
                             },
                         },
@@ -214,78 +215,83 @@ Module(
                             arguments: Arguments {
                                 range: 50..70,
                                 node_index: NodeIndex(None),
-                                args: [],
-                                keywords: [
-                                    Keyword {
-                                        range: 51..56,
-                                        node_index: NodeIndex(None),
-                                        arg: Some(
-                                            Identifier {
-                                                id: Name("x"),
-                                                range: 51..52,
-                                                node_index: NodeIndex(None),
-                                            },
-                                        ),
-                                        value: StringLiteral(
-                                            ExprStringLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 53..56,
-                                                value: StringLiteralValue {
-                                                    inner: Single(
-                                                        StringLiteral {
-                                                            range: 53..56,
-                                                            node_index: NodeIndex(None),
-                                                            value: "a",
-                                                            flags: StringLiteralFlags {
-                                                                quote_style: Double,
-                                                                prefix: Empty,
-                                                                triple_quoted: false,
-                                                                unclosed: false,
+                                items: [
+                                    Keyword(
+                                        Keyword {
+                                            range: 51..56,
+                                            node_index: NodeIndex(None),
+                                            arg: Some(
+                                                Identifier {
+                                                    id: Name("x"),
+                                                    range: 51..52,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                            ),
+                                            value: StringLiteral(
+                                                ExprStringLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 53..56,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 53..56,
+                                                                node_index: NodeIndex(None),
+                                                                value: "a",
+                                                                flags: StringLiteralFlags {
+                                                                    quote_style: Double,
+                                                                    prefix: Empty,
+                                                                    triple_quoted: false,
+                                                                    unclosed: false,
+                                                                },
                                                             },
-                                                        },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    Keyword(
+                                        Keyword {
+                                            range: 58..61,
+                                            node_index: NodeIndex(None),
+                                            arg: Some(
+                                                Identifier {
+                                                    id: Name("y"),
+                                                    range: 58..59,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                            ),
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 60..61,
+                                                    value: Int(
+                                                        1,
                                                     ),
                                                 },
-                                            },
-                                        ),
-                                    },
-                                    Keyword {
-                                        range: 58..61,
-                                        node_index: NodeIndex(None),
-                                        arg: Some(
-                                            Identifier {
-                                                id: Name("y"),
-                                                range: 58..59,
-                                                node_index: NodeIndex(None),
-                                            },
-                                        ),
-                                        value: NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 60..61,
-                                                value: Int(
-                                                    1,
-                                                ),
-                                            },
-                                        ),
-                                    },
-                                    Keyword {
-                                        range: 63..69,
-                                        node_index: NodeIndex(None),
-                                        arg: Some(
-                                            Identifier {
-                                                id: Name("z"),
-                                                range: 63..64,
-                                                node_index: NodeIndex(None),
-                                            },
-                                        ),
-                                        value: BooleanLiteral(
-                                            ExprBooleanLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 65..69,
-                                                value: true,
-                                            },
-                                        ),
-                                    },
+                                            ),
+                                        },
+                                    ),
+                                    Keyword(
+                                        Keyword {
+                                            range: 63..69,
+                                            node_index: NodeIndex(None),
+                                            arg: Some(
+                                                Identifier {
+                                                    id: Name("z"),
+                                                    range: 63..64,
+                                                    node_index: NodeIndex(None),
+                                                },
+                                            ),
+                                            value: BooleanLiteral(
+                                                ExprBooleanLiteral {
+                                                    node_index: NodeIndex(None),
+                                                    range: 65..69,
+                                                    value: true,
+                                                },
+                                            ),
+                                        },
+                                    ),
                                 ],
                             },
                         },

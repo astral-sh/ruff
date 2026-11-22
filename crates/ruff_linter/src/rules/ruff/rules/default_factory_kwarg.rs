@@ -92,7 +92,7 @@ pub(crate) fn default_factory_kwarg(
     }
 
     // If the user provided a positional argument for `default_factory`, return.
-    if !call.arguments.args.is_empty() {
+    if call.arguments.args().next().is_some() {
         return;
     }
 
@@ -144,7 +144,7 @@ fn convert_to_positional(
     if call.arguments.len() == 1 {
         // Ex) `defaultdict(default_factory=list)`
         Ok(Fix::unsafe_edit(Edit::range_replacement(
-            locator.slice(&default_factory.value).to_string(),
+            locator.slice(&*default_factory.value).to_string(),
             default_factory.range(),
         )))
     } else {
@@ -161,7 +161,7 @@ fn convert_to_positional(
 
         // Second, insert the value as the first positional argument.
         let insertion_edit = Edit::insertion(
-            format!("{}, ", locator.slice(&default_factory.value)),
+            format!("{}, ", locator.slice(&*default_factory.value)),
             call.arguments
                 .iter_source_order()
                 .next()

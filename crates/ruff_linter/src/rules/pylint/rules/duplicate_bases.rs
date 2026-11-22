@@ -81,9 +81,10 @@ pub(crate) fn duplicate_bases(checker: &Checker, name: &str, arguments: Option<&
     let Some(arguments) = arguments else {
         return;
     };
-    let bases = &arguments.args;
+    let bases = arguments.args();
 
-    let mut seen: FxHashSet<&str> = FxHashSet::with_capacity_and_hasher(bases.len(), FxBuildHasher);
+    let mut seen: FxHashSet<&str> =
+        FxHashSet::with_capacity_and_hasher(arguments.len(), FxBuildHasher);
     for base in bases {
         if let Expr::Name(ast::ExprName { id, .. }) = base {
             if !seen.insert(id) {

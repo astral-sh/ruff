@@ -34,8 +34,7 @@ Module(
                                         arguments: Arguments {
                                             range: 9..11,
                                             node_index: NodeIndex(None),
-                                            args: [],
-                                            keywords: [],
+                                            items: [],
                                         },
                                     },
                                 ),
@@ -86,8 +85,7 @@ Module(
                                                     arguments: Arguments {
                                                         range: 44..46,
                                                         node_index: NodeIndex(None),
-                                                        args: [],
-                                                        keywords: [],
+                                                        items: [],
                                                     },
                                                 },
                                             ),

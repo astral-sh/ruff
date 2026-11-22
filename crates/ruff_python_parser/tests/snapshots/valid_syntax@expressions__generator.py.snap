@@ -634,162 +634,163 @@ Module(
                             arguments: Arguments {
                                 range: 348..481,
                                 node_index: NodeIndex(None),
-                                args: [
-                                    Generator(
-                                        ExprGenerator {
-                                            node_index: NodeIndex(None),
-                                            range: 354..479,
-                                            elt: Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 354..357,
-                                                    id: Name("sql"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            generators: [
-                                                Comprehension {
-                                                    range: 362..479,
-                                                    node_index: NodeIndex(None),
-                                                    target: Name(
-                                                        ExprName {
-                                                            node_index: NodeIndex(None),
-                                                            range: 366..369,
-                                                            id: Name("sql"),
-                                                            ctx: Store,
-                                                        },
-                                                    ),
-                                                    iter: Tuple(
-                                                        ExprTuple {
-                                                            node_index: NodeIndex(None),
-                                                            range: 373..479,
-                                                            elts: [
-                                                                If(
-                                                                    ExprIf {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 383..420,
-                                                                        test: Name(
-                                                                            ExprName {
-                                                                                node_index: NodeIndex(None),
-                                                                                range: 405..410,
-                                                                                id: Name("limit"),
-                                                                                ctx: Load,
-                                                                            },
-                                                                        ),
-                                                                        body: BinOp(
-                                                                            ExprBinOp {
-                                                                                node_index: NodeIndex(None),
-                                                                                range: 383..401,
-                                                                                left: StringLiteral(
-                                                                                    ExprStringLiteral {
-                                                                                        node_index: NodeIndex(None),
-                                                                                        range: 383..393,
-                                                                                        value: StringLiteralValue {
-                                                                                            inner: Single(
-                                                                                                StringLiteral {
-                                                                                                    range: 383..393,
-                                                                                                    node_index: NodeIndex(None),
-                                                                                                    value: "LIMIT %d",
-                                                                                                    flags: StringLiteralFlags {
-                                                                                                        quote_style: Double,
-                                                                                                        prefix: Empty,
-                                                                                                        triple_quoted: false,
-                                                                                                        unclosed: false,
+                                items: [
+                                    Positional(
+                                        Generator(
+                                            ExprGenerator {
+                                                node_index: NodeIndex(None),
+                                                range: 354..479,
+                                                elt: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 354..357,
+                                                        id: Name("sql"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                generators: [
+                                                    Comprehension {
+                                                        range: 362..479,
+                                                        node_index: NodeIndex(None),
+                                                        target: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 366..369,
+                                                                id: Name("sql"),
+                                                                ctx: Store,
+                                                            },
+                                                        ),
+                                                        iter: Tuple(
+                                                            ExprTuple {
+                                                                node_index: NodeIndex(None),
+                                                                range: 373..479,
+                                                                elts: [
+                                                                    If(
+                                                                        ExprIf {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 383..420,
+                                                                            test: Name(
+                                                                                ExprName {
+                                                                                    node_index: NodeIndex(None),
+                                                                                    range: 405..410,
+                                                                                    id: Name("limit"),
+                                                                                    ctx: Load,
+                                                                                },
+                                                                            ),
+                                                                            body: BinOp(
+                                                                                ExprBinOp {
+                                                                                    node_index: NodeIndex(None),
+                                                                                    range: 383..401,
+                                                                                    left: StringLiteral(
+                                                                                        ExprStringLiteral {
+                                                                                            node_index: NodeIndex(None),
+                                                                                            range: 383..393,
+                                                                                            value: StringLiteralValue {
+                                                                                                inner: Single(
+                                                                                                    StringLiteral {
+                                                                                                        range: 383..393,
+                                                                                                        node_index: NodeIndex(None),
+                                                                                                        value: "LIMIT %d",
+                                                                                                        flags: StringLiteralFlags {
+                                                                                                            quote_style: Double,
+                                                                                                            prefix: Empty,
+                                                                                                            triple_quoted: false,
+                                                                                                            unclosed: false,
+                                                                                                        },
                                                                                                     },
-                                                                                                },
-                                                                                            ),
+                                                                                                ),
+                                                                                            },
                                                                                         },
-                                                                                    },
-                                                                                ),
-                                                                                op: Mod,
-                                                                                right: Name(
-                                                                                    ExprName {
-                                                                                        node_index: NodeIndex(None),
-                                                                                        range: 396..401,
-                                                                                        id: Name("limit"),
-                                                                                        ctx: Load,
-                                                                                    },
-                                                                                ),
-                                                                            },
-                                                                        ),
-                                                                        orelse: NoneLiteral(
-                                                                            ExprNoneLiteral {
-                                                                                node_index: NodeIndex(None),
-                                                                                range: 416..420,
-                                                                            },
-                                                                        ),
-                                                                    },
-                                                                ),
-                                                                If(
-                                                                    ExprIf {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 430..472,
-                                                                        test: Name(
-                                                                            ExprName {
-                                                                                node_index: NodeIndex(None),
-                                                                                range: 456..462,
-                                                                                id: Name("offset"),
-                                                                                ctx: Load,
-                                                                            },
-                                                                        ),
-                                                                        body: BinOp(
-                                                                            ExprBinOp {
-                                                                                node_index: NodeIndex(None),
-                                                                                range: 431..451,
-                                                                                left: StringLiteral(
-                                                                                    ExprStringLiteral {
-                                                                                        node_index: NodeIndex(None),
-                                                                                        range: 431..442,
-                                                                                        value: StringLiteralValue {
-                                                                                            inner: Single(
-                                                                                                StringLiteral {
-                                                                                                    range: 431..442,
-                                                                                                    node_index: NodeIndex(None),
-                                                                                                    value: "OFFSET %d",
-                                                                                                    flags: StringLiteralFlags {
-                                                                                                        quote_style: Double,
-                                                                                                        prefix: Empty,
-                                                                                                        triple_quoted: false,
-                                                                                                        unclosed: false,
+                                                                                    ),
+                                                                                    op: Mod,
+                                                                                    right: Name(
+                                                                                        ExprName {
+                                                                                            node_index: NodeIndex(None),
+                                                                                            range: 396..401,
+                                                                                            id: Name("limit"),
+                                                                                            ctx: Load,
+                                                                                        },
+                                                                                    ),
+                                                                                },
+                                                                            ),
+                                                                            orelse: NoneLiteral(
+                                                                                ExprNoneLiteral {
+                                                                                    node_index: NodeIndex(None),
+                                                                                    range: 416..420,
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                    If(
+                                                                        ExprIf {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 430..472,
+                                                                            test: Name(
+                                                                                ExprName {
+                                                                                    node_index: NodeIndex(None),
+                                                                                    range: 456..462,
+                                                                                    id: Name("offset"),
+                                                                                    ctx: Load,
+                                                                                },
+                                                                            ),
+                                                                            body: BinOp(
+                                                                                ExprBinOp {
+                                                                                    node_index: NodeIndex(None),
+                                                                                    range: 431..451,
+                                                                                    left: StringLiteral(
+                                                                                        ExprStringLiteral {
+                                                                                            node_index: NodeIndex(None),
+                                                                                            range: 431..442,
+                                                                                            value: StringLiteralValue {
+                                                                                                inner: Single(
+                                                                                                    StringLiteral {
+                                                                                                        range: 431..442,
+                                                                                                        node_index: NodeIndex(None),
+                                                                                                        value: "OFFSET %d",
+                                                                                                        flags: StringLiteralFlags {
+                                                                                                            quote_style: Double,
+                                                                                                            prefix: Empty,
+                                                                                                            triple_quoted: false,
+                                                                                                            unclosed: false,
+                                                                                                        },
                                                                                                     },
-                                                                                                },
-                                                                                            ),
+                                                                                                ),
+                                                                                            },
                                                                                         },
-                                                                                    },
-                                                                                ),
-                                                                                op: Mod,
-                                                                                right: Name(
-                                                                                    ExprName {
-                                                                                        node_index: NodeIndex(None),
-                                                                                        range: 445..451,
-                                                                                        id: Name("offset"),
-                                                                                        ctx: Load,
-                                                                                    },
-                                                                                ),
-                                                                            },
-                                                                        ),
-                                                                        orelse: NoneLiteral(
-                                                                            ExprNoneLiteral {
-                                                                                node_index: NodeIndex(None),
-                                                                                range: 468..472,
-                                                                            },
-                                                                        ),
-                                                                    },
-                                                                ),
-                                                            ],
-                                                            ctx: Load,
-                                                            parenthesized: true,
-                                                        },
-                                                    ),
-                                                    ifs: [],
-                                                    is_async: false,
-                                                },
-                                            ],
-                                            parenthesized: false,
-                                        },
+                                                                                    ),
+                                                                                    op: Mod,
+                                                                                    right: Name(
+                                                                                        ExprName {
+                                                                                            node_index: NodeIndex(None),
+                                                                                            range: 445..451,
+                                                                                            id: Name("offset"),
+                                                                                            ctx: Load,
+                                                                                        },
+                                                                                    ),
+                                                                                },
+                                                                            ),
+                                                                            orelse: NoneLiteral(
+                                                                                ExprNoneLiteral {
+                                                                                    node_index: NodeIndex(None),
+                                                                                    range: 468..472,
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                                ctx: Load,
+                                                                parenthesized: true,
+                                                            },
+                                                        ),
+                                                        ifs: [],
+                                                        is_async: false,
+                                                    },
+                                                ],
+                                                parenthesized: false,
+                                            },
+                                        ),
                                     ),
                                 ],
-                                keywords: [],
                             },
                         },
                     ),

@@ -57,25 +57,28 @@ Module(
                         Arguments {
                             range: 17..23,
                             node_index: NodeIndex(None),
-                            args: [
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 18..19,
-                                        id: Name("a"),
-                                        ctx: Load,
-                                    },
+                            items: [
+                                Positional(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 18..19,
+                                            id: Name("a"),
+                                            ctx: Load,
+                                        },
+                                    ),
                                 ),
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 21..22,
-                                        id: Name("b"),
-                                        ctx: Load,
-                                    },
+                                Positional(
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 21..22,
+                                            id: Name("b"),
+                                            ctx: Load,
+                                        },
+                                    ),
                                 ),
                             ],
-                            keywords: [],
                         },
                     ),
                     body: [

@@ -995,6 +995,22 @@ def _(flag: bool):
     ExplicitDictValueTarget({"a": 1} if flag else {"a": 2}, b={"a": 1})
 ```
 
+Each unpacked value supplies its own keys, even with an explicit keyword between the two.
+
+```py
+class Title(TypedDict):
+    title: str
+
+class PageCount(TypedDict):
+    pages: int
+
+class Book(Title, PageCount):
+    available: bool
+
+def _(title: Title, page_count: PageCount):
+    Book({}, **title, available=True, **page_count)  # no diagnostic
+```
+
 ## Union of `TypedDict`
 
 When assigning to a union of `TypedDict` types, the type will be narrowed based on the dictionary

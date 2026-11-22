@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
@@ -116,13 +116,15 @@ impl Violation for EmptyMethodWithoutAbstractDecorator {
     }
 }
 
-fn is_abc_class(bases: &[Expr], keywords: &[Keyword], semantic: &SemanticModel) -> bool {
-    keywords.iter().any(|keyword| {
-        keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass")
-            && semantic.matches_qualified_name(&keyword.value, &["abc", "ABCMeta"])
-    }) || bases
-        .iter()
-        .any(|base| semantic.matches_qualified_name(base, &["abc", "ABC"]))
+fn is_abc_class(arguments: &Arguments, semantic: &SemanticModel) -> bool {
+    match arguments.items.as_slice() {
+        [ast::Argument::Positional(base)] => semantic.matches_qualified_name(base, &["abc", "ABC"]),
+        [ast::Argument::Keyword(keyword)] => {
+            keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass")
+                && semantic.matches_qualified_name(&keyword.value, &["abc", "ABCMeta"])
+        }
+        _ => false,
+    }
 }
 
 fn is_empty_body(body: &[Stmt]) -> bool {
@@ -151,14 +153,11 @@ pub(crate) fn abstract_base_class(
     arguments: Option<&Arguments>,
     body: &[Stmt],
 ) {
-    let Some(Arguments { args, keywords, .. }) = arguments else {
+    let Some(arguments) = arguments else {
         return;
     };
 
-    if args.len() + keywords.len() != 1 {
-        return;
-    }
-    if !is_abc_class(args, keywords, checker.semantic()) {
+    if !is_abc_class(arguments, checker.semantic()) {
         return;
     }
 

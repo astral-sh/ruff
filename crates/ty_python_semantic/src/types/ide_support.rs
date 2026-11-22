@@ -1645,7 +1645,7 @@ pub fn inlay_hint_call_argument_details<'db>(
 
     let mut argument_names = HashMap::new();
 
-    for arg_index in 0..call_expr.arguments.args.len() {
+    for arg_index in 0..call_expr.arguments.args().count() {
         let Some(arg_mapping) = resolved.argument_to_parameter_mapping.get(arg_index) else {
             continue;
         };

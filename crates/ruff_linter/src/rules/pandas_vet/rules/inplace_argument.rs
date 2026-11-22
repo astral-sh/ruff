@@ -73,7 +73,7 @@ pub(crate) fn inplace_argument(checker: &Checker, call: &ast::ExprCall) {
     }
 
     let mut seen_star = false;
-    for keyword in call.arguments.keywords.iter().rev() {
+    for keyword in call.arguments.keywords().rev() {
         let Some(arg) = &keyword.arg else {
             seen_star = true;
             continue;

@@ -89,12 +89,10 @@ pub(crate) fn duplicate_entry_in_dunder_all_aug_assign(
 pub(crate) fn duplicate_entry_in_dunder_all_extend_call(
     checker: &Checker,
     ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
+        func, arguments, ..
     }: &ast::ExprCall,
 ) {
-    let ([value_passed], []) = (&**args, &**keywords) else {
+    let Some(value_passed) = arguments.as_single_positional() else {
         return;
     };
     let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &**func else {

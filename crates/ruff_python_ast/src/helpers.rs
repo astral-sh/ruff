@@ -12,7 +12,7 @@ use crate::statement_visitor::StatementVisitor;
 use crate::token::{Tokens, parenthesized_range};
 use crate::visitor::Visitor;
 use crate::{
-    self as ast, Arguments, AtomicNodeIndex, CmpOp, DictItem, ExceptHandler, Expr, ExprNoneLiteral,
+    self as ast, AtomicNodeIndex, CmpOp, DictItem, ExceptHandler, Expr, ExprNoneLiteral,
     InterpolatedStringElement, MatchCase, Operator, Pattern, Stmt, TypeParam,
 };
 use crate::{AnyNodeRef, ExprContext};
@@ -398,17 +398,10 @@ where
                 range_start: _,
                 node_index: _,
             }) => {
-                // Note that this is the evaluation order but not necessarily the declaration order
-                // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
                 any_over_expr(call_func, &mut *func)
                     || arguments
-                        .args
-                        .iter()
-                        .any(|expr| any_over_expr(expr, &mut *func))
-                    || arguments
-                        .keywords
-                        .iter()
-                        .any(|keyword| any_over_expr(&keyword.value, &mut *func))
+                        .iter_source_order()
+                        .any(|argument| any_over_expr(argument.value(), &mut *func))
             }
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 any_over_expr(value, &mut *func) || any_over_expr(slice, &mut *func)
@@ -563,22 +556,15 @@ where
                 decorator_list,
                 ..
             }) => {
-                // Note that e.g. `class A(*args, a=2, *args2, **kwargs): pass` is a valid class
-                // definition
-                arguments
-                    .as_deref()
-                    .is_some_and(|Arguments { args, keywords, .. }| {
-                        args.iter().any(|expr| any_over_expr(expr, &mut *func))
-                            || keywords
-                                .iter()
-                                .any(|keyword| any_over_expr(&keyword.value, &mut *func))
-                    })
-                    || type_params.as_ref().is_some_and(|type_params| {
-                        type_params
-                            .iter()
-                            .any(|type_param| any_over_type_param(type_param, &mut *func))
-                    })
-                    || body.iter().any(|stmt| any_over_stmt(stmt, &mut *func))
+                arguments.as_deref().is_some_and(|arguments| {
+                    arguments
+                        .iter_source_order()
+                        .any(|argument| any_over_expr(argument.value(), &mut *func))
+                }) || type_params.as_ref().is_some_and(|type_params| {
+                    type_params
+                        .iter()
+                        .any(|type_param| any_over_type_param(type_param, &mut *func))
+                }) || body.iter().any(|stmt| any_over_stmt(stmt, &mut *func))
                     || decorator_list
                         .iter()
                         .any(|decorator| any_over_expr(&decorator.expression, &mut *func))
@@ -1481,9 +1467,7 @@ impl Truthiness {
                         if arguments.is_empty() {
                             // Ex) `list()`
                             Self::Falsey
-                        } else if let [argument] = &*arguments.args
-                            && arguments.keywords.is_empty()
-                        {
+                        } else if let Some(argument) = arguments.as_single_positional() {
                             // Ex) `list([1, 2, 3])`
                             match argument {
                                 // Return Unknown for types with definite truthiness that might

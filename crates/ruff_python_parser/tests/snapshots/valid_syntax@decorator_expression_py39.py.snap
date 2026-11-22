@@ -166,17 +166,18 @@ Module(
                                     arguments: Arguments {
                                         range: 108..113,
                                         node_index: NodeIndex(None),
-                                        args: [
-                                            Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 109..112,
-                                                    id: Name("foo"),
-                                                    ctx: Load,
-                                                },
+                                        items: [
+                                            Positional(
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 109..112,
+                                                        id: Name("foo"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
                                             ),
                                         ],
-                                        keywords: [],
                                     },
                                 },
                             ),

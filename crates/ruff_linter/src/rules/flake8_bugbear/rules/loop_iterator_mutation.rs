@@ -77,7 +77,7 @@ pub(crate) fn loop_iterator_mutation(checker: &Checker, stmt_for: &StmtFor) {
             func, arguments, ..
         }) if checker.semantic().match_builtin_expr(func, "enumerate") => {
             // Ex) `items`
-            let Some(iter) = arguments.args.first() else {
+            let Some(iter) = arguments.args().next() else {
                 return;
             };
 

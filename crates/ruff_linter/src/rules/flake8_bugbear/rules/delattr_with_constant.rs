@@ -62,19 +62,26 @@ impl AlwaysFixableViolation for DelattrWithConstant {
 }
 
 /// B043
-pub(crate) fn delattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    if !checker.semantic().match_builtin_expr(func, "delattr") {
-        return;
-    }
-
-    let [
-        obj,
-        Expr::StringLiteral(ast::ExprStringLiteral { value: name, .. }),
-    ] = args
+pub(crate) fn delattr_with_constant(
+    checker: &Checker,
+    expr: &Expr,
+    func: &Expr,
+    arguments: &ast::Arguments,
+) {
+    let Some(
+        [
+            obj,
+            Expr::StringLiteral(ast::ExprStringLiteral { value: name, .. }),
+        ],
+    ) = arguments.as_positional_array()
     else {
         return;
     };
     if obj.is_starred_expr() {
+        return;
+    }
+
+    if !checker.semantic().match_builtin_expr(func, "delattr") {
         return;
     }
 

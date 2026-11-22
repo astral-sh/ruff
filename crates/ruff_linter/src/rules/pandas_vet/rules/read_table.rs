@@ -62,7 +62,7 @@ pub(crate) fn use_of_read_table(
         && let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = call
             .arguments
             .find_keyword("sep")
-            .map(|keyword| &keyword.value)
+            .map(|keyword| keyword.value.as_ref())
         && value == ","
     {
         checker.report_diagnostic(PandasUseOfDotReadTable, call.func.range());

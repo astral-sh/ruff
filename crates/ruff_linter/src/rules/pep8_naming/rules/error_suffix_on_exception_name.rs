@@ -62,7 +62,7 @@ pub(crate) fn error_suffix_on_exception_name(
     }
 
     if !arguments.is_some_and(|arguments| {
-        arguments.args.iter().any(|base| {
+        arguments.args().any(|base| {
             if let Expr::Name(ast::ExprName { id, .. }) = &base {
                 id == "Exception" || id.ends_with("Error")
             } else {

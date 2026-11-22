@@ -93,14 +93,16 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
     //
     // NOTE: `func` is not necessarily just a function name, it can be an attribute access,
     //       or even a call itself.
-    let Some((args, func)) = match_call(target.element()) else {
+    let Some(call) = target.element().as_call_expr() else {
         return;
     };
+    let arguments = &call.arguments;
+    let func = call.func.as_ref();
 
     match value {
         // Ex) `f(*x) for x in iter`
         ComprehensionTarget::Name(name) => {
-            let [arg] = args else {
+            let Some(arg) = arguments.as_single_positional() else {
                 return;
             };
 
@@ -121,9 +123,10 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
         }
         // Ex) `f(x, y, z) for x, y, z in iter`
         ComprehensionTarget::Tuple(tuple) => {
-            if tuple.len() != args.len()
-                || std::iter::zip(tuple, args)
-                    .any(|(x, y)| ComparableExpr::from(x) != ComparableExpr::from(y))
+            if tuple.len() != arguments.len()
+                || !std::iter::zip(tuple, arguments.iter_source_order()).all(|(target, arg)| {
+                    matches!(arg, ast::ArgOrKeyword::Arg(expr) if ComparableExpr::from(target) == ComparableExpr::from(expr))
+                })
             {
                 return;
             }
@@ -320,8 +323,9 @@ fn construct_starmap_call(starmap_binding: Name, iter: &Expr, func: &Expr) -> as
     ast::ExprCall {
         func: Box::new(starmap.into()),
         arguments: ast::Arguments {
-            args: [func.clone(), iter.clone()].into(),
-            keywords: std::iter::empty().collect(),
+            items: [func.clone(), iter.clone()]
+                .map(ast::Argument::Positional)
+                .into(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
@@ -341,8 +345,7 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
     ast::ExprCall {
         func: Box::new(name.into()),
         arguments: ast::Arguments {
-            args: [call.into()].into(),
-            keywords: std::iter::empty().collect(),
+            items: [ast::Argument::Positional(call.into())].into(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
@@ -371,19 +374,4 @@ fn match_comprehension_target(
         Expr::Name(name) => Some(ComprehensionTarget::Name(name)),
         _ => None,
     }
-}
-
-/// Match that the given expression is `func(x, y, z, ...)`.
-fn match_call(element: &Expr) -> Option<(&[Expr], &Expr)> {
-    let ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
-    } = element.as_call_expr()?;
-
-    if !keywords.is_empty() {
-        return None;
-    }
-
-    Some((args, func))
 }

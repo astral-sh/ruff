@@ -55,15 +55,16 @@ Module(
                                                                     arguments: Arguments {
                                                                         range: 56..62,
                                                                         node_index: NodeIndex(None),
-                                                                        args: [
-                                                                            NoneLiteral(
-                                                                                ExprNoneLiteral {
-                                                                                    node_index: NodeIndex(None),
-                                                                                    range: 57..61,
-                                                                                },
+                                                                        items: [
+                                                                            Positional(
+                                                                                NoneLiteral(
+                                                                                    ExprNoneLiteral {
+                                                                                        node_index: NodeIndex(None),
+                                                                                        range: 57..61,
+                                                                                    },
+                                                                                ),
                                                                             ),
                                                                         ],
-                                                                        keywords: [],
                                                                     },
                                                                 },
                                                             ),
@@ -94,18 +95,19 @@ Module(
                                                                             arguments: Arguments {
                                                                                 range: 77..80,
                                                                                 node_index: NodeIndex(None),
-                                                                                args: [
-                                                                                    NumberLiteral(
-                                                                                        ExprNumberLiteral {
-                                                                                            node_index: NodeIndex(None),
-                                                                                            range: 78..79,
-                                                                                            value: Int(
-                                                                                                2,
-                                                                                            ),
-                                                                                        },
+                                                                                items: [
+                                                                                    Positional(
+                                                                                        NumberLiteral(
+                                                                                            ExprNumberLiteral {
+                                                                                                node_index: NodeIndex(None),
+                                                                                                range: 78..79,
+                                                                                                value: Int(
+                                                                                                    2,
+                                                                                                ),
+                                                                                            },
+                                                                                        ),
                                                                                     ),
                                                                                 ],
-                                                                                keywords: [],
                                                                             },
                                                                         },
                                                                     ),
