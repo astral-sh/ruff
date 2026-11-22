@@ -991,6 +991,7 @@ enum EnumComparisonKeyDomain<'db> {
     Str,
     Bytes,
     Tuple,
+    List,
     Dict,
 }
 
@@ -1002,6 +1003,7 @@ impl<'db> EnumComparisonKeyDomain<'db> {
             KnownComparisonSemantics::Str => Self::Str,
             KnownComparisonSemantics::Bytes => Self::Bytes,
             KnownComparisonSemantics::Tuple => Self::Tuple,
+            KnownComparisonSemantics::List => Self::List,
             KnownComparisonSemantics::Dict => Self::Dict,
         }
     }

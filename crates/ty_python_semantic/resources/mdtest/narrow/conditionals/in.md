@@ -819,6 +819,10 @@ def builtin_equality_and_membership(x: str | None, y: str, values: list[str]):
     if x in values:
         reveal_type(x)  # revealed: str
 
+def string_or_list(value: str | list[str]):
+    if value in ("all", "open"):
+        reveal_type(value)  # revealed: Literal["all", "open"]
+
 class C: ...
 
 def broad_union_membership(origin: C | int):
