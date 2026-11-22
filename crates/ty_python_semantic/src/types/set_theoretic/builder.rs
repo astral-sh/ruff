@@ -2149,7 +2149,8 @@ fn can_resume_intersection<'db>(
         return false;
     }
 
-    // Dropping the lowest set bit finds a shared prefix in logarithmic recursion depth.
+    // Checking the previous prefix would require one stack frame per exclusion on a cache
+    // miss. Clear the lowest set bit to bound the depth (e.g. 39 -> 38 -> 36 -> 32 -> 0).
     let prefix_len = negative.len() & (negative.len() - 1);
     let mut builder = if prefix_len == 0 {
         let mut builder = InnerIntersectionBuilder::default();
@@ -3263,6 +3264,47 @@ mod tests {
         assert!(matches!(negated, Type::Intersection(intersection)
             if intersection.is_simple_negation(&db) && intersection.iter_negative(&db).eq([alias])));
         assert_eq!(negated, alias.negate(&db, &env));
+    }
+
+    #[test]
+    fn recheck_exclusions_when_a_base_class_changes() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            "from base import Parent\nclass Child(Parent): ...\nx: Child",
+        )
+        .unwrap();
+
+        for parent in ["object", "str", "object"] {
+            db.write_dedented("/src/base.py", &format!("Parent = {parent}"))
+                .unwrap();
+            let env = db.program_environment();
+            let file = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+            let module = ProgramFile::new(&db, file, env.program(&db));
+            let child = global_symbol(&db, module, "x").place.expect_type();
+
+            // As after substitution, the stored elements may still need simplification.
+            // Excluding `str` makes `~Child` redundant only while `Child` inherits from `str`.
+            let exclusions = [KnownClass::Str.to_instance(&db, &env), child]
+                .into_iter()
+                .chain((0..15).map(Type::int_literal))
+                .collect();
+            let raw = super::IntersectionType::new(
+                &db,
+                crate::FxOrderSet::<Type>::default(),
+                super::NegativeIntersectionElements::Multiple(exclusions),
+            );
+            let Type::Intersection(result) = IntersectionBuilder::new(&db, &env)
+                .add_positive(Type::Intersection(raw))
+                .build()
+            else {
+                panic!("expected an intersection");
+            };
+            assert_eq!(
+                result.iter_negative(&db).any(|ty| ty == child),
+                parent == "object"
+            );
+        }
     }
 
     #[test]
