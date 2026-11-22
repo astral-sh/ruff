@@ -169,26 +169,9 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
     }
 
     fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
-        match pattern {
-            ast::Pattern::MatchAs(p) => {
-                if let Some(name) = &p.name {
-                    self.bound_places
-                        .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
-                }
-            }
-            ast::Pattern::MatchStar(p) => {
-                if let Some(name) = &p.name {
-                    self.bound_places
-                        .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
-                }
-            }
-            ast::Pattern::MatchMapping(p) => {
-                if let Some(rest) = &p.rest {
-                    self.bound_places
-                        .push(PlaceExpr::Symbol(Symbol::new(rest.id.clone())));
-                }
-            }
-            _ => {}
+        if let Some(name) = pattern.capture_name() {
+            self.bound_places
+                .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
         }
         walk_pattern(self, pattern);
     }

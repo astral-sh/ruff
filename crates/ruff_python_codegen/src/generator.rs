@@ -795,25 +795,22 @@ impl<'a> Generator<'a> {
                 }
                 self.p("]");
             }
-            Pattern::MatchMapping(ast::PatternMatchMapping {
-                keys,
-                patterns,
-                rest,
-                range: _,
-                node_index: _,
-            }) => {
+            Pattern::MatchMapping(mapping) => {
                 self.p("{");
                 let mut first = true;
-                for (key, pattern) in keys.iter().zip(patterns) {
+                for item in &mapping.items {
                     self.p_delim(&mut first, ", ");
-                    self.unparse_expr(key, precedence::MAX);
-                    self.p(": ");
-                    self.unparse_pattern(pattern);
-                }
-                if let Some(rest) = rest {
-                    self.p_delim(&mut first, ", ");
-                    self.p("**");
-                    self.p_id(rest);
+                    match item {
+                        ast::MappingPatternItem::Entry { key, pattern } => {
+                            self.unparse_expr(key, precedence::MAX);
+                            self.p(": ");
+                            self.unparse_pattern(pattern);
+                        }
+                        ast::MappingPatternItem::Rest(rest) => {
+                            self.p("**");
+                            self.p_id(rest);
+                        }
+                    }
                 }
                 self.p("}");
             }

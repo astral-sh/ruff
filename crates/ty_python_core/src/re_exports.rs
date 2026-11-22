@@ -146,15 +146,15 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     }
                 }
             }
-            ast::Pattern::MatchMapping(ast::PatternMatchMapping {
-                patterns,
-                rest,
-                keys: _,
-                range: _,
-                node_index: _,
-            }) => {
-                for pattern in patterns {
-                    self.visit_pattern(pattern);
+            ast::Pattern::MatchMapping(mapping) => {
+                let mut rest = None;
+                for item in &mapping.items {
+                    match item {
+                        ast::MappingPatternItem::Entry { pattern, .. } => {
+                            self.visit_pattern(pattern);
+                        }
+                        ast::MappingPatternItem::Rest(name) => rest = Some(name),
+                    }
                 }
                 if let Some(rest) = rest {
                     self.possibly_add_export(&rest.id, PossibleExportKind::Normal);

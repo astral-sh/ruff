@@ -4,7 +4,7 @@ use insta::assert_snapshot;
 
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, BoolOp, CmpOp, Operator, Singleton, UnaryOp};
-use ruff_python_parser::{Mode, ParseOptions, parse};
+use ruff_python_parser::{Mode, ParseOptions, parse, parse_unchecked};
 
 #[test]
 fn function_arguments() {
@@ -58,6 +58,41 @@ fn set_comprehension() {
     let trace = trace_source_order_visitation(source);
 
     assert_snapshot!(trace);
+}
+
+#[test]
+fn mapping_pattern_with_misplaced_captures() {
+    let source = "match x:\n    case {'a': a, **first, 'b': b, **second}: pass";
+    let parsed = parse_unchecked(source, ParseOptions::from(Mode::Module));
+    assert!(!parsed.errors().is_empty());
+
+    let mut visitor = RecordVisitor::default();
+    visitor.visit_mod(parsed.syntax());
+    assert_snapshot!(visitor.output);
+}
+
+#[test]
+fn mapping_pattern_rest_finds_the_last_capture_in_recovered_syntax() {
+    for (pattern, expected) in [
+        ("{}", None),
+        ("{1: a, 2: b}", None),
+        ("{1: a, **only}", Some("only")),
+        ("{**first, **last, 1: a, 2: b}", Some("last")),
+        ("{**first, 1: a, **last, 2: b}", Some("last")),
+    ] {
+        let source = format!("match x:\n    case {pattern}: pass");
+        let parsed = parse_unchecked(&source, ParseOptions::from(Mode::Module))
+            .try_into_module()
+            .unwrap();
+        let stmt = parsed.suite().first().unwrap().as_match_stmt().unwrap();
+        let case = stmt.cases.first().unwrap();
+        let mapping = case.pattern.as_match_mapping().unwrap();
+        assert_eq!(
+            mapping.rest().map(ruff_python_ast::Identifier::as_str),
+            expected,
+            "{pattern}"
+        );
+    }
 }
 
 #[test]

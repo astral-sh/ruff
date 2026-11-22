@@ -247,6 +247,33 @@ impl Ranged for DictItem {
     }
 }
 
+/// A key and its pattern, or the `**name` capture in a mapping pattern.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub enum MappingPatternItem<K = Expr, P = Pattern, R = Identifier> {
+    Entry { key: K, pattern: P },
+    Rest(R),
+}
+
+pub type MappingPatternItems = ThinVec<MappingPatternItem>;
+
+impl crate::PatternMatchMapping {
+    pub fn entries(&self) -> impl DoubleEndedIterator<Item = (&Expr, &Pattern)> {
+        self.items.iter().filter_map(|item| match item {
+            MappingPatternItem::Entry { key, pattern } => Some((key, pattern)),
+            MappingPatternItem::Rest(_) => None,
+        })
+    }
+
+    /// Returns the last `**name` capture. A valid pattern has at most one.
+    pub fn rest(&self) -> Option<&Identifier> {
+        self.items.iter().rev().find_map(|item| match item {
+            MappingPatternItem::Rest(name) => Some(name),
+            MappingPatternItem::Entry { .. } => None,
+        })
+    }
+}
+
 impl ExprDict {
     /// Returns an `Iterator` over the AST nodes representing the
     /// dictionary's keys.
@@ -3075,6 +3102,16 @@ pub struct MatchCase {
 }
 
 impl Pattern {
+    /// The name bound by this pattern itself, excluding nested patterns.
+    pub fn capture_name(&self) -> Option<&Identifier> {
+        match self {
+            Self::MatchAs(pattern) => pattern.name.as_ref(),
+            Self::MatchStar(pattern) => pattern.name.as_ref(),
+            Self::MatchMapping(pattern) => pattern.rest(),
+            _ => None,
+        }
+    }
+
     /// Checks if the [`Pattern`] is an [irrefutable pattern].
     ///
     /// [irrefutable pattern]: https://peps.python.org/pep-0634/#irrefutable-case-blocks
@@ -3922,8 +3959,6 @@ pub type Suite = ThinVec<Stmt>;
 pub type DecoratorList = ThinVec<Decorator>;
 
 pub type Patterns = ThinVec<Pattern>;
-
-pub type PatternKeys = ThinVec<Expr>;
 
 pub type ParameterWithDefaults = ThinVec<ParameterWithDefault>;
 
