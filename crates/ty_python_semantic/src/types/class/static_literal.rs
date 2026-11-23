@@ -263,10 +263,10 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Returns `true` if this class is decorated with `@dataclass(order=True)`.
     pub(crate) fn is_ordered_dataclass(self, db: &'db dyn Db) -> bool {
-        self.find_dataclass_decorator_position(db).is_some()
-            && self
-                .dataclass_params(db)
-                .is_some_and(|params| params.flags(db).contains(DataclassFlags::ORDER))
+        // Looking for the decorator can reparse the class's module.
+        self.dataclass_params(db)
+            .is_some_and(|params| params.flags(db).contains(DataclassFlags::ORDER))
+            && self.find_dataclass_decorator_position(db).is_some()
     }
 
     /// Returns a new [`StaticClassLiteral`] with the given dataclass params, preserving all other fields.
