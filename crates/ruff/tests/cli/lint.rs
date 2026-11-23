@@ -2973,6 +2973,100 @@ fn add_noqa_with_newline_in_reason() -> Result<()> {
 }
 
 #[test]
+fn add_noqa_uses_inline_script_rules() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # tool.ruff.lint.select = ['T201']
+            # ///
+            print(42)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--add-noqa", "script.py"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    ");
+
+    insta::assert_snapshot!(test.read_file("script.py")?, @"
+
+    # /// script
+    # tool.ruff.lint.select = ['T201']
+    # ///
+    print(42)  # noqa: T201
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_invalid_script_metadata() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # requires-python = 42
+            # ///
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--add-noqa", "script.py"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: invalid-script-metadata: invalid type: integer `42`, expected a string
+     --> script.py:3:21
+      |
+    2 | # /// script
+    3 | # requires-python = 42
+      |                     ^^
+    4 | # ///
+      |
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn add_ignore_invalid_script_metadata() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # requires-python = 42
+            # ///
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--add-ignore", "script.py"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: invalid-script-metadata: invalid type: integer `42`, expected a string
+     --> script.py:3:21
+      |
+    2 | # /// script
+    3 | # requires-python = 42
+      |                     ^^
+    4 | # ///
+      |
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn add_ignore() -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file(
