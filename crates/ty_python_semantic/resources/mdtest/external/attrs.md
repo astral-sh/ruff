@@ -270,12 +270,12 @@ With `init=False`, attrs generates an `__attrs_init__` method that a custom `__i
 initialize the fields, even on a frozen class.
 
 ```py
-from attrs import field, frozen
+from attrs import frozen
 
 @frozen(init=False)
 class User:
     name: str
-    roles: list[str] = field(factory=list)
+    role: str = "member"
 
     def __init__(self, first_name: str, last_name: str) -> None:
         self.__attrs_init__(name=f"{first_name} {last_name}")
@@ -283,10 +283,11 @@ class User:
 User("John", "Doe")  # ok
 User("John")  # error: [missing-argument]
 
-reveal_type(User.__attrs_init__)  # revealed: (self: User, /, name: str, roles: list[str] = ...) -> None
+reveal_type(User.__attrs_init__)  # revealed: (self: User, /, name: str, role: str = "member") -> None
 ```
 
-When attrs generates `__init__`, it does not generate `__attrs_init__`.
+For classes without a custom `__init__`, attrs does not generate `__attrs_init__` when `init` is
+omitted or set to `True`.
 
 ```py
 from attrs import define
