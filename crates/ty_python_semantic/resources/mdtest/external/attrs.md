@@ -273,17 +273,17 @@ initialize the fields, even on a frozen class.
 from attrs import field, frozen
 
 @frozen(init=False)
-class Document:
-    content: str
-    metadata: dict[str, str] = field(factory=dict)
+class User:
+    name: str
+    roles: list[str] = field(factory=list)
 
-    def __init__(self, content: str, source: str) -> None:
-        self.__attrs_init__(content=content, metadata={"source": source})
+    def __init__(self, first_name: str, last_name: str) -> None:
+        self.__attrs_init__(name=f"{first_name} {last_name}")
 
-Document("text", source="file")  # ok
-Document("text")  # error: [missing-argument]
+User("John", "Doe")  # ok
+User("John")  # error: [missing-argument]
 
-reveal_type(Document.__attrs_init__)  # revealed: (self: Document, /, content: str, metadata: dict[str, str] = ...) -> None
+reveal_type(User.__attrs_init__)  # revealed: (self: User, /, name: str, roles: list[str] = ...) -> None
 ```
 
 ## Generated initializer without a custom constructor
