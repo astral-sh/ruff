@@ -1191,6 +1191,8 @@ fn evaluate_projected_narrowing_checkpoint<'db>(
     }
 }
 
+type ProjectionCache = FxHashMap<ScopedNarrowingConstraint, ProjectedNarrowingNodeId>;
+
 /// Narrows bindings of one place while reusing their shared constraint suffixes.
 pub(crate) struct NarrowingProjector<'a, 'db> {
     db: &'db dyn Db,
@@ -1201,7 +1203,8 @@ pub(crate) struct NarrowingProjector<'a, 'db> {
     place: ScopedPlaceId,
     base_ty: Type<'db>,
     /// Checkpoint entries retain narrowed types, so projections are specific to the binding type.
-    project_cache: FxHashMap<(ScopedNarrowingConstraint, Type<'db>), ProjectedNarrowingNodeId>,
+    project_cache: ProjectionCache,
+    other_projections: FxHashMap<Type<'db>, ProjectionCache>,
     graph: ProjectedNarrowingGraph<'db>,
     narrowed_cache: FxHashMap<(ProjectedNarrowingNodeId, Type<'db>), Type<'db>>,
 }
@@ -1225,7 +1228,8 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             predicate_narrowing_targets,
             place,
             base_ty,
-            project_cache: FxHashMap::default(),
+            project_cache: ProjectionCache::default(),
+            other_projections: FxHashMap::default(),
             graph: ProjectedNarrowingGraph::default(),
             narrowed_cache: FxHashMap::default(),
         }
@@ -1248,7 +1252,6 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         constraint: ScopedNarrowingConstraint,
         base_ty: Type<'db>,
     ) -> Type<'db> {
-        self.base_ty = base_ty;
         match constraint {
             ScopedNarrowingConstraint::ALWAYS_TRUE => return base_ty,
             ScopedNarrowingConstraint::ALWAYS_FALSE => return Type::Never,
@@ -1259,6 +1262,15 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         // Avoid evaluating unrelated expressions, which can introduce inference cycles.
         if !self.predicate_narrowing_targets.contains_place(self.place) {
             return base_ty;
+        }
+
+        // Keep the current type out of the key for every visited node. Only places with
+        // bindings of different types need more than one projection table.
+        if self.base_ty != base_ty {
+            let next = self.other_projections.remove(&base_ty).unwrap_or_default();
+            let previous = std::mem::replace(&mut self.project_cache, next);
+            self.other_projections.insert(self.base_ty, previous);
+            self.base_ty = base_ty;
         }
 
         let root = self.project(constraint, true);
@@ -1475,12 +1487,12 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         id: ProjectedNarrowingNodeId,
         constraint: ScopedNarrowingConstraint,
     ) -> ProjectedNarrowingNodeId {
-        if let Some(cached) = self.project_cache.get(&(constraint, self.base_ty)).copied()
+        if let Some(cached) = self.project_cache.get(&constraint).copied()
             && cached != id
         {
             return cached;
         }
-        self.project_cache.remove(&(constraint, self.base_ty));
+        self.project_cache.remove(&constraint);
         self.project(constraint, false)
     }
 
@@ -1505,7 +1517,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         while let Some(action) = actions.pop() {
             match action {
                 Action::Visit(id) => {
-                    if id.is_terminal() || self.project_cache.contains_key(&(id, self.base_ty)) {
+                    if id.is_terminal() || self.project_cache.contains_key(&id) {
                         continue;
                     }
 
@@ -1551,7 +1563,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                                 projected
                             }
                         };
-                        self.project_cache.insert((id, self.base_ty), projected);
+                        self.project_cache.insert(id, projected);
                         continue;
                     }
                     actions.push(Action::VisitBranches(id));
@@ -1565,7 +1577,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         == ProjectedNarrowingNodeId::ALWAYS_TRUE
                     {
                         self.project_cache
-                            .insert((id, self.base_ty), ProjectedNarrowingNodeId::ALWAYS_TRUE);
+                            .insert(id, ProjectedNarrowingNodeId::ALWAYS_TRUE);
                         continue;
                     }
                     let predicate = self.predicates.entries[node.atom];
@@ -1599,7 +1611,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let branch = self.projected_node(branch);
                     let if_uncertain = self.projected_node(node.if_uncertain);
                     let projected = self.or(branch, if_uncertain);
-                    self.project_cache.insert((id, self.base_ty), projected);
+                    self.project_cache.insert(id, projected);
                 }
                 Action::FinishPredicate(id) => {
                     let node = self.constraints.get_interior_node(id);
@@ -1611,7 +1623,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     if [if_true, if_false].into_iter().all(|branch| {
                         branch == ProjectedNarrowingNodeId::ALWAYS_FALSE || branch == if_uncertain
                     }) {
-                        self.project_cache.insert((id, self.base_ty), if_uncertain);
+                        self.project_cache.insert(id, if_uncertain);
                         continue;
                     }
                     let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
@@ -1637,7 +1649,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                             if_false,
                         })
                     };
-                    self.project_cache.insert((id, self.base_ty), projected);
+                    self.project_cache.insert(id, projected);
                 }
             }
         }
@@ -1649,7 +1661,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         match id {
             ScopedNarrowingConstraint::ALWAYS_TRUE => ProjectedNarrowingNodeId::ALWAYS_TRUE,
             ScopedNarrowingConstraint::ALWAYS_FALSE => ProjectedNarrowingNodeId::ALWAYS_FALSE,
-            _ => self.project_cache[&(id, self.base_ty)],
+            _ => self.project_cache[&id],
         }
     }
 }
