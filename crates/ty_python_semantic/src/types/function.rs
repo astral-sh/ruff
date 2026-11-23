@@ -1519,8 +1519,10 @@ impl<'db> FunctionType<'db> {
 
     /// Default dataclass parameters when this function is used as a decorator or decorator factory.
     pub(super) fn dataclass_params(self, db: &'db dyn Db) -> Option<DataclassParams<'db>> {
-        // Only one overload or the implementation may specify `@dataclass_transform`.
-        // If several do, use the last one.
+        // Ideally, either the implementation, or exactly one of the overloads
+        // of the function can have the dataclass_transform decorator applied.
+        // However, we do not yet enforce this, and in the case of multiple
+        // applications of the decorator, we will only consider the last one.
         let params = self
             .iter_overloads_and_implementation(db)
             .rev()
