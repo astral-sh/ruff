@@ -3,6 +3,7 @@ use ruff_python_stdlib::identifiers::is_mangled_private;
 use crate::Db;
 use crate::types::{DataclassFlags, FunctionType, KnownFunction, StaticClassLiteral};
 
+/// Returns whether `class` is directly decorated with an `attrs` class decorator.
 pub(in crate::types) fn is_attrs_class<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
@@ -12,6 +13,7 @@ pub(in crate::types) fn is_attrs_class<'db>(
         .is_some_and(|params| params.flags(db).contains(DataclassFlags::ATTRS))
 }
 
+/// Returns whether `decorator` resolves to `attr.attrs`, `attrs.define`, or `attrs.frozen`.
 pub(in crate::types) fn is_known_decorator<'db>(
     db: &'db dyn Db,
     decorator: FunctionType<'db>,
