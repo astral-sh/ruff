@@ -9451,16 +9451,14 @@ impl<'db> Binding<'db> {
         let arguments = arguments.with_self(binding.bound_type);
         let vars = self.inferable_typevars;
         // An enclosing function's unconstrained U cannot be assumed to match list[T].
-        let accepts = |nested, candidates: &[Type<'db>]| {
-            candidates.iter().any(|ty| {
-                ty.when_assignable_to(db, env, nested, constraints.unlimited(), vars)
-                    .is_never_satisfied_bounded(db, env, vars)
-                    == Some(false)
-            })
+        let accepts = |nested, ty: Type<'db>| {
+            ty.when_assignable_to(db, env, nested, constraints.unlimited(), vars)
+                .is_never_satisfied_bounded(db, env, vars)
+                == Some(false)
         };
         let mut ambiguous = FxHashSet::default();
         let mut invariant = FxHashSet::default();
-        let mut omitted = false;
+        let mut omitted = SmallVec::<[_; 2]>::new();
         let mut siblings = self.argument_matches.clone();
         for (matched, argument) in siblings.iter_mut().zip(arguments.iter()) {
             let fixed = !argument.source_types().context_sensitive;
@@ -9485,7 +9483,7 @@ impl<'db> Binding<'db> {
                             Type::Union(u) if !fixed => u.elements(db),
                             _ => std::slice::from_ref(&actual),
                         };
-                        if !accepts(nested, candidates) {
+                        if !candidates.iter().any(|&ty| accepts(nested, ty)) {
                             keep = true;
                             continue;
                         }
@@ -9501,8 +9499,9 @@ impl<'db> Binding<'db> {
                         }
                     } else if any_over_type(db, env, ty, false, |part| {
                         // In tuple[T | list[T]], look for a list among the bindings for T.
-                        nested_members(db, env, part, var)
-                            .is_some_and(|nested| accepts(nested, hint.elements(db)))
+                        nested_members(db, env, part, var).is_some_and(|nested| {
+                            hint.elements(db).iter().any(|&ty| accepts(nested, ty))
+                        })
                     }) {
                         ambiguous.insert(var);
                         circular = true;
@@ -9515,11 +9514,34 @@ impl<'db> Binding<'db> {
                         invariant.insert(var);
                     }
                 }
-                omitted |= !keep || circular;
-                keep && !circular
+                if !keep || circular {
+                    omitted.push(ty);
+                    return false;
+                }
+                true
             });
         }
-        if ambiguous.is_empty() && invariant.is_empty() {
+        // In `select(xs, Tree(Branch()))`, the inner call can add `Branch[Unknown]`
+        // to T. Substituting T into the outer `tree: Tree[T]` parameter then puts
+        // a tree inside a tree. Use `xs: list[T]` to recover an independent hint
+        // in this case. An invariant sibling alone isn't evidence of growth.
+        let repeats_container = |(var, hint): (_, UnionType<'db>)| {
+            if !invariant.contains(&var) {
+                return false;
+            }
+            let var_set = TypeVarSet::from_typevars(db, [var]);
+            omitted.iter().any(|&ty| {
+                any_over_type(db, env, ty, false, |part| {
+                    matches!(part, Type::NominalInstance(_) | Type::ProtocolInstance(_))
+                        && inferable_typevar_occurrences(db, env, part, var_set) > 0
+                        && hint
+                            .elements(db)
+                            .iter()
+                            .any(|&member| !member.is_dynamic() && accepts(part, member))
+                })
+            })
+        };
+        if ambiguous.is_empty() && !hints.into_iter().any(repeats_container) {
             return None;
         }
         let call = CallInference {
@@ -9534,7 +9556,7 @@ impl<'db> Binding<'db> {
         // the full solve would put any omitted arguments back into their own hints.
         let valid =
             result.errors.is_empty() && call.accepts_arguments(inference.merged_specialization(db));
-        if !valid && !omitted {
+        if !valid && omitted.is_empty() {
             return None;
         }
         let initial = self

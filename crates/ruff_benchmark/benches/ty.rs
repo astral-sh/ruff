@@ -1253,6 +1253,30 @@ fn benchmark_nested_generic_constructor_arguments(criterion: &mut Criterion) {
         "#
         ),
     );
+
+    // In Bokeh's Either constructor, the literal union comes from a fixed sibling.
+    // Solving again without the nested call is expensive even though no hint can grow.
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[nested_generic_constructor_arguments_literal_union]",
+        r#"
+        from typing import Literal
+
+        class Property[G]:
+            get: G
+
+        class Either[G, S]:
+            values: tuple[G, S]
+
+            def __init__[A, B](self: "Either[A | B, A | B]", x: type[Property[A]], y: Property[B]): ...
+
+        type Marker = Literal[
+            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p"
+        ]
+        MarkerType = Property[Marker]
+        Either(MarkerType, Property[str]())
+        "#,
+    );
 }
 
 /// Each additional argument allows more inference passes. Using the whole list as

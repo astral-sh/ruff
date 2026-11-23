@@ -3004,6 +3004,9 @@ class Node(Tree[T], Generic[Unused, T]): ...
 def select(values: list[U], tree: Tree[U]) -> list[U]:
     return values
 
+def nested(xs: list[int]):
+    reveal_type(select(xs, Tree(Branch())))  # revealed: list[int]
+
 def sibling(xs: list[Branch[Any] | int], ys: list[Branch[Any] | int | Any]):
     values = select(xs, Tree(Node(Branch()), 1))
     values.append("bad")  # error: [invalid-argument-type]
