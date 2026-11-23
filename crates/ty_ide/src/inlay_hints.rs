@@ -585,19 +585,21 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                 source_order::walk_expr(self, expr);
             }
             Expr::Call(call) => {
-                let details =
-                    if self.settings.call_argument_names && !call.arguments.args.is_empty() {
-                        inlay_hint_call_argument_details(self.db, &self.model, call)
-                    } else {
-                        None
-                    };
+                let details = if self.settings.call_argument_names
+                    && call.arguments.args().next().is_some()
+                {
+                    inlay_hint_call_argument_details(self.db, &self.model, call)
+                } else {
+                    None
+                };
 
                 self.visit_expr(&call.func);
 
                 // `argument_names` is keyed by positional-arg index, not source-order index,
                 // so track them separately to stay in sync after keyword args appear mid-call.
                 let mut positional_index = 0;
-                for arg_or_keyword in call.arguments.iter_source_order() {
+                let mut arguments = call.arguments.iter_source_order();
+                while let Some(arg_or_keyword) = arguments.next() {
                     if let ArgOrKeyword::Arg(argument) = arg_or_keyword {
                         if let Some(details) = &details
                             && let Some((name, parameter_label_offset)) =
@@ -608,8 +610,9 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                             // includes starred arguments. Changing `f(value(), *items())` to
                             // `f(x=value(), *items())` would evaluate `items()` first and could
                             // pass `x` twice.
-                            let is_last_positional =
-                                positional_index + 1 == call.arguments.args.len();
+                            let is_last_positional = !arguments
+                                .clone()
+                                .any(|item| matches!(item, ArgOrKeyword::Arg(_)));
                             // For `def f(ｉｆ): ...`, `name` is already normalized to the
                             // reserved word `if`. Inserting `if=` would be a syntax error.
                             // Repeating an existing keyword, as in `f(x=1, x=2)`, would be too.

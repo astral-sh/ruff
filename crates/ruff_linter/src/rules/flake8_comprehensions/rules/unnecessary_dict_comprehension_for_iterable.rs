@@ -208,12 +208,10 @@ fn is_constant_like(expr: &Expr) -> bool {
 fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -> Expr {
     let iterable = generator.iter.clone();
     let args = Arguments {
-        args: if value.is_none_literal_expr() {
-            [iterable].into()
-        } else {
-            [iterable, value.clone()].into()
-        },
-        keywords: std::iter::empty().collect(),
+        items: std::iter::once(iterable)
+            .chain((!value.is_none_literal_expr()).then(|| value.clone()))
+            .map(ast::Argument::Positional)
+            .collect(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };

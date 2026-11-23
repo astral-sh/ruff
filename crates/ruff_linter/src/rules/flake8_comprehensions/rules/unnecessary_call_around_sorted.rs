@@ -66,11 +66,11 @@ pub(crate) fn unnecessary_call_around_sorted(
     checker: &Checker,
     expr: &Expr,
     outer_func: &Expr,
-    args: &[Expr],
+    arguments: &ast::Arguments,
 ) {
     let Some(Expr::Call(ast::ExprCall {
         func: inner_func, ..
-    })) = args.first()
+    })) = arguments.args().next()
     else {
         return;
     };

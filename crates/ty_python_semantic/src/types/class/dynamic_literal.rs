@@ -154,12 +154,11 @@ impl get_size2::GetSize for DynamicClassLiteral<'_> {}
 /// Dynamic class constructors accept `bases` either as the second positional argument or as a
 /// `bases=` keyword argument.
 pub(crate) fn dynamic_class_bases_argument(arguments: &ast::Arguments) -> Option<&ast::Expr> {
-    arguments.args.get(1).or_else(|| {
+    arguments.args().nth(1).or_else(|| {
         arguments
-            .keywords
-            .iter()
+            .keywords()
             .find(|kw| kw.arg.as_deref() == Some("bases"))
-            .map(|kw| &kw.value)
+            .map(|kw| kw.value.as_ref())
     })
 }
 

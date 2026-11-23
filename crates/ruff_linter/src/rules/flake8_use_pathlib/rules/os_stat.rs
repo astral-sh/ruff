@@ -204,7 +204,7 @@ fn is_boolean_literal_or_default(argument: &Arguments, name: &str) -> Option<boo
         return Some(true);
     };
 
-    match &kw.value {
+    match kw.value.as_ref() {
         Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
         _ => None,
     }

@@ -71,57 +71,58 @@ Module(
                         Arguments {
                             range: 83..107,
                             node_index: NodeIndex(None),
-                            args: [
-                                Subscript(
-                                    ExprSubscript {
-                                        node_index: NodeIndex(None),
-                                        range: 84..106,
-                                        value: Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 84..91,
-                                                id: Name("Generic"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        slice: Tuple(
-                                            ExprTuple {
-                                                node_index: NodeIndex(None),
-                                                range: 92..105,
-                                                elts: [
-                                                    Name(
-                                                        ExprName {
-                                                            node_index: NodeIndex(None),
-                                                            range: 92..97,
-                                                            id: Name("DType"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                    Starred(
-                                                        ExprStarred {
-                                                            node_index: NodeIndex(None),
-                                                            range: 99..105,
-                                                            value: Name(
-                                                                ExprName {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 100..105,
-                                                                    id: Name("Shape"),
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                ],
-                                                ctx: Load,
-                                                parenthesized: false,
-                                            },
-                                        ),
-                                        ctx: Load,
-                                    },
+                            items: [
+                                Positional(
+                                    Subscript(
+                                        ExprSubscript {
+                                            node_index: NodeIndex(None),
+                                            range: 84..106,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 84..91,
+                                                    id: Name("Generic"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            slice: Tuple(
+                                                ExprTuple {
+                                                    node_index: NodeIndex(None),
+                                                    range: 92..105,
+                                                    elts: [
+                                                        Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 92..97,
+                                                                id: Name("DType"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        Starred(
+                                                            ExprStarred {
+                                                                node_index: NodeIndex(None),
+                                                                range: 99..105,
+                                                                value: Name(
+                                                                    ExprName {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 100..105,
+                                                                        id: Name("Shape"),
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                    parenthesized: false,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
                                 ),
                             ],
-                            keywords: [],
                         },
                     ),
                     body: [

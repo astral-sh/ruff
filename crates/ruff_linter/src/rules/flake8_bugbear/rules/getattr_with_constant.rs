@@ -69,8 +69,13 @@ impl AlwaysFixableViolation for GetattrWithConstant {
 }
 
 /// B009
-pub(crate) fn getattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
-    let [obj, arg] = args else {
+pub(crate) fn getattr_with_constant(
+    checker: &Checker,
+    expr: &Expr,
+    func: &Expr,
+    arguments: &ast::Arguments,
+) {
+    let Some([obj, arg]) = arguments.as_positional_array() else {
         return;
     };
     if obj.is_starred_expr() {

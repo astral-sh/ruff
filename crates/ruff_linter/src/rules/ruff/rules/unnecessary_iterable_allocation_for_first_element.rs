@@ -1,7 +1,8 @@
+use itertools::Itertools;
 use std::borrow::Cow;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, Int};
+use ruff_python_ast::{self as ast, Comprehension, Expr, Int};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::builtins::is_iterator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -87,10 +88,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(checker: &Checke
         Expr::Call(ast::ExprCall {
             func, arguments, ..
         }) => {
-            if !arguments.keywords.is_empty() {
-                return;
-            }
-            let [arg] = arguments.args.as_ref() else {
+            let Some(arg) = arguments.as_single_positional() else {
                 return;
             };
             if !is_zero(arg) {
@@ -161,13 +159,9 @@ struct IterationTarget {
 fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<IterationTarget> {
     let result = match expr {
         Expr::Call(ast::ExprCall {
-            func,
-            arguments: Arguments { args, .. },
-            ..
+            func, arguments, ..
         }) => {
-            let [arg] = &**args else {
-                return None;
-            };
+            let [arg] = arguments.args().collect_array()?;
 
             let builtin_function_name = semantic.resolve_builtin_symbol(func)?;
             if !matches!(builtin_function_name, "tuple" | "list") {

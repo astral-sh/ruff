@@ -179,11 +179,7 @@ pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
         return;
     };
 
-    if !arguments.keywords.is_empty() {
-        return;
-    }
-
-    let [arg] = arguments.args.as_ref() else {
+    let Some(arg) = arguments.as_single_positional() else {
         return;
     };
 

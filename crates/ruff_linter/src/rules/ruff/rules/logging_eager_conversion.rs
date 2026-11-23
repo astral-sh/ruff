@@ -140,8 +140,7 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
         })
         .zip(
             call.arguments
-                .args
-                .iter()
+                .args()
                 .skip(msg_pos + 1)
                 .take_while(|arg| !arg.is_starred_expr()),
         )

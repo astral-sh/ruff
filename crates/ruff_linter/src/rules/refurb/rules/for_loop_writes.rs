@@ -160,10 +160,7 @@ fn for_loop_writes(
         return;
     }
 
-    if !call_expr.arguments.keywords.is_empty() {
-        return;
-    }
-    let [write_arg] = call_expr.arguments.args.as_ref() else {
+    let Some(write_arg) = call_expr.arguments.as_single_positional() else {
         return;
     };
 

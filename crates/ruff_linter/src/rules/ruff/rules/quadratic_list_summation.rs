@@ -118,7 +118,7 @@ pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) 
         node_index: _,
     } = call;
 
-    let Some(iterable) = arguments.args.first() else {
+    let Some(iterable) = arguments.args().next() else {
         return;
     };
 

@@ -65,7 +65,6 @@ pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) 
 
     if !parent
         .bases()
-        .iter()
         .any(|expr| semantic.matches_qualified_name(expr, &["enum", "Enum"]))
     {
         return;
@@ -120,11 +119,9 @@ fn member_has_unknown_value(semantic: &SemanticModel, expr: &Expr) -> bool {
                 return false;
             }
 
-            if !arguments.keywords.is_empty() {
-                return false;
-            }
-
-            matches!(arguments.args.as_ref(), [_, Expr::EllipsisLiteral(_)])
+            arguments
+                .as_positional_array()
+                .is_some_and(|[_, value]| value.is_ellipsis_literal_expr())
         }
 
         _ => false,

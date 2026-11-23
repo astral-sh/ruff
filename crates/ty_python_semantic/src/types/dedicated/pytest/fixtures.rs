@@ -570,8 +570,7 @@ fn pytest_builtin_plugin_names<'db>(db: &'db dyn Db, program: Program<'db>) -> B
                 .value
                 .as_name_expr()
                 .is_some_and(|name| name.id == "builtin_plugins")
-            && let [ast::Expr::StringLiteral(string)] = call.arguments.args.as_ref()
-            && call.arguments.keywords.is_empty()
+            && let Some(ast::Expr::StringLiteral(string)) = call.arguments.as_single_positional()
         {
             names.insert(string.value.to_str().to_owned());
         }

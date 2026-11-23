@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, ConversionFlag, Expr};
+use ruff_python_ast::{self as ast, ConversionFlag, Expr};
 use ruff_text_size::TextRange;
 
 /// Wrap an expression in a [`ast::FStringElement::Expression`] with no special formatting.
@@ -28,16 +28,10 @@ fn is_simple_call(expr: &Expr) -> bool {
     match expr {
         Expr::Call(ast::ExprCall {
             func,
-            arguments:
-                Arguments {
-                    args,
-                    keywords,
-                    range: _,
-                    node_index: _,
-                },
+            arguments,
             range_start: _,
             node_index: _,
-        }) => args.is_empty() && keywords.is_empty() && is_simple_callee(func),
+        }) => arguments.is_empty() && is_simple_callee(func),
         _ => false,
     }
 }
