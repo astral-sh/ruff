@@ -519,30 +519,51 @@ impl<'db> UnionElement<'db> {
             return ReduceResult::KeepIf(true);
         }
 
-        let mut other_type_negated_cache = None;
+        match self {
+            UnionElement::IntLiterals(literals) => {
+                Self::reduce_literals(db, env, other_type, LiteralKind::Int, literals)
+            }
+            UnionElement::StringLiterals(literals) => {
+                Self::reduce_literals(db, env, other_type, LiteralKind::String, literals)
+            }
+            UnionElement::BytesLiterals(literals) => {
+                Self::reduce_literals(db, env, other_type, LiteralKind::Bytes, literals)
+            }
+            UnionElement::EnumLiterals {
+                enum_class,
+                literals,
+            } => Self::reduce_literals(
+                db,
+                env,
+                other_type,
+                LiteralKind::Enum {
+                    enum_class: *enum_class,
+                },
+                literals,
+            ),
+            UnionElement::Type(_) => unreachable!("ordinary types are handled before reduction"),
+        }
+    }
 
+    /// Reduce a group whose literals all have the same kind.
+    fn reduce_literals<L: Copy + Into<LiteralValueTypeKind<'db>>>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other_type: Type<'db>,
+        kind: LiteralKind<'db>,
+        literals: &mut FxOrderMap<L, bool>,
+    ) -> ReduceResult<'db> {
+        if !other_type.splits_literals(db, kind) {
+            let (&literal, &promotable) = literals.first().unwrap();
+            let ty = Type::from(LiteralValueType::new(literal, promotable));
+            return ReduceResult::KeepIf(!ty.is_redundant_with(db, env, other_type));
+        }
+
+        let mut other_type_negated_cache = None;
         let mut collapse = false;
         let mut ignore = false;
-
-        // A closure called for each element in a set of literals
-        // to determine whether the element should be retained in the set.
-        //
-        // If `ignore` or `collapse` is `true` for any element in the set,
-        // we no longer need to do any expensive redundancy checks for any
-        // further elements in the set:
-        //
-        // - if `ignore` is `true`, this indicates that `other_type` is
-        //   redundant with one of the literals in this set. Given this fact,
-        //   it cannot be possible for any other literals in this set to be
-        //   redundant with `other_type`.
-        // - if `collapse` is `true`, all literals of this kind will be
-        //   removed from the union, so it's irrelevant to answer the
-        //   question of which literals should remain in this set.
-        //
-        // We therefore only ask if `ty` is redundant with `other_type` if
-        // both `ignore` and `collapse` are `false`. If either is `true`,
-        // we skip the expensive redundancy check and return `true`.
-        let mut should_retain_type = |ty| {
+        literals.retain(|literal, promotable| {
+            let ty = Type::from(LiteralValueType::new(*literal, *promotable));
             if ignore || other_type.is_redundant_with(db, env, ty) {
                 ignore = true;
                 return true;
@@ -559,72 +580,14 @@ impl<'db> UnionElement<'db> {
                 return true;
             }
             !ty.is_redundant_with(db, env, other_type)
-        };
-
-        let should_keep = match self {
-            UnionElement::IntLiterals(literals) => {
-                if other_type.splits_literals(db, LiteralKind::Int) {
-                    literals.retain(|literal, promotable| {
-                        should_retain_type(LiteralValueType::new(*literal, *promotable).into())
-                    });
-                    !literals.is_empty()
-                } else {
-                    let (literal, promotable) = literals.first().unwrap();
-                    !Type::from(LiteralValueType::new(*literal, *promotable))
-                        .is_redundant_with(db, env, other_type)
-                }
-            }
-            UnionElement::StringLiterals(literals) => {
-                if other_type.splits_literals(db, LiteralKind::String) {
-                    literals.retain(|literal, promotable| {
-                        should_retain_type(LiteralValueType::new(*literal, *promotable).into())
-                    });
-                    !literals.is_empty()
-                } else {
-                    let (literal, promotable) = literals.first().unwrap();
-                    !Type::from(LiteralValueType::new(*literal, *promotable))
-                        .is_redundant_with(db, env, other_type)
-                }
-            }
-            UnionElement::BytesLiterals(literals) => {
-                if other_type.splits_literals(db, LiteralKind::Bytes) {
-                    literals.retain(|literal, promotable| {
-                        should_retain_type(LiteralValueType::new(*literal, *promotable).into())
-                    });
-                    !literals.is_empty()
-                } else {
-                    let (literal, promotable) = literals.first().unwrap();
-                    !Type::from(LiteralValueType::new(*literal, *promotable))
-                        .is_redundant_with(db, env, other_type)
-                }
-            }
-            UnionElement::EnumLiterals {
-                enum_class,
-                literals,
-            } => {
-                let enum_class = LiteralKind::Enum {
-                    enum_class: *enum_class,
-                };
-                if other_type.splits_literals(db, enum_class) {
-                    literals.retain(|literal, promotable| {
-                        should_retain_type(LiteralValueType::new(*literal, *promotable).into())
-                    });
-                    !literals.is_empty()
-                } else {
-                    let (literal, promotable) = literals.first().unwrap();
-                    !Type::from(LiteralValueType::new(*literal, *promotable))
-                        .is_redundant_with(db, env, other_type)
-                }
-            }
-            UnionElement::Type(_) => unreachable!("ordinary types are handled before reduction"),
-        };
+        });
 
         if ignore {
             ReduceResult::Ignore
         } else if collapse {
             ReduceResult::CollapseToObject
         } else {
-            ReduceResult::KeepIf(should_keep)
+            ReduceResult::KeepIf(!literals.is_empty())
         }
     }
 }
@@ -640,6 +603,31 @@ enum ReduceResult<'db> {
     /// The given `Type` can stand-in for the entire `UnionElement` for further union
     /// simplification checks.
     Type(Type<'db>),
+}
+
+/// Whole union members replaced by an insertion or merge.
+#[derive(Default)]
+struct UnionReductions {
+    to_remove: SmallVec<[usize; 2]>,
+}
+
+impl UnionReductions {
+    /// Apply all removals before restarting a merge, or insert `replacement` in
+    /// the first vacated slot when no further comparisons are needed.
+    fn apply<'db>(self, elements: &mut Vec<UnionElement<'db>>, replacement: Option<Type<'db>>) {
+        let mut to_remove = self.to_remove.into_iter();
+        if let Some(ty) = replacement {
+            if let Some(first) = to_remove.next() {
+                elements[first] = UnionElement::Type(ty);
+            } else {
+                elements.push(UnionElement::Type(ty));
+            }
+        }
+        // Descending indices remain valid after each swap.
+        for index in to_remove.rev() {
+            elements.swap_remove(index);
+        }
+    }
 }
 
 /// If the value ​​is defined recursively, widening is performed from fewer literal elements,
@@ -1246,7 +1234,7 @@ impl<'db> UnionBuilder<'db> {
         let should_simplify_full = !ty.is_alias_like() && !self.cycle_recovery;
 
         let mut ty_negated: Option<Type> = None;
-        let mut to_remove = SmallVec::<[usize; 2]>::new();
+        let mut reductions = UnionReductions::default();
 
         for (i, element) in self.elements.iter_mut().enumerate() {
             let element_type = match element.try_reduce(
@@ -1258,7 +1246,7 @@ impl<'db> UnionBuilder<'db> {
             ) {
                 ReduceResult::KeepIf(keep) => {
                     if !keep {
-                        to_remove.push(i);
+                        reductions.to_remove.push(i);
                     }
                     continue;
                 }
@@ -1311,7 +1299,7 @@ impl<'db> UnionBuilder<'db> {
             ) = (ty, element_type)
                 && left != right
             {
-                to_remove.push(i);
+                reductions.to_remove.push(i);
                 ty = KnownClass::Range.to_instance(db, &self.env);
                 continue;
             }
@@ -1321,16 +1309,14 @@ impl<'db> UnionBuilder<'db> {
                 && let Some(merged_type) =
                     merge_truthiness_guarded_pair(db, &self.env, ty, element_type)
             {
-                to_remove.push(i);
+                reductions.to_remove.push(i);
                 // A nominal core can replace the first element in place; no earlier elements
                 // need to be reconsidered.
                 if i == 0 && merged_type.is_nominal_instance() && !merged_type.is_object() {
                     ty = merged_type;
                     continue;
                 }
-                for index in to_remove.into_iter().rev() {
-                    self.elements.swap_remove(index);
-                }
+                reductions.apply(&mut self.elements, None);
                 // The merged type can also subsume earlier elements, such as `bool` when
                 // the truthy and falsy parts of `int` merge.
                 self.add_in_place_impl(merged_type, seen_aliases);
@@ -1378,10 +1364,8 @@ impl<'db> UnionBuilder<'db> {
                     continue;
                 }
                 if let Some(merged) = merge_disjoint_exclusions(db, &self.env, ty, element_type) {
-                    to_remove.push(i);
-                    for index in to_remove.into_iter().rev() {
-                        self.elements.swap_remove(index);
-                    }
+                    reductions.to_remove.push(i);
+                    reductions.apply(&mut self.elements, None);
                     // The common part can also subsume elements we already visited.
                     self.add_in_place_impl(merged, seen_aliases);
                     return;
@@ -1410,19 +1394,15 @@ impl<'db> UnionBuilder<'db> {
                     })
                 };
                 if let Some(widened) = remove_covered_by(ty, element_type) {
-                    for index in to_remove.into_iter().rev() {
-                        self.elements.swap_remove(index);
-                    }
+                    reductions.apply(&mut self.elements, None);
                     // The covering element is unchanged. Recheck only the widened incoming
                     // type against earlier elements that it might now subsume.
                     self.add_in_place_impl(widened, seen_aliases);
                     return;
                 }
                 if let Some(widened) = remove_covered_by(element_type, ty) {
-                    to_remove.push(i);
-                    for index in to_remove.into_iter().rev() {
-                        self.elements.swap_remove(index);
-                    }
+                    reductions.to_remove.push(i);
+                    reductions.apply(&mut self.elements, None);
                     // The existing element changed, so recheck it against the whole union
                     // before adding the incoming covering type.
                     self.add_in_place_impl(widened, seen_aliases);
@@ -1434,7 +1414,7 @@ impl<'db> UnionBuilder<'db> {
                 }
 
                 if element_type.is_redundant_with(db, &self.env, ty) {
-                    to_remove.push(i);
+                    reductions.to_remove.push(i);
                     continue;
                 }
 
@@ -1466,16 +1446,7 @@ impl<'db> UnionBuilder<'db> {
             }
         }
 
-        let mut to_remove = to_remove.into_iter();
-        if let Some(first) = to_remove.next() {
-            self.elements[first] = UnionElement::Type(ty);
-            // We iterate in descending order to keep remaining indices valid after `swap_remove`.
-            for index in to_remove.rev() {
-                self.elements.swap_remove(index);
-            }
-        } else {
-            self.elements.push(UnionElement::Type(ty));
-        }
+        reductions.apply(&mut self.elements, Some(ty));
     }
 
     pub(crate) fn build(self) -> Type<'db> {
