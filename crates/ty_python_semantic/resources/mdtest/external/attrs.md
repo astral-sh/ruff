@@ -103,6 +103,21 @@ reveal_type(AliasedUser.__init__)  # revealed: (self: AliasedUser, _name: str) -
 AliasedUser(_name="John Doe")  # ok
 ```
 
+For double-underscore field names (that do not end with double underscores), Python mangles `__id`
+to `_<class-name>__id` before attrs strips the leading underscore. So the effective constructor
+parameter name for `__id` becomes `<class-name>__id`
+(<https://github.com/python-attrs/attrs/issues/619>). A "dunder" attribute is not mangled, but
+leading underscores are still stripped, so `__name__` becomes `name__`.
+
+```py
+@define
+class VeryPrivateUser:
+    __id: int
+    __name__: str
+
+reveal_type(VeryPrivateUser.__init__)  # revealed: (self: VeryPrivateUser, VeryPrivateUser__id: int, name__: str) -> None
+```
+
 ## Usage of `field` parameters
 
 ```py

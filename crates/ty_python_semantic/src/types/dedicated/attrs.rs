@@ -38,9 +38,10 @@ pub(in crate::types) fn effective_field_alias(
         return None;
     }
 
-    // Python mangles private names before attrs strips leading underscores.
     let class_name = class_name.trim_start_matches('_');
     if is_mangled_private(name) && !class_name.is_empty() {
+        // For double-underscore field names, Python mangles `__id` to `_<class-name>__id` before attrs strips the leading underscore. So the
+        // effective constructor parameter name for `__id` becomes `<class-name>__id` (https://github.com/python-attrs/attrs/issues/619):
         Some(format!("{class_name}{name}").into_boxed_str())
     } else {
         Some(name.trim_start_matches('_').into())
