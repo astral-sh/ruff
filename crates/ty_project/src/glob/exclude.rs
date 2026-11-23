@@ -120,6 +120,7 @@ struct Gitignore {
     #[get_size(ignore)]
     set: GlobSet,
     globs: Vec<IgnoreGlob>,
+    scope: MatchScope,
     #[get_size(ignore)]
     matches: Arc<Pool<Vec<usize>>>,
 }
@@ -133,7 +134,12 @@ impl Gitignore {
     ///
     /// The path must be absolute or it will only match prefix-wildcard patterns.
     fn matched(&self, path: &SystemPath, is_dir: bool) -> Match {
-        if self.globs.is_empty() {
+        let can_match = match self.scope {
+            MatchScope::Empty => false,
+            MatchScope::DirectoriesOnly => is_dir,
+            MatchScope::FilesAndDirectories => true,
+        };
+        if !can_match {
             return Match::None;
         }
 
@@ -169,6 +175,14 @@ impl PartialEq for Gitignore {
 }
 
 impl Eq for Gitignore {}
+
+/// The kinds of paths the glob set can match.
+#[derive(Copy, Clone, Debug, get_size2::GetSize)]
+enum MatchScope {
+    Empty,
+    DirectoriesOnly,
+    FilesAndDirectories,
+}
 
 #[derive(Copy, Clone, Debug)]
 enum Match {
@@ -231,10 +245,18 @@ impl GitignoreBuilder {
     /// Once a matcher is built, no new globs can be added to it.
     fn build(&self) -> Result<Gitignore, globset::Error> {
         let set = self.builder.build()?;
+        let scope = if self.globs.is_empty() {
+            MatchScope::Empty
+        } else if self.globs.iter().all(|glob| glob.is_only_dir) {
+            MatchScope::DirectoriesOnly
+        } else {
+            MatchScope::FilesAndDirectories
+        };
 
         Ok(Gitignore {
             set,
             globs: self.globs.clone(),
+            scope,
             matches: Arc::new(Pool::new(Vec::new)),
         })
     }
