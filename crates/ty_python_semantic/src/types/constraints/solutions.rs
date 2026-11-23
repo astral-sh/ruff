@@ -11,7 +11,7 @@ use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::sequents::SequentMap;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::{
-    AtomicConstraint, Constraint, ConstraintProvenance, UnsatisfiableBound,
+    AtomicConstraint, Constraint, ConstraintOperands, ConstraintProvenance, UnsatisfiableBound,
     UnspecializedTypeVarPolicy,
 };
 use crate::types::constraints::{
@@ -1593,79 +1593,39 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, CandidateTypeVarSolver<'db>> =
             FxIndexMap::default();
 
-        let is_useful_bound = |constraint: AtomicConstraint<'db>, bound: Type<'db>| {
-            constraint.provides_candidate_bound(
-                db,
-                env,
-                Some(bound),
-                self.unspecialized_type_var_policy,
-            )
-        };
-
         for (constraint, _) in typevars {
             let constraint = storage.atomic_constraint_data(constraint);
-            match constraint {
-                AtomicConstraint::ConcreteLower(lower)
-                    if lower.typevar.is_inferable(db, self.inferable)
-                        && is_useful_bound(constraint, lower.bound) =>
-                {
-                    let solver = mappings.entry(lower.typevar).or_default();
-                    solver.add_constraint(db, lower.typevar, constraint);
+            let mut add_bound = |typevar, bound| {
+                if constraint.provides_candidate_bound(
+                    db,
+                    env,
+                    Some(bound),
+                    self.unspecialized_type_var_policy,
+                ) {
+                    mappings
+                        .entry(typevar)
+                        .or_default()
+                        .add_constraint(db, typevar, constraint);
                 }
-                AtomicConstraint::ConcreteUpper(upper)
-                    if upper.typevar.is_inferable(db, self.inferable)
-                        && is_useful_bound(constraint, upper.bound) =>
-                {
-                    let solver = mappings.entry(upper.typevar).or_default();
-                    solver.add_constraint(db, upper.typevar, constraint);
+            };
+
+            let (left, right) = match constraint.operands() {
+                ConstraintOperands::Concrete(typevar, bound) => {
+                    if typevar.is_inferable(db, self.inferable) {
+                        add_bound(typevar, bound);
+                    }
+                    continue;
                 }
-                AtomicConstraint::ConcreteEquivalence(equivalence)
-                    if equivalence.typevar.is_inferable(db, self.inferable)
-                        && is_useful_bound(constraint, equivalence.bound) =>
-                {
-                    let solver = mappings.entry(equivalence.typevar).or_default();
-                    solver.add_constraint(db, equivalence.typevar, constraint);
-                }
-                AtomicConstraint::TypeVarRange(bound) => {
-                    // A direct relationship between an inferable and non-inferable typevar must
-                    // contribute bounds for both endpoints. Contextual inference relies on the
-                    // reverse, non-inferable binding to preserve relationships to outer typevars.
-                    if !bound.left.is_inferable(db, self.inferable)
-                        && !bound.right.is_inferable(db, self.inferable)
-                    {
-                        continue;
-                    }
-                    if is_useful_bound(constraint, Type::TypeVar(bound.right)) {
-                        let solver = mappings.entry(bound.left).or_default();
-                        solver.add_constraint(db, bound.left, constraint);
-                    }
-                    if is_useful_bound(constraint, Type::TypeVar(bound.left)) {
-                        let solver = mappings.entry(bound.right).or_default();
-                        solver.add_constraint(db, bound.right, constraint);
-                    }
-                }
-                AtomicConstraint::TypeVarEquivalence(bound) => {
-                    // A direct relationship between an inferable and non-inferable typevar must
-                    // contribute bounds for both endpoints. Contextual inference relies on the
-                    // reverse, non-inferable binding to preserve relationships to outer typevars.
-                    let (left, right) = bound.in_builder(db, storage);
-                    if !left.is_inferable(db, self.inferable)
-                        && !right.is_inferable(db, self.inferable)
-                    {
-                        continue;
-                    }
-                    if is_useful_bound(constraint, Type::TypeVar(right)) {
-                        let solver = mappings.entry(left).or_default();
-                        solver.add_constraint(db, left, constraint);
-                    }
-                    if is_useful_bound(constraint, Type::TypeVar(left)) {
-                        let solver = mappings.entry(right).or_default();
-                        solver.add_constraint(db, right, constraint);
-                    }
-                }
-                AtomicConstraint::ConcreteLower(_)
-                | AtomicConstraint::ConcreteUpper(_)
-                | AtomicConstraint::ConcreteEquivalence(_) => {}
+                ConstraintOperands::TypeVarRange(bound) => (bound.left, bound.right),
+                ConstraintOperands::TypeVarEquivalence(bound) => bound.in_builder(db, storage),
+            };
+
+            // A direct relationship between an inferable and non-inferable typevar must
+            // contribute bounds for both endpoints. Contextual inference relies on the
+            // reverse, non-inferable binding to preserve relationships to outer typevars.
+            if left.is_inferable(db, self.inferable) || right.is_inferable(db, self.inferable) {
+                add_bound(left, Type::TypeVar(right));
+                add_bound(right, Type::TypeVar(left));
             }
         }
 
