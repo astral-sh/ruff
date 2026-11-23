@@ -6176,14 +6176,9 @@ impl<'db> Type<'db> {
                         .nominal_class(db, env)
                         .map(|class| class.class_literal(db))
                         .and_then(|class| class.into_enum_class(db)),
-                } && let Some(resolved_name) = enum_class.resolve_member(db, name)
+                } && let Some(member) = enum_class.member_type(db, env, name)
                 {
-                    return Place::bound(Type::enum_literal(EnumLiteralType::new(
-                        db,
-                        enum_class,
-                        resolved_name,
-                    )))
-                    .into();
+                    return Place::bound(member).into();
                 }
 
                 let fallback = this.instance_member(db, env, name_str);
@@ -6720,7 +6715,7 @@ impl<'db> Type<'db> {
                 Type::LiteralValue(literal)
                     if matches!(name_str, "name" | "_name_" | "value" | "_value_")
                         && let Some(enum_literal) = literal.as_enum()
-                        && !enums::class_defines_property(
+                        && !enums::class_overrides_enum_attribute(
                             db,
                             env,
                             enum_literal.enum_class(db),
@@ -6760,7 +6755,12 @@ impl<'db> Type<'db> {
                     if matches!(name_str, "name" | "_name_" | "value" | "_value_")
                         && let class_literal = instance.class_literal(db, env)
                         && let Some(metadata) = enum_metadata(db, class_literal)
-                        && !enums::class_defines_property(db, env, class_literal, name_str) =>
+                        && !enums::class_overrides_enum_attribute(
+                            db,
+                            env,
+                            class_literal,
+                            name_str,
+                        ) =>
                 {
                     let is_enum_subclass = Type::ClassLiteral(class_literal).is_subtype_of(
                         db,
@@ -6864,14 +6864,9 @@ impl<'db> Type<'db> {
                         _ => None,
                     };
                     if let Some(enum_class) = enum_class
-                        && let Some(resolved_name) = enum_class.resolve_member(db, name)
+                        && let Some(member) = enum_class.member_type(db, env, name)
                     {
-                        return Place::bound(Type::enum_literal(EnumLiteralType::new(
-                            db,
-                            enum_class,
-                            resolved_name,
-                        )))
-                        .into();
+                        return Place::bound(member).into();
                     }
 
                     let class_attr_plain = this.class_object_member(db, env, name_str, policy);

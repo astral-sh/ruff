@@ -1517,6 +1517,33 @@ reveal_type(PairsAlias.A)  # revealed: PairsAlias
 reveal_type(PairsAlias.B)  # revealed: PairsAlias
 ```
 
+### Conditional aliases
+
+A member declared in one branch cannot determine the canonical name of an equal value in another
+branch. When the identity is uncertain, ty uses the enum instance type.
+
+```py
+from enum import Enum, auto
+from ty_extensions._internal import enum_members
+
+def example(flag: bool):
+    class E(Enum):
+        A = 1
+        if flag:
+            B = auto()
+        else:
+            C = 2
+        D = 2
+        ALSO_A = 1
+
+    if not flag:
+        reveal_type(E.C)  # revealed: E
+        reveal_type(E.C.name)  # revealed: Literal["A", "B", "C", "D"]
+    reveal_type(E.D)  # revealed: E
+    reveal_type(E.ALSO_A.name)  # revealed: Literal["A"]
+    reveal_type(enum_members(E))  # revealed: Unknown
+```
+
 ### Using `auto()`
 
 ```toml
@@ -1544,7 +1571,8 @@ class SingleMember(Enum):
 reveal_type(SingleMember.SINGLE.value)  # revealed: Literal[1]
 ```
 
-Usages of `auto()` can be combined with manual value assignments:
+For integer values, `auto()` adds one to the highest value so far, on Python 3.11.4 and later.
+Python 3.11.0 through 3.11.3 had a different behavior, but for 3.11+ we assume the 3.11.4+ behavior.
 
 ```py
 class Mixed(Enum):
@@ -1554,27 +1582,78 @@ class Mixed(Enum):
     AUTO_2 = auto()
 
 reveal_type(Mixed.MANUAL_1.value)  # revealed: Literal[-1]
-reveal_type(Mixed.AUTO_1.value)  # revealed: Literal[1]
+reveal_type(Mixed.AUTO_1.value)  # revealed: Literal[0]
 reveal_type(Mixed.MANUAL_2.value)  # revealed: Literal[-2]
-reveal_type(Mixed.AUTO_2.value)  # revealed: Literal[2]
+reveal_type(Mixed.AUTO_2.value)  # revealed: Literal[1]
+
+Descending = Enum("Descending", {"FIVE": 5, "FOUR": 4, "NEXT": auto()})
+reveal_type(Descending.NEXT.value)  # revealed: Literal[6]
 ```
 
-If `auto()` follows a non-literal value, the generated value widens to `int` since the previous
-value isn't known at type-check time:
+Only member values contribute to `auto()` numbering.
+
+```py
+from enum import nonmember
+
+class WithNonmember(Enum):
+    FIRST = 5
+    SKIPPED = nonmember(100)
+    NEXT = auto()
+
+reveal_type(WithNonmember.NEXT.value)  # revealed: Literal[6]
+```
+
+Reading a global before assigning a member of the same name does not change the member order.
+
+```py
+LATER = 10
+
+class Shadow(Enum):
+    __doc__ = str(LATER)
+    ONE = 1
+    TWO = auto()
+    LATER = 50
+
+reveal_type(Shadow.TWO.value)  # revealed: Literal[2]
+reveal_type(Shadow.TWO.name)  # revealed: Literal["TWO"]
+```
+
+If an earlier integer is non-literal or only conditionally defined, the generated value can widen to
+`int`.
 
 ```py
 def f(n: int):
     class StaticDynamic(Enum):
         A = n
         B = auto()
+        C = 1
+        D = auto()
 
     reveal_type(StaticDynamic.A.value)  # revealed: int
     reveal_type(StaticDynamic.B.value)  # revealed: int
+    reveal_type(StaticDynamic.D.value)  # revealed: int
 
-    Dynamic = Enum("Dynamic", {"A": n, "B": auto()})
+    Dynamic = Enum("Dynamic", {"A": n, "B": auto(), "C": 1, "D": auto()})
 
     reveal_type(Dynamic.A.value)  # revealed: int
     reveal_type(Dynamic.B.value)  # revealed: int
+    reveal_type(Dynamic.D.value)  # revealed: int
+
+    class Conditional(Enum):
+        if n:
+            TEN = 10
+        NEXT = auto()
+
+    reveal_type(Conditional.NEXT.value)  # revealed: int
+
+    class BranchOrder(Enum):
+        if n:
+            NINE = 9
+        else:
+            FIRST = auto()
+            NINE = 9
+
+    reveal_type(BranchOrder.FIRST.value)  # revealed: int
 ```
 
 Bool literals are still concrete predecessors for `auto()`:
@@ -1619,9 +1698,12 @@ from enum import IntEnum, auto
 class Answer(IntEnum):
     YES = auto()
     NO = auto()
+    OTHER = 10
+    UNKNOWN = auto()
 
 reveal_type(Answer.YES.value)  # revealed: Literal[1]
 reveal_type(Answer.NO.value)  # revealed: Literal[2]
+reveal_type(Answer.UNKNOWN.value)  # revealed: Literal[11]
 ```
 
 As does using `auto()` for other enums that use `int` as a mixin:
@@ -1677,14 +1759,39 @@ Combining aliases with `auto()`:
 from enum import Enum, auto
 
 class Answer(Enum):
+    ZERO = 0
     YES = auto()
     NO = auto()
-
     DEFINITELY = YES
+    ALSO_YES = DEFINITELY
+    LATER = auto()
 
-# TODO: This should ideally be `tuple[Literal["YES"], Literal["NO"]]`
-# revealed: tuple[Literal["YES"], Literal["NO"], Literal["DEFINITELY"]]
+# revealed: tuple[Literal["ZERO"], Literal["YES"], Literal["NO"], Literal["LATER"]]
 reveal_type(enum_members(Answer))
+reveal_type(Answer.DEFINITELY.value)  # revealed: Literal[1]
+reveal_type(Answer.ALSO_YES.name)  # revealed: Literal["YES"]
+reveal_type(Answer.LATER.value)  # revealed: Literal[3]
+
+class TextAnswer(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return name
+
+    FIRST = auto()
+    ALSO_FIRST = FIRST
+
+reveal_type(TextAnswer.ALSO_FIRST.value)  # revealed: str
+reveal_type(TextAnswer.ALSO_FIRST.name)  # revealed: Literal["FIRST"]
+
+class SeparateAnnotation(Enum):
+    FIRST: auto
+    FIRST = auto()
+    ALIAS = FIRST
+    NEXT = auto()
+
+reveal_type(SeparateAnnotation.ALIAS.name)  # revealed: Literal["FIRST"]
+reveal_type(SeparateAnnotation.ALIAS.value)  # revealed: Literal[1]
+reveal_type(SeparateAnnotation.NEXT.value)  # revealed: Literal[2]
 ```
 
 `auto()` values are computed at runtime by the enum metaclass, so we skip validation against both
@@ -1980,6 +2087,92 @@ def _inherited_mixed_instance(x: InheritedCustomNextValueChild):
     reveal_type(x.value)  # revealed: str | Literal[1]
 ```
 
+An enum with multiple bases inherits `_generate_next_value_`, the method that computes values for
+`auto()`, from its last direct enum base. Here, `DefaultChild` inherits the default method through
+`UseDefault`. Reversing the bases in `UseCustom` selects the method that returns a string.
+
+```py
+Empty = Enum("Empty", [])
+
+class UseDefault(InheritedCustomNextValue, Empty): ...
+
+class DefaultChild(UseDefault):
+    FIRST = 5
+    NEXT = auto()
+    ALIAS = 6
+
+class UseCustom(Empty, InheritedCustomNextValue):
+    FIRST = 5
+    NEXT = auto()
+
+reveal_type(DefaultChild.NEXT.value)  # revealed: Literal[6]
+reveal_type(DefaultChild.ALIAS.name)  # revealed: Literal["NEXT"]
+reveal_type(UseCustom.NEXT.value)  # revealed: str
+```
+
+### Inheriting `_generate_next_value_` from `Enum` and `Flag`
+
+`Permissions` inherits `Flag`'s power-of-two numbering through the functional enum `EmptyFlag`.
+`Sequential` uses `Enum`'s integer numbering because `Enum` is its last direct base.
+
+```py
+from enum import Enum, Flag, auto
+
+EmptyFlag = Flag("EmptyFlag", [])
+
+class Permissions(EmptyFlag):
+    READ = 4
+    WRITE = auto()
+
+class Sequential(Flag, Enum):
+    FIRST = 4
+    SECOND = auto()
+
+reveal_type(Permissions.WRITE.value)  # revealed: Literal[8]
+reveal_type(Sequential.SECOND.value)  # revealed: Literal[5]
+```
+
+A functional enum can also supply a custom `_generate_next_value_` to its subclasses.
+
+```py
+from typing import Literal
+
+def generate(name: str, start: int, count: int, last_values: list[object]) -> Literal[42]:
+    return 42
+
+Base = Enum("Base", {"_generate_next_value_": generate})
+
+class Child(Base):
+    A = auto()
+
+reveal_type(Child.A.value)  # revealed: Literal[42]
+```
+
+### `auto()` before Python 3.11
+
+With integer values, `auto()` adds one to the last declared value. A descending sequence can
+therefore produce an alias of an earlier member.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from enum import Enum, auto
+
+class Descending(Enum):
+    FIVE = 5
+    FOUR = 4
+    NEXT = auto()
+
+reveal_type(Descending.NEXT.value)  # revealed: Literal[5]
+reveal_type(Descending.NEXT.name)  # revealed: Literal["FIVE"]
+
+Functional = Enum("Functional", {"FIVE": 5, "FOUR": 4, "NEXT": auto()})
+reveal_type(Functional.NEXT.value)  # revealed: Literal[5]
+```
+
 ### `auto()` after an alias
 
 Even when a declaration becomes an alias, its original value is included in the `last_values` passed
@@ -2119,14 +2312,15 @@ reveal_type(enum_members(Answer2))
 
 ### Special names
 
-Make sure that special names like `name` and `value` can be used for enum members (without
-conflicting with `Enum.name` and `Enum.value`):
+An enum can have members named `name` and `value`. Reserved names such as `_order_` are excluded
+from the member list.
 
 ```py
 from enum import Enum
 from ty_extensions._internal import enum_members
 
 class Answer(Enum):
+    _order_ = "name value"
     name = 1
     value = 2
 
@@ -2973,8 +3167,8 @@ reveal_type(Color.GREEN.value)  # revealed: Literal[2]
 reveal_type(Color.BLUE.value)  # revealed: Literal[3]
 ```
 
-When mixing explicit values with `auto()` in a dict, the auto value is derived from the previous
-member's value, not from `start + index`:
+When mixing explicit values with `auto()` in a dict, the generated values here count up from the
+explicit value:
 
 ```py
 from enum import Enum, auto
@@ -3039,6 +3233,79 @@ Perm = Flag("Perm", (("READ", auto()), ("WRITE", auto())), start=3)
 
 reveal_type(Perm.READ.value)  # revealed: Literal[1]
 reveal_type(Perm.WRITE.value)  # revealed: Literal[2]
+```
+
+### Nonmember attributes
+
+Only enum members contribute to `auto()` numbering. A value wrapped in `nonmember` remains
+accessible as an ordinary class attribute.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, auto, member, nonmember
+from typing import assert_type
+from ty_extensions._internal import enum_members
+
+Filtered = Enum("Filtered", {"FIRST": 5, "skip": nonmember(100), "NEXT": auto()})
+reveal_type(enum_members(Filtered))  # revealed: tuple[Literal["FIRST"], Literal["NEXT"]]
+reveal_type(Filtered.NEXT.value)  # revealed: Literal[6]
+assert_type(Filtered.skip, int)
+```
+
+A nonmember named `value` shadows the inherited `Enum.value` property on instances.
+
+```py
+WithValue = Enum("WithValue", {"value": nonmember("label"), "FIRST": auto()})
+assert_type(WithValue.value, str)
+assert_type(WithValue.FIRST.value, str)
+```
+
+Functions supplied in a list of pairs become methods. An explicit `member(auto())` still receives
+the next number.
+
+```py
+def label(self: Enum) -> str:
+    return self.name
+
+WithMethod = Enum("WithMethod", [("FIRST", 5), ("label", label), ("NEXT", member(auto()))])
+reveal_type(enum_members(WithMethod))  # revealed: tuple[Literal["FIRST"], Literal["NEXT"]]
+reveal_type(WithMethod.NEXT.value)  # revealed: Literal[6]
+assert_type(WithMethod.FIRST.label(), str)
+```
+
+If an entry could be either a member or a method, the member names and the next value are uncertain.
+
+```py
+def uncertain(flag: bool):
+    Mixed = Enum("Mixed", {"ENTRY": 10 if flag else label, "NEXT": auto()})
+    reveal_type(enum_members(Mixed))  # revealed: Unknown
+    reveal_type(Mixed.NEXT.value)  # revealed: Unknown
+```
+
+Names listed in `_ignore_` are removed from the enum namespace. Only `FIRST` contributes to the
+value of `NEXT` here.
+
+```py
+Ignored = Enum(
+    "Ignored",
+    {"label": nonmember("red"), "_ignore_": "label skip", "FIRST": 5, "skip": 100, "NEXT": auto()},
+)
+reveal_type(Ignored.NEXT.value)  # revealed: Literal[6]
+Ignored.skip  # error: [missing-attribute]
+Ignored.label  # error: [missing-attribute]
+```
+
+In the names-only form, Python assigns a value to each name before deciding which names become
+members.
+
+```py
+Generated = Enum("Generated", "FIRST __note__ NEXT")
+reveal_type(Generated.__note__)  # revealed: Literal[2]
+reveal_type(Generated.NEXT.value)  # revealed: Literal[3]
 ```
 
 ### Duplicate member names

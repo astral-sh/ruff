@@ -457,6 +457,13 @@ impl KnownClass {
         }
     }
 
+    pub(in crate::types) const fn is_builtin_enum_base(self) -> bool {
+        matches!(
+            self,
+            Self::Enum | Self::IntEnum | Self::StrEnum | Self::Flag | Self::IntFlag
+        )
+    }
+
     /// Return `true` if this class is a subclass of `enum.Enum` *and* has enum members, i.e.
     /// if it is an "actual" enum, not `enum.Enum` itself or a similar custom enum class.
     pub(crate) const fn is_enum_subclass_with_members(self) -> bool {
