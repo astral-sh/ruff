@@ -8,7 +8,8 @@ use crate::types::{
     infer::nearest_enclosing_class,
 };
 use ty_python_core::{
-    place_table, scope::ScopeId, semantic_index, symbol::ScopedSymbolId, use_def_map,
+    frozen::FrozenSet, place_table, scope::ScopeId, semantic_index, symbol::ScopedSymbolId,
+    use_def_map,
 };
 
 /// The return type of certain member-lookup operations. Contains information
@@ -151,7 +152,7 @@ pub(super) fn class_member_with_symbol<'db>(
 fn inherited_declaration_candidates<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
-) -> Option<Box<[ScopedSymbolId]>> {
+) -> Option<FrozenSet<ScopedSymbolId>> {
     let index = semantic_index(db, scope.program_file(db));
     let class = nearest_enclosing_class(db, index, scope)?;
     let mut bases = Vec::new();
@@ -177,9 +178,8 @@ fn inherited_declaration_candidates<'db>(
                 .iter()
                 .any(|base| base.symbol_id(symbol.name()).is_some())
         })
-        .map(|(id, _)| ScopedSymbolId::from_usize(id))
-        .collect();
-    Some(candidates)
+        .map(|(id, _)| ScopedSymbolId::from_usize(id));
+    Some(FrozenSet::from_sorted_unique(candidates))
 }
 
 /// Returns the inherited class-body annotation governing an unannotated class attribute.
@@ -203,7 +203,7 @@ pub(super) fn inherited_class_body_declaration<'db>(
     if !table.symbol(symbol).is_declared()
         && inherited_declaration_candidates(db, scope)
             .as_ref()
-            .is_some_and(|candidates| candidates.binary_search(&symbol).is_err())
+            .is_some_and(|candidates| !candidates.contains(&symbol))
     {
         return None;
     }
