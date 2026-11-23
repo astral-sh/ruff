@@ -123,11 +123,13 @@ pub(super) enum Sequent<C, FuelCost = ()> {
     /// path that assumes both is impossible and can be pruned.
     PairImpossibility { ante1: C, ante2: C },
 
-    /// Sequent of the form `C₁ ∧ C₂ ∧ C₃ → false`
+    /// Sequent of the form `C₁ ∧ C₂ → ¬D`, encoded as `C₁ ∧ C₂ ∧ D → false`.
     ///
-    /// This indicates that `C₁`, `C₂` and `C₃` are mutually disjoint: it is not possible for all
-    /// three to hold. Any path that assumes all three is impossible and can be pruned.
-    TripleImpossibility { ante1: C, ante2: C, ante3: C },
+    /// `negated_post` must store the atom `D` whose negation was derived from `ante1` and
+    /// `ante2`. Path pruning treats all three atoms symmetrically, but
+    /// [`PathAssignments::implied_constraints`][super::paths::PathAssignments::implied_constraints]
+    /// needs to identify the derived atom to recover captured type variables.
+    TripleImpossibility { ante1: C, ante2: C, negated_post: C },
 
     /// Sequent of the form `C → D`
     ///
@@ -190,7 +192,7 @@ impl<'db> SequentMap<'db> {
                     Sequent::TripleImpossibility {
                         ante1,
                         ante2,
-                        ante3,
+                        negated_post,
                     } => {
                         maybe_write_prefix(f)?;
                         write!(
@@ -198,7 +200,7 @@ impl<'db> SequentMap<'db> {
                             "{} ∧ {} ∧ {} → false",
                             ante1.constraint(db).display(db, env, Some(true)),
                             ante2.constraint(db).display(db, env, Some(true)),
-                            ante3.constraint(db).display(db, env, Some(true)),
+                            negated_post.constraint(db).display(db, env, Some(true)),
                         )?;
                     }
 
@@ -322,16 +324,16 @@ impl<'db> SequentMapBuilder<'db> {
         });
     }
 
-    fn add_triple_impossibility(
+    fn add_negative_pair_implication(
         &mut self,
         ante1: AtomicConstraint<'db>,
         ante2: AtomicConstraint<'db>,
-        ante3: AtomicConstraint<'db>,
+        negated_post: AtomicConstraint<'db>,
     ) {
         self.pending.push(Sequent::TripleImpossibility {
             ante1: InternedSequentConstraint::new(self.db, ante1),
             ante2: InternedSequentConstraint::new(self.db, ante2),
-            ante3: InternedSequentConstraint::new(self.db, ante3),
+            negated_post: InternedSequentConstraint::new(self.db, negated_post),
         });
     }
 
@@ -868,7 +870,7 @@ impl<'db> AtomicConstraint<'db> {
                             map.add_pair_implication(lower_constraint, upper_constraint, derived);
                             node = interior.if_true;
                         } else {
-                            map.add_triple_impossibility(
+                            map.add_negative_pair_implication(
                                 lower_constraint,
                                 upper_constraint,
                                 derived,

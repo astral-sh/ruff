@@ -304,7 +304,7 @@ impl PathAssignments {
                 Some(post)
             }
             // A negative conclusion `a ∧ b → ¬c` is encoded as `a ∧ b ∧ c → false`.
-            Sequent::TripleImpossibility { ante3, .. } => Some(ante3),
+            Sequent::TripleImpossibility { negated_post, .. } => Some(negated_post),
             Sequent::SingleTautology { .. } | Sequent::PairImpossibility { .. } => None,
         })
     }
@@ -668,18 +668,19 @@ impl PathAssignments {
                     Sequent::TripleImpossibility {
                         ante1,
                         ante2,
-                        ante3,
+                        negated_post,
                     } => {
                         let ante1 = storage.intern_atomic_constraint(db, env, ante1.constraint(db));
                         let ante2 = storage.intern_atomic_constraint(db, env, ante2.constraint(db));
-                        let ante3 = storage.intern_atomic_constraint(db, env, ante3.constraint(db));
+                        let negated_post =
+                            storage.intern_atomic_constraint(db, env, negated_post.constraint(db));
                         add_antecedent(ante1.when_true());
                         add_antecedent(ante2.when_true());
-                        add_antecedent(ante3.when_true());
+                        add_antecedent(negated_post.when_true());
                         Sequent::TripleImpossibility {
                             ante1,
                             ante2,
-                            ante3,
+                            negated_post,
                         }
                     }
                     Sequent::PairImplication {
@@ -1095,8 +1096,8 @@ impl PathAssignments {
             Sequent::TripleImpossibility {
                 ante1,
                 ante2,
-                ante3,
-            } => self.check_triple_impossibility(db, env, storage, ante1, ante2, ante3),
+                negated_post,
+            } => self.check_triple_impossibility(db, env, storage, ante1, ante2, negated_post),
             Sequent::PairImplication {
                 ante1,
                 ante2,
@@ -1189,19 +1190,18 @@ impl PathAssignments {
         storage: &mut ConstraintSetStorage<'db>,
         ante1: AtomicConstraintId,
         ante2: AtomicConstraintId,
-        ante3: AtomicConstraintId,
+        negated_post: AtomicConstraintId,
     ) -> Result<(), PathAssignmentConflict> {
         if self.assignment_holds(ante1.when_true())
             && self.assignment_holds(ante2.when_true())
-            && self.assignment_holds(ante3.when_true())
+            && self.assignment_holds(negated_post.when_true())
         {
-            // The sequent map says (ante1 ∧ ante2 ∧ ante3) is an impossible combination, and the
-            // current path asserts that all three are true.
+            // Both antecedents hold, but the path also asserts the atom they rule out.
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
                 ante1 = %ante1.into_inner().display(db, env, storage),
                 ante2 = %ante2.into_inner().display(db, env, storage),
-                ante3 = %ante3.into_inner().display(db, env, storage),
+                negated_post = %negated_post.into_inner().display(db, env, storage),
                 facts = %format_args!(
                     "[{}]",
                     self.assignments.iter().map(|(assignment, _)| {
