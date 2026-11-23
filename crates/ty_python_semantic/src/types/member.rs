@@ -144,6 +144,37 @@ pub(super) fn class_member_with_symbol<'db>(
     })
 }
 
+/// Local symbols whose names occur in a base class body, in symbol ID order.
+#[salsa::tracked(returns(deref), cycle_initial=|_, _, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+pub(super) fn inherited_declaration_candidates<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+) -> Box<[ScopedSymbolId]> {
+    let index = semantic_index(db, scope.program_file(db));
+    let Some(class) = nearest_enclosing_class(db, index, scope) else {
+        return Box::default();
+    };
+    let bases: Vec<_> = class
+        .identity_specialization(db)
+        .iter_mro(db)
+        .skip(1)
+        .filter_map(|base| {
+            let (base, _) = base.into_class()?.static_class_literal(db)?;
+            Some(place_table(db, base.body_scope(db)))
+        })
+        .collect();
+    place_table(db, scope)
+        .symbols()
+        .enumerate()
+        .filter(|(_, symbol)| {
+            bases
+                .iter()
+                .any(|base| base.symbol_id(symbol.name()).is_some())
+        })
+        .map(|(id, _)| ScopedSymbolId::from_usize(id))
+        .collect()
+}
+
 /// Returns the inherited class-body annotation governing an unannotated class attribute.
 ///
 /// A subclass assignment such as `items = []` retains an inherited `items: list[int]`

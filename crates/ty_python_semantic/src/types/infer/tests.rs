@@ -1844,6 +1844,31 @@ fn abstract_methods_track_changes_to_identity_decorators() -> anyhow::Result<()>
 }
 
 #[test]
+fn inherited_annotation_added_and_removed() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file(
+        "/src/child.py",
+        "from parent import Parent\nclass Child(Parent):\n    items = []\nitems = Child.items",
+    )?;
+
+    for (body, expected) in [
+        ("pass", "list[Unknown]"),
+        ("items: list[int]", "list[int]"),
+        ("items: list[str]", "list[str]"),
+        ("pass", "list[Unknown]"),
+    ] {
+        db.write_file("/src/parent.py", format!("class Parent: {body}"))?;
+        let child = system_path_to_file(&db, "/src/child.py").unwrap();
+        let items = global_symbol(&db, child, "items").place.expect_type();
+        assert_eq!(
+            items.display(&db, &db.program_environment()).to_string(),
+            expected
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn dependency_internal_symbol_change() -> anyhow::Result<()> {
     let mut db = setup_db();
 
