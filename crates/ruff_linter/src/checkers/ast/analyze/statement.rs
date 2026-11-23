@@ -169,7 +169,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::GlobalStatement) {
                 pylint::rules::global_statement(checker, name);
             }
-            if checker.is_rule_enabled(Rule::LRUCacheWithoutArguments) {
+            if checker.is_rule_enabled(Rule::LRUCacheCallWithoutArguments) {
                 if checker.target_version() >= PythonVersion::PY38 {
                     pyupgrade::rules::lru_cache_without_parameters(checker, decorator_list);
                 }
@@ -225,7 +225,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.settings().mccabe.max_complexity,
                 );
             }
-            if checker.is_rule_enabled(Rule::HardcodedPasswordDefault) {
+            if checker.is_rule_enabled(Rule::HardcodedPasswordParameterDefault) {
                 flake8_bandit::rules::hardcoded_password_default(checker, parameters);
             }
             if checker.is_rule_enabled(Rule::SuspiciousMarkSafeUsage) {
@@ -268,9 +268,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.any_rule_enabled(&[
                 Rule::PytestFixtureIncorrectParenthesesStyle,
-                Rule::PytestFixturePositionalArgs,
+                Rule::PytestFixturePositionalArguments,
                 Rule::PytestExtraneousScopeFunction,
-                Rule::PytestFixtureParamWithoutValue,
+                Rule::PytestFixtureParameterWithoutValue,
                 Rule::PytestDeprecatedYieldFixture,
                 Rule::PytestFixtureFinalizerCallback,
                 Rule::PytestUselessYieldFixture,
@@ -301,7 +301,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     parameters,
                 );
             }
-            if checker.is_rule_enabled(Rule::BooleanDefaultValuePositionalParameter) {
+            if checker.is_rule_enabled(Rule::BooleanPositionalParameterDefault) {
                 flake8_boolean_trap::rules::boolean_default_value_positional_argument(
                     checker,
                     name,
@@ -322,7 +322,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_bugbear::rules::f_string_docstring(checker, body);
             }
             if !checker.semantic.current_scope().kind.is_class() {
-                if checker.is_rule_enabled(Rule::VariableShadowsBuiltin) {
+                if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
                     flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
                 }
             }
@@ -508,7 +508,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::FStringDocstring) {
                 flake8_bugbear::rules::f_string_docstring(checker, body);
             }
-            if checker.is_rule_enabled(Rule::VariableShadowsBuiltin) {
+            if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
                 flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
             }
             if checker.is_rule_enabled(Rule::DuplicateBases) {
@@ -705,7 +705,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         alias.asname.as_deref(),
                     );
                 }
-                if checker.is_rule_enabled(Rule::ImportShadowsBuiltin) {
+                if checker.is_rule_enabled(Rule::BuiltinImportShadowing) {
                     flake8_builtins::rules::builtin_import_shadowing(checker, alias);
                 }
             }
@@ -914,7 +914,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         }
                     }
                 }
-                if checker.is_rule_enabled(Rule::ImportShadowsBuiltin) {
+                if checker.is_rule_enabled(Rule::BuiltinImportShadowing) {
                     flake8_builtins::rules::builtin_import_shadowing(checker, alias);
                 }
             }
@@ -1186,7 +1186,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::AssertWithPrintMessage) {
                 ruff::rules::assert_with_print_message(checker, assert_stmt);
             }
-            if checker.is_rule_enabled(Rule::InvalidAssertMessageLiteral) {
+            if checker.is_rule_enabled(Rule::NonStringLiteralAsAssertMessage) {
                 ruff::rules::invalid_assert_message_literal_argument(checker, assert_stmt);
             }
         }
@@ -1194,7 +1194,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
-            if checker.is_rule_enabled(Rule::AssertRaisesOverlyBroadException) {
+            if checker.is_rule_enabled(Rule::AssertRaisesExceptionOrBaseException) {
                 flake8_bugbear::rules::assert_raises_exception(checker, items);
             }
             if checker.is_rule_enabled(Rule::PytestRaisesWithMultipleStatements) {
@@ -1492,7 +1492,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.source_type.is_stub() {
                 if checker.any_rule_enabled(&[
-                    Rule::UnprefixedTypeParameterInStub,
+                    Rule::PublicTypeVarInStub,
                     Rule::AssignmentDefaultInStub,
                     Rule::UnannotatedAssignmentInStub,
                     Rule::ComplexAssignmentInStub,
@@ -1504,7 +1504,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         .current_scopes()
                         .any(|scope| scope.kind.is_function())
                     {
-                        if checker.is_rule_enabled(Rule::UnprefixedTypeParameterInStub) {
+                        if checker.is_rule_enabled(Rule::PublicTypeVarInStub) {
                             flake8_pyi::rules::prefix_type_params(checker, value, targets);
                         }
                         if checker.is_rule_enabled(Rule::AssignmentDefaultInStub) {

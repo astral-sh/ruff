@@ -13,7 +13,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
     if !checker.any_rule_enabled(&[
         Rule::AsyncioDanglingTask,
         Rule::BadStaticmethodParameter,
-        Rule::AttributeShadowsBuiltin,
+        Rule::BuiltinAttributeShadowing,
         Rule::FunctionCallInDataclassFieldDefault,
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
@@ -22,7 +22,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::InstanceMethodReceiverNotNamedSelf,
         Rule::MethodReceiverDefault,
         Rule::MutableClassDefault,
-        Rule::MutableDataclassDefault,
+        Rule::MutableDataclassFieldDefault,
         Rule::MethodWithoutParameters,
         Rule::UnusedSelf,
         Rule::RedefinedParameterFromLocal,
@@ -135,7 +135,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         }
 
         if let Some(class_def) = scope.kind.as_class() {
-            if checker.is_rule_enabled(Rule::AttributeShadowsBuiltin) {
+            if checker.is_rule_enabled(Rule::BuiltinAttributeShadowing) {
                 flake8_builtins::rules::builtin_attribute_shadowing(
                     checker, scope_id, scope, class_def,
                 );
@@ -146,7 +146,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             if checker.is_rule_enabled(Rule::MutableClassDefault) {
                 ruff::rules::mutable_class_default(checker, class_def);
             }
-            if checker.is_rule_enabled(Rule::MutableDataclassDefault) {
+            if checker.is_rule_enabled(Rule::MutableDataclassFieldDefault) {
                 ruff::rules::mutable_dataclass_default(checker, class_def);
             }
         }

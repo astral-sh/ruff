@@ -28,9 +28,9 @@ use crate::codes::Category;
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.10.0", category = Category::Suspicious)]
-pub(crate) struct InvalidAssertMessageLiteral;
+pub(crate) struct NonStringLiteralAsAssertMessage;
 
-impl Violation for InvalidAssertMessageLiteral {
+impl Violation for NonStringLiteralAsAssertMessage {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Non-string literal used as assert message".to_string()
@@ -54,5 +54,5 @@ pub(crate) fn invalid_assert_message_literal_argument(checker: &Checker, stmt: &
         return;
     }
 
-    checker.report_diagnostic(InvalidAssertMessageLiteral, message.range());
+    checker.report_diagnostic(NonStringLiteralAsAssertMessage, message.range());
 }

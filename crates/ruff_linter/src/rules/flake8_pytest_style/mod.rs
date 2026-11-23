@@ -41,7 +41,7 @@ mod tests {
         "PT001_parentheses"
     )]
     #[test_case(
-        Rule::PytestFixturePositionalArgs,
+        Rule::PytestFixturePositionalArguments,
         Path::new("PT002.py"),
         Settings::default(),
         "PT002"
@@ -214,7 +214,7 @@ mod tests {
         "PT018"
     )]
     #[test_case(
-        Rule::PytestFixtureParamWithoutValue,
+        Rule::PytestFixtureParameterWithoutValue,
         Path::new("PT019.py"),
         Settings::default(),
         "PT019"

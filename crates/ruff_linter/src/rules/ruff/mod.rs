@@ -27,9 +27,9 @@ mod tests {
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005_slices.py"))]
     #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"))]
     #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
-    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
-    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
-    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_deferred.py"))]
+    #[test_case(Rule::MutableDataclassFieldDefault, Path::new("RUF008.py"))]
+    #[test_case(Rule::MutableDataclassFieldDefault, Path::new("RUF008_attrs.py"))]
+    #[test_case(Rule::MutableDataclassFieldDefault, Path::new("RUF008_deferred.py"))]
     #[test_case(Rule::FunctionCallInDataclassFieldDefault, Path::new("RUF009.py"))]
     #[test_case(
         Rule::FunctionCallInDataclassFieldDefault,
@@ -81,7 +81,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryEmptyIterableWithinDequeCall, Path::new("RUF037.py"))]
     #[test_case(Rule::RedundantBoolLiteral, Path::new("RUF038.py"))]
     #[test_case(Rule::RedundantBoolLiteral, Path::new("RUF038.pyi"))]
-    #[test_case(Rule::InvalidAssertMessageLiteral, Path::new("RUF040.py"))]
+    #[test_case(Rule::NonStringLiteralAsAssertMessage, Path::new("RUF040.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.pyi"))]
     #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
@@ -793,8 +793,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
-    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
+    #[test_case(Rule::MutableDataclassFieldDefault, Path::new("RUF008.py"))]
+    #[test_case(Rule::MutableDataclassFieldDefault, Path::new("RUF008_attrs.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039_concat.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_0.py"))]

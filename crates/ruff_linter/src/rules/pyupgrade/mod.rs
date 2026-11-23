@@ -36,7 +36,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryPositionalStrFormatIndices, Path::new("UP030_1.py"))]
     #[test_case(Rule::LRUCacheWithMaxsizeNone, Path::new("UP033_0.py"))]
     #[test_case(Rule::LRUCacheWithMaxsizeNone, Path::new("UP033_1.py"))]
-    #[test_case(Rule::LRUCacheWithoutArguments, Path::new("UP011.py"))]
+    #[test_case(Rule::LRUCacheCallWithoutArguments, Path::new("UP011.py"))]
     #[test_case(Rule::UnnecessaryLiteralConstructor, Path::new("UP018.py"))]
     #[test_case(Rule::UnnecessaryLiteralConstructor, Path::new("UP018_CR.py"))]
     #[test_case(Rule::UnnecessaryLiteralConstructor, Path::new("UP018_LF.py"))]
@@ -69,7 +69,7 @@ mod tests {
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015_1.py"))]
     #[test_case(Rule::SubprocessRunWithPipedStdoutAndStderr, Path::new("UP022.py"))]
     #[test_case(Rule::SubprocessRunWithUniversalNewlines, Path::new("UP021.py"))]
-    #[test_case(Rule::SuperCallWithArguments, Path::new("UP008.py"))]
+    #[test_case(Rule::RedundantSuperArguments, Path::new("UP008.py"))]
     #[test_case(Rule::TimeoutErrorAlias, Path::new("UP041.py"))]
     #[test_case(Rule::ManualStrEnum, Path::new("UP042.py"))]
     #[test_case(Rule::TypeOfPrimitive, Path::new("UP003.py"))]
@@ -102,7 +102,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029_2.py"))]
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029_3.py"))]
     #[test_case(Rule::UnnecessaryClassParentheses, Path::new("UP039.py"))]
-    #[test_case(Rule::UnnecessaryDefaultTypeArgs, Path::new("UP043.py"))]
+    #[test_case(Rule::UnnecessaryDefaultTypeArguments, Path::new("UP043.py"))]
     #[test_case(Rule::UnnecessaryEncodeUTF8, Path::new("UP012.py"))]
     #[test_case(Rule::UnnecessaryFutureImport, Path::new("UP010_0.py"))]
     #[test_case(Rule::UnnecessaryFutureImport, Path::new("UP010_1.py"))]
@@ -527,7 +527,7 @@ mod tests {
         let snapshot = "UP043.pyi";
         let diagnostics = test_path(
             Path::new("pyupgrade/UP043.pyi"),
-            &settings::LinterSettings::for_rule(Rule::UnnecessaryDefaultTypeArgs)
+            &settings::LinterSettings::for_rule(Rule::UnnecessaryDefaultTypeArguments)
                 .with_target_version(PythonVersion::PY312),
         )?;
         assert_diagnostics!(snapshot, diagnostics);

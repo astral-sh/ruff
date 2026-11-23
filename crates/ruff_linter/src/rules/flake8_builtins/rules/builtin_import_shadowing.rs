@@ -43,14 +43,14 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// - `target-version`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.8.0", category = Category::Pedantic)]
-pub(crate) struct ImportShadowsBuiltin {
+pub(crate) struct BuiltinImportShadowing {
     name: String,
 }
 
-impl Violation for ImportShadowsBuiltin {
+impl Violation for BuiltinImportShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ImportShadowsBuiltin { name } = self;
+        let BuiltinImportShadowing { name } = self;
         format!("Import `{name}` is shadowing a Python builtin")
     }
 }
@@ -65,7 +65,7 @@ pub(crate) fn builtin_import_shadowing(checker: &Checker, alias: &Alias) {
         checker.target_version(),
     ) {
         checker.report_diagnostic(
-            ImportShadowsBuiltin {
+            BuiltinImportShadowing {
                 name: name.to_string(),
             },
             name.range,

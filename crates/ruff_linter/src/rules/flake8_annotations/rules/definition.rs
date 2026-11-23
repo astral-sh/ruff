@@ -40,11 +40,11 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - `lint.flake8-annotations.suppress-dummy-args`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.105", category = Category::Pedantic)]
-pub(crate) struct UnannotatedParameter {
+pub(crate) struct MissingParameterAnnotation {
     name: String,
 }
 
-impl Violation for UnannotatedParameter {
+impl Violation for MissingParameterAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { name } = self;
@@ -76,11 +76,11 @@ impl Violation for UnannotatedParameter {
 /// - `lint.flake8-annotations.suppress-dummy-args`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.105", category = Category::Pedantic)]
-pub(crate) struct UnannotatedVariadicPositionalParameter {
+pub(crate) struct MissingArgsAnnotation {
     name: String,
 }
 
-impl Violation for UnannotatedVariadicPositionalParameter {
+impl Violation for MissingArgsAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { name } = self;
@@ -112,11 +112,11 @@ impl Violation for UnannotatedVariadicPositionalParameter {
 /// - `lint.flake8-annotations.suppress-dummy-args`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.105", category = Category::Pedantic)]
-pub(crate) struct UnannotatedVariadicKeywordParameter {
+pub(crate) struct MissingKwargsAnnotation {
     name: String,
 }
 
-impl Violation for UnannotatedVariadicKeywordParameter {
+impl Violation for MissingKwargsAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { name } = self;
@@ -685,9 +685,9 @@ pub(crate) fn definition(
                     .dummy_variable_rgx
                     .is_match(parameter.name()))
             {
-                if checker.is_rule_enabled(Rule::UnannotatedParameter) {
+                if checker.is_rule_enabled(Rule::MissingParameterAnnotation) {
                     diagnostics.push(checker.report_diagnostic(
-                        UnannotatedParameter {
+                        MissingParameterAnnotation {
                             name: parameter.name().to_string(),
                         },
                         parameter.parameter.range(),
@@ -711,9 +711,9 @@ pub(crate) fn definition(
             if !(checker.settings().flake8_annotations.suppress_dummy_args
                 && checker.settings().dummy_variable_rgx.is_match(&arg.name))
             {
-                if checker.is_rule_enabled(Rule::UnannotatedVariadicPositionalParameter) {
+                if checker.is_rule_enabled(Rule::MissingArgsAnnotation) {
                     diagnostics.push(checker.report_diagnostic(
-                        UnannotatedVariadicPositionalParameter {
+                        MissingArgsAnnotation {
                             name: arg.name.to_string(),
                         },
                         arg.range(),
@@ -742,9 +742,9 @@ pub(crate) fn definition(
             if !(checker.settings().flake8_annotations.suppress_dummy_args
                 && checker.settings().dummy_variable_rgx.is_match(&arg.name))
             {
-                if checker.is_rule_enabled(Rule::UnannotatedVariadicKeywordParameter) {
+                if checker.is_rule_enabled(Rule::MissingKwargsAnnotation) {
                     diagnostics.push(checker.report_diagnostic(
-                        UnannotatedVariadicKeywordParameter {
+                        MissingKwargsAnnotation {
                             name: arg.name.to_string(),
                         },
                         arg.range(),

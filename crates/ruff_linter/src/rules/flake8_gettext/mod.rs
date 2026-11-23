@@ -75,7 +75,7 @@ mod tests {
     use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::FStringInGettextCall, Path::new("INT001.py"))]
-    #[test_case(Rule::FormatInGettextCall, Path::new("INT002.py"))]
+    #[test_case(Rule::StrFormatInGettextCall, Path::new("INT002.py"))]
     #[test_case(Rule::PrintfInGettextCall, Path::new("INT003.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
@@ -88,7 +88,7 @@ mod tests {
     }
 
     #[test_case(Rule::FStringInGettextCall, Path::new("INT001.py"))]
-    #[test_case(Rule::FormatInGettextCall, Path::new("INT002.py"))]
+    #[test_case(Rule::StrFormatInGettextCall, Path::new("INT002.py"))]
     #[test_case(Rule::PrintfInGettextCall, Path::new("INT003.py"))]
     fn rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());

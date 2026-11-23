@@ -47,14 +47,14 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.48", category = Category::Pedantic)]
-pub(crate) struct VariableShadowsBuiltin {
+pub(crate) struct BuiltinVariableShadowing {
     name: String,
 }
 
-impl Violation for VariableShadowsBuiltin {
+impl Violation for BuiltinVariableShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let VariableShadowsBuiltin { name } = self;
+        let BuiltinVariableShadowing { name } = self;
         format!("Variable `{name}` is shadowing a Python builtin")
     }
 }
@@ -71,7 +71,7 @@ pub(crate) fn builtin_variable_shadowing(checker: &Checker, name: &str, range: T
     }
 
     // In class scope, attribute bindings (e.g., `id = 1`) are covered by
-    // `attribute-shadows-builtin` (A003), but other bindings (e.g., a `for`
+    // `builtin-attribute-shadowing` (A003), but other bindings (e.g., a `for`
     // target or `:=`) are not and still shadow the builtin.
     let scope = checker.semantic().current_scope();
     if scope.kind.is_class()
@@ -92,7 +92,7 @@ pub(crate) fn builtin_variable_shadowing(checker: &Checker, name: &str, range: T
         checker.target_version(),
     ) {
         checker.report_diagnostic(
-            VariableShadowsBuiltin {
+            BuiltinVariableShadowing {
                 name: name.to_string(),
             },
             range,

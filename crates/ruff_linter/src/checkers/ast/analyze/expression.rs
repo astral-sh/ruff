@@ -146,7 +146,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 ruff::rules::never_union(checker, expr);
             }
 
-            if checker.is_rule_enabled(Rule::UnnecessaryDefaultTypeArgs) {
+            if checker.is_rule_enabled(Rule::UnnecessaryDefaultTypeArguments) {
                 if checker.target_version() >= PythonVersion::PY313
                     || checker.semantic().in_stub_file()
                 {
@@ -385,7 +385,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.is_rule_enabled(Rule::AmbiguousVariableName) {
                         pycodestyle::rules::ambiguous_variable_name(checker, id, expr.range());
                     }
-                    if checker.is_rule_enabled(Rule::VariableShadowsBuiltin) {
+                    if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
                         flake8_builtins::rules::builtin_variable_shadowing(checker, id, *range);
                     }
                 }
@@ -552,9 +552,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 // pylint
                 Rule::BadStringFormatCharacter,
                 // pyflakes
-                Rule::StrFormatInvalidFormat,
-                Rule::StrFormatExtraNamedArguments,
-                Rule::StrFormatExtraPositionalArguments,
+                Rule::StrFormatInvalidSyntax,
+                Rule::StrFormatUnusedKeywordArguments,
+                Rule::StrFormatUnusedPositionalArguments,
                 Rule::StrFormatMissingArguments,
                 Rule::StrFormatMixedPlaceholderNumbering,
                 // pyupgrade
@@ -600,20 +600,22 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                 Err(e) => {
                                     // F521
                                     checker.report_diagnostic_if_enabled(
-                                        pyflakes::rules::StrFormatInvalidFormat {
+                                        pyflakes::rules::StrFormatInvalidSyntax {
                                             message: pyflakes::format::error_to_string(&e),
                                         },
                                         location,
                                     );
                                 }
                                 Ok(summary) => {
-                                    if checker.is_rule_enabled(Rule::StrFormatExtraNamedArguments) {
+                                    if checker
+                                        .is_rule_enabled(Rule::StrFormatUnusedKeywordArguments)
+                                    {
                                         pyflakes::rules::string_dot_format_extra_named_arguments(
                                             checker, call, &summary, keywords,
                                         );
                                     }
                                     if checker
-                                        .is_rule_enabled(Rule::StrFormatExtraPositionalArguments)
+                                        .is_rule_enabled(Rule::StrFormatUnusedPositionalArguments)
                                     {
                                         pyflakes::rules::string_dot_format_extra_positional_arguments(
                                             checker, call, &summary, args,
@@ -668,7 +670,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::DeprecatedUnittestAlias) {
                 pyupgrade::rules::deprecated_unittest_alias(checker, func);
             }
-            if checker.is_rule_enabled(Rule::SuperCallWithArguments) {
+            if checker.is_rule_enabled(Rule::RedundantSuperArguments) {
                 pyupgrade::rules::super_call_with_parameters(checker, call);
             }
             if checker.is_rule_enabled(Rule::UnnecessaryEncodeUTF8) {
@@ -794,7 +796,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::Exec) {
                 flake8_bandit::rules::exec_used(checker, func);
             }
-            if checker.is_rule_enabled(Rule::HardcodedPasswordFuncArg) {
+            if checker.is_rule_enabled(Rule::HardcodedPasswordArgument) {
                 flake8_bandit::rules::hardcoded_password_func_arg(checker, keywords);
             }
             if checker.is_rule_enabled(Rule::SuspiciousSqlStringConstruction) {
@@ -964,7 +966,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.any_rule_enabled(&[
                 Rule::FStringInGettextCall,
-                Rule::FormatInGettextCall,
+                Rule::StrFormatInGettextCall,
                 Rule::PrintfInGettextCall,
             ]) && flake8_gettext::is_gettext_func_call(
                 checker,
@@ -974,7 +976,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 if checker.is_rule_enabled(Rule::FStringInGettextCall) {
                     flake8_gettext::rules::f_string_in_gettext_func_call(checker, func, args);
                 }
-                if checker.is_rule_enabled(Rule::FormatInGettextCall) {
+                if checker.is_rule_enabled(Rule::StrFormatInGettextCall) {
                     flake8_gettext::rules::format_in_gettext_func_call(checker, func, args);
                 }
                 if checker.is_rule_enabled(Rule::PrintfInGettextCall) {
@@ -1009,7 +1011,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             ]) {
                 flake8_logging_format::rules::logging_call(checker, call);
             }
-            if checker.any_rule_enabled(&[Rule::LoggingTooFewArgs, Rule::LoggingTooManyArgs]) {
+            if checker
+                .any_rule_enabled(&[Rule::LoggingTooFewArguments, Rule::LoggingTooManyArguments])
+            {
                 pylint::rules::logging_call(checker, call);
             }
             if checker.is_rule_enabled(Rule::DjangoLocalsInRenderFunction) {
@@ -1138,7 +1142,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::NonOctalPermissions) {
                 ruff::rules::non_octal_permissions(checker, call);
             }
-            if checker.is_rule_enabled(Rule::AssertRaisesOverlyBroadException) {
+            if checker.is_rule_enabled(Rule::AssertRaisesExceptionOrBaseException) {
                 flake8_bugbear::rules::assert_raises_exception_call(checker, call);
             }
         }
@@ -1223,10 +1227,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 left.as_ref()
             {
                 if checker.any_rule_enabled(&[
-                    Rule::PercentFormatInvalidFormat,
+                    Rule::PercentFormatInvalidSyntax,
                     Rule::PercentFormatExpectedMapping,
                     Rule::PercentFormatExpectedSequence,
-                    Rule::PercentFormatExtraNamedArguments,
+                    Rule::PercentFormatUnusedNamedArguments,
                     Rule::PercentFormatMissingArgument,
                     Rule::PercentFormatMixedPositionalAndNamed,
                     Rule::PercentFormatPositionalCountMismatch,
@@ -1256,7 +1260,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         Err(e) => {
                             // F501
                             checker.report_diagnostic_if_enabled(
-                                pyflakes::rules::PercentFormatInvalidFormat {
+                                pyflakes::rules::PercentFormatInvalidSyntax {
                                     message: e.to_string(),
                                 },
                                 location,
@@ -1273,7 +1277,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                     checker, &summary, right, location,
                                 );
                             }
-                            if checker.is_rule_enabled(Rule::PercentFormatExtraNamedArguments) {
+                            if checker.is_rule_enabled(Rule::PercentFormatUnusedNamedArguments) {
                                 pyflakes::rules::percent_format_extra_named_arguments(
                                     checker, &summary, right, location,
                                 );
@@ -1719,7 +1723,7 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
         Rule::TimeoutErrorAlias,
         Rule::Print,
         Rule::Pprint,
-        Rule::ReSubPositionalArgs,
+        Rule::ReSubPositionalArguments,
         Rule::UselessContextlibSuppress,
         Rule::NoExplicitStacklevel,
         Rule::BadFilePermissions,
@@ -1824,7 +1828,7 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
     if checker.any_rule_enabled(&[Rule::Print, Rule::Pprint]) {
         flake8_print::rules::print_call(checker, call, &qualified_name);
     }
-    if checker.is_rule_enabled(Rule::ReSubPositionalArgs) {
+    if checker.is_rule_enabled(Rule::ReSubPositionalArguments) {
         flake8_bugbear::rules::re_sub_positional_args(checker, call, &qualified_name);
     }
     if checker.is_rule_enabled(Rule::UselessContextlibSuppress) {

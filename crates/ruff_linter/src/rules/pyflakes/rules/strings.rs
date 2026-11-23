@@ -42,14 +42,14 @@ use crate::rules::pyflakes::format::FormatSummary;
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.142", category = Category::Correctness)]
-pub(crate) struct PercentFormatInvalidFormat {
+pub(crate) struct PercentFormatInvalidSyntax {
     pub(crate) message: String,
 }
 
-impl Violation for PercentFormatInvalidFormat {
+impl Violation for PercentFormatInvalidSyntax {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PercentFormatInvalidFormat { message } = self;
+        let PercentFormatInvalidSyntax { message } = self;
         format!("`%`-format string has invalid format string: {message}")
     }
 }
@@ -159,20 +159,20 @@ impl Violation for PercentFormatExpectedSequence {
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.142", category = Category::Correctness)]
-pub(crate) struct PercentFormatExtraNamedArguments {
+pub(crate) struct PercentFormatUnusedNamedArguments {
     missing: Vec<String>,
 }
 
-impl AlwaysFixableViolation for PercentFormatExtraNamedArguments {
+impl AlwaysFixableViolation for PercentFormatUnusedNamedArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PercentFormatExtraNamedArguments { missing } = self;
+        let PercentFormatUnusedNamedArguments { missing } = self;
         let message = missing.join(", ");
         format!("`%`-format string has unused named argument(s): {message}")
     }
 
     fn fix_title(&self) -> String {
-        let PercentFormatExtraNamedArguments { missing } = self;
+        let PercentFormatUnusedNamedArguments { missing } = self;
         let message = missing.join(", ");
         format!("Remove extra named arguments: {message}")
     }
@@ -374,14 +374,14 @@ impl Violation for PercentFormatUnsupportedFormatCharacter {
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.138", category = Category::Correctness)]
-pub(crate) struct StrFormatInvalidFormat {
+pub(crate) struct StrFormatInvalidSyntax {
     pub(crate) message: String,
 }
 
-impl Violation for StrFormatInvalidFormat {
+impl Violation for StrFormatInvalidSyntax {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StrFormatInvalidFormat { message } = self;
+        let StrFormatInvalidSyntax { message } = self;
         format!("`.format` call has invalid format string: {message}")
     }
 }
@@ -417,22 +417,22 @@ impl Violation for StrFormatInvalidFormat {
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.139", category = Category::Correctness)]
-pub(crate) struct StrFormatExtraNamedArguments {
+pub(crate) struct StrFormatUnusedKeywordArguments {
     missing: Vec<Name>,
 }
 
-impl Violation for StrFormatExtraNamedArguments {
+impl Violation for StrFormatUnusedKeywordArguments {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StrFormatExtraNamedArguments { missing } = self;
+        let StrFormatUnusedKeywordArguments { missing } = self;
         let message = missing.join(", ");
         format!("`.format` call has unused named argument(s): {message}")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let StrFormatExtraNamedArguments { missing } = self;
+        let StrFormatUnusedKeywordArguments { missing } = self;
         let message = missing.join(", ");
         Some(format!("Remove extra named arguments: {message}"))
     }
@@ -469,22 +469,22 @@ impl Violation for StrFormatExtraNamedArguments {
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.139", category = Category::Correctness)]
-pub(crate) struct StrFormatExtraPositionalArguments {
+pub(crate) struct StrFormatUnusedPositionalArguments {
     missing: Vec<String>,
 }
 
-impl Violation for StrFormatExtraPositionalArguments {
+impl Violation for StrFormatUnusedPositionalArguments {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StrFormatExtraPositionalArguments { missing } = self;
+        let StrFormatUnusedPositionalArguments { missing } = self;
         let message = missing.join(", ");
         format!("`.format` call has unused arguments at position(s): {message}")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let StrFormatExtraPositionalArguments { missing } = self;
+        let StrFormatUnusedPositionalArguments { missing } = self;
         let message = missing.join(", ");
         Some(format!(
             "Remove extra positional arguments at position(s): {message}"
@@ -648,7 +648,7 @@ pub(crate) fn percent_format_extra_named_arguments(
         .map(|(_, name)| (*name).to_string())
         .collect();
     let mut diagnostic = checker.report_diagnostic(
-        PercentFormatExtraNamedArguments { missing: names },
+        PercentFormatUnusedNamedArguments { missing: names },
         location,
     );
 
@@ -837,7 +837,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
 
     let names: Vec<Name> = missing.iter().map(|(_, name)| (*name).clone()).collect();
     let mut diagnostic = checker.report_diagnostic(
-        StrFormatExtraNamedArguments { missing: names },
+        StrFormatUnusedKeywordArguments { missing: names },
         call.range(),
     );
     let indexes: Vec<usize> = missing.into_iter().map(|(index, _)| index).collect();
@@ -911,7 +911,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     }
 
     let mut diagnostic = checker.report_diagnostic(
-        StrFormatExtraPositionalArguments {
+        StrFormatUnusedPositionalArguments {
             missing: missing
                 .iter()
                 .map(ToString::to_string)

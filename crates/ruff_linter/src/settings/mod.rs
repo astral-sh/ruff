@@ -378,7 +378,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::DuplicateHandlerException), // B014
     RuleSelector::rule(Rule::UselessComparison), // B015
     RuleSelector::rule(Rule::RaiseLiteral), // B016
-    RuleSelector::rule(Rule::AssertRaisesOverlyBroadException), // B017
+    RuleSelector::rule(Rule::AssertRaisesExceptionOrBaseException), // B017
     RuleSelector::rule(Rule::UselessExpression), // B018
     RuleSelector::rule(Rule::CachedInstanceMethod), // B019
     RuleSelector::rule(Rule::LoopVariableOverridesIterator), // B020
@@ -394,7 +394,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::DuplicateValue), // B033
     RuleSelector::rule(Rule::StaticKeyDictComprehension), // B035
     RuleSelector::rule(Rule::MutableContextvarDefault), // B039
-    RuleSelector::rule(Rule::ExceptOverlyBroadException), // BLE001
+    RuleSelector::rule(Rule::CatchExceptionOrBaseException), // BLE001
     RuleSelector::rule(Rule::UnnecessaryGeneratorList), // C400
     RuleSelector::rule(Rule::UnnecessaryGeneratorSet), // C401
     RuleSelector::rule(Rule::UnnecessaryGeneratorDict), // C402
@@ -427,18 +427,18 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::LateFutureImport), // F404
     RuleSelector::rule(Rule::NonModuleLevelStarImport), // F406
     RuleSelector::rule(Rule::FutureFeatureNotDefined), // F407
-    RuleSelector::rule(Rule::PercentFormatInvalidFormat), // F501
+    RuleSelector::rule(Rule::PercentFormatInvalidSyntax), // F501
     RuleSelector::rule(Rule::PercentFormatExpectedMapping), // F502
     RuleSelector::rule(Rule::PercentFormatExpectedSequence), // F503
-    RuleSelector::rule(Rule::PercentFormatExtraNamedArguments), // F504
+    RuleSelector::rule(Rule::PercentFormatUnusedNamedArguments), // F504
     RuleSelector::rule(Rule::PercentFormatMissingArgument), // F505
     RuleSelector::rule(Rule::PercentFormatMixedPositionalAndNamed), // F506
     RuleSelector::rule(Rule::PercentFormatPositionalCountMismatch), // F507
     RuleSelector::rule(Rule::PercentFormatStarRequiresSequence), // F508
     RuleSelector::rule(Rule::PercentFormatUnsupportedFormatCharacter), // F509
-    RuleSelector::rule(Rule::StrFormatInvalidFormat), // F521
-    RuleSelector::rule(Rule::StrFormatExtraNamedArguments), // F522
-    RuleSelector::rule(Rule::StrFormatExtraPositionalArguments), // F523
+    RuleSelector::rule(Rule::StrFormatInvalidSyntax), // F521
+    RuleSelector::rule(Rule::StrFormatUnusedKeywordArguments), // F522
+    RuleSelector::rule(Rule::StrFormatUnusedPositionalArguments), // F523
     RuleSelector::rule(Rule::StrFormatMissingArguments), // F524
     RuleSelector::rule(Rule::StrFormatMixedPlaceholderNumbering), // F525
     RuleSelector::rule(Rule::FStringMissingPlaceholders), // F541
@@ -488,7 +488,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::LoggingRedundantExcInfo), // G202
     RuleSelector::rule(Rule::UnsortedImports), // I001
     RuleSelector::rule(Rule::FStringInGettextCall), // INT001
-    RuleSelector::rule(Rule::FormatInGettextCall), // INT002
+    RuleSelector::rule(Rule::StrFormatInGettextCall), // INT002
     RuleSelector::rule(Rule::PrintfInGettextCall), // INT003
     RuleSelector::rule(Rule::ImplicitStringConcatenationInCollectionLiteral), // ISC004
     RuleSelector::rule(Rule::DirectLoggerInstantiation), // LOG001
@@ -535,8 +535,8 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::MisplacedBareRaise), // PLE0704
     RuleSelector::rule(Rule::RepeatedKeywordArgument), // PLE1132
     RuleSelector::rule(Rule::AwaitOutsideAsync), // PLE1142
-    RuleSelector::rule(Rule::LoggingTooManyArgs), // PLE1205
-    RuleSelector::rule(Rule::LoggingTooFewArgs), // PLE1206
+    RuleSelector::rule(Rule::LoggingTooManyArguments), // PLE1205
+    RuleSelector::rule(Rule::LoggingTooFewArguments), // PLE1206
     RuleSelector::rule(Rule::BadStringFormatCharacter), // PLE1300
     RuleSelector::rule(Rule::BadStringFormatType), // PLE1307
     RuleSelector::rule(Rule::BadStrStripCall), // PLE1310
@@ -591,7 +591,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::PytestWarnsWithMultipleStatements), // PT031
     RuleSelector::rule(Rule::PyPath), // PTH124
     RuleSelector::rule(Rule::InvalidPathlibWithSuffix), // PTH210
-    RuleSelector::rule(Rule::UnprefixedTypeParameterInStub), // PYI001
+    RuleSelector::rule(Rule::PublicTypeVarInStub), // PYI001
     RuleSelector::rule(Rule::ComplexIfStatementInStub), // PYI002
     RuleSelector::rule(Rule::UnrecognizedVersionInfoCheckInStub), // PYI003
     RuleSelector::rule(Rule::PatchVersionComparisonInStub), // PYI004
@@ -640,7 +640,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::BadVersionInfoOrder), // PYI066
     RuleSelector::rule(Rule::UnnecessaryReturnNone), // RET501
     RuleSelector::rule(Rule::ZipInsteadOfPairwise), // RUF007
-    RuleSelector::rule(Rule::MutableDataclassDefault), // RUF008
+    RuleSelector::rule(Rule::MutableDataclassFieldDefault), // RUF008
     RuleSelector::rule(Rule::FunctionCallInDataclassFieldDefault), // RUF009
     RuleSelector::rule(Rule::ExplicitFStringTypeConversion), // RUF010
     RuleSelector::rule(Rule::MutableClassDefault), // RUF012
@@ -660,7 +660,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::DecimalFromFloatLiteral), // RUF032
     RuleSelector::rule(Rule::PostInitDefault), // RUF033
     RuleSelector::rule(Rule::IfExprWithIdenticalBranches), // RUF034
-    RuleSelector::rule(Rule::InvalidAssertMessageLiteral), // RUF040
+    RuleSelector::rule(Rule::NonStringLiteralAsAssertMessage), // RUF040
     RuleSelector::rule(Rule::UnnecessaryNestedLiteral), // RUF041
     RuleSelector::rule(Rule::UnnecessaryCastToInt), // RUF046
     RuleSelector::rule(Rule::MapIntVersionParsing), // RUF048
@@ -715,10 +715,10 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::DeprecatedUnittestAlias), // UP005
     RuleSelector::rule(Rule::NonPEP585Annotation), // UP006
     RuleSelector::rule(Rule::NonPEP604AnnotationUnion), // UP007
-    RuleSelector::rule(Rule::SuperCallWithArguments), // UP008
+    RuleSelector::rule(Rule::RedundantSuperArguments), // UP008
     RuleSelector::rule(Rule::UTF8EncodingDeclaration), // UP009
     RuleSelector::rule(Rule::UnnecessaryFutureImport), // UP010
-    RuleSelector::rule(Rule::LRUCacheWithoutArguments), // UP011
+    RuleSelector::rule(Rule::LRUCacheCallWithoutArguments), // UP011
     RuleSelector::rule(Rule::UnnecessaryEncodeUTF8), // UP012
     RuleSelector::rule(Rule::FunctionalNamedTuple), // UP014
     RuleSelector::rule(Rule::DatetimeTimezoneUTC), // UP017
@@ -744,7 +744,7 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(Rule::UnnecessaryClassParentheses), // UP039
     RuleSelector::rule(Rule::NonPEP695TypeAlias), // UP040
     RuleSelector::rule(Rule::TimeoutErrorAlias), // UP041
-    RuleSelector::rule(Rule::UnnecessaryDefaultTypeArgs), // UP043
+    RuleSelector::rule(Rule::UnnecessaryDefaultTypeArguments), // UP043
     RuleSelector::rule(Rule::NonPEP646Unpack), // UP044
     RuleSelector::rule(Rule::NonPEP604AnnotationOptional), // UP045
     RuleSelector::rule(Rule::NonPEP695GenericClass), // UP046

@@ -161,7 +161,7 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ("set-attr-with-constant", Rule::SetattrWithConstant),
     ("del-attr-with-constant", Rule::DelattrWithConstant),
     ("f-string-in-get-text-func-call", Rule::FStringInGettextCall),
-    ("format-in-get-text-func-call", Rule::FormatInGettextCall),
+    ("format-in-get-text-func-call", Rule::StrFormatInGettextCall),
     ("printf-in-get-text-func-call", Rule::PrintfInGettextCall),
     ("exec-builtin", Rule::Exec),
     ("suspicious-eval-usage", Rule::Eval),
@@ -201,7 +201,7 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     (
         "boolean-default-value-positional-argument",
-        Rule::BooleanDefaultValuePositionalParameter,
+        Rule::BooleanPositionalParameterDefault,
     ),
     ("invalid-class-name", Rule::NonCamelCaseClassName),
     ("invalid-function-name", Rule::NonLowercaseFunctionName),
@@ -391,15 +391,15 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ("f-string", Rule::StrFormat),
     (
         "string-dot-format-invalid-format",
-        Rule::StrFormatInvalidFormat,
+        Rule::StrFormatInvalidSyntax,
     ),
     (
         "string-dot-format-extra-named-arguments",
-        Rule::StrFormatExtraNamedArguments,
+        Rule::StrFormatUnusedKeywordArguments,
     ),
     (
         "string-dot-format-extra-positional-arguments",
-        Rule::StrFormatExtraPositionalArguments,
+        Rule::StrFormatUnusedPositionalArguments,
     ),
     (
         "string-dot-format-missing-arguments",
@@ -409,26 +409,26 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
         "string-dot-format-mixing-automatic",
         Rule::StrFormatMixedPlaceholderNumbering,
     ),
-    ("blind-except", Rule::ExceptOverlyBroadException),
+    ("blind-except", Rule::CatchExceptionOrBaseException),
     (
         "assert-raises-exception",
-        Rule::AssertRaisesOverlyBroadException,
+        Rule::AssertRaisesExceptionOrBaseException,
     ),
     ("logging-string-format", Rule::LoggingStrFormat),
-    ("builtin-argument-shadowing", Rule::ParameterShadowsBuiltin),
+    (
+        "builtin-argument-shadowing",
+        Rule::BuiltinParameterShadowing,
+    ),
     (
         "builtin-lambda-argument-shadowing",
-        Rule::LambdaParameterShadowsBuiltin,
-    ),
-    ("missing-type-function-argument", Rule::UnannotatedParameter),
-    (
-        "missing-type-args",
-        Rule::UnannotatedVariadicPositionalParameter,
+        Rule::BuiltinLambdaParameterShadowing,
     ),
     (
-        "missing-type-kwargs",
-        Rule::UnannotatedVariadicKeywordParameter,
+        "missing-type-function-argument",
+        Rule::MissingParameterAnnotation,
     ),
+    ("missing-type-args", Rule::MissingArgsAnnotation),
+    ("missing-type-kwargs", Rule::MissingKwargsAnnotation),
     ("unused-function-argument", Rule::UnusedFunctionParameter),
     ("unused-method-argument", Rule::UnusedMethodParameter),
     (
@@ -464,10 +464,10 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
         "pytest-parameter-with-default-argument",
         Rule::PytestParameterWithDefaultValue,
     ),
-    ("super-call-with-parameters", Rule::SuperCallWithArguments),
+    ("super-call-with-parameters", Rule::RedundantSuperArguments),
     (
         "lru-cache-without-parameters",
-        Rule::LRUCacheWithoutArguments,
+        Rule::LRUCacheCallWithoutArguments,
     ),
     (
         "whitespace-before-parameters",
@@ -483,9 +483,9 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     (
         "invalid-assert-message-literal-argument",
-        Rule::InvalidAssertMessageLiteral,
+        Rule::NonStringLiteralAsAssertMessage,
     ),
-    ("unprefixed-type-param", Rule::UnprefixedTypeParameterInStub),
+    ("unprefixed-type-param", Rule::PublicTypeVarInStub),
     (
         "unrecognized-version-info-check",
         Rule::UnrecognizedVersionInfoCheckInStub,
@@ -512,9 +512,6 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
         "numeric-literal-too-long",
         Rule::NumericLiteralTooLongInStub,
     ),
-    ("builtin-variable-shadowing", Rule::VariableShadowsBuiltin),
-    ("builtin-attribute-shadowing", Rule::AttributeShadowsBuiltin),
-    ("builtin-import-shadowing", Rule::ImportShadowsBuiltin),
     (
         "missing-return-type-public-function",
         Rule::MissingReturnAnnotationForPublicFunction,
@@ -534,6 +531,46 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     (
         "missing-return-type-class-method",
         Rule::MissingReturnAnnotationForClassMethod,
+    ),
+    (
+        "percent-format-invalid-format",
+        Rule::PercentFormatInvalidSyntax,
+    ),
+    (
+        "percent-format-extra-named-arguments",
+        Rule::PercentFormatUnusedNamedArguments,
+    ),
+    ("logging-too-many-args", Rule::LoggingTooManyArguments),
+    ("logging-too-few-args", Rule::LoggingTooFewArguments),
+    ("re-sub-positional-args", Rule::ReSubPositionalArguments),
+    ("format-in-gettext-call", Rule::StrFormatInGettextCall),
+    (
+        "unnecessary-default-type-args",
+        Rule::UnnecessaryDefaultTypeArguments,
+    ),
+    (
+        "hardcoded-password-func-arg",
+        Rule::HardcodedPasswordArgument,
+    ),
+    (
+        "hardcoded-password-default",
+        Rule::HardcodedPasswordParameterDefault,
+    ),
+    (
+        "boolean-default-value-positional-parameter",
+        Rule::BooleanPositionalParameterDefault,
+    ),
+    (
+        "pytest-fixture-positional-args",
+        Rule::PytestFixturePositionalArguments,
+    ),
+    (
+        "pytest-fixture-param-without-value",
+        Rule::PytestFixtureParameterWithoutValue,
+    ),
+    (
+        "mutable-dataclass-default",
+        Rule::MutableDataclassFieldDefault,
     ),
 ];
 

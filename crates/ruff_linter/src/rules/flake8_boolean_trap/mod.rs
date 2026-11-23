@@ -16,7 +16,7 @@ mod tests {
     use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::BooleanAnnotatedPositionalParameter, Path::new("FBT.py"))]
-    #[test_case(Rule::BooleanDefaultValuePositionalParameter, Path::new("FBT.py"))]
+    #[test_case(Rule::BooleanPositionalParameterDefault, Path::new("FBT.py"))]
     #[test_case(Rule::BooleanPositionalValueInCall, Path::new("FBT.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
