@@ -12076,7 +12076,6 @@ enum DivergentOrigin {
 /// reference a recursive type. Both must survive dynamic type reduction
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reduced to `@Todo`).
 /// Otherwise, type inference cannot converge properly.
-/// For detailed properties of this type, see the unit test at the end of the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DivergentType {
     origin: DivergentOrigin,
