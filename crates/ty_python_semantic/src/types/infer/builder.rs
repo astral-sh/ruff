@@ -6099,7 +6099,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
-        let initial_argument_types = argument_types.clone();
         let env = self.program_environment();
 
         // Keep track of which arguments match generic parameters.
@@ -6184,7 +6183,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     builder.infer_and_check_argument_types_simple(
                         ast_arguments.clone(),
                         arguments,
-                        &initial_argument_types,
                         infer_argument_ty,
                         bindings,
                         &constraints,
@@ -6244,7 +6242,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let mut speculative_bindings = bindings.clone();
             let mut speculative_builder = self.speculate();
-            let mut speculative_argument_types = initial_argument_types.clone();
+            let mut speculative_argument_types = argument_types.clone();
 
             // Attempt to infer the argument types using the target type context.
             infer_and_check_argument_types(
@@ -6363,7 +6361,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         ast_arguments: ArgumentsIter<'_>,
         argument_types: &mut CallArguments<'call, 'db>,
-        baseline_argument_types: &CallArguments<'call, 'db>,
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
         bindings: &mut Bindings<'db>,
         constraints: &ConstraintSetBuilder<'db>,
@@ -6375,7 +6372,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let env = self.program_environment();
         let requires_overload_evaluation = requires_overload_evaluation(candidates);
         let arguments_tcx = self.collect_call_arguments_type_context(
-            baseline_argument_types,
+            argument_types,
             bindings,
             requires_overload_evaluation.then_some(candidates),
             constraints,
@@ -6406,9 +6403,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Otherwise, we first infer the argument types speculatively.
         let mut speculative_builder = self.speculate();
+        let mut checked_argument_types = argument_types.clone();
         speculative_builder.infer_all_argument_types(
             ast_arguments.clone(),
-            argument_types,
+            &mut checked_argument_types,
             &arguments_tcx,
             infer_argument_ty,
             // If there are multiple matching overloads, we will re-infer with the final set
@@ -6421,14 +6419,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db,
             env,
             constraints,
-            argument_types,
+            &checked_argument_types,
             call_expression_tcx,
             &self.dataclass_field_specifiers,
             CheckTypesMode::Finalize,
         );
-
-        let checked_argument_types = argument_types.clone();
-        *argument_types = baseline_argument_types.clone();
 
         // And re-infer argument types after overload evaluation, ensuring that only
         // inferred types and diagnostics from matching overloads are preserved.
@@ -6480,7 +6475,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut iteration = 0;
         let mut next_bindings = bindings.clone();
-        let mut prev_argument_types = argument_types.clone();
+        let mut prev_argument_types = Cow::Borrowed(&*argument_types);
 
         let (converged_builder, converged_argument_types) = loop {
             let mut next_argument_types = argument_types.clone();
@@ -6505,14 +6500,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let inferred_types_converged = next_argument_types
                 .inferred_types_equal_at(&prev_argument_types, generic_arguments);
 
-            // If the inferred types have converged, and already evaluated the bindings from the
-            // previous iteration, we are done.
-            if iteration > 0 && inferred_types_converged {
-                break (speculative_builder, next_argument_types);
+            // The first iteration starts with unchecked bindings. Later iterations can
+            // reuse the last check if the argument types have converged.
+            if iteration > 0 {
+                if inferred_types_converged {
+                    break (speculative_builder, next_argument_types);
+                }
+                next_bindings = bindings.clone();
             }
 
-            // Otherwise, we have to evaluate the bindings against the newly inferred types.
-            next_bindings = bindings.clone();
             let _ = next_bindings.check_types_impl(
                 db,
                 self.program_environment(),
@@ -6550,7 +6546,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             iteration += 1;
             arguments_tcx = next_arguments_tcx;
-            prev_argument_types = next_argument_types;
+            prev_argument_types = Cow::Owned(next_argument_types);
         };
 
         // Discard any non-matching constructors overloads now that the inferred types have converged.
