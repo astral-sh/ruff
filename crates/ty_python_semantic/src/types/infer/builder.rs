@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::cell::{LazyCell, OnceCell, RefCell};
+use std::cell::{Cell, LazyCell, OnceCell, RefCell};
 use std::collections::{HashSet, hash_map};
 use std::convert::Infallible;
 use std::rc::Rc;
@@ -7813,9 +7813,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Infer expressions once, in evaluation order and with their type context, before
         // recovering literal positions. For `(*[(item := 1), item],)`, both list elements
         // must be inferred before the traversal reads their types.
-        let inferred_type = |expression: &ast::Expr, promote| {
+        let last_promotion = Cell::new(None);
+        let inferred_type = |expression: &ast::Expr, promote: bool| {
             let ty = self.expression_type(expression);
-            if promote { ty.promote(db, env) } else { ty }
+            if !promote {
+                return ty;
+            }
+
+            // In large tables, many distinct literals promote to the same builtin instance.
+            if let Type::LiteralValue(literal) = ty
+                && literal.is_promotable()
+                && let Some(class) = literal.kind().known_class()
+            {
+                if let Some((previous, instance)) = last_promotion.get()
+                    && previous == class
+                {
+                    return instance;
+                }
+                let instance = ty.promote(db, env);
+                last_promotion.set(Some((class, instance)));
+                return instance;
+            }
+
+            ty.promote(db, env)
         };
         let spec = sequence_from_literal_elements(
             elts,
