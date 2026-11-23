@@ -311,6 +311,29 @@ impl<'db> BoundMethodType<'db> {
         self.callables(db).and_then(CallableTypes::exactly_one)
     }
 
+    /// Bind each overload without filtering or specializing it, retaining
+    /// the receiver constraints for argument checking.
+    #[salsa::tracked(
+        returns(as_ref),
+        cycle_result=|_, _, _| None,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    pub(super) fn bound_overloads_for_call(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<CallableSignature<'db>> {
+        let Type::Callable(callable) = self.func(db) else {
+            return None;
+        };
+        let signature = callable.signatures(db);
+        Some(signature.bind_self_with_receiver(
+            db,
+            &ProgramEnvironment::from_program(self.program(db)),
+            Some(self.signature_receiver(db)),
+            Some(self.typing_self_type(db)),
+        ))
+    }
+
     pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
         Some(self.into_callable_type(db)?.signatures(db))
     }

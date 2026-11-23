@@ -3757,6 +3757,36 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
+    /// Bind a method without filtering its overloads. Calls still need to
+    /// check receiver constraints and report errors at the original parameters.
+    pub(crate) fn for_bound_method(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        method: crate::types::BoundMethodType<'db>,
+        signatures: &CallableSignature<'db>,
+    ) -> Self {
+        let ty = Type::BoundMethod(method);
+        if signatures.overloads.len() > 1
+            && method.program(db) == env.program(db)
+            && let Some(bound) = method.bound_overloads_for_call(db)
+        {
+            let mut binding = Self::from_overloads(ty, bound.iter().cloned());
+            for (overload, source) in binding.overloads.iter_mut().zip(signatures.iter()) {
+                overload.source_parameter_index_offset = usize::from(
+                    source
+                        .parameters()
+                        .get(0)
+                        .is_some_and(Parameter::is_positional),
+                );
+            }
+            return binding;
+        }
+        let mut binding = Self::from_overloads(ty, signatures.iter().cloned())
+            .with_bound_type(method.signature_receiver(db));
+        binding.bake_bound_type_into_overloads(db, env);
+        binding
+    }
+
     /// Rewrites overload signatures as if an implicit bound receiver argument had already been
     /// consumed, preserving the corresponding source-parameter offset for diagnostics.
     pub(crate) fn bake_bound_type_into_overloads(

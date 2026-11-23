@@ -7305,11 +7305,7 @@ impl<'db> Type<'db> {
                     || protocol_receiver_is_specialized
                     || signature_receiver != self_instance
                 {
-                    let mut binding =
-                        CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
-                            .with_bound_type(signature_receiver);
-                    binding.bake_bound_type_into_overloads(db, env);
-                    binding.into()
+                    CallableBinding::for_bound_method(db, env, bound_method, &signature).into()
                 } else {
                     // Solve exact receiver constraints before checking the other arguments, but
                     // retain the receiver itself for call inference and receiver diagnostics.
