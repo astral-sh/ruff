@@ -12545,15 +12545,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let ty = self.expression_type(&decorator.expression);
                 let flags = FunctionDecorators::from_decorator_type(self.db(), ty);
                 known_decorators |= flags;
-                if flags.is_empty()
-                    && !matches!(ty, Type::ClassLiteral(class)
+                if !flags.is_empty()
+                    || matches!(ty, Type::ClassLiteral(class)
                         if class.known(self.db()) == Some(KnownClass::Property))
-                    && !(decorators.len() == 1
-                        && (returns_nominal_instance(self.db(), ty)
-                            || is_identity_decorator(self.db(), self.program_environment(), ty)))
                 {
-                    may_produce_abstract_method = true;
+                    continue;
                 }
+                if decorators.len() == 1 {
+                    if returns_nominal_instance(self.db(), ty) {
+                        continue;
+                    }
+                    // A class-body TypeGuard can narrow the method to an abstract function
+                    // even if the decorator preserves the type of the original definition.
+                    let bindings = self.index.use_def_map(definition.file_scope(self.db()));
+                    if !bindings.may_narrow(definition.place(self.db()))
+                        && is_identity_decorator(self.db(), self.program_environment(), ty)
+                    {
+                        continue;
+                    }
+                }
+                may_produce_abstract_method = true;
             }
             may_produce_abstract_method |=
                 known_decorators.contains(FunctionDecorators::ABSTRACT_METHOD);

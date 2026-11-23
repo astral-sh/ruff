@@ -1240,6 +1240,13 @@ impl<'db> UseDefMap<'db> {
         self.all_definitions.get(id).state()
     }
 
+    /// Returns whether any predicate in this scope may narrow `place`.
+    pub fn may_narrow(&self, place: ScopedPlaceId) -> bool {
+        self.constraint_tables()
+            .predicate_narrowing_targets
+            .contains_place(place)
+    }
+
     pub fn narrowing_evaluator(
         &self,
         constraint: ScopedNarrowingConstraint,
