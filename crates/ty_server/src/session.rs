@@ -291,12 +291,7 @@ impl Session {
         let environments = db.uv_environments().clone();
         let changes = environments.poll_sync(db);
         if self.global_settings.diagnostic_mode().is_workspace()
-            && matches!(
-                changes.project,
-                Some(ProjectReloadResult::Changed {
-                    files_changed: true,
-                })
-            )
+            && matches!(changes.project, Some(ProjectReloadResult::Changed { .. }))
         {
             let scripts = db.project().scripts_to_synchronize(db);
             Self::synchronize_closed_scripts(

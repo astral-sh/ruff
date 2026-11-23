@@ -1,3 +1,6 @@
+#[cfg(feature = "test-uv")]
+use std::process::Command;
+
 use anyhow::Result;
 use insta::assert_snapshot;
 use lsp_types::{
@@ -6,7 +9,7 @@ use lsp_types::{
 use ruff_db::system::SystemPath;
 use ruff_python_trivia::textwrap::dedent;
 #[cfg(feature = "test-uv")]
-use ty_project::UseUv;
+use ty_project::{UseUv, uv_test_env_vars};
 use ty_server::{ClientOptions, DiagnosticMode};
 
 use crate::TestServerBuilder;
@@ -290,6 +293,85 @@ fn saving_a_script_uv_opt_out_stops_resolving_its_dependencies() -> Result<()> {
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     ");
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "test-uv")]
+fn closed_script_syncs_after_project_configuration_reload() -> Result<()> {
+    let config = "src/ty.toml";
+    let builder = workspace_builder(DiagnosticMode::Workspace)?
+        .with_file(
+            "src/pyproject.toml",
+            dedent(
+                r#"
+            [project]
+            name = "example"
+            version = "0.1.0"
+            requires-python = ">=3.12"
+            "#,
+            ),
+        )?
+        .with_file(config, "project-manager.project = 'uv'")?
+        .with_file(
+            "src/script.py",
+            dedent(
+                r#"
+            # /// script
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+
+            import attrs
+            missing
+            "#,
+            ),
+        )?
+        .with_real_uv()?
+        .enable_work_done_progress(true);
+    let output = Command::new("uv")
+        .env_clear()
+        .envs(uv_test_env_vars())
+        .current_dir(builder.test_context.root().join("src").as_std_path())
+        .args(["sync", "--offline"])
+        .output()?;
+    anyhow::ensure!(
+        output.status.success(),
+        "uv sync failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let mut server = builder.build().wait_until_workspaces_are_initialized();
+
+    let initial = server.workspace_diagnostic_request(None, None);
+    assert_snapshot!(condensed_workspace_diagnostic_snapshot(initial), @"
+    file://<temp_dir>/src/script.py
+    	5:7..5:12[ERROR]: Cannot resolve imported module `attrs`
+
+    info: Searched in the following paths during module resolution:
+    info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    	6:0..6:7[ERROR]: Name `missing` used when not defined
+    ");
+    server.assert_work_done_progress("Checking")?;
+
+    server.write_file(
+        config,
+        dedent(
+            r#"
+        [project-manager]
+        project = "uv"
+        script = "uv"
+        "#,
+        ),
+    )?;
+    server.did_change_watched_file(config, lsp_types::FileChangeType::Changed);
+    server.assert_work_done_progress("Refreshing example metadata")?;
+    server.assert_work_done_progress("Synchronizing scripts")?;
+    let updated = server.workspace_diagnostic_request(None, None);
+    assert_snapshot!(condensed_workspace_diagnostic_snapshot(updated), @"
+    file://<temp_dir>/src/script.py
+    	6:0..6:7[ERROR]: Name `missing` used when not defined
+    ");
+    server.assert_work_done_progress("Checking")?;
     Ok(())
 }
 

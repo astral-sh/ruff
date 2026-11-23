@@ -562,16 +562,9 @@ impl MainLoop {
                     if !changes.is_empty() {
                         revision += 1;
                     }
-                    if let Some(project_change) = changes.project {
-                        if matches!(
-                            project_change,
-                            ProjectReloadResult::Changed {
-                                files_changed: true,
-                            }
-                        ) {
-                            let scripts = db.project().scripts_to_synchronize(db);
-                            self.synchronize_scripts(db, &scripts);
-                        }
+                    if matches!(changes.project, Some(ProjectReloadResult::Changed { .. })) {
+                        let scripts = db.project().scripts_to_synchronize(db);
+                        self.synchronize_scripts(db, &scripts);
                     }
                     if !changes.is_empty()
                         && let Some(watcher) = self.watcher.as_mut()
