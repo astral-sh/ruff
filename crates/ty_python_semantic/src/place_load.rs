@@ -115,7 +115,7 @@ impl<'db, 'a> PlaceLoadResolver<'db, 'a> {
                         .loaded_symbol_name()
                         .is_some_and(|name| name == "reveal_type") =>
                 {
-                    PlaceLoadConstraints::unnarrowed_source(
+                    ConstraintKeys::unnarrowed_source(
                         PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::UnimportedRevealType),
                         PlaceLoadSourceRole::Ordinary,
                     )
@@ -145,7 +145,7 @@ impl<'db, 'a> PlaceLoadResolver<'db, 'a> {
             place,
             deprecation_target: deprecation_target.unwrap_or(place),
             crosses_scope_declaration: self.procedure.crosses_scope_declaration,
-            constraint_keys: self.procedure.into_constraints(),
+            constraint_keys: self.procedure.constraints,
         }
     }
 
@@ -260,7 +260,7 @@ pub(crate) struct ResolvedPlaceLoad<'db> {
     /// or the `reveal_type` fallback.
     pub(crate) deprecation_target: PlaceAndQualifiers<'db>,
     /// Constraint keys accumulated for expression-level narrowing.
-    pub(crate) constraint_keys: Vec<(FileScopeId, ConstraintKey)>,
+    pub(crate) constraint_keys: ConstraintKeys,
     /// Whether resolution followed a `global` or `nonlocal` declaration.
     pub(crate) crosses_scope_declaration: bool,
 }
@@ -376,7 +376,7 @@ pub(crate) struct PlaceLoadResolutionProcedure<'db, 'ast> {
     /// The next node to visit in the resolution graph, or `None` after reaching a leaf.
     next_node: Option<PlaceLoadResolutionNode<'db>>,
     /// Narrowing constraints accumulated while resolution advances.
-    constraints: PlaceLoadConstraints,
+    constraints: ConstraintKeys,
     /// Whether resolution has crossed a `global` or `nonlocal` declaration so far.
     crosses_scope_declaration: bool,
 }
@@ -431,7 +431,7 @@ impl<'db> Iterator for PlaceLoadResolutionProcedure<'db, '_> {
                     self.next_node = Some(PlaceLoadResolutionNode::EnclosingScopeSource);
 
                     return Some(PlaceLoadResolutionStep::Source(
-                        PlaceLoadConstraints::unnarrowed_source(
+                        ConstraintKeys::unnarrowed_source(
                             PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::DunderClass(
                                 definition,
                             )),
@@ -533,7 +533,7 @@ impl<'db> Iterator for PlaceLoadResolutionProcedure<'db, '_> {
                         Some(PlaceLoadResolutionNode::Failure(PlaceLoadFailure::NotFound));
 
                     return Some(PlaceLoadResolutionStep::Source(
-                        PlaceLoadConstraints::unnarrowed_source(
+                        ConstraintKeys::unnarrowed_source(
                             PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::Builtin(name)),
                             PlaceLoadSourceRole::Ordinary,
                         ),
@@ -595,7 +595,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
             context,
             place_expr,
             next_node: Some(PlaceLoadResolutionNode::LocalSource),
-            constraints: PlaceLoadConstraints::default(),
+            constraints: ConstraintKeys::default(),
             crosses_scope_declaration,
         }
     }
@@ -856,10 +856,6 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
         source: &PlaceLoadSource<'_>,
     ) -> &[(FileScopeId, ConstraintKey)] {
         self.constraints.narrowing_constraints_for(source)
-    }
-
-    fn into_constraints(self) -> Vec<(FileScopeId, ConstraintKey)> {
-        self.constraints.into_constraints()
     }
 
     fn place_expr(&self) -> PlaceExprRef<'_> {
@@ -1394,11 +1390,12 @@ struct ForwardedGlobalSnapshot<'db> {
 
 /// Narrowing constraints accumulated while a consumer advances through a place load.
 #[derive(Default)]
-struct PlaceLoadConstraints {
-    constraint_keys: Vec<(FileScopeId, ConstraintKey)>,
+pub(crate) struct ConstraintKeys {
+    /// A read usually needs at most the constraint from its own scope.
+    keys: SmallVec<[(FileScopeId, ConstraintKey); 1]>,
 }
 
-impl PlaceLoadConstraints {
+impl ConstraintKeys {
     /// Creates a source narrowed by the constraints accumulated before it.
     ///
     /// `exit_constraint`, when present, is activated only after the source is requested (that
@@ -1423,8 +1420,8 @@ impl PlaceLoadConstraints {
         role: PlaceLoadSourceRole,
         exit_constraint: Option<(FileScopeId, ConstraintKey)>,
     ) -> PlaceLoadSource<'db> {
-        let entry_checkpoint = self.constraint_keys.len();
-        self.constraint_keys.extend(exit_constraint);
+        let entry_checkpoint = self.keys.len();
+        self.keys.extend(exit_constraint);
         PlaceLoadSource {
             kind,
             entry_checkpoint,
@@ -1446,7 +1443,7 @@ impl PlaceLoadConstraints {
 
     /// Extends the list of constraints used by subsequent sources.
     fn push(&mut self, scope: FileScopeId, key: ConstraintKey) {
-        self.constraint_keys.push((scope, key));
+        self.keys.push((scope, key));
     }
 
     /// Returns the constraints used to narrow `source`.
@@ -1454,11 +1451,11 @@ impl PlaceLoadConstraints {
         &self,
         source: &PlaceLoadSource<'_>,
     ) -> &[(FileScopeId, ConstraintKey)] {
-        &self.constraint_keys[..source.entry_checkpoint]
+        &self.keys[..source.entry_checkpoint]
     }
 
     /// Returns the constraints activated by the sources that were requested.
-    fn into_constraints(self) -> Vec<(FileScopeId, ConstraintKey)> {
-        self.constraint_keys
+    pub(crate) fn as_slice(&self) -> &[(FileScopeId, ConstraintKey)] {
+        &self.keys
     }
 }

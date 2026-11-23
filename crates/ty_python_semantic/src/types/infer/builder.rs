@@ -42,7 +42,7 @@ use crate::place::{
     place_from_declarations_with_reachability_cache,
 };
 use crate::place_load::{
-    ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolver, PlaceLoadSourceKind,
+    ConstraintKeys, ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolver, PlaceLoadSourceKind,
     ResolvedPlaceLoadSource,
 };
 use crate::reachability::{
@@ -11144,7 +11144,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         source_place: &SourcePlace,
         expr_ref: ast::ExprRef,
-    ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
+    ) -> (PlaceAndQualifiers<'db>, ConstraintKeys) {
         let mode = if self.is_deferred() && self.in_string_annotation() {
             PlaceLoadMode::StringAnnotation
         } else if self.is_deferred() {
@@ -11322,14 +11322,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         place: Option<&SourcePlace>,
         ty: Type<'db>,
-        constraint_keys: &[(FileScopeId, ConstraintKey)],
+        constraint_keys: &ConstraintKeys,
     ) -> Type<'db> {
         place.map_or(ty, |p| {
             self.narrow_place_with_applicable_constraints(
                 p.place(),
                 p.operand(),
                 ty,
-                constraint_keys,
+                constraint_keys.as_slice(),
             )
         })
     }
@@ -11398,7 +11398,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::ExprAttribute { value, attr, .. } = attribute;
 
         let db = self.db();
-        let mut constraint_keys = vec![];
+        let mut constraint_keys = ConstraintKeys::default();
 
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
             && typevar.is_paramspec(db)
@@ -11418,7 +11418,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(place_expr) = &place_expr {
             let (resolved, keys) =
                 self.infer_place_load(place_expr, ast::ExprRef::Attribute(attribute));
-            constraint_keys.extend(keys);
+            constraint_keys = keys;
             if let Place::Defined(
                 place @ DefinedPlace {
                     definedness: Definedness::AlwaysDefined,
