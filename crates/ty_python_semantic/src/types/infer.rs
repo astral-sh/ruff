@@ -279,6 +279,11 @@ pub(crate) fn infer_definition_types<'db>(
     .entered();
 
     let env = ProgramEnvironment::from_file(program_file);
+    if let Some(constant) =
+        TypeInferenceBuilder::infer_class_constant(db, &env, definition, &module)
+    {
+        return constant;
+    }
     TypeInferenceBuilder::for_definition(db, &env, definition, &module)
         .finish_definition(definition)
 }
