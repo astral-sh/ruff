@@ -524,6 +524,44 @@ def broaden_parameters[**P](consumer: CallbackConsumer[[]]) -> CallbackConsumer[
     return consumer  # error: [invalid-explicit-return]
 ```
 
+Depending on `Q`, callers of `job.target` may pass `flag="yes"` or omit `flag` entirely. An optional
+keyword-only parameter of type `object` or `Any` accepts both calls.
+
+```py
+from typing import Any
+from ty_extensions._internal import TypeOf
+
+def reserved(*args: Any, flag: bool = False, **kwargs: Any) -> None: ...
+def required(*args: Any, flag: Any, **kwargs: Any) -> None: ...
+def accepts_object(*args: Any, flag: object = False, **kwargs: Any) -> None: ...
+def accepts_any(*args: Any, flag: Any = False, **kwargs: Any) -> None: ...
+def check[**Q](job: Job[Q]) -> None:
+    reserved_job = Job(reserved)
+    a: Job[Q] = reserved_job  # error: [invalid-assignment]
+    b: Job[Q] = Job(required)  # error: [invalid-assignment]
+    c: Job[Q] = Job(accepts_object)  # ok
+    d: Job[Q] = Job(accepts_any)  # ok
+    # Q might exclude the flag keyword altogether.
+    e: TypeOf[reserved_job] = job  # error: [invalid-assignment]
+```
+
+## A reserved keyword in an overload implementation
+
+The first overload forwards `P`, which could accept `return_state="yes"`. The implementation
+reserves that keyword for a `bool`.
+
+```py
+from typing import Any, overload
+
+class Task[**P]:
+    @overload
+    # error: [inconsistent-overload-implementation]
+    def submit(self: "Task[P]", *args: P.args, **kwargs: P.kwargs) -> None: ...
+    @overload
+    def submit(self: "Task[P]", *, return_state: bool) -> None: ...
+    def submit(self: "Task[P]", *args: Any, return_state: bool = False, **kwargs: Any) -> None: ...
+```
+
 ## `ParamSpec` cannot specialize a `TypeVar`, and vice versa
 
 <!-- snapshot-diagnostics -->

@@ -16,7 +16,7 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::relation_error::ErrorRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
+use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::TupleType;
 use crate::types::typed_dict::TypedDictType;
 use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain};
@@ -2482,9 +2482,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
         if var.domain(db) == TypeVarDomain::ParameterSignature
             && let Type::Callable(other) = source
-            && (gradual(other) || other.is_bottom_paramspec_value(db))
+            && other.kind(db) == CallableTypeKind::ParamSpecValue
         {
-            return Some(self.always());
+            if gradual(other) || other.is_bottom_paramspec_value(db) {
+                return Some(self.always());
+            }
+            if self.relation.is_assignability() {
+                // The caller could specialize a fixed ParamSpec to the bottom signature,
+                // `(*args: object, **kwargs: object)`, which accepts every call. Even with
+                // gradual variadics, a required or narrowly typed keyword can rule out calls.
+                return Some(self.check_type_pair(
+                    db,
+                    source,
+                    TypeVarDomain::ParameterSignature.bottom(db),
+                ));
+            }
         }
 
         // Declared constraints can overlap. A source type might satisfy all of them.
@@ -3832,7 +3844,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             && callable
                 .signatures(db)
                 .iter()
-                .all(|signature| signature.parameters().kind() == ParametersKind::Gradual)
+                .all(|signature| signature.parameters().is_fully_gradual())
     }
 }
 

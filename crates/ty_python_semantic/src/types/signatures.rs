@@ -5269,7 +5269,7 @@ impl<'db> Parameters<'db> {
     }
 
     /// Returns whether the entire parameter list is gradual, with no fixed parameters.
-    fn is_fully_gradual(&self) -> bool {
+    pub(super) fn is_fully_gradual(&self) -> bool {
         self.kind() == ParametersKind::Gradual && self.len() == 2
     }
 
