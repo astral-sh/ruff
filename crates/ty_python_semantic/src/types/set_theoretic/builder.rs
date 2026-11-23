@@ -1378,6 +1378,19 @@ impl<'db> UnionBuilder<'db> {
                     continue;
                 }
 
+                // Disjoint leading literals distinguish tagged tuples. Only inspect
+                // the tags when we would otherwise check both directions for redundancy.
+                if let Some(left) = ty.exact_tuple_instance_spec(db)
+                    && let Some(left) = left.as_fixed_length()
+                    && let Some(Type::LiteralValue(tag)) = left.elements_slice().first()
+                    && let Some(right) = element_type.exact_tuple_instance_spec(db)
+                    && let Some(right) = right.as_fixed_length()
+                    && let Some(Type::LiteralValue(other)) = right.elements_slice().first()
+                    && tag.is_disjoint_from(db, *other)
+                {
+                    continue;
+                }
+
                 // Narrowing a union of classes can add the same exclusions to every
                 // alternative. Neither side can restore a shared exclusion. If each
                 // also requires a nominal bound the other lacks, neither subsumes the
