@@ -931,6 +931,23 @@ pub enum TypeVarFreshening<'db> {
 
 /// A capture pairs the original binding context with the receiving ParamSpec's identity.
 /// Repeated derivations share the same binding, even across materializations of its bounds.
+///
+/// TODO: Revisit why a captured parameter list carries the callback's
+/// entire generic context. For example, when we match `[T]() -> list[T]`
+/// against `Callable[P, list[Callable[P, int]]]`, `P` captures an empty
+/// parameter list. Substituting it into `Callable[P, int]` should give
+/// `() -> int`. Today we get `[T]() -> int`, even though that callable
+/// never uses `T`. Comparing it again can freshen `T` indefinitely, so
+/// we use the receiving ParamSpec to recognize the same binding each time.
+///
+/// With scoped existentials [1], we should be able to express the match
+/// as "there exists a `T` such that `P = []` and `T = Callable[P, int]`".
+/// Then `T` stays bound around the comparison, and substituting `P` only
+/// supplies the parameters. We still need to preserve the binder when
+/// forwarding the whole `[T]() -> list[T]` signature, since its return
+/// type uses `T`.
+///
+/// [1]: https://github.com/astral-sh/ruff/pull/29027
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct CapturedBinding<'db> {
     #[returns(copy)]

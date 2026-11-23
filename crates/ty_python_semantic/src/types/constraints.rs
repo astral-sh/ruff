@@ -140,6 +140,18 @@ impl<'db> TypeVarSet<'db> {
     /// Returns the binders brought into scope by each `ParamSpec` in this set. A captured
     /// generic callable brings its own binders into scope when comparing its parameters
     /// with other bounds, such as the arguments forwarded by `fn(*args, **kwargs)`.
+    ///
+    /// TODO: We anticipate that this method can be removed as part of the scoped
+    /// existentials work [1]. For example, suppose `P` captures the parameters
+    /// of `def identity[T](x: T, /) -> T` when we match it against `Callable[P, R]`.
+    /// We could express that match as `∃ T. (P = (x: T, /) ∧ T ≤ R)`.
+    ///
+    /// If the capture retains that existential scope, we can open it when checking
+    /// a forwarded call. The argument then constrains the same `T` that determines
+    /// the callback's return type, without us having to search the constraints to
+    /// rediscover which type variables belong to the capture.
+    ///
+    /// [1]: https://github.com/astral-sh/ruff/pull/29027
     fn captured_typevars<I: IntoIterator<Item = AtomicConstraintId>>(
         self,
         db: &'db dyn Db,
@@ -5053,6 +5065,25 @@ impl InteriorNode {
         // Comparing lower and upper callable bounds can capture a generic signature in
         // a ParamSpec being projected out. Other derived facts can still refer to its
         // binders, so include these intermediate captures when checking what left scope.
+        //
+        // TODO: We shouldn't have to inspect the sequent map to figure out which
+        // type variables are local to a callable comparison.
+        //
+        // For example, suppose we're trying to eliminate a ParamSpec `P`. While
+        // comparing its bounds, we encounter a generic callback `[T](x: T) -> T`.
+        // We can infer both that `P` captures `(x: T)` and that `T <= R`, where `R`
+        // is the expected return type. When we eliminate `P`, we can lose the capture
+        // but keep `T <= R`. The outer solver then sees a bound on `T` with no way
+        // to tell that `T` belonged to the callback. We look through the sequents
+        // here to find the lost capture so we know to eliminate `T` too.
+        //
+        // With scoped existentials [1], we'll keep the constraints from the callback
+        // comparison under a BDD node that says “there exists a T such that ...”.
+        // Quantifying over P will add another existential node. The capture and
+        // `T <= R` will both still be there, under the node that binds T. At that
+        // point, we won't need this search for lost captures.
+        //
+        // [1] https://github.com/astral-sh/ruff/pull/29027
         let scope = if derived_source_order.is_some() {
             let captured = inferable.captured_typevars(db, storage, || path.implied_constraints());
             inferable.merge(db, captured)

@@ -213,6 +213,19 @@ pub(crate) enum TypeVarEvaluation {
     /// `L`, its declared choices.
     /// Receiver comparisons use `Lazy` because the receiver can approximate a whole
     /// family of specializations, only some of which the base method accepts.
+    ///
+    /// TODO: We anticipate that scoped existentials [1] will let us use `Lazy`
+    /// here. For example, if a method declares `T: bool` and a parameter comparison
+    /// requires `int ≤ T`, we need to check `∃ T ≤ bool. int ≤ T`, which is false.
+    /// Today `reduce_inferable` can remove `int ≤ T` before the solver consults
+    /// `T`'s declaration. Keeping `T` in an existential node would let the solver
+    /// check its declared bound when deciding whether a specialization exists.
+    ///
+    /// For overrides, we also need to account for the base method's receiver
+    /// restriction. The override only has to work for receivers on which the base
+    /// method is callable.
+    ///
+    /// [1]: https://github.com/astral-sh/ruff/pull/29027
     LazyWithEagerBounds,
 
     /// Derive constraints from existing bounds, preserving exclusions on source typevars

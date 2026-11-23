@@ -8979,6 +8979,8 @@ pub(crate) struct Binding<'db> {
 }
 
 impl<'db> Binding<'db> {
+    // TODO: Move the `inferable` parameter from `ConstraintSet.solutions` to each of the
+    // various constructors.
     fn constraint_solver_scope(
         &mut self,
         db: &'db dyn Db,
