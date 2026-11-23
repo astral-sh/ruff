@@ -67,21 +67,6 @@ impl<'db> Type<'db> {
         any_over_type(db, env, self, false, |ty| matches!(ty, Type::TypeVar(_)))
     }
 
-    /// Search for a bound type variable, treating aliases and recursive types as
-    /// possible matches without expanding them.
-    pub(super) fn may_contain_typevars(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> bool {
-        any_over_type(db, env, self, false, |ty| {
-            matches!(
-                ty,
-                Type::TypeVar(_) | Type::TypeAlias(_) | Type::Recursive(_)
-            )
-        })
-    }
-
     pub(crate) fn references_typevar(
         self,
         db: &'db dyn Db,
@@ -1031,6 +1016,65 @@ impl<'db> TypeVarNonceGenerator<'db> {
     }
 }
 
+/// Returns whether a type could contain a bound type variable.
+///
+/// Unions can share a large nested type even when their members differ. Cache the
+/// answer for each compound type so we only search its children once. Leave aliases,
+/// recursive types, and cycles for the caller to inspect with its own recursion guard.
+fn may_need_freshening<'db>(db: &'db dyn Db, program: Program<'db>, ty: Type<'db>) -> bool {
+    #[salsa::tracked(
+        returns(copy),
+        cycle_result=|_, _, _, _| true,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn children_may_need_freshening<'db>(
+        db: &'db dyn Db,
+        program: Program<'db>,
+        ty: NonAtomicType<'db>,
+    ) -> bool {
+        struct Children<'db> {
+            env: ProgramEnvironment<'db>,
+            found: Cell<bool>,
+        }
+
+        impl<'db> TypeVisitor<'db> for Children<'db> {
+            fn program_environment(&self) -> &ProgramEnvironment<'db> {
+                &self.env
+            }
+
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if !self.found.get() && may_need_freshening(db, self.env.program(db), ty) {
+                    self.found.set(true);
+                }
+            }
+        }
+
+        let visitor = Children {
+            env: ProgramEnvironment::from_program(program),
+            found: Cell::new(false),
+        };
+        walk_non_atomic_type(db, ty, &visitor);
+        visitor.found.get()
+    }
+
+    match TypeKind::from(ty) {
+        TypeKind::Atomic => false,
+        TypeKind::NonAtomic(
+            NonAtomicType::TypeVar(_) | NonAtomicType::TypeAlias(_) | NonAtomicType::Recursive(_),
+        ) => true,
+        TypeKind::NonAtomic(NonAtomicType::NominalInstance(instance))
+            if !instance.is_definition_generic(db) =>
+        {
+            false
+        }
+        TypeKind::NonAtomic(ty) => children_may_need_freshening(db, program, ty),
+    }
+}
+
 /// Returns the union members to inspect for type variable collisions.
 ///
 /// Keeping members intact bounds the size of the cached slice and lets the caller
@@ -1041,12 +1085,11 @@ fn freshening_candidates<'db>(
     program: Program<'db>,
     union: UnionType<'db>,
 ) -> Box<[Type<'db>]> {
-    let env = ProgramEnvironment::from_program(program);
     union
         .elements(db)
         .iter()
         .copied()
-        .filter(|ty| ty.may_contain_typevars(db, &env))
+        .filter(|&ty| may_need_freshening(db, program, ty))
         .collect()
 }
 
