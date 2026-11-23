@@ -3478,9 +3478,15 @@ impl<'db> CandidateTypeVarSolver<'db> {
                     .peekable();
 
                 evidence.peek().is_some()
-                    && evidence.all(|ty| {
-                        ty.is_type_var()
-                            || ty.bottom_materialization(db, env) != ty.top_materialization(db, env)
+                    && evidence.all(|ty| match ty {
+                        // A fixed `U: (bool, int)` must promote to `int` for `T: (int, object)`.
+                        // Check each variable before lower bounds combine into a union like `U | V`.
+                        Type::TypeVar(peer) => {
+                            peer.is_inferable(db, inferable)
+                                || !peer.typevar(db).is_constrained(db)
+                                || peer.can_specialize_typevar(db, env, bound_typevar)
+                        }
+                        _ => ty.bottom_materialization(db, env) != ty.top_materialization(db, env),
                     })
             });
 
@@ -3614,7 +3620,7 @@ pub(crate) struct CandidateTypeVarSolution<'db> {
     upper: UpperBound<'db>,
     /// Whether any bound originates from declared evidence.
     has_declared_evidence: bool,
-    /// Whether every original evidence bound is gradual or another `TypeVar`.
+    /// Whether all evidence is gradual or from type variables eligible for a family solution.
     has_only_non_concrete_evidence: Option<bool>,
     /// The declared constraint selected for this range, if the typevar is constrained.
     selected_declared_constraint: Option<Type<'db>>,

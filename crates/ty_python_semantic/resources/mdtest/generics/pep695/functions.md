@@ -6114,6 +6114,26 @@ def g[S: (bool, str)](x: S) -> S:
     return f(x)  # error: [invalid-argument-type]
 ```
 
+## Promoting constrained arguments to a declared choice
+
+`int` is the narrowest choice for `T` that accepts both `bool` and `int`. When `U` and `V` are both
+`bool`, even `U | V` excludes the plain `int` returned by `zero`.
+
+```py
+def zero[T: (int, object)](x: T, *rest: T) -> T:
+    return 0
+
+def one[U: (bool, int)](x: U) -> U:
+    result = zero(x)
+    reveal_type(result)  # revealed: int
+    return result  # error: [invalid-explicit-return]
+
+def two[U: (bool, int), V: (bool, int)](x: U, y: V) -> U | V:
+    result = zero(x, y)
+    reveal_type(result)  # revealed: int
+    return result  # error: [invalid-explicit-return]
+```
+
 ## Inferring a constrained type variable from a common subclass and a callback
 
 `Both` fits all three constraints on `T`. The callback may accept only `A` or only `B`, so no single
