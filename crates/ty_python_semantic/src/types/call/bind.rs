@@ -6080,7 +6080,31 @@ fn enumerate_argument_types<'a, 'db>(
     })
 }
 
-/// The inputs to parameter specialization when the expected return type supplies no bindings.
+/// The return annotation and expected type that constrain argument inference.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct ReturnTypeContext<'db> {
+    return_ty: Type<'db>,
+    expected: Type<'db>,
+    kind: TypeContextKind,
+}
+
+impl<'db> ReturnTypeContext<'db> {
+    fn bounds(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        generic_context: GenericContext<'db>,
+    ) -> &'db CandidateSolutions<'db> {
+        self.return_ty.assignable_solutions_for_argument_context(
+            db,
+            env,
+            self.expected,
+            generic_context.inferable_typevars(db),
+        )
+    }
+}
+
+/// The inputs to parameter specialization for one pass of argument inference.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype)]
 enum ParameterContextKey<'db> {
     Uninferred(GenericContext<'db>),
@@ -6095,7 +6119,9 @@ struct ExplicitParameterContext<'db> {
     #[returns(copy)]
     program: Program<'db>,
     #[returns(copy)]
-    inference: TypeVarInference<'db>,
+    inference: Option<TypeVarInference<'db>>,
+    #[returns(copy)]
+    return_context: Option<ReturnTypeContext<'db>>,
 }
 
 impl<'db> ParameterContextKey<'db> {
@@ -6104,23 +6130,26 @@ impl<'db> ParameterContextKey<'db> {
         env: &ProgramEnvironment<'db>,
         generic_context: GenericContext<'db>,
         inference: Option<TypeVarInference<'db>>,
+        return_context: Option<ReturnTypeContext<'db>>,
     ) -> Self {
-        let Some(inference) = inference else {
-            return Self::Uninferred(generic_context);
-        };
         let program = env.program(db);
-        if inference.generic_context(db) == generic_context
-            && generic_context.program(db) == program
-        {
-            Self::Inferred(inference)
-        } else {
-            Self::Explicit(ExplicitParameterContext::new(
-                db,
-                generic_context,
-                program,
-                inference,
-            ))
+        if return_context.is_none() {
+            let Some(inference) = inference else {
+                return Self::Uninferred(generic_context);
+            };
+            if inference.generic_context(db) == generic_context
+                && generic_context.program(db) == program
+            {
+                return Self::Inferred(inference);
+            }
         }
+        Self::Explicit(ExplicitParameterContext::new(
+            db,
+            generic_context,
+            program,
+            inference,
+            return_context,
+        ))
     }
 }
 
@@ -6214,17 +6243,37 @@ fn parameter_context_specialization<'db>(
     env: &ProgramEnvironment<'db>,
     generic_context: GenericContext<'db>,
     inference: Option<TypeVarInference<'db>>,
-    return_type_solutions: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
-    return_context_kind: TypeContextKind,
-    return_bounds: Option<&CandidateSolutions<'db>>,
+    constraints: &ConstraintSetBuilder<'db>,
+    return_context: Option<ReturnTypeContext<'db>>,
 ) -> ArgumentContextSpecialization<'db> {
+    let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
+        FxHashMap::default();
+    let return_bounds = return_context.map(|context| context.bounds(db, env, generic_context));
+    if let Some(bounds) = return_bounds
+        && let Solutions::Constrained(solutions) =
+            bounds.solve_for_argument_context(db, env, constraints)
+    {
+        for solution in solutions.into_vec() {
+            for binding in solution.solved_typevars {
+                let identity = binding.bound_typevar.identity(db);
+                return_type_solutions
+                    .entry(identity)
+                    .and_modify(|existing| {
+                        *existing =
+                            UnionType::from_two_elements(db, env, *existing, binding.solution);
+                    })
+                    .or_insert(binding.solution);
+            }
+        }
+    }
+
     let specialization = if let Some(inference) = inference {
         inferred_parameter_specialization(
             db,
             env,
             generic_context,
             inference,
-            return_type_solutions,
+            &return_type_solutions,
             return_bounds,
         )
     } else {
@@ -6249,7 +6298,7 @@ fn parameter_context_specialization<'db>(
         .map(|typevar| {
             let identity = typevar.identity(db);
             if return_type_solutions.contains_key(&identity) {
-                Some(return_context_kind)
+                return_context.map(|context| context.kind)
             } else {
                 inference
                     .is_some_and(|inference| inference.has_inferred_type(db, identity))
@@ -9333,8 +9382,6 @@ impl<'db> Binding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Cow<'db, ArgumentContextSpecialization<'db>> {
-        /// With no evidence from the expected return type, every call in this program
-        /// with the same generic context and inferred arguments has the same parameter context.
         #[salsa::tracked(
             returns(as_ref),
             cycle_initial = |_, _, _, _| None,
@@ -9344,7 +9391,7 @@ impl<'db> Binding<'db> {
             db: &'db dyn Db,
             key: ParameterContextKey<'db>,
         ) -> Option<ArgumentContextSpecialization<'db>> {
-            let (generic_context, program, inference) = match key {
+            let (generic_context, program, inference, return_context) = match key {
                 ParameterContextKey::Uninferred(context) => {
                     return Some(ArgumentContextSpecialization {
                         specialization: context.repeat_specialization(
@@ -9356,62 +9403,44 @@ impl<'db> Binding<'db> {
                 }
                 ParameterContextKey::Inferred(inference) => {
                     let context = inference.generic_context(db);
-                    (context, context.program(db), inference)
+                    (context, context.program(db), Some(inference), None)
                 }
-                ParameterContextKey::Explicit(key) => {
-                    (key.generic_context(db), key.program(db), key.inference(db))
-                }
+                ParameterContextKey::Explicit(key) => (
+                    key.generic_context(db),
+                    key.program(db),
+                    key.inference(db),
+                    key.return_context(db),
+                ),
             };
             Some(parameter_context_specialization(
                 db,
                 &ProgramEnvironment::from_program(program),
                 generic_context,
-                Some(inference),
-                &FxHashMap::default(),
-                TypeContextKind::preference(),
-                None,
+                inference,
+                &ConstraintSetBuilder::new(),
+                return_context,
             ))
         }
 
-        let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
-            FxHashMap::default();
-        let return_bounds = call_expression_tcx.expected_type().map(|expected| {
-            self.unspecialized_return_type(db)
-                .assignable_solutions_for_argument_context(
-                    db,
-                    env,
-                    expected,
-                    generic_context.inferable_typevars(db),
+        // Calls whose expected type contributes no bounds can share a cache entry
+        // with calls that have no expected type.
+        let return_context = call_expression_tcx
+            .expected_type()
+            .map(|expected| ReturnTypeContext {
+                return_ty: self.unspecialized_return_type(db),
+                expected,
+                kind: call_expression_tcx.kind(),
+            })
+            .filter(|context| {
+                matches!(
+                    context.bounds(db, env, generic_context),
+                    CandidateSolutions::Constrained(_)
                 )
-        });
-        if let Some(path_bounds) = return_bounds {
-            let solutions = path_bounds.solve_for_argument_context(db, env, constraints);
-            if let Solutions::Constrained(solutions) = solutions {
-                for solution in solutions.into_vec() {
-                    for binding in solution.solved_typevars {
-                        let identity = binding.bound_typevar.identity(db);
-                        return_type_solutions
-                            .entry(identity)
-                            .and_modify(|existing| {
-                                *existing = UnionType::from_two_elements(
-                                    db,
-                                    env,
-                                    *existing,
-                                    binding.solution,
-                                );
-                            })
-                            .or_insert(binding.solution);
-                    }
-                }
-            }
-        }
-
-        if return_type_solutions.is_empty()
-            && let Some(specialization) = inferred_parameter_context(
-                db,
-                ParameterContextKey::new(db, env, generic_context, inference),
-            )
-        {
+            });
+        if let Some(specialization) = inferred_parameter_context(
+            db,
+            ParameterContextKey::new(db, env, generic_context, inference, return_context),
+        ) {
             return Cow::Borrowed(specialization);
         }
         Cow::Owned(parameter_context_specialization(
@@ -9419,9 +9448,8 @@ impl<'db> Binding<'db> {
             env,
             generic_context,
             inference,
-            &return_type_solutions,
-            call_expression_tcx.kind(),
-            return_bounds,
+            constraints,
+            return_context,
         ))
     }
 
