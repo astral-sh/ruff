@@ -1844,31 +1844,6 @@ fn abstract_methods_track_changes_to_identity_decorators() -> anyhow::Result<()>
 }
 
 #[test]
-fn inherited_annotation_added_and_removed() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    db.write_file(
-        "/src/child.py",
-        "from parent import Parent\nclass Child(Parent):\n    items = []\nitems = Child.items",
-    )?;
-
-    for (body, expected) in [
-        ("pass", "list[Unknown]"),
-        ("items: list[int]", "list[int]"),
-        ("items: list[str]", "list[str]"),
-        ("pass", "list[Unknown]"),
-    ] {
-        db.write_file("/src/parent.py", format!("class Parent: {body}"))?;
-        let child = system_path_to_file(&db, "/src/child.py").unwrap();
-        let items = global_symbol(&db, child, "items").place.expect_type();
-        assert_eq!(
-            items.display(&db, &db.program_environment()).to_string(),
-            expected
-        );
-    }
-    Ok(())
-}
-
-#[test]
 fn dependency_internal_symbol_change() -> anyhow::Result<()> {
     let mut db = setup_db();
 
@@ -2094,6 +2069,82 @@ fn declared_instance_attribute_avoids_inferring_method_assignments() -> anyhow::
     // index modules that are only used by assignments to it in method bodies.
     assert_function_query_was_not_run(&db, semantic_index, program_file(&db, dependency), &events);
 
+    Ok(())
+}
+
+#[test]
+fn inherited_annotation_added_and_removed() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file(
+        "/src/child.py",
+        "from parent import Parent\nclass Child(Parent):\n    items = []\nitems = Child.items",
+    )?;
+
+    for (body, expected) in [
+        ("pass", "list[Unknown]"),
+        ("items: list[int]", "list[int]"),
+        ("items: list[str]", "list[str]"),
+        ("pass", "list[Unknown]"),
+    ] {
+        db.write_file("/src/parent.py", format!("class Parent: {body}"))?;
+        let child = system_path_to_file(&db, "/src/child.py").unwrap();
+        let items = global_symbol(&db, child, "items").place.expect_type();
+        assert_eq!(
+            items.display(&db, &db.program_environment()).to_string(),
+            expected
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn recursive_inherited_annotation_after_looking_up_subclass_attribute() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY312)
+        .build()?;
+    let path = "/src/main.py";
+    db.write_dedented(
+        path,
+        r#"
+        from typing import NamedTuple, Protocol, overload, reveal_type
+
+        class Result:
+            type Item = int
+
+        class HasStrKind(Protocol):
+            kind: type[str] | None
+
+        class Base:
+            kind: type["Selected.Item"] | None
+
+        class Record(NamedTuple):
+            item: "Selected.Item"
+
+        @overload
+        def choose[T: HasStrKind](cls: type[T]) -> type[T]: ...
+        @overload
+        def choose(cls: type[Base]) -> type[Result]: ...
+        def choose(cls):
+            return Result if issubclass(cls, Base) else cls
+
+        class Child(Base, Record):
+            kind = int
+            Item = kind
+
+        Selected = choose(Child)
+        reveal_type(Selected)
+        "#,
+    )?;
+
+    // Hovering over `kind` can start inference here, before we check the call to `choose`.
+    let file = program_file(&db, system_path_to_file(&db, path)?);
+    let module = parsed_module(&db, file.python_file(&db)).load(&db);
+    let child = semantic_index(&db, file)
+        .scope_ids()
+        .find(|scope| scope.name(&db, &module) == "Child")
+        .unwrap();
+    infer_complete_scope_types(&db, child);
+    assert_revealed_type(&db, path, "type[Result]");
     Ok(())
 }
 

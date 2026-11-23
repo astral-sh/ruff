@@ -4,7 +4,8 @@ use crate::place::{
     TypeOrigin, place_by_id, place_from_bindings, place_from_declarations,
 };
 use crate::types::{
-    ProgramEnvironment, StaticClassLiteral, Type, class::MroLookup, infer::nearest_enclosing_class,
+    ClassBase, ProgramEnvironment, StaticClassLiteral, Type, class::MroLookup,
+    infer::nearest_enclosing_class,
 };
 use ty_python_core::{
     place_table, scope::ScopeId, semantic_index, symbol::ScopedSymbolId, use_def_map,
@@ -144,35 +145,41 @@ pub(super) fn class_member_with_symbol<'db>(
     })
 }
 
-/// Local symbols whose names occur in a base class body, in symbol ID order.
-#[salsa::tracked(returns(deref), cycle_initial=|_, _, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
-pub(super) fn inherited_declaration_candidates<'db>(
+/// Undeclared bindings whose names occur in a base class body, in symbol ID order.
+/// Returns `None` when the bases aren't fully known and every name needs a lookup.
+#[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+fn inherited_declaration_candidates<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
-) -> Box<[ScopedSymbolId]> {
+) -> Option<Box<[ScopedSymbolId]>> {
     let index = semantic_index(db, scope.program_file(db));
-    let Some(class) = nearest_enclosing_class(db, index, scope) else {
-        return Box::default();
-    };
-    let bases: Vec<_> = class
-        .identity_specialization(db)
-        .iter_mro(db)
-        .skip(1)
-        .filter_map(|base| {
-            let (base, _) = base.into_class()?.static_class_literal(db)?;
-            Some(place_table(db, base.body_scope(db)))
-        })
-        .collect();
-    place_table(db, scope)
+    let class = nearest_enclosing_class(db, index, scope)?;
+    let mut bases = Vec::new();
+    for base in class.identity_specialization(db).iter_mro(db).skip(1) {
+        let base = match base {
+            ClassBase::Dynamic(_) | ClassBase::Divergent(_) => return None,
+            ClassBase::Any | ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => {
+                continue;
+            }
+            ClassBase::Class(base) => base,
+        };
+        let (base, _) = base.static_class_literal(db)?;
+        bases.push(place_table(db, base.body_scope(db)));
+    }
+
+    let candidates = index
+        .place_table(scope.file_scope_id(db))
         .symbols()
         .enumerate()
+        .filter(|(_, symbol)| symbol.is_bound() && !symbol.is_declared())
         .filter(|(_, symbol)| {
             bases
                 .iter()
                 .any(|base| base.symbol_id(symbol.name()).is_some())
         })
         .map(|(id, _)| ScopedSymbolId::from_usize(id))
-        .collect()
+        .collect();
+    Some(candidates)
 }
 
 /// Returns the inherited class-body annotation governing an unannotated class attribute.
@@ -186,7 +193,20 @@ pub(super) fn inherited_class_body_declaration<'db>(
     scope: ScopeId<'db>,
     symbol: ScopedSymbolId,
 ) -> Option<ClassBodyDeclaration<'db>> {
-    scope.node(db).as_class()?;
+    let index = semantic_index(db, scope.program_file(db));
+    let scope_id = scope.file_scope_id(db);
+    index.scope(scope_id).node().as_class()?;
+    let table = index.place_table(scope_id);
+
+    // Resolving the bases can recursively look up this attribute. Keep the filter
+    // inside the per-name query so a recursive lookup sees its provisional result.
+    if !table.symbol(symbol).is_declared()
+        && inherited_declaration_candidates(db, scope)
+            .as_ref()
+            .is_some_and(|candidates| candidates.binary_search(&symbol).is_err())
+    {
+        return None;
+    }
     let use_def = use_def_map(db, scope);
     let env = ProgramEnvironment::from_scope(scope);
     if !place_from_declarations(db, &env, use_def.end_of_scope_symbol_declarations(symbol))
@@ -196,8 +216,7 @@ pub(super) fn inherited_class_body_declaration<'db>(
         return None;
     }
 
-    let class = nearest_enclosing_class(db, semantic_index(db, scope.program_file(db)), scope)?;
-    let table = place_table(db, scope);
+    let class = nearest_enclosing_class(db, index, scope)?;
     class_body_declaration_from_bases(db, &env, class, table.symbol(symbol).name())
 }
 

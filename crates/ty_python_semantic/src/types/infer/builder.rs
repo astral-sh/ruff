@@ -114,10 +114,7 @@ use crate::types::infer::{
     nearest_enclosing_class, nearest_enclosing_function, original_class_type,
 };
 use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
-use crate::types::member::{
-    class_body_declaration_from_bases, inherited_class_body_declaration,
-    inherited_declaration_candidates,
-};
+use crate::types::member::{class_body_declaration_from_bases, inherited_class_body_declaration};
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::narrow::pattern_success_types;
 use crate::types::newtype::NewType;
@@ -1757,10 +1754,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Avoid allocating inheritance-query cache entries for ordinary local variables.
             && self.index.scope(file_scope_id).kind() == ScopeKind::Class
             && let Some(symbol) = place_id.as_symbol()
-            // For a name with no local declarations, avoid memoizing a negative
-            // lookup if the name doesn't occur in any base class body.
-            && (place_table.symbol(symbol).is_declared()
-                || inherited_declaration_candidates(db, binding.scope(db)).binary_search(&symbol).is_ok())
             && let Some(inherited) =
                 inherited_class_body_declaration(db, binding.scope(db), symbol)
         {
