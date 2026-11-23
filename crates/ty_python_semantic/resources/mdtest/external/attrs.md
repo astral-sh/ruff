@@ -299,7 +299,8 @@ class Person:
 Person.__attrs_init__  # error: [missing-attribute]
 ```
 
-When `init` is omitted, `@define` detects a custom `__init__` and generates `__attrs_init__`.
+attrs also generates an `__attrs_init__` method when `init` is omitted and `@define` detects a
+custom `__init__`.
 
 ```py
 @define
