@@ -6324,6 +6324,45 @@ fn parameter_context_specialization<'db>(
     }
 }
 
+/// Inputs to generic inference when a call has no expected return type. Only
+/// the ordered formal and actual types affect a successful solution.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct GenericArguments<'db> {
+    #[returns(copy)]
+    context: GenericContext<'db>,
+    #[returns(copy)]
+    return_ty: Type<'db>,
+    #[returns(deref)]
+    relations: Box<[(Type<'db>, Type<'db>)]>,
+}
+
+#[salsa::tracked(
+    returns(copy),
+    cycle_result=|_, _, _| None,
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn infer_generic_arguments<'db>(
+    db: &'db dyn Db,
+    arguments: GenericArguments<'db>,
+) -> Option<TypeVarInference<'db>> {
+    let context = arguments.context(db);
+    let env = &ProgramEnvironment::from_program(context.program(db));
+    let constraints = &ConstraintSetBuilder::new();
+    let mut builder = SpecializationBuilder::new(db, env, constraints, context);
+    for &(formal, actual) in arguments.relations(db) {
+        builder.infer(formal, actual).ok()?;
+    }
+    let return_ty = arguments.return_ty(db);
+    let prefer = TypeContext::default().should_prefer_expected_type();
+    builder
+        .build_inference_with(ReportDiagnostics::Yes, |_, bounds| {
+            bounds.map(|bounds| {
+                CallInference::solve_typevar(db, env, return_ty, constraints, bounds, prefer)
+            })
+        })
+        .ok()
+}
+
 /// Completed inference and its diagnostics, passed together to argument validation.
 /// The suppression flags correspond to the retained errors, including after a retry.
 struct InferredCall<'db> {
@@ -7023,6 +7062,43 @@ impl<'db> CallInference<'_, 'db> {
             return self.infer_legacy(constraints, generic_context, constraint_set_errors);
         }
 
+        // Expected return types and unpacked variadic packs can add constraints
+        // beyond the argument relations. Keep those calls and any failed solutions
+        // on the path that has the full argument list and diagnostic locations.
+        if self.call_expression_tcx == TypeContext::default()
+            && generic_context.program(db) == self.env.program(db)
+            // With a declared bound or constraints, rejecting one overload can be
+            // expensive. Solve those calls once with the full diagnostic context.
+            && generic_context.variables(db).all(|var| {
+                let var = var.typevar(db);
+                var.is_simple(db) || var.is_self(db)
+            })
+            && self
+                .signature
+                .parameters()
+                .variadic()
+                .is_none_or(|(_, parameter)| !parameter.has_starred_annotation())
+        {
+            let relations: SmallVec<[_; 4]> = self
+                .argument_relations()
+                .filter(|r| r.declared_type != r.argument_type)
+                .map(|r| (r.declared_type, r.argument_type))
+                .collect();
+            let arguments =
+                GenericArguments::new(db, generic_context, self.return_ty, relations.as_slice());
+            if let Some(inference) = infer_generic_arguments(db, arguments) {
+                let (return_ty, arguments_validated) = self.select_return_type(inference);
+                return InferredCall {
+                    inferable_typevars: self.inferable_typevars,
+                    inference: Some(inference),
+                    return_ty,
+                    arguments_validated,
+                    errors: Vec::new(),
+                    constraint_set_errors,
+                };
+            }
+        }
+
         let mut specialization_errors = Vec::new();
         let mut builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
 
@@ -7085,7 +7161,10 @@ impl<'db> CallInference<'_, 'db> {
                 &mut specialization_errors,
                 |_, bounds| {
                     bounds.map(|bounds| {
-                        self.solve_typevar(
+                        Self::solve_typevar(
+                            self.db,
+                            self.env,
+                            self.return_ty,
                             constraints,
                             bounds,
                             self.call_expression_tcx.should_prefer_expected_type(),
@@ -7337,7 +7416,10 @@ impl<'db> CallInference<'_, 'db> {
 
         let inference = builder.build_inference_with(report_diagnostics, |_, bounds| {
             bounds.map(|bounds| {
-                self.solve_typevar(
+                Self::solve_typevar(
+                    self.db,
+                    self.env,
+                    self.return_ty,
                     constraints,
                     bounds,
                     self.call_expression_tcx.should_prefer_expected_type(),
@@ -7363,39 +7445,33 @@ impl<'db> CallInference<'_, 'db> {
     }
 
     fn solve_typevar(
-        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        return_ty: Type<'db>,
         constraints: &ConstraintSetBuilder<'db>,
         bounds: &CandidateTypeVarSolution<'db>,
         prefer_declared: bool,
     ) -> PathBoundSolution<'db> {
-        let db = self.db;
         let typevar = bounds.bound_typevar;
 
-        CandidateSolutions::solve_with_preference(
-            db,
-            self.env,
-            constraints,
-            bounds,
-            prefer_declared,
-        )
-        .map(|solution| {
-            let bound_or_constraints = typevar.typevar(db).bound_or_constraints(db, self.env);
+        CandidateSolutions::solve_with_preference(db, env, constraints, bounds, prefer_declared)
+            .map(|solution| {
+                let bound_or_constraints = typevar.typevar(db).bound_or_constraints(db, env);
 
-            // For constrained TypeVars, the inferred type is already one of the
-            // constraints. Promoting literals would produce a type that doesn't
-            // match any constraint.
-            if matches!(
-                bound_or_constraints,
-                Some(TypeVarBoundOrConstraints::Constraints(_))
-            ) {
-                return solution;
-            }
+                // For constrained TypeVars, the inferred type is already one of the
+                // constraints. Promoting literals would produce a type that doesn't
+                // match any constraint.
+                if matches!(
+                    bound_or_constraints,
+                    Some(TypeVarBoundOrConstraints::Constraints(_))
+                ) {
+                    return solution;
+                }
 
-            let mut variance_in_return = TypeVarVariance::Bivariant;
+                let mut variance_in_return = TypeVarVariance::Bivariant;
 
-            // Find all occurrences of the type variable in the return type.
-            self.return_ty
-                .visit_specialization(db, self.env, |ty, variance| {
+                // Find all occurrences of the type variable in the return type.
+                return_ty.visit_specialization(db, env, |ty, variance| {
                     if ty != Type::TypeVar(typevar) {
                         return;
                     }
@@ -7403,35 +7479,34 @@ impl<'db> CallInference<'_, 'db> {
                     variance_in_return = variance_in_return.join(variance);
                 });
 
-            // Promotion is only useful if the type variable is in non-covariant position
-            // in the return type.
-            if variance_in_return.is_covariant() {
-                return solution;
-            }
+                // Promotion is only useful if the type variable is in non-covariant position
+                // in the return type.
+                if variance_in_return.is_covariant() {
+                    return solution;
+                }
 
-            let promoted = solution.promote(db, self.env);
+                let promoted = solution.promote(db, env);
 
-            // If the TypeVar has an upper bound, only use the promoted type if it
-            // still satisfies the bound.
-            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints
-                && !promoted.is_assignable_to(db, self.env, bound)
-            {
-                return solution;
-            }
+                // If the TypeVar has an upper bound, only use the promoted type if it
+                // still satisfies the bound.
+                if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints
+                    && !promoted.is_assignable_to(db, env, bound)
+                {
+                    return solution;
+                }
 
-            // The promoted type must still be compatible with the constraints on this type variable.
-            //
-            // Note that legacy mappings are stored as equivalence mappings and so generally cannot
-            // be promoted, as we do not have access to the original constraints to validate the
-            // promotion.
-            if promoted != solution
-                && !bounds.accepts_candidate(db, self.env, constraints, promoted)
-            {
-                solution
-            } else {
-                promoted
-            }
-        })
+                // The promoted type must still be compatible with the constraints on this type variable.
+                //
+                // Note that legacy mappings are stored as equivalence mappings and so generally cannot
+                // be promoted, as we do not have access to the original constraints to validate the
+                // promotion.
+                if promoted != solution && !bounds.accepts_candidate(db, env, constraints, promoted)
+                {
+                    solution
+                } else {
+                    promoted
+                }
+            })
     }
 
     /// Solve the collected constraints, consuming the builder before argument validation.
@@ -7482,7 +7557,14 @@ impl<'db> CallInference<'_, 'db> {
                         .apply_optional_specialization(db, preferred_specialization)
                         .is_assignable_to(db, self.env, ty)
                 }) {
-                    return Some(self.solve_typevar(constraints, bounds, true));
+                    return Some(Self::solve_typevar(
+                        self.db,
+                        self.env,
+                        self.return_ty,
+                        constraints,
+                        bounds,
+                        true,
+                    ));
                 }
             }
 
