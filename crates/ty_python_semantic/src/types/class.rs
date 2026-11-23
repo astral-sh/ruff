@@ -3147,6 +3147,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         // Repeated writes to an attribute often see the same wide union from one class.
         // Collect the inputs in MRO order so their normalization can be reused.
         let mut types = SmallVec::<[Type<'db>; 1]>::new();
+        let mut known_nonempty = false;
         let combined_type = |types: &[Type<'db>]| {
             if types.is_empty() {
                 return Type::Never;
@@ -3269,9 +3270,12 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         }
 
                         if origin.is_declared() {
-                            if combined_type(&types) == Type::Never {
+                            // Once a type contributes, later defaults cannot make the union
+                            // empty. Avoid interning a growing union at each default.
+                            if !known_nonempty && combined_type(&types) == Type::Never {
                                 return InstanceMemberResult::Done(class_member.inner);
                             }
+                            known_nonempty = true;
 
                             types.push(class_member_ty);
                             provenance = provenance.or(class_member_provenance);
