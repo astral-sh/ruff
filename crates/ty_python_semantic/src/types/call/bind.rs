@@ -1349,7 +1349,9 @@ impl<'db> Bindings<'db> {
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
-        let nonce_generator = TypeVarNonceGenerator::new(self.call_site_scope);
+        // A union or intersection can bind the same context in separate callables.
+        // Within a single callable, we only need to freshen recursive references.
+        let nonce_generator = TypeVarNonceGenerator::new(self.call_site_scope, !self.is_single());
         self.freshen_generic_contexts_in_place(db, env, &nonce_generator);
         self.match_parameters_in_place(db, env, arguments);
         self
@@ -3832,9 +3834,8 @@ impl<'db> CallableBinding<'db> {
         // generic function recursively within its body: the recursive reference should bind new
         // copies of the typevars.
         //
-        // We can use a single new nonce here for all of the generic overloads, since overloads are
-        // not able to share generic contexts. That means we cannot freshen two overloads in a way
-        // that causes their typevars to collide.
+        // Overloads of a single callable are alternatives and can share a nonce.
+        // Synthesized methods, such as TypedDict.get, can even reuse the same context.
         let nonce = nonce_generator.next();
         for overload in &mut self.overloads {
             let Some(generic_context) = overload.signature.generic_context else {
