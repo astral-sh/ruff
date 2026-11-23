@@ -327,6 +327,36 @@ class D:
 reveal_type(D.__init__)  # revealed:(self: D, /, x: int = 1) -> None
 ```
 
+## Signature of `__replace__`
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+Starting in Python 3.13, dataclasses synthesize a `__replace__` method. `copy.replace` calls it to
+create a new instance of the same class with the specified fields updated.
+
+```py
+from copy import replace
+from dataclasses import dataclass, field
+
+@dataclass
+class Record:
+    value: int
+    id: int = field(init=False, default=0)
+
+record = Record(2)
+reveal_type(replace(record, value=3))  # revealed: Record
+```
+
+A field with `init=False` cannot be replaced.
+
+```py
+replace(record, id=9)  # error: [unknown-argument]
+record.__replace__(id=9)  # error: [unknown-argument]
+```
+
 ## `@dataclass` calls with arguments
 
 The `@dataclass` decorator can take several arguments to customize the existence of the generated

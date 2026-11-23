@@ -144,6 +144,15 @@ reveal_type(p.data)  # revealed: bytes
 p.data = "not a dict"  # error: [invalid-assignment]
 ```
 
+The constructor parameters are optional keywords in `copy.replace`.
+
+```py
+from copy import replace
+
+reveal_type(replace(p, name="Widget"))  # revealed: Product
+replace(p, id=1)  # error: [unknown-argument]
+```
+
 ## Field validators
 
 attrs supports validator functions, which can either be specified using `field(validator=...)` or by
