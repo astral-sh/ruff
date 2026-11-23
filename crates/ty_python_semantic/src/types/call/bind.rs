@@ -7056,6 +7056,12 @@ impl<'db> CallInference<'_, 'db> {
         // on the path that has the full argument list and diagnostic locations.
         if self.call_expression_tcx == TypeContext::default()
             && generic_context.program(db) == self.env.program(db)
+            // With a declared bound or constraints, rejecting one overload can be
+            // expensive. Solve those calls once with the full diagnostic context.
+            && generic_context.variables(db).all(|var| {
+                let var = var.typevar(db);
+                var.is_simple(db) || var.is_self(db)
+            })
             && self
                 .signature
                 .parameters()
