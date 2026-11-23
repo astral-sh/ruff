@@ -181,7 +181,7 @@ impl<'db> ProtocolClass<'db> {
                     };
                     // Function declarations below replace the class context with their own scope.
                     let self_binding_context = ty.contains_self(db, env).then(|| {
-                        let class = inherited_class_body_declaration(db, parent_scope, symbol_id)
+                        let class = inherited_class_body_declaration(db, use_def_map, symbol_id)
                             .map_or(parent, |inherited| inherited.class);
                         BindingContext::Definition(class.definition(db))
                     });

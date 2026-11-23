@@ -8,8 +8,8 @@ use crate::types::{
     infer::nearest_enclosing_class,
 };
 use ty_python_core::{
-    frozen::FrozenSet, place_table, scope::ScopeId, semantic_index, symbol::ScopedSymbolId,
-    use_def_map,
+    UseDefMap, definition::Definition, frozen::FrozenSet, place_table, scope::ScopeId,
+    semantic_index, symbol::ScopedSymbolId, use_def_map,
 };
 
 /// The return type of certain member-lookup operations. Contains information
@@ -89,7 +89,8 @@ pub(super) fn class_member_with_symbol<'db>(
 
         if let Place::Defined(ref mut place) = place_and_quals.place
             && place.origin == TypeOrigin::Inferred
-            && let Some(inherited) = inherited_class_body_declaration(db, scope, symbol_id)
+            && let Some(inherited) =
+                inherited_class_body_declaration(db, use_def_map(db, scope), symbol_id)
         {
             if let Place::Defined(declared) = inherited.member.place {
                 // The annotation determines the public type, but the value is still supplied
@@ -187,12 +188,28 @@ fn inherited_declaration_candidates<'db>(
 /// A subclass assignment such as `items = []` retains an inherited `items: list[int]`
 /// declaration. Both initializer inference and public member lookup use that declaration,
 /// while an explicit annotation or a new method definition supplies its own public type.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn inherited_class_body_declaration<'db>(
     db: &'db dyn Db,
-    scope: ScopeId<'db>,
+    use_def: &UseDefMap<'db>,
     symbol: ScopedSymbolId,
 ) -> Option<ClassBodyDeclaration<'db>> {
+    // All assignments and member lookups share one query for this symbol. Use its
+    // first binding as the key to avoid interning a (scope, symbol) pair. Include
+    // bindings that are later deleted, since their initializers still need context.
+    let binding = use_def
+        .reachable_symbol_bindings(symbol)
+        .find_map(|binding| binding.binding.definition())?;
+    inherited_declaration_by_binding(db, binding).copied()
+}
+
+/// Most class attributes are new, so keep negative results small by boxing the declaration.
+#[salsa::tracked(returns(as_deref), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+fn inherited_declaration_by_binding<'db>(
+    db: &'db dyn Db,
+    binding: Definition<'db>,
+) -> Option<Box<ClassBodyDeclaration<'db>>> {
+    let scope = binding.scope(db);
+    let symbol = binding.place(db).expect_symbol();
     let index = semantic_index(db, scope.program_file(db));
     let scope_id = scope.file_scope_id(db);
     index.scope(scope_id).node().as_class()?;
@@ -217,7 +234,7 @@ pub(super) fn inherited_class_body_declaration<'db>(
     }
 
     let class = nearest_enclosing_class(db, index, scope)?;
-    class_body_declaration_from_bases(db, &env, class, table.symbol(symbol).name())
+    class_body_declaration_from_bases(db, &env, class, table.symbol(symbol).name()).map(Box::new)
 }
 
 pub(super) fn class_body_declaration_from_bases<'db>(

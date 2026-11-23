@@ -1755,7 +1755,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && self.index.scope(file_scope_id).kind() == ScopeKind::Class
             && let Some(symbol) = place_id.as_symbol()
             && let Some(inherited) =
-                inherited_class_body_declaration(db, binding.scope(db), symbol)
+                inherited_class_body_declaration(db, use_def, symbol)
         {
             place_and_quals = inherited.member;
         }
