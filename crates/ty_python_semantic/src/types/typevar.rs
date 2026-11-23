@@ -927,21 +927,21 @@ impl TypeVarNonce {
 #[derive(Debug)]
 pub(crate) struct TypeVarNonceGenerator<'db> {
     next: Cell<TypeVarNonce>,
-    seen: Option<RefCell<FxHashSet<GenericContext<'db>>>>,
+    seen: RefCell<FxHashSet<GenericContext<'db>>>,
     call_site_scope: Option<ScopeId<'db>>,
 }
 
 impl Default for TypeVarNonceGenerator<'_> {
     fn default() -> Self {
-        Self::new(None, true)
+        Self::new(None)
     }
 }
 
 impl<'db> TypeVarNonceGenerator<'db> {
-    pub(crate) fn new(call_site_scope: Option<ScopeId<'db>>, track_repeated: bool) -> Self {
+    pub(crate) fn new(call_site_scope: Option<ScopeId<'db>>) -> Self {
         Self {
             next: Cell::new(TypeVarNonce::FIRST),
-            seen: track_repeated.then(RefCell::default),
+            seen: RefCell::default(),
             call_site_scope,
         }
     }
@@ -965,11 +965,7 @@ impl<'db> TypeVarNonceGenerator<'db> {
                 && enclosing_binding_contexts(semantic_index(db, file), scope.file_scope_id(db))
                     .any(|enclosing| enclosing == first)
         });
-        matches_enclosing
-            || self
-                .seen
-                .as_ref()
-                .is_some_and(|seen| !seen.borrow_mut().insert(generic_context))
+        matches_enclosing || !self.seen.borrow_mut().insert(generic_context)
     }
 
     pub(crate) fn next(&self) -> TypeVarNonce {

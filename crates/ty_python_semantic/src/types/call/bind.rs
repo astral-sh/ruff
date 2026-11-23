@@ -1349,9 +1349,7 @@ impl<'db> Bindings<'db> {
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
-        // A union or intersection can bind the same context in separate callables.
-        // Within a single callable, we only need to freshen recursive references.
-        let nonce_generator = TypeVarNonceGenerator::new(self.call_site_scope, !self.is_single());
+        let nonce_generator = TypeVarNonceGenerator::new(self.call_site_scope);
         self.freshen_generic_contexts_in_place(db, env, &nonce_generator);
         self.match_parameters_in_place(db, env, arguments);
         self
@@ -3834,8 +3832,9 @@ impl<'db> CallableBinding<'db> {
         // generic function recursively within its body: the recursive reference should bind new
         // copies of the typevars.
         //
-        // Overloads of a single callable are alternatives and can share a nonce.
-        // Synthesized methods, such as TypedDict.get, can even reuse the same context.
+        // Synthesized overloads can share a context. The first occurrence keeps its
+        // type variables unless it refers to an enclosing definition. Later occurrences
+        // use the same fresh nonce for this callable.
         let nonce = nonce_generator.next();
         for overload in &mut self.overloads {
             let Some(generic_context) = overload.signature.generic_context else {
@@ -9456,6 +9455,7 @@ impl<'db> Binding<'db> {
         }
     }
 
+    #[expect(clippy::unnecessary_wraps, reason = "Salsa returns None during cycles")]
     fn freshen_bound_typevars(
         &mut self,
         db: &'db dyn Db,
@@ -9469,7 +9469,38 @@ impl<'db> Binding<'db> {
         if self.signature.generic_context.is_none() {
             return;
         }
-        self.signature = self.signature.freshen_bound_typevars(db, env, delta);
+        // Synthesized overloads, such as those for TypedDict.get, often need the
+        // same renaming at many call sites. Keep nonce selection local to the call.
+        #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+        struct Freshening<'db> {
+            #[returns(copy)]
+            program: crate::Program<'db>,
+            #[returns(ref)]
+            signature: Signature<'db>,
+            #[returns(copy)]
+            delta: u32,
+        }
+
+        #[salsa::tracked(
+            returns(as_ref),
+            cycle_result=|_, _, _| None,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn freshened_signature<'db>(
+            db: &'db dyn Db,
+            key: Freshening<'db>,
+        ) -> Option<Signature<'db>> {
+            let env = &ProgramEnvironment::from_program(key.program(db));
+            Some(
+                key.signature(db)
+                    .freshen_bound_typevars(db, env, key.delta(db)),
+            )
+        }
+
+        let key = Freshening::new(db, env.program(db), &self.signature, delta);
+        self.signature = freshened_signature(db, key)
+            .cloned()
+            .unwrap_or_else(|| self.signature.freshen_bound_typevars(db, env, delta));
         self.return_ty = self.initial_return_type(db);
     }
 
