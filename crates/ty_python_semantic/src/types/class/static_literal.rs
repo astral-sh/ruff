@@ -3022,7 +3022,7 @@ impl<'db> StaticClassLiteral<'db> {
                 }
 
                 if is_attrs {
-                    alias = attrs::field_alias(self.name(db), symbol.name(), alias);
+                    alias = attrs::effective_field_alias(self.name(db), symbol.name(), alias);
                 }
 
                 let kind = match field_policy {
