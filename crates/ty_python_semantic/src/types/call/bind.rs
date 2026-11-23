@@ -3819,9 +3819,9 @@ impl<'db> CallableBinding<'db> {
         // generic function recursively within its body: the recursive reference should bind new
         // copies of the typevars.
         //
-        // We can use a single new nonce here for all of the generic overloads, since overloads are
-        // not able to share generic contexts. That means we cannot freshen two overloads in a way
-        // that causes their typevars to collide.
+        // Synthesized overloads can share a context. The first occurrence keeps its
+        // type variables unless it refers to an enclosing definition. Later occurrences
+        // use the same fresh nonce for this callable.
         let nonce = nonce_generator.next();
         for overload in &mut self.overloads {
             let Some(generic_context) = overload.signature.generic_context else {
@@ -9442,6 +9442,7 @@ impl<'db> Binding<'db> {
         }
     }
 
+    #[expect(clippy::unnecessary_wraps, reason = "Salsa returns None during cycles")]
     fn freshen_bound_typevars(
         &mut self,
         db: &'db dyn Db,
@@ -9455,7 +9456,38 @@ impl<'db> Binding<'db> {
         if self.signature.generic_context.is_none() {
             return;
         }
-        self.signature = self.signature.freshen_bound_typevars(db, env, delta);
+        // Synthesized overloads, such as those for TypedDict.get, often need the
+        // same renaming at many call sites. Keep nonce selection local to the call.
+        #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+        struct Freshening<'db> {
+            #[returns(copy)]
+            program: crate::Program<'db>,
+            #[returns(ref)]
+            signature: Signature<'db>,
+            #[returns(copy)]
+            delta: u32,
+        }
+
+        #[salsa::tracked(
+            returns(as_ref),
+            cycle_result=|_, _, _| None,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn freshened_signature<'db>(
+            db: &'db dyn Db,
+            key: Freshening<'db>,
+        ) -> Option<Signature<'db>> {
+            let env = &ProgramEnvironment::from_program(key.program(db));
+            Some(
+                key.signature(db)
+                    .freshen_bound_typevars(db, env, key.delta(db)),
+            )
+        }
+
+        let key = Freshening::new(db, env.program(db), &self.signature, delta);
+        self.signature = freshened_signature(db, key)
+            .cloned()
+            .unwrap_or_else(|| self.signature.freshen_bound_typevars(db, env, delta));
         self.return_ty = self.initial_return_type(db);
     }
 

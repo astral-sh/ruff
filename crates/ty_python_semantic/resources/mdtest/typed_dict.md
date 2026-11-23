@@ -3187,6 +3187,34 @@ def _(payload: Payload | Payload2) -> None:
     takes_resolved(payload.get("resolved", {}))
 ```
 
+Nested calls can infer different defaults even when the overloads for different keys share a
+synthetic type variable.
+
+```py
+from typing import TypedDict
+from typing_extensions import assert_type
+
+class Record(TypedDict, total=False):
+    name: str
+    count: int
+
+def _(record: Record, backup: bytes) -> None:
+    assert_type(record.get("count", record.get("name", backup)), int | str | bytes)
+```
+
+The overload for a later key can give the default a different type context.
+
+```py
+from typing_extensions import NotRequired, TypeForm, TypedDict
+
+class Fields(TypedDict):
+    text: str
+    form: NotRequired[TypeForm[int]]
+
+def _(data: Fields):
+    value: TypeForm[int] = data.get("form", 1)  # error: [invalid-type-form]
+```
+
 With a gradual default, the specialized known-key overload and generic default overload both match,
 so we currently fall back to `Unknown`:
 
