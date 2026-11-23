@@ -197,6 +197,42 @@ def check(closure: Closure, partial: Partial) -> None:
     assert_type(partial.entries, int | Leaf)
 ```
 
+### Named tuple fields with mutually recursive protocols
+
+The wide unions in the two protocols refer back to `Leaf`. As ty compares the protocols, the
+inferred type of `Leaf.entries` can alternate between `A[Any]` and `B[Any]`. Accessing the field by
+name or by index should give the same type.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from __future__ import annotations
+from typing import Any, Literal, NamedTuple, Protocol, assert_type
+
+class Leaf(NamedTuple):
+    entries: Metadata
+    tag: Literal[42]
+
+class A[T](Protocol):
+    @property
+    def entries(self) -> A[T] | A[Leaf] | type[T] | T | A[int] | B[T] | str | float: ...
+
+class B[T](Protocol):
+    @property
+    def entries(self) -> A[T] | A[Leaf] | type[T] | T | A[int] | B[T] | str | float: ...
+
+Metadata = A[Any] | B[Any]
+
+def check(leaf: Leaf):
+    assert_type(leaf.entries, Metadata)
+    assert_type(leaf[0], Metadata)
+    assert_type(leaf.tag, Literal[42])
+    assert_type(leaf[1], Literal[42])
+```
+
 ### Explicit dataclass-transform metaclass
 
 `models.pyi`:

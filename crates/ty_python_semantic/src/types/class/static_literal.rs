@@ -2835,6 +2835,7 @@ impl<'db> StaticClassLiteral<'db> {
     #[salsa::tracked(
         returns(ref),
         cycle_initial=|_, _, _, _, _, _| OwnClassFields::default(),
+        cycle_fn=own_fields_cycle_fn,
         heap_size=get_size2::GetSize::get_heap_size
     )]
     fn own_fields_inner(
@@ -3858,6 +3859,35 @@ fn mro_ancestors_cycle_initial<'db>(
         &env,
         class.apply_optional_specialization(db, None),
     )))
+}
+
+/// A named tuple's field types determine its tuple base. If a field alternates between
+/// equivalent protocols during inference, the class's MRO can't converge until the field does.
+fn own_fields_cycle_fn<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous: &OwnClassFields<'db>,
+    mut current: OwnClassFields<'db>,
+    class: StaticClassLiteral<'db>,
+    _: Option<Specialization<'db>>,
+    field_policy: CodeGeneratorKind<'db>,
+) -> OwnClassFields<'db> {
+    if field_policy != CodeGeneratorKind::NamedTuple {
+        return current;
+    }
+
+    let env = ProgramEnvironment::from_scope(class.body_scope(db));
+    for (name, field) in &mut current.fields {
+        if let Some(prev) = previous.fields.get(name)
+            && prev.declared_ty != field.declared_ty
+        {
+            field.declared_ty =
+                field
+                    .declared_ty
+                    .cycle_normalized(db, &env, prev.declared_ty, cycle);
+        }
+    }
+    current
 }
 
 fn explicit_bases_cycle_initial<'db>(
