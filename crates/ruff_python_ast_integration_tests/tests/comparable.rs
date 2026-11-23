@@ -5,7 +5,9 @@ use ruff_python_ast::comparable::{
     ComparableExpr, ComparableLiteral, ComparableMod, ComparableStmt, HashableExpr,
 };
 use ruff_python_ast::{HasNodeIndex, Mod, NodeIndex};
-use ruff_python_parser::{ParseError, parse_expression, parse_module};
+use ruff_python_parser::{
+    Mode, ParseError, ParseOptions, parse_expression, parse_module, parse_unchecked,
+};
 
 #[track_caller]
 fn assert_comparable(left: &str, right: &str) -> Result<(), ParseError> {
@@ -190,4 +192,25 @@ fn large_integers_fall_back_to_structural_comparison() -> Result<(), ParseError>
 #[test]
 fn dynamic_tuple_elements_do_not_compare_by_value() -> Result<(), ParseError> {
     assert_hashable_unequal("(f(), 2)", "(f(), 2.0)")
+}
+
+#[test]
+fn recovered_mapping_pattern_order() {
+    let sources = [
+        "match x:\n    case {'a': a, **rest}: pass",
+        "match x:\n    case {**rest, 'a': a}: pass",
+        "match x:\n    case {**rest, 'a': a, **rest}: pass",
+        "match x:\n    case {**other, 'a': a, **rest}: pass",
+    ];
+    let parses: Vec<_> = sources
+        .iter()
+        .map(|s| parse_unchecked(s, ParseOptions::from(Mode::Module)))
+        .collect();
+    for (i, left) in parses.iter().enumerate() {
+        for (j, right) in parses.iter().enumerate() {
+            let left = ComparableMod::from(left.syntax());
+            let right = ComparableMod::from(right.syntax());
+            assert_eq!(left == right, i == j);
+        }
+    }
 }

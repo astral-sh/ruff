@@ -59,28 +59,26 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
         Pattern::MatchMapping(ast::PatternMatchMapping {
             range,
             node_index,
-            keys,
-            patterns,
-            rest,
+            items,
         }) => {
-            let mut items: Vec<ast::DictItem> = keys
+            let items = items
                 .into_iter()
-                .zip(patterns)
-                .map(|(key, pattern)| ast::DictItem {
-                    key: Some(key),
-                    value: pattern_to_expr(pattern),
+                .map(|item| match item {
+                    ast::MappingPatternItem::Entry { key, pattern } => ast::DictItem {
+                        key: Some(key),
+                        value: pattern_to_expr(pattern),
+                    },
+                    ast::MappingPatternItem::Rest(rest) => ast::DictItem {
+                        key: None,
+                        value: Expr::Name(ast::ExprName {
+                            range: rest.range,
+                            node_index: node_index.clone(),
+                            id: rest.id,
+                            ctx: ExprContext::Store,
+                        }),
+                    },
                 })
                 .collect();
-            if let Some(rest) = rest {
-                let value = Expr::Name(ast::ExprName {
-                    range: rest.range,
-                    node_index: node_index.clone(),
-                    id: rest.id,
-                    ctx: ExprContext::Store,
-                });
-                items.push(ast::DictItem { key: None, value });
-            }
-            items.shrink_to_fit();
 
             Expr::Dict(ast::ExprDict {
                 range,
