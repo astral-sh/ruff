@@ -2290,6 +2290,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     target,
                     self.relation,
                     self.typevar_evaluation,
+                    // TODO: Track which variables' inferability affects this comparison so we
+                    // can reuse the result across scopes that agree on those variables. For
+                    // example, `Patch.summary` in pytest-autoprofile repeatedly compares the
+                    // same protocols under different scopes from their generic overloads.
+                    // Checking just the type arguments misses variables in inferred attributes.
                     self.inferable,
                 ),
                 // Cached constraints do not retain explanations. When collecting context,

@@ -1845,6 +1845,33 @@ class Box(Generic[C]):
             reveal_type(Box[C](arg))
 ```
 
+## Inferring a callback parameter through a protocol member
+
+`Box` has no type arguments, but its `value` attribute carries the type variable from `put`.
+Comparing the result of `put` with `HasValue` supplies the upper bound of `int` for `X`.
+
+```py
+from typing import Callable, Protocol, TypeVar
+
+T = TypeVar("T", bound=int)
+X = TypeVar("X")
+
+class HasValue(Protocol):
+    @property
+    def value(self) -> int: ...
+
+class Box:
+    def put(self, x: T) -> "Box":
+        self.value = x
+        return self
+
+def argument(f: Callable[[X], HasValue]) -> X:
+    raise NotImplementedError
+
+def check(box: Box):
+    reveal_type(argument(box.put))  # revealed: int
+```
+
 ## Specializing generic protocol methods
 
 A method can use its own type parameter as the class argument of another instance of its protocol.
