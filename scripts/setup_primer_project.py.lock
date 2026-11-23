@@ -13,7 +13,7 @@ build-constraints = [{ name = "setuptools", specifier = "==84.0.0", hashes = ["s
 [[package]]
 name = "mypy-primer"
 version = "0.1.0"
-source = { git = "https://github.com/hauntsaninja/mypy_primer#09201ae7e61c935e0d975b80ee8619d774c80300" }
+source = { git = "https://github.com/hauntsaninja/mypy_primer#4f8b6f3e4b3a970beb4eec66f0f84fc73a46cb3e" }
 dependencies = [
     { name = "tomlkit" },
 ]
