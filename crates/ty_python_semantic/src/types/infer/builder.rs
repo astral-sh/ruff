@@ -10769,7 +10769,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ApplicableConstraints::ConstrainedBindings(bindings) => {
                     let reachability_constraints = bindings.reachability_constraints();
                     let predicates = bindings.predicates();
-                    let mut union = UnionBuilder::new(db, env);
+                    let mut types = SmallVec::<[Type<'db>; 1]>::new();
                     let mut loop_header_fallbacks = FxHashMap::default();
                     for binding in bindings {
                         let static_reachability = evaluate_reachability_with_cache(
@@ -10782,7 +10782,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if static_reachability.is_always_false() {
                             continue;
                         }
-                        match binding.binding {
+                        let binding_ty = match binding.binding {
                             DefinitionState::Defined(definition)
                                 if !is_discarded_dict_key_assignment(db, definition) =>
                             {
@@ -10799,26 +10799,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         [binding_ty, fallback_ty],
                                     );
                                 }
-                                union.add_in_place(
-                                    binding
-                                        .narrowing_constraint
-                                        .narrow(db, env, binding_ty, place),
-                                );
+                                binding_ty
                             }
                             DefinitionState::Defined(_)
                             | DefinitionState::Undefined
-                            | DefinitionState::Deleted => {
-                                union.add_in_place(
-                                    binding.narrowing_constraint.narrow(db, env, ty, place),
-                                );
-                            }
-                        }
+                            | DefinitionState::Deleted => ty,
+                        };
+                        types.push(
+                            binding
+                                .narrowing_constraint
+                                .narrow(db, env, binding_ty, place),
+                        );
                     }
                     // If there are no visible bindings, the union becomes `Never`.
                     // Since an unbound binding is recorded even for an undefined place,
                     // this can only happen if the code is unreachable
                     // and therefore it is correct to set the result to `Never`.
-                    ty = union.build();
+                    ty = UnionType::normalize_place_types(db, env, &types);
                 }
             }
         }

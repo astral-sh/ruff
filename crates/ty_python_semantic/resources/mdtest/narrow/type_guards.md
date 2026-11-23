@@ -1131,6 +1131,40 @@ def _(obj: GradualReader):
         reveal_type(obj.read())  # revealed: Any & int
 ```
 
+### Strict narrowing with a recursively inferred type argument
+
+The only assignment to `Box.value` reads the same attribute from another box, so ty cannot infer its
+type. Strict narrowing gives the tuple element type `object`. An `isinstance` check can then narrow
+the element to `str`.
+
+```toml
+[environment]
+python-version = "3.13"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import TypeIs
+
+class Box:
+    def copy_from(self, other: "Box"):
+        self.value = other.value
+
+def singleton_of[T](x: object, cls: type[T]) -> TypeIs[tuple[T]]:
+    return isinstance(x, tuple) and len(x) == 1 and isinstance(x[0], cls)
+
+def check(x: object, box: Box):
+    if singleton_of(x, type(box.value)):
+        item = x[0]
+        reveal_type(item)  # revealed: object
+        if isinstance(item, str):
+            reveal_type(item)  # revealed: str
+            item.upper()
+        item + 1  # error: [unsupported-operator]
+```
+
 ## Materialized `TypeIs` narrowing
 
 A `TypeIs[Any]` guard may materialize to any type, and so it narrows its argument to `Never` in the
