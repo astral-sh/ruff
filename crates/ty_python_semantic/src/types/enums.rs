@@ -228,6 +228,8 @@ impl<'db> EnumValueAnnotation<'db> {
 pub(crate) struct EnumMetadata<'db> {
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
     aliases: FxHashMap<Name, Name>,
+    /// Members whose canonical identity depends on control flow in the class body.
+    uncertain_members: FxHashSet<Name>,
 
     /// Whether alias detection was precise for every member declaration.
     pub(super) aliases_are_known: bool,
@@ -331,7 +333,8 @@ fn enum_class_literal<'db>(
         .map(|(alias, member)| (alias.clone(), member.clone()))
         .collect();
     aliases.sort_unstable();
-    let members_are_exhaustive = !metadata.value_construction.metaclass_may_transform_values
+    let members_are_exhaustive = metadata.uncertain_members.is_empty()
+        && !metadata.value_construction.metaclass_may_transform_values
         && !Type::ClassLiteral(class).is_subtype_of(
             db,
             &env,
@@ -378,6 +381,22 @@ impl<'db> EnumClassLiteral<'db> {
     pub(crate) fn resolve_member(self, db: &'db dyn Db, name: &Name) -> Option<&'db Name> {
         self.resolve_member_entry(db, name)
             .map(|(member, _)| member)
+    }
+
+    pub(crate) fn member_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &Name,
+    ) -> Option<Type<'db>> {
+        let name = self.resolve_member(db, name)?;
+        let class = self.class_literal(db);
+        if !self.aliases_are_known(db) && enum_metadata(db, class)?.uncertain_members.contains(name)
+        {
+            Some(class.to_non_generic_instance(db, env))
+        } else {
+            Some(Type::enum_literal(EnumLiteralType::new(db, self, name)))
+        }
     }
 
     /// Returns the type of `.name`/`._name_` for a given enum member.
@@ -507,6 +526,7 @@ impl<'db> EnumMetadata<'db> {
         EnumMetadata {
             members: FxIndexMap::default(),
             aliases: FxHashMap::default(),
+            uncertain_members: FxHashSet::default(),
             aliases_are_known: false,
             auto_members: FxHashSet::default(),
             value_annotation: None,
@@ -1168,6 +1188,7 @@ pub(crate) fn enum_metadata<'db>(
             return Some(EnumMetadata {
                 members,
                 aliases,
+                uncertain_members: FxHashSet::default(),
                 aliases_are_known,
                 auto_members: FxHashSet::default(),
                 value_annotation: None,
@@ -1197,6 +1218,7 @@ pub(crate) fn enum_metadata<'db>(
     let table = place_table(db, scope_id);
 
     let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();
+    let mut uncertain_members = FxHashSet::default();
     let mut auto_history = EnumAutoHistory::Empty;
     let mut auto_values = FxHashMap::<Name, Type<'db>>::default();
     let mut aliases_are_known = true;
@@ -1376,6 +1398,24 @@ pub(crate) fn enum_metadata<'db>(
                 aliases.insert(name.clone(), canonical);
                 return None;
             }
+            // After a conditional declaration, an equal value may or may not have appeared.
+            // We can still resolve an alias to a member known to precede the conditional.
+            if !inferred.is_definitely_bound()
+                || first != last
+                || !order_is_known
+                || !uncertain_members.is_empty()
+            {
+                if let Some(canonical) = alias_value
+                    .and_then(Type::as_literal_value_kind)
+                    .and_then(|value| enum_values.get(&value))
+                {
+                    aliases.insert(name.clone(), canonical.clone());
+                    return None;
+                }
+                uncertain_members.insert(name.clone());
+                aliases_are_known = false;
+                return Some((name.clone(), value_ty));
+            }
             match alias_value.and_then(|alias_value_ty| {
                 try_register_alias(alias_value_ty, name, &mut enum_values, &mut aliases)
             }) {
@@ -1411,6 +1451,7 @@ pub(crate) fn enum_metadata<'db>(
     Some(EnumMetadata {
         members,
         aliases,
+        uncertain_members,
         aliases_are_known,
         auto_members: auto_values.into_keys().collect(),
         value_annotation,

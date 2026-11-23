@@ -1517,6 +1517,33 @@ reveal_type(PairsAlias.A)  # revealed: PairsAlias
 reveal_type(PairsAlias.B)  # revealed: PairsAlias
 ```
 
+### Conditional aliases
+
+A member declared in one branch cannot determine the canonical name of an equal value in another
+branch. When the identity is uncertain, ty uses the enum instance type.
+
+```py
+from enum import Enum, auto
+from ty_extensions._internal import enum_members
+
+def example(flag: bool):
+    class E(Enum):
+        A = 1
+        if flag:
+            B = auto()
+        else:
+            C = 2
+        D = 2
+        ALSO_A = 1
+
+    if not flag:
+        reveal_type(E.C)  # revealed: E
+        reveal_type(E.C.name)  # revealed: Literal["A", "B", "C", "D"]
+    reveal_type(E.D)  # revealed: E
+    reveal_type(E.ALSO_A.name)  # revealed: Literal["A"]
+    reveal_type(enum_members(E))  # revealed: Unknown
+```
+
 ### Using `auto()`
 
 ```toml
