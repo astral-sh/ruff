@@ -9789,13 +9789,21 @@ impl<'db> Binding<'db> {
                     return false;
                 }
                 let declared = parameter.annotated_type();
-                let Some(expected) = declared.as_literal_value() else {
-                    return false;
-                };
-                argument
+                let Some(actual) = argument
                     .matched_type(declared, matched.argument_type)
                     .and_then(Type::as_literal_value)
-                    .is_some_and(|actual| actual.is_disjoint_from(db, expected))
+                else {
+                    return false;
+                };
+                match declared {
+                    Type::LiteralValue(expected) => actual.is_disjoint_from(db, expected),
+                    Type::Union(union) => union.elements(db).iter().all(|element| {
+                        element
+                            .as_literal_value()
+                            .is_some_and(|expected| actual.is_disjoint_from(db, expected))
+                    }),
+                    _ => false,
+                }
             })
     }
 

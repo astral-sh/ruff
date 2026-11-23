@@ -3187,6 +3187,54 @@ def _(payload: Payload | Payload2) -> None:
     takes_resolved(payload.get("resolved", {}))
 ```
 
+Keys with identical declared types retain their common value type when the key is a union of
+literals. Required and non-required fields remain separate because only non-required fields can
+return the default:
+
+```py
+from typing import Literal, NotRequired, TypedDict
+
+class Counts(TypedDict):
+    first: int
+    second: int
+    optional_first: NotRequired[int]
+    optional_second: NotRequired[int]
+
+def equivalent_keys(
+    data: Counts,
+    required: Literal["first", "second"],
+    optional: Literal["optional_first", "optional_second"],
+    default: bytes,
+) -> None:
+    reveal_type(data.get(required))  # revealed: int
+    reveal_type(data.get(required, default))  # revealed: int
+    reveal_type(data.get(optional))  # revealed: int | None
+    reveal_type(data.get(optional, default))  # revealed: int | bytes
+```
+
+The field type also provides context for an empty dictionary default with a union of optional keys:
+
+```py
+class ResolvedPayload(TypedDict, total=False):
+    first: ResolvedData
+    second: ResolvedData
+
+def _(data: ResolvedPayload, key: Literal["first", "second"]):
+    reveal_type(data.get(key, {}))  # revealed: ResolvedData
+```
+
+Grouping currently uses type identity rather than equivalence. TODO: Reordered unions and aliases
+for the same type do not share an overload:
+
+```py
+class ReorderedFields(TypedDict):
+    first: int | str
+    second: str | int
+
+def _(data: ReorderedFields, key: Literal["first", "second"]):
+    reveal_type(data.get(key))  # revealed: Unknown | None
+```
+
 Nested calls can infer different defaults even when the overloads for different keys share a
 synthetic type variable.
 

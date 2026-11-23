@@ -17,6 +17,7 @@ use crate::types::class::{
 use crate::types::generics::GenericContext;
 use crate::types::member::Member;
 use crate::types::mro::Mro;
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::typed_dict::{
     SynthesizedTypedDictType, TypedDictField, TypedDictOpenness, TypedDictSchema,
@@ -400,10 +401,32 @@ fn synthesize_typed_dict_get<'db>(
     let fallback_types = missing_keys
         .into_iter()
         .chain(std::iter::once((str_ty, fallback_value_ty)));
-    let overloads = fields
-        .iter()
-        .flat_map(|(field_name, field)| {
-            let key_type = Type::string_literal(db, field_name);
+    // Keys with the same value type and requiredness have identical overloads. Grouping
+    // their literals lets calls with a union of these keys match the precise overloads
+    // before the broad string fallback, which otherwise prevents argument expansion.
+    let mut fields_by_type = FxIndexMap::<_, Vec<Type<'db>>>::default();
+    for (field_name, field) in fields.iter() {
+        let key_type = Type::string_literal(db, field_name);
+        fields_by_type
+            .entry((field.declared_ty, field.is_required()))
+            .or_default()
+            .push(key_type);
+    }
+    let overloads = fields_by_type
+        .into_iter()
+        .flat_map(|((value_type, is_required), keys)| {
+            let key_type = match keys.as_slice() {
+                [] => Type::Never,
+                [key] => *key,
+                // Field names are unique string literals, so this union needs no simplification.
+                // Keep it exact: UnionBuilder can widen large literal sets to `str`, which would
+                // let this overload match unrelated or missing keys before the fallback.
+                _ => Type::Union(UnionType::new(
+                    db,
+                    keys.into_boxed_slice(),
+                    RecursivelyDefined::No,
+                )),
+            };
 
             let get_sig_params = [
                 Parameter::positional_only(Some(Name::new_static("self")))
@@ -413,10 +436,10 @@ fn synthesize_typed_dict_get<'db>(
             ];
             let get_sig = Signature::new(
                 Parameters::standard(get_sig_params),
-                if field.is_required() {
-                    field.declared_ty
+                if is_required {
+                    value_type
                 } else {
-                    UnionType::from_two_elements(db, env, field.declared_ty, Type::none(db, env))
+                    UnionType::from_two_elements(db, env, value_type, Type::none(db, env))
                 },
             );
 
@@ -438,15 +461,10 @@ fn synthesize_typed_dict_get<'db>(
             let get_with_default_sig = Signature::new_generic(
                 Some(GenericContext::from_typevar_instances(db, env, [t_default])),
                 Parameters::standard(get_with_default_sig_params),
-                if field.is_required() {
-                    field.declared_ty
+                if is_required {
+                    value_type
                 } else {
-                    UnionType::from_two_elements(
-                        db,
-                        env,
-                        field.declared_ty,
-                        Type::TypeVar(t_default),
-                    )
+                    UnionType::from_two_elements(db, env, value_type, Type::TypeVar(t_default))
                 },
             );
 
@@ -454,7 +472,7 @@ fn synthesize_typed_dict_get<'db>(
             // field type as the default. This is ordered before the generic TypeVar
             // overload so that `td.get("key", {})` can use the field type as
             // bidirectional inference context for the default argument.
-            if field.is_required() {
+            if is_required {
                 Either::Left([get_sig, get_with_default_sig].into_iter())
             } else {
                 let get_with_typed_default_sig = Signature::new(
@@ -464,9 +482,9 @@ fn synthesize_typed_dict_get<'db>(
                         Parameter::positional_only(Some(Name::new_static("key")))
                             .with_annotated_type(key_type),
                         Parameter::positional_only(Some(Name::new_static("default")))
-                            .with_annotated_type(field.declared_ty),
+                            .with_annotated_type(value_type),
                     ]),
-                    field.declared_ty,
+                    value_type,
                 );
                 Either::Right(
                     [get_sig, get_with_typed_default_sig, get_with_default_sig].into_iter(),
