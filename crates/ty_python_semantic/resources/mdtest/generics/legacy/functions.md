@@ -554,6 +554,31 @@ def wrapper(source: SourceT) -> None:
     consume(source)  # error: [invalid-argument-type]
 ```
 
+## Preserving the caller's type variable with an aliased union bound
+
+The invariant list and the callback's input and output both require `T` to match `U`. Every
+specialization of `U` satisfies the shared `Scalar` bound.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+from typing_extensions import TypeAliasType
+
+Scalar = TypeAliasType("Scalar", int | str)
+T = TypeVar("T", bound=Scalar)
+U = TypeVar("U", bound=Scalar)
+
+def first(items: list[T] | None) -> T | None:
+    return items[0] if items is not None and items else None
+
+def apply(fn: Callable[[T], T], value: T) -> T:
+    return fn(value)
+
+def forward(items: list[U], fn: Callable[[U], U], value: U) -> None:
+    reveal_type(first(items))  # revealed: U@forward | None
+    reveal_type(apply(fn, value))  # revealed: U@forward
+```
+
 ## Preserving an argument through a gradual upper bound
 
 In the call on the last line of this example, we should infer `list[T]`, not substitute `Any` for

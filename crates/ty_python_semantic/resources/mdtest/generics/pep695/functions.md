@@ -2128,6 +2128,27 @@ def wrapper[S: Source[object]](source: S) -> None:
     consume(source)  # error: [invalid-argument-type]
 ```
 
+## Preserving the caller's type variable with an aliased union bound
+
+The invariant list and the callback's input and output both require `T` to match `U`. Every
+specialization of `U` satisfies the shared `Scalar` bound.
+
+```py
+from collections.abc import Callable
+
+type Scalar = int | str
+
+def first[T: Scalar](items: list[T] | None) -> T | None:
+    return items[0] if items is not None and items else None
+
+def apply[T: Scalar](fn: Callable[[T], T], value: T) -> T:
+    return fn(value)
+
+def forward[U: Scalar](items: list[U], fn: Callable[[U], U], value: U) -> None:
+    reveal_type(first(items))  # revealed: U@forward | None
+    reveal_type(apply(fn, value))  # revealed: U@forward
+```
+
 ## Preserving an argument through a gradual upper bound
 
 For every caller specialization of `T`, `list[T]` satisfies the bound `list[Any]`. Returning the
