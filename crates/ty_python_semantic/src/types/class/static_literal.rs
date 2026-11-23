@@ -2009,9 +2009,9 @@ impl<'db> StaticClassLiteral<'db> {
                 };
                 let mut field_ty = field.declared_ty;
 
-                if !init && (name == "__init__" || field_policy.is_pydantic()) {
-                    // Fields with `init=False` are excluded from constructors. Pydantic's private
-                    // and internal fields are also excluded from replacement.
+                if !init {
+                    // Both constructors and replacement omit non-init fields, including
+                    // private and internal Pydantic model fields.
                     continue;
                 }
 

@@ -2356,6 +2356,16 @@ Person(name="Alice", age=20)
 Person(name="Alice", something_else=7)  # error: [unknown-argument]
 ```
 
+Fields excluded from initialization are also excluded from replacement.
+
+```py
+from copy import replace
+
+person = Person(name="Alice")
+reveal_type(replace(person, age=21))  # revealed: Person
+replace(person, id=1)  # error: [unknown-argument]
+```
+
 ## Inherited `ModelMetaclass`
 
 Pydantic's metaclass-based `@dataclass_transform` metadata should continue to apply when a custom
