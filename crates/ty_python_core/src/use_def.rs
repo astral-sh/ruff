@@ -661,17 +661,19 @@ impl PredicateNarrowingTargets {
         Self(entries.into_boxed_slice())
     }
 
-    /// Returns whether `predicate` may narrow `place`.
-    pub fn contains(&self, predicate: ScopedPredicateId, place: ScopedPlaceId) -> bool {
-        self.0
-            .binary_search_by_key(&(place, predicate), |&(predicate, place)| {
-                (place, predicate)
-            })
-            .is_ok()
+    /// Returns the predicate entries for a single place, in predicate order.
+    pub fn for_place(&self, place: ScopedPlaceId) -> &[(ScopedPredicateId, ScopedPlaceId)] {
+        let start = self.0.partition_point(|&(_, target)| target < place);
+        let remaining = &self.0[start..];
+        if remaining.first().is_none_or(|&(_, target)| target != place) {
+            return &[];
+        }
+        let len = remaining.partition_point(|&(_, target)| target == place);
+        &remaining[..len]
     }
 
     /// Returns whether any predicate may narrow `place`.
-    pub fn contains_place(&self, place: ScopedPlaceId) -> bool {
+    fn contains_place(&self, place: ScopedPlaceId) -> bool {
         self.0
             .binary_search_by_key(&place, |&(_, target)| target)
             .is_ok()
