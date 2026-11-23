@@ -3209,6 +3209,7 @@ dependencies = [
  "ignore",
  "insta",
  "matchit",
+ "memchr",
  "path-slash",
  "pathdiff",
  "quick-xml",

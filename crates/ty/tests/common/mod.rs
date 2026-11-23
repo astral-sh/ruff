@@ -174,7 +174,9 @@ impl CliTest {
 }
 
 fn tempdir_filter(path: &Path) -> String {
-    format!(r"{}\\?/?", regex::escape(path.to_str().unwrap()))
+    // GitHub Actions escapes the colon in Windows drive letters.
+    let path = regex::escape(path.to_str().unwrap()).replace(':', "(?::|%3A)");
+    format!(r"{path}\\?/?")
 }
 
 pub(crate) fn user_config_directory_env_var() -> &'static str {

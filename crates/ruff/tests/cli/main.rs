@@ -25,7 +25,9 @@ const BIN_NAME: &str = "ruff";
 
 /// Creates a regex filter for replacing temporary directory paths in snapshots
 pub(crate) fn tempdir_filter(path: impl AsRef<str>) -> String {
-    format!(r"{}[\\/]?", regex::escape(path.as_ref()))
+    // GitHub Actions escapes the colon in Windows drive letters.
+    let path = regex::escape(path.as_ref()).replace(':', "(?::|%3A)");
+    format!(r"{path}[\\/]?")
 }
 
 /// A test fixture for running ruff CLI tests with temporary directories and files.
