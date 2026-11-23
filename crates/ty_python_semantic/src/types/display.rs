@@ -1848,7 +1848,7 @@ impl<'db> BoundTypeVarIdentity<'db> {
     fn display_with(self, db: &'db dyn Db, settings: DisplaySettings<'db>) -> impl Display {
         std::fmt::from_fn(move |f| {
             f.write_str(self.identity.name(db))?;
-            let binding_context = self.binding_context;
+            let binding_context = self.binding_context(db);
             if let Some(binding_context_name) = binding_context.name(db)
                 && let Some(definition) = binding_context.definition()
                 && !settings.active_scopes.contains(&definition)
@@ -3971,9 +3971,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 let set = constraints.load(db, self.env, interned_set.constraints(db));
                 if interned_set.detailed_display(db) {
                     write!(f, "[{}]", set.display(db, self.env))
-                } else if set.is_always_satisfied(db, self.env, TypeVarSet::None) {
+                } else if set.is_always_satisfied(db, self.env, TypeVarSet::All) {
                     f.write_str("[Literal[True]]")
-                } else if set.is_never_satisfied(db, self.env, TypeVarSet::None) {
+                } else if set.is_never_satisfied(db, self.env, TypeVarSet::All) {
                     f.write_str("[Literal[False]]")
                 } else {
                     f.write_str("[bool]")

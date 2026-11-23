@@ -28,7 +28,7 @@ use crate::subscript::{
 };
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
@@ -572,8 +572,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // TODO: Extend lazy inference for mixed gradual tuples: let gradual segments
                 // supply fixed target elements, and generate constraints for source packs that
                 // overlap fixed target elements.
-                if self.typevar_evaluation == TypeVarEvaluation::Lazy
-                    && let VariableSegment::TypeVarTuple(typevartuple) = target.variable()
+                if let VariableSegment::TypeVarTuple(typevartuple) = target.variable()
+                    && self.collects(db, typevartuple)
                 {
                     let source_prefix = source.prefix_elements();
                     let source_suffix = source.suffix_elements();
@@ -613,9 +613,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 // These checks must hold for every specialization of a non-inferable pack.
-                // Lazy evaluation needs to retain pack constraints for later solving; its empty
-                // `inferable` set does not imply universal quantification.
-                if self.is_eager_assignability() {
+                if self.relation.is_assignability() {
                     match (source.variable(), target.variable()) {
                         (source_segment, VariableSegment::TypeVarTuple(target_pack))
                             if !target_pack.is_inferable(db, self.inferable)

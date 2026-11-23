@@ -2207,6 +2207,50 @@ class InstanceChild(InstanceBase):
     def clone(self: Self) -> Self: ...
 ```
 
+## Overrides with a type variable shared by the receiver and an argument
+
+`Base.remove` accepts `3`. Both overrides use the receiver's key type for the `key` parameter, so a
+map with `bool` keys rejects that same call.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Generic, TypeVar
+
+class Base:
+    def remove(self, key: int) -> None: ...
+
+V = TypeVar("V", covariant=True)
+K = TypeVar("K", bound=bool, covariant=True)
+T = TypeVar("T", bound=bool)
+
+class LegacyMap(Base, Generic[V, K]):
+    # error: [incompatible-method-override]
+    def remove(self: "LegacyMap[Any, T]", key: T) -> None: ...
+
+class Map[V, K: bool](Base):
+    # error: [incompatible-method-override]
+    def remove[T: bool](self: "Map[Any, T]", key: T) -> None: ...
+
+def check(legacy: LegacyMap[int, bool], modern: Map[int, bool]):
+    legacy.remove(3)  # error: [invalid-argument-type]
+    modern.remove(3)  # error: [invalid-argument-type]
+```
+
+The same receiver annotations permit every specialization of each subclass. The override is valid
+when its key parameter accepts every `int`.
+
+```py
+class LegacyIntMap(Base, Generic[V, K]):
+    def remove(self: "LegacyIntMap[Any, T]", key: int) -> None: ...  # ok
+
+class IntMap[V, K: bool](Base):
+    def remove[T: bool](self: "IntMap[Any, T]", key: int) -> None: ...  # ok
+```
+
 ## Generic methods on generic classes work as expected
 
 ```toml

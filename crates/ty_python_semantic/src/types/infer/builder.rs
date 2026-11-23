@@ -510,6 +510,66 @@ fn transparent_callable_decorator_result<'db>(
         return None;
     };
 
+    // Matching `Callable[[A, B], R]` against `[M: Matrix](M, M) -> M` can
+    // equate `A`, `B` and `R` without solving for `R`. The resulting `(R, R) -> R`
+    // refers to a variable that went out of scope when the decorator returned.
+    // TODO: Carry the callback's bound through call inference so we can solve
+    // for the decorator's variables before specializing the returned signature.
+    if let Type::Callable(result) = overload.return_ty
+        && let [inferred] = result.signatures(db).overloads.as_slice()
+        && inferred.generic_context.is_none()
+        && let Type::TypeVar(free) = inferred.return_ty
+        && let Some(context) = decorator_signature.generic_context
+        && context.contains(db, free.identity(db))
+        && let Type::Callable(formal) = parameter.annotated_type().resolve_type_alias(db)
+        && Type::Callable(formal) == decorator_signature.return_ty.resolve_type_alias(db)
+        // A bound on the decorator could restrict inputs more than the callback does.
+        && context
+            .variables(db)
+            .all(|var| var.typevar(db).is_simple(db))
+    {
+        let callback = decorated_ty
+            .try_upcast_to_callable(db, env)?
+            .exactly_one()?;
+        let [original] = callback.signatures(db).overloads.as_slice() else {
+            return None;
+        };
+        let var = original.return_ty.as_typevar()?;
+        if !original.generic_context?.contains(db, var.identity(db))
+            || original.parameters().len() != inferred.parameters().len()
+        {
+            return None;
+        }
+        let TypeVarBoundOrConstraints::UpperBound(bound) =
+            var.require_bound_or_constraints(db, env)
+        else {
+            return None;
+        };
+
+        let mut parameters = Vec::with_capacity(inferred.parameters().len());
+        for (param, arg) in std::iter::zip(inferred.parameters(), original.parameters()) {
+            if !param.is_positional_only() || !arg.is_positional() {
+                return None;
+            }
+            if param.annotated_type() == Type::TypeVar(free)
+                && arg.annotated_type() == Type::TypeVar(var)
+            {
+                parameters.push(param.clone().with_annotated_type(bound));
+            } else if param.annotated_type() == arg.annotated_type() {
+                parameters.push(param.clone());
+            } else {
+                return None;
+            }
+        }
+
+        // The callback accepts its upper bound. The wrapper might reuse a
+        // previous result, so we can't assume it stays generic across calls.
+        let signature = Signature::new(Parameters::standard(parameters), Type::unknown());
+        return Some(Type::Callable(
+            callback.with_signatures(db, CallableSignature::single(signature)),
+        ));
+    }
+
     let (parameter_callable_paramspec, parameter_callable_return) =
         callable_paramspec_and_return(db, env, parameter.annotated_type())?;
     let (return_callable_paramspec, return_callable_return) =

@@ -5576,6 +5576,10 @@ class NominalNotGeneric:
     def f(self, input: int) -> int:
         return input
 
+class NominalReturningInt:
+    def f[T](self, input: T) -> int:
+        return 0
+
 class NominalReturningSelfNotGeneric:
     def g(self) -> "NominalReturningSelfNotGeneric":
         return self
@@ -5652,10 +5656,17 @@ static_assert(not is_assignable_to(NominalWithSelf, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalWithSelf, LegacyFunctionScoped))
 static_assert(is_assignable_to(NominalWithSelf, UsesSelf))
 static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
+```
 
-# TODO: these should pass
+A caller can pass a string to the protocol's `f` method and expect a string back.
+`NominalNotGeneric` only accepts integers, and `NominalReturningInt` always returns one.
+
+```py
+# TODO: Reject both implementations of the generic method.
 static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))  # error: [static-assert-error]
 static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalReturningInt, NewStyleFunctionScoped))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalReturningInt, LegacyFunctionScoped))  # error: [static-assert-error]
 static_assert(not is_assignable_to(NominalNotGeneric, UsesSelf))
 
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunctionScoped))

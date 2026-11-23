@@ -737,8 +737,9 @@ fn divergent_satisfies_assignability_constraints_with_unknown_and_unions() {
 
     let union = UnionType::from_elements(db, &env, [div, KnownClass::Int.to_instance(db, &env)]);
     for (source, target) in [(div, union), (div, Type::unknown()), (Type::unknown(), div)] {
-        let when = source.when_constraint_set_assignable_to_owned(db, &env, target);
-        assert!(when.query(|_builder, when| when.is_always_satisfied(db, &env, TypeVarSet::None)));
+        let when =
+            source.when_constraint_set_assignable_to_owned(db, &env, target, TypeVarSet::All);
+        assert!(when.query(|_builder, when| when.is_always_satisfied(db, &env, TypeVarSet::All)));
     }
 }
 

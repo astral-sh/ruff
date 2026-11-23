@@ -67,6 +67,7 @@ use crate::types::infer::{TypeContextKind, original_class_type};
 use crate::types::known_instance::{
     FieldInstance, InternedConstraintSetSolution, MethodWrapper, MethodWrapperKind,
 };
+use crate::types::relation::TypeVarEvaluation;
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
     PartialApplication,
@@ -74,7 +75,9 @@ use crate::types::signatures::{
 use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::type_alias::walk_type_alias_arguments;
 use crate::types::typed_dict::TypedDictOpenness;
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarKind, TypeVarNonceGenerator, TypeVarSet};
+use crate::types::typevar::{
+    BoundTypeVarIdentity, TypeVarFreshening, TypeVarKind, TypeVarNonceGenerator, TypeVarSet,
+};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
@@ -228,7 +231,7 @@ fn freshen_generic_contexts_in_type<'db>(
                 env,
                 &TypeMapping::FreshenBoundTypeVars {
                     generic_context,
-                    delta: nonce_generator.next().value(),
+                    freshening: TypeVarFreshening::Offset(nonce_generator.next().value()),
                 },
                 TypeContext::default(),
             )
@@ -2301,6 +2304,7 @@ impl<'db> Bindings<'db> {
                                             env,
                                             ty_b,
                                             constraints,
+                                            TypeVarSet::All,
                                         )
                                     } else {
                                         ty_a.when_subtype_of(
@@ -2351,6 +2355,7 @@ impl<'db> Bindings<'db> {
                                         env,
                                         ty_b,
                                         constraints,
+                                        TypeVarSet::All,
                                     )
                                 });
                                 let tracked = InternedConstraintSet::new(db, result);
@@ -2986,6 +2991,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 constraints,
                                 ConstraintProvenance::INFERRED,
+                                TypeVarSet::All,
                                 typevar,
                                 lower,
                             )
@@ -3015,6 +3021,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 constraints,
                                 ConstraintProvenance::INFERRED,
+                                TypeVarSet::All,
                                 typevar,
                                 upper,
                             )
@@ -3044,6 +3051,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 constraints,
                                 ConstraintProvenance::INFERRED,
+                                TypeVarSet::All,
                                 typevar,
                                 value,
                             )
@@ -3076,6 +3084,7 @@ impl<'db> Bindings<'db> {
                                 env,
                                 constraints,
                                 ConstraintProvenance::INFERRED,
+                                TypeVarSet::All,
                                 typevar,
                                 lower,
                                 upper,
@@ -3193,9 +3202,15 @@ impl<'db> Bindings<'db> {
                         let result = constraints.into_owned(|constraints| {
                             let set = constraints.load(db, env, tracked.constraints(db));
                             if matches!(method, KnownBoundMethodType::ConstraintSetExists(_)) {
-                                set.reduce_inferable(db, env, constraints, typevars)
+                                set.reduce_inferable(
+                                    db,
+                                    env,
+                                    constraints,
+                                    typevars,
+                                    TypeVarSet::All,
+                                )
                             } else {
-                                set.for_all(db, env, constraints, typevars)
+                                set.for_all(db, env, constraints, typevars, TypeVarSet::All)
                             }
                         });
                         let tracked = InternedConstraintSet::new(db, result);
@@ -3213,11 +3228,8 @@ impl<'db> Bindings<'db> {
                         let Type::TypeVar(typevar) = typevar.project_type_form(db, env) else {
                             continue;
                         };
-                        let Type::NominalInstance(inferable) = inferable.project_type_form(db, env)
-                        else {
-                            continue;
-                        };
-                        let Some(inferable) = inferable_typevars_from_tuple(db, env, &inferable)
+                        let Some(inferable) =
+                            overload.constraint_solver_scope(db, env, tracked, *inferable)
                         else {
                             continue;
                         };
@@ -3253,11 +3265,8 @@ impl<'db> Bindings<'db> {
                         let [Some(inferable)] = overload.parameter_types() else {
                             continue;
                         };
-                        let Type::NominalInstance(inferable) = inferable.project_type_form(db, env)
-                        else {
-                            continue;
-                        };
-                        let Some(inferable) = inferable_typevars_from_tuple(db, env, &inferable)
+                        let Some(inferable) =
+                            overload.constraint_solver_scope(db, env, tracked, *inferable)
                         else {
                             continue;
                         };
@@ -3305,11 +3314,8 @@ impl<'db> Bindings<'db> {
                         let [Some(inferable)] = overload.parameter_types() else {
                             continue;
                         };
-                        let Type::NominalInstance(inferable) = inferable.project_type_form(db, env)
-                        else {
-                            continue;
-                        };
-                        let Some(inferable) = inferable_typevars_from_tuple(db, env, &inferable)
+                        let Some(inferable) =
+                            overload.constraint_solver_scope(db, env, tracked, *inferable)
                         else {
                             continue;
                         };
@@ -7124,8 +7130,13 @@ impl<'db> CallInference<'_, 'db> {
                 ConstraintProvenance::DECLARED
             };
             let return_constraints = return_ty
-                .when_constraint_set_assignable_to_owned_with_provenance(
-                    db, self.env, tcx, provenance,
+                .when_constraint_set_assignable_to_owned_with_evaluation(
+                    db,
+                    self.env,
+                    tcx,
+                    self.inferable_typevars,
+                    TypeVarEvaluation::Lazy,
+                    provenance,
                 );
             builder.record_constraint_set(constraints.load(db, self.env, &return_constraints));
             (return_ty, tcx)
@@ -8293,8 +8304,40 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let (sub_arguments, sources) =
             select_paramspec_arguments(db, self.env, self.arguments, self.argument_matches, prefix);
 
-        let bindings = match callable
-            .bindings(db, self.env)
+        let mut bindings = callable.bindings(db, self.env);
+        // TODO: Remove this fallback once https://github.com/astral-sh/ruff/pull/30566
+        // lands. The outer call will then solve for its result using the forwarded arguments.
+        //
+        // The outer result can still refer to the callback's type variables. Give that
+        // result to the existing argument check so it can apply its usual return context
+        // and literal promotion rules. Overloads may have different return types.
+        let mut free_in_result = None;
+        if let Ok(callable) = bindings.iter_flat_mut().exactly_one()
+            && let [binding] = callable.overloads.as_mut_slice()
+            && let Some(context) = binding.signature.generic_context
+        {
+            let free = self.return_ty.free_typevars(db, self.env).0;
+            if context.variables(db).any(|var| var.is_inferable(db, free))
+                // An indeterminate unpack may change which argument binds to a parameter.
+                && sub_arguments.iter().all(|arg| match arg {
+                    CallArgument::Variadic(arg) => arg
+                        .sequence(db, self.env)
+                        .is_some_and(|seq| seq.as_fixed_length().is_some()),
+                    CallArgument::Keywords(arg) => arg.is_complete(),
+                    _ => true,
+                })
+                // Substitution would also specialize the callback if the wrapper returns P.
+                // Enforcing the wrapper's own bounds requires solving both calls together.
+                && !self.signature.return_ty.free_typevars(db, self.env).0.iter(db).any(|var| {
+                    var.is_same_typevar_as(db, paramspec)
+                        || var.typevar(db).bound_or_constraints(db, self.env).is_some()
+                })
+            {
+                binding.set_return_type(self.return_ty);
+                free_in_result = Some(free);
+            }
+        }
+        let bindings = match bindings
             .match_parameters(db, self.env, &sub_arguments)
             .check_types(
                 db,
@@ -8304,7 +8347,23 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 self.call_expression_tcx,
                 &[],
             ) {
-            Ok(bindings) => bindings,
+            Ok(bindings) => {
+                // An unsolved variable with no default would become Unknown and could
+                // hide an incompatible assignment.
+                if let Some(free) = free_in_result
+                    && let Some(callable) = bindings.single_element()
+                    && let [binding] = callable.overloads()
+                    && let Some(inference) = binding.inference
+                    && inference.generic_context(db).variables(db).all(|var| {
+                        !var.is_inferable(db, free)
+                            || inference.has_inferred_type(db, var.identity(db))
+                            || var.default_type(db).is_some()
+                    })
+                {
+                    self.return_ty = binding.return_type();
+                }
+                bindings
+            }
             Err(CallError(_, bindings)) => *bindings,
         };
 
@@ -8829,12 +8888,11 @@ pub(crate) fn inferable_typevar_occurrences<'db>(
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
             if let Type::TypeVar(typevar) = ty {
-                let identity = if typevar.is_paramspec(db) {
-                    typevar.without_paramspec_attr(db).identity(db)
-                } else {
-                    typevar.identity(db)
-                };
-                if identity.is_inferable(db, self.inferable) {
+                if typevar
+                    .identity(db)
+                    .binder()
+                    .is_inferable(db, self.inferable)
+                {
                     self.count.set(self.count.get() + 1);
                 }
                 return;
@@ -8921,6 +8979,32 @@ pub(crate) struct Binding<'db> {
 }
 
 impl<'db> Binding<'db> {
+    // TODO: Move the `inferable` parameter from `ConstraintSet.solutions` to each of the
+    // various constructors.
+    fn constraint_solver_scope(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        tracked: InternedConstraintSet<'db>,
+        inferable: Type<'db>,
+    ) -> Option<TypeVarSet<'db>> {
+        let Type::NominalInstance(instance) = inferable.project_type_form(db, env) else {
+            return None;
+        };
+        let inferable = inferable_typevars_from_tuple(db, env, &instance)?;
+        if !tracked
+            .constraints(db)
+            .query(|_, set| set.has_inferable_subjects(db, inferable))
+        {
+            self.errors.push(BindingError::InternalCallError(
+                "`inferable` must include every type variable constrained by this set",
+            ));
+            self.set_return_type(Type::unknown());
+            return None;
+        }
+        Some(inferable)
+    }
+
     /// Checks the getter invoked by `property.__get__`, retaining its error and recovery type.
     fn check_property_getter(
         &mut self,

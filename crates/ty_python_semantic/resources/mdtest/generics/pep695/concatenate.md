@@ -206,6 +206,39 @@ reveal_type(f(1, "", x=2))  # revealed: int
 reveal_type(f(a=1, b="", x=2))  # revealed: int
 ```
 
+### Registering a wrapper that forwards to its callback
+
+The first argument of `invoke` is a callback. Its remaining parameters and its return type match
+that callback. A decorator requiring this relationship accepts `invoke`.
+
+```py
+from typing import Callable, Concatenate
+
+def register[**P, R](wrapper: Callable[Concatenate[Callable[P, R], P], R]) -> Callable[P, R]:
+    raise NotImplementedError
+
+def invoke[**P, R](fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return fn(*args, **kwargs)
+
+register(invoke)  # ok
+```
+
+Passing `parse` to `wrap` fixes `P` to the parameter `s: str` and `R` to `int`. With that
+specialization, `invoke` accepts a callback of type `(s: str) -> int` followed by the argument `s`
+to forward.
+
+```py
+def wrap[**P, R](fn: Callable[P, R], wrapper: Callable[Concatenate[Callable[P, R], P], R]) -> Callable[P, R]:
+    raise NotImplementedError
+
+def parse(s: str) -> int:
+    return int(s)
+
+# TODO: No error. Specialize `invoke`'s `P` and `R` when checking its first parameter.
+# We currently compare the signature of `parse` against the still-generic `Callable[P, R]`.
+wrap(parse, invoke)  # error: [invalid-argument-type]
+```
+
 ## Invalid uses of `Concatenate`
 
 ### Standalone annotation (not inside `Callable`)
@@ -711,6 +744,78 @@ def f3(y: str | int) -> str | int:
 reveal_type(f3)  # revealed: Overload[(x: int, /, y: str) -> str, (x: int, /, y: int) -> int]
 ```
 
+## Choosing an overload from a callback's leading parameters
+
+The two overloads of `command` accept callbacks with one or two parameters before `P`. When the
+callback is a union of those two signatures, ty resolves the call separately for each signature.
+
+```py
+from typing import Callable, Concatenate, overload
+
+@overload
+def command[O, C, **P, R](f: Callable[Concatenate[O, C, P], R]) -> tuple[O, R]: ...
+@overload
+def command[C, **P, R](f: Callable[Concatenate[C, P], R]) -> tuple[None, R]: ...
+def command(f):
+    raise NotImplementedError
+
+def check[O, C, **P, R](
+    callback: Callable[Concatenate[O, C, P], R] | Callable[Concatenate[C, P], R],
+    standalone: Callable[Concatenate[C, P], R],
+):
+    reveal_type(command(callback))  # revealed: tuple[O@check, R@check] | tuple[None, R@check]
+    reveal_type(command(standalone))  # revealed: tuple[None, R@check]
+    owned: tuple[O, R] = command(standalone)  # error: [invalid-assignment]
+```
+
+## Forwarding a positional argument to a generic callable
+
+`pipe` passes its first argument to the callback. That argument can determine the callback's return
+type even when there are no remaining arguments in `P`.
+
+```py
+from typing import Callable, Concatenate
+
+def pipe[A, **P, R](value: A, f: Callable[Concatenate[A, P], R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return f(value, *args, **kwargs)
+
+def identity[T](value: T, /) -> T:
+    return value
+
+reveal_type(pipe(1, identity))  # revealed: Literal[1]
+```
+
+The leading argument contributes `Literal[1]` to the inferred type of `T` even when `P` captures
+another parameter of type `T`.
+
+```py
+def first[T](x: T, y: T, /) -> T:
+    return x
+
+reveal_type(pipe(1, first, 1))  # revealed: Literal[1]
+```
+
+Matching the `int` prefix determines the result even when the signature only mentions `P` in the
+callback.
+
+```py
+def result_of[**P, R](f: Callable[Concatenate[int, P], R]) -> R:
+    raise NotImplementedError
+
+reveal_type(result_of(first))  # revealed: int
+```
+
+An invariant return type can require a wider specialization of `T` that accommodates both arguments.
+
+```py
+def both[T](x: T, y: T, /) -> list[T]:
+    return [x, y]
+
+# TODO: Infer `list[int | str]` from both arguments, as in the direct call `both(1, "a")`.
+reveal_type(pipe(1, both, "a"))  # revealed: Unknown
+values: list[int | str] = pipe(1, both, "a")  # ok
+```
+
 ## `Concatenate` with protocol classes
 
 A protocol with `ParamSpec` in its `__call__` can be used where `Callable[Concatenate[...], ...]` is
@@ -871,4 +976,31 @@ def pick(f):
 
 def check[**P](callback: Callable[Concatenate[str, P], None]) -> None:
     reveal_type(pick(callback))  # revealed: None
+```
+
+### Matching generic callbacks with `Concatenate`
+
+A generic wrapper accepts the leading `int` and can specialize its remaining arguments to match the
+parameter list required by the decorator.
+
+```py
+from typing import Callable, Concatenate
+
+def register[**P](wrapper: Callable[Concatenate[int, P], int]) -> Callable[P, int]:
+    raise NotImplementedError
+
+@register  # ok
+def invoke[**Q](value: int, /, *args: Q.args, **kwargs: Q.kwargs) -> int:
+    return value
+```
+
+A callback whose leading parameter is bounded by `int` cannot accept the required `str`. The
+remaining parameter list does not affect the mismatch.
+
+```py
+def accepts_str[**P](callback: Callable[Concatenate[str, P], int]) -> None: ...
+def identity[T: int](value: T, /) -> T:
+    return value
+
+accepts_str(identity)  # error: [invalid-argument-type]
 ```

@@ -747,13 +747,13 @@ class C[T]:
     def __init__(self, value: T) -> None:
         reveal_type(C(value))  # revealed: C[T@C]
 
-        # error: [invalid-argument-type] "Expected `int`, found `T@C`"
+        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
         invalid: C[int] = C(value)
 
     def from_union(self, value: T | list[T]) -> None:
         reveal_type(C(value))  # revealed: C[T@C | list[T@C]]
 
-        # error: [invalid-argument-type] "Expected `list[T@C]`, found `T@C | list[T@C]`"
+        # error: [invalid-assignment] "Object of type `C[T@C | list[T@C]]` is not assignable to `C[list[T@C]]`"
         invalid_union: C[list[T]] = C(value)
 ```
 
@@ -1227,6 +1227,28 @@ reveal_type(C(1, True))  # revealed: C[int]
 wrong_innards: C[int] = C("five", 1)
 ```
 
+### Inferring a union from the initializer's receiver
+
+The arguments fix `A` to `bool` and `B` to `int`. The initializer's `self` annotation then gives the
+new box the element type `int`, since `bool` is a subtype of `int`.
+
+```py
+class Box[T]:
+    value: T
+
+    def __init__[A, B](self: "Box[A | B]", left: "Box[A]", right: "Box[B]") -> None: ...
+
+def combine(left: Box[bool], right: Box[int]):
+    reveal_type(Box(left, right))  # revealed: Box[int]
+```
+
+If the left box carries a caller's type variable, the result keeps it in the union.
+
+```py
+def forward[U](left: Box[U], right: Box[int]):
+    reveal_type(Box(left, right))  # revealed: Box[U@forward | int]
+```
+
 ### Calling a generic initializer on an existing instance
 
 An inherited initializer can infer its own type parameters from the arguments. Its explicit `self`
@@ -1260,7 +1282,7 @@ could be `str` alone, so the initializer cannot assume it accepts both types.
 class Child[T: str | int](Either[T]):
     def initialize(self, cls: type[T], default: T | Factory[T]) -> None:
         super().__init__(cls, cls, default)  # ok
-        super().__init__(str, int, default)  # error: [invalid-argument-type] "Expected `Either[str | int]`"
+        super().__init__(str, int, default)  # error: [invalid-argument-type] "found `Self@initialize`"
 ```
 
 For `Either[bytes]`, the receiver is incompatible whether it is bound implicitly or passed
@@ -1776,6 +1798,102 @@ class GenericChild[T](Gradual, Base[list[T]]): ...
 
 as_specialized: Base[list[int]] = GenericChild[int]()
 incompatible_specialization: Base[list[str]] = GenericChild[int]()  # error: [unsound-assignment]
+```
+
+Both `Child` and `Reversed` inherit `Base[int]`, so a value stored in either must be assignable to
+`int`.
+
+```py
+def store[T](value: T, box: Base[T]) -> None:
+    box.value = value
+
+def check[U](value: U, child: Child, reversed_child: Reversed, concrete: Concrete):
+    # TODO: error: [invalid-argument-type]
+    store("wrong", child)
+    # TODO: error: [invalid-argument-type]
+    store(value, child)
+
+    # TODO: error: [invalid-argument-type]
+    store("wrong", reversed_child)
+    # TODO: error: [invalid-argument-type]
+    store(value, reversed_child)
+
+    store("wrong", concrete)  # error: [invalid-argument-type]
+    store(value, concrete)  # error: [invalid-argument-type]
+```
+
+## Overriding a method that returns its receiver type
+
+The base method promises a `Base` at minimum. An override that can return `None` violates that
+promise even when the receiver satisfies the bound on `T`.
+
+```pyi
+class Base:
+    def clone[T: Base](self: T) -> T: ...
+
+class Child(Base):
+    def clone(self) -> Child: ...
+
+class OptionalChild(Base):
+    def clone(self) -> OptionalChild | None: ...  # error: [incompatible-method-override]
+
+class Sibling(Base):
+    # TODO: Reject this override. The bound permits a Child, but the receiver is a Sibling.
+    def clone(self) -> Child: ...
+```
+
+## Invariant parameter and return types with a bounded receiver type variable
+
+The override of `get` returns `list[int]` where the base method promises `list[T]`. The override of
+`put` accepts `list[T]` where the base method accepts `list[int]`. Since `list` is invariant, both
+overrides would require `T` to be `int`, which exceeds its bound of `bool`.
+
+```pyi
+class Buffer[K: bool]:
+    def get[T: bool](self: Buffer[T]) -> list[T]: ...
+    def put(self, values: list[int]) -> None: ...
+
+class Child[K: bool](Buffer[K]):
+    def get(self) -> list[int]: ...  # error: [incompatible-method-override]
+    # error: [incompatible-method-override]
+    def put[T: bool](self: Child[T], values: list[T]) -> None: ...
+```
+
+## Parameter and return types with a constrained receiver type variable
+
+The base methods restrict the receiver's key type to `bool` or `str`. Neither choice allows
+`first_key` to return an arbitrary `int` or `remove` to narrow its parameter from `int` to `T`.
+Returning `K` is valid for every receiver the base method accepts, even though `K` is unbounded.
+
+```pyi
+from typing import Any
+
+class Map[K, V]:
+    def first_key[T: (bool, str)](self: Map[T, Any]) -> T: ...
+    def remove[T: (bool, str)](self: Map[T, Any], key: int) -> None: ...
+
+class ChildMap[K, V](Map[K, V]):
+    def first_key(self) -> int: ...  # error: [incompatible-method-override]
+    # error: [incompatible-method-override]
+    def remove[T: (bool, str)](self: ChildMap[T, Any], key: T) -> None: ...
+
+class KeyMap[K, V](Map[K, V]):
+    def first_key(self) -> K: ...  # ok
+```
+
+## An override with the same receiver restriction as the base method
+
+Although `K` is unbounded, `Box.read` only accepts receivers whose element type satisfies the bound
+on `T`. The override accepts every `Child` for which the base method is defined.
+
+```pyi
+class Box[K]:
+    value: K
+
+    def read[T: int](self: Box[T]) -> T: ...
+
+class Child[K](Box[K]):
+    def read[T: int](self: Child[T]) -> T: ...  # ok
 ```
 
 ## Method overrides through gradual and concrete inheritance paths

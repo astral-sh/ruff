@@ -8,7 +8,7 @@
 use std::ops::{BitOrAssign, Sub};
 
 use crate::Db;
-use crate::types::constraints::{ConstraintId, ConstraintSetStorage, TypeVarId};
+use crate::types::constraints::{ConstraintSetStorage, TypeVarId};
 use crate::types::typevar::TypeVarSet;
 
 use ruff_index::newtype_index;
@@ -97,13 +97,6 @@ impl Support {
         })
     }
 
-    /// Returns whether this support contains any typevars that are not in `other`.
-    fn contains_more_than(&self, other: &Self) -> bool {
-        let lhs = self.iter_chunks();
-        let rhs = std::iter::chain(other.iter_chunks(), std::iter::repeat(0));
-        std::iter::zip(lhs, rhs).any(|(lhs, rhs)| (lhs & !rhs) != 0)
-    }
-
     /// Returns whether this support contains any type variables in common with `other`.
     pub(super) fn overlaps_with(&self, other: &Self) -> bool {
         let lhs = self.iter_chunks();
@@ -119,46 +112,6 @@ impl Support {
     /// Returns whether all type attributes were inspected while collecting this support.
     pub(super) fn is_complete(&self) -> bool {
         !self.has_skipped_lazy_attributes
-    }
-
-    /// Closes this support over a set of constraints. Returns whether the result
-    /// contains every type variable in the storage.
-    ///
-    /// We perform a fixed-point loop, where we find the constraints that mention any of the
-    /// typevars in the support, and add any _other_ typevars they mention. (That might add
-    /// additional typevars that cause more constraints to become eligible, and so on.)
-    #[expect(clippy::needless_pass_by_value)]
-    pub(super) fn close_over_constraints(
-        &mut self,
-        storage: &ConstraintSetStorage<'_>,
-        constraints: impl Iterator<Item = ConstraintId> + Clone,
-    ) -> bool {
-        let typevar_count = storage.typevar_count();
-        loop {
-            // Each set bit identifies a variable interned in this storage.
-            let support_len = self
-                .iter_chunks()
-                .map(|chunk| chunk.count_ones() as usize)
-                .sum::<usize>();
-            if support_len == typevar_count {
-                return true;
-            }
-
-            let mut any_added = false;
-            for constraint in constraints.clone() {
-                let constraint_support = storage.constraint_support(constraint);
-                if constraint_support.overlaps_with(self)
-                    && constraint_support.contains_more_than(self)
-                {
-                    any_added = true;
-                    *self |= constraint_support;
-                }
-            }
-
-            if !any_added {
-                return false;
-            }
-        }
     }
 }
 

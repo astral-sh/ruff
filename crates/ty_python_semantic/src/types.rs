@@ -113,7 +113,7 @@ pub(crate) use crate::types::typevar::{
     TypeVarBoundOrConstraints, TypeVarNonce,
 };
 pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarKind};
-use crate::types::typevar::{TypeVarDomain, TypeVarInstance, TypeVarSet};
+use crate::types::typevar::{TypeVarDomain, TypeVarFreshening, TypeVarInstance, TypeVarSet};
 use crate::types::union_type_instance::UnionTypeInstance;
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::{VarianceInferable, VarianceTerm};
@@ -11853,10 +11853,10 @@ pub enum TypeMapping<'a, 'db> {
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
     BindLegacyTypevars(BindingContext<'db>),
-    /// Freshens typevars bound by a generic context occurrence by adding a shared delta.
+    /// Freshens typevars bound by a generic context occurrence.
     FreshenBoundTypeVars {
         generic_context: GenericContext<'db>,
-        delta: u32,
+        freshening: TypeVarFreshening<'db>,
     },
     /// Binds any `typing.Self` typevar with a particular `self` class.
     BindSelf(SelfBinding<'db>),

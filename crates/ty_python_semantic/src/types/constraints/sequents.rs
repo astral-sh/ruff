@@ -18,12 +18,11 @@ use crate::types::constraints::{
     OwnedConstraintSet,
 };
 use crate::types::generics::AliasPolicy;
+use crate::types::relation::TypeVarEvaluation;
 use crate::types::signatures::CallableSignature;
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type_expanding_aliases, walk_type_with_recursion_guard,
-};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplySpecialization, ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type,
     TypeContext, TypeMapping, TypeVarVariance, UnionType,
@@ -69,6 +68,7 @@ pub(super) struct SequentMap<'db> {
 }
 
 struct SequentMapBuilder<'db> {
+    inferable: TypeVarSet<'db>,
     db: &'db dyn Db,
     sequents: Vec<SequentGroup<'db>>,
     /// Pending sequents that have not yet been added to [`sequents`][Self::sequents]. This is only
@@ -123,11 +123,13 @@ pub(super) enum Sequent<C, FuelCost = ()> {
     /// path that assumes both is impossible and can be pruned.
     PairImpossibility { ante1: C, ante2: C },
 
-    /// Sequent of the form `C₁ ∧ C₂ ∧ C₃ → false`
+    /// Sequent of the form `C₁ ∧ C₂ → ¬D`, encoded as `C₁ ∧ C₂ ∧ D → false`.
     ///
-    /// This indicates that `C₁`, `C₂` and `C₃` are mutually disjoint: it is not possible for all
-    /// three to hold. Any path that assumes all three is impossible and can be pruned.
-    TripleImpossibility { ante1: C, ante2: C, ante3: C },
+    /// `negated_post` must store the atom `D` whose negation was derived from `ante1` and
+    /// `ante2`. Path pruning treats all three atoms symmetrically, but
+    /// [`PathAssignments::implied_constraints`][super::paths::PathAssignments::implied_constraints]
+    /// needs to identify the derived atom to recover captured type variables.
+    TripleImpossibility { ante1: C, ante2: C, negated_post: C },
 
     /// Sequent of the form `C → D`
     ///
@@ -190,7 +192,7 @@ impl<'db> SequentMap<'db> {
                     Sequent::TripleImpossibility {
                         ante1,
                         ante2,
-                        ante3,
+                        negated_post,
                     } => {
                         maybe_write_prefix(f)?;
                         write!(
@@ -198,7 +200,7 @@ impl<'db> SequentMap<'db> {
                             "{} ∧ {} ∧ {} → false",
                             ante1.constraint(db).display(db, env, Some(true)),
                             ante2.constraint(db).display(db, env, Some(true)),
-                            ante3.constraint(db).display(db, env, Some(true)),
+                            negated_post.constraint(db).display(db, env, Some(true)),
                         )?;
                     }
 
@@ -253,9 +255,10 @@ impl<'db> SequentMap<'db> {
 }
 
 impl<'db> SequentMapBuilder<'db> {
-    fn new(db: &'db dyn Db) -> Self {
+    fn new(db: &'db dyn Db, inferable: TypeVarSet<'db>) -> Self {
         Self {
             db,
+            inferable,
             sequents: Vec::new(),
             pending: Vec::new(),
         }
@@ -321,16 +324,16 @@ impl<'db> SequentMapBuilder<'db> {
         });
     }
 
-    fn add_triple_impossibility(
+    fn add_negative_pair_implication(
         &mut self,
         ante1: AtomicConstraint<'db>,
         ante2: AtomicConstraint<'db>,
-        ante3: AtomicConstraint<'db>,
+        negated_post: AtomicConstraint<'db>,
     ) {
         self.pending.push(Sequent::TripleImpossibility {
             ante1: InternedSequentConstraint::new(self.db, ante1),
             ante2: InternedSequentConstraint::new(self.db, ante2),
-            ante3: InternedSequentConstraint::new(self.db, ante3),
+            negated_post: InternedSequentConstraint::new(self.db, negated_post),
         });
     }
 
@@ -383,6 +386,7 @@ impl<'db> SequentMap<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         constraint: AtomicConstraint<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Option<&'db Self> {
         // Most individual constraints produce no sequents. Avoid interning the query arguments
         // and retaining an empty Salsa result for those cases. Keep the checks in sync with the
@@ -411,13 +415,14 @@ impl<'db> SequentMap<'db> {
 
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _, _, _| SequentMap::default(),
+            cycle_initial=|_, _, _, _, _, _| SequentMap::default(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn for_constraint_inner<'db>(
             db: &'db dyn Db,
             program: Program<'db>,
             constraint: InternedSequentConstraint<'db>,
+            inferable: TypeVarSet<'db>,
         ) -> SequentMap<'db> {
             let env = &ProgramEnvironment::from_program(program);
             let constraint = constraint.constraint(db);
@@ -426,7 +431,7 @@ impl<'db> SequentMap<'db> {
                 constraint = %constraint.display(db, env, Some(true)),
                 "add sequents for constraint",
             );
-            let mut map = SequentMapBuilder::new(db);
+            let mut map = SequentMapBuilder::new(db, inferable);
             constraint.add_sequents(db, env, &mut map);
             map.finish()
         }
@@ -435,6 +440,7 @@ impl<'db> SequentMap<'db> {
             db,
             env.program(db),
             InternedSequentConstraint::new(db, constraint),
+            inferable,
         ))
     }
 
@@ -451,6 +457,7 @@ impl<'db> SequentMap<'db> {
         env: &ProgramEnvironment<'db>,
         left: AtomicConstraint<'db>,
         right: AtomicConstraint<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Option<&'db Self> {
         // Currently, the only pattern we look for is when two concrete lower-bound constraints
         // have disjoint bounds. Given `l₁ ≤ T ∧ l₂ ≤ T`, the only sequent we could theoretically
@@ -475,7 +482,7 @@ impl<'db> SequentMap<'db> {
 
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _, _, _, _| SequentMap::default(),
+            cycle_initial=|_, _, _, _, _, _, _| SequentMap::default(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn for_constraint_pair_inner<'db>(
@@ -483,6 +490,7 @@ impl<'db> SequentMap<'db> {
             program: Program<'db>,
             left: InternedSequentConstraint<'db>,
             right: InternedSequentConstraint<'db>,
+            inferable: TypeVarSet<'db>,
         ) -> SequentMap<'db> {
             let env = &ProgramEnvironment::from_program(program);
             let left = left.constraint(db);
@@ -493,7 +501,7 @@ impl<'db> SequentMap<'db> {
                 right = %right.display(db, env, Some(true)),
                 "add sequents for constraint pair",
             );
-            let mut map = SequentMapBuilder::new(db);
+            let mut map = SequentMapBuilder::new(db, inferable);
             left.add_sequents_with(db, env, &mut map, right);
             map.finish()
         }
@@ -503,6 +511,7 @@ impl<'db> SequentMap<'db> {
             env.program(db),
             InternedSequentConstraint::new(db, left),
             InternedSequentConstraint::new(db, right),
+            inferable,
         ))
     }
 }
@@ -705,8 +714,7 @@ impl<'db> AtomicConstraint<'db> {
         upper: impl ProvidesConcreteUpperBound<'db>,
     ) {
         // Given constraints `α ≤ T` and `T ≤ β`, `α ≤ β` must also hold. If those bounds contain
-        // other typevars, we can infer additional constraints. (α and U won't be bare typevars,
-        // since those will be modeled by `TypeVarRange` bounds.)
+        // inferable typevars, we can infer additional constraints.
         //
         //   1. `(Covariant[S] ≤ T) ∧ (T ≤ Covariant[U]) → (S ≤ U)`
         //      `(Covariant[S] ≤ T) ∧ (T ≤ Covariant[τ]) → (S ≤ τ)`
@@ -742,7 +750,14 @@ impl<'db> AtomicConstraint<'db> {
 
         let when = lower
             .bound()
-            .when_constraint_set_assignable_to_owned(db, env, upper.bound());
+            .when_constraint_set_assignable_to_owned_with_evaluation(
+                db,
+                env,
+                upper.bound(),
+                map.inferable,
+                TypeVarEvaluation::LazyForSolver,
+                ConstraintProvenance::INFERRED,
+            );
         let provenance = ConstraintProvenance::derived(lower.provenance(), upper.provenance());
         Self::add_constraint_set_implication(
             map,
@@ -765,10 +780,12 @@ impl<'db> AtomicConstraint<'db> {
         if lower.bound().is_static_sequent_eligible(db, env)
             && upper.bound().is_static_sequent_eligible(db, env)
         {
-            let when =
-                lower
-                    .bound()
-                    .when_constraint_set_equivalent_to_owned(db, env, upper.bound());
+            let when = lower.bound().when_constraint_set_equivalent_to_owned(
+                db,
+                env,
+                upper.bound(),
+                map.inferable,
+            );
             let provenance = ConstraintProvenance::derived(lower.provenance(), upper.provenance());
             Self::add_constraint_set_implication(
                 map,
@@ -853,7 +870,7 @@ impl<'db> AtomicConstraint<'db> {
                             map.add_pair_implication(lower_constraint, upper_constraint, derived);
                             node = interior.if_true;
                         } else {
-                            map.add_triple_impossibility(
+                            map.add_negative_pair_implication(
                                 lower_constraint,
                                 upper_constraint,
                                 derived,
@@ -1690,41 +1707,20 @@ impl<'db> ConcreteUpperBound<'db> {
             map.add_single_implication(self.into(), derived.into());
         }
 
-        // `U ≤ T | A` implies `U & ~Top[A] ≤ T`. In particular, when U is fixed by the caller,
-        // the original upper bound cannot select a solution for T. The residual lower bound
-        // preserves U without requiring T to accept the part of U already covered by A.
-        // Subtracting A's top materialization excludes every materialization of a gradual arm, so
-        // a fully covered U contributes no inference evidence and does not override T's default.
-        let Type::Union(union) = self.bound else {
-            return;
-        };
-        for element in union.elements(db) {
-            let Type::TypeVar(typevar) = *element else {
-                continue;
-            };
-            let other_elements = union.elements(db).iter().filter(|other| *other != element);
-            // Wait for substitutions to resolve other type variables in the union. Otherwise,
-            // `U ≤ T | V` would produce mutually dependent lower bounds `U & ~V ≤ T` and
-            // `U & ~T ≤ V`, which cannot independently select solutions for T and V.
-            if other_elements
-                .clone()
-                .any(|other| any_over_type_expanding_aliases(db, env, *other, Type::is_type_var))
-            {
-                continue;
-            }
-            let residual = IntersectionType::bounded_from_elements(
+        // A fully covered source supplies no inference evidence and must not override T's default.
+        if let Type::Union(union) = self.bound
+            && let Some((typevar, residual)) =
+                union.residual_typevar_lower_bound(db, env, self.typevar, map.inferable)
+            && !residual.is_never()
+        {
+            for derived in AtomicConstraint::new_lower_bound(
                 db,
-                env,
-                std::iter::once(Type::TypeVar(self.typevar)).chain(
-                    other_elements.map(|other| other.top_materialization(db, env).negate(db, env)),
-                ),
-            );
-            // `Never ≤ T` supplies no inference evidence and must not override T's default.
-            let Some(residual) = residual.filter(|residual| !residual.is_never()) else {
-                continue;
-            };
-            for derived in AtomicConstraint::new_lower_bound(db, self.provenance, typevar, residual)
-                .filter_map(Result::ok)
+                self.provenance,
+                typevar,
+                residual,
+                map.inferable,
+            )
+            .filter_map(Result::ok)
             {
                 map.add_single_implication(self.into(), derived);
             }
@@ -1771,8 +1767,11 @@ impl<'db> ConcreteUpperBound<'db> {
         // Keep unions as separate, factored upper bounds. Intersecting a union with another bound
         // can distribute the result into a union of intersections. That expanded type no longer
         // looks like an intersection, and repeatedly combining it with other upper bounds can
-        // produce a combinatorial number of equivalent constraints.
-        if self.bound.is_union() || other.bound.is_union() {
+        // produce a combinatorial number of equivalent constraints. Even a single expansion
+        // can obscure that a fixed U bounded by int | str satisfies (U & int) | (U & str).
+        if self.bound.resolve_type_alias(db).is_union()
+            || other.bound.resolve_type_alias(db).is_union()
+        {
             return;
         }
 
@@ -2265,7 +2264,8 @@ mod tests {
                 AtomicConstraint::from(ConcreteUpperBound::new(provenance, t, int)),
                 AtomicConstraint::from(ConcreteEquivalenceBound::new(provenance, t, int)),
             ] {
-                let sequents = SequentMap::for_constraint_pair(db, &env, lower, replacement);
+                let sequents =
+                    SequentMap::for_constraint_pair(db, &env, lower, replacement, TypeVarSet::All);
                 if provenance == ConstraintProvenance::VALIDITY {
                     assert!(
                         sequents.is_none_or(|sequents| sequents.all_sequents().next().is_none()),
@@ -2335,7 +2335,7 @@ mod tests {
                 p,
                 expected_bound,
             ));
-            let sequents = SequentMap::for_constraint_pair(db, &env, lower, upper);
+            let sequents = SequentMap::for_constraint_pair(db, &env, lower, upper, TypeVarSet::All);
             assert!(sequents.is_some_and(|sequents| {
                 sequents.all_sequents().any(|sequent| {
                     matches!(sequent, Sequent::PairImplication { post, .. }
@@ -2393,7 +2393,8 @@ mod tests {
             p,
             captured.substitute_one_typevar(db, &env, q, overloads, AliasPolicy::Expand),
         ));
-        let sequents = SequentMap::for_constraint_pair(db, &env, lower, replacement);
+        let sequents =
+            SequentMap::for_constraint_pair(db, &env, lower, replacement, TypeVarSet::All);
         assert!(sequents.is_some_and(|sequents| {
             sequents.all_sequents().any(|sequent| {
                 matches!(sequent, Sequent::PairImplication { post, .. }
@@ -2419,10 +2420,12 @@ mod tests {
             Type::int_literal(1),
         ));
 
-        assert!(SequentMap::for_constraint(db, &env, left).is_none());
-        assert!(SequentMap::for_constraint(db, &env, right).is_none());
+        assert!(SequentMap::for_constraint(db, &env, left, TypeVarSet::All).is_none());
+        assert!(SequentMap::for_constraint(db, &env, right, TypeVarSet::All).is_none());
         for (left, right) in [(left, right), (right, left)] {
-            assert!(SequentMap::for_constraint_pair(db, &env, left, right).is_none());
+            assert!(
+                SequentMap::for_constraint_pair(db, &env, left, right, TypeVarSet::All).is_none()
+            );
         }
     }
 
@@ -2449,7 +2452,7 @@ mod tests {
         ));
 
         for (left, right) in [(left, right), (right, left)] {
-            let sequents = SequentMap::for_constraint_pair(db, &env, left, right);
+            let sequents = SequentMap::for_constraint_pair(db, &env, left, right, TypeVarSet::All);
 
             assert!(sequents.is_some_and(|sequents| {
                 sequents

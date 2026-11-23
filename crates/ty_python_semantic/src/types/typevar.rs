@@ -888,10 +888,9 @@ impl<'db> TypeVarInstance<'db> {
     }
 }
 
-/// A nonce that gives a bound typevar occurrence a fresh identity.
+/// A numeric offset that distinguishes occurrences within a typevar binding.
 ///
-/// `0` is the source-level occurrence. Higher values distinguish other occurrences of the same
-/// typevar. Inferability is determined by membership in a [`TypeVarSet`], not by the nonce itself.
+/// Inferability is determined by membership in a [`TypeVarSet`].
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct TypeVarNonce(u32);
 
@@ -921,6 +920,48 @@ impl TypeVarNonce {
                 .expect("exhausted bound typevar freshness nonces"),
         )
     }
+}
+
+/// How to distinguish a signature's binders from other occurrences of the same declaration.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
+pub enum TypeVarFreshening<'db> {
+    Offset(u32),
+    Capture(BoundTypeVarIdentity<'db>),
+}
+
+/// A capture pairs the original binding context with the receiving ParamSpec's identity.
+/// Repeated derivations share the same binding, even across materializations of its bounds.
+///
+/// TODO: Revisit why a captured parameter list carries the callback's
+/// entire generic context. For example, when we match `[T]() -> list[T]`
+/// against `Callable[P, list[Callable[P, int]]]`, `P` captures an empty
+/// parameter list. Substituting it into `Callable[P, int]` should give
+/// `() -> int`. Today we get `[T]() -> int`, even though that callable
+/// never uses `T`. Comparing it again can freshen `T` indefinitely, so
+/// we use the receiving ParamSpec to recognize the same binding each time.
+///
+/// With scoped existentials [1], we should be able to express the match
+/// as "there exists a `T` such that `P = []` and `T = Callable[P, int]`".
+/// Then `T` stays bound around the comparison, and substituting `P` only
+/// supplies the parameters. We still need to preserve the binder when
+/// forwarding the whole `[T]() -> list[T]` signature, since its return
+/// type uses `T`.
+///
+/// [1]: https://github.com/astral-sh/ruff/pull/29027
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct CapturedBinding<'db> {
+    #[returns(copy)]
+    context: BindingContext<'db>,
+    #[returns(copy)]
+    paramspec: BoundTypeVarIdentity<'db>,
+}
+
+impl get_size2::GetSize for CapturedBinding<'_> {}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum BindingOrigin<'db> {
+    Original(BindingContext<'db>),
+    Captured(CapturedBinding<'db>),
 }
 
 /// Generates fresh identities when a call repeats a generic context or calls it recursively.
@@ -1016,11 +1057,11 @@ pub(super) fn freshening_delta<'db>(
                 if self.binders.contains(db, id) {
                     self.collides.set(true);
                 } else if !self.binders.variables(db).any(|binder| {
-                    binder.identity(db).unfreshened_binder() == id.unfreshened_binder()
+                    binder.identity(db).binder_without_offset() == id.binder_without_offset()
                 }) {
                     return;
                 }
-                self.max.set(self.max.get().max(var.freshness(db)));
+                self.max.set(self.max.get().max(id.freshness));
             } else {
                 walk_type_with_recursion_guard(db, ty, self, &self.seen);
             }
@@ -1074,7 +1115,7 @@ impl<'db> BoundTypeVarInstance<'db> {
     ) -> Self {
         let identity = BoundTypeVarIdentity {
             identity: typevar.identity(db),
-            binding_context,
+            origin: BindingOrigin::Original(binding_context),
             paramspec_attr,
             freshness,
         };
@@ -1082,33 +1123,34 @@ impl<'db> BoundTypeVarInstance<'db> {
     }
 
     pub(super) fn binding_context(self, db: &'db dyn Db) -> BindingContext<'db> {
-        self.identity(db).binding_context
+        self.identity(db).binding_context(db)
     }
 
     pub(super) fn paramspec_attr(self, db: &'db dyn Db) -> Option<ParamSpecAttrKind> {
         self.identity(db).paramspec_attr
     }
 
-    pub(super) fn freshness(self, db: &'db dyn Db) -> TypeVarNonce {
-        self.identity(db).freshness
+    pub(super) fn is_fresh(self, db: &'db dyn Db) -> bool {
+        let identity = self.identity(db);
+        identity.freshness != TypeVarNonce::NONE
+            || matches!(identity.origin, BindingOrigin::Captured(_))
+    }
+
+    pub(super) fn with_typevar(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Self {
+        let identity = BoundTypeVarIdentity {
+            identity: typevar.identity(db),
+            ..self.identity(db)
+        };
+        Self::new_internal(db, typevar, identity)
     }
 
     pub(crate) fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
-        Self::new(
-            db,
-            self.typevar(db).with_name_suffix(db, suffix),
-            self.binding_context(db),
-            self.paramspec_attr(db),
-            self.freshness(db),
-        )
+        self.with_typevar(db, self.typevar(db).with_name_suffix(db, suffix))
     }
 
     /// Get the identity of this bound typevar occurrence.
     ///
-    /// This includes the source-level typevar, binding context, `ParamSpec` attribute, and
-    /// freshness nonce. It is used for comparing whether two bound typevars represent the same
-    /// occurrence, regardless of e.g. differences in their bounds or constraints due to
-    /// materialization.
+    /// The identity is preserved when materializing bounds and constraints.
     pub(crate) fn identity(self, db: &'db dyn Db) -> BoundTypeVarIdentity<'db> {
         self.identity_inner(db)
     }
@@ -1232,13 +1274,9 @@ impl<'db> BoundTypeVarInstance<'db> {
             None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
         );
 
-        Self::new(
-            db,
-            typevar,
-            self.binding_context(db),
-            Some(kind),
-            self.freshness(db),
-        )
+        let mut identity = self.identity(db);
+        identity.paramspec_attr = Some(kind);
+        Self::new_internal(db, typevar, identity)
     }
 
     /// Returns a new bound typevar instance without any `ParamSpec` attribute set.
@@ -1256,7 +1294,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         );
 
         let typevar = self.typevar(db);
-        Self::new(
+        Self::new_internal(
             db,
             TypeVarInstance::new(
                 db,
@@ -1265,9 +1303,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 typevar.explicit_variance(db),
                 None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
             ),
-            self.binding_context(db),
-            None,
-            self.freshness(db),
+            self.identity(db).binder(),
         )
     }
 
@@ -1379,13 +1415,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             typevar._default(db),
         );
 
-        Self::new(
-            db,
-            typevar,
-            self.binding_context(db),
-            self.paramspec_attr(db),
-            self.freshness(db),
-        )
+        self.with_typevar(db, typevar)
     }
 
     pub(crate) fn variance_with_polarity(
@@ -1519,21 +1549,15 @@ impl<'db> BoundTypeVarInstance<'db> {
             }
             TypeMapping::FreshenBoundTypeVars {
                 generic_context,
-                delta,
+                freshening,
             } => visitor.visit(db, Type::TypeVar(self), type_mapping, || {
-                let identity = if self.is_paramspec(db) {
-                    self.identity(db).without_paramspec_attr(db)
-                } else {
-                    self.identity(db)
-                };
-                let nonce = if generic_context.contains(db, identity) {
-                    self.freshness(db).add(*delta)
-                } else {
-                    self.freshness(db)
-                };
+                let mut identity = self.identity(db);
+                if generic_context.contains(db, identity) {
+                    identity.freshen(db, *freshening);
+                }
                 // Bounds and defaults can mention this context's typevars even when the
                 // typevar itself belongs to another context.
-                Type::TypeVar(self.freshen_with_mapping(db, nonce, type_mapping, visitor))
+                Type::TypeVar(self.freshen_with_mapping(db, identity, type_mapping, visitor))
             }),
             TypeMapping::Promote(..)
             | TypeMapping::ReplaceParameterDefaults
@@ -1626,20 +1650,17 @@ impl<'db> BoundTypeVarInstance<'db> {
         materialization_kind: MaterializationKind,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        Self::new(
+        self.with_typevar(
             db,
             self.typevar(db)
                 .materialize_impl(db, materialization_kind, visitor),
-            self.binding_context(db),
-            self.paramspec_attr(db),
-            self.freshness(db),
         )
     }
 
     fn freshen_with_mapping(
         self,
         db: &'db dyn Db,
-        nonce: TypeVarNonce,
+        identity: BoundTypeVarIdentity<'db>,
         type_mapping: &TypeMapping<'_, 'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -1668,13 +1689,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 )
             };
 
-        Self::new(
-            db,
-            typevar,
-            self.binding_context(db),
-            self.paramspec_attr(db),
-            nonce,
-        )
+        Self::new_internal(db, typevar, identity)
     }
 
     pub(super) fn to_instance(
@@ -1682,15 +1697,11 @@ impl<'db> BoundTypeVarInstance<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<InstanceProjection<Self>> {
-        Some(self.typevar(db).to_instance(db, env)?.map(|typevar| {
-            Self::new(
-                db,
-                typevar,
-                self.binding_context(db),
-                self.paramspec_attr(db),
-                self.freshness(db),
-            )
-        }))
+        Some(
+            self.typevar(db)
+                .to_instance(db, env)?
+                .map(|typevar| self.with_typevar(db, typevar)),
+        )
     }
 }
 
@@ -1942,48 +1953,58 @@ impl std::fmt::Display for ParamSpecAttrKind {
 
 /// The identity of a bound type variable occurrence.
 ///
-/// This identifies a specific binding of a typevar to a context (e.g., `T@ClassC` vs `T@FunctionF`),
-/// plus a freshness nonce for fresh callable occurrences, independent of the typevar's
-/// bounds or constraints. Two bound typevars have the same identity if they represent the same
-/// occurrence, even if their bounds have been materialized differently. Two fresh occurrences of
-/// the same source-level typevar have different bound identities.
+/// The binding context distinguishes occurrences such as `T@ClassC` and `T@FunctionF`.
+/// Within a context, the nonce distinguishes fresh occurrences of a callable's binders.
+/// A captured binder also records the receiving `ParamSpec`, so deriving the same capture
+/// again reproduces the same identity. Materializing its bounds or constraints preserves
+/// that identity.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct BoundTypeVarIdentity<'db> {
     pub(crate) identity: TypeVarIdentity<'db>,
-    pub(crate) binding_context: BindingContext<'db>,
+    origin: BindingOrigin<'db>,
     /// If [`Some`], this indicates that this type variable is the `args` or `kwargs` component
     /// of a `ParamSpec` i.e., `P.args` or `P.kwargs`.
     pub(super) paramspec_attr: Option<ParamSpecAttrKind>,
-    /// The freshness nonce for this bound typevar occurrence; `0` is the source-level occurrence.
     freshness: TypeVarNonce,
 }
 
 impl<'db> BoundTypeVarIdentity<'db> {
-    /// All fresh occurrences of a binder, including both components of a `ParamSpec`, share
-    /// the same source declaration.
-    fn unfreshened_binder(self) -> Self {
-        Self {
-            paramspec_attr: None,
-            freshness: TypeVarNonce::NONE,
-            ..self
+    pub(super) fn binding_context(self, db: &'db dyn Db) -> BindingContext<'db> {
+        match self.origin {
+            BindingOrigin::Original(context) => context,
+            BindingOrigin::Captured(capture) => capture.context(db),
         }
+    }
+
+    pub(super) fn shares_binding(self, other: Self) -> bool {
+        self.origin == other.origin && self.freshness == other.freshness
+    }
+
+    fn freshen(&mut self, db: &'db dyn Db, freshening: TypeVarFreshening<'db>) {
+        match freshening {
+            TypeVarFreshening::Offset(delta) => self.freshness = self.freshness.add(delta),
+            TypeVarFreshening::Capture(paramspec) => {
+                self.origin = BindingOrigin::Captured(CapturedBinding::new(
+                    db,
+                    self.binding_context(db),
+                    paramspec.binder(),
+                ));
+            }
+        }
+    }
+
+    fn binder_without_offset(mut self) -> Self {
+        self.freshness = TypeVarNonce::NONE;
+        self.binder()
     }
 
     fn kind(self, db: &'db dyn Db) -> TypeVarKind<'db> {
         self.identity.kind(db)
     }
 
-    pub(crate) fn is_paramspec(self, db: &'db dyn Db) -> bool {
-        self.kind(db).is_paramspec()
-    }
-
-    pub(crate) fn without_paramspec_attr(mut self, db: &'db dyn Db) -> Self {
-        debug_assert!(
-            self.is_paramspec(db),
-            "Expected a ParamSpec, got {:?}",
-            self.kind(db)
-        );
-
+    /// The identity of the binder, shared by a `ParamSpec` and its `args` and `kwargs`.
+    /// Fresh occurrences of the same declaration keep distinct binder identities.
+    pub(super) fn binder(mut self) -> Self {
         self.paramspec_attr = None;
         self
     }
@@ -2036,17 +2057,12 @@ impl<'db> Type<'db> {
                     };
                     let enclosing = self.variables.take();
                     walk_signature(db, signature, self);
-                    let locals = context.inferable_typevars(db);
                     let candidates = self.variables.replace(enclosing);
-                    self.variables
-                        .borrow_mut()
-                        .extend(candidates.into_iter().filter(|variable| {
-                            let mut identity = variable.identity(db);
-                            if variable.paramspec_attr(db).is_some() {
-                                identity = identity.without_paramspec_attr(db);
-                            }
-                            !identity.is_inferable(db, locals)
-                        }));
+                    self.variables.borrow_mut().extend(
+                        candidates
+                            .into_iter()
+                            .filter(|variable| !context.contains(db, variable.identity(db))),
+                    );
                 }
 
                 fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
@@ -2119,9 +2135,24 @@ impl<'db> Type<'db> {
 pub(crate) enum TypeVarSet<'db> {
     None,
     Some(TypeVarSetInner<'db>),
+    /// Every bound typevar occurrence can acquire bounds in this relation.
+    All,
 }
 
 impl<'db> TypeVarSet<'db> {
+    /// Collects the binders of all the signatures in order. Interning each successive
+    /// prefix would retain a quadratic number of entries for generic overloads.
+    pub(super) fn from_contexts(db: &'db dyn Db, contexts: &[GenericContext<'db>]) -> Self {
+        match contexts {
+            [] => Self::None,
+            [context] => context.inferable_typevars(db),
+            _ => Self::from_typevars(
+                db,
+                contexts.iter().flat_map(|context| context.variables(db)),
+            ),
+        }
+    }
+
     pub(crate) fn from_typevars(
         db: &'db dyn Db,
         typevars: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
@@ -2153,6 +2184,7 @@ impl<'db> BoundTypeVarIdentity<'db> {
     pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: TypeVarSet<'db>) -> bool {
         match inferable {
             TypeVarSet::None => false,
+            TypeVarSet::All => true,
             TypeVarSet::Some(inner) => inner.typevars(db).contains_key(&self),
         }
     }
@@ -2160,7 +2192,7 @@ impl<'db> BoundTypeVarIdentity<'db> {
 
 impl<'db> BoundTypeVarInstance<'db> {
     pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: TypeVarSet<'db>) -> bool {
-        self.identity(db).is_inferable(db, inferable)
+        inferable == TypeVarSet::All || self.identity(db).is_inferable(db, inferable)
     }
 }
 
@@ -2183,6 +2215,7 @@ impl<'db> TypeVarSet<'db> {
         }
 
         match (self, other) {
+            (TypeVarSet::All, _) | (_, TypeVarSet::All) => TypeVarSet::All,
             (TypeVarSet::None, other) | (other, TypeVarSet::None) => other,
             (TypeVarSet::Some(self_inner), TypeVarSet::Some(other_inner)) => {
                 merge_inner(db, self_inner, other_inner)
@@ -2190,13 +2223,23 @@ impl<'db> TypeVarSet<'db> {
         }
     }
 
-    // This is not an IntoIterator implementation because I have no desire to try to name the
-    // iterator type.
+    /// Returns the variables explicitly selected for inference. An unrestricted relation
+    /// can collect bounds on any variable without explicitly selecting any.
+    pub(super) fn explicit_typevars(self) -> Self {
+        match self {
+            Self::All => Self::None,
+            typevars => typevars,
+        }
+    }
+
+    /// Iterates a finite set of type variables. Callers must resolve `All` against a finite
+    /// set of variables before enumerating it.
     pub(crate) fn iter(
         self,
         db: &'db dyn Db,
     ) -> impl Iterator<Item = BoundTypeVarInstance<'db>> + 'db {
         match self {
+            TypeVarSet::All => panic!("cannot enumerate an unrestricted set of type variables"),
             TypeVarSet::None => Either::Left(std::iter::empty()),
             TypeVarSet::Some(inner) => Either::Right(inner.typevars(db).values().copied()),
         }
@@ -2205,6 +2248,9 @@ impl<'db> TypeVarSet<'db> {
     // Keep this around for debugging purposes
     #[cfg_attr(not(test), expect(dead_code))]
     fn display(self, db: &'db dyn Db) -> String {
+        if self == Self::All {
+            return "All".to_string();
+        }
         format!(
             "[{}]",
             self.iter(db)
@@ -2732,15 +2778,11 @@ mod tests {
         assert!(!paramspec.is_inferable(db, inferable));
 
         let paramspec_only = TypeVarSet::from_typevars(db, [paramspec]);
-        assert!(
-            args.identity(db)
-                .without_paramspec_attr(db)
-                .is_inferable(db, paramspec_only)
-        );
+        assert!(args.identity(db).binder().is_inferable(db, paramspec_only));
         assert!(
             kwargs
                 .identity(db)
-                .without_paramspec_attr(db)
+                .binder()
                 .is_inferable(db, paramspec_only)
         );
     }

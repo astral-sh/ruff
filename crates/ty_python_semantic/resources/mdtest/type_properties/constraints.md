@@ -484,24 +484,6 @@ def _[T, U]() -> None:
     ~ConstraintSet.range(Sub, T, Base) & ~ConstraintSet.range(Sub, U, Base)
 ```
 
-### Declared bounds of non-inferable typevars
-
-A path is only satisfiable if every type variable on the path satisfies its declared bound,
-including type variables that are not being inferred.
-
-```py
-from ty_extensions._internal import ConstraintSet
-
-def noninferable_declared_bound[T, U: str]() -> None:
-    constraints = ConstraintSet.equality(U, int) & ConstraintSet.equality(T, bytes)
-    # revealed: None
-    reveal_type(constraints.solutions(inferable=tuple[T]))
-
-    reversed_constraints = ConstraintSet.equality(T, bytes) & ConstraintSet.equality(U, int)
-    # revealed: None
-    reveal_type(reversed_constraints.solutions(inferable=tuple[T]))
-```
-
 ### Intersection of two ranges
 
 The intersection of two ranges is where the ranges "overlap".
@@ -1346,21 +1328,16 @@ def basic[T]() -> None:
 
 Gradual bounds can still conflict in their static components. There is no specialization between
 `tuple[Any, str]` and `tuple[int, int]`, so the range is never satisfied when `T` is inferable, and
-its negation is always satisfied. An empty or unrelated inferable set leaves `T`'s gradual bounds
-unchecked.
+its negation is always satisfied.
 
 ```py
-def conflicting_bounds[T, U]() -> None:
+def conflicting_bounds[T]() -> None:
     impossible = ConstraintSet.range(tuple[Any, str], T, tuple[int, int])
     static_assert(impossible.solutions(inferable=tuple[T]) is None)
     static_assert(impossible.is_never_satisfied(inferable=tuple[T]))
     static_assert((~impossible).is_always_satisfied(inferable=tuple[T]))
     static_assert(not impossible.is_always_satisfied(inferable=tuple[T]))
     static_assert(not (~impossible).is_never_satisfied(inferable=tuple[T]))
-
-    static_assert(not impossible.is_never_satisfied(inferable=tuple[()]))
-    static_assert(not impossible.is_never_satisfied(inferable=tuple[U]))
-    static_assert(not (~impossible).is_always_satisfied(inferable=tuple[U]))
 ```
 
 An alternative with compatible bounds keeps the constraint set satisfiable.
@@ -1462,211 +1439,56 @@ def bounded[A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, X]() -> None:
     reveal_type(choices.is_never_satisfied(inferable=tuple[A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R]))
 ```
 
-## Solutions with inferable and non-inferable typevars
+## Solver scope
 
-Solution extraction receives the type variables that it is allowed to infer. Other type variables
-may still restrict whether a path is feasible, but should not appear as top-level solution bindings.
-References to an unfixed outer variable inside an inferable variable's solution must remain
-symbolic.
-
-### Inferable constraints and non-inferable-only alternatives
+Solving a constraint set and checking its satisfiability require every variable that receives a
+bound to be inferable.
 
 ```py
 from ty_extensions._internal import ConstraintSet
-
-def inferable_only[I, N]() -> None:
-    constraints = ConstraintSet.range(int, I, int)
-    # revealed: tuple[Solution[I=int]]
-    reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def noninferable_only[I, N]() -> None:
     constraints = ConstraintSet.range(int, N, int)
-    # revealed: tuple[()]
-    reveal_type(constraints.solutions(inferable=tuple[I]))
-
-def independent_noninferable[I, N]() -> None:
-    constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(str, I, str)
-    # revealed: tuple[Solution[I=str]]
-    reveal_type(constraints.solutions(inferable=tuple[I]))
-
-def noninferable_alternative[I, N]() -> None:
-    constraints = ConstraintSet.range(int, N, int) | ConstraintSet.range(str, I, str)
-    # revealed: tuple[Solution[], Solution[I=str]]
-    reveal_type(constraints.solutions(inferable=tuple[I]))
+    # error: [not-callable] "`inferable` must include every type variable constrained by this set"
+    constraints.solutions(inferable=tuple[I])
+    constraints.is_always_satisfied(inferable=tuple[I])  # error: [not-callable]
+    constraints.is_never_satisfied(inferable=tuple[I])  # error: [not-callable]
 ```
 
-### Independent non-inferable alternatives
+`I ≤ N` gives `I` an upper bound and `N` a lower bound. Filtering the results to one variable with
+`solutions_for` still requires solving for both.
 
-Each independent binary alternative doubles the number of paths through the original constraint set,
-but none of those decisions can refine the inferable type variable. The hidden alternatives use
-types disjoint from the inferable solution so transitivity cannot relate them to that solution.
-Walking the hidden alternatives must not produce duplicates or enumerate their cross product. Both
-source orders exercise the shortcut after an inferable decision and normalized-node reuse when
-non-inferable decisions appear first.
+```py
+def related[I, N]() -> None:
+    constraints = ConstraintSet.lower_bound(I, N)
+    constraints.solutions_for(I, inferable=tuple[I])  # error: [not-callable]
+    constraints.solutions_for(N, inferable=tuple[N])  # error: [not-callable]
+```
+
+A variable can stay fixed if its constraint drops out of the formula.
+
+```py
+def simplified[I, N]() -> None:
+    kept = ConstraintSet.equality(I, int)
+    discarded = ConstraintSet.equality(N, str)
+    constraints = kept | (kept & discarded)
+    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[Solution[I=int]]
+```
+
+## Bounds containing type variables
+
+### Union bounds containing fixed variables
+
+A caller-fixed type variable can remain in a solution when a union containing it is both a lower and
+an upper bound.
 
 ```py
 from ty_extensions._internal import ConstraintSet
 
-def inferable_first[I, N0, N1, N2, N3, N4, N5, N6, N7, N8, N9, N10, N11]() -> None:
-    constraints = ConstraintSet.range(int, I, int)
-    constraints &= ConstraintSet.range(str, N0, str) | ConstraintSet.range(bytes, N0, bytes)
-    constraints &= ConstraintSet.range(str, N1, str) | ConstraintSet.range(bytes, N1, bytes)
-    constraints &= ConstraintSet.range(str, N2, str) | ConstraintSet.range(bytes, N2, bytes)
-    constraints &= ConstraintSet.range(str, N3, str) | ConstraintSet.range(bytes, N3, bytes)
-    constraints &= ConstraintSet.range(str, N4, str) | ConstraintSet.range(bytes, N4, bytes)
-    constraints &= ConstraintSet.range(str, N5, str) | ConstraintSet.range(bytes, N5, bytes)
-    constraints &= ConstraintSet.range(str, N6, str) | ConstraintSet.range(bytes, N6, bytes)
-    constraints &= ConstraintSet.range(str, N7, str) | ConstraintSet.range(bytes, N7, bytes)
-    constraints &= ConstraintSet.range(str, N8, str) | ConstraintSet.range(bytes, N8, bytes)
-    constraints &= ConstraintSet.range(str, N9, str) | ConstraintSet.range(bytes, N9, bytes)
-    constraints &= ConstraintSet.range(str, N10, str) | ConstraintSet.range(bytes, N10, bytes)
-    constraints &= ConstraintSet.range(str, N11, str) | ConstraintSet.range(bytes, N11, bytes)
-    # revealed: tuple[Solution[I=int]]
-    reveal_type(constraints.solutions(inferable=tuple[I]))
-
-def inferable_last[I, N0, N1, N2, N3, N4, N5, N6, N7, N8, N9, N10, N11]() -> None:
-    constraints = ConstraintSet.range(str, N0, str) | ConstraintSet.range(bytes, N0, bytes)
-    constraints &= ConstraintSet.range(str, N1, str) | ConstraintSet.range(bytes, N1, bytes)
-    constraints &= ConstraintSet.range(str, N2, str) | ConstraintSet.range(bytes, N2, bytes)
-    constraints &= ConstraintSet.range(str, N3, str) | ConstraintSet.range(bytes, N3, bytes)
-    constraints &= ConstraintSet.range(str, N4, str) | ConstraintSet.range(bytes, N4, bytes)
-    constraints &= ConstraintSet.range(str, N5, str) | ConstraintSet.range(bytes, N5, bytes)
-    constraints &= ConstraintSet.range(str, N6, str) | ConstraintSet.range(bytes, N6, bytes)
-    constraints &= ConstraintSet.range(str, N7, str) | ConstraintSet.range(bytes, N7, bytes)
-    constraints &= ConstraintSet.range(str, N8, str) | ConstraintSet.range(bytes, N8, bytes)
-    constraints &= ConstraintSet.range(str, N9, str) | ConstraintSet.range(bytes, N9, bytes)
-    constraints &= ConstraintSet.range(str, N10, str) | ConstraintSet.range(bytes, N10, bytes)
-    constraints &= ConstraintSet.range(str, N11, str) | ConstraintSet.range(bytes, N11, bytes)
-    constraints &= ConstraintSet.range(int, I, int)
-    # revealed: tuple[Solution[I=int]]
-    reveal_type(constraints.solutions(inferable=tuple[I]))
-```
-
-### Symbolic relationships and fixed non-inferable bindings
-
-A bare relationship must have the same meaning regardless of which type variable the TDD chooses as
-its constraint subject. Directly related non-inferable variables retain their reverse bindings,
-while unrelated non-inferable constraints do not. An explicit exact constraint fixes a non-inferable
-variable to a concrete type; a one-sided bound does not.
-
-```py
-from typing import Any, Never
-from ty_extensions._internal import ConstraintSet, Unknown
-
-def symbolic_relationship[I, N]() -> None:
-    constraints = ConstraintSet.range(N, I, N)
-    # revealed: tuple[Solution[N=I@symbolic_relationship, I=N@symbolic_relationship]]
-    reveal_type(constraints.solutions(inferable=tuple[I]))
-
-def symbolic_relationship_reversed[N, I]() -> None:
-    constraints = ConstraintSet.range(N, I, N)
-    # revealed: tuple[Solution[N=I@symbolic_relationship_reversed, I=N@symbolic_relationship_reversed]]
-    reveal_type(constraints.solutions(inferable=tuple[I]))
-
-def fixed_noninferable[I, N]() -> None:
-    constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(N, I, N)
-    # revealed: tuple[Solution[I=int]]
-    reveal_type(constraints.solutions(inferable=tuple[I]))
-
-def fixed_nested_noninferable[I, N]() -> None:
-    constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(list[N], I, list[N])
-    # revealed: tuple[Solution[I=list[int]]]
-    reveal_type(constraints.solutions(inferable=tuple[I]))
-
-def gradual_noninferable_any[I, N]() -> None:
-    constraints = ConstraintSet.range(Any, N, Any) & ConstraintSet.range(N, I, N)
-    # revealed: tuple[Solution[I=Any]]
-    reveal_type(constraints.solutions(inferable=tuple[I]))
-
-def gradual_noninferable_unknown[I, N]() -> None:
-    constraints = ConstraintSet.range(Unknown, N, Unknown) & ConstraintSet.range(N, I, N)
-    # revealed: tuple[Solution[I=Unknown]]
-    reveal_type(constraints.solutions(inferable=tuple[I]))
-
-def lower_bounded_noninferable[I, N]() -> None:
-    constraints = ConstraintSet.range(int, N, object) & ConstraintSet.range(N, I, N)
-    # TODO: revealed: tuple[Solution[I=N@lower_bounded_noninferable]]
-    # revealed: tuple[Solution[I=int | N@lower_bounded_noninferable]]
-    reveal_type(constraints.solutions_for(I, inferable=tuple[I]))
-
-def upper_bounded_noninferable[I, N]() -> None:
-    constraints = ConstraintSet.range(Never, N, int) & ConstraintSet.range(N, I, N)
-    # revealed: tuple[Solution[I=N@upper_bounded_noninferable, N=I@upper_bounded_noninferable]]
-    reveal_type(constraints.solutions(inferable=tuple[I]))
-```
-
-### Type variables in union upper bounds
-
-An upper bound on a caller-fixed variable can provide evidence for an inferable variable inside the
-bound. From `U ≤ T | int`, we infer `U & ~int ≤ T`: `T` only needs to accept the portion of `U` that
-the concrete `int` arm does not cover. The solution preserves `U` symbolically without binding it.
-
-```py
-from typing import Any
-from ty_extensions._internal import ConstraintSet
-
-def union_upper[T, U]() -> None:
-    constraints = ConstraintSet.upper_bound(U, T | int) & ConstraintSet.lower_bound(str, T)
-    # revealed: tuple[Solution[T=(U@union_upper & ~int) | str]]
-    reveal_type(constraints.solutions(inferable=tuple[T]))
-```
-
-Every other union arm contributes to the residual, even when there is no separate lower-bound
-evidence for `T`.
-
-```py
-def several_arms[T, U]() -> None:
-    constraints = ConstraintSet.upper_bound(U, T | int | bytes)
-    # revealed: tuple[Solution[T=U@several_arms & ~int & ~bytes]]
-    reveal_type(constraints.solutions(inferable=tuple[T]))
-```
-
-We reject the constraint when the remaining portion of `U` cannot satisfy `T`'s declared bound.
-
-```py
-def uncovered[T: str, U: int | bytes]() -> None:
-    constraints = ConstraintSet.upper_bound(U, T | int)
-    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
-```
-
-When `T | str` is both a lower and an upper bound on `U`, the solution preserves the caller's `T`.
-Its declared bound restricts only the part of `U` outside `str`.
-
-```py
 def bounded_caller[T: int, U]() -> None:
-    constraints = ConstraintSet.upper_bound(U, T | str) & ConstraintSet.lower_bound(T | str, U)
+    constraints = ConstraintSet.range(T | str, U, T | str)
     # revealed: tuple[Solution[U=T@bounded_caller | str]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[U]))
-```
-
-For a gradual arm, we subtract its top materialization: `U & ~Top[A] ≤ T`. This preserves the
-portion of `U` that the gradual arm cannot accept.
-
-```py
-def nested_gradual[T, U]() -> None:
-    constraints = ConstraintSet.upper_bound(U, T | list[Any]) & ConstraintSet.lower_bound(str, T)
-    # revealed: tuple[Solution[T=(U@nested_gradual & ~Top[list[Any]]) | str]]
-    reveal_type(constraints.solutions(inferable=tuple[T]))
-```
-
-Propagating the residual through `T = U` can produce `T & ~str ≤ T`. This tautology contributes no
-inference evidence: the solution remains `U`, rather than the self-referential `U | (T & ~str)`.
-
-```py
-def propagated_residual[T, U]() -> None:
-    constraints = ConstraintSet.range(U, T, U) & ConstraintSet.upper_bound(T, U | str)
-    # revealed: tuple[Solution[T=U@propagated_residual]]
-    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
-```
-
-The dual tautology, `T ≤ T | V`, also contributes no evidence. Here, `T = U` satisfies both upper
-bounds without leaving a reference to `T` in its own solution.
-
-```py
-def propagated_union[T, U, V]() -> None:
-    constraints = ConstraintSet.upper_bound(T, U) & ConstraintSet.upper_bound(U, T | V)
-    # revealed: tuple[Solution[T=U@propagated_union]]
-    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
 ```
 
 ### Upper bounds from intersections with exclusions
@@ -1691,6 +1513,16 @@ def upper[U: Any]() -> None:
     static_assert(is_constraint_set_subtype_of(Intersection[U, Not[str], Not[bytes]], int) == expected)
 ```
 
+The same reasoning applies through an intermediate bound. If `U & ~str ≤ T` and `T ≤ int`, the
+solver derives `U ≤ int | str`.
+
+```py
+def implied_upper[T, U]() -> None:
+    bounds = ConstraintSet.lower_bound(Intersection[U, Not[str]], T) & ConstraintSet.upper_bound(T, int)
+    # revealed: tuple[Solution[U=int | str]]
+    reveal_type(bounds.solutions_for(U, inferable=tuple[T, U]))
+```
+
 For a static specialization of `U`, `(U & ~str) ≤ str` holds exactly when `U ≤ str`. With a bound of
 `Any`, assignability can materialize the bound to `str`, making the intersection `Never`. Subtyping
 also considers a bound of `object`, which permits `U = int`.
@@ -1706,7 +1538,8 @@ def static_bound[U: object]() -> None:
     static_assert(not is_assignable_to(Intersection[U, Not[str]], str))
 ```
 
-Equivalence imposes the same upper bound. Choosing `U = int | str` satisfies `(U & ~str) = int`.
+For `U & ~str` to equal `int`, `U` must contain `int` and may also contain strings. For example,
+`U = int | str` should be a valid binding.
 
 ```py
 def equivalent[T, U]() -> None:
@@ -1724,22 +1557,11 @@ def covered[U: int | str = int]() -> None:
     reveal_type(constraints.solutions_for(U, inferable=tuple[U]))  # revealed: tuple[()]
 ```
 
-Comparing the remaining part of a bound with a `TypedDict` can also infer a type variable from a
-field.
-
 ```py
 from typing import TypedDict
 
 class StringField(TypedDict):
     value: str
-
-def field[T, U: StringField | int]() -> None:
-    class Field(TypedDict):
-        value: T
-
-    constraints = is_constraint_set_assignable_to(Intersection[U, Not[int]], Field)
-    # revealed: tuple[Solution[T=str], Solution[]]
-    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
 ```
 
 Excluding a `TypedDict` with an `Any` field may still leave values of `StringField`: the field could
@@ -1792,32 +1614,23 @@ def limited_substitution[I, U, V]() -> None:
     reveal_type(constraints.solutions(inferable=tuple[I, U]))
 ```
 
-### Invariant classes containing bounded non-inferable typevars
+### Fixed variables inside invariant bounds
 
-A non-inferable typevar can appear inside an invariant generic class in an inferable typevar's
-bounds. Here `list[N] ≤ I ≤ list[int]` forces `N = int`: invariance does not permit a wider or
-narrower list element type. That derived exact binding must be substituted into `I`, rather than
-leaving `list[N] | list[int]` in its solution. Using `solutions_for` filters the non-inferable
-binding independently, so these cases specifically verify the specialization of `I`.
+An inferable variable can retain a caller-fixed variable inside its solution. If the two bounds
+require `list[N]` to equal `list[int]`, an upper bound of `int` on fixed `N` is insufficient. When
+`N` is inferable, the same range determines both specializations.
 
 ```py
-from typing import Never
 from ty_extensions._internal import ConstraintSet
 
-def invariant_declared_upper[I, N: int]() -> None:
+def invariant_fixed_declared_upper[I, N: int]() -> None:
     constraints = ConstraintSet.range(list[N], I, list[int])
-    # revealed: tuple[Solution[I=list[int]]]
-    reveal_type(constraints.solutions_for(I, inferable=tuple[I]))
+    reveal_type(constraints.solutions_for(I, inferable=tuple[I]))  # revealed: None
 
-def invariant_explicit_upper[I, N]() -> None:
-    constraints = ConstraintSet.range(Never, N, int) & ConstraintSet.range(list[N], I, list[int])
-    # revealed: tuple[Solution[I=list[int]]]
-    reveal_type(constraints.solutions_for(I, inferable=tuple[I]))
-
-def invariant_finite_domain[I, N: (int, str)]() -> None:
+def invariant_inferable[I, N]() -> None:
     constraints = ConstraintSet.range(list[N], I, list[int])
-    # revealed: tuple[Solution[I=list[int]]]
-    reveal_type(constraints.solutions_for(I, inferable=tuple[I]))
+    reveal_type(constraints.solutions_for(I, inferable=tuple[I, N]))  # revealed: tuple[Solution[I=list[int]]]
+    reveal_type(constraints.solutions_for(N, inferable=tuple[I, N]))  # revealed: tuple[Solution[N=int]]
 
 def invariant_unfixed_declared_upper[I, N: int]() -> None:
     constraints = ConstraintSet.range(list[N], I, object)
@@ -1825,144 +1638,33 @@ def invariant_unfixed_declared_upper[I, N: int]() -> None:
     reveal_type(constraints.solutions_for(I, inferable=tuple[I]))
 ```
 
-### Declared non-inferable domains
+### Negative decisions
 
-A positive constraint on a non-inferable variable must be compatible with its declared upper bound
-or finite domain, even though that variable is not returned. Complete reasoning about combinations
-of negative non-inferable constraints is intentionally deferred.
+Negative decisions alone provide no positive inference evidence.
 
 ```py
 from ty_extensions._internal import ConstraintSet
 
-def incompatible_finite_noninferable[I, N: (int, str)]() -> None:
-    constraints = ConstraintSet.range(bytes, N, bytes)
-    # revealed: None
-    reveal_type(constraints.solutions(inferable=tuple[I]))
-
-def incompatible_bounded_noninferable[I, N: str]() -> None:
-    constraints = ConstraintSet.range(int, N, int)
-    # revealed: None
-    reveal_type(constraints.solutions(inferable=tuple[I]))
-
-def negative_finite_noninferable[I, N: (int, str)]() -> None:
-    constraints = ~ConstraintSet.range(int, N, int) & ~ConstraintSet.range(str, N, str)
-    # TODO: Complete reasoning about negative non-inferable constraints would reject this path.
-    # TODO: revealed: None
-    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
-```
-
-### Alternatives with different declared-domain validity
-
-An invalid alternative must not prevent another alternative from producing a solution, even when
-both reach the same remaining constraints. The non-inferable variable's declared domain matters
-regardless of the order of the alternatives.
-
-```py
-from ty_extensions._internal import ConstraintSet
-
-def bounded_alternatives[I, N: str]() -> None:
-    inferred = ConstraintSet.equality(I, bytes)
-    good = ConstraintSet.equality(N, str)
-    bad = ConstraintSet.equality(N, int)
-    # revealed: tuple[Solution[I=bytes]]
-    reveal_type((inferred & (good | bad)).solutions(inferable=tuple[I]))
-    # revealed: tuple[Solution[I=bytes]]
-    reveal_type((inferred & (bad | good)).solutions(inferable=tuple[I]))
-
-def constrained_alternatives[I, N: (int, str)]() -> None:
-    inferred = ConstraintSet.equality(I, bytes)
-    good = ConstraintSet.equality(N, str)
-    bad = ConstraintSet.equality(N, bytes)
-    # revealed: tuple[Solution[I=bytes]]
-    reveal_type((inferred & (good | bad)).solutions(inferable=tuple[I]))
-    # revealed: tuple[Solution[I=bytes]]
-    reveal_type((inferred & (bad | good)).solutions(inferable=tuple[I]))
-```
-
-### Negative inferable decisions and correlated outputs
-
-Negative inferable decisions alone provide no positive inference evidence, while a negative-only
-alternative must not discard a different path that does provide useful bindings. This also applies
-when the inferable variable appears inside a non-inferable variable's nested bound. Different
-non-inferable values must not combine inferable bindings from different alternatives.
-
-```py
-from ty_extensions._internal import ConstraintSet
-
-def negative_inferable[I, N]() -> None:
+def negative_inferable[I]() -> None:
     constraints = ~ConstraintSet.range(int, I, int)
     reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
+```
 
-def positive_nested_inferable[I, N]() -> None:
-    constraints = ConstraintSet.range(list[I], N, list[I]) & ConstraintSet.range(int, I, int)
-    # revealed: tuple[Solution[I=int]]
-    reveal_type(constraints.solutions(inferable=tuple[I]))
+### Correlated solutions
 
-def negative_nested_inferable[I, N]() -> None:
-    constraints = ~ConstraintSet.range(list[I], N, list[I])
-    reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
+Each solution preserves the bindings that occur together on one alternative.
 
-def negative_nested_alternative[I, N]() -> None:
-    constraints = ~ConstraintSet.range(list[I], N, list[I]) | ConstraintSet.range(int, I, int)
-    # revealed: tuple[Solution[], Solution[I=int]]
-    reveal_type(constraints.solutions(inferable=tuple[I]))
+```py
+from ty_extensions._internal import ConstraintSet
 
-def correlated_noninferable[I, J, N]() -> None:
-    int_path = ConstraintSet.range(int, N, int) & ConstraintSet.range(int, I, int) & ConstraintSet.range(list[int], J, list[int])
-    str_path = ConstraintSet.range(str, N, str) & ConstraintSet.range(str, I, str) & ConstraintSet.range(list[str], J, list[str])
-    constraints = int_path | str_path
-    # revealed: tuple[Solution[I=int], Solution[I=str]]
-    reveal_type(constraints.solutions_for(I, inferable=tuple[I, J]))
-    # revealed: tuple[Solution[J=list[int]], Solution[J=list[str]]]
-    reveal_type(constraints.solutions_for(J, inferable=tuple[I, J]))
+def correlated[I, J]() -> None:
+    int_path = ConstraintSet.equality(I, int) & ConstraintSet.equality(J, list[int])
+    str_path = ConstraintSet.equality(I, str) & ConstraintSet.equality(J, list[str])
+    # revealed: tuple[Solution[I=int, J=list[int]], Solution[I=str, J=list[str]]]
+    reveal_type((int_path | str_path).solutions(inferable=tuple[I, J]))
 ```
 
 ## Solving declared bounds and constraints
-
-### Fixed type variables
-
-An inferred type must satisfy the type variable's declared upper bound or constraints. An unbounded,
-caller-fixed `S` does not satisfy a bound of `str` or select one of the constraints `str` and
-`bytes`, even if the path contains an upper bound on `S`.
-
-```py
-from typing import TypeVar
-from ty_extensions._internal import ConstraintSet
-
-def fixed_upper_bound[S, T: str, U: (str, bytes)]() -> None:
-    constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.upper_bound(S, str)
-    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
-
-    constrained = ConstraintSet.lower_bound(S, U) & ConstraintSet.upper_bound(S, str)
-    reveal_type(constrained.solutions_for(U, inferable=tuple[U]))  # revealed: None
-
-    impossible = ConstraintSet.lower_bound(S, T) & ConstraintSet.equality(S, int)
-    reveal_type(impossible.solutions_for(T, inferable=tuple[T]))  # revealed: None
-
-def bounded_upper_bound[S: str, T: str]() -> None:
-    constraints = ConstraintSet.lower_bound(S, T)
-    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=S@bounded_upper_bound]]
-
-S = TypeVar("S")
-BoundedS = TypeVar("BoundedS", bound=str)
-T = TypeVar("T", bound=str)
-U = TypeVar("U", str, bytes)
-
-def legacy_fixed_upper_bound(source: S, target: T, constrained_target: U) -> None:
-    constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.upper_bound(S, str)
-    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
-
-    constrained = ConstraintSet.lower_bound(S, U) & ConstraintSet.upper_bound(S, str)
-    reveal_type(constrained.solutions_for(U, inferable=tuple[U]))  # revealed: None
-
-    impossible = ConstraintSet.lower_bound(S, T) & ConstraintSet.equality(S, int)
-    reveal_type(impossible.solutions_for(T, inferable=tuple[T]))  # revealed: None
-
-def legacy_bounded_upper_bound(source: BoundedS, target: T) -> None:
-    constraints = ConstraintSet.lower_bound(BoundedS, T)
-    # revealed: tuple[Solution[T=BoundedS@legacy_bounded_upper_bound]]
-    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
-```
 
 ### Valid alternatives after a declared-bound violation
 
@@ -2516,14 +2218,7 @@ from ty_extensions._internal import ConstraintSet
 def empty[**P]() -> None:
     static_assert(ConstraintSet.range(Callable[..., None], P, Callable[[], None]) != ConstraintSet.never())
     static_assert(ConstraintSet.range(Callable[[], None], P, Callable[..., None]) != ConstraintSet.never())
-    # TODO: These currently fail because we only derive new constraints from fully static
-    # constraints, and so we can't propagate the fact that (Any) is not assignable to ().
-    # Even though the parameter type is dynamic, the arity of the callable should step in and allow
-    # us to compare these two callables via _subtyping_, which would allow us to derive this
-    # information.
-    # error: [static-assert-error]
     static_assert(ConstraintSet.range(Callable[[Any], None], P, Callable[[], None]) == ConstraintSet.never())
-    # error: [static-assert-error]
     static_assert(ConstraintSet.range(Callable[[], None], P, Callable[[Any], None]) == ConstraintSet.never())
 ```
 
