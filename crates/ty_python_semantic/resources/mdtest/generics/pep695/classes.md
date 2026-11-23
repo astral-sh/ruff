@@ -1575,7 +1575,7 @@ class Base[T]:
 @model
 class Child(Base[str]): ...
 
-reveal_type(Child.__init__)  # revealed: (self: Child, /, value: str) -> None
+reveal_type(Child.__init__)  # revealed: [Self](self: Self, /, value: str) -> None
 child = Child("a")
 reveal_type(child.value)  # revealed: str
 Child(1)  # error: [invalid-argument-type]
@@ -1597,7 +1597,7 @@ class Nested[U](Base[list[U]]): ...
 @model
 class Indirect(Nested[str]): ...
 
-reveal_type(Indirect.__init__)  # revealed: (self: Indirect, /, value: list[str]) -> None
+reveal_type(Indirect.__init__)  # revealed: [Self](self: Self, /, value: list[str]) -> None
 indirect = Indirect(["a"])
 Indirect([1])  # error: [invalid-argument-type]
 indirect.value = ["b"]  # ok
@@ -3709,6 +3709,23 @@ class Explicit(String, Integer):
     @property
     def value(self) -> str:  # error: [incompatible-property-override]
         return ""
+```
+
+## Inherited generic dataclass initializer
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Box[T]:
+    value: T
+
+class IntBox(Box[int]): ...
+
+reveal_type(Box(1))  # revealed: Box[int]
+reveal_type(IntBox.__init__)  # revealed: [Self](self: Self, /, value: int) -> None
+IntBox.__init__(IntBox(1), value=2)  # ok
+IntBox.__init__(Box("wrong"), value=2)  # error: [invalid-argument-type]
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

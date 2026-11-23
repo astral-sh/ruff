@@ -2183,7 +2183,8 @@ impl<'db> StaticClassLiteral<'db> {
                 "__new__" | "__init__" => inherited_generic_context,
                 _ => None,
             };
-            let signature = if return_ty.contains_self(db, env)
+            let signature = if name == "__init__"
+                || return_ty.contains_self(db, env)
                 || parameters
                     .iter()
                     .any(|parameter| parameter.annotated_type().contains_self(db, env))
@@ -2212,9 +2213,7 @@ impl<'db> StaticClassLiteral<'db> {
                 if field_policy.synthesizes_constructor_signature_from_fields(db, self) =>
             {
                 // The receiver must not consume keyword arguments for fields named `self`.
-                let self_parameter = Parameter::positional_only(Some(Name::new_static("self")))
-                    // TODO: could be `Self`.
-                    .with_annotated_type(*instance_ty);
+                let self_parameter = Parameter::positional_only(Some(Name::new_static("self")));
                 signature_from_fields(vec![self_parameter], Type::none(db, env))
             }
             (
