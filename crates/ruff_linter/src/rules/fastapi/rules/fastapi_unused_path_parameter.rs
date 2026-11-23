@@ -138,12 +138,25 @@ pub(crate) fn fastapi_unused_path_parameter(
     };
 
     // Extract the path parameters from the route path.
-    let path_params = PathParamIterator::new(path.to_str());
+    let mut path_params = PathParamIterator::new(path.to_str()).peekable();
+    if path_params.peek().is_none() {
+        return;
+    }
 
     // Extract the arguments from the function signature
     let mut named_args = vec![];
+    let mut positional_only_args = vec![];
 
-    for parameter_with_default in non_posonly_non_variadic_parameters(function_def) {
+    for item in &function_def.parameters.items {
+        let parameter_with_default = match item {
+            ast::ParameterItem::PositionalOnly(param) => {
+                positional_only_args.push(param.name().as_str());
+                continue;
+            }
+            ast::ParameterItem::PositionalOrKeyword(param)
+            | ast::ParameterItem::KeywordOnly(param) => param,
+            ast::ParameterItem::Vararg(_) | ast::ParameterItem::Kwarg(_) => continue,
+        };
         let ParameterWithDefault { parameter, .. } = parameter_with_default;
 
         if let Some(alias) = parameter_alias(parameter, checker.semantic()) {
@@ -177,11 +190,7 @@ pub(crate) fn fastapi_unused_path_parameter(
         // Determine whether the path parameter is used as a positional-only argument. In this case,
         // the path parameter injection won't work, but we also can't fix it (yet), since we'd need
         // to make the parameter non-positional-only.
-        let is_positional = function_def
-            .parameters
-            .posonlyargs
-            .iter()
-            .any(|param| param.name() == path_param);
+        let is_positional = positional_only_args.contains(&path_param);
 
         let mut diagnostic = checker.report_diagnostic(
             FastApiUnusedPathParameter {
@@ -204,17 +213,6 @@ pub(crate) fn fastapi_unused_path_parameter(
             }
         }
     }
-}
-
-/// Returns an iterator over the non-positional-only, non-variadic parameters of a function.
-fn non_posonly_non_variadic_parameters(
-    function_def: &ast::StmtFunctionDef,
-) -> impl Iterator<Item = &ParameterWithDefault> {
-    function_def
-        .parameters
-        .args
-        .iter()
-        .chain(&function_def.parameters.kwonlyargs)
 }
 
 #[derive(Debug, is_macro::Is)]
@@ -342,7 +340,9 @@ impl<'a> Dependency<'a> {
                     return Some(Self::Unknown);
                 };
 
-                let parameter_names = non_posonly_non_variadic_parameters(function_def)
+                let parameter_names = function_def
+                    .parameters
+                    .iter_keyword_params()
                     .map(|param| param.name().as_str())
                     .collect();
 
@@ -407,7 +407,9 @@ impl<'a> Dependency<'a> {
                 .filter_map(|stmt| stmt.as_function_def_stmt())
                 .find(|func_def| func_def.name.as_str() == method_name)?;
             // Skip `self` parameter
-            non_posonly_non_variadic_parameters(method_def)
+            method_def
+                .parameters
+                .iter_keyword_params()
                 .skip(1)
                 .map(|param| param.name().as_str())
                 .collect()

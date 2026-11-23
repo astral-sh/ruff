@@ -487,32 +487,37 @@ impl Hash for ComparableParameters<'_> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-struct ComparableParametersFields<'a> {
-    posonlyargs: ComparableSlice<'a, ast::ParameterWithDefault, ComparableParameterWithDefault<'a>>,
-    args: ComparableSlice<'a, ast::ParameterWithDefault, ComparableParameterWithDefault<'a>>,
-    vararg: Option<ComparableParameter<'a>>,
-    kwonlyargs: ComparableSlice<'a, ast::ParameterWithDefault, ComparableParameterWithDefault<'a>>,
-    kwarg: Option<ComparableParameter<'a>>,
-}
+type ComparableParametersFields<'a> =
+    ComparableSlice<'a, ast::ParameterItem, ComparableParameterItem<'a>>;
 
 impl<'a> From<&'a ast::Parameters> for ComparableParametersFields<'a> {
     fn from(parameters: &'a ast::Parameters) -> Self {
         let ast::Parameters {
-            posonlyargs,
-            args,
-            vararg,
-            kwonlyargs,
-            kwarg,
+            items,
             range: _,
             node_index: _,
         } = parameters;
-        Self {
-            posonlyargs: ComparableSlice::new(posonlyargs),
-            args: ComparableSlice::new(args),
-            vararg: vararg.as_deref().map(Into::into),
-            kwonlyargs: ComparableSlice::new(kwonlyargs),
-            kwarg: kwarg.as_deref().map(Into::into),
+        ComparableSlice::new(items)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum ComparableParameterItem<'a> {
+    PositionalOnly(ComparableParameterWithDefault<'a>),
+    PositionalOrKeyword(ComparableParameterWithDefault<'a>),
+    Vararg(ComparableParameter<'a>),
+    KeywordOnly(ComparableParameterWithDefault<'a>),
+    Kwarg(ComparableParameter<'a>),
+}
+
+impl<'a> From<&'a ast::ParameterItem> for ComparableParameterItem<'a> {
+    fn from(item: &'a ast::ParameterItem) -> Self {
+        match item {
+            ast::ParameterItem::PositionalOnly(p) => Self::PositionalOnly(p.into()),
+            ast::ParameterItem::PositionalOrKeyword(p) => Self::PositionalOrKeyword(p.into()),
+            ast::ParameterItem::Vararg(p) => Self::Vararg(p.into()),
+            ast::ParameterItem::KeywordOnly(p) => Self::KeywordOnly(p.into()),
+            ast::ParameterItem::Kwarg(p) => Self::Kwarg(p.into()),
         }
     }
 }

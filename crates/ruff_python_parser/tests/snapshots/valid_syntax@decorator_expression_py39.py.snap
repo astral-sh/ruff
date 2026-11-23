@@ -78,11 +78,7 @@ Module(
                     parameters: Parameters {
                         range: 81..83,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [
@@ -134,27 +130,25 @@ Module(
                                                         Parameters {
                                                             range: 103..104,
                                                             node_index: NodeIndex(None),
-                                                            posonlyargs: [],
-                                                            args: [
-                                                                ParameterWithDefault {
-                                                                    range: 103..104,
-                                                                    node_index: NodeIndex(None),
-                                                                    parameter: Parameter {
+                                                            items: [
+                                                                PositionalOrKeyword(
+                                                                    ParameterWithDefault {
                                                                         range: 103..104,
                                                                         node_index: NodeIndex(None),
-                                                                        name: Identifier {
-                                                                            id: Name("x"),
+                                                                        parameter: Parameter {
                                                                             range: 103..104,
                                                                             node_index: NodeIndex(None),
+                                                                            name: Identifier {
+                                                                                id: Name("x"),
+                                                                                range: 103..104,
+                                                                                node_index: NodeIndex(None),
+                                                                            },
+                                                                            annotation: None,
                                                                         },
-                                                                        annotation: None,
+                                                                        default: None,
                                                                     },
-                                                                    default: None,
-                                                                },
+                                                                ),
                                                             ],
-                                                            vararg: None,
-                                                            kwonlyargs: [],
-                                                            kwarg: None,
                                                         },
                                                     ),
                                                     body: Name(
@@ -197,11 +191,7 @@ Module(
                     parameters: Parameters {
                         range: 121..123,
                         node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
+                        items: [],
                     },
                     returns: None,
                     body: [

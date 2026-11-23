@@ -63,7 +63,7 @@ pub(crate) fn no_return_argument_annotation(checker: &Checker, parameters: &ast:
     // Ex) def func(*args: NoReturn): ...
     // Ex) def func(**kwargs: NoReturn): ...
     for annotation in parameters
-        .iter()
+        .iter_source_order()
         .filter_map(ast::AnyParameterRef::annotation)
     {
         if is_no_return(annotation, checker) {

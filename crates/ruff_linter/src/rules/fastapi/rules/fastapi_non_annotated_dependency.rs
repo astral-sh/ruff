@@ -116,19 +116,22 @@ pub(crate) fn fastapi_non_annotated_dependency(
 
     // Only remove a positional default if all earlier positional parameters are already required.
     // A `noqa` or a conflicting edit can prevent an earlier fix from removing its default.
-    let parameters = &function_def.parameters;
-    let mut seen_default = parameters
-        .posonlyargs
-        .iter()
-        .any(|parameter| parameter.default.is_some());
-    for parameter in &parameters.args {
-        check_parameter(checker, parameter, seen_default);
-        seen_default |= parameter.default.is_some();
-    }
-
-    // Keyword-only parameters can be required after a parameter with a default.
-    for parameter in &parameters.kwonlyargs {
-        check_parameter(checker, parameter, false);
+    let mut seen_default = false;
+    for parameter in &function_def.parameters.items {
+        match parameter {
+            ast::ParameterItem::PositionalOnly(parameter) => {
+                seen_default |= parameter.default.is_some();
+            }
+            ast::ParameterItem::PositionalOrKeyword(parameter) => {
+                check_parameter(checker, parameter, seen_default);
+                seen_default |= parameter.default.is_some();
+            }
+            // Keyword-only parameters can be required after a parameter with a default.
+            ast::ParameterItem::KeywordOnly(parameter) => {
+                check_parameter(checker, parameter, false);
+            }
+            ast::ParameterItem::Vararg(_) | ast::ParameterItem::Kwarg(_) => {}
+        }
     }
 }
 

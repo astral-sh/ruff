@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use ruff_python_ast::{Decorator, Parameters, Stmt};
+use ruff_python_ast::{Decorator, ParameterItem, Parameters, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::Identifier;
@@ -148,23 +148,29 @@ pub(crate) fn unexpected_special_method_signature(
         return;
     }
 
-    // Ignore methods with keyword-only parameters or variadic parameters.
-    if !parameters.kwonlyargs.is_empty() || parameters.kwarg.is_some() {
+    let mut actual_params = 0;
+    let mut mandatory_params = 0;
+    let mut has_positional_or_keyword = false;
+    let mut has_vararg = false;
+    for item in &parameters.items {
+        let parameter = match item {
+            ParameterItem::KeywordOnly(_) | ParameterItem::Kwarg(_) => return,
+            ParameterItem::Vararg(_) => {
+                has_vararg = true;
+                continue;
+            }
+            ParameterItem::PositionalOrKeyword(p) => {
+                has_positional_or_keyword = true;
+                p
+            }
+            ParameterItem::PositionalOnly(p) => p,
+        };
+        actual_params += 1;
+        mandatory_params += usize::from(parameter.default().is_none());
+    }
+    if !has_positional_or_keyword && !has_vararg {
         return;
     }
-
-    // Method has no parameter, will be caught by no-method-argument (E0211/N805).
-    if parameters.args.is_empty() && parameters.vararg.is_none() {
-        return;
-    }
-
-    let actual_params = parameters.args.len() + parameters.posonlyargs.len();
-    let mandatory_params = parameters
-        .args
-        .iter()
-        .chain(parameters.posonlyargs.iter())
-        .filter(|arg| arg.default.is_none())
-        .count();
 
     let Some(expected_params) =
         ExpectedParams::from_method(name, is_staticmethod(decorator_list, checker.semantic()))
@@ -177,12 +183,12 @@ pub(crate) fn unexpected_special_method_signature(
             if mandatory_params >= min {
                 mandatory_params <= max
             } else {
-                parameters.vararg.is_some() || actual_params <= max
+                has_vararg || actual_params <= max
             }
         }
         ExpectedParams::Fixed(expected) => match expected.cmp(&mandatory_params) {
             Ordering::Less => false,
-            Ordering::Greater => parameters.vararg.is_some() || actual_params >= expected,
+            Ordering::Greater => has_vararg || actual_params >= expected,
             Ordering::Equal => true,
         },
     };

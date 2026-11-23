@@ -3209,34 +3209,30 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn declare_parameters(&mut self, parameters: &'ast ast::Parameters, is_stub_body: bool) {
-        let nodes = parameters
-            .iter_non_variadic_params()
-            .map(ParameterDefinitionNodeRef::Parameter)
-            .chain(
-                parameters
-                    .vararg
-                    .as_deref()
-                    .map(ParameterDefinitionNodeRef::VariadicPositionalParameter),
-            )
-            .chain(
-                parameters
-                    .kwarg
-                    .as_deref()
-                    .map(ParameterDefinitionNodeRef::VariadicKeywordParameter),
-            );
-        if is_stub_body {
-            let parameters = nodes
-                .map(|node| self.declare_stub_parameter(node))
-                .collect();
-            self.current_use_def_map_mut().stub_parameters = Some(parameters);
-        } else {
-            for node in nodes {
+        let mut stub_parameters = is_stub_body.then(|| Vec::with_capacity(parameters.len()));
+        let mut declare = |node: ParameterDefinitionNodeRef<'ast>| {
+            if let Some(stub_parameters) = &mut stub_parameters {
+                stub_parameters.push(self.declare_stub_parameter(node));
+            } else {
                 let symbol = self.add_symbol(node.parameter().name.id().clone());
                 self.add_definition(symbol.into(), node);
                 self.current_place_table_mut()
                     .symbol_mut(symbol)
                     .mark_parameter();
             }
+        };
+        let (vararg, kwarg) =
+            parameters.split_variadic(|p| declare(ParameterDefinitionNodeRef::Parameter(p)));
+        if let Some(vararg) = vararg {
+            declare(ParameterDefinitionNodeRef::VariadicPositionalParameter(
+                vararg,
+            ));
+        }
+        if let Some(kwarg) = kwarg {
+            declare(ParameterDefinitionNodeRef::VariadicKeywordParameter(kwarg));
+        }
+        if let Some(parameters) = stub_parameters {
+            self.current_use_def_map_mut().stub_parameters = Some(parameters);
         }
     }
 
@@ -3269,17 +3265,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         parameters: &'ast ast::Parameters,
         lambda: &'ast ast::ExprLambda,
     ) {
-        let mut index = 0;
-        for parameter in &parameters.posonlyargs {
-            self.declare_lambda_parameter(index, parameter, lambda);
-            index += 1;
-        }
-        for parameter in &parameters.args {
-            self.declare_lambda_parameter(index, parameter, lambda);
-            index += 1;
-        }
-        if let Some(vararg) = parameters.vararg.as_ref() {
-            let symbol = self.add_symbol(vararg.name.id().clone());
+        for (index, item) in parameters.items_in_binding_order().enumerate() {
+            let (p, parameter) = match item {
+                ast::ParameterItem::PositionalOnly(p)
+                | ast::ParameterItem::PositionalOrKeyword(p)
+                | ast::ParameterItem::KeywordOnly(p) => {
+                    self.declare_lambda_parameter(index, p, lambda);
+                    continue;
+                }
+                ast::ParameterItem::Vararg(p) => (
+                    p,
+                    ParameterDefinitionNodeRef::VariadicPositionalParameter(p),
+                ),
+                ast::ParameterItem::Kwarg(p) => {
+                    (p, ParameterDefinitionNodeRef::VariadicKeywordParameter(p))
+                }
+            };
+            let symbol = self.add_symbol(p.name.id().clone());
             self.current_place_table_mut()
                 .symbol_mut(symbol)
                 .mark_parameter();
@@ -3287,27 +3289,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 symbol.into(),
                 LambdaParameterDefinitionNodeRef {
                     index,
+                    parameter,
                     lambda,
-                    parameter: ParameterDefinitionNodeRef::VariadicPositionalParameter(vararg),
-                },
-            );
-            index += 1;
-        }
-        for parameter in &parameters.kwonlyargs {
-            self.declare_lambda_parameter(index, parameter, lambda);
-            index += 1;
-        }
-        if let Some(kwarg) = parameters.kwarg.as_ref() {
-            let symbol = self.add_symbol(kwarg.name.id().clone());
-            self.current_place_table_mut()
-                .symbol_mut(symbol)
-                .mark_parameter();
-            self.add_definition(
-                symbol.into(),
-                LambdaParameterDefinitionNodeRef {
-                    index,
-                    lambda,
-                    parameter: ParameterDefinitionNodeRef::VariadicKeywordParameter(kwarg),
                 },
             );
         }
