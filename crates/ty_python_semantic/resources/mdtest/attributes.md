@@ -5768,7 +5768,7 @@ class G:
     def f(self):
         self.x = tuple(self.x)
 
-reveal_type(G().x)  # revealed: tuple[Divergent, ...]
+reveal_type(G().x)  # revealed: tuple[()] | tuple[Divergent, ...]
 ```
 
 ## Attributes of standard library modules that aren't yet defined

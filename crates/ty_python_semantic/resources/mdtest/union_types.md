@@ -503,8 +503,9 @@ def _(c: BC, d: BD):
 ## Unions of tuples
 
 A union of a fixed-length tuple and a variable-length tuple must be collapsed to the variable-length
-element, never to the fixed-length element (`tuple[()] | tuple[Any, ...]` -> `tuple[Any, ...]`, not
-`tuple[()]`).
+element, never to the fixed-length element (`tuple[()] | tuple[int, ...]` -> `tuple[int, ...]`, not
+`tuple[()]`). If the tuple has a gradual length, as in `tuple[Any, ...]`, neither element is
+redundant.
 
 ```py
 from typing import Any
@@ -518,15 +519,23 @@ def f(
     f: tuple[Any, ...] | tuple[()],
     g: tuple[Any, ...] | tuple[Any | str, ...],
     h: tuple[Any | str, ...] | tuple[Any, ...],
+    i: tuple[Any] | tuple[Any, ...],
+    j: tuple[Any, ...] | tuple[Any],
+    k: tuple[int] | tuple[Any, ...],
+    l: tuple[Any, ...] | tuple[int],
 ):
     reveal_type(a)  # revealed: tuple[int, ...]
     reveal_type(b)  # revealed: tuple[int, ...]
     reveal_type(c)  # revealed: tuple[int] | tuple[str, ...]
     reveal_type(d)  # revealed: tuple[str, ...] | tuple[int]
-    reveal_type(e)  # revealed: tuple[Any, ...]
-    reveal_type(f)  # revealed: tuple[Any, ...]
+    reveal_type(e)  # revealed: tuple[()] | tuple[Any, ...]
+    reveal_type(f)  # revealed: tuple[Any, ...] | tuple[()]
     reveal_type(g)  # revealed: tuple[Any | str, ...]
     reveal_type(h)  # revealed: tuple[Any | str, ...]
+    reveal_type(i)  # revealed: tuple[Any] | tuple[Any, ...]
+    reveal_type(j)  # revealed: tuple[Any, ...] | tuple[Any]
+    reveal_type(k)  # revealed: tuple[int] | tuple[Any, ...]
+    reveal_type(l)  # revealed: tuple[Any, ...] | tuple[int]
 ```
 
 ## Tuple unions with narrowed built-in elements

@@ -419,6 +419,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
 
             Tuple::Variable(target) => {
+                // A gradual tuple type can materialize to any length and element type, so no
+                // fixed-length tuple can be its subtype, nor redundant with it in a union.
+                let variable = target.variable();
+                if !self.relation.is_assignability()
+                    && variable.gradual_element_type(db, self.env).is_some()
+                {
+                    return self.never();
+                }
+
                 // This tuple must have enough elements to match up with the other tuple's prefix
                 // and suffix, and each of those elements must pairwise satisfy the relation.
                 let mut result = self.always();
@@ -448,7 +457,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
                 }
 
-                match target.variable() {
+                match variable {
                     VariableSegment::TypeVarTuple(typevartuple) => {
                         let packed = Type::heterogeneous_tuple(db, self.env, source_iter.copied());
                         result.and(db, self.constraints, || {

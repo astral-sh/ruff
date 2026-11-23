@@ -377,7 +377,7 @@ static_assert(not is_subtype_of(tuple[Any, ...], tuple[int, ...]))
 static_assert(not is_subtype_of(tuple[Any, ...], tuple[int]))
 static_assert(not is_subtype_of(tuple[Any, ...], tuple[int, int]))
 static_assert(is_subtype_of(tuple[Any, ...], tuple[object, ...]))
-static_assert(is_subtype_of(tuple[Never, ...], tuple[Any, ...]))
+static_assert(not is_subtype_of(tuple[Never, ...], tuple[Any, ...]))
 ```
 
 Same applies when `tuple[Any, ...]` is unpacked into a mixed tuple.
