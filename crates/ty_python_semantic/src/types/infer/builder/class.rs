@@ -275,25 +275,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             if let Type::FunctionLiteral(f) = decorator_ty {
-                // We do not yet detect or flag `@dataclass_transform` applied to more than one
-                // overload, or an overload and the implementation both. Nevertheless, this is not
-                // allowed. We do not try to treat the offenders intelligently -- just use the
-                // params of the last seen usage of `@dataclass_transform`.
-                //
                 // In class-decorator position, dataclass-transform metadata shapes the
                 // original class object. We keep it metadata-only here because the call path
                 // uses synthetic dataclass-transform return types to model decorator factories;
                 // treating this as an ordinary replacement-returning class decorator would
                 // conflate those two cases.
-                let transformer_params = f
-                    .iter_overloads_and_implementation(db)
-                    .rev()
-                    .find_map(|overload| overload.dataclass_transformer_params(db));
-                if let Some(transformer_params) = transformer_params {
-                    dataclass_params = Some(DataclassParams::from_transformer_params(
-                        db,
-                        transformer_params,
-                    ));
+                if let Some(params) = f.dataclass_params(db) {
+                    dataclass_params = Some(params);
                     // We only model the metadata of this application, but its selected overload
                     // can still be deprecated. Avoid resolving the call when no overload is
                     // deprecated: the decorator's annotations may depend on this class.

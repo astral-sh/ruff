@@ -83,9 +83,9 @@ use crate::types::typevar::TypeVarNonce;
 use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
-    CallableType, ClassType, FindLegacyTypeVarsVisitor, KnownClass, MemberLookupPolicy,
-    SubclassOfInner, SubclassOfType, Type, TypeContext, TypeMapping, UnionType, binding_type,
-    definition_expression_type,
+    CallableType, ClassType, DataclassParams, FindLegacyTypeVarsVisitor, KnownClass,
+    MemberLookupPolicy, SubclassOfInner, SubclassOfType, Type, TypeContext, TypeMapping, UnionType,
+    binding_type, definition_expression_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -1515,6 +1515,17 @@ impl<'db> FunctionType<'db> {
                 self.descriptor_kind(db),
             )
         }
+    }
+
+    /// Default dataclass parameters when this function is used as a decorator or decorator factory.
+    pub(super) fn dataclass_params(self, db: &'db dyn Db) -> Option<DataclassParams<'db>> {
+        // Only one overload or the implementation may specify `@dataclass_transform`.
+        // If several do, use the last one.
+        let params = self
+            .iter_overloads_and_implementation(db)
+            .rev()
+            .find_map(|overload| overload.dataclass_transformer_params(db))?;
+        Some(DataclassParams::from_transformer_params(db, params))
     }
 
     pub(crate) fn with_dataclass_transformer_params(
