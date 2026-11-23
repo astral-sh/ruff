@@ -57,3 +57,26 @@ assert [42, not foo] in bar
 # https://github.com/astral-sh/ruff/issues/17582
 if True == True: # No duplicated diagnostic
     pass
+
+# https://github.com/astral-sh/ruff/issues/4560
+# Chained comparisons must not be rewritten to `is`/`is not`: for types that
+# overload `__eq__` (e.g. NumPy arrays, pandas objects, SQLAlchemy columns),
+# `x == True` is not equivalent to `x is True`, so no fix is offered.
+#: E712 (no fix)
+if arr == True != False:
+    pass
+
+#: E712 (no fix)
+if arr != True == False:
+    pass
+
+#: E712 (no fix)
+if True == arr != False:
+    pass
+
+#: E712 (no fix)
+if arr == True < 10:
+    pass
+
+#: E712 (no fix)
+result = arr == True != other
