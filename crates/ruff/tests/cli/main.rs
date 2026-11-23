@@ -28,6 +28,15 @@ pub(crate) fn tempdir_filter(path: impl AsRef<str>) -> String {
     format!(r"{}[\\/]?", regex::escape(path.as_ref()))
 }
 
+fn output_format_settings(_: &Path, mut settings: insta::Settings) -> insta::Settings {
+    // JSON double escapes backslashes.
+    settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
+    // CI annotations can contain an escaped directory prefix.
+    settings.add_filter(r",file=[^,\n]+[\\/]", ",file=[TMP]/");
+    settings.add_filter(r";sourcepath=[^;\n]+[\\/]", ";sourcepath=[TMP]/");
+    settings
+}
+
 /// A test fixture for running ruff CLI tests with temporary directories and files.
 ///
 /// This fixture provides:
