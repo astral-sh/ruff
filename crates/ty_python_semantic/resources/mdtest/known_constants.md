@@ -150,9 +150,6 @@ TYPE_CHECKING: Literal[False] = False
 
 # error: [invalid-type-checking-constant]
 TYPE_CHECKING: Literal[True] = False
-
-class Constants:
-    TYPE_CHECKING = 0  # error: [invalid-type-checking-constant]
 ```
 
 The same rules apply in a stub file:

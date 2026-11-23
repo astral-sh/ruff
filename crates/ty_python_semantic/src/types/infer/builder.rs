@@ -614,67 +614,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
     }
 
-    /// Infer an unconstrained class constant without creating a full builder.
-    pub(super) fn infer_class_constant(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        definition: Definition<'db>,
-        module: &ParsedModuleRef,
-    ) -> Option<DefinitionInference<'db>> {
-        let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
-            return None;
-        };
-        let value = assignment.value(module);
-        if !matches!(
-            value,
-            ast::Expr::NumberLiteral(_) | ast::Expr::StringLiteral(_)
-        ) {
-            return None;
-        }
-        let target = assignment.target(module);
-        let name = &target.as_name_expr()?.id;
-        let scope = definition.scope(db);
-        let index = semantic_index(db, scope.program_file(db));
-        let scope_id = scope.file_scope_id(db);
-        if index.scope(scope_id).kind() != ScopeKind::Class
-            || assignment.unpack().is_some()
-            || index.try_expression(value).is_some()
-            || name == "TYPE_CHECKING"
-        {
-            return None;
-        }
-
-        // A single local binding has no prior assignment or import of a Final.
-        // An annotation in this class or a base still needs the usual checks.
-        let id = definition.place(db).as_symbol()?;
-        let symbol = index.place_table(scope_id).symbol(id);
-        if !symbol.is_local()
-            || symbol.is_reassigned()
-            || symbol.is_declared()
-            || inherited_class_body_declaration(db, scope, id).is_some()
-        {
-            return None;
-        }
-        let file = ImportingFile::File(definition.file(db), env.resolver_environment(db));
-        if SpecialFormType::try_from_file_and_name(db, file, name).is_some() {
-            return None;
-        }
-        let ty = match value {
-            ast::Expr::NumberLiteral(literal) => Self::number_literal_type(db, env, literal),
-            ast::Expr::StringLiteral(literal) => Self::string_literal_type(db, literal),
-            _ => unreachable!(),
-        };
-        Some(DefinitionInference {
-            #[cfg(debug_assertions)]
-            scope,
-            expressions: [(target.into(), ty), (value.into(), ty)]
-                .into_iter()
-                .collect(),
-            types: DefinitionTypes::Binding(ty),
-            extra: None,
-        })
-    }
-
     /// Creates a new builder for inferring types in a region.
     pub(super) fn new(
         db: &'db dyn Db,
@@ -3732,11 +3671,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) {
         let target = assignment.target(self.module());
 
-        let add = self.add_binding(target.into(), definition);
-        let target_ty =
-            self.infer_assignment_definition_impl(assignment, definition, add.type_context);
+        // A local name introduced by a single assignment in a class body has no
+        // earlier binding, including any import of a Final. Only an inherited
+        // declaration could constrain the initializer.
+        let db = self.db();
+        let scope = definition.file_scope(db);
+        let unconstrained = self.index.scope(scope).kind() == ScopeKind::Class
+            && definition.place(db).as_symbol().is_some_and(|id| {
+                let symbol = self.index.place_table(scope).symbol(id);
+                symbol.is_local()
+                    && !symbol.is_reassigned()
+                    && !symbol.is_declared()
+                    && inherited_class_body_declaration(db, definition.scope(db), id).is_none()
+            });
+        let add = (!unconstrained).then(|| self.add_binding(target.into(), definition));
+        let context = add.as_ref().map_or_default(|add| add.type_context);
+        let target_ty = self.infer_assignment_definition_impl(assignment, definition, context);
         self.store_expression_type(target, target_ty);
-        add.insert(self, target_ty);
+        if let Some(add) = add {
+            add.insert(self, target_ty);
+        } else {
+            self.bindings.insert(definition, target_ty);
+        }
     }
 
     fn stub_placeholder_binding_type(&self, value: &ast::Expr) -> Option<Type<'db>> {
@@ -7785,15 +7741,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_number_literal_expression(&self, literal: &ast::ExprNumberLiteral) -> Type<'db> {
-        Self::number_literal_type(self.db(), self.program_environment(), literal)
-    }
-
-    /// Type of a numeric literal in a value expression.
-    fn number_literal_type(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        literal: &ast::ExprNumberLiteral,
-    ) -> Type<'db> {
+        let db = self.db();
+        let env = self.program_environment();
         let ast::ExprNumberLiteral {
             range: _,
             node_index: _,
@@ -7836,13 +7785,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 aliased_type,
             )));
         }
-        Self::string_literal_type(self.db(), literal)
-    }
-
-    /// Preserve the literal value for short strings.
-    fn string_literal_type(db: &'db dyn Db, literal: &ast::ExprStringLiteral) -> Type<'db> {
         if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
-            Type::string_literal(db, literal.value.to_str())
+            Type::string_literal(self.db(), literal.value.to_str())
         } else {
             Type::literal_string()
         }
