@@ -1700,12 +1700,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         let result = elements
             .iter()
             .when_any(db, self.constraints, |&element| {
-                // Union membership already handled reflexivity, so a TypedDict arm
-                // goes straight to the same guarded comparison as in check_type_pair.
-                if let (Some(source), Type::TypedDict(target)) = (cache_source, element) {
-                    let (result, reused) = self.check_guarded_typeddict_pair(db, source, target);
+                // Union membership already handled reflexivity. With context collection
+                // disabled, the pair guard accepts every completed TypedDict result.
+                if cache_source.is_some()
+                    && element.is_typed_dict()
+                    && let Some(result) = self.relation_visitor.pairs.completed(&(
+                        source,
+                        element,
+                        self.relation,
+                        self.typevar_evaluation,
+                    ))
+                {
                     // Save the slot for a union that needs more than one pair lookup.
-                    if !reused || (result.is_trivially_always_satisfied() && element == elements[0]) {
+                    if result.is_trivially_always_satisfied() && element == elements[0] {
                         cache_source = None;
                     }
                     return result;
@@ -2033,36 +2040,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        self.with_recursion_guard_and_status(db, source, target, work)
-            .0
-    }
-
-    fn check_guarded_typeddict_pair(
-        &self,
-        db: &'db dyn Db,
-        source: TypedDictType<'db>,
-        target: TypedDictType<'db>,
-    ) -> (ConstraintSet<'db, 'c>, bool) {
-        self.with_recursion_guard_and_status(
-            db,
-            Type::TypedDict(source),
-            Type::TypedDict(target),
-            || self.check_typeddict_pair(db, source, target),
-        )
-    }
-
-    /// Also reports whether the guard reused a completed result.
-    fn with_recursion_guard_and_status(
-        &self,
-        db: &'db dyn Db,
-        source: Type<'db>,
-        target: Type<'db>,
-        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
-    ) -> (ConstraintSet<'db, 'c>, bool) {
         let collect_context = self.is_context_collection_enabled();
-        let mut reused = false;
-        let result = self
-            .relation_visitor
+        self.relation_visitor
             .pairs
             .try_visit(
                 db,
@@ -2072,14 +2051,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // guards. Satisfiable constraints remain reusable, including those that
                 // constrain type variables.
                 |result| {
-                    reused = !collect_context
-                        || !result.is_never_satisfied(db, self.env, self.inferable);
-                    reused
+                    !collect_context || !result.is_never_satisfied(db, self.env, self.inferable)
                 },
                 work,
             )
-            .unwrap_or_else(|item| self.recursive_type_pair_fallback(db, item.0, item.1));
-        (result, reused)
+            .unwrap_or_else(|item| self.recursive_type_pair_fallback(db, item.0, item.1))
     }
 
     fn recursive_type_pair_fallback(
@@ -3100,8 +3076,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::ProtocolInstance(_), _) => self.never(),
 
             (Type::TypedDict(source_td), Type::TypedDict(target_td)) => {
-                self.check_guarded_typeddict_pair(db, source_td, target_td)
-                    .0
+                self.with_recursion_guard(db, source, target, || {
+                    self.check_typeddict_pair(db, source_td, target_td)
+                })
             }
 
             (Type::TypedDict(typed_dict), _) => {
