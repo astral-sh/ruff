@@ -174,7 +174,7 @@ impl AlwaysFixableViolation for PercentFormatUnusedNamedArguments {
     fn fix_title(&self) -> String {
         let PercentFormatUnusedNamedArguments { missing } = self;
         let message = missing.join(", ");
-        format!("Remove extra named arguments: {message}")
+        format!("Remove unused named arguments: {message}")
     }
 }
 
@@ -428,13 +428,13 @@ impl Violation for StrFormatUnusedKeywordArguments {
     fn message(&self) -> String {
         let StrFormatUnusedKeywordArguments { missing } = self;
         let message = missing.join(", ");
-        format!("`.format` call has unused named argument(s): {message}")
+        format!("`.format` call has unused keyword argument(s): {message}")
     }
 
     fn fix_title(&self) -> Option<String> {
         let StrFormatUnusedKeywordArguments { missing } = self;
         let message = missing.join(", ");
-        Some(format!("Remove extra named arguments: {message}"))
+        Some(format!("Remove unused keyword arguments: {message}"))
     }
 }
 
@@ -487,7 +487,7 @@ impl Violation for StrFormatUnusedPositionalArguments {
         let StrFormatUnusedPositionalArguments { missing } = self;
         let message = missing.join(", ");
         Some(format!(
-            "Remove extra positional arguments at position(s): {message}"
+            "Remove unused positional arguments at position(s): {message}"
         ))
     }
 }

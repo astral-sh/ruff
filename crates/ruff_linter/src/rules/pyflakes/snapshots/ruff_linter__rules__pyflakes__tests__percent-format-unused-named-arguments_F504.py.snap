@@ -11,7 +11,7 @@ F504 [*] `%`-format string has unused named argument(s): b
 4 |
 5 | hidden = {"a": "!"}
   |
-help: Remove extra named arguments: b
+help: Remove unused named arguments: b
   |
 2 | a = "wrong"
   - "%(a)s %(c)s" % {a: "?", "b": "!"}  # F504 ("b" not used)
@@ -28,7 +28,7 @@ F504 [*] `%`-format string has unused named argument(s): b
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 9 | "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
   |
-help: Remove extra named arguments: b
+help: Remove unused named arguments: b
   |
 7 |
   - "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
@@ -45,7 +45,7 @@ F504 [*] `%`-format string has unused named argument(s): b
 10 |
 11 | '' % {'a''b' : ''}  # F504 ("ab" not used)
    |
-help: Remove extra named arguments: b
+help: Remove unused named arguments: b
    |
 8  | "%(a)s" % {"a": 1, r"b": "!"}  # F504 ("b" not used)
    - "%(a)s" % {'a': 1, u"b": "!"}  # F504 ("b" not used)
@@ -63,7 +63,7 @@ F504 [*] `%`-format string has unused named argument(s): ab
 12 |
 13 | # https://github.com/astral-sh/ruff/issues/4899
    |
-help: Remove extra named arguments: ab
+help: Remove unused named arguments: ab
    |
 10 |
    - '' % {'a''b' : ''}  # F504 ("ab" not used)
@@ -83,7 +83,7 @@ F504 [*] `%`-format string has unused named argument(s): test1, test2
 18 |
 19 |   # https://github.com/astral-sh/ruff/issues/18806
    |
-help: Remove extra named arguments: test1, test2
+help: Remove unused named arguments: test1, test2
    |
 14 | "" % {
    -   'test1': '',   -   'test2': '',
@@ -97,7 +97,7 @@ F504 [*] `%`-format string has unused named argument(s): greeting
 19 | # https://github.com/astral-sh/ruff/issues/18806
 20 | "Hello, %(name)s" % {"greeting": print(1), "name": "World"}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-help: Remove extra named arguments: greeting
+help: Remove unused named arguments: greeting
    |
 19 | # https://github.com/astral-sh/ruff/issues/18806
    - "Hello, %(name)s" % {"greeting": print(1), "name": "World"}

@@ -13,7 +13,7 @@ use crate::rules::flake8_boolean_trap::helpers::{
 };
 
 /// ## What it does
-/// Checks for the use of boolean positional arguments in function definitions,
+/// Checks for the use of boolean positional parameters in function definitions,
 /// as determined by the presence of a type hint containing `bool` as an
 /// evident subtype - e.g. `bool`, `bool | int`, `typing.Optional[bool]`, etc.
 ///
@@ -26,8 +26,8 @@ use crate::rules::flake8_boolean_trap::helpers::{
 /// behaviors, which makes the function difficult to extend in the future.
 ///
 /// Instead, consider refactoring into separate implementations for the
-/// `True` and `False` cases, using an `Enum`, or making the argument a
-/// keyword-only argument, to force callers to be explicit when providing
+/// `True` and `False` cases, using an `Enum`, or making the parameter a
+/// keyword-only parameter, to force callers to be explicit when providing
 /// the argument.
 ///
 /// Dunder methods that define operators are exempt from this rule, as are
@@ -79,7 +79,7 @@ use crate::rules::flake8_boolean_trap::helpers::{
 /// def round_number(value: float, method: RoundingMethod) -> float: ...
 /// ```
 ///
-/// Or, make the argument a keyword-only argument:
+/// Or, make the parameter a keyword-only parameter:
 ///
 /// ```python
 /// from math import ceil, floor
@@ -105,7 +105,7 @@ pub(crate) struct BooleanAnnotatedPositionalParameter;
 impl Violation for BooleanAnnotatedPositionalParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Boolean-typed positional argument in function definition".to_string()
+        "Boolean-annotated positional parameter in function definition".to_string()
     }
 }
 

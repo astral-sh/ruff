@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_boolean_trap/mod.rs
 ---
-FBT002 Boolean default positional argument in function definition
+FBT002 Boolean default value for positional parameter
   --> FBT.py:12:5
    |
 10 |     posorkw_nonvalued_boolhint: bool,
@@ -12,7 +12,7 @@ FBT002 Boolean default positional argument in function definition
 14 |     posorkw_boolvalued_boolhint: bool = True,
    |
 
-FBT002 Boolean default positional argument in function definition
+FBT002 Boolean default value for positional parameter
   --> FBT.py:13:5
    |
 11 |     posorkw_nonvalued_boolstrhint: "bool",
@@ -23,7 +23,7 @@ FBT002 Boolean default positional argument in function definition
 15 |     posorkw_boolvalued_boolstrhint: "bool" = True,
    |
 
-FBT002 Boolean default positional argument in function definition
+FBT002 Boolean default value for positional parameter
   --> FBT.py:14:5
    |
 12 |     posorkw_boolvalued_nohint=True,
@@ -34,7 +34,7 @@ FBT002 Boolean default positional argument in function definition
 16 |     posorkw_nonboolvalued_nohint=1,
    |
 
-FBT002 Boolean default positional argument in function definition
+FBT002 Boolean default value for positional parameter
   --> FBT.py:15:5
    |
 13 |     posorkw_boolvalued_nonboolhint: int = True,

@@ -10,7 +10,7 @@ F523 [*] `.format` call has unused arguments at position(s): 1
 3 | "{1}".format(1, 2, 3)  # F523
 4 | "{1:{0}}".format(1, 2)  # No issues
   |
-help: Remove extra positional arguments at position(s): 1
+help: Remove unused positional arguments at position(s): 1
   |
 1 | # With indexes
   - "{0}".format(1, 2)  # F523
@@ -28,7 +28,7 @@ F523 `.format` call has unused arguments at position(s): 0, 2
 4 | "{1:{0}}".format(1, 2)  # No issues
 5 | "{1:{0}}".format(1, 2, 3)  # F523
   |
-help: Remove extra positional arguments at position(s): 0, 2
+help: Remove unused positional arguments at position(s): 0, 2
 
 F523 [*] `.format` call has unused arguments at position(s): 2
  --> F523.py:5:1
@@ -40,7 +40,7 @@ F523 [*] `.format` call has unused arguments at position(s): 2
 6 | "{0}{2}".format(1, 2)  # F523, # F524
 7 | "{1.arg[1]!r:0{2['arg']}{1}}".format(1, 2, 3, 4) # F523
   |
-help: Remove extra positional arguments at position(s): 2
+help: Remove unused positional arguments at position(s): 2
   |
 4 | "{1:{0}}".format(1, 2)  # No issues
   - "{1:{0}}".format(1, 2, 3)  # F523
@@ -57,7 +57,7 @@ F523 [*] `.format` call has unused arguments at position(s): 1
   | ^^^^^^^^^^^^^^^^^^^^^
 7 | "{1.arg[1]!r:0{2['arg']}{1}}".format(1, 2, 3, 4) # F523
   |
-help: Remove extra positional arguments at position(s): 1
+help: Remove unused positional arguments at position(s): 1
   |
 5 | "{1:{0}}".format(1, 2, 3)  # F523
   - "{0}{2}".format(1, 2)  # F523, # F524
@@ -75,7 +75,7 @@ F523 `.format` call has unused arguments at position(s): 0, 3
 8 |
 9 | # With no indexes
   |
-help: Remove extra positional arguments at position(s): 0, 3
+help: Remove unused positional arguments at position(s): 0, 3
 
 F523 [*] `.format` call has unused arguments at position(s): 1
   --> F523.py:10:1
@@ -86,7 +86,7 @@ F523 [*] `.format` call has unused arguments at position(s): 1
 11 | "{}".format(1, 2, 3)  # F523
 12 | "{:{}}".format(1, 2)  # No issues
    |
-help: Remove extra positional arguments at position(s): 1
+help: Remove unused positional arguments at position(s): 1
    |
 9  | # With no indexes
    - "{}".format(1, 2)  # F523
@@ -104,7 +104,7 @@ F523 [*] `.format` call has unused arguments at position(s): 1, 2
 12 | "{:{}}".format(1, 2)  # No issues
 13 | "{:{}}".format(1, 2, 3)  # F523
    |
-help: Remove extra positional arguments at position(s): 1, 2
+help: Remove unused positional arguments at position(s): 1, 2
    |
 10 | "{}".format(1, 2)  # F523
    - "{}".format(1, 2, 3)  # F523
@@ -122,7 +122,7 @@ F523 [*] `.format` call has unused arguments at position(s): 2
 14 |
 15 | # With *args
    |
-help: Remove extra positional arguments at position(s): 2
+help: Remove unused positional arguments at position(s): 2
    |
 12 | "{:{}}".format(1, 2)  # No issues
    - "{:{}}".format(1, 2, 3)  # F523
@@ -140,7 +140,7 @@ F523 `.format` call has unused arguments at position(s): 2
 20 |
 21 | # With nested quotes
    |
-help: Remove extra positional arguments at position(s): 2
+help: Remove unused positional arguments at position(s): 2
 
 F523 [*] `.format` call has unused arguments at position(s): 1, 2
   --> F523.py:22:1
@@ -151,7 +151,7 @@ F523 [*] `.format` call has unused arguments at position(s): 1, 2
 23 | "\"\"{1}{0}".format(1, 2, 3)  # F523
 24 | '""{1}{0}'.format(1, 2, 3)  # F523
    |
-help: Remove extra positional arguments at position(s): 1, 2
+help: Remove unused positional arguments at position(s): 1, 2
    |
 21 | # With nested quotes
    - "''1{0}".format(1, 2, 3)  # F523
@@ -168,7 +168,7 @@ F523 [*] `.format` call has unused arguments at position(s): 2
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 24 | '""{1}{0}'.format(1, 2, 3)  # F523
    |
-help: Remove extra positional arguments at position(s): 2
+help: Remove unused positional arguments at position(s): 2
    |
 22 | "''1{0}".format(1, 2, 3)  # F523
    - "\"\"{1}{0}".format(1, 2, 3)  # F523
@@ -186,7 +186,7 @@ F523 [*] `.format` call has unused arguments at position(s): 2
 25 |
 26 | # With modified indexes
    |
-help: Remove extra positional arguments at position(s): 2
+help: Remove unused positional arguments at position(s): 2
    |
 23 | "\"\"{1}{0}".format(1, 2, 3)  # F523
    - '""{1}{0}'.format(1, 2, 3)  # F523
@@ -203,7 +203,7 @@ F523 `.format` call has unused arguments at position(s): 0
 28 | "{1}{3}".format(1, 2, 3, 4)  # F523, # F524
 29 | "{1} {8}".format(0, 1)  # F523, # F524
    |
-help: Remove extra positional arguments at position(s): 0
+help: Remove unused positional arguments at position(s): 0
 
 F523 `.format` call has unused arguments at position(s): 0, 2
   --> F523.py:28:1
@@ -214,7 +214,7 @@ F523 `.format` call has unused arguments at position(s): 0, 2
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 29 | "{1} {8}".format(0, 1)  # F523, # F524
    |
-help: Remove extra positional arguments at position(s): 0, 2
+help: Remove unused positional arguments at position(s): 0, 2
 
 F523 `.format` call has unused arguments at position(s): 0
   --> F523.py:29:1
@@ -226,7 +226,7 @@ F523 `.format` call has unused arguments at position(s): 0
 30 |
 31 | # Multiline
    |
-help: Remove extra positional arguments at position(s): 0
+help: Remove unused positional arguments at position(s): 0
 
 F523 [*] `.format` call has unused arguments at position(s): 0
   --> F523.py:32:2
@@ -239,7 +239,7 @@ F523 [*] `.format` call has unused arguments at position(s): 0
 34 |
 35 |   # Removing the final argument.
    |
-help: Remove extra positional arguments at position(s): 0
+help: Remove unused positional arguments at position(s): 0
    |
 31 | # Multiline
    - (''
@@ -256,7 +256,7 @@ F523 [*] `.format` call has unused arguments at position(s): 0
    | ^^^^^^^^^^^^^^^^^^^^^^^
 37 | "Hello".format("world", key="value")
    |
-help: Remove extra positional arguments at position(s): 0
+help: Remove unused positional arguments at position(s): 0
    |
 35 | # Removing the final argument.
    - "Hello".format("world")
@@ -274,7 +274,7 @@ F523 [*] `.format` call has unused arguments at position(s): 0
 38 |
 39 | # https://github.com/astral-sh/ruff/issues/18806
    |
-help: Remove extra positional arguments at position(s): 0
+help: Remove unused positional arguments at position(s): 0
    |
 36 | "Hello".format("world")
    - "Hello".format("world", key="value")
@@ -292,7 +292,7 @@ F523 [*] `.format` call has unused arguments at position(s): 1
 42 |
 43 | # The fix here is safe because the unused argument has no side effect,
    |
-help: Remove extra positional arguments at position(s): 1
+help: Remove unused positional arguments at position(s): 1
    |
 40 | # The fix here is unsafe because the unused argument has side effect
    - "Hello, {0}".format("world", print(1))
@@ -308,7 +308,7 @@ F523 [*] `.format` call has unused arguments at position(s): 1
 44 | # even though the used argument has a side effect
 45 | "Hello, {0}".format(print(1), "Pikachu")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-help: Remove extra positional arguments at position(s): 1
+help: Remove unused positional arguments at position(s): 1
    |
 44 | # even though the used argument has a side effect
    - "Hello, {0}".format(print(1), "Pikachu")

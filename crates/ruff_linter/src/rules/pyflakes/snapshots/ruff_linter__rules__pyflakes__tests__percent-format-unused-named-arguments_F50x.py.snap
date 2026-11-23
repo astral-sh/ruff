@@ -11,7 +11,7 @@ F504 [*] `%`-format string has unused named argument(s): baz
  9 | '%(bar)s' % (1, 2, 3)  # F502
 10 | '%s %s' % {'k': 'v'}  # F503
    |
-help: Remove extra named arguments: baz
+help: Remove unused named arguments: baz
   |
 7 | '%(bar)s' % {}  # F505
   - '%(bar)s' % {'bar': 1, 'baz': 2}  # F504

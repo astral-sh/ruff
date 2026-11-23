@@ -12,7 +12,7 @@ use crate::rules::flake8_boolean_trap::helpers::{
 };
 
 /// ## What it does
-/// Checks for the use of boolean positional arguments in function definitions,
+/// Checks for the use of boolean positional parameters in function definitions,
 /// as determined by the presence of a boolean default value.
 ///
 /// ## Why is this bad?
@@ -24,8 +24,8 @@ use crate::rules::flake8_boolean_trap::helpers::{
 /// behaviors, which makes the function difficult to extend in the future.
 ///
 /// Instead, consider refactoring into separate implementations for the
-/// `True` and `False` cases, using an `Enum`, or making the argument a
-/// keyword-only argument, to force callers to be explicit when providing
+/// `True` and `False` cases, using an `Enum`, or making the parameter a
+/// keyword-only parameter, to force callers to be explicit when providing
 /// the argument.
 ///
 /// This rule exempts methods decorated with [`@typing.override`][override],
@@ -81,7 +81,7 @@ use crate::rules::flake8_boolean_trap::helpers::{
 /// round_number(1.5, RoundingMethod.DOWN)
 /// ```
 ///
-/// Or, make the argument a keyword-only argument:
+/// Or, make the parameter a keyword-only parameter:
 /// ```python
 /// from math import ceil, floor
 ///
@@ -106,7 +106,7 @@ pub(crate) struct BooleanPositionalParameterDefault;
 impl Violation for BooleanPositionalParameterDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Boolean default positional argument in function definition".to_string()
+        "Boolean default value for positional parameter".to_string()
     }
 }
 

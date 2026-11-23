@@ -10,7 +10,7 @@ use crate::codes::Category;
 use crate::rules::flake8_bandit::helpers::{matches_password_name, string_literal};
 
 /// ## What it does
-/// Checks for potential uses of hardcoded passwords in function argument
+/// Checks for potential uses of hardcoded passwords in function parameter
 /// defaults.
 ///
 /// ## Why is this bad?
