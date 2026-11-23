@@ -1649,7 +1649,11 @@ impl<'db> Specialization<'db> {
                     }
                 }
                 TypeVarVariance::Invariant => {
-                    if !has_unsimplified_dynamic_typevar {
+                    if has_unsimplified_dynamic_typevar {
+                        // A later recursive reference can reuse this materialization before
+                        // hitting its cycle guard. Only the equivalence check is redundant.
+                        LazyCell::force(&top_materialization);
+                    } else {
                         has_unsimplified_dynamic_typevar = *has_dynamic_type;
                     }
                     vartype

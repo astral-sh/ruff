@@ -572,6 +572,21 @@ def f(x: A):
     assert_type(x[0], object)
 ```
 
+## Top materialization of a nested recursive alias
+
+The dictionary's value type also appears inside the second tuple element. Reading the inner node's
+payload through the top materialization yields `object`.
+
+```py
+from typing import Any
+from ty_extensions import Top
+
+type Node[T] = tuple[T, tuple[Node[list[T]], ...]]
+
+def payload(pair: Top[tuple[dict[Any, Node[Any]], Node[Node[Any]]]]) -> int:
+    return pair[1][0][0]  # error: [invalid-explicit-return] "expected `int`, found `object`"
+```
+
 ## Recursive tuple elements in a protocol
 
 Each element of `A` must be both another `A` and an `Items`. We can inspect an element without
