@@ -488,7 +488,17 @@ pub fn project_files_in_path<'a>(
     paths: &[PathBuf],
     root_project: &'a RootProject,
     transformer: &(dyn ConfigurationTransformer + Sync),
-) -> Result<(Vec<Result<ResolvedFile, ignore::Error>>, Resolver<'a>)> {
+) -> Result<(ResolvedFiles, Resolver<'a>)> {
+    project_files_in_path_with_directories(paths, root_project, transformer, None)
+}
+
+/// Find project files and notify an observer about directories that are traversed.
+pub fn project_files_in_path_with_directories<'a>(
+    paths: &[PathBuf],
+    root_project: &'a RootProject,
+    transformer: &(dyn ConfigurationTransformer + Sync),
+    visit_directory: Option<&(dyn Fn(&Path) + Sync)>,
+) -> Result<(ResolvedFiles, Resolver<'a>)> {
     // Normalize every path (e.g., convert from relative to absolute).
     let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).unique().collect();
 
@@ -555,13 +565,17 @@ pub fn project_files_in_path<'a>(
 
     // Run the `WalkParallel` to collect all files.
     let state = WalkPythonFilesState::new(resolver, configuration_cache);
-    let mut visitor = PythonFilesVisitorBuilder::new(transformer, &state);
+    let mut visitor = PythonFilesVisitorBuilder {
+        state: &state,
+        transformer,
+        visit_directory,
+    };
     walker.visit(&mut visitor);
 
     state.finish()
 }
 
-type ResolvedFiles = Vec<Result<ResolvedFile, ignore::Error>>;
+pub type ResolvedFiles = Vec<Result<ResolvedFile, ignore::Error>>;
 
 struct WalkPythonFilesState<'config> {
     is_hierarchical: bool,
@@ -623,15 +637,7 @@ fn deduplicate_files(mut files: ResolvedFiles) -> ResolvedFiles {
 struct PythonFilesVisitorBuilder<'s, 'config> {
     state: &'s WalkPythonFilesState<'config>,
     transformer: &'s (dyn ConfigurationTransformer + Sync),
-}
-
-impl<'s, 'config> PythonFilesVisitorBuilder<'s, 'config> {
-    fn new(
-        transformer: &'s (dyn ConfigurationTransformer + Sync),
-        state: &'s WalkPythonFilesState<'config>,
-    ) -> Self {
-        Self { state, transformer }
-    }
+    visit_directory: Option<&'s (dyn Fn(&Path) + Sync)>,
 }
 
 struct PythonFilesVisitor<'s, 'config> {
@@ -639,6 +645,7 @@ struct PythonFilesVisitor<'s, 'config> {
     local_error: Result<()>,
     global: &'s WalkPythonFilesState<'config>,
     transformer: &'s (dyn ConfigurationTransformer + Sync),
+    visit_directory: Option<&'s (dyn Fn(&Path) + Sync)>,
 }
 
 impl<'config, 's> ignore::ParallelVisitorBuilder<'s> for PythonFilesVisitorBuilder<'s, 'config>
@@ -651,6 +658,7 @@ where
             local_error: Ok(()),
             global: self.state,
             transformer: self.transformer,
+            visit_directory: self.visit_directory,
         })
     }
 }
@@ -686,6 +694,15 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
                     return WalkState::Skip;
                 }
             }
+        }
+
+        if let Some(visit_directory) = self.visit_directory
+            && let Ok(entry) = &result
+            && entry
+                .file_type()
+                .is_some_and(|file_type| file_type.is_dir())
+        {
+            visit_directory(entry.path());
         }
 
         // Search for the `pyproject.toml` file in this directory, before we visit any
