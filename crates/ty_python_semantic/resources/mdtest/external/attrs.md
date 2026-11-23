@@ -146,15 +146,15 @@ p.data = "not a dict"  # error: [invalid-assignment]
 
 ## Field validators
 
-Registering validators leaves the stored field type unchanged. Each validator keeps its method
-signature.
+attrs supports validator functions, which can either be specified using `field(validator=...)` or by decorating a method with `@<field>.validator`:
 
 ```py
 import attr
-from attrs import define, field
+from attrs import define, field, validators
 
 @attr.s
 class User1:
+    name: str = attr.ib(validator=attr.validators.instance_of(str))
     age: int = attr.ib()
 
     @age.validator
@@ -164,6 +164,7 @@ class User1:
 
 @define
 class User2:
+    name: str = field(validator=validators.instance_of(str))
     age: int = field()
 
     @age.validator
@@ -171,12 +172,16 @@ class User2:
         if value < 0:
             raise ValueError
 
-user1 = User1(age=42)
-user2 = User2(age=42)
+user1 = User1(name="John Doe", age=30)
+user2 = User2(name="John Doe", age=30)
 
 reveal_type(user1.age)  # revealed: int
 reveal_type(user2.age)  # revealed: int
+```
 
+The decorator `@<field>.validator` only registers the method as a validator. It does not modify the signature of the function:
+
+```py
 reveal_type(user1.non_negative)  # revealed: bound method User1.non_negative(attr: object, value: int) -> None
 reveal_type(user2.non_negative)  # revealed: bound method User2.non_negative(attr: object, value: int) -> None
 ```
