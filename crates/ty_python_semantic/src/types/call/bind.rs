@@ -12,7 +12,7 @@ mod constructor;
 mod property;
 
 use std::borrow::Cow;
-use std::cell::{Cell, OnceCell, RefCell};
+use std::cell::{Cell, LazyCell, OnceCell, RefCell};
 use std::collections::HashSet;
 use std::fmt;
 use std::ops::Range;
@@ -1622,8 +1622,19 @@ impl<'db> Bindings<'db> {
         } else {
             // Report diagnostics for each element (union variant).
             // Each element may be a single binding or an intersection of bindings.
+            // Every failing variant includes the same union. Format it only once,
+            // and only if a diagnostic actually needs the note.
+            let union_note = LazyCell::new(|| {
+                SubDiagnostic::new(
+                    SubDiagnosticSeverity::Info,
+                    format_args!(
+                        "Attempted to call union type `{}`",
+                        self.callable_type().display(db, env)
+                    ),
+                )
+            });
             for element in &self.elements {
-                self.report_element_diagnostics(context, node, element);
+                self.report_element_diagnostics(context, node, element, &|| union_note.clone());
             }
         }
 
@@ -1655,6 +1666,7 @@ impl<'db> Bindings<'db> {
         context: &CallDiagnosticContext<'_, '_, 'db, '_>,
         node: ast::AnyNodeRef,
         element: &BindingsElement<'db>,
+        union_note: &dyn Fn() -> SubDiagnostic,
     ) {
         // If this element succeeded, no diagnostics to report
         if element.as_result(context.db()).is_ok() {
@@ -1678,7 +1690,7 @@ impl<'db> Bindings<'db> {
                     if is_union {
                         // Use layered diagnostic for intersection inside a union
                         let layered_diag = LayeredDiagnostic {
-                            union_callable_type: self.callable_type(),
+                            union_note,
                             intersection_callable_type: element.callable_type,
                             binding,
                         };
@@ -1704,7 +1716,7 @@ impl<'db> Bindings<'db> {
                     return;
                 }
                 let union_diag = UnionDiagnostic {
-                    callable_type: self.callable_type(),
+                    union_note,
                     variant_type: element.callable_type,
                 };
                 binding.report_diagnostics(context, node, Some(&union_diag));
@@ -11682,14 +11694,13 @@ trait CompoundDiagnostic {
 /// This is used when a function call is inconsistent with one or more variants
 /// of a union. This can be used to attach sub-diagnostics that clarify that
 /// the error is part of a union.
-struct UnionDiagnostic<'db> {
-    /// The type of the union.
-    callable_type: Type<'db>,
+struct UnionDiagnostic<'a, 'db> {
+    union_note: &'a dyn Fn() -> SubDiagnostic,
     /// The type associated with the specific union variant that failed.
     variant_type: Type<'db>,
 }
 
-impl CompoundDiagnostic for UnionDiagnostic<'_> {
+impl CompoundDiagnostic for UnionDiagnostic<'_, '_> {
     fn add_context(&self, db: &dyn Db, env: &ProgramEnvironment<'_>, diag: &mut Diagnostic) {
         let sub = SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
@@ -11700,14 +11711,7 @@ impl CompoundDiagnostic for UnionDiagnostic<'_> {
         );
         diag.sub(sub);
 
-        let sub = SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            format_args!(
-                "Attempted to call union type `{}`",
-                self.callable_type.display(db, env)
-            ),
-        );
-        diag.sub(sub);
+        diag.sub((self.union_note)());
     }
 }
 
@@ -11750,8 +11754,7 @@ impl CompoundDiagnostic for IntersectionDiagnostic<'_, '_> {
 /// Used when an intersection fails inside a union - we want to report both
 /// that this is a union variant AND that this is an intersection element.
 struct LayeredDiagnostic<'b, 'db> {
-    /// The type of the union.
-    union_callable_type: Type<'db>,
+    union_note: &'b dyn Fn() -> SubDiagnostic,
     /// The type of the intersection (for intersection context).
     intersection_callable_type: Type<'db>,
     /// The specific binding that failed.
@@ -11780,14 +11783,7 @@ impl CompoundDiagnostic for LayeredDiagnostic<'_, '_> {
         diag.sub(sub);
 
         // Then add union context (outer layer)
-        let sub = SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            format_args!(
-                "Attempted to call union type `{}`",
-                self.union_callable_type.display(db, env)
-            ),
-        );
-        diag.sub(sub);
+        diag.sub((self.union_note)());
     }
 }
 
