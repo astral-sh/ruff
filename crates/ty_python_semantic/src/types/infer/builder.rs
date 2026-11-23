@@ -11326,14 +11326,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         place: Option<&SourcePlace>,
         ty: Type<'db>,
-        constraint_keys: &[(FileScopeId, ConstraintKey)],
+        constraint_keys: &ConstraintKeys,
     ) -> Type<'db> {
         place.map_or(ty, |p| {
             self.narrow_place_with_applicable_constraints(
                 p.place(),
                 p.operand(),
                 ty,
-                constraint_keys,
+                constraint_keys.as_slice(),
             )
         })
     }
@@ -11402,7 +11402,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::ExprAttribute { value, attr, .. } = attribute;
 
         let db = self.db();
-        let mut constraint_keys = ConstraintKeys::new();
+        let mut constraint_keys = ConstraintKeys::default();
 
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
             && typevar.is_paramspec(db)

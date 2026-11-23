@@ -215,7 +215,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.store_typed_dict_key_expected_type(slice, value_ty);
 
-        let mut constraint_keys = ConstraintKeys::new();
+        let mut constraint_keys = ConstraintKeys::default();
 
         // If `value` is a valid reference, we attempt type narrowing by assignment.
         let source_place = (!value_ty.is_unknown())
