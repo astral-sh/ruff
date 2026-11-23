@@ -332,7 +332,8 @@ impl<'db> ClassType<'db> {
             });
 
             for (symbol_id, bindings_iterator) in use_def_map.all_end_of_scope_symbol_bindings() {
-                let name = place_table.symbol(symbol_id).name();
+                let symbol = place_table.symbol(symbol_id);
+                let name = symbol.name();
                 // Avoid inferring signatures for methods that cannot introduce abstractness.
                 // Inspect all reachable definitions: an earlier overload can be abstract even
                 // when the final implementation is concrete.
@@ -341,7 +342,11 @@ impl<'db> ClassType<'db> {
                     && use_def_map
                         .reachable_symbol_bindings(symbol_id)
                         .filter_map(|binding| binding.binding.definition())
-                        .all(|definition| !might_be_explicitly_abstract(db, definition))
+                        .all(|definition| {
+                            // A function definition always declares the symbol. Other bindings
+                            // can alias abstract methods and still need regular inference.
+                            symbol.is_declared() && !might_be_explicitly_abstract(db, definition)
+                        })
                 {
                     continue;
                 }
