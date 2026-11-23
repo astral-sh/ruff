@@ -1489,6 +1489,12 @@ impl<'db> UnionBuilder<'db> {
         let cycle_recovery = self.cycle_recovery;
         let recursively_defined = self.recursively_defined;
 
+        // Both complement reductions need a second element. A single ordinary
+        // type is already normalized and doesn't need a temporary vector.
+        if let [UnionElement::Type(ty)] = self.elements.as_slice() {
+            return Some(*ty);
+        }
+
         let type_count = self.elements.iter().map(UnionElement::type_count).sum();
         let mut types = Vec::with_capacity(type_count);
         for element in self.elements {
