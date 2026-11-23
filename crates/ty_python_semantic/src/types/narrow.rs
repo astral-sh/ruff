@@ -1324,15 +1324,13 @@ impl<'db> NarrowingConstraint<'db> {
             }
             NarrowingConstraintKind::Empty => Type::Never,
             NarrowingConstraintKind::Combined(combined) => {
-                let mut union = UnionBuilder::new(db, env);
-                for conjunctions in combined
+                let types: SmallVec<[_; 2]> = combined
                     .replacement_disjuncts
                     .into_iter()
                     .chain(combined.intersection_disjuncts)
-                {
-                    union.add_in_place(conjunctions.evaluate_constraint_type(db, env));
-                }
-                union.build()
+                    .map(|conjunctions| conjunctions.evaluate_constraint_type(db, env))
+                    .collect();
+                UnionType::normalize_place_types(db, env, &types)
             }
         }
     }

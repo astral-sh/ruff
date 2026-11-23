@@ -136,6 +136,37 @@ impl<'db> UnionType<'db> {
         }
     }
 
+    /// Normalize the types of a place across bindings, declarations, or narrowing alternatives.
+    pub(crate) fn normalize_place_types(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        types: &[Type<'db>],
+    ) -> Type<'db> {
+        // Successive reads often merge the same few bindings. Even two inputs can
+        // require quadratic work if one is a wide union. Bound the key size so a
+        // series of conditional assignments doesn't retain a growing list at each use.
+        if types.len() <= WIDE_UNION
+            && types.iter().any(
+                |ty| matches!(ty, Type::Union(union) if union.elements(db).len() >= WIDE_UNION),
+            )
+        {
+            return OrderedUnionInput::new(
+                db,
+                env.program(db),
+                types,
+                true,
+                RecursivelyDefined::No,
+            )
+            .normalize(db);
+        }
+
+        let mut builder = UnionBuilder::new(db, env);
+        for &ty in types {
+            builder.add_in_place(ty);
+        }
+        builder.build()
+    }
+
     /// Create a union type `A | B` from two elements `A` and `B`.
     pub fn from_two_elements(
         db: &'db dyn Db,

@@ -16,7 +16,7 @@ use crate::reachability::{
 };
 use crate::types::{
     DeclaredType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
+    UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
     may_exist_at_runtime,
 };
 use crate::{Db, FxIndexSet, FxOrderSet};
@@ -2076,7 +2076,8 @@ pub(super) struct PlaceWithDefinition<'db> {
 struct PublicTypeBuilder<'db> {
     db: &'db dyn Db,
     queue: Option<Type<'db>>,
-    builder: UnionBuilder<'db>,
+    env: ProgramEnvironment<'db>,
+    elements: smallvec::SmallVec<[Type<'db>; 2]>,
 }
 
 impl<'db> PublicTypeBuilder<'db> {
@@ -2084,17 +2085,14 @@ impl<'db> PublicTypeBuilder<'db> {
         PublicTypeBuilder {
             db,
             queue: None,
-            builder: UnionBuilder::new(db, env),
+            env: env.clone(),
+            elements: smallvec::SmallVec::new(),
         }
-    }
-
-    fn add_to_union(&mut self, element: Type<'db>) {
-        self.builder.add_in_place(element);
     }
 
     fn drain_queue(&mut self) {
         if let Some(queued_element) = self.queue.take() {
-            self.add_to_union(queued_element);
+            self.elements.push(queued_element);
         }
     }
 
@@ -2135,13 +2133,13 @@ impl<'db> PublicTypeBuilder<'db> {
                     } else {
                         self.drain_queue();
                     }
-                    self.add_to_union(element);
+                    self.elements.push(element);
                     true
                 }
             }
             _ => {
                 self.drain_queue();
-                self.add_to_union(element);
+                self.elements.push(element);
                 true
             }
         }
@@ -2149,7 +2147,7 @@ impl<'db> PublicTypeBuilder<'db> {
 
     fn build(mut self) -> Type<'db> {
         self.drain_queue();
-        self.builder.build()
+        UnionType::normalize_place_types(self.db, &self.env, &self.elements)
     }
 }
 
