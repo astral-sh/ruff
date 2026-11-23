@@ -638,6 +638,10 @@ fn analyze_non_terminal_calls_up_to_predicate<'db>(
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     root: InteriorNode,
 ) {
+    if predicates.len() <= NON_TERMINAL_CALL_CHUNK_SIZE {
+        return;
+    }
+
     let root_predicate = root.atom();
     if !matches!(
         predicates[root_predicate].node,
@@ -651,17 +655,11 @@ fn analyze_non_terminal_calls_up_to_predicate<'db>(
         return;
     }
     let scope = predicate_scope(db, &predicates[root_predicate]);
-    let has_many_calls = predicates
-        .iter()
-        .filter(|predicate| matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)))
-        .nth(NON_TERMINAL_CALL_CHUNK_SIZE)
-        .is_some();
-
-    if !has_many_calls {
+    let call_predicates = non_terminal_call_predicates(db, scope);
+    if call_predicates.len() <= NON_TERMINAL_CALL_CHUNK_SIZE {
         return;
     }
 
-    let call_predicates = non_terminal_call_predicates(db, scope);
     let call_count = call_predicates.partition_point(|predicate| *predicate <= root_predicate);
     let mut start = 0;
     // Leave the incomplete final block demand-driven. Its reverse dependency chain is bounded by
@@ -678,8 +676,8 @@ fn analyze_non_terminal_calls_up_to_predicate<'db>(
 
 /// Returns the statement-call predicates for `scope` in source order.
 ///
-/// This tracked index is used only once a scope exceeds [`NON_TERMINAL_CALL_CHUNK_SIZE`], avoiding
-/// a persistent allocation for the common case of scopes with few calls.
+/// This tracked index is used only once a scope has more than [`NON_TERMINAL_CALL_CHUNK_SIZE`]
+/// predicates. Smaller scopes never need to warm a call prefix.
 #[salsa::tracked(returns(deref), heap_size = get_size2::GetSize::get_heap_size)]
 fn non_terminal_call_predicates<'db>(
     db: &'db dyn Db,
