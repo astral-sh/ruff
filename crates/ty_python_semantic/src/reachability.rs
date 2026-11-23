@@ -2168,15 +2168,19 @@ pub(crate) fn evaluate_reachability(
 }
 
 #[derive(Default)]
-struct TruthinessCache(RefCell<FxHashMap<usize, Truthiness>>);
+struct TruthinessCache(RefCell<Vec<Option<Truthiness>>>);
 
 impl TruthinessCache {
     fn get_or_evaluate(&self, index: usize, evaluate: impl FnOnce() -> Truthiness) -> Truthiness {
-        if let Some(value) = self.0.borrow().get(&index).copied() {
+        if let Some(value) = self.0.borrow().get(index).copied().flatten() {
             return value;
         }
         let value = evaluate();
-        self.0.borrow_mut().insert(index, value);
+        let mut entries = self.0.borrow_mut();
+        if entries.len() <= index {
+            entries.resize(index + 1, None);
+        }
+        entries[index] = Some(value);
         value
     }
 }
@@ -2188,28 +2192,22 @@ impl TruthinessCache {
 /// related places. Those evaluations can in turn infer predicate truthiness, so reusing the result
 /// avoids repeating non-trivial work.
 ///
-/// The common case is evaluating constraints from the inferred region's own use-def map. Those
-/// entries are keyed by [`ScopedReachabilityConstraintId`]. A region may consult only a few
-/// constraints in a large scope, so we store only the IDs it visits. Distinct
-/// paths through that graph can test the same predicate, so cache its truthiness for the lifetime
-/// of this inference, including when the surrounding query is iterating a cycle. Constraints
-/// from other use-def maps are less common and are stored separately, keyed by the address of their
-/// [`ReachabilityConstraints`] graph plus the local constraint id. The graph address is part of the
-/// key because scoped constraint ids are only unique within one graph.
+/// A region may visit only a few constraints in a large graph. Store the results by
+/// graph address and local ID because constraint IDs are only unique within a graph.
+/// Within the primary scope, distinct paths can test the same predicate, so also
+/// cache its truthiness for the lifetime of this inference, including during cycles.
 pub(crate) struct ReachabilityEvaluationCache<'db> {
     primary_scope: ScopeId<'db>,
     primary_constraints: usize,
-    primary_entries: TruthinessCache,
     primary_predicates: TruthinessCache,
-    other_entries: RefCell<FxHashMap<(usize, ScopedReachabilityConstraintId), Truthiness>>,
+    entries: RefCell<FxHashMap<(usize, ScopedReachabilityConstraintId), Truthiness>>,
 }
 
 impl<'db> ReachabilityEvaluationCache<'db> {
     /// Creates a cache optimized for the use-def map of `primary_scope`.
     ///
     /// `primary_constraints` must be the reachability graph for `primary_scope`'s use-def map. The
-    /// cache uses this graph's address to decide whether an evaluation can use the primary
-    /// storage or must fall back to the secondary map for another graph.
+    /// cache uses the graph's address to decide whether to share predicate evaluations.
     pub(crate) fn new(
         primary_scope: ScopeId<'db>,
         primary_constraints: &ReachabilityConstraints,
@@ -2217,18 +2215,14 @@ impl<'db> ReachabilityEvaluationCache<'db> {
         Self {
             primary_scope,
             primary_constraints: std::ptr::from_ref(primary_constraints).addr(),
-            primary_entries: TruthinessCache::default(),
             primary_predicates: TruthinessCache::default(),
-            other_entries: RefCell::new(FxHashMap::default()),
+            entries: RefCell::new(FxHashMap::default()),
         }
     }
 
     /// Evaluates `id`, reusing a cached result when possible.
     ///
-    /// Trivial constraint ids return immediately and are not stored. For interior nodes, the
-    /// predicate determines whether the constraint belongs to the primary scope. A primary-scope
-    /// constraint from the primary graph is cached by local ID; all other constraints are cached
-    /// by graph identity and id.
+    /// Trivial constraint IDs return immediately and are not stored.
     fn evaluate(
         &self,
         db: &'db dyn Db,
@@ -2243,29 +2237,19 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             _ => {}
         }
 
-        let predicate = predicates[constraints.get_interior_node(id).atom()];
-        let constraints_key = std::ptr::from_ref(constraints).addr();
-        let scope = predicate_scope(db, &predicate);
-
-        if scope != self.primary_scope || constraints_key != self.primary_constraints {
-            let key = (constraints_key, id);
-            if let Some(result) = self.other_entries.borrow().get(&key).copied() {
-                return result;
-            }
-
-            let result = evaluate_reachability_constraint(db, scope, id, None);
-            self.other_entries.borrow_mut().insert(key, result);
+        let graph = std::ptr::from_ref(constraints).addr();
+        let key = (graph, id);
+        if let Some(result) = self.entries.borrow().get(&key).copied() {
             return result;
         }
 
-        self.primary_entries.get_or_evaluate(id.index(), || {
-            evaluate_reachability_constraint(
-                db,
-                self.primary_scope,
-                id,
-                Some(&self.primary_predicates),
-            )
-        })
+        let predicate = predicates[constraints.get_interior_node(id).atom()];
+        let scope = predicate_scope(db, &predicate);
+        let predicate_cache = (scope == self.primary_scope && graph == self.primary_constraints)
+            .then_some(&self.primary_predicates);
+        let result = evaluate_reachability_constraint(db, scope, id, predicate_cache);
+        self.entries.borrow_mut().insert(key, result);
+        result
     }
 }
 
