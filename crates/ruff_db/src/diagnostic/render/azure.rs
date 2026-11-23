@@ -75,7 +75,7 @@ fn escape_message(message: impl Display) -> impl Display {
 }
 
 /// Property values must also escape the delimiters in the command header.
-fn escape_property(text: &str) -> impl Display + '_ {
+pub(super) fn escape_property(text: &str) -> impl Display + '_ {
     fmt::from_fn(move |f| {
         let mut start = 0;
         for i in memchr::memchr2_iter(b';', b']', text.as_bytes()) {

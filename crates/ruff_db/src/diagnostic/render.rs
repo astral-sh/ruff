@@ -1051,6 +1051,24 @@ impl<'r> EscapedSourceCode<'r> {
     }
 }
 
+/// Match directory prefixes in CLI snapshots, including paths in CI command properties.
+#[cfg(feature = "testing")]
+pub fn snapshot_dir_filter(path: &Path) -> String {
+    let path = path.to_string_lossy();
+    // Try encoded paths first in case the raw path ends in a percent sign.
+    let mut paths = Vec::new();
+    for encoded in [
+        github::escape_property(&path).to_string(),
+        azure::escape_property(&path).to_string(),
+    ] {
+        if encoded != path {
+            paths.push(regex::escape(&encoded));
+        }
+    }
+    paths.push(regex::escape(&path));
+    format!(r"(?:{})[\\/]?", paths.join("|"))
+}
+
 /// A stub implementation of [`FileResolver`] intended for testing.
 pub struct DummyFileResolver;
 
@@ -1092,6 +1110,18 @@ mod tests {
     use crate::tests::TestDb;
 
     use super::*;
+
+    #[cfg(feature = "testing")]
+    #[test]
+    fn snapshot_filter_matches_raw_and_encoded_directory_prefixes() {
+        let pattern = snapshot_dir_filter(Path::new(r"C:\tmp[1]%"));
+        let filter = regex::Regex::new(&pattern).unwrap();
+        let paths = r"C:\tmp[1]%\a.py C%3A\tmp[1]%25\b.py C:\tmp[1%5D%AZP25\c.py";
+        assert_eq!(
+            filter.replace_all(paths, "[TMP]/"),
+            "[TMP]/a.py [TMP]/b.py [TMP]/c.py"
+        );
+    }
 
     static ANIMALS: &str = "\
 aardvark
