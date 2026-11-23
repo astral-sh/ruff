@@ -4376,6 +4376,38 @@ def two(x: U, y: V) -> U | V:
     return result  # error: [invalid-explicit-return]
 ```
 
+## Inferring a constrained type variable from a callback's union parameter
+
+Neither `str` nor `bytes` works for every specialization of `U`. Taking `T = U` lets us forward a
+callback that also accepts `None`.
+
+```py
+from typing import Callable, Literal, TypeVar
+
+T = TypeVar("T", str, bytes)
+U = TypeVar("U", str, bytes)
+
+def send(f: Callable[[T | None], None]) -> T:
+    raise NotImplementedError
+
+def forward(f: Callable[[U | None], None]):
+    reveal_type(send(f))  # revealed: U@forward
+```
+
+Accepting `""` in addition to `U` still doesn't guarantee the callback accepts every `str`. If it
+accepts every `int`, we prefer that declared choice over `U`.
+
+```py
+S = TypeVar("S", str, bytes, int)
+
+def choose(f: Callable[[S], None]) -> S:
+    raise NotImplementedError
+
+def check(f: Callable[[U | Literal[""]], None], g: Callable[[U | int], None]):
+    reveal_type(choose(f))  # revealed: U@check
+    reveal_type(choose(g))  # revealed: int
+```
+
 ## Inferring a constrained type variable from a common subclass and a callback
 
 `Both` fits all three constraints on `T`. The callback may accept only `A` or only `B`, so no single

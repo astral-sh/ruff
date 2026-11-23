@@ -1186,24 +1186,30 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         // A caller's constrained U can be the solution for T for every choice of U.
         // For example, U: (int, str) satisfies T: (int, str, bytes), even though neither
         // T = int nor T = str works for every U.
+        let inferable = self.inferable;
+        let is_witness = |ty: Type<'db>| {
+            ty.as_typevar().is_some_and(|var| {
+                !var.is_inferable(db, inferable)
+                    && var.can_specialize_typevar(db, env, bound_typevar)
+            })
+        };
         let mut witnesses = SmallVec::<[_; 2]>::new();
-        if self.inferable != TypeVarSet::All {
+        if inferable != TypeVarSet::All {
             let bounds = path.positive_constraints().filter_map(|(id, _)| {
                 let (subject, ty) = storage.atomic_constraint_data(id).as_concrete()?;
                 subject.is_same_typevar_as(db, bound_typevar).then_some(ty)
             });
             // Prefer the combined lower bound when both ends of the range are possible solutions.
             for ty in evidence.evidence_lower.into_iter().chain(bounds) {
-                if let Type::TypeVar(var) = ty
-                    && !var.is_inferable(db, self.inferable)
-                    && var.can_specialize_typevar(db, env, bound_typevar)
-                    && !witnesses.contains(&ty)
-                {
+                if is_witness(ty) && !witnesses.contains(&ty) {
                     witnesses.push(ty);
                 }
             }
         }
-        for witness in witnesses {
+        let try_witness = |this: &mut Self,
+                           storage: &mut ConstraintSetStorage<'db>,
+                           path: &mut PathAssignments,
+                           witness: Type<'db>| {
             let satisfied = Cell::new(false);
             let check_candidate: &ProcessSatisfied<'_, 'db, L, Break<L::Break>> =
                 &|this, storage, path| {
@@ -1234,7 +1240,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                             && declared.constrained_ty.is_subtype_of(db, env, witness)
                     })
             {
-                self.validate_single_declared_constraint(
+                this.validate_single_declared_constraint(
                     db,
                     env,
                     storage,
@@ -1246,7 +1252,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                     check_candidate,
                 )?;
                 if satisfied.get() {
-                    return ControlFlow::Continue(());
+                    return ControlFlow::Continue(true);
                 }
             }
 
@@ -1256,7 +1262,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 witness,
             );
             let equality = storage.intern_atomic_constraint(db, env, equality.into());
-            self.visit_constraints_and_then(
+            this.visit_constraints_and_then(
                 db,
                 env,
                 storage,
@@ -1266,7 +1272,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                     this.validate_constrained(db, env, storage, path, constrained, check_candidate)
                 },
             )?;
-            if satisfied.into_inner() {
+            ControlFlow::Continue(satisfied.into_inner())
+        };
+        for &witness in &witnesses {
+            if try_witness(self, storage, path, witness)? {
                 return ControlFlow::Continue(());
             }
         }
@@ -1497,13 +1506,29 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             constraint_solutions.push(start..end);
         }
 
-        // Fast path: If exactly one constraint was satisfied, we can return its solutions
-        // immediately. If _no_ constraints were satisfied, we can return its _lack_ of solutions
-        // immediately.
         let satisfied_constraint_count = constraint_satisfied
             .iter()
             .filter(|satisfied| **satisfied)
             .count();
+        // For `T <= U | None`, `T = U` may work even if no single declared choice does.
+        // Try these witnesses last so `T <= U | int` can still select a declared `int`.
+        // Keep the union intact when checking each witness against the full path.
+        if satisfied_constraint_count == 0 && inferable != TypeVarSet::All {
+            for witness in evidence
+                .upper
+                .iter_evidence(EvidenceSource::All)
+                .filter_map(|ty| ty.resolve_type_alias(db).as_union())
+                .flat_map(|union| union.elements(db).iter().copied())
+            {
+                if !is_witness(witness) || witnesses.contains(&witness) {
+                    continue;
+                }
+                if try_witness(self, storage, path, witness)? {
+                    return ControlFlow::Continue(());
+                }
+                witnesses.push(witness);
+            }
+        }
         if satisfied_constraint_count <= 1 {
             return ControlFlow::Continue(());
         }
