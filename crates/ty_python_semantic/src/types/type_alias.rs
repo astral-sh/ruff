@@ -699,7 +699,7 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    fn with_materialization_kind(
+    pub(super) fn with_materialization_kind(
         self,
         db: &'db dyn Db,
         materialization_kind: Option<MaterializationKind>,
@@ -795,12 +795,16 @@ impl<'db> TypeAliasType<'db> {
                 })
             }
             TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => ty,
-            TypeMapping::EagerExpansion if self.materialization_kind(db).is_some() => self
-                .value_type_with_recursion(db, visitor.recursion_context)
-                .expand_eagerly(db, visitor.env),
+            TypeMapping::EagerExpansion
+                if self.materialization_kind(db).is_some() && !ty.is_growing_alias(db) =>
+            {
+                self.value_type_with_recursion(db, visitor.recursion_context)
+                    .expand_eagerly(db, visitor.env)
+            }
             // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
             // detection rather than the visitor's cycle detection, because the visitor tracks
-            // Type values and `RecursiveList` is different from `RecursiveList[T]`.
+            // Type values and `RecursiveList` is different from `RecursiveList[T]`. Even a
+            // marked growing alias needs the raw body so that the Salsa query key repeats.
             TypeMapping::EagerExpansion => self.raw_value_type(db).expand_eagerly(db, visitor.env),
             // When specializing a generic type alias, instead of specializing the expanded type, the type alias itself is specialized.
             // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.
@@ -832,23 +836,16 @@ impl<'db> TypeAliasType<'db> {
                 // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
                 // will detect the cycle and return the fallback value.
                 visitor.visit(db, ty, type_mapping, || {
-                    let mapped = self
-                        .value_type_with_recursion(db, visitor.recursion_context)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                    let value = self.value_type_with_recursion(db, visitor.recursion_context);
+                    let mapped = value.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
 
-                    // If the type mapping does not result in any change to this type alias, keep the
-                    // alias node instead of eagerly expanding it. A recursive backedge also returns
-                    // the alias itself, and fully static aliases must retain their original identity.
-                    if mapped == ty
-                        || self.value_type_with_recursion(db, visitor.recursion_context) == mapped
-                    {
+                    // Fully static aliases must retain their original identity.
+                    if mapped == ty || mapped == value {
                         ty
-                    } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
+                    } else if let TypeMapping::Materialize(kind) = type_mapping
                         && self.is_recursive(db)
                     {
-                        Type::TypeAlias(
-                            self.with_materialization_kind(db, Some(*materialization_kind)),
-                        )
+                        visitor.materialize_changed_alias(db, ty, value, mapped, *kind)
                     } else {
                         mapped
                     }
@@ -926,7 +923,8 @@ impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
 impl<'db> TypeAliasType<'db> {
     /// Measure the alias's own parameters in its raw RHS, and external parameters through its
     /// specialization arguments. For `type Items[T] = list[T]`, querying `Items[int]` for its
-    /// formal `T` still describes `list[T]`, not the specialized `list[int]`.
+    /// formal `T` still describes `list[T]`. A growing recursive use can pass that same
+    /// formal parameter in a different position, so its arguments participate in the equation.
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, _, _, _, _| VarianceTerm::BIVARIANT,
@@ -946,6 +944,7 @@ impl<'db> TypeAliasType<'db> {
         if generic_context
             .variables(db)
             .any(|alias_typevar| alias_typevar.identity(db) == typevar)
+            && (self.specialization(db).is_none() || !Type::TypeAlias(self).is_growing_alias(db))
         {
             return self.raw_value_type(db).variance_of(db, &env, typevar);
         }

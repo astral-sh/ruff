@@ -1461,6 +1461,26 @@ def f(value: Color):
         assert_type(value.value, Literal[2])
 ```
 
+`((1, "leaf"),)` is a `Tree[int]` because the first recursive step replaces `T` with
+`tuple[int, Any]`. The negative branch excludes `tuple[tuple[int, str]]` in either union order.
+
+```py
+from typing import Any, Callable
+
+type Tree[T] = T | tuple[Tree[tuple[T, Any]]]
+type Forest = dict[Any, Tree[tuple[int, Any]]]
+
+def check(
+    value: tuple[tuple[int, str]] | str,
+    tree_first: Callable[[object], TypeIs[Tree[int] | Forest]],
+    forest_first: Callable[[object], TypeIs[Forest | Tree[int]]],
+):
+    if not tree_first(value):
+        assert_type(value, str)
+    if not forest_first(value):
+        assert_type(value, str)
+```
+
 ## Type guard definitions with recursive signatures
 
 This chain is long enough for ty to reach its cycle recovery limit and infer `Unknown` for the

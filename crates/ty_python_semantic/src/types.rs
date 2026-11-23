@@ -5,7 +5,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use smallvec::SmallVec;
 use std::borrow::Cow;
-use std::cell::{OnceCell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -540,6 +540,9 @@ struct ApplyMaterializationEquivalence;
 type MaterializationEquivalenceVisitor<'db> =
     Rc<CycleDetector<'db, ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
 
+/// Original and materialized types whose comparison could recursively unfold a growing alias.
+type GrowingMaterializations<'db> = FxHashSet<(Type<'db>, Type<'db>)>;
+
 type MaterializationDependency<'db> = (Type<'db>, MaterializationKind);
 
 struct DependentMaterialization<'db> {
@@ -565,6 +568,9 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
+    /// Whether the current transformation introduced a deferred materialization of a growing alias.
+    marked_growing_alias: Cell<bool>,
+    growing_changes: OnceCell<Box<RefCell<GrowingMaterializations<'db>>>>,
     materialization_dependencies: RefCell<Vec<MaterializationDependency<'db>>>,
     dependent_materializations:
         RefCell<FxHashMap<MaterializationDependency<'db>, DependentMaterialization<'db>>>,
@@ -584,6 +590,8 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             promotion: OnceCell::default(),
             skip_promotion: OnceCell::default(),
             materialization_equivalence: OnceCell::default(),
+            marked_growing_alias: Cell::new(false),
+            growing_changes: OnceCell::new(),
             materialization_dependencies: RefCell::default(),
             dependent_materializations: RefCell::default(),
         }
@@ -632,7 +640,21 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         let TypeMapping::Materialize(kind) = type_mapping else {
             return type_transformer.visit_type(db, ty, func);
         };
-        let key = (ty, *kind);
+        self.track_materialization(ty, || {
+            self.visit_materialization(db, ty, *kind, type_transformer, func)
+        })
+    }
+
+    /// Cache materializations only as long as their recursive dependencies remain valid.
+    fn visit_materialization(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        kind: MaterializationKind,
+        type_transformer: &TypeTransformer<'db, ApplyTypeMappingTag>,
+        func: impl FnOnce() -> Type<'db>,
+    ) -> Type<'db> {
+        let key = (ty, kind);
         if let Some(cached) = self.dependent_materializations.borrow().get(&key) {
             self.materialization_dependencies
                 .borrow_mut()
@@ -653,14 +675,18 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
                 } else {
                     self.materialization_dependencies
                         .borrow_mut()
-                        .push((active, *kind));
-                    Some(ty)
+                        .push((active, kind));
+                    Some(if ty == active {
+                        ty
+                    } else {
+                        self.materialize_growing_alias(db, ty, kind)
+                    })
                 }
             },
             |result| {
-                // A fallback leaves a recursive reference unchanged. Intermediate results
-                // depend on that active guard, even across a variance change. Once the
-                // guard itself finishes, its result can be reused outside that cycle.
+                // Intermediate results depend on the active guard, even across a variance
+                // change. Once the guard itself finishes, its result can be reused outside
+                // that cycle.
                 let mut dependencies = self.materialization_dependencies.borrow_mut();
                 let mut seen = FxHashSet::default();
                 dependencies
@@ -694,12 +720,110 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         )
     }
 
+    /// Remember which transformations added a marker to a growing alias, even inside
+    /// an invariant argument that keeps its original type. Scope this to the current
+    /// transformation so an unrelated sibling can't change the equivalence check.
+    fn track_materialization(
+        &self,
+        ty: Type<'db>,
+        compute: impl FnOnce() -> Type<'db>,
+    ) -> Type<'db> {
+        let previous = self.marked_growing_alias.replace(false);
+        let result = compute();
+        let nested = self.marked_growing_alias.replace(previous);
+        if ty != result {
+            if nested {
+                self.growing_changes
+                    .get_or_init(Box::default)
+                    .borrow_mut()
+                    .insert((ty, result));
+                self.marked_growing_alias.set(true);
+            } else if self.materialized_growing_alias(ty, result) {
+                // Reusing a cached transformation also reuses its marker.
+                self.marked_growing_alias.set(true);
+            }
+        }
+        result
+    }
+
+    /// Keep a growing alias static when materializing its body only changed the
+    /// representation of a type like a fully static protocol.
+    fn materialize_changed_alias(
+        &self,
+        db: &'db dyn Db,
+        alias: Type<'db>,
+        body: Type<'db>,
+        mapped: Type<'db>,
+        kind: MaterializationKind,
+    ) -> Type<'db> {
+        if !self.marked_growing_alias.get() && alias.is_growing_alias(db) {
+            if self.is_equivalent_to_materialization(db, body, mapped) {
+                return alias;
+            }
+            self.marked_growing_alias.set(true);
+        }
+        alias.with_alias_materialization(db, Some(kind))
+    }
+
+    /// A recursive alias can introduce a gradual argument while its definition is active.
+    /// Inspect the arguments without unfolding the definition again.
+    fn materialize_growing_alias(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        kind: MaterializationKind,
+    ) -> Type<'db> {
+        let (constructor, arguments) = match ty {
+            Type::TypeAlias(alias) => (
+                Type::TypeAlias(alias.unspecialized(db)),
+                alias.specialization(db),
+            ),
+            Type::Recursive(alias) => (Type::Recursive(alias.constructor(db)), alias.arguments(db)),
+            _ => return ty,
+        };
+        let Some(arguments) = arguments else {
+            return ty;
+        };
+        let changed = arguments
+            .generic_context(db)
+            .variables(db)
+            .zip(arguments.types(db))
+            .any(|(param, &arg)| {
+                // A bivariant parameter can flow around the cycle without ever being used.
+                let mapped = arg.materialize(db, kind, self);
+                mapped != arg
+                    && constructor
+                        .variance_of(db, self.env, param.identity(db))
+                        .evaluate(db)
+                        != TypeVarVariance::Bivariant
+                    && !self.is_equivalent_to_materialization(db, arg, mapped)
+            });
+        if changed {
+            self.marked_growing_alias.set(true);
+            ty.with_alias_materialization(db, Some(kind))
+        } else {
+            ty
+        }
+    }
+
+    /// Whether this transformation added a marker to a growing alias anywhere in the type.
+    fn materialized_growing_alias(&self, original: Type<'db>, result: Type<'db>) -> bool {
+        self.growing_changes
+            .get()
+            .is_some_and(|changes| changes.borrow().contains(&(original, result)))
+    }
+
     fn is_equivalent_to_materialization(
         &self,
         db: &'db dyn Db,
         left: Type<'db>,
         right: Type<'db>,
     ) -> bool {
+        // Unfolding a marked growing alias to prove equivalence starts a fresh
+        // materialization, which can ask the same question with ever larger arguments.
+        if self.materialized_growing_alias(left, right) {
+            return false;
+        }
         self.materialization_equivalence()
             .visit(db, (left, right), || {
                 left.is_equivalent_to_with_materialization_visitor(db, right, self)
@@ -2765,6 +2889,40 @@ impl<'db> Type<'db> {
         matches!(self, Type::TypeAlias(_) | Type::Recursive(_))
     }
 
+    /// Whether the alias can keep generating distinct specializations as it unfolds.
+    fn is_growing_alias(self, db: &'db dyn Db) -> bool {
+        self.is_alias_like()
+            && matches!(
+                self.to_type_identity(db),
+                TypeIdentity::GrowingTypeAlias(_) | TypeIdentity::GrowingRecursive(_)
+            )
+    }
+
+    fn alias_materialization(self, db: &'db dyn Db) -> Option<MaterializationKind> {
+        match self {
+            Type::TypeAlias(alias) => alias.materialization_kind(db),
+            Type::Recursive(alias) => alias.materialization_kind(db),
+            _ => None,
+        }
+    }
+
+    fn is_marked_growing_alias(self, db: &'db dyn Db) -> bool {
+        self.alias_materialization(db).is_some() && self.is_growing_alias(db)
+    }
+
+    /// Set or clear the deferred materialization without changing the specialization.
+    fn with_alias_materialization(
+        self,
+        db: &'db dyn Db,
+        kind: Option<MaterializationKind>,
+    ) -> Self {
+        match self {
+            Type::TypeAlias(alias) => Type::TypeAlias(alias.with_materialization_kind(db, kind)),
+            Type::Recursive(alias) => Type::Recursive(alias.with_materialization(db, kind)),
+            _ => unreachable!("expected an alias"),
+        }
+    }
+
     pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
         self.is_instance_of(db, KnownClass::NotImplementedType)
     }
@@ -3081,12 +3239,14 @@ impl<'db> Type<'db> {
         materialization_kind: MaterializationKind,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        self.apply_type_mapping_impl(
-            db,
-            &TypeMapping::Materialize(materialization_kind),
-            TypeContext::default(),
-            visitor,
-        )
+        visitor.track_materialization(*self, || {
+            self.apply_type_mapping_impl(
+                db,
+                &TypeMapping::Materialize(materialization_kind),
+                TypeContext::default(),
+                visitor,
+            )
+        })
     }
 
     fn has_dynamic(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {

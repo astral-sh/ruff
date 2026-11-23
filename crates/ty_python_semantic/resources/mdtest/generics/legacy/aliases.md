@@ -28,6 +28,82 @@ def _(value: Any):
     reveal_type(growing(value))  # revealed: tuple[Unknown, list[Unknown]]
 ```
 
+## Materializing growing recursive aliases
+
+In `Node[Node[Any]]`, the inner node has an `Any` payload. Both materializations reach that payload
+even though the outer node uses the same recursive definition.
+
+```py
+from typing import Any, TypeVar
+from ty_extensions import Bottom, Top
+
+T = TypeVar("T")
+Node = tuple[T, tuple["Node[list[T]]", ...]]
+
+def nested(top: Top[Node[Node[Any]]], bottom: Bottom[Node[Node[Any]]]) -> Top[Node[Node[Any]]]:
+    reveal_type(top[0][0])  # revealed: object
+    reveal_type(bottom[0][0])  # revealed: Never
+    return bottom
+```
+
+A node with a fully static protocol as its payload stays static on either side of `Node[Any]`.
+
+```py
+from typing import Protocol
+
+class P(Protocol):
+    def read(self) -> int: ...
+
+def ordered(first: Top[tuple[Node[P], Node[Any]]], last: Top[tuple[Node[Any], Node[P]]]):
+    reveal_type(first)  # revealed: tuple[Node[P], Top[Node[Any]]]
+    reveal_type(last)  # revealed: tuple[Top[Node[Any]], Node[P]]
+```
+
+Each child of `Branch[int, str]` has type `Branch[str, tuple[int, Any]]`. The child's second
+argument becomes the grandchild's payload, so its top materialization is `tuple[int, object]`.
+
+```py
+U = TypeVar("U")
+Branch = tuple[T, tuple["Branch[U, tuple[T, Any]]", ...]]
+
+def delayed(top: Top[Branch[int, str]]):
+    child = top[1][0]
+    grandchild = child[1][0]
+    reveal_type(grandchild[0])  # revealed: tuple[int, object]
+```
+
+Reading from an invariant list of optional children also exposes the materialized payload.
+
+```py
+Mutable = tuple[T, list["Mutable[tuple[T, Any]] | None"]]
+
+def children(top: Top[Mutable[int]]):
+    child = top[1][0]
+    if child is not None:
+        reveal_type(child[0])  # revealed: tuple[int, object]
+```
+
+A union is assignable to its top materialization regardless of the order of its members.
+
+```py
+Link = tuple[T, "Link[tuple[T, Any]] | None"]
+
+def optional(x: Link[int] | None) -> Top[Link[int] | None]:
+    return x
+
+def reordered(x: None | Link[int]) -> Top[Link[int] | None]:
+    return x
+```
+
+If every node's payload is `int` regardless of `T`, the alias is fully static even for `T = Any`.
+
+```py
+Fixed = tuple[int, tuple["Fixed[list[T]]", ...]]
+
+def unchanged(x: list[Fixed[Any]]) -> list[Top[Fixed[Any]]]:
+    return x
+```
+
 ## Recursive calls returning a generic alias
 
 ```py

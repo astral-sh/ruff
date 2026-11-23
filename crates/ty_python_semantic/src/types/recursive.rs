@@ -468,7 +468,7 @@ impl<'db> RecursiveType<'db> {
         )
     }
 
-    fn with_materialization(
+    pub(super) fn with_materialization(
         self,
         db: &'db dyn Db,
         materialization: Option<MaterializationKind>,
@@ -623,13 +623,12 @@ impl<'db> RecursiveType<'db> {
                         .map(|unfolded| {
                             let mapped =
                                 unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
-                            // Preserve static aliases, including recursive references that the
-                            // visitor leaves unchanged while materializing their enclosing body.
-                            Type::Recursive(if mapped == unfolded {
-                                self
+                            let ty = Type::Recursive(self);
+                            if mapped == unfolded {
+                                ty
                             } else {
-                                self.with_materialization(db, Some(*kind))
-                            })
+                                visitor.materialize_changed_alias(db, ty, unfolded, mapped, *kind)
+                            }
                         })
                         .into_type()
                 })
@@ -679,6 +678,26 @@ impl<'db> RecursiveType<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         let env = self.environment(db);
+        // Unfolding each growing application creates an unbounded set of variance
+        // equations. Compose through the constructor's formal parameters instead.
+        if let Some(arguments) = self.arguments(db)
+            && self.may_have_unbounded_specialization(db)
+            && self != self.constructor(db)
+        {
+            let constructor = self.constructor(db);
+            return VarianceTerm::join(
+                db,
+                arguments
+                    .generic_context(db)
+                    .variables(db)
+                    .zip(arguments.types(db))
+                    .map(|(parameter, argument)| {
+                        constructor
+                            .variance_of(db, &env, parameter.identity(db))
+                            .compose_thunk(db, || argument.variance_of(db, &env, typevar))
+                    }),
+            );
+        }
         self.unfold(db, &env)
             .map(|unfolded| unfolded.variance_of(db, &env, typevar))
             .unwrap_or(VarianceTerm::BIVARIANT)

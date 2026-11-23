@@ -2030,6 +2030,37 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         self.never()
     }
 
+    /// Compare a growing alias with a materialization of the same specialization.
+    /// Unfolding the marked alias starts a new materialization, which can request
+    /// this comparison again with ever larger arguments and fresh recursion guards.
+    fn compare_growing_materializations(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> Option<bool> {
+        if !source.is_alias_like() || !target.is_alias_like() {
+            return None;
+        }
+        let source_kind = source.alias_materialization(db);
+        let target_kind = target.alias_materialization(db);
+        if (source_kind.is_none() && target_kind.is_none())
+            || source.with_alias_materialization(db, None)
+                != target.with_alias_materialization(db, None)
+            || !source.is_growing_alias(db)
+        {
+            return None;
+        }
+        // At least one side is fully static, so redundancy agrees with subtyping.
+        // Assignability can choose the matching materialization on an unmarked side.
+        Some(
+            source_kind == Some(MaterializationKind::Bottom)
+                || target_kind == Some(MaterializationKind::Top)
+                || (self.relation.is_assignability()
+                    && (source_kind.is_none() || target_kind.is_none())),
+        )
+    }
+
     /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?
     ///
     /// This does not include all types that are subtypes of `builtins.type`! The semantic
@@ -2213,6 +2244,23 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
 
+            (Type::Recursive(_), Type::Recursive(_)) | (Type::TypeAlias(_), Type::TypeAlias(_))
+                if let Some(result) = self.compare_growing_materializations(db, source, target) =>
+            {
+                ConstraintSet::from_bool(self.constraints, result)
+            }
+
+            // Compare corresponding specializations before union expansion erases them.
+            (Type::TypeAlias(_) | Type::Recursive(_), Type::Union(union))
+                if union.has_aliases(db)
+                    && union.elements(db).iter().any(|&element| {
+                        self.compare_growing_materializations(db, source, element)
+                            .is_some()
+                    }) =>
+            {
+                self.check_target_union(db, source, union)
+            }
+
             (Type::Recursive(source_recursive), _) => {
                 // Both comparing arguments and unfolding can revisit this pair.
                 self.with_recursion_guard(db, source, target, || {
@@ -2289,6 +2337,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // that depend on multiple elements, such as all members of an enum, are visible.
             (_, Type::Union(union)) if union.has_aliases(db) => {
                 self.with_recursion_guard(db, source, target, || {
+                    if let Type::Union(left) = source
+                        && left.has_aliases(db)
+                        && left
+                            .elements(db)
+                            .iter()
+                            .chain(union.elements(db))
+                            .any(|t| t.is_marked_growing_alias(db))
+                    {
+                        return self.check_source_union(db, left, target);
+                    }
                     self.check_type_pair(db, source, union.expand_aliases(db, env))
                 })
             }
