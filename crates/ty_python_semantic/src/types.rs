@@ -2464,6 +2464,44 @@ fn object_type_form(db: &dyn Db) -> Type<'_> {
     TypeFormType::from_type_expression(db, Type::object())
 }
 
+/// Normalizes types for one cycle marker. Both arms of `list[U] | set[U]` visit
+/// `U` as a nested type. If `U` branches the same way, each layer doubles the
+/// work unless we reuse the result.
+///
+/// Share this state only through unions, tuples and generic arguments. Start
+/// fresh inside a function, where revisiting that function would trigger its
+/// recursion guard and could change the result for the same union.
+struct RecursiveTypeNormalizer<'env, 'db> {
+    env: &'env ProgramEnvironment<'db>,
+    div: Type<'db>,
+    nested_unions: FxHashMap<UnionType<'db>, Option<Type<'db>>>,
+}
+
+impl<'env, 'db> RecursiveTypeNormalizer<'env, 'db> {
+    fn new(env: &'env ProgramEnvironment<'db>, div: Type<'db>) -> Self {
+        Self {
+            env,
+            div,
+            nested_unions: FxHashMap::default(),
+        }
+    }
+
+    /// Propagate divergence through nested constructors and keep the outermost one.
+    fn normalize_argument(
+        &mut self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        parent_is_nested: bool,
+    ) -> Option<Type<'db>> {
+        let result = ty.normalize_recursive(db, self, true);
+        if parent_is_nested {
+            result
+        } else {
+            Some(result.unwrap_or(self.div))
+        }
+    }
+}
+
 #[salsa::tracked]
 impl<'db> Type<'db> {
     pub(crate) const fn any() -> Self {
@@ -3994,6 +4032,18 @@ impl<'db> Type<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        self.normalize_recursive(db, &mut RecursiveTypeNormalizer::new(env, div), nested)
+    }
+
+    /// Continue normalization under the same cycle marker and function recursion guards.
+    fn normalize_recursive(
+        self,
+        db: &'db dyn Db,
+        normalizer: &mut RecursiveTypeNormalizer<'_, 'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let env = normalizer.env;
+        let div = normalizer.div;
         if nested && (self.same_divergent_marker(div) || self.is_pending_narrowing()) {
             return None;
         }
@@ -4014,7 +4064,15 @@ impl<'db> Type<'db> {
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
-            Type::Union(union) => union.recursive_type_normalized_impl(db, env, div, nested),
+            Type::Union(union) if nested => {
+                if let Some(result) = normalizer.nested_unions.get(&union) {
+                    return *result;
+                }
+                let result = union.normalize_recursive(db, normalizer, true);
+                normalizer.nested_unions.insert(union, result);
+                result
+            }
+            Type::Union(union) => union.normalize_recursive(db, normalizer, false),
             Type::Intersection(intersection) => intersection
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::Intersection),
@@ -4028,7 +4086,7 @@ impl<'db> Type<'db> {
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::ProtocolInstance),
             Type::NominalInstance(instance) => instance
-                .recursive_type_normalized_impl(db, env, div, nested)
+                .normalize_recursive(db, normalizer, nested)
                 .map(Type::NominalInstance),
             Type::FunctionLiteral(function) => function
                 .recursive_type_normalized_impl(db, env, div, nested)
@@ -4061,7 +4119,7 @@ impl<'db> Type<'db> {
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::BoundSuper),
             Type::GenericAlias(generic) => generic
-                .recursive_type_normalized_impl(db, env, div, nested)
+                .normalize_recursive(db, normalizer, nested)
                 .map(Type::GenericAlias),
             Type::Recursive(_) => Some(self),
             Type::ClassLiteral(class) => class

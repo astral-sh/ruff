@@ -42,10 +42,10 @@ use crate::types::visitor::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
-    KnownInstanceType, MaterializationKind, RecursiveType, SelfTypeVarOrigin, SubclassOfInner,
-    Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind,
-    TypeVarVariance, UnionAccumulator, UnionType, binding_type, infer_definition_types,
-    inferred_declaration,
+    KnownInstanceType, MaterializationKind, RecursiveType, RecursiveTypeNormalizer,
+    SelfTypeVarOrigin, SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
+    binding_type, infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -1556,22 +1556,26 @@ impl<'db> Specialization<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        self.normalize_recursive(db, &mut RecursiveTypeNormalizer::new(env, div), nested)
+    }
+
+    pub(super) fn normalize_recursive(
+        self,
+        db: &'db dyn Db,
+        normalizer: &mut RecursiveTypeNormalizer<'_, 'db>,
+        nested: bool,
+    ) -> Option<Self> {
         let original_types = self.types(db);
         let mut types = Cow::Borrowed(original_types);
         for (index, ty) in original_types.iter().enumerate() {
-            let normalized = ty.recursive_type_normalized_impl(db, env, div, true);
-            let normalized = if nested {
-                normalized?
-            } else {
-                normalized.unwrap_or(div)
-            };
+            let normalized = normalizer.normalize_argument(db, *ty, nested)?;
             if normalized != *ty {
                 types.to_mut()[index] = normalized;
             }
         }
         let original_tuple_inner = self.tuple_inner(db);
         let tuple_inner = match original_tuple_inner {
-            Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, env, div, nested)?),
+            Some(tuple) => Some(tuple.normalize_recursive(db, normalizer, nested)?),
             None => None,
         };
         if matches!(types, Cow::Borrowed(_)) && tuple_inner == original_tuple_inner {

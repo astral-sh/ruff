@@ -795,3 +795,21 @@ def make[T](arg: T) -> list[T]:
     reveal_type(values)  # revealed: list[int]
     return keep(values)  # error: [invalid-explicit-return]
 ```
+
+## A nested union inside and outside a bound method
+
+Both alternatives for `items` are one-element tuples. While normalizing the outer `copy` method, ty
+can encounter the same method on the inner frozenset. That recursion must not affect the independent
+tuple in the next field.
+
+```py
+from typing import Literal
+
+def check(flag: bool):
+    items = (frozenset({1}).copy,) if flag else (0,)
+    state = None
+    for _ in range(2):
+        state = (frozenset((items,)).copy, items, state)
+        size: Literal[1] = len(state[1])
+        state[1].append(42)  # error: [missing-attribute]
+```

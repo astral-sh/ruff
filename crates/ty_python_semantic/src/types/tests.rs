@@ -563,6 +563,22 @@ fn divergent_type() {
         "list[Divergent]"
     );
 
+    // The same nested union stays intact when recovering from a different cycle.
+    let shared = UnionType::from_elements(
+        db,
+        &env,
+        [nested_rec, Type::heterogeneous_tuple(db, &env, [recursive])],
+    );
+    let other = Type::divergent(salsa::plumbing::Id::from_bits(2));
+    assert_eq!(
+        shared.recursive_type_normalized_impl(db, &env, div, true),
+        None
+    );
+    assert_eq!(
+        shared.recursive_type_normalized_impl(db, &env, other, true),
+        Some(shared)
+    );
+
     let recursive_tuple = Type::heterogeneous_tuple(
         db,
         &env,

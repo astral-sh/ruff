@@ -52,8 +52,9 @@ use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceOrigin;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassFlags, DataclassParams,
-    ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType, TypeContext,
-    TypeMapping, TypingModule, UnionBuilder, VarianceInferable, VarianceTerm,
+    ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType,
+    RecursiveTypeNormalizer, TypeContext, TypeMapping, TypingModule, UnionBuilder,
+    VarianceInferable, VarianceTerm,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet,
@@ -443,15 +444,14 @@ impl<'db> GenericAlias<'db> {
         ))
     }
 
-    pub(super) fn recursive_type_normalized_impl(
+    pub(super) fn normalize_recursive(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalizer: &mut RecursiveTypeNormalizer<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
         let original = self.specialization(db);
-        let normalized = original.recursive_type_normalized_impl(db, env, div, nested)?;
+        let normalized = original.normalize_recursive(db, normalizer, nested)?;
         if normalized == original {
             Some(self)
         } else {
@@ -1228,12 +1228,21 @@ impl<'db> ClassType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        self.normalize_recursive(db, &mut RecursiveTypeNormalizer::new(env, div), nested)
+    }
+
+    pub(super) fn normalize_recursive(
+        self,
+        db: &'db dyn Db,
+        normalizer: &mut RecursiveTypeNormalizer<'_, 'db>,
+        nested: bool,
+    ) -> Option<Self> {
         match self {
             Self::NonGeneric(class) => Some(Self::NonGeneric(
-                class.recursive_type_normalized_impl(db, env, div, nested)?,
+                class.recursive_type_normalized_impl(db, normalizer.env, normalizer.div, nested)?,
             )),
             Self::Generic(generic) => Some(Self::Generic(
-                generic.recursive_type_normalized_impl(db, env, div, nested)?,
+                generic.normalize_recursive(db, normalizer, nested)?,
             )),
         }
     }
