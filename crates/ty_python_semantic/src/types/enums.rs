@@ -1164,12 +1164,14 @@ pub(crate) fn enum_metadata<'db>(
                             // Some types are specifically disallowed for enum members.
                             return None;
                         }
-                        // In the bundled stubs, int, bool, str and bytes have no `__get__`.
+                        // In the bundled stubs, int, bool, str, bytes and tuple have no `__get__`.
                         // Enum members and types from custom stubs can be descriptors.
                         Type::LiteralValue(literal) if vendored_stdlib && !literal.is_enum() => {
                             Some(ty)
                         }
                         Type::NominalInstance(instance) => match instance.known_class(db) {
+                            Some(KnownClass::Tuple) if vendored_stdlib => Some(ty),
+
                             // enum.nonmember
                             Some(KnownClass::Nonmember) => return None,
 

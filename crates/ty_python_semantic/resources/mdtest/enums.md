@@ -1183,6 +1183,20 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 ```
 
+A tuple can be an enum member, but a tuple subclass that defines `__get__` is a descriptor.
+
+```py
+class TupleDescriptor(tuple[int, ...]):
+    def __get__(self, instance: object, owner: type) -> int:
+        return 0
+
+class Point(Enum):
+    ORIGIN = (0, 0)
+    label = TupleDescriptor()
+
+reveal_type(enum_members(Point))  # revealed: tuple[Literal["ORIGIN"]]
+```
+
 An enum member can itself be a descriptor. In that case, assigning it in another enum's body doesn't
 create a member of the second enum.
 
