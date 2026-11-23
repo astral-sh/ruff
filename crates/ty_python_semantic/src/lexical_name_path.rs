@@ -58,8 +58,8 @@ pub(crate) fn lexical_name_path_component_for_node(
             // This is just implicit, so has no component
             return Ok(None);
         }
-        NodeWithScopeKind::Class(class) => class.node(parsed).name().id().clone(),
-        NodeWithScopeKind::Function(func) => func.node(parsed).name().id().clone(),
+        NodeWithScopeKind::Class(class) => class.node(parsed).name().id().into(),
+        NodeWithScopeKind::Function(func) => func.node(parsed).name().id().into(),
         NodeWithScopeKind::TypeAlias(_)
         | NodeWithScopeKind::ClassTypeParameters(_)
         | NodeWithScopeKind::FunctionTypeParameters(_)
@@ -85,19 +85,19 @@ fn lexical_name_path_component_for_leaf(
     definition: Definition,
 ) -> Result<Name, ()> {
     let component = match definition.kind(db) {
-        DefinitionKind::Function(func) => func.node(parsed).name().id().clone(),
-        DefinitionKind::Class(class) => class.node(parsed).name().id().clone(),
+        DefinitionKind::Function(func) => func.node(parsed).name().id().into(),
+        DefinitionKind::Class(class) => class.node(parsed).name().id().into(),
         DefinitionKind::Assignment(assignment) => {
             let ExprKind::Name(name) = assignment.target(parsed).classify() else {
                 return Err(());
             };
-            name.id().clone()
+            name.id().into()
         }
         DefinitionKind::AnnotatedAssignment(assignment) => {
             let ExprKind::Name(name) = assignment.target(parsed).classify() else {
                 return Err(());
             };
-            name.id().clone()
+            name.id().into()
         }
         DefinitionKind::TypeAlias(_)
         | DefinitionKind::Import(_)

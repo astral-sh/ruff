@@ -808,7 +808,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     kwarg,
                 );
             };
-            match identifier.id().as_str() {
+            match identifier.id() {
                 "name" => {
                     if positional_name.is_some() {
                         return error(
@@ -997,7 +997,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let target_name = name_node.id();
 
-        if name_param != Some(target_name.as_str()) {
+        if name_param != Some(target_name) {
             report_mismatched_type_name(
                 &self.context,
                 &MISMATCHED_TYPEVARTUPLE_NAME,
@@ -1017,7 +1017,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let identity = TypeVarIdentity::new(
             db,
-            target_name.clone(),
+            target_name,
             Some(definition),
             TypeVarKind::LegacyTypeVarTuple,
         );
@@ -1086,7 +1086,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     kwarg,
                 );
             };
-            match identifier.id().as_str() {
+            match identifier.id() {
                 "name" => {
                     // Duplicate keyword argument is a syntax error, so we don't have to check if
                     // `name_param_ty.is_some()` here.
@@ -1254,7 +1254,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let target_name = name_node.id();
 
-        if name_param != Some(target_name.as_str()) {
+        if name_param != Some(target_name) {
             report_mismatched_type_name(
                 &self.context,
                 &MISMATCHED_PARAMSPEC_NAME,
@@ -1344,7 +1344,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     kwarg,
                 );
             };
-            match identifier.id().as_str() {
+            match identifier.id() {
                 "name" => {
                     // Duplicate keyword argument is a syntax error, so we don't have to check if
                     // `name_param_ty.is_some()` here.
@@ -1509,7 +1509,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let target_name = name_node.id();
 
-        if name_param != Some(target_name.as_str()) {
+        if name_param != Some(target_name) {
             report_mismatched_type_name(
                 &self.context,
                 &MISMATCHED_TYPEVAR_NAME,

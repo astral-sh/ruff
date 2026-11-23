@@ -11,7 +11,7 @@ pub(super) fn is_special_attribute(value: Expr<'_>) -> bool {
     if let ExprKind::Name(name) = value.classify() {
         let id = name.id();
         matches!(
-            id.as_str(),
+            id,
             "__slots__" | "__dict__" | "__weakref__" | "__annotations__"
         )
     } else {

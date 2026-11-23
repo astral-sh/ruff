@@ -16,10 +16,8 @@ use std::hash::BuildHasher;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 
-use ruff_text_size::{Ranged, TextRange, TextSize};
-
-use crate::name::Name;
 use hashbrown::HashTable;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxBuildHasher;
 use thin_vec::ThinVec;
 
@@ -356,10 +354,10 @@ impl<'ast> SyntaxNode<'ast> {
     /// `id` must come from a name field in this row's layout.
     #[inline]
     #[expect(unsafe_code)]
-    unsafe fn stored_name(self, id: u32) -> &'ast Name {
+    unsafe fn stored_name(self, id: u32) -> &'ast str {
         // SAFETY: The builder checked the pool index when it wrote the field. Rewind
         // restores an earlier state in which every retained row had its name.
-        unsafe { self.ast.names.get_unchecked(id as usize) }
+        unsafe { self.ast.names.at_unchecked(id as usize) }
     }
 
     fn retype<N: AstNode<'ast>>(self) -> N {
@@ -606,7 +604,14 @@ pub struct Ast {
     nodes: NodeStorage,
     extra: Vec<u32>,
     text: String,
-    names: Vec<Name>,
+    /// One copy of each distinct spelling, indexed by AST-local [`NameId`].
+    /// Only the builder needs the reverse lookup from spelling to ID.
+    ///
+    /// Packing the UTF-8 bytes together lets us borrow names during a walk
+    /// and drop them all without visiting individual entries. Consumers such
+    /// as ty copy a spelling into a [`Name`](crate::name::Name) when they need
+    /// to retain it independently of the AST.
+    names: NamePool,
     // Most files have no bytes literals. Keep only a pointer in the AST and store
     // the length and capacity alongside the bytes when the buffer is allocated.
     bytes: ThinVec<u8>,
@@ -625,7 +630,7 @@ impl Ast {
             nodes: NodeStorage::empty(),
             extra: Vec::new(),
             text: String::new(),
-            names: Vec::new(),
+            names: NamePool::empty(),
             bytes: ThinVec::new(),
             keys: RowKeys::Unindexed,
         }
@@ -634,7 +639,7 @@ impl Ast {
     /// Whether an identifier with this normalized spelling occurs in the tree.
     /// This scans the distinct names interned during parsing.
     pub fn contains_identifier(&self, spelling: &str) -> bool {
-        self.names.iter().any(|name| name.as_str() == spelling)
+        (0..self.names.len()).any(|i| self.names.at(i) == spelling)
     }
 
     #[inline]
@@ -715,6 +720,90 @@ impl Ast {
     }
 }
 
+/// Consecutive offsets delimit each spelling within `text`. For example,
+/// interning `"x"` and `"foo"` stores `"xfoo"` with offsets `[0, 1, 4]`.
+/// Keeping the bytes separate from string literals saves a length per name.
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+struct NamePool {
+    offsets: Vec<u32>,
+    text: String,
+}
+
+impl NamePool {
+    const fn empty() -> Self {
+        Self {
+            offsets: Vec::new(),
+            text: String::new(),
+        }
+    }
+
+    fn with_capacity(count: usize) -> Self {
+        if count == 0 {
+            return Self::empty();
+        }
+        Self {
+            offsets: Vec::with_capacity(count + 1),
+            // Estimate eight UTF-8 bytes per distinct spelling.
+            text: String::with_capacity(count * 8),
+        }
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.offsets.len().saturating_sub(1)
+    }
+
+    #[inline]
+    fn push(&mut self, spelling: &str) {
+        let end = offset(self.text.len() + spelling.len());
+        if self.offsets.is_empty() {
+            // Delay the first boundary so empty inputs need no name storage.
+            self.offsets.push(0);
+        }
+        self.text.push_str(spelling);
+        self.offsets.push(end);
+    }
+
+    /// # Safety
+    ///
+    /// `index` must be less than `self.len()`.
+    #[inline]
+    #[expect(unsafe_code)]
+    unsafe fn at_unchecked(&self, index: usize) -> &str {
+        // SAFETY: Both offsets exist for an in-bounds index. Each push records
+        // the end of a complete UTF-8 spelling, and truncation keeps the text
+        // through the last retained offset. Equal offsets denote an empty name.
+        unsafe {
+            let start = *self.offsets.get_unchecked(index) as usize;
+            let end = *self.offsets.get_unchecked(index + 1) as usize;
+            self.text.get_unchecked(start..end)
+        }
+    }
+
+    #[inline]
+    fn at(&self, index: usize) -> &str {
+        assert!(index < self.len());
+        // SAFETY: The index is in bounds.
+        #[expect(unsafe_code)]
+        unsafe {
+            self.at_unchecked(index)
+        }
+    }
+
+    fn truncate(&mut self, len: usize) {
+        if len < self.len() {
+            self.text.truncate(self.offsets[len] as usize);
+            self.offsets.truncate(len + 1);
+        }
+    }
+
+    fn shrink_to_fit(&mut self) {
+        self.offsets.shrink_to_fit();
+        self.text.shrink_to_fit();
+    }
+}
+
 /// Mutable construction state. Nested lists share scratch space, so building the
 /// children of a list never interleaves their extra data with its own elements.
 #[derive(Debug)]
@@ -777,7 +866,7 @@ impl Builder {
                 nodes,
                 extra: Vec::with_capacity(estimated + estimated / 8),
                 text: String::with_capacity((bytes / 8).min(4096)),
-                names: Vec::with_capacity(estimated / 8),
+                names: NamePool::with_capacity(estimated / 8),
                 ..Ast::default()
             },
             checkpoints: Vec::new(),
@@ -880,15 +969,18 @@ impl Builder {
         self.ast.nodes.truncate(lengths.rows);
         self.ast.extra.truncate(lengths.extra);
         self.ast.text.truncate(lengths.text);
-        for (i, name) in self.ast.names.drain(lengths.names..).enumerate() {
-            let index = offset(lengths.names + i);
+        // Removing an ID requires hashing its spelling while its bytes are still available.
+        for i in lengths.names..self.ast.names.len() {
+            let name = self.ast.names.at(i);
+            let index = offset(i);
             if let Ok(entry) = self
                 .name_ids
-                .find_entry(FxBuildHasher.hash_one(name.as_str()), |&id| id == index)
+                .find_entry(FxBuildHasher.hash_one(name), |&id| id == index)
             {
                 entry.remove();
             }
         }
+        self.ast.names.truncate(lengths.names);
         self.ast.bytes.truncate(lengths.bytes);
     }
 
@@ -1144,20 +1236,20 @@ impl Builder {
         let hash = FxBuildHasher.hash_one(text);
         if let Some(&index) = self
             .name_ids
-            .find(hash, |&index| names[index as usize].as_str() == text)
+            .find(hash, |&index| names.at(index as usize) == text)
         {
             return NameId(index);
         }
         let index = offset(names.len());
-        names.push(Name::new(text));
+        names.push(text);
         self.name_ids.insert_unique(hash, index, |&index| {
-            FxBuildHasher.hash_one(names[index as usize].as_str())
+            FxBuildHasher.hash_one(names.at(index as usize))
         });
         NameId(index)
     }
 
-    pub fn name(&self, id: NameId) -> &Name {
-        &self.ast.names[id.0 as usize]
+    pub fn name(&self, id: NameId) -> &str {
+        self.ast.names.at(id.index())
     }
 
     fn store_debug_text(&mut self, parts: build::DebugText<'_>) -> u32 {
@@ -1404,7 +1496,6 @@ mod tests {
             .as_name_expr()
             .unwrap()
             .id()
-            .as_str()
     }
 
     #[test]
@@ -1444,6 +1535,48 @@ mod tests {
             range: TextRange::default(),
             id,
         });
+    }
+
+    #[test]
+    fn names_borrow_distinct_spellings() {
+        let mut builder = Builder::default();
+        let first = builder.intern_name("π");
+        let empty = builder.intern_name("");
+        let last = builder.intern_name("connection_timeout_seconds");
+        assert_eq!(builder.intern_name("π"), first);
+        assert_eq!(builder.intern_name(""), empty);
+        assert_eq!(builder.name(empty), "");
+        assert_eq!(builder.name(last), "connection_timeout_seconds");
+
+        let root = builder.add(build::Identifier {
+            id: first,
+            range: TextRange::default(),
+        });
+        let tree = builder.finish_tree(root);
+        assert_eq!(tree.root().as_str(), "π");
+        assert!(tree.ast().contains_identifier(""));
+        assert!(tree.ast().contains_identifier("connection_timeout_seconds"));
+        assert!(
+            !tree
+                .ast()
+                .contains_identifier("πconnection_timeout_seconds")
+        );
+    }
+
+    #[test]
+    fn rewind_reuses_name_ids_with_local_boundaries() {
+        let mut builder = Builder::default();
+        let first = builder.intern_name("π");
+        let checkpoint = builder.checkpoint();
+        let removed = builder.intern_name("connection_timeout_seconds");
+        builder.rewind(checkpoint);
+        assert_eq!(builder.intern_name("π"), first);
+        let replacement = builder.intern_name("x");
+        assert_eq!(replacement, removed);
+        let restored = builder.intern_name("connection_timeout_seconds");
+        assert_ne!(replacement, restored);
+        assert_eq!(builder.name(replacement), "x");
+        assert_eq!(builder.name(restored), "connection_timeout_seconds");
     }
 
     #[test]

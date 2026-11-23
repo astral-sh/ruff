@@ -116,7 +116,7 @@ pub(crate) fn blocking_os_path(checker: &Checker, call: &ast::ExprCallFields<'_>
         return;
     };
 
-    if !maybe_calling_io_operation(attr.id().as_str()) {
+    if !maybe_calling_io_operation(attr.id()) {
         return;
     }
 

@@ -607,12 +607,12 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: Stmt<'_>) {
         }
 
         // Ignore variables that have an annotation defined elsewhere.
-        if stack.annotations.contains(assigned_id.as_str()) {
+        if stack.annotations.contains(assigned_id) {
             continue;
         }
 
         // Ignore `nonlocal` and `global` variables.
-        if stack.non_locals.contains(assigned_id.as_str()) {
+        if stack.non_locals.contains(assigned_id) {
             continue;
         }
 

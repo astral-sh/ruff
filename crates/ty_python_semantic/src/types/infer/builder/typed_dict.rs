@@ -544,7 +544,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 && arguments.keywords().iter().any(|keyword| {
                     keyword
                         .arg()
-                        .and_then(|name| typed_dict.item(db, name.id().as_str()))
+                        .and_then(|name| typed_dict.item(db, name.id()))
                         .is_some_and(|field| {
                             !self.expression_type(keyword.value()).is_assignable_to(
                                 db,
@@ -621,7 +621,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 };
 
                 if let Some(name) = keyword.arg() {
-                    return permits_field_inference(name.id().as_str());
+                    return permits_field_inference(name.id());
                 }
 
                 self.try_expression_type(keyword.value())
@@ -714,7 +714,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         for keyword in arguments.keywords() {
             let value_tcx = keyword
                 .arg()
-                .and_then(|arg_name| typed_dict.item(self.db(), arg_name.id().as_str()))
+                .and_then(|arg_name| typed_dict.item(self.db(), arg_name.id()))
                 .map_or_default(|field| tcx.with_expected_type(Some(field.declared_ty)));
             self.get_or_infer_expression(keyword.value(), value_tcx);
         }

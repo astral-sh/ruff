@@ -283,7 +283,6 @@ fn affix_removal_data<'a>(
         .func()
         .as_attribute_expr()?
         .attr()
-        .id()
         .as_str();
 
     let func_args = test.as_call_expr()?.arguments().args();

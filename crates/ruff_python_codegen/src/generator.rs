@@ -1268,7 +1268,7 @@ impl<'a> Generator<'a> {
                 self.p("*");
                 self.unparse_expr(value, precedence::MAX);
             }
-            ast::ExprFields::Name(ast::ExprNameFields { id, .. }) => self.p(id.as_str()),
+            ast::ExprFields::Name(ast::ExprNameFields { id, .. }) => self.p(id),
             ast::ExprFields::List(ast::ExprListFields { elts, .. }) => {
                 self.p("[");
                 let mut first = true;

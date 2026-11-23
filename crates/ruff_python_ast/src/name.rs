@@ -9,14 +9,14 @@ use char_str::{CharStr, CharString};
 
 use crate::Expr;
 
-/// An immutable name.
+/// An owned, immutable name.
 ///
 /// # Choosing a string representation
 ///
 /// On 64-bit targets, [`CharStr`] occupies 16 bytes and stores up to 16 UTF-8 bytes inline. Longer
 /// values use an exactly-sized, reference-counted allocation, so cloning a heap-backed value
 /// reuses its allocation. [`compact_str::CompactString`] occupies 24 bytes, stores up to 24 bytes
-/// inline, and remains mutable; cloning a heap-backed value copies its contents into a new
+/// inline, and remains mutable. Cloning a heap-backed value copies its contents into a new
 /// allocation.
 ///
 /// Prefer `CharStr` for immutable text that is retained densely or passed between owners, when
@@ -24,9 +24,10 @@ use crate::Expr;
 /// between 17 and 24 bytes. Prefer `CompactString` for uniquely owned text, especially when it is
 /// built incrementally, mutated, or commonly falls in that 17-to-24-byte range.
 ///
-/// `Name` uses `CharStr` because names appear throughout the AST and repeated heap-backed parser
-/// names share an allocation. `ty_module_resolver::ModuleName` uses `CompactString` because
-/// module names can be extended in place.
+/// The AST stores spellings in a single buffer and lends them out as `&str`. Consumers such
+/// as ty's symbol tables use `Name` to retain individual spellings after the AST is dropped.
+/// Clones of a long `Name` share its allocation. `ty_module_resolver::ModuleName` uses
+/// `CompactString` because module names can be extended in place.
 ///
 /// Converting a borrowed `&str` into `CharStr` creates a new value and does not preserve structural
 /// sharing. When an API retains text already held in a `CharStr` (including a `Name`), pass or clone
@@ -501,7 +502,7 @@ impl<'a> UnqualifiedName<'a> {
         let attr1 = match expr.classify() {
             flat::ExprKind::Attribute(attr1) => attr1,
             // Ex) `foo`
-            flat::ExprKind::Name(name) => return Some(Self::from_slice(&[name.id().as_str()])),
+            flat::ExprKind::Name(name) => return Some(Self::from_slice(&[name.id()])),
             _ => return None,
         };
 
@@ -509,10 +510,7 @@ impl<'a> UnqualifiedName<'a> {
             flat::ExprKind::Attribute(attr2) => attr2,
             // Ex) `foo.bar`
             flat::ExprKind::Name(name) => {
-                return Some(Self::from_slice(&[
-                    name.id().as_str(),
-                    attr1.attr().as_str(),
-                ]));
+                return Some(Self::from_slice(&[name.id(), attr1.attr().as_str()]));
             }
             _ => return None,
         };
@@ -522,7 +520,7 @@ impl<'a> UnqualifiedName<'a> {
             // Ex) `foo.bar.baz`
             flat::ExprKind::Name(name) => {
                 return Some(Self::from_slice(&[
-                    name.id().as_str(),
+                    name.id(),
                     attr2.attr().as_str(),
                     attr1.attr().as_str(),
                 ]));
@@ -535,7 +533,7 @@ impl<'a> UnqualifiedName<'a> {
             // Ex) `foo.bar.baz.bop`
             flat::ExprKind::Name(name) => {
                 return Some(Self::from_slice(&[
-                    name.id().as_str(),
+                    name.id(),
                     attr3.attr().as_str(),
                     attr2.attr().as_str(),
                     attr1.attr().as_str(),
@@ -549,7 +547,7 @@ impl<'a> UnqualifiedName<'a> {
             // Ex) `foo.bar.baz.bop.bap`
             flat::ExprKind::Name(name) => {
                 return Some(Self::from_slice(&[
-                    name.id().as_str(),
+                    name.id(),
                     attr4.attr().as_str(),
                     attr3.attr().as_str(),
                     attr2.attr().as_str(),
@@ -564,7 +562,7 @@ impl<'a> UnqualifiedName<'a> {
             // Ex) `foo.bar.baz.bop.bap.bab`
             flat::ExprKind::Name(name) => {
                 return Some(Self::from_slice(&[
-                    name.id().as_str(),
+                    name.id(),
                     attr5.attr().as_str(),
                     attr4.attr().as_str(),
                     attr3.attr().as_str(),
@@ -580,7 +578,7 @@ impl<'a> UnqualifiedName<'a> {
             // Ex) `foo.bar.baz.bop.bap.bab.bob`
             flat::ExprKind::Name(name) => {
                 return Some(Self::from_slice(&[
-                    name.id().as_str(),
+                    name.id(),
                     attr6.attr().as_str(),
                     attr5.attr().as_str(),
                     attr4.attr().as_str(),
@@ -597,7 +595,7 @@ impl<'a> UnqualifiedName<'a> {
             // Ex) `foo.bar.baz.bop.bap.bab.bob.bib`
             flat::ExprKind::Name(name) => {
                 return Some(Self(SegmentsVec::from([
-                    name.id().as_str(),
+                    name.id(),
                     attr7.attr().as_str(),
                     attr6.attr().as_str(),
                     attr5.attr().as_str(),
@@ -621,7 +619,7 @@ impl<'a> UnqualifiedName<'a> {
                     attr.value()
                 }
                 flat::ExprKind::Name(name) => {
-                    segments.push(name.id().as_str());
+                    segments.push(name.id());
                     break;
                 }
                 _ => {

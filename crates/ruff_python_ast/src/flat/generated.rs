@@ -3488,7 +3488,7 @@ impl std::fmt::Debug for crate::ExprName<'_> {
         f.debug_struct("ExprName")
             .field("node_index", &v.node_index())
             .field("range", &v.range())
-            .field("id", &v.id())
+            .field("id", &format_args!("Name({:?})", v.id()))
             .field("ctx", &v.ctx())
             .finish()
     }
@@ -3514,7 +3514,7 @@ impl<'a> crate::ExprName<'a> {
     }
     #[expect(unsafe_code)]
     #[inline]
-    pub fn id(self) -> &'a crate::name::Name {
+    pub fn id(self) -> &'a str {
         let word = u64::from(self.syntax_node().row.expr_name_id());
         // SAFETY: `push_expr_name` validates `id` before storing it.
         unsafe { self.syntax_node().stored_name(split_words(word)[0]) }
@@ -5498,7 +5498,7 @@ impl std::fmt::Debug for crate::Identifier<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let v = *self;
         f.debug_struct("Identifier")
-            .field("id", &v.id())
+            .field("id", &format_args!("Name({:?})", v.id()))
             .field("range", &v.range())
             .field("node_index", &v.node_index())
             .finish()
@@ -5524,7 +5524,7 @@ impl<'a> crate::Identifier<'a> {
     }
     #[expect(unsafe_code)]
     #[inline]
-    pub fn id(self) -> &'a crate::name::Name {
+    pub fn id(self) -> &'a str {
         let word = u64::from(self.syntax_node().row.identifier_id());
         // SAFETY: `push_identifier` validates `id` before storing it.
         unsafe { self.syntax_node().stored_name(split_words(word)[0]) }
@@ -5952,7 +5952,7 @@ impl Builder {
             .cast(),
             AnyNode::ExprName(node) => build::ExprName {
                 range: node.range(),
-                id: self.intern_name(node.id().as_str()),
+                id: self.intern_name(node.id()),
                 ctx: node.ctx(),
             }
             .emit(self)
@@ -6244,7 +6244,7 @@ impl Builder {
             .cast(),
             AnyNode::Identifier(node) => build::Identifier {
                 range: node.range(),
-                id: self.intern_name(node.id().as_str()),
+                id: self.intern_name(node.id()),
             }
             .emit(self)
             .cast(),
@@ -10947,7 +10947,7 @@ pub(crate) mod fields {
     #[derive(Clone, Copy)]
     pub struct ExprNameFields<'a> {
         pub node: crate::ExprName<'a>,
-        pub id: &'a crate::name::Name,
+        pub id: &'a str,
         pub ctx: crate::ExprContext,
     }
     impl Ranged for ExprNameFields<'_> {
@@ -11797,7 +11797,7 @@ pub(crate) mod fields {
     #[derive(Clone, Copy)]
     pub struct IdentifierFields<'a> {
         pub node: crate::Identifier<'a>,
-        pub id: &'a crate::name::Name,
+        pub id: &'a str,
     }
     impl Ranged for IdentifierFields<'_> {
         #[inline]

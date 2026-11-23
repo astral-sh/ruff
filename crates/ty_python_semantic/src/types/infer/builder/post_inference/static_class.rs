@@ -817,10 +817,10 @@ pub(crate) fn check_static_class_definitions<'db>(
                 .iter()
                 .filter_map(|keyword| match keyword.arg() {
                     // We mimic the runtime behaviour and discard the metaclass argument
-                    Some(name) if name.id().as_str() == "metaclass" => None,
+                    Some(name) if name.id() == "metaclass" => None,
                     Some(name) => {
                         let ty = file_expression_type(keyword.value());
-                        Some((Argument::Keyword(name.id().as_str()), Some(ty)))
+                        Some((Argument::Keyword(name.id()), Some(ty)))
                     }
                     None => {
                         let ty = file_expression_type(keyword.value());

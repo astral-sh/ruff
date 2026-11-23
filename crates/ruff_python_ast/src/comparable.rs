@@ -331,7 +331,7 @@ struct ComparableText<'a>(&'a str);
 impl<'a> From<ast::Identifier<'a>> for ComparableText<'a> {
     fn from(identifier: ast::Identifier<'a>) -> Self {
         let ast::IdentifierFields { id, node: _ } = identifier.fields();
-        Self(id.as_str())
+        Self(id)
     }
 }
 
@@ -1411,7 +1411,7 @@ fn name_fields(node: ast::ExprName<'_>) -> &str {
         ctx: _,
         node: _,
     } = node.fields();
-    id.as_str()
+    id
 }
 
 fn list_fields(node: ast::ExprList<'_>) -> ComparableExprSlice<'_> {

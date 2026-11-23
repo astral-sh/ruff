@@ -5352,9 +5352,9 @@ pub(crate) fn report_inconsistent_generic_bases<'db, 'ast>(
 
 pub(crate) fn report_shadowed_type_variable<'db>(
     context: &InferContext<'db, '_>,
-    typevar_name: &ast::name::Name,
+    typevar_name: &str,
     kind: &str,
-    name: &ast::name::Name,
+    name: &str,
     range: TextRange,
     type_var_kind: TypeVarKind<'db>,
     other_typevar: BoundTypeVarInstance<'db>,

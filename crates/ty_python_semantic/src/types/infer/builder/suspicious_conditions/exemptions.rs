@@ -476,7 +476,7 @@ fn place_condition_definition_info<'db>(
             db,
             file.program(db),
             expression_type(attribute.value()),
-            attribute.attr().id().clone(),
+            attribute.attr().id().into(),
         ));
     }
     info
@@ -723,7 +723,7 @@ fn definition_contains_special_cased_condition<'db>(
             .as_name_expr()
             .map(ast::ExprName::id)
     {
-        match &**id {
+        match id {
             "version_info" | "platform" if in_known_module(KnownModule::Sys) => {
                 return true;
             }

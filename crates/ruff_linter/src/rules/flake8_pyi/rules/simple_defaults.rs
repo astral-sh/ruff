@@ -457,7 +457,7 @@ fn is_type_var_like_call(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
 fn is_special_assignment(target: Expr<'_>, semantic: &SemanticModel) -> bool {
     if let ExprKind::Name(name_node_view) = target.classify() {
         let id = name_node_view.id();
-        match id.as_str() {
+        match id {
             "__all__" => semantic.current_scope().kind.is_module(),
             "__match_args__" | "__slots__" => semantic.current_scope().kind.is_class(),
             _ => false,

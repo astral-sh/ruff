@@ -115,7 +115,7 @@ impl Truthiness {
             }
             ast::ExprKind::Call(call) => {
                 if let Some(name) = call.func().as_name_expr()
-                    && is_iterable_initializer(name.id().as_str(), |id| is_builtin(id))
+                    && is_iterable_initializer(name.id(), |id| is_builtin(id))
                 {
                     let arguments = call.arguments();
                     if arguments.is_empty() {

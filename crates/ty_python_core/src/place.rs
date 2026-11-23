@@ -8,7 +8,7 @@ use crate::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
 use crate::{Db, PossiblyNarrowedPlaces};
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::IndexVec;
-use ruff_python_ast::{self as ast, ExprKind};
+use ruff_python_ast::{self as ast, ExprKind, name::Name};
 use smallvec::SmallVec;
 use std::hash::{Hash, Hasher};
 use std::iter::FusedIterator;
@@ -51,7 +51,7 @@ impl PlaceExpr {
     ///
     /// This always returns a `PlaceExpr::Symbol` with empty flags and `name`.
     pub fn from_expr_name(name: ast::ExprName<'_>) -> Self {
-        PlaceExpr::Symbol(Symbol::new(name.id().clone()))
+        PlaceExpr::Symbol(Symbol::new(name.id().into()))
     }
 
     /// Tries to create a `PlaceExpr` from an expression.
@@ -63,10 +63,23 @@ impl PlaceExpr {
     /// * attribute: `x.y`
     /// * subscripts with integer or string literals: `x[0]`, `x['key']`
     pub fn try_from_expr<'e>(expr: impl Into<ast::Expr<'e>>) -> Option<Self> {
-        Self::try_from_expr_kind(expr.into().classify())
+        match PlaceExprBuilder::try_from_expr(expr.into().classify())? {
+            PlaceExprBuilder::Symbol(name) => Some(Self::Symbol(Symbol::new(name.into()))),
+            PlaceExprBuilder::Member(member) => Some(Self::Member(member)),
+        }
     }
+}
 
-    pub(crate) fn try_from_expr_kind(expr: ExprKind<'_>) -> Option<Self> {
+/// A prospective place. Keep the symbol's spelling borrowed until the place table
+/// knows whether the scope already has a symbol for it.
+#[derive(Debug)]
+pub(crate) enum PlaceExprBuilder<'ast> {
+    Symbol(&'ast str),
+    Member(Member),
+}
+
+impl<'ast> PlaceExprBuilder<'ast> {
+    pub(crate) fn try_from_expr(expr: ExprKind<'ast>) -> Option<Self> {
         // For named expressions (walrus operator), extract the target. The grammar only permits
         // names as targets; parser recovery may still produce other expressions here.
         let name = match expr {
@@ -75,12 +88,9 @@ impl PlaceExpr {
             _ => return MemberExprBuilder::visit_expr(expr).and_then(Self::try_from_member_expr),
         };
 
-        Some(Self::Symbol(Symbol::new(name.id().clone())))
+        Some(Self::Symbol(name.id()))
     }
 
-    /// Tries to create a `PlaceExpr` from a member expression.
-    ///
-    /// Returns `None` if the expression is not a valid place expression and `Some` otherwise.
     pub(super) fn try_from_member_expr(builder: MemberExprBuilder) -> Option<Self> {
         let member_expression = MemberExpr::try_from_builder(builder)?;
         Some(Self::Member(Member::new(member_expression)))
@@ -351,6 +361,14 @@ pub struct PlaceTableBuilder {
 }
 
 impl PlaceTableBuilder {
+    /// Look up a place from syntax without allocating an owned symbol.
+    pub(crate) fn expr_place_id(&self, expr: ast::Expr<'_>) -> Option<ScopedPlaceId> {
+        match PlaceExprBuilder::try_from_expr(expr.classify())? {
+            PlaceExprBuilder::Symbol(name) => self.symbol_id(name).map(Into::into),
+            PlaceExprBuilder::Member(member) => self.place_id(PlaceExprRef::Member(&member)),
+        }
+    }
+
     /// Looks up a place ID by its expression.
     pub(crate) fn place_id(&self, expression: PlaceExprRef) -> Option<ScopedPlaceId> {
         match expression {
@@ -410,8 +428,11 @@ impl PlaceTableBuilder {
         self.symbols.iter()
     }
 
-    pub(crate) fn add_symbol(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
-        let (id, is_new) = self.symbols.add(symbol);
+    pub(crate) fn add_symbol(
+        &mut self,
+        name: impl AsRef<str> + Into<Name>,
+    ) -> (ScopedSymbolId, bool) {
+        let (id, is_new) = self.symbols.add(name);
 
         if is_new {
             let new_id = self.associated_symbol_members.push(SmallVec::new_const());
@@ -448,13 +469,13 @@ impl PlaceTableBuilder {
         (id, is_new)
     }
 
-    pub(crate) fn add_place(&mut self, place: PlaceExpr) -> (ScopedPlaceId, bool) {
+    pub(crate) fn add_place(&mut self, place: PlaceExprBuilder<'_>) -> (ScopedPlaceId, bool) {
         match place {
-            PlaceExpr::Symbol(symbol) => {
-                let (id, is_new) = self.add_symbol(symbol);
+            PlaceExprBuilder::Symbol(name) => {
+                let (id, is_new) = self.add_symbol(name);
                 (ScopedPlaceId::Symbol(id), is_new)
             }
-            PlaceExpr::Member(member) => {
+            PlaceExprBuilder::Member(member) => {
                 let (id, is_new) = self.add_member(member);
                 (ScopedPlaceId::Member(id), is_new)
             }
@@ -612,10 +633,8 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     /// Simple expressions that directly narrow a single place.
     fn simple_expr(&self, expr: ast::Expr<'_>) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
-        if let Some(place_expr) = PlaceExpr::try_from_expr(expr) {
-            if let Some(place) = self.places.place_id((&place_expr).into()) {
-                places.insert(place);
-            }
+        if let Some(place) = self.places.expr_place_id(expr) {
+            places.insert(place);
         }
         places
     }
@@ -638,15 +657,13 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         for expr in expr_compare.operands() {
             if can_narrow_tagged_union_base
                 && let ExprKind::Subscript(subscript) = expr.expression_value().classify()
-                && let Some(place_expr) = PlaceExpr::try_from_expr(subscript.value())
-                && let Some(place) = self.places.place_id((&place_expr).into())
+                && let Some(place) = self.places.expr_place_id(subscript.value())
             {
                 places.insert(place);
             }
             if can_narrow_tagged_union_base
                 && let ExprKind::Attribute(attribute) = expr.classify()
-                && let Some(place_expr) = PlaceExpr::try_from_expr(attribute.value())
-                && let Some(place) = self.places.place_id((&place_expr).into())
+                && let Some(place) = self.places.expr_place_id(attribute.value())
             {
                 places.insert(place);
             }
@@ -677,15 +694,12 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                 ast::ArgOrKeyword::Keyword(keyword) if !keyword.is_variadic() => keyword.value(),
                 _ => continue,
             };
-            if let Some(place_expr) = PlaceExpr::try_from_expr(argument)
-                && let Some(place) = self.places.place_id((&place_expr).into())
-            {
+            if let Some(place) = self.places.expr_place_id(argument) {
                 places.insert(place);
             }
             // Checking a tuple element can also eliminate alternatives of its tuple union.
             if let ExprKind::Subscript(subscript) = argument.expression_value().classify()
-                && let Some(place_expr) = PlaceExpr::try_from_expr(subscript.value())
-                && let Some(place) = self.places.place_id((&place_expr).into())
+                && let Some(place) = self.places.expr_place_id(subscript.value())
             {
                 places.insert(place);
             }
@@ -717,9 +731,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
 
     /// Helper to add a potential narrowing target expression to the set.
     fn add_narrowing_target(&self, expr: ast::Expr<'_>, places: &mut PossiblyNarrowedPlaces) {
-        if let Some(place_expr) = PlaceExpr::try_from_expr(expr)
-            && let Some(place) = self.places.place_id((&place_expr).into())
-        {
+        if let Some(place) = self.places.expr_place_id(expr) {
             places.insert(place);
         }
 
@@ -727,17 +739,14 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
             // type(x) is Y can narrow x
             ExprKind::Call(call) => {
                 if let Some([first_arg]) = call.arguments().args().as_array()
-                    && let Some(place_expr) = PlaceExpr::try_from_expr(first_arg)
-                    && let Some(place) = self.places.place_id((&place_expr).into())
+                    && let Some(place) = self.places.expr_place_id(first_arg)
                 {
                     places.insert(place);
                 }
             }
             // x.__class__ is Y can narrow x
             ExprKind::Attribute(attribute) if attribute.attr().as_str() == "__class__" => {
-                if let Some(place_expr) = PlaceExpr::try_from_expr(attribute.value())
-                    && let Some(place) = self.places.place_id((&place_expr).into())
-                {
+                if let Some(place) = self.places.expr_place_id(attribute.value()) {
                     places.insert(place);
                 }
             }
@@ -755,9 +764,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
 
         let subject_node = subject.node_ref(self.db).node(module);
         for expression in match_subject_place_expressions(subject_node) {
-            if let Some(place) = PlaceExpr::try_from_expr(expression)
-                .and_then(|place| self.places.place_id((&place).into()))
-            {
+            if let Some(place) = self.places.expr_place_id(expression) {
                 places.insert(place);
             }
         }

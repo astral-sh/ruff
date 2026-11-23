@@ -122,7 +122,7 @@ impl EqHash {
                 ClassMemberKind::FunctionDef(function) => function.name().id(),
             };
 
-            match id.as_str() {
+            match id {
                 "__eq__" => has_eq = has_eq | declaration.boundness().into(),
                 "__hash__" => has_hash = has_hash | declaration.boundness().into(),
                 _ => {}

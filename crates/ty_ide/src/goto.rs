@@ -891,7 +891,7 @@ impl GotoTarget<'_> {
                 ..
             }
             | GotoTarget::Expression(expression) => match expression.classify() {
-                ExprKind::Name(name) => Some(Cow::Borrowed(name.id().as_str())),
+                ExprKind::Name(name) => Some(Cow::Borrowed(name.id())),
                 ExprKind::Attribute(attr) => Some(Cow::Borrowed(attr.attr().as_str())),
                 _ => None,
             },
@@ -1375,7 +1375,7 @@ fn definitions_for_expression<'db>(
     match expression.classify() {
         ExprKind::Name(name) => Some(definitions_for_name(
             model,
-            name.id().as_str(),
+            name.id(),
             expression.into(),
             alias_resolution,
         )),

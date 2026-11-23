@@ -154,12 +154,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let has_explicit_metaclass = class_node
             .arguments()
             .is_some_and(|arguments| arguments.find_keyword("metaclass").is_some());
+        let class_name = self.index.definition_symbol(db, definition).name();
         let infer_original_class_ty = |deprecated,
                                        type_check_only,
                                        dataclass_params,
                                        dataclass_transformer_params,
                                        total_ordering| {
-            match (maybe_known_class, name.id().as_str()) {
+            match (maybe_known_class, name.id()) {
                 (None, "NamedTuple") if in_typing_module() => {
                     Type::SpecialForm(SpecialFormType::NamedTuple)
                 }
@@ -169,7 +170,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 _ => Type::from(StaticClassLiteral::new(
                     db,
-                    name.id(),
+                    class_name,
                     body_scope,
                     StaticClassHeader {
                         known: maybe_known_class,

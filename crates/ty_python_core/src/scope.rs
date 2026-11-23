@@ -83,7 +83,7 @@ impl<'db> ScopeId<'db> {
                 .node(module)
                 .name()
                 .as_name_expr()
-                .map(|name| name.id().as_str())
+                .map(ast::ExprName::id)
                 .unwrap_or("<type alias>"),
             NodeWithScopeKind::Lambda(_) => "<lambda>",
             NodeWithScopeKind::ListComprehension(_) => "<listcomp>",

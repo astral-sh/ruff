@@ -329,7 +329,7 @@ fn is_name(expr: ast::Expr<'_>, name: &str) -> bool {
         return false;
     };
     let id = name_node.id();
-    id.as_str() == name
+    id == name
 }
 
 /// Return `true` if the given expression resolves to the given name,

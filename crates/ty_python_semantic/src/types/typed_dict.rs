@@ -2189,7 +2189,7 @@ pub(super) fn collect_guaranteed_keyword_keys<'db>(
     let mut provided_keys: OrderSet<Name> = arguments
         .keywords()
         .iter()
-        .filter_map(|keyword| keyword.arg().map(|arg| arg.id().clone()))
+        .filter_map(|keyword| keyword.arg().map(|arg| arg.id().into()))
         .collect();
 
     for &(value, unpacked_type) in unpacked_keyword_types {
@@ -2770,12 +2770,12 @@ fn validate_from_keywords<'db, 'ast>(
                 context,
                 typed_dict,
                 &mut guaranteed_keys,
-                arg_name.id().clone(),
+                arg_name.id().into(),
                 keyword_node,
             );
 
             let value_tcx = typed_dict
-                .item(db, arg_name.id().as_str())
+                .item(db, arg_name.id())
                 .map_or_default(|field| TypeContext::preference(Some(field.declared_ty)));
             let value_ty = expression_type_fn(keyword.value(), value_tcx);
             TypedDictKeyAssignment {

@@ -798,8 +798,9 @@ pub(crate) fn string_dot_format_extra_named_arguments(
             // An unpacking may supply any of the format fields.
             return;
         };
-        if !summary.keywords.contains(name.id()) {
-            missing.push((index, name.id(), keyword.value()));
+        let name = name.as_str();
+        if !summary.keywords.iter().any(|key| key == name) {
+            missing.push((index, name, keyword.value()));
         }
     }
 
@@ -807,7 +808,10 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         return;
     }
 
-    let names: Vec<Name> = missing.iter().map(|(_, name, _)| (*name).clone()).collect();
+    let names: Vec<Name> = missing
+        .iter()
+        .map(|(_, name, _)| Name::new(*name))
+        .collect();
     let mut diagnostic = checker.report_diagnostic(
         StringDotFormatExtraNamedArguments { missing: names },
         call_fields.range(),
@@ -926,7 +930,7 @@ pub(crate) fn string_dot_format_missing_argument(
             summary
                 .keywords
                 .iter()
-                .filter(|k| !keywords.contains(*k))
+                .filter(|k| !keywords.contains(k.as_str()))
                 .map(ToString::to_string),
         )
         .collect();

@@ -78,7 +78,7 @@ pub(crate) fn invalid_get_logger_argument(checker: &Checker, call: &ast::ExprCal
     };
 
     let id = expr.id();
-    if !matches!(id.as_ref(), "__file__" | "__cached__") {
+    if !matches!(id, "__file__" | "__cached__") {
         return;
     }
 

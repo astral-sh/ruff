@@ -222,7 +222,7 @@ impl MemberExprBuilder {
         };
         if let Some(name) = name {
             return Some(MemberExprBuilder {
-                path: CharStr::from(name.id().clone()),
+                path: CharStr::from(name.id()),
                 segments: SmallVec::new_const(),
             });
         }
@@ -246,7 +246,7 @@ impl MemberExprBuilder {
     ) -> Option<()> {
         match expr {
             ExprKind::Name(name) => {
-                let text = name.id().as_str();
+                let text = name.id();
                 *path_len += text.text_len();
                 parts.push(MemberPathPart::Borrowed(text));
                 Some(())
@@ -260,7 +260,7 @@ impl MemberExprBuilder {
                 Self::collect_expr(attribute.value().classify(), parts, segments, path_len)?;
 
                 let start_offset = *path_len;
-                let text = attribute.attr().id().as_str();
+                let text = attribute.attr().id();
                 *path_len += text.text_len();
                 parts.push(MemberPathPart::Borrowed(text));
                 segments.push(SegmentInfo::new(SegmentKind::Attribute, start_offset));

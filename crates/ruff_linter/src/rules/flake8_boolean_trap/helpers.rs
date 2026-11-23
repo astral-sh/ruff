@@ -132,10 +132,7 @@ pub(super) fn allow_boolean_trap(call: ast::ExprCall<'_>, checker: &Checker) -> 
             let attr = expr_attribute.attr();
             attr.as_str()
         }
-        ExprKind::Name(expr_name) => {
-            let id = expr_name.id();
-            id.as_str()
-        }
+        ExprKind::Name(expr_name) => expr_name.id(),
         _ => return false,
     };
 

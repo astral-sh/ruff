@@ -103,7 +103,7 @@ pub(crate) fn modified_iterating_set(checker: &Checker, for_stmt: ast::StmtFor<'
     if is_modified {
         let mut diagnostic = checker.report_diagnostic(
             ModifiedIteratingSet {
-                name: name.id().clone(),
+                name: name.id().into(),
             },
             for_stmt.range(),
         );

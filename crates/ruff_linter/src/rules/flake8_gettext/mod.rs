@@ -34,10 +34,10 @@ pub(crate) fn is_gettext_func_call(
     func: Expr<'_>,
     functions_names: &[Name],
 ) -> bool {
+    let is_gettext_name = |id: &str| functions_names.iter().any(|name| name == id);
     if func
         .as_name_expr()
-        .map(ruff_python_ast::ExprName::id)
-        .is_some_and(|id| functions_names.contains(id))
+        .is_some_and(|name| is_gettext_name(name.id()))
     {
         return true;
     }
@@ -51,7 +51,7 @@ pub(crate) fn is_gettext_func_call(
     if semantic.seen_module(Modules::BUILTINS)
         && matches!(
             qualified_name.segments(),
-            ["builtins", id] if functions_names.contains(&Name::new(id)),
+            ["builtins", id] if is_gettext_name(id),
         )
     {
         return true;

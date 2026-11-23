@@ -416,7 +416,7 @@ impl<'a> CallSitesFinder<'a, '_> {
                     })
                     .unwrap_or(false);
                 CallHierarchyItem {
-                    name: func.name().id().clone(),
+                    name: func.name().id().into(),
                     kind: if is_method {
                         SymbolKind::Method
                     } else {
@@ -431,7 +431,7 @@ impl<'a> CallSitesFinder<'a, '_> {
             NodeWithScopeKind::Class(class) => {
                 let class = class.node(self.module);
                 CallHierarchyItem {
-                    name: class.name().id().clone(),
+                    name: class.name().id().into(),
                     kind: SymbolKind::Class,
                     detail: module_detail(self.db, resolver_file),
                     file,

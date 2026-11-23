@@ -255,14 +255,11 @@ impl<'db> FieldMetadata<'db> {
         // using `StrictInt = Annotated[int, Strict()]`. Since we don't retain the `Annotated`
         // metadata, we need to follow the alias back to its definition and parse the metadata
         // from there.
-        let Some(alias_definition) = definitions_for_name(
-            db,
-            scope,
-            name.id().as_str(),
-            ImportAliasResolution::ResolveAliases,
-        )
-        .into_iter()
-        .find_map(|resolved| resolved.definition()) else {
+        let Some(alias_definition) =
+            definitions_for_name(db, scope, name.id(), ImportAliasResolution::ResolveAliases)
+                .into_iter()
+                .find_map(|resolved| resolved.definition())
+        else {
             return;
         };
 

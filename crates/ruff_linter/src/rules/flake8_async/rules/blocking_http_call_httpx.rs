@@ -117,7 +117,7 @@ pub(crate) fn blocking_http_call_httpx(checker: &Checker, call_fields: &ast::Exp
 
     if check_type::<HttpxClientChecker>(binding, semantic) {
         if matches!(
-            attr.id().as_str(),
+            attr.id(),
             "close"
                 | "delete"
                 | "get"

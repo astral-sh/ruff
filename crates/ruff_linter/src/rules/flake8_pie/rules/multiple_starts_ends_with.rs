@@ -110,7 +110,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: ExprBoolOp<'_>)
         }
 
         duplicates
-            .entry((attr.as_str(), arg_name.as_str()))
+            .entry((attr.as_str(), arg_name))
             .or_insert_with(Vec::new)
             .push(index);
     }
@@ -185,7 +185,7 @@ fn is_bound_to_tuple(arg: Expr<'_>, semantic: &SemanticModel) -> bool {
     };
     let id = name.id();
 
-    let Some(binding_id) = semantic.lookup_symbol(id.as_str()).binding_id() else {
+    let Some(binding_id) = semantic.lookup_symbol(id).binding_id() else {
         return false;
     };
 

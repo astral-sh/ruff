@@ -550,7 +550,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let overload_literal = OverloadLiteral::new(
             db,
-            name.id(),
+            self.index.definition_symbol(db, definition).name(),
             known_function,
             body_scope,
             function_decorators,

@@ -50,7 +50,7 @@ use crate::types::{
 };
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{Expr, ParameterWithDefault, StmtFunctionDef, name, name::Name};
+use ruff_python_ast::{Expr, StmtFunctionDef, name, name::Name};
 use ty_python_core::SemanticIndex;
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_core::scope::NodeWithScopeRef;
@@ -5457,12 +5457,6 @@ impl<'db> Parameters<'db> {
         has_implicitly_positional_first_parameter: bool,
         annotation: &impl Fn(Expr<'_>) -> (Type<'db>, TypeExpressionFlags),
     ) -> Self {
-        let default_type = |param: ParameterWithDefault<'_>| {
-            param.default().map(|_| {
-                ParameterDefault::Deferred(index.expect_single_definition(param.parameter()))
-            })
-        };
-
         // Without a slash, a leading run of `__name` parameters follows the PEP 484
         // positional-only convention. A method receiver can start that run.
         let mut legacy_positional_prefix = true;
@@ -5470,56 +5464,42 @@ impl<'db> Parameters<'db> {
             .items_in_binding_order()
             .enumerate()
             .map(|(i, item)| {
-                let (node, kind) = match item {
-                    ast::ParameterItem::PositionalOnly(p) => {
+                let param = item.into_parameter();
+                let node = param.as_parameter();
+                let definition = index.expect_single_definition(node);
+                let name = index.definition_symbol(db, definition).name().clone();
+                let default_type = param
+                    .default()
+                    .map(|_| ParameterDefault::Deferred(definition));
+                let kind = match item {
+                    ast::ParameterItem::PositionalOnly(_) => {
                         legacy_positional_prefix = false;
-                        (
-                            p.parameter(),
-                            ParameterKind::PositionalOnly {
-                                name: Some(p.parameter().name().id().clone()),
-                                default_type: default_type(p),
-                            },
-                        )
+                        ParameterKind::PositionalOnly {
+                            name: Some(name),
+                            default_type,
+                        }
                     }
                     ast::ParameterItem::PositionalOrKeyword(p) => {
-                        let kind = if legacy_positional_prefix
+                        if legacy_positional_prefix
                             && ((i == 0 && has_implicitly_positional_first_parameter)
                                 || p.uses_pep_484_positional_only_convention())
                         {
                             ParameterKind::PositionalOnly {
-                                name: Some(p.parameter().name().id().clone()),
-                                default_type: default_type(p),
+                                name: Some(name),
+                                default_type,
                             }
                         } else {
                             legacy_positional_prefix = false;
-                            ParameterKind::PositionalOrKeyword {
-                                name: p.parameter().name().id().clone(),
-                                default_type: default_type(p),
-                            }
-                        };
-                        (p.parameter(), kind)
+                            ParameterKind::PositionalOrKeyword { name, default_type }
+                        }
                     }
-                    ast::ParameterItem::KeywordOnly(p) => (
-                        p.parameter(),
-                        ParameterKind::KeywordOnly {
-                            name: p.parameter().name().id().clone(),
-                            default_type: default_type(p),
-                        },
-                    ),
-                    ast::ParameterItem::Vararg(p) => (
-                        p,
-                        ParameterKind::Variadic {
-                            name: p.name().id().clone(),
-                        },
-                    ),
-                    ast::ParameterItem::Kwarg(p) => (
-                        p,
-                        ParameterKind::KeywordVariadic {
-                            name: p.name().id().clone(),
-                        },
-                    ),
+                    ast::ParameterItem::KeywordOnly(_) => {
+                        ParameterKind::KeywordOnly { name, default_type }
+                    }
+                    ast::ParameterItem::Vararg(_) => ParameterKind::Variadic { name },
+                    ast::ParameterItem::Kwarg(_) => ParameterKind::KeywordVariadic { name },
                 };
-                Parameter::from_node_and_kind(db, index, annotation, node, kind)
+                Parameter::from_node_and_kind(db, definition, annotation, node, kind)
                     .with_source_parameter_index(Some(i))
             });
         Self::from_annotation(db, parameters)
@@ -6176,13 +6156,11 @@ impl<'db> Parameter<'db> {
 
     fn from_node_and_kind(
         db: &'db dyn Db,
-        index: &SemanticIndex<'db>,
+        definition: Definition<'db>,
         infer_annotation: &impl Fn(Expr<'_>) -> (Type<'db>, TypeExpressionFlags),
         parameter: ast::Parameter<'_>,
         kind: ParameterKind<'db>,
     ) -> Self {
-        let definition = Some(index.expect_single_definition(parameter));
-
         let (annotated_type, inferred_annotation, annotation_flags, has_starred_annotation) =
             if let Some(annotation) = parameter.annotation() {
                 let (ty, flags) = infer_annotation(annotation);
@@ -6204,7 +6182,7 @@ impl<'db> Parameter<'db> {
         };
         Self {
             annotated_type,
-            definition,
+            definition: Some(definition),
             inferred_annotation,
             annotation_kind,
             source_parameter_index: None,

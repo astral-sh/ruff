@@ -137,7 +137,6 @@ impl<'db> Definition<'db> {
                         .as_name_expr()
                         .expect("type alias name should be a NameExpr")
                         .id()
-                        .as_str()
                         .to_string(),
                 )
             }
@@ -145,7 +144,7 @@ impl<'db> Definition<'db> {
                 let target_node = assignment.target.node(&module);
                 target_node
                     .as_name_expr()
-                    .map(|name_expr| name_expr.id().as_str().to_string())
+                    .map(|name_expr| name_expr.id().to_string())
             }
             _ => None,
         }

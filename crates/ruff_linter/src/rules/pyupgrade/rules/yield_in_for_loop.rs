@@ -111,7 +111,7 @@ pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: StmtFor<'_>) {
         checker
             .semantic()
             .current_scope()
-            .get_all(name.id().as_str())
+            .get_all(name.id())
             // Skip unbound bindings like `del x`
             .find(|&id| !checker.semantic().binding(id).is_unbound())
             .is_some_and(|binding_id| {
@@ -137,7 +137,7 @@ pub(crate) fn yield_in_for_loop(checker: &Checker, stmt_for: StmtFor<'_>) {
 
     if !collect_names(value).any(|name| {
         let semantic = checker.semantic();
-        let mut bindings = semantic.current_scope().get_all(name.id().as_str());
+        let mut bindings = semantic.current_scope().get_all(name.id());
 
         bindings.any(|id| {
             let binding = semantic.binding(id);

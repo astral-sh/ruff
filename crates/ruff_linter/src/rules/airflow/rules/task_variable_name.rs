@@ -113,7 +113,7 @@ pub(crate) fn variable_name_task_id(
     };
 
     // If the target name is the same as the task_id, no violation.
-    if task_id == id.as_str() {
+    if task_id == id {
         return;
     }
 

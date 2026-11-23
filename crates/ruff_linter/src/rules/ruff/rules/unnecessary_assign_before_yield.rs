@@ -107,8 +107,8 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
         }
         let assigned_id = assigned.id();
 
-        if !visitor.annotations.contains(assigned_id.as_str())
-            && !visitor.non_locals.contains(assigned_id.as_str())
+        if !visitor.annotations.contains(assigned_id)
+            && !visitor.non_locals.contains(assigned_id)
             && let Some(assigned_binding) = function_scope
                 .get(assigned_id)
                 .map(|binding_id| checker.semantic().binding(binding_id))
@@ -214,7 +214,7 @@ impl<'a> Visitor<'a> for YieldVisitor<'_, 'a> {
                 if assign.value().is_none()
                     && let Some(name) = assign.target().as_name_expr()
                 {
-                    self.annotations.insert(name.id().as_str());
+                    self.annotations.insert(name.id());
                 }
             }
             StmtKind::Expr(expr) => {

@@ -10,7 +10,7 @@ pub(super) fn has_slots(body: Suite<'_>) -> bool {
                 for target in targets {
                     if let ExprKind::Name(name) = target.classify() {
                         let id = name.id();
-                        if id.as_str() == "__slots__" {
+                        if id == "__slots__" {
                             return true;
                         }
                     }
@@ -21,7 +21,7 @@ pub(super) fn has_slots(body: Suite<'_>) -> bool {
 
                 if let ExprKind::Name(name) = target.classify() {
                     let id = name.id();
-                    if id.as_str() == "__slots__" {
+                    if id == "__slots__" {
                         return true;
                     }
                 }

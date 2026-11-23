@@ -188,7 +188,7 @@ fn resolve_file_open<'a>(
 
     let var = item.optional_vars()?.as_name_expr()?;
     let scope = semantic.current_scope();
-    let binding = scope.get_all(var.id().as_str()).find_map(|id| {
+    let binding = scope.get_all(var.id()).find_map(|id| {
         let binding = semantic.binding(id);
         (binding.range() == var.range()).then_some(binding)
     })?;

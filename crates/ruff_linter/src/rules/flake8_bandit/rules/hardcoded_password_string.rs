@@ -54,10 +54,7 @@ impl Violation for HardcodedPasswordString {
 fn password_target(target: Expr<'_>) -> Option<&str> {
     let target_name = match target.classify() {
         // variable = "s3cr3t"
-        ExprKind::Name(expr_name) => {
-            let id = expr_name.id();
-            id.as_str()
-        }
+        ExprKind::Name(expr_name) => expr_name.id(),
         // d["password"] = "s3cr3t"
         ExprKind::Subscript(expr_subscript) => {
             let slice = expr_subscript.slice();

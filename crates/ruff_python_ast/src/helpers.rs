@@ -75,7 +75,7 @@ impl SideEffect {
             // Empty initializers for known builtins are side-effect-free.
             ast::ExprKind::Call(call) if call.arguments().is_empty() => {
                 if let Some(name) = call.func().as_name_expr()
-                    && is_iterable_initializer(name.id().as_str(), |id| is_builtin(id))
+                    && is_iterable_initializer(name.id(), |id| is_builtin(id))
                 {
                     return Self::Absent;
                 }
@@ -368,7 +368,7 @@ where
         else {
             return false;
         };
-        let id = name.id().as_str();
+        let id = name.id();
         matches!(id, "locals" | "globals" | "vars" | "exec" | "eval") && is_builtin(id)
     })
 }

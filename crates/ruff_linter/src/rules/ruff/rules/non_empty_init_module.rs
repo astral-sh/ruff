@@ -196,7 +196,7 @@ impl<'a> Assignment<'a> {
         self.targets.clone().all(|target| {
             target
                 .as_name_expr()
-                .is_some_and(|name| is_dunder(name.id().as_str()))
+                .is_some_and(|name| is_dunder(name.id()))
         })
     }
 }

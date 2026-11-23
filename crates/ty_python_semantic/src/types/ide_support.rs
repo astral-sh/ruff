@@ -67,8 +67,7 @@ pub fn definition_for_name<'db>(
     name: ast::ExprName<'_>,
     alias_resolution: ImportAliasResolution,
 ) -> Option<Definition<'db>> {
-    let definitions =
-        definitions_for_name(model, name.id().as_str(), name.into(), alias_resolution);
+    let definitions = definitions_for_name(model, name.id(), name.into(), alias_resolution);
 
     // Find the first valid definition and return its kind
     for declaration in definitions {

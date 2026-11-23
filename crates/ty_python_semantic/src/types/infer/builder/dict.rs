@@ -91,14 +91,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let keyword_names = arguments
             .keywords()
             .iter()
-            .filter_map(|keyword| Some((keyword.value().node_index(), keyword.arg()?.id().clone())))
+            .filter_map(|keyword| Some((keyword.value().node_index(), keyword.arg()?.id())))
             .collect::<FxHashMap<_, _>>();
         let mut infer_elt_ty = |builder: &mut Self, (i, elt, tcx): ArgExpr<'db, '_>| {
             if i == 0 {
                 let key = keyword_names
                     .get(&elt.node_index())
                     .expect("keyword-only dict() fast-path requires named keywords");
-                Type::string_literal(builder.db(), key)
+                Type::string_literal(builder.db(), *key)
             } else {
                 builder.infer_expression(elt, tcx)
             }

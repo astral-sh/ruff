@@ -1,8 +1,7 @@
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
 use ruff_python_ast::{self as ast, ExceptHandlerKind, ExprKind, StmtKind};
 
-use crate::place::PlaceExpr;
-use crate::symbol::Symbol;
+use crate::place::PlaceExprBuilder;
 
 /// Do a pre-walk of a `while` loop to collect all the places that are bound, prior to visiting the
 /// loop with `SemanticIndexBuilder`. This walk includes bindings in nested loops, but not in
@@ -10,7 +9,9 @@ use crate::symbol::Symbol;
 /// pre-walk so that we can synthesize "loop header definitions" that are visible to the loop body
 /// (and condition). See `LoopHeader`.
 /// TODO: Handle `nonlocal` bindings from nested scopes somehow.
-pub(crate) fn collect_while_loop_bindings(while_stmt: ast::StmtWhile<'_>) -> Vec<PlaceExpr> {
+pub(crate) fn collect_while_loop_bindings(
+    while_stmt: ast::StmtWhile<'_>,
+) -> Vec<PlaceExprBuilder<'_>> {
     let mut collector = LoopBindingsVisitor::default();
     collector.visit_expr(while_stmt.test());
     collector.visit_body(while_stmt.body());
@@ -18,7 +19,7 @@ pub(crate) fn collect_while_loop_bindings(while_stmt: ast::StmtWhile<'_>) -> Vec
 }
 
 /// Like `collect_while_loop_bindings` above, but for `for` loops.
-pub(crate) fn collect_for_loop_bindings(for_stmt: ast::StmtFor<'_>) -> Vec<PlaceExpr> {
+pub(crate) fn collect_for_loop_bindings(for_stmt: ast::StmtFor<'_>) -> Vec<PlaceExprBuilder<'_>> {
     let mut collector = LoopBindingsVisitor::default();
     collector.add_place_from_target(for_stmt.target());
     collector.visit_body(for_stmt.body());
@@ -29,18 +30,15 @@ pub(crate) fn collect_for_loop_bindings(for_stmt: ast::StmtFor<'_>) -> Vec<Place
 ///
 /// This visitor doesn't walk nested function/class definitions since those are different scopes.
 #[derive(Debug, Default)]
-pub(crate) struct LoopBindingsVisitor {
-    bound_places: Vec<PlaceExpr>,
+pub(crate) struct LoopBindingsVisitor<'ast> {
+    bound_places: Vec<PlaceExprBuilder<'ast>>,
 }
 
-impl LoopBindingsVisitor {
-    fn add_place_from_target(&mut self, target: ast::Expr<'_>) {
+impl<'ast> LoopBindingsVisitor<'ast> {
+    fn add_place_from_target(&mut self, target: ast::Expr<'ast>) {
         match target.classify() {
-            ExprKind::Name(name) => {
-                self.bound_places.push(PlaceExpr::from_expr_name(name));
-            }
-            ExprKind::Attribute(_) | ExprKind::Subscript(_) => {
-                if let Some(place) = PlaceExpr::try_from_expr(target) {
+            kind @ (ExprKind::Name(_) | ExprKind::Attribute(_) | ExprKind::Subscript(_)) => {
+                if let Some(place) = PlaceExprBuilder::try_from_expr(kind) {
                     self.bound_places.push(place);
                 }
             }
@@ -62,7 +60,7 @@ impl LoopBindingsVisitor {
     }
 }
 
-impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
+impl<'ast> Visitor<'ast> for LoopBindingsVisitor<'ast> {
     fn visit_stmt(&mut self, stmt: ast::Stmt<'ast>) {
         match stmt.classify() {
             StmtKind::Assign(node) => {
@@ -107,8 +105,7 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
                 for handler in node.handlers() {
                     let ExceptHandlerKind::ExceptHandler(h) = handler.classify();
                     if let Some(name) = h.name() {
-                        self.bound_places
-                            .push(PlaceExpr::Symbol(Symbol::new(name.id().clone())));
+                        self.bound_places.push(PlaceExprBuilder::Symbol(name.id()));
                     }
                     self.visit_body(h.body());
                 }
@@ -118,27 +115,25 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
             StmtKind::Import(node) => {
                 for alias in node.names() {
                     let name = alias.asname().unwrap_or(alias.name());
-                    self.bound_places
-                        .push(PlaceExpr::Symbol(Symbol::new(name.id().clone())));
+                    self.bound_places.push(PlaceExprBuilder::Symbol(name.id()));
                 }
             }
             StmtKind::ImportFrom(node) => {
                 for alias in node.names() {
                     if &alias.name() != "*" {
                         let name = alias.asname().unwrap_or(alias.name());
-                        self.bound_places
-                            .push(PlaceExpr::Symbol(Symbol::new(name.id().clone())));
+                        self.bound_places.push(PlaceExprBuilder::Symbol(name.id()));
                     }
                 }
             }
             StmtKind::FunctionDef(node) => {
                 self.bound_places
-                    .push(PlaceExpr::Symbol(Symbol::new(node.name().id().clone())));
+                    .push(PlaceExprBuilder::Symbol(node.name().id()));
                 // Don't descend into function bodies - they're different scopes.
             }
             StmtKind::ClassDef(node) => {
                 self.bound_places
-                    .push(PlaceExpr::Symbol(Symbol::new(node.name().id().clone())));
+                    .push(PlaceExprBuilder::Symbol(node.name().id()));
                 // Don't descend into class bodies - they're different scopes.
             }
             StmtKind::Match(node) => {
@@ -172,8 +167,7 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
     fn visit_pattern(&mut self, pattern: ast::Pattern<'ast>) {
         let kind = pattern.classify();
         if let Some(name) = kind.capture_name() {
-            self.bound_places
-                .push(PlaceExpr::Symbol(Symbol::new(name.id().clone())));
+            self.bound_places.push(PlaceExprBuilder::Symbol(name.id()));
         }
         walk_pattern(self, kind);
     }
@@ -196,8 +190,8 @@ mod tests {
         collect_while_loop_bindings(while_stmt)
             .into_iter()
             .map(|place| match place {
-                PlaceExpr::Symbol(sym) => sym.name().to_string(),
-                PlaceExpr::Member(member) => member.to_string(),
+                PlaceExprBuilder::Symbol(name) => name.to_string(),
+                PlaceExprBuilder::Member(member) => member.to_string(),
             })
             .collect()
     }
@@ -260,8 +254,8 @@ mod tests {
         collect_for_loop_bindings(for_stmt)
             .into_iter()
             .map(|place| match place {
-                PlaceExpr::Symbol(sym) => sym.name().to_string(),
-                PlaceExpr::Member(member) => member.to_string(),
+                PlaceExprBuilder::Symbol(name) => name.to_string(),
+                PlaceExprBuilder::Member(member) => member.to_string(),
             })
             .collect()
     }

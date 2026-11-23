@@ -415,7 +415,7 @@ impl<'a> SemanticModel<'a> {
     {
         // Fast path: we only need to worry about name expressions
         if !self.seen_module(Modules::BUILTINS) {
-            let name = expr.as_name_expr()?.id().as_str();
+            let name = expr.as_name_expr()?.id();
             return if self.has_builtin_binding(name) {
                 Some(name)
             } else {
@@ -495,7 +495,7 @@ impl<'a> SemanticModel<'a> {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
         if self.in_forward_reference() {
-            if let Some(binding_id) = self.scopes.global().get(name.id().as_str()) {
+            if let Some(binding_id) = self.scopes.global().get(name.id()) {
                 if !self.bindings[binding_id].is_unbound() {
                     // Mark the binding as used.
                     let reference_id = self.resolved_references.push(
@@ -509,7 +509,7 @@ impl<'a> SemanticModel<'a> {
 
                     // Mark any submodule aliases as used.
                     if let Some(binding_id) =
-                        self.resolve_submodule(name.id().as_str(), ScopeId::global(), binding_id)
+                        self.resolve_submodule(name.id(), ScopeId::global(), binding_id)
                     {
                         let reference_id = self.resolved_references.push(
                             ScopeId::global(),
@@ -562,7 +562,7 @@ impl<'a> SemanticModel<'a> {
                 (ScopeKind::Type, 0) | (ScopeKind::DunderClassCell, 1)
             );
 
-            if let Some(binding_id) = scope.get(name.id().as_str()) {
+            if let Some(binding_id) = scope.get(name.id()) {
                 // Mark the binding as used.
                 let reference_id = self.resolved_references.push(
                     self.scope_id,
@@ -574,9 +574,7 @@ impl<'a> SemanticModel<'a> {
                 self.bindings[binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
-                if let Some(binding_id) =
-                    self.resolve_submodule(name.id().as_str(), scope_id, binding_id)
-                {
+                if let Some(binding_id) = self.resolve_submodule(name.id(), scope_id, binding_id) {
                     let reference_id = self.resolved_references.push(
                         self.scope_id,
                         self.node_id,
@@ -727,7 +725,7 @@ impl<'a> SemanticModel<'a> {
 
                         // Mark any submodule aliases as used.
                         if let Some(binding_id) =
-                            self.resolve_submodule(name.id().as_str(), scope_id, binding_id)
+                            self.resolve_submodule(name.id(), scope_id, binding_id)
                         {
                             let reference_id = self.resolved_references.push(
                                 self.scope_id,
@@ -784,7 +782,7 @@ impl<'a> SemanticModel<'a> {
             //     print(__qualname__)
             // ```
             if index == 0 && scope.kind.is_class() {
-                if matches!(name.id().as_str(), "__module__" | "__qualname__") {
+                if matches!(name.id(), "__module__" | "__qualname__") {
                     return ReadResult::ImplicitGlobal;
                 }
             }
@@ -792,7 +790,7 @@ impl<'a> SemanticModel<'a> {
             import_starred = import_starred || scope.uses_star_imports();
         }
 
-        if let Some(binding_id) = self.materialize_builtin_binding(name.id().as_str()) {
+        if let Some(binding_id) = self.materialize_builtin_binding(name.id()) {
             let reference_id = self.resolved_references.push(
                 self.scope_id,
                 self.node_id,
@@ -950,7 +948,7 @@ impl<'a> SemanticModel<'a> {
         typing_only_bindings_status: TypingOnlyBindingsStatus,
     ) -> Option<BindingId> {
         self.simulate_runtime_load_at_location_in_scope(
-            name.id().as_str(),
+            name.id(),
             name.range(),
             self.scope_id,
             typing_only_bindings_status,
@@ -1201,7 +1199,7 @@ impl<'a> SemanticModel<'a> {
             // `from typing import Literal as L` allows `L` to match `Literal`.
             // A name without a recorded binding still needs a scope lookup.
             ExprKind::Name(name) => {
-                name.id().as_str() == member
+                name.id() == member
                     || self
                         .resolve_name(name)
                         .is_none_or(|id| self.binding(id).is_alias())
@@ -1248,10 +1246,10 @@ impl<'a> SemanticModel<'a> {
             Symbol::Binding(binding_id) => self.binding(binding_id),
             Symbol::Builtin => {
                 if value.is_name_expr() {
-                    return Some(QualifiedName::builtin(head.id().as_str()));
+                    return Some(QualifiedName::builtin(head.id()));
                 }
 
-                return QualifiedName::builtin(head.id().as_str()).qualify(value);
+                return QualifiedName::builtin(head.id()).qualify(value);
             }
             Symbol::Unbound => return None,
         };
@@ -1278,10 +1276,10 @@ impl<'a> SemanticModel<'a> {
             BindingKind::Builtin => {
                 if value.is_name_expr() {
                     // Ex) `dict`
-                    Some(QualifiedName::builtin(head.id().as_str()))
+                    Some(QualifiedName::builtin(head.id()))
                 } else {
                     // Ex) `dict.__dict__`
-                    QualifiedName::builtin(head.id().as_str()).qualify(value)
+                    QualifiedName::builtin(head.id()).qualify(value)
                 }
             }
             BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {
