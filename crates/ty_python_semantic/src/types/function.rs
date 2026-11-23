@@ -68,6 +68,7 @@ use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::cyclic::ActiveRecursionDetector;
 
+use crate::types::dedicated::attrs;
 use crate::types::generics::{
     GenericContext, Specialization, typing_self, walk_specialization_types,
 };
@@ -83,9 +84,9 @@ use crate::types::typevar::TypeVarNonce;
 use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
-    CallableType, ClassType, DataclassParams, FindLegacyTypeVarsVisitor, KnownClass,
-    MemberLookupPolicy, SubclassOfInner, SubclassOfType, Type, TypeContext, TypeMapping, UnionType,
-    binding_type, definition_expression_type,
+    CallableType, ClassType, DataclassFlags, DataclassParams, FindLegacyTypeVarsVisitor,
+    KnownClass, MemberLookupPolicy, SubclassOfInner, SubclassOfType, Type, TypeContext,
+    TypeMapping, UnionType, binding_type, definition_expression_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -1527,7 +1528,9 @@ impl<'db> FunctionType<'db> {
             .iter_overloads_and_implementation(db)
             .rev()
             .find_map(|overload| overload.dataclass_transformer_params(db))?;
-        Some(DataclassParams::from_transformer_params(db, params))
+        let mut flags = DataclassFlags::from(params.flags(db));
+        flags.set(DataclassFlags::ATTRS, attrs::is_known_decorator(db, self));
+        Some(DataclassParams::new(db, flags, params.field_specifiers(db)))
     }
 
     pub(crate) fn with_dataclass_transformer_params(
@@ -2373,6 +2376,16 @@ pub enum KnownFunction {
     /// `dataclasses.field`
     Field,
 
+    /// `attr.attrs`, also exported as `attr.s`, `attr.attributes`, and `attr.dataclass`.
+    #[strum(serialize = "attrs")]
+    AttrAttrs,
+    /// `attrs.define`, also exported as `attrs.mutable`.
+    #[strum(serialize = "define")]
+    AttrsDefine,
+    /// `attrs.frozen`
+    #[strum(serialize = "frozen")]
+    AttrsFrozen,
+
     /// `pydantic.fields.Field`
     #[strum(serialize = "Field")]
     PydanticField,
@@ -2493,6 +2506,11 @@ impl KnownFunction {
             Self::Dataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
             }
+            Self::AttrAttrs => matches!(module, KnownModule::Attr),
+            // Older attrs stubs define the modern decorators in `attr`.
+            Self::AttrsDefine | Self::AttrsFrozen => {
+                matches!(module, KnownModule::Attr | KnownModule::Attrs)
+            }
             Self::PydanticField => matches!(module, KnownModule::PydanticFields),
             Self::PydanticFieldValidator => {
                 matches!(module, KnownModule::PydanticFunctionalValidators)
@@ -2583,6 +2601,8 @@ pub(crate) mod tests {
 
                 KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
 
+                KnownFunction::AttrAttrs => KnownModule::Attr,
+                KnownFunction::AttrsDefine | KnownFunction::AttrsFrozen => KnownModule::Attrs,
                 KnownFunction::PydanticField => KnownModule::PydanticFields,
                 KnownFunction::PydanticFieldValidator => KnownModule::PydanticFunctionalValidators,
                 KnownFunction::PytestFixture | KnownFunction::PytestYieldFixture => {

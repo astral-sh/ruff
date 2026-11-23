@@ -40,6 +40,85 @@ reveal_type(user.id)  # revealed: int
 reveal_type(user.internal_name)  # revealed: str
 ```
 
+## Private fields
+
+attrs strips leading underscores from field names when generating constructor parameters.
+
+```py
+import copy
+from attrs import define, field
+import attr
+
+@attr.s
+class User1:
+    _id: int = attr.ib()
+    name: str = attr.ib()
+
+@define
+class User2:
+    _id: int
+    name: str
+
+reveal_type(User1.__init__)  # revealed: (self: User1, /, id: int, name: str) -> None
+reveal_type(User2.__init__)  # revealed: (self: User2, /, id: int, name: str) -> None
+
+user1 = User1(id=1, name="John Doe")
+user2 = User2(id=1, name="John Doe")
+
+# error: [missing-argument]
+# error: [unknown-argument]
+User1(_id=1, name="John Doe")
+```
+
+Fields are still accessed through the original attribute name, and they cannot be accessed using the
+stripped name:
+
+```py
+reveal_type(user1._id)  # revealed: int
+reveal_type(user1.name)  # revealed: str
+
+reveal_type(user2._id)  # revealed: int
+reveal_type(user2.name)  # revealed: str
+
+user1.id  # error: [missing-attribute]
+user2.id  # error: [missing-attribute]
+```
+
+The signature for `__replace__` also uses the stripped name:
+
+```py
+copy.replace(user1, id=2)  # ok
+copy.replace(user2, id=2)  # ok
+copy.replace(user2, _id=3)  # error: [unknown-argument]
+```
+
+An explicit alias overwrites underscore-stripping:
+
+```py
+@define
+class AliasedUser:
+    _name: str = field(alias="_name")
+
+reveal_type(AliasedUser.__init__)  # revealed: (self: AliasedUser, /, _name: str) -> None
+
+AliasedUser(_name="John Doe")  # ok
+```
+
+For double-underscore field names (that do not end with double underscores), Python mangles `__id`
+to `_<class-name>__id` before attrs strips the leading underscore. So the effective constructor
+parameter name for `__id` becomes `<class-name>__id`
+(<https://github.com/python-attrs/attrs/issues/619>). A "dunder" attribute is not mangled, but
+leading underscores are still stripped, so `__name__` becomes `name__`.
+
+```py
+@define
+class VeryPrivateUser:
+    __id: int
+    __name__: str
+
+reveal_type(VeryPrivateUser.__init__)  # revealed: (self: VeryPrivateUser, /, VeryPrivateUser__id: int, name__: str) -> None
+```
+
 ## Usage of `field` parameters
 
 ```py

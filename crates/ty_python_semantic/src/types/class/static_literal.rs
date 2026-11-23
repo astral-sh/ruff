@@ -40,7 +40,7 @@ use crate::{
             typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
         },
         context::InferContext,
-        dedicated::{django, pydantic},
+        dedicated::{attrs, django, pydantic},
         definition_expression_type, determine_self_class,
         diagnostic::INVALID_DATACLASS_OVERRIDE,
         enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
@@ -2909,6 +2909,7 @@ impl<'db> StaticClassLiteral<'db> {
                 CodeGeneratorKind::from_class(db, self.into()).unwrap_or(field_policy);
             self.has_dataclass_param(db, own_field_policy, DataclassFlags::KW_ONLY)
         });
+        let is_attrs = attrs::is_attrs_class(db, self);
         let mut kw_only_sentinel_field_seen = false;
         let mut field_declarations = Vec::new();
 
@@ -3018,6 +3019,10 @@ impl<'db> StaticClassLiteral<'db> {
                     // A bare `Final` infers its type from the default value. The constructor must
                     // accept only values compatible with the type read through the instance.
                     declared_ty = default_ty;
+                }
+
+                if is_attrs {
+                    alias = attrs::effective_field_alias(self.name(db), symbol.name(), alias);
                 }
 
                 let kind = match field_policy {
