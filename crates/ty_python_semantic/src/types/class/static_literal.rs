@@ -2515,6 +2515,23 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
+    /// A class's type arguments do not affect whether any base is frozen. Share this
+    /// check across attribute writes and specializations before looking for overrides
+    /// and collecting fields. Incomplete MROs use the full lookup.
+    #[salsa::tracked(returns(copy), cycle_result=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+    fn may_inherit_frozen_fields(self, db: &'db dyn Db) -> bool {
+        let Ok(ancestors) = self.try_mro_ancestors(db, None) else {
+            return true;
+        };
+        ancestors.iter().any(|base| match base {
+            ClassBase::Class(class) => class
+                .static_class_literal(db)
+                .is_some_and(|(literal, _)| literal.is_frozen_dataclass(db) == Some(true)),
+            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
+            ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict(_) => false,
+        })
+    }
+
     /// Returns the inherited fields whose generated `__setattr__` or `__delattr__` still applies.
     fn inherited_non_slotted_frozen_dataclass_fields(
         self,
@@ -2522,6 +2539,10 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         method: &str,
     ) -> Option<InheritedFrozenDataclassFields<'db>> {
+        if !self.may_inherit_frozen_fields(db) {
+            return None;
+        }
+
         let mut names = FxIndexSet::default();
         let mut last_frozen_base = None;
 
