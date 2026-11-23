@@ -85,7 +85,7 @@ use crate::types::{
     DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, NominalInstanceType, ParamSpecValue, PropertyInstanceType, RecursiveType,
-    StringLiteralType, TypeAliasType, TypeContext, TypeIdentity, TypeMapping,
+    StringLiteralType, TypeAliasType, TypeContext, TypeIdentity, TypeMapping, TypePair,
     TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
     WrapperDescriptorKind, enums, factory_name_literal, is_property_method, list_members,
 };
@@ -4509,6 +4509,10 @@ impl<'db> CallableBinding<'db> {
     /// [`Unknown`]: crate::types::DynamicType::Unknown
     /// [`mark_as_unmatched_overload`]: Binding::mark_as_unmatched_overload
     /// [1]: https://typing.python.org/en/latest/spec/overload.html#overload-call-evaluation
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None when an overload comparison participates in a cycle"
+    )]
     fn filter_overloads_using_any_or_unknown(
         &mut self,
         db: &'db dyn Db,
@@ -4517,6 +4521,28 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
     ) {
+        /// Step 5 compares specialized types without inferring any type variables. Calls
+        /// with different arguments can still compare the same parameters or return types.
+        #[salsa::tracked(returns(copy), cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn equivalent_overload_types<'db>(db: &'db dyn Db, pair: TypePair<'db>) -> Option<bool> {
+            let env = &ProgramEnvironment::from_program(pair.program(db));
+            Some(
+                pair.first(db)
+                    .when_equivalent_to(db, env, pair.second(db), &ConstraintSetBuilder::new())
+                    .is_always_satisfied(db, env, TypeVarSet::None),
+            )
+        }
+
+        let equivalent = |first: Type<'db>, second: Type<'db>| {
+            first == second
+                || equivalent_overload_types(db, TypePair::new(db, env.program(db), first, second))
+                    .unwrap_or_else(|| {
+                        first
+                            .when_equivalent_to(db, env, second, constraints)
+                            .is_always_satisfied(db, env, TypeVarSet::None)
+                    })
+        };
+
         let matching_overload_slots = matching_overload_indexes
             .iter()
             .map(|&index| {
@@ -4564,10 +4590,7 @@ impl<'db> CallableBinding<'db> {
                     overload_slots.get(slot_index).map(|slot| slot.parameter);
                 match (first_parameter_type, current_parameter_type) {
                     (Some(first_parameter_type), Some(current_parameter_type)) => {
-                        if !first_parameter_type
-                            .when_equivalent_to(db, env, current_parameter_type, constraints)
-                            .is_always_satisfied(db, env, TypeVarSet::None)
-                        {
+                        if !equivalent(first_parameter_type, current_parameter_type) {
                             participating_slot_indices.push(slot_index);
                             break;
                         }
@@ -4612,10 +4635,7 @@ impl<'db> CallableBinding<'db> {
                 .map(|(_, overload)| overload.return_type())
             {
                 matching_overloads.all(|(_, overload)| {
-                    overload
-                        .return_type()
-                        .when_equivalent_to(db, env, first_overload_return_type, constraints)
-                        .is_always_satisfied(db, env, TypeVarSet::None)
+                    equivalent(overload.return_type(), first_overload_return_type)
                 })
             } else {
                 // No matching overload
