@@ -1,3 +1,3 @@
-pub(crate) use except_overly_broad_exception::*;
+pub(crate) use catch_exception_or_base_exception::*;
 
-mod except_overly_broad_exception;
+mod catch_exception_or_base_exception;

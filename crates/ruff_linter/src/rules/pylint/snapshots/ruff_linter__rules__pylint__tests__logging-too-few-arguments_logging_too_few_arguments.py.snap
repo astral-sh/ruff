@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
 PLE1206 Not enough arguments for `logging` format string
- --> logging_too_few_args.py:3:1
+ --> logging_too_few_arguments.py:3:1
   |
 1 | import logging
 2 |
@@ -13,7 +13,7 @@ PLE1206 Not enough arguments for `logging` format string
   |
 
 PLE1206 Not enough arguments for `logging` format string
-  --> logging_too_few_args.py:33:1
+  --> logging_too_few_arguments.py:33:1
    |
 31 | from logging import error, info, warning
 32 |

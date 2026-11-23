@@ -136,7 +136,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
 
         if let Some(class_def) = scope.kind.as_class() {
             if checker.is_rule_enabled(Rule::BuiltinAttributeShadowing) {
-                flake8_builtins::rules::attribute_shadows_builtin(
+                flake8_builtins::rules::builtin_attribute_shadowing(
                     checker, scope_id, scope, class_def,
                 );
             }
@@ -147,7 +147,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                 ruff::rules::mutable_class_default(checker, class_def);
             }
             if checker.is_rule_enabled(Rule::MutableDataclassFieldDefault) {
-                ruff::rules::mutable_dataclass_default(checker, class_def);
+                ruff::rules::mutable_dataclass_field_default(checker, class_def);
             }
         }
 

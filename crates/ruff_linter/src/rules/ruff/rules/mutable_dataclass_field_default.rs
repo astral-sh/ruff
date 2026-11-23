@@ -72,7 +72,7 @@ impl Violation for MutableDataclassFieldDefault {
 }
 
 /// RUF008
-pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
+pub(crate) fn mutable_dataclass_field_default(checker: &Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 
     let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic) else {

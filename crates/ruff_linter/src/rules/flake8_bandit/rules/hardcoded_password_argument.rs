@@ -53,7 +53,7 @@ impl Violation for HardcodedPasswordArgument {
 }
 
 /// S106
-pub(crate) fn hardcoded_password_func_arg(checker: &Checker, keywords: &[Keyword]) {
+pub(crate) fn hardcoded_password_argument(checker: &Checker, keywords: &[Keyword]) {
     for keyword in keywords {
         if string_literal(&keyword.value).is_none_or(str::is_empty) {
             continue;

@@ -69,7 +69,7 @@ impl Violation for BuiltinParameterShadowing {
 }
 
 /// A002
-pub(crate) fn parameter_shadows_builtin(checker: &Checker, parameter: &Parameter) {
+pub(crate) fn builtin_parameter_shadowing(checker: &Checker, parameter: &Parameter) {
     if shadows_builtin(
         parameter.name(),
         checker.source_type,

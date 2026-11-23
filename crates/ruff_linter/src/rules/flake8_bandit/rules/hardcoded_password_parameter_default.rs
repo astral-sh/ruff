@@ -73,7 +73,7 @@ fn check_password_kwarg(checker: &Checker, parameter: &Parameter, default: &Expr
 }
 
 /// S107
-pub(crate) fn hardcoded_password_default(checker: &Checker, parameters: &Parameters) {
+pub(crate) fn hardcoded_password_parameter_default(checker: &Checker, parameters: &Parameters) {
     for parameter in parameters.iter_non_variadic_params() {
         let Some(default) = parameter.default() else {
             continue;

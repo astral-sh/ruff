@@ -58,7 +58,7 @@ impl fmt::Display for ExceptionKind {
     }
 }
 
-fn detect_overly_broad_exception(
+fn detect_exception_or_base_exception(
     semantic: &ruff_python_semantic::SemanticModel<'_>,
     func: &Expr,
     arguments: &Arguments,
@@ -104,7 +104,7 @@ fn detect_overly_broad_exception(
 }
 
 /// B017
-pub(crate) fn assert_raises_overly_broad_exception(checker: &Checker, items: &[WithItem]) {
+pub(crate) fn assert_raises_exception_or_base_exception(checker: &Checker, items: &[WithItem]) {
     for item in items {
         let Expr::Call(ast::ExprCall {
             func,
@@ -121,7 +121,7 @@ pub(crate) fn assert_raises_overly_broad_exception(checker: &Checker, items: &[W
         }
 
         if let Some(exception) =
-            detect_overly_broad_exception(checker.semantic(), func.as_ref(), arguments)
+            detect_exception_or_base_exception(checker.semantic(), func.as_ref(), arguments)
         {
             checker.report_diagnostic(
                 AssertRaisesExceptionOrBaseException { exception },
@@ -132,7 +132,10 @@ pub(crate) fn assert_raises_overly_broad_exception(checker: &Checker, items: &[W
 }
 
 /// B017 (call form)
-pub(crate) fn assert_raises_overly_broad_exception_call(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn assert_raises_exception_or_base_exception_call(
+    checker: &Checker,
+    call: &ast::ExprCall,
+) {
     let ast::ExprCall {
         func,
         arguments,
@@ -145,7 +148,8 @@ pub(crate) fn assert_raises_overly_broad_exception_call(checker: &Checker, call:
         return;
     }
 
-    if let Some(exception) = detect_overly_broad_exception(semantic, func.as_ref(), arguments) {
+    if let Some(exception) = detect_exception_or_base_exception(semantic, func.as_ref(), arguments)
+    {
         checker.report_diagnostic(
             AssertRaisesExceptionOrBaseException { exception },
             call.range(),

@@ -61,7 +61,7 @@ impl Violation for PublicTypeVarInStub {
 }
 
 /// PYI001
-pub(crate) fn unprefixed_type_parameter_in_stub(checker: &Checker, value: &Expr, targets: &[Expr]) {
+pub(crate) fn public_type_var_in_stub(checker: &Checker, value: &Expr, targets: &[Expr]) {
     // If the typing modules were never imported, we'll never match below.
     if !checker.semantic().seen_typing() {
         return;

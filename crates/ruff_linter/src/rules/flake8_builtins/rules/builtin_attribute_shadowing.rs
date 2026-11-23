@@ -80,7 +80,7 @@ impl Violation for BuiltinAttributeShadowing {
 }
 
 /// A003
-pub(crate) fn attribute_shadows_builtin(
+pub(crate) fn builtin_attribute_shadowing(
     checker: &Checker,
     scope_id: ScopeId,
     scope: &Scope,

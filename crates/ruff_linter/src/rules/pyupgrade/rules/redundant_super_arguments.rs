@@ -70,7 +70,7 @@ impl Violation for RedundantSuperArguments {
 }
 
 /// UP008
-pub(crate) fn super_call_with_arguments(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn redundant_super_arguments(checker: &Checker, call: &ast::ExprCall) {
     // Only bother going through the super check at all if we're in a `super` call.
     // (We check this in `super_args` too, so this is just an optimization.)
     if !is_super_call_with_arguments(call, checker) {

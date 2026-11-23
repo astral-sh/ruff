@@ -660,9 +660,9 @@ mod tests {
 
     #[test_case(Path::new("ruff/RUF102.py"))]
     #[test_case(Path::new("ruff/RUF102_1.py"))]
-    fn invalid_rule_selector_external_rules(path: &Path) -> Result<()> {
+    fn unknown_rule_in_suppression_comment_external_rules(path: &Path) -> Result<()> {
         let snapshot = format!(
-            "invalid_rule_selector_external_rules_{}",
+            "unknown_rule_in_suppression_comment_external_rules_{}",
             path.to_string_lossy(),
         );
         let diagnostics = test_path(

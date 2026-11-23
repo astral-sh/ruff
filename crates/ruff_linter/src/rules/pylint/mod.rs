@@ -123,8 +123,14 @@ mod tests {
     #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
     #[test_case(Rule::InvalidGetenvKey, Path::new("invalid_getenv_key.py"))]
     #[test_case(Rule::IterationOverSet, Path::new("iteration_over_set.py"))]
-    #[test_case(Rule::LoggingTooFewArguments, Path::new("logging_too_few_args.py"))]
-    #[test_case(Rule::LoggingTooManyArguments, Path::new("logging_too_many_args.py"))]
+    #[test_case(
+        Rule::LoggingTooFewArguments,
+        Path::new("logging_too_few_arguments.py")
+    )]
+    #[test_case(
+        Rule::LoggingTooManyArguments,
+        Path::new("logging_too_many_arguments.py")
+    )]
     #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"))]
     #[test_case(Rule::ModifiedIteratingSet, Path::new("modified_iterating_set.py"))]
     #[test_case(

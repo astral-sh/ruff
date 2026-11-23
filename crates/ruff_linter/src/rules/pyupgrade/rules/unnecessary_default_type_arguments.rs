@@ -76,7 +76,7 @@ impl AlwaysFixableViolation for UnnecessaryDefaultTypeArguments {
 }
 
 /// UP043
-pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
+pub(crate) fn unnecessary_default_type_arguments(checker: &Checker, expr: &Expr) {
     let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
         return;
     };

@@ -59,7 +59,7 @@ impl Violation for ReSubPositionalArguments {
 }
 
 /// B034
-pub(crate) fn re_sub_positional_args(
+pub(crate) fn re_sub_positional_arguments(
     checker: &Checker,
     call: &ast::ExprCall,
     qualified_name: &QualifiedName,

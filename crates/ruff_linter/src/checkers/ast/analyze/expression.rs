@@ -150,7 +150,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 if checker.target_version() >= PythonVersion::PY313
                     || checker.semantic().in_stub_file()
                 {
-                    pyupgrade::rules::unnecessary_default_type_args(checker, expr);
+                    pyupgrade::rules::unnecessary_default_type_arguments(checker, expr);
                 }
             }
 
@@ -386,7 +386,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         pycodestyle::rules::ambiguous_variable_name(checker, id, expr.range());
                     }
                     if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
-                        flake8_builtins::rules::variable_shadows_builtin(checker, id, *range);
+                        flake8_builtins::rules::builtin_variable_shadowing(checker, id, *range);
                     }
                 }
                 _ => {}
@@ -607,15 +607,17 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                     );
                                 }
                                 Ok(summary) => {
-                                    if checker.is_rule_enabled(Rule::StrFormatUnusedKeywordArguments) {
-                                        pyflakes::rules::str_format_extra_named_arguments(
+                                    if checker
+                                        .is_rule_enabled(Rule::StrFormatUnusedKeywordArguments)
+                                    {
+                                        pyflakes::rules::str_format_unused_keyword_arguments(
                                             checker, call, &summary, keywords,
                                         );
                                     }
                                     if checker
                                         .is_rule_enabled(Rule::StrFormatUnusedPositionalArguments)
                                     {
-                                        pyflakes::rules::str_format_extra_positional_arguments(
+                                        pyflakes::rules::str_format_unused_positional_arguments(
                                             checker, call, &summary, args,
                                         );
                                     }
@@ -671,7 +673,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 pyupgrade::rules::deprecated_unittest_alias(checker, func);
             }
             if checker.is_rule_enabled(Rule::RedundantSuperArguments) {
-                pyupgrade::rules::super_call_with_arguments(checker, call);
+                pyupgrade::rules::redundant_super_arguments(checker, call);
             }
             if checker.is_rule_enabled(Rule::UnnecessaryEncodeUTF8) {
                 pyupgrade::rules::unnecessary_encode_utf8(checker, call);
@@ -795,7 +797,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_bandit::rules::exec(checker, func);
             }
             if checker.is_rule_enabled(Rule::HardcodedPasswordArgument) {
-                flake8_bandit::rules::hardcoded_password_func_arg(checker, keywords);
+                flake8_bandit::rules::hardcoded_password_argument(checker, keywords);
             }
             if checker.is_rule_enabled(Rule::SuspiciousSqlStringConstruction) {
                 flake8_bandit::rules::suspicious_sql_string_construction(checker, expr);
@@ -975,7 +977,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     flake8_gettext::rules::f_string_in_gettext_call(checker, func, args);
                 }
                 if checker.is_rule_enabled(Rule::StrFormatInGettextCall) {
-                    flake8_gettext::rules::format_in_gettext_call(checker, func, args);
+                    flake8_gettext::rules::str_format_in_gettext_call(checker, func, args);
                 }
                 if checker.is_rule_enabled(Rule::PrintfInGettextCall) {
                     flake8_gettext::rules::printf_in_gettext_call(checker, func, args);
@@ -1141,7 +1143,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 ruff::rules::non_octal_permissions(checker, call);
             }
             if checker.is_rule_enabled(Rule::AssertRaisesExceptionOrBaseException) {
-                flake8_bugbear::rules::assert_raises_overly_broad_exception_call(checker, call);
+                flake8_bugbear::rules::assert_raises_exception_or_base_exception_call(
+                    checker, call,
+                );
             }
         }
         Expr::Dict(dict) => {
@@ -1276,7 +1280,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                 );
                             }
                             if checker.is_rule_enabled(Rule::PercentFormatUnusedNamedArguments) {
-                                pyflakes::rules::percent_format_extra_named_arguments(
+                                pyflakes::rules::percent_format_unused_named_arguments(
                                     checker, &summary, right, location,
                                 );
                             }
@@ -1829,7 +1833,7 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
         flake8_print::rules::print_call(checker, call, &qualified_name);
     }
     if checker.is_rule_enabled(Rule::ReSubPositionalArguments) {
-        flake8_bugbear::rules::re_sub_positional_args(checker, call, &qualified_name);
+        flake8_bugbear::rules::re_sub_positional_arguments(checker, call, &qualified_name);
     }
     if checker.is_rule_enabled(Rule::UselessContextlibSuppress) {
         flake8_bugbear::rules::useless_contextlib_suppress(checker, call, &qualified_name);

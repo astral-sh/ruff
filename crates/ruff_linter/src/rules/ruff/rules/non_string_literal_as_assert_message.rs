@@ -38,7 +38,7 @@ impl Violation for NonStringLiteralAsAssertMessage {
 }
 
 /// RUF040
-pub(crate) fn invalid_assert_message_literal(checker: &Checker, stmt: &StmtAssert) {
+pub(crate) fn non_string_literal_as_assert_message(checker: &Checker, stmt: &StmtAssert) {
     let Some(message) = stmt.msg.as_deref() else {
         return;
     };

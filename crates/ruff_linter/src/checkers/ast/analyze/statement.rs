@@ -174,7 +174,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::LRUCacheCallWithoutArguments) {
                 if checker.target_version() >= PythonVersion::PY38 {
-                    pyupgrade::rules::lru_cache_without_arguments(checker, decorator_list);
+                    pyupgrade::rules::lru_cache_call_without_arguments(checker, decorator_list);
                 }
             }
             if checker.is_rule_enabled(Rule::LRUCacheWithMaxsizeNone) {
@@ -229,7 +229,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 );
             }
             if checker.is_rule_enabled(Rule::HardcodedPasswordParameterDefault) {
-                flake8_bandit::rules::hardcoded_password_default(checker, parameters);
+                flake8_bandit::rules::hardcoded_password_parameter_default(checker, parameters);
             }
             if checker.is_rule_enabled(Rule::SuspiciousMarkSafeUsage) {
                 for decorator in decorator_list {
@@ -305,7 +305,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 );
             }
             if checker.is_rule_enabled(Rule::BooleanPositionalParameterDefault) {
-                flake8_boolean_trap::rules::boolean_default_value_positional_parameter(
+                flake8_boolean_trap::rules::boolean_positional_parameter_default(
                     checker,
                     name,
                     decorator_list,
@@ -326,7 +326,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if !checker.semantic.current_scope().kind.is_class() {
                 if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
-                    flake8_builtins::rules::variable_shadows_builtin(checker, name, name.range());
+                    flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
                 }
             }
             if checker.is_rule_enabled(Rule::AsyncFunctionWithTimeout) {
@@ -512,7 +512,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_bugbear::rules::f_string_docstring(checker, body);
             }
             if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
-                flake8_builtins::rules::variable_shadows_builtin(checker, name, name.range());
+                flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
             }
             if checker.is_rule_enabled(Rule::DuplicateBases) {
                 pylint::rules::duplicate_bases(checker, name, arguments.as_deref());
@@ -709,7 +709,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     );
                 }
                 if checker.is_rule_enabled(Rule::BuiltinImportShadowing) {
-                    flake8_builtins::rules::import_shadows_builtin(checker, alias);
+                    flake8_builtins::rules::builtin_import_shadowing(checker, alias);
                 }
             }
         }
@@ -918,7 +918,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
                 if checker.is_rule_enabled(Rule::BuiltinImportShadowing) {
-                    flake8_builtins::rules::import_shadows_builtin(checker, alias);
+                    flake8_builtins::rules::builtin_import_shadowing(checker, alias);
                 }
             }
             if checker.is_rule_enabled(Rule::ImportSelf) {
@@ -1190,7 +1190,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ruff::rules::assert_with_print_message(checker, assert_stmt);
             }
             if checker.is_rule_enabled(Rule::NonStringLiteralAsAssertMessage) {
-                ruff::rules::invalid_assert_message_literal(checker, assert_stmt);
+                ruff::rules::non_string_literal_as_assert_message(checker, assert_stmt);
             }
         }
         Stmt::With(with_stmt @ ast::StmtWith { items, body, .. }) => {
@@ -1198,7 +1198,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
             if checker.is_rule_enabled(Rule::AssertRaisesExceptionOrBaseException) {
-                flake8_bugbear::rules::assert_raises_overly_broad_exception(checker, items);
+                flake8_bugbear::rules::assert_raises_exception_or_base_exception(checker, items);
             }
             if checker.is_rule_enabled(Rule::PytestRaisesWithMultipleStatements) {
                 flake8_pytest_style::rules::complex_raises(checker, stmt, items, body);
@@ -1504,9 +1504,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         .any(|scope| scope.kind.is_function())
                     {
                         if checker.is_rule_enabled(Rule::PublicTypeVarInStub) {
-                            flake8_pyi::rules::unprefixed_type_parameter_in_stub(
-                                checker, value, targets,
-                            );
+                            flake8_pyi::rules::public_type_var_in_stub(checker, value, targets);
                         }
                         if checker.is_rule_enabled(Rule::AssignmentDefaultInStub) {
                             flake8_pyi::rules::assignment_default_in_stub(checker, targets, value);
