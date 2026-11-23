@@ -3671,11 +3671,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) {
         let target = assignment.target(self.module());
 
-        let add = self.add_binding(target.into(), definition);
-        let target_ty =
-            self.infer_assignment_definition_impl(assignment, definition, add.type_context);
+        // A local name introduced by a single assignment in a class body has no
+        // earlier binding, including any import of a Final. Only an inherited
+        // declaration could constrain the initializer.
+        let db = self.db();
+        let scope = definition.file_scope(db);
+        let unconstrained = self.index.scope(scope).kind() == ScopeKind::Class
+            && definition.place(db).as_symbol().is_some_and(|id| {
+                let symbol = self.index.place_table(scope).symbol(id);
+                symbol.is_local()
+                    && !symbol.is_reassigned()
+                    && !symbol.is_declared()
+                    && inherited_class_body_declaration(db, self.index.use_def_map(scope), id)
+                        .is_none()
+            });
+        let add = (!unconstrained).then(|| self.add_binding(target.into(), definition));
+        let context = add.as_ref().map_or_default(|add| add.type_context);
+        let target_ty = self.infer_assignment_definition_impl(assignment, definition, context);
         self.store_expression_type(target, target_ty);
-        add.insert(self, target_ty);
+        if let Some(add) = add {
+            add.insert(self, target_ty);
+        } else {
+            self.bindings.insert(definition, target_ty);
+        }
     }
 
     fn stub_placeholder_binding_type(&self, value: &ast::Expr) -> Option<Type<'db>> {
