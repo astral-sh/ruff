@@ -410,13 +410,13 @@ impl<'db> SemanticIndex<'db> {
         &self.use_def_maps[scope_id]
     }
 
-    /// Returns the set of modules that are imported anywhere in this file.
+    /// Returns the modules imported anywhere in this file, including their parent packages.
     ///
     /// This set only considers `import` statements, not `from...import` statements.
     /// See `ModuleLiteralType::available_submodule_attributes` for discussion
     /// of why this analysis is intentionally limited.
-    pub fn imported_modules(&self) -> impl Iterator<Item = &ModuleName> {
-        self.imported_modules.iter()
+    pub fn imported_modules(&self) -> &FrozenSet<ModuleName> {
+        &self.imported_modules
     }
 
     #[track_caller]
