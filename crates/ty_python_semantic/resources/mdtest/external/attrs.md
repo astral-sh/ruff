@@ -59,8 +59,8 @@ class User2:
     _id: int
     name: str
 
-reveal_type(User1.__init__)  # revealed: (self: User1, id: int, name: str) -> None
-reveal_type(User2.__init__)  # revealed: (self: User2, id: int, name: str) -> None
+reveal_type(User1.__init__)  # revealed: (self: User1, /, id: int, name: str) -> None
+reveal_type(User2.__init__)  # revealed: (self: User2, /, id: int, name: str) -> None
 
 user1 = User1(id=1, name="John Doe")
 user2 = User2(id=1, name="John Doe")
@@ -99,7 +99,7 @@ An explicit alias overwrites underscore-stripping:
 class AliasedUser:
     _name: str = field(alias="_name")
 
-reveal_type(AliasedUser.__init__)  # revealed: (self: AliasedUser, _name: str) -> None
+reveal_type(AliasedUser.__init__)  # revealed: (self: AliasedUser, /, _name: str) -> None
 
 AliasedUser(_name="John Doe")  # ok
 ```
@@ -116,7 +116,7 @@ class VeryPrivateUser:
     __id: int
     __name__: str
 
-reveal_type(VeryPrivateUser.__init__)  # revealed: (self: VeryPrivateUser, VeryPrivateUser__id: int, name__: str) -> None
+reveal_type(VeryPrivateUser.__init__)  # revealed: (self: VeryPrivateUser, /, VeryPrivateUser__id: int, name__: str) -> None
 ```
 
 ## Usage of `field` parameters
