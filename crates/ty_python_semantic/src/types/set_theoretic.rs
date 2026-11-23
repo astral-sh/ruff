@@ -142,6 +142,18 @@ impl<'db> UnionType<'db> {
         env: &ProgramEnvironment<'db>,
         types: &[Type<'db>],
     ) -> Type<'db> {
+        // Most reads see one binding. Aliases still need expansion and literals
+        // and unions may still need normalization.
+        if let [ty] = types
+            && !matches!(
+                ty,
+                Type::Union(_) | Type::TypeAlias(_) | Type::LiteralValue(_)
+            )
+        {
+            ty.assert_not_recursive_var();
+            return *ty;
+        }
+
         // Successive reads often merge the same few bindings. Even two inputs can
         // require quadratic work if one is a wide union. Bound the key size so a
         // series of conditional assignments doesn't retain a growing list at each use.
