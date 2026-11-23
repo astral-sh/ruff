@@ -47,13 +47,13 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as it may lead to runtime errors when
-/// alongside libraries that rely on runtime type annotations, like Pydantic,
-/// on Python versions prior to Python 3.9.
+/// Ruff marks this fix as unsafe when targeting Python 3.9 or earlier. On
+/// Python versions before 3.9, libraries such as Pydantic can raise errors
+/// when they evaluate the rewritten annotations at runtime.
 ///
-/// In [preview], this rule can also add its own `__future__` import on Python
-/// 3.9 and earlier, if the [`lint.future-annotations`] setting is enabled. This
-/// also makes the fix unsafe.
+/// In [preview], the fix can add `from __future__ import annotations` on
+/// Python 3.9 or earlier when [`lint.future-annotations`] is enabled. This
+/// import changes how Python evaluates annotations throughout the file.
 ///
 /// ## Options
 /// - `target-version`
