@@ -406,6 +406,15 @@ fn divergent_type() {
     let top_div = div.materialize(db, MaterializationKind::Top, &visitor);
     let bottom_div = div.materialize(db, MaterializationKind::Bottom, &visitor);
 
+    let other = Type::divergent(salsa::plumbing::Id::from_bits(2));
+    let both = UnionType::from_elements(db, &env, [div, other, div]);
+    assert_eq!(both.expect_union().elements(db), [div, other]);
+    assert!(UnionType::from_elements(db, &env, [other, top_div]).is_object());
+    assert_eq!(
+        UnionType::from_elements(db, &env, [bottom_div, other]),
+        other
+    );
+
     assert!(top_div.is_divergent());
     assert!(bottom_div.is_divergent());
     assert!(!top_div.is_dynamic());

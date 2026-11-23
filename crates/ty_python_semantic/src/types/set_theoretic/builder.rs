@@ -1199,6 +1199,11 @@ impl<'db> UnionBuilder<'db> {
     /// other type.
     fn is_incomparable_for_union(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
         match (left, right) {
+            // Unmaterialized markers survive redundancy checks and are their own
+            // negations. Materialized markers can act like `object` or `Never`.
+            (Type::Divergent(left), Type::Divergent(right)) => {
+                left.materialization_kind().is_none() && right.materialization_kind().is_none()
+            }
             (Type::ClassLiteral(_), Type::ClassLiteral(_))
             | (Type::ModuleLiteral(_), Type::ModuleLiteral(_)) => true,
             // Distributing `Any & Literal["a", "b"]` produces one intersection per
