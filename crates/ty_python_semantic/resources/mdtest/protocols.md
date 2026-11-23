@@ -8064,6 +8064,30 @@ class Bar(Protocol[S]):
 z: S | Bar[S]
 ```
 
+### Literal members in a recursive protocol
+
+Comparing the two specializations of `Node` requires simplifying the union in `value`. If we discard
+a protocol from that union, we must keep any literals it would have replaced.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Literal, Protocol
+
+class Node[T](Protocol):
+    value: T | Node[int] | Node[Literal[1]] | Node[T] | str
+
+def check(node: Node[Literal[1]]) -> Node[Literal[1]] | Node[str]:
+    node.value = 1
+    node.value = 2  # error: [invalid-assignment]
+    return node
+```
+
 ### Recursive generic protocols with growing specializations
 
 This snippet caused a stack overflow in <https://github.com/astral-sh/ty/issues/1736> because the

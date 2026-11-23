@@ -184,6 +184,50 @@ def _(
     reveal_type(alias_first)  # revealed: NamedRed | Literal[Color.GREEN]
 ```
 
+A negative `TypeIs` check excludes `T` from `Color.BLUE`. Since `T` is a subtype of `RedOrBlue`,
+adding `RedOrBlue` restores `Color.BLUE`. If we have already found that `RedOrBlue` covers
+`Color.RED`, we remove `Color.RED` before restoring `Color.BLUE`. Otherwise, the three literals
+would combine into `Color` and ty would reject the return.
+
+```py
+from collections.abc import Callable
+from typing_extensions import TypeIs
+
+class RedOrBlue(Protocol):
+    @property
+    def name(self) -> Literal["RED", "BLUE"]: ...
+
+def pick[T: RedOrBlue](
+    test: Callable[[object], TypeIs[T]],
+    value: T,
+    fallback: RedOrBlue,
+    index: int,
+) -> Literal[Color.GREEN] | RedOrBlue:
+    if value is Color.RED or test(Color.BLUE):
+        return fallback
+    direct = (Color.RED, Color.GREEN, Color.BLUE, fallback)[index]
+    reveal_type(direct)  # revealed: Literal[Color.GREEN] | RedOrBlue
+    # Here the protocol first restores T, which in turn restores Color.BLUE.
+    return (Color.RED, Color.GREEN, value, Color.BLUE, fallback)[index]
+```
+
+If the protocol covers neither of the earlier literals, restoring the third completes the enum. We
+can then narrow `Color` to its last remaining member.
+
+```py
+def pick_red[T: NamedRed](
+    test: Callable[[object], TypeIs[T]],
+    fallback: NamedRed,
+    index: int,
+) -> Literal[Color.RED] | None:
+    if test(Color.RED):
+        return None
+    color = (Color.GREEN, Color.BLUE, Color.RED, fallback)[index]
+    if isinstance(color, Color) and color not in (Color.GREEN, Color.BLUE):
+        return color
+    return None
+```
+
 ## Unions of integer literals with a numerator protocol
 
 An integer is its own numerator, so only `1` satisfies this protocol.
