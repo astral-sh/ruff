@@ -68,6 +68,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
@@ -3143,7 +3144,15 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// allowing the caller to handle this case specially.
     fn instance_member(self, name: &str) -> InstanceMemberResult<'db> {
         let db = self.db;
-        let mut union = UnionBuilder::new(db, &self.env);
+        // Repeated writes to an attribute often see the same wide union from one class.
+        // Collect the inputs in MRO order so their normalization can be reused.
+        let mut types = SmallVec::<[Type<'db>; 1]>::new();
+        let combined_type = |types: &[Type<'db>]| {
+            if types.is_empty() {
+                return Type::Never;
+            }
+            UnionType::normalize_place_types(db, &self.env, types)
+        };
         let mut union_qualifiers = TypeQualifiers::empty();
         let mut definitely_bound_member: Option<PlaceAndQualifiers<'db>> = None;
         let mut provenance = Provenance::Unknown;
@@ -3218,7 +3227,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         // If the attribute is not definitely declared on this class, keep looking
                         // higher up in the MRO, and build a union of all inferred types (and
                         // possibly-declared types):
-                        union = union.add(ty);
+                        types.push(ty);
                         provenance = provenance.or(member_provenance);
 
                         // TODO: We could raise a diagnostic here if there are conflicting type
@@ -3231,7 +3240,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 &self.env,
                                 &pending_augmented_bindings,
                             );
-                            union = union.add(inferred_ty);
+                            types.push(inferred_ty);
                             provenance = provenance.or(inferred_provenance);
                             union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
                             pending_augmented_bindings.clear();
@@ -3260,11 +3269,11 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         }
 
                         if origin.is_declared() {
-                            if union.is_empty() {
+                            if combined_type(&types).is_never() {
                                 return InstanceMemberResult::Done(class_member.inner);
                             }
 
-                            union = union.add(class_member_ty);
+                            types.push(class_member_ty);
                             provenance = provenance.or(class_member_provenance);
                             union_qualifiers |= class_member.inner.qualifiers;
                         } else {
@@ -3273,7 +3282,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 &self.env,
                                 &pending_augmented_bindings,
                             );
-                            union = union.add(inferred_ty);
+                            types.push(inferred_ty);
                             provenance = provenance.or(inferred_provenance);
                             union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
                         }
@@ -3290,7 +3299,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             }
         }
 
-        let result = if union.is_empty() {
+        let ty = combined_type(&types);
+        let result = if ty.is_never() {
             Place::Undefined.with_qualifiers(TypeQualifiers::empty())
         } else {
             let boundness = if definitely_bound_member.is_some() {
@@ -3300,7 +3310,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             };
 
             Place::Defined(DefinedPlace {
-                ty: union.build(),
+                ty,
                 origin: TypeOrigin::Inferred,
                 definedness: boundness,
                 public_type_policy: PublicTypePolicy::Raw,
