@@ -142,12 +142,12 @@ impl<'db> UnionType<'db> {
         env: &ProgramEnvironment<'db>,
         types: &[Type<'db>],
     ) -> Type<'db> {
-        // Most reads see one binding. Aliases still need expansion and literals
-        // and unions may still need normalization.
+        // Most reads see one binding. The builder still needs to expand aliases,
+        // normalize literals and unions, and turn `Top[Divergent]` into plain `object`.
         if let [ty] = types
             && !matches!(
                 ty,
-                Type::Union(_) | Type::TypeAlias(_) | Type::LiteralValue(_)
+                Type::Union(_) | Type::TypeAlias(_) | Type::LiteralValue(_) | Type::Divergent(_)
             )
         {
             ty.assert_not_recursive_var();
