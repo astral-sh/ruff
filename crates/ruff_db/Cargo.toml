@@ -37,7 +37,6 @@ memchr = { workspace = true }
 path-slash = { workspace = true }
 pathdiff = { workspace = true }
 quick-xml = { workspace = true, optional = true }
-regex = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
 same-file = { workspace = true, optional = true }
@@ -76,7 +75,7 @@ serde = [
     "ruff_diagnostics/serde",
 ]
 # Exposes testing utilities.
-testing = ["dep:regex", "tracing-subscriber"]
+testing = ["tracing-subscriber"]
 
 [lints.cargo]
 redundant_homepage = "allow"

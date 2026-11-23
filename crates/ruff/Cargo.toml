@@ -78,7 +78,6 @@ tikv-jemallocator = { workspace = true }
 mimalloc = { workspace = true }
 
 [dev-dependencies]
-ruff_db = { workspace = true, features = ["testing"] }
 # Enable test rules during development
 ruff_linter = { workspace = true, features = ["clap", "test-rules"] }
 

@@ -3213,7 +3213,6 @@ dependencies = [
  "path-slash",
  "pathdiff",
  "quick-xml",
- "regex",
  "ruff_annotate_snippets",
  "ruff_cache",
  "ruff_diagnostics",

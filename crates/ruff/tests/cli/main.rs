@@ -8,7 +8,6 @@
 use anyhow::{Context as _, Result};
 use insta::internals::SettingsBindDropGuard;
 use insta_cmd::get_cargo_bin;
-use ruff_db::diagnostic::render::snapshot_dir_filter;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -23,6 +22,20 @@ mod show_settings;
 mod version;
 
 const BIN_NAME: &str = "ruff";
+
+/// Creates a regex filter for replacing temporary directory paths in snapshots
+pub(crate) fn tempdir_filter(path: impl AsRef<str>) -> String {
+    // Match raw paths and paths escaped in GitHub Actions or Azure Pipelines annotations.
+    let path = regex::escape(path.as_ref())
+        .replace('%', "%(25|AZP25)?")
+        .replace(':', "(:|%3A)")
+        .replace(',', "(,|%2C)")
+        .replace(';', "(;|%3B)")
+        .replace(r"\]", r"(\]|%5D)")
+        .replace('\r', r"(\r|%0D)")
+        .replace('\n', r"(\n|%0A)");
+    format!(r"{path}[\\/]?")
+}
 
 /// A test fixture for running ruff CLI tests with temporary directories and files.
 ///
@@ -83,8 +96,11 @@ impl CliTest {
 
         let mut settings = setup_settings(&project_dir, insta::Settings::clone_current());
 
-        settings.add_filter(&snapshot_dir_filter(&project_dir), "[TMP]/");
-        settings.add_filter(&snapshot_dir_filter(Self::crate_root()), "CRATE_ROOT/");
+        settings.add_filter(&tempdir_filter(project_dir.to_str().unwrap()), "[TMP]/");
+        settings.add_filter(
+            &tempdir_filter(Self::crate_root().to_str().unwrap()),
+            "CRATE_ROOT/",
+        );
         settings.add_filter(r#"\\([\w&&[^nr"]]\w|\s|\.)"#, "/$1");
         settings.add_filter(r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>");
         settings.add_filter(ruff_linter::VERSION, "[VERSION]");
