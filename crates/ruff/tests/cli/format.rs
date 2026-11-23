@@ -668,12 +668,7 @@ if __name__ == "__main__":
     say_hy("dear Ruff contributor")
 "#;
 
-    let test = CliTest::with_settings(|_project_dir, mut settings| {
-        // JSON double escapes backslashes
-        settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
-
-        settings
-    })?;
+    let test = CliTest::with_settings(crate::output_format_settings)?;
     test.write_file("input.py", CONTENT)?;
 
     let snapshot = format!("output_format_{output_format}");

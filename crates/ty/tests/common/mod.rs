@@ -174,16 +174,7 @@ impl CliTest {
 }
 
 fn tempdir_filter(path: &Path) -> String {
-    // Match raw paths and paths escaped in GitHub Actions or Azure Pipelines annotations.
-    let path = regex::escape(path.to_str().unwrap())
-        .replace('%', "%(25|AZP25)?")
-        .replace(':', "(:|%3A)")
-        .replace(',', "(,|%2C)")
-        .replace(';', "(;|%3B)")
-        .replace(r"\]", r"(\]|%5D)")
-        .replace('\r', r"(\r|%0D)")
-        .replace('\n', r"(\n|%0A)");
-    format!(r"{path}\\?/?")
+    format!(r"{}\\?/?", regex::escape(path.to_str().unwrap()))
 }
 
 pub(crate) fn user_config_directory_env_var() -> &'static str {

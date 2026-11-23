@@ -25,16 +25,16 @@ const BIN_NAME: &str = "ruff";
 
 /// Creates a regex filter for replacing temporary directory paths in snapshots
 pub(crate) fn tempdir_filter(path: impl AsRef<str>) -> String {
-    // Match raw paths and paths escaped in GitHub Actions or Azure Pipelines annotations.
-    let path = regex::escape(path.as_ref())
-        .replace('%', "%(25|AZP25)?")
-        .replace(':', "(:|%3A)")
-        .replace(',', "(,|%2C)")
-        .replace(';', "(;|%3B)")
-        .replace(r"\]", r"(\]|%5D)")
-        .replace('\r', r"(\r|%0D)")
-        .replace('\n', r"(\n|%0A)");
-    format!(r"{path}[\\/]?")
+    format!(r"{}[\\/]?", regex::escape(path.as_ref()))
+}
+
+fn output_format_settings(_: &Path, mut settings: insta::Settings) -> insta::Settings {
+    // JSON double escapes backslashes.
+    settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
+    // CI annotations can contain an escaped directory prefix.
+    settings.add_filter(r",file=[^,\n]+[\\/]", ",file=[TMP]/");
+    settings.add_filter(r";sourcepath=[^;\n]+[\\/]", ";sourcepath=[TMP]/");
+    settings
 }
 
 /// A test fixture for running ruff CLI tests with temporary directories and files.

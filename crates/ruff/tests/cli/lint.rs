@@ -4551,12 +4551,7 @@ match 42:  # invalid-syntax
     case _: ...
 ";
 
-    let fixture = CliTest::with_settings(|_project_dir, mut settings| {
-        // JSON double escapes backslashes
-        settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
-
-        settings
-    })?;
+    let fixture = CliTest::with_settings(crate::output_format_settings)?;
 
     fixture.write_file("input.py", CONTENT)?;
 
@@ -4600,12 +4595,7 @@ match 42:  # invalid-syntax
     case _: ...
 ";
 
-    let fixture = CliTest::with_settings(|_project_dir, mut settings| {
-        // JSON double escapes backslashes
-        settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
-
-        settings
-    })?;
+    let fixture = CliTest::with_settings(crate::output_format_settings)?;
 
     fixture.write_file("input.py", CONTENT)?;
 
