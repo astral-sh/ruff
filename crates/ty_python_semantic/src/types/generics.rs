@@ -2130,40 +2130,41 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
-        // A failed first comparison rules out the relation. Materialize the remaining
-        // endpoints only when we need the second comparison.
-        let source = |kind| source_type.materialize(db, kind, self.materialization_visitor);
-        let target = |kind| target_type.materialize(db, kind, self.materialization_visitor);
+        let materialize =
+            |ty: Type<'db>, kind| ty.materialize(db, kind, self.materialization_visitor);
         let is_subtype_of = |source, target| self.check_type_pair(db, source, target);
-        match (source_materialization, target_materialization) {
-            // `source` is a subtype of `target` if the range of materializations covered by `source`
-            // is a subset of the range covered by `target`.
-            (Top, Top) => {
-                is_subtype_of(target(Bottom), source(Bottom)).and(db, self.constraints, || {
-                    is_subtype_of(source(Top), target(Top))
-                })
-            }
-            // One bottom is a subtype of another if it covers a strictly larger set of materializations.
-            (Bottom, Bottom) => {
-                is_subtype_of(source(Bottom), target(Bottom)).and(db, self.constraints, || {
-                    is_subtype_of(target(Top), source(Top))
-                })
-            }
-            // The ranges overlap when each lower bound is a subtype of the other upper bound.
-            // Their common materialization can lie strictly inside both ranges: neither the
-            // lower bounds nor the upper bounds need to be comparable to each other.
-            (Bottom, Top) => {
-                is_subtype_of(source(Bottom), target(Top)).and(db, self.constraints, || {
-                    is_subtype_of(target(Bottom), source(Top))
-                })
-            }
-            // A top materialization is a subtype of a bottom materialization only if both original
-            // un-materialized types are the same fully static type.
-            (Top, Bottom) => {
-                is_subtype_of(source(Top), target(Bottom)).and(db, self.constraints, || {
-                    is_subtype_of(target(Top), source(Bottom))
-                })
-            }
+
+        if source_materialization == target_materialization {
+            // Top preserves inclusion between the ranges of materializations. Bottom reverses it.
+            let (inner, outer) = match source_materialization {
+                Top => (source_type, target_type),
+                Bottom => (target_type, source_type),
+            };
+            // If the lower bounds rule out inclusion, we don't need the upper bounds.
+            return is_subtype_of(materialize(outer, Bottom), materialize(inner, Bottom)).and(
+                db,
+                self.constraints,
+                || is_subtype_of(materialize(inner, Top), materialize(outer, Top)),
+            );
+        }
+
+        // For opposite materializations, keep expanding each top before its bottom. Expanding
+        // the bottom first can exhaust the stack when excluding a recursive alias.
+        let source_top = materialize(source_type, Top);
+        let source_bottom = materialize(source_type, Bottom);
+        let target_top = materialize(target_type, Top);
+        let target_bottom = materialize(target_type, Bottom);
+
+        match source_materialization {
+            // Bottom to top requires overlap. The common materialization can lie strictly
+            // inside both ranges.
+            Bottom => is_subtype_of(source_bottom, target_top).and(db, self.constraints, || {
+                is_subtype_of(target_bottom, source_top)
+            }),
+            // Top to bottom requires both ranges to describe the same fully static type.
+            Top => is_subtype_of(source_top, target_bottom).and(db, self.constraints, || {
+                is_subtype_of(target_top, source_bottom)
+            }),
         }
     }
 }
