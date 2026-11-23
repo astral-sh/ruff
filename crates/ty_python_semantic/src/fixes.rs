@@ -1292,25 +1292,25 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
+        # ty: ignore[unknown-rule-in-ignore-comment] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
         value = 1 / 0
         ```
 
         ## Diagnostics after applying fixes
 
         warning[unused-ignore-comment]: Unused `ty: ignore` directive
-         --> test.py:2:68
+         --> test.py:2:71
           |
         1 | seen_code = True
-        2 | # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
-          |                                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        2 | # ty: ignore[unknown-rule-in-ignore-comment] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
+          |                                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         3 | value = 1 / 0
           |
         help: Remove the unused suppression comment
           |
         1 | seen_code = True
-          - # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
-        2 + # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule]
+          - # ty: ignore[unknown-rule-in-ignore-comment] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
+        2 + # ty: ignore[unknown-rule-in-ignore-comment] # ty: ignore[not-a-rule]
         3 | value = 1 / 0
           |
         "

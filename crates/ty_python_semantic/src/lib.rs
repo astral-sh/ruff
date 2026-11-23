@@ -4,8 +4,8 @@
 )]
 use crate::lint::{LintRegistry, LintRegistryBuilder};
 use crate::suppression::{
-    BLANKET_IGNORE_COMMENT, IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT,
-    RENAMED_RULE_IN_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT,
+    BLANKET_IGNORE_COMMENT, INVALID_IGNORE_COMMENT, RENAMED_RULE_IN_IGNORE_COMMENT,
+    UNKNOWN_RULE_IN_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT,
 };
 use crate::types::check_types;
 pub use db::Db;
@@ -14,7 +14,7 @@ pub use diagnostic::inferred_python_version_source_annotation;
 pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
 pub use place::definitions::DefinitionResolution;
 use ruff_db::PythonFile;
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
@@ -93,7 +93,11 @@ pub fn register_lints(registry: &mut LintRegistryBuilder) {
     types::register_lints(registry);
     registry.register_lint(&UNUSED_IGNORE_COMMENT);
     registry.register_lint(&UNUSED_TYPE_IGNORE_COMMENT);
-    registry.register_lint(&IGNORE_COMMENT_UNKNOWN_RULE);
+    registry.register_lint(&UNKNOWN_RULE_IN_IGNORE_COMMENT);
+    registry.register_alias(
+        LintName::of("ignore-comment-unknown-rule"),
+        &UNKNOWN_RULE_IN_IGNORE_COMMENT,
+    );
     registry.register_lint(&RENAMED_RULE_IN_IGNORE_COMMENT);
     registry.register_lint(&INVALID_IGNORE_COMMENT);
     registry.register_lint(&BLANKET_IGNORE_COMMENT);

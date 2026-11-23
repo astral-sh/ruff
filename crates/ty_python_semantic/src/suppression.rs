@@ -46,8 +46,8 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[doc = include_str!("../resources/lint_docs/ignore-comment-unknown-rule.md")]
-    pub(crate) static IGNORE_COMMENT_UNKNOWN_RULE = {
+    #[doc = include_str!("../resources/lint_docs/unknown-rule-in-ignore-comment.md")]
+    pub(crate) static UNKNOWN_RULE_IN_IGNORE_COMMENT = {
         summary: "detects `ty: ignore` comments that reference unknown rules",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Warn,
@@ -195,12 +195,12 @@ fn check_blanket_suppressions(context: &mut CheckSuppressionsContext) {
 
 /// Checks for `ty: ignore` and `type: ignore[ty:<code>]` comments that reference unknown rules.
 fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
-    if context.is_lint_disabled(&IGNORE_COMMENT_UNKNOWN_RULE) {
+    if context.is_lint_disabled(&UNKNOWN_RULE_IN_IGNORE_COMMENT) {
         return;
     }
 
     for unknown in &context.suppressions.unknown {
-        if let Some(diag) = context.report_lint(&IGNORE_COMMENT_UNKNOWN_RULE, unknown.range) {
+        if let Some(diag) = context.report_lint(&UNKNOWN_RULE_IN_IGNORE_COMMENT, unknown.range) {
             let mut diag = diag.into_diagnostic(&unknown.reason);
             if let Some(info) = unknown.reason.info() {
                 diag.info(info);
