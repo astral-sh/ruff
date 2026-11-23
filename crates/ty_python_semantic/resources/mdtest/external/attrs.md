@@ -57,7 +57,7 @@ class User1:
 @define
 class User2:
     _id: int
-    name: str = field()
+    name: str
 
 reveal_type(User1.__init__)  # revealed: (self: User1, id: int, name: str) -> None
 reveal_type(User2.__init__)  # revealed: (self: User2, id: int, name: str) -> None
