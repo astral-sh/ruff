@@ -89,6 +89,7 @@ The signature for `__replace__` also uses the stripped name:
 ```py
 copy.replace(user1, id=2)  # ok
 copy.replace(user2, id=2)  # ok
+copy.replace(user2, _id=3)  # error: [unknown-argument]
 ```
 
 An explicit alias overwrites underscore-stripping:
