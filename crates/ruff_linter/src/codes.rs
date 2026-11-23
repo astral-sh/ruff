@@ -321,18 +321,18 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pyflakes, "405") => rules::pyflakes::rules::PossiblyUndefinedNameWithStarImport,
         (Pyflakes, "406") => rules::pyflakes::rules::NonModuleLevelStarImport,
         (Pyflakes, "407") => rules::pyflakes::rules::FutureFeatureNotDefined,
-        (Pyflakes, "501") => rules::pyflakes::rules::PercentFormatInvalidFormat,
+        (Pyflakes, "501") => rules::pyflakes::rules::PercentFormatInvalidSyntax,
         (Pyflakes, "502") => rules::pyflakes::rules::PercentFormatExpectedMapping,
         (Pyflakes, "503") => rules::pyflakes::rules::PercentFormatExpectedSequence,
-        (Pyflakes, "504") => rules::pyflakes::rules::PercentFormatExtraNamedArguments,
+        (Pyflakes, "504") => rules::pyflakes::rules::PercentFormatUnusedNamedArguments,
         (Pyflakes, "505") => rules::pyflakes::rules::PercentFormatMissingArgument,
         (Pyflakes, "506") => rules::pyflakes::rules::PercentFormatMixedPositionalAndNamed,
         (Pyflakes, "507") => rules::pyflakes::rules::PercentFormatPositionalCountMismatch,
         (Pyflakes, "508") => rules::pyflakes::rules::PercentFormatStarRequiresSequence,
         (Pyflakes, "509") => rules::pyflakes::rules::PercentFormatUnsupportedFormatCharacter,
-        (Pyflakes, "521") => rules::pyflakes::rules::StrFormatInvalidFormat,
-        (Pyflakes, "522") => rules::pyflakes::rules::StrFormatExtraNamedArguments,
-        (Pyflakes, "523") => rules::pyflakes::rules::StrFormatExtraPositionalArguments,
+        (Pyflakes, "521") => rules::pyflakes::rules::StrFormatInvalidSyntax,
+        (Pyflakes, "522") => rules::pyflakes::rules::StrFormatUnusedKeywordArguments,
+        (Pyflakes, "523") => rules::pyflakes::rules::StrFormatUnusedPositionalArguments,
         (Pyflakes, "524") => rules::pyflakes::rules::StrFormatMissingArguments,
         (Pyflakes, "525") => rules::pyflakes::rules::StrFormatMixedPlaceholderNumbering,
         (Pyflakes, "541") => rules::pyflakes::rules::FStringMissingPlaceholders,
@@ -398,8 +398,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pylint, "E1132") => rules::pylint::rules::RepeatedKeywordArgument,
         (Pylint, "E1141") => rules::pylint::rules::DictIterMissingItems,
         (Pylint, "E1142") => rules::pylint::rules::AwaitOutsideAsync,
-        (Pylint, "E1205") => rules::pylint::rules::LoggingTooManyArgs,
-        (Pylint, "E1206") => rules::pylint::rules::LoggingTooFewArgs,
+        (Pylint, "E1205") => rules::pylint::rules::LoggingTooManyArguments,
+        (Pylint, "E1206") => rules::pylint::rules::LoggingTooFewArguments,
         (Pylint, "E1300") => rules::pylint::rules::BadStringFormatCharacter,
         (Pylint, "E1307") => rules::pylint::rules::BadStringFormatType,
         (Pylint, "E1310") => rules::pylint::rules::BadStrStripCall,
@@ -499,12 +499,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Async, "401") => rules::flake8_async::rules::PytestRaisesExceptionGroup,
 
         // flake8-builtins
-        (Flake8Builtins, "001") => rules::flake8_builtins::rules::VariableShadowsBuiltin,
-        (Flake8Builtins, "002") => rules::flake8_builtins::rules::ParameterShadowsBuiltin,
-        (Flake8Builtins, "003") => rules::flake8_builtins::rules::AttributeShadowsBuiltin,
-        (Flake8Builtins, "004") => rules::flake8_builtins::rules::ImportShadowsBuiltin,
+        (Flake8Builtins, "001") => rules::flake8_builtins::rules::BuiltinVariableShadowing,
+        (Flake8Builtins, "002") => rules::flake8_builtins::rules::BuiltinParameterShadowing,
+        (Flake8Builtins, "003") => rules::flake8_builtins::rules::BuiltinAttributeShadowing,
+        (Flake8Builtins, "004") => rules::flake8_builtins::rules::BuiltinImportShadowing,
         (Flake8Builtins, "005") => rules::flake8_builtins::rules::StdlibModuleShadowing,
-        (Flake8Builtins, "006") => rules::flake8_builtins::rules::LambdaParameterShadowsBuiltin,
+        (Flake8Builtins, "006") => rules::flake8_builtins::rules::BuiltinLambdaParameterShadowing,
 
         // flake8-bugbear
         (Flake8Bugbear, "002") => rules::flake8_bugbear::rules::UnaryPrefixIncrementDecrement,
@@ -522,7 +522,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Bugbear, "014") => rules::flake8_bugbear::rules::DuplicateHandlerException,
         (Flake8Bugbear, "015") => rules::flake8_bugbear::rules::UselessComparison,
         (Flake8Bugbear, "016") => rules::flake8_bugbear::rules::RaiseLiteral,
-        (Flake8Bugbear, "017") => rules::flake8_bugbear::rules::AssertRaisesOverlyBroadException,
+        (Flake8Bugbear, "017") => rules::flake8_bugbear::rules::AssertRaisesExceptionOrBaseException,
         (Flake8Bugbear, "018") => rules::flake8_bugbear::rules::UselessExpression,
         (Flake8Bugbear, "019") => rules::flake8_bugbear::rules::CachedInstanceMethod,
         (Flake8Bugbear, "020") => rules::flake8_bugbear::rules::LoopVariableOverridesIterator,
@@ -539,7 +539,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Bugbear, "031") => rules::flake8_bugbear::rules::ReuseOfGroupbyGenerator,
         (Flake8Bugbear, "032") => rules::flake8_bugbear::rules::UnintentionalTypeAnnotation,
         (Flake8Bugbear, "033") => rules::flake8_bugbear::rules::DuplicateValue,
-        (Flake8Bugbear, "034") => rules::flake8_bugbear::rules::ReSubPositionalArgs,
+        (Flake8Bugbear, "034") => rules::flake8_bugbear::rules::ReSubPositionalArguments,
         (Flake8Bugbear, "035") => rules::flake8_bugbear::rules::StaticKeyDictComprehension,
         (Flake8Bugbear, "039") => rules::flake8_bugbear::rules::MutableContextvarDefault,
         (Flake8Bugbear, "043") => rules::flake8_bugbear::rules::DelattrWithConstant,
@@ -552,7 +552,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Bugbear, "912") => rules::flake8_bugbear::rules::MapWithoutExplicitStrict,
 
         // flake8-blind-except
-        (Flake8BlindExcept, "001") => rules::flake8_blind_except::rules::ExceptOverlyBroadException,
+        (Flake8BlindExcept, "001") => rules::flake8_blind_except::rules::CatchExceptionOrBaseException,
 
         // flake8-comprehensions
         (Flake8Comprehensions, "00") => rules::flake8_comprehensions::rules::UnnecessaryGeneratorList,
@@ -600,7 +600,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         // flake8-gettext
         (Flake8GetText, "001") => rules::flake8_gettext::rules::FStringInGettextCall,
-        (Flake8GetText, "002") => rules::flake8_gettext::rules::FormatInGettextCall,
+        (Flake8GetText, "002") => rules::flake8_gettext::rules::StrFormatInGettextCall,
         (Flake8GetText, "003") => rules::flake8_gettext::rules::PrintfInGettextCall,
 
         // flake8-implicit-str-concat
@@ -621,9 +621,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Quotes, "004") => rules::flake8_quotes::rules::UnnecessaryEscapedQuote,
 
         // flake8-annotations
-        (Flake8Annotations, "001") => rules::flake8_annotations::rules::UnannotatedParameter,
-        (Flake8Annotations, "002") => rules::flake8_annotations::rules::UnannotatedVariadicPositionalParameter,
-        (Flake8Annotations, "003") => rules::flake8_annotations::rules::UnannotatedVariadicKeywordParameter,
+        (Flake8Annotations, "001") => rules::flake8_annotations::rules::MissingParameterAnnotation,
+        (Flake8Annotations, "002") => rules::flake8_annotations::rules::MissingArgsAnnotation,
+        (Flake8Annotations, "003") => rules::flake8_annotations::rules::MissingKwargsAnnotation,
         #[allow(deprecated)]
         (Flake8Annotations, "101") => rules::flake8_annotations::rules::MissingTypeSelf,
         #[allow(deprecated)]
@@ -693,10 +693,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pyupgrade, "005") => rules::pyupgrade::rules::DeprecatedUnittestAlias,
         (Pyupgrade, "006") => rules::pyupgrade::rules::NonPEP585Annotation,
         (Pyupgrade, "007") => rules::pyupgrade::rules::NonPEP604AnnotationUnion,
-        (Pyupgrade, "008") => rules::pyupgrade::rules::SuperCallWithArguments,
+        (Pyupgrade, "008") => rules::pyupgrade::rules::RedundantSuperArguments,
         (Pyupgrade, "009") => rules::pyupgrade::rules::UTF8EncodingDeclaration,
         (Pyupgrade, "010") => rules::pyupgrade::rules::UnnecessaryFutureImport,
-        (Pyupgrade, "011") => rules::pyupgrade::rules::LRUCacheWithoutArguments,
+        (Pyupgrade, "011") => rules::pyupgrade::rules::LRUCacheCallWithoutArguments,
         (Pyupgrade, "012") => rules::pyupgrade::rules::UnnecessaryEncodeUTF8,
         (Pyupgrade, "013") => rules::pyupgrade::rules::FunctionalTypedDict,
         (Pyupgrade, "014") => rules::pyupgrade::rules::FunctionalNamedTuple,
@@ -727,7 +727,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pyupgrade, "040") => rules::pyupgrade::rules::NonPEP695TypeAlias,
         (Pyupgrade, "041") => rules::pyupgrade::rules::TimeoutErrorAlias,
         (Pyupgrade, "042") => rules::pyupgrade::rules::ManualStrEnum,
-        (Pyupgrade, "043") => rules::pyupgrade::rules::UnnecessaryDefaultTypeArgs,
+        (Pyupgrade, "043") => rules::pyupgrade::rules::UnnecessaryDefaultTypeArguments,
         (Pyupgrade, "044") => rules::pyupgrade::rules::NonPEP646Unpack,
         (Pyupgrade, "045") => rules::pyupgrade::rules::NonPEP604AnnotationOptional,
         (Pyupgrade, "046") => rules::pyupgrade::rules::NonPEP695GenericClass,
@@ -819,8 +819,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Bandit, "103") => rules::flake8_bandit::rules::BadFilePermissions,
         (Flake8Bandit, "104") => rules::flake8_bandit::rules::HardcodedBindAllInterfaces,
         (Flake8Bandit, "105") => rules::flake8_bandit::rules::HardcodedPasswordString,
-        (Flake8Bandit, "106") => rules::flake8_bandit::rules::HardcodedPasswordFuncArg,
-        (Flake8Bandit, "107") => rules::flake8_bandit::rules::HardcodedPasswordDefault,
+        (Flake8Bandit, "106") => rules::flake8_bandit::rules::HardcodedPasswordArgument,
+        (Flake8Bandit, "107") => rules::flake8_bandit::rules::HardcodedPasswordParameterDefault,
         (Flake8Bandit, "108") => rules::flake8_bandit::rules::HardcodedTempFile,
         (Flake8Bandit, "110") => rules::flake8_bandit::rules::TryExceptPass,
         (Flake8Bandit, "112") => rules::flake8_bandit::rules::TryExceptContinue,
@@ -890,7 +890,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         // flake8-boolean-trap
         (Flake8BooleanTrap, "001") => rules::flake8_boolean_trap::rules::BooleanAnnotatedPositionalParameter,
-        (Flake8BooleanTrap, "002") => rules::flake8_boolean_trap::rules::BooleanDefaultValuePositionalParameter,
+        (Flake8BooleanTrap, "002") => rules::flake8_boolean_trap::rules::BooleanPositionalParameterDefault,
         (Flake8BooleanTrap, "003") => rules::flake8_boolean_trap::rules::BooleanPositionalValueInCall,
 
         // flake8-unused-arguments
@@ -945,7 +945,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8ErrMsg, "103") => rules::flake8_errmsg::rules::StrFormatInException,
 
         // flake8-pyi
-        (Flake8Pyi, "001") => rules::flake8_pyi::rules::UnprefixedTypeParameterInStub,
+        (Flake8Pyi, "001") => rules::flake8_pyi::rules::PublicTypeVarInStub,
         (Flake8Pyi, "002") => rules::flake8_pyi::rules::ComplexIfStatementInStub,
         (Flake8Pyi, "003") => rules::flake8_pyi::rules::UnrecognizedVersionInfoCheckInStub,
         (Flake8Pyi, "004") => rules::flake8_pyi::rules::PatchVersionComparisonInStub,
@@ -1003,7 +1003,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle,
-        (Flake8PytestStyle, "002") => rules::flake8_pytest_style::rules::PytestFixturePositionalArgs,
+        (Flake8PytestStyle, "002") => rules::flake8_pytest_style::rules::PytestFixturePositionalArguments,
         (Flake8PytestStyle, "003") => rules::flake8_pytest_style::rules::PytestExtraneousScopeFunction,
         #[allow(deprecated)]
         (Flake8PytestStyle, "004") => rules::flake8_pytest_style::rules::PytestMissingFixtureNameUnderscore,
@@ -1022,7 +1022,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8PytestStyle, "016") => rules::flake8_pytest_style::rules::PytestFailWithoutMessage,
         (Flake8PytestStyle, "017") => rules::flake8_pytest_style::rules::PytestAssertInExcept,
         (Flake8PytestStyle, "018") => rules::flake8_pytest_style::rules::PytestCompositeAssertion,
-        (Flake8PytestStyle, "019") => rules::flake8_pytest_style::rules::PytestFixtureParamWithoutValue,
+        (Flake8PytestStyle, "019") => rules::flake8_pytest_style::rules::PytestFixtureParameterWithoutValue,
         (Flake8PytestStyle, "020") => rules::flake8_pytest_style::rules::PytestDeprecatedYieldFixture,
         (Flake8PytestStyle, "021") => rules::flake8_pytest_style::rules::PytestFixtureFinalizerCallback,
         (Flake8PytestStyle, "022") => rules::flake8_pytest_style::rules::PytestUselessYieldFixture,
@@ -1164,7 +1164,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Ruff, "005") => rules::ruff::rules::CollectionLiteralConcatenation,
         (Ruff, "006") => rules::ruff::rules::AsyncioDanglingTask,
         (Ruff, "007") => rules::ruff::rules::ZipInsteadOfPairwise,
-        (Ruff, "008") => rules::ruff::rules::MutableDataclassDefault,
+        (Ruff, "008") => rules::ruff::rules::MutableDataclassFieldDefault,
         (Ruff, "009") => rules::ruff::rules::FunctionCallInDataclassFieldDefault,
         (Ruff, "010") => rules::ruff::rules::ExplicitFStringTypeConversion,
         (Ruff, "011") => rules::ruff::rules::RuffStaticKeyDictComprehension,
@@ -1194,7 +1194,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Ruff, "037") => rules::ruff::rules::UnnecessaryEmptyIterableWithinDequeCall,
         (Ruff, "038") => rules::ruff::rules::RedundantBoolLiteral,
         (Ruff, "039") => rules::ruff::rules::UnrawRePattern,
-        (Ruff, "040") => rules::ruff::rules::InvalidAssertMessageLiteral,
+        (Ruff, "040") => rules::ruff::rules::NonStringLiteralAsAssertMessage,
         (Ruff, "041") => rules::ruff::rules::UnnecessaryNestedLiteral,
         (Ruff, "043") => rules::ruff::rules::PytestRaisesAmbiguousPattern,
         (Ruff, "045") => rules::ruff::rules::ImplicitClassVarInDataclass,
