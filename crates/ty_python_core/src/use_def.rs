@@ -2189,13 +2189,13 @@ impl PendingReachability {
     ///
     /// When all bindings start at `ALWAYS_TRUE`, they follow the same sequence of ANDs.
     /// Computing that prefix once preserves the order even at the constraint limit.
-    fn materialize_branch(
+    fn materialize_branch<'a>(
         &mut self,
-        mut pending: PendingPlaceState,
+        pending: &'a mut PendingPlaceState,
         branch: PendingBranch,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) -> PlaceState {
+    ) -> &'a PlaceState {
         let start = pending.narrowing;
         let fork = branch.last_fork;
         let bindings = pending.state.bindings().as_slice();
@@ -2212,13 +2212,12 @@ impl PendingReachability {
                 .record_narrowing_constraint(narrowing_constraints, constraint);
             pending.narrowing = fork;
         }
-        self.materialize(
-            &mut pending,
+        self.materialize_ref(
+            pending,
             branch.tip,
             narrowing_constraints,
             reachability_constraints,
-        );
-        Rc::unwrap_or_clone(pending.state)
+        )
     }
 
     /// Merges an alternative branch's place states into the current control-flow path.
@@ -2248,7 +2247,7 @@ impl PendingReachability {
         let mut last_singleton_merge = None;
         let mut branch_states = branch_states.into_iter();
         for current in current_states {
-            let Some(branch_state) = branch_states.next() else {
+            let Some(mut branch_state) = branch_states.next() else {
                 let current = self.materialize(
                     current,
                     self.current,
@@ -2256,7 +2255,7 @@ impl PendingReachability {
                     reachability_constraints,
                 );
                 current.merge(
-                    PlaceState::undefined(branch_reachability),
+                    &PlaceState::undefined(branch_reachability),
                     narrowing_constraints,
                     reachability_constraints,
                 );
@@ -2338,7 +2337,7 @@ impl PendingReachability {
             }
 
             let branch_state = self.materialize_branch(
-                branch_state,
+                &mut branch_state,
                 branch,
                 narrowing_constraints,
                 reachability_constraints,
@@ -2351,7 +2350,7 @@ impl PendingReachability {
             );
             if let Some(inputs) = inputs {
                 let merged = current.merge_singleton(
-                    &branch_state,
+                    branch_state,
                     narrowing_constraints,
                     reachability_constraints,
                 );
@@ -2896,7 +2895,7 @@ impl<'db> UseDefMapBuilder<'db> {
         );
 
         symbol_state.merge(
-            post_definition_state,
+            &post_definition_state,
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
         );
@@ -2927,7 +2926,7 @@ impl<'db> UseDefMapBuilder<'db> {
             );
 
             member_state.merge(
-                post_definition_state,
+                &post_definition_state,
                 &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,
             );
@@ -3323,8 +3322,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,
             )
-            .bindings()
-            .clone();
+            .bindings();
         match self.enclosing_snapshots.get_mut(snapshot_id) {
             Some(EnclosingSnapshot::Bindings(bindings)) => {
                 bindings.merge(
