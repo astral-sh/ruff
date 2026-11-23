@@ -1,7 +1,12 @@
+use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
 
-use crate::Db;
-use crate::types::{DataclassFlags, FunctionType, KnownFunction, StaticClassLiteral};
+use crate::types::known_instance::FieldInstanceKind;
+use crate::types::{
+    BoundTypeVarInstance, DataclassFlags, FunctionType, GenericContext, KnownFunction, Parameter,
+    Parameters, Signature, StaticClassLiteral, Type, TypeVarVariance,
+};
+use crate::{Db, ProgramEnvironment};
 
 /// Returns whether `class` is directly decorated with an `attrs` class decorator.
 pub(in crate::types) fn is_attrs_class<'db>(
@@ -46,4 +51,36 @@ pub(in crate::types) fn effective_field_alias(
     } else {
         Some(name.trim_start_matches('_').into())
     }
+}
+
+/// Recognizes attrs field specifiers like `attr.ib` and `attrs.field`.
+pub(in crate::types) fn field_instance_kind<'db>(
+    db: &'db dyn Db,
+    specifier: FunctionType<'db>,
+) -> FieldInstanceKind {
+    match specifier.known(db) {
+        Some(KnownFunction::AttrAttrib | KnownFunction::AttrsField) => FieldInstanceKind::Attrs,
+        _ => FieldInstanceKind::Other,
+    }
+}
+
+/// Returns the type of a generic identity function `[F](F, /) -> F`.
+///
+/// We use this for the `<field>.validator` and `<field>.default` decorators, which simply return
+/// the original method unchanged.
+/// <https://github.com/python-attrs/attrs/blob/7bfc49e9b22d5ba25b6e429524c3d49fee27cb36/src/attr/_make.py#L2811-L2841>
+pub(in crate::types) fn generic_identity_function<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+) -> Type<'db> {
+    let f =
+        BoundTypeVarInstance::synthetic(db, env, Name::new_static("F"), TypeVarVariance::Invariant);
+    let signature = Signature::new_generic(
+        Some(GenericContext::from_typevar_instances(db, env, [f])),
+        Parameters::standard([
+            Parameter::positional_only(None).with_annotated_type(Type::TypeVar(f))
+        ]),
+        Type::TypeVar(f),
+    );
+    Type::function_like_callable(db, signature)
 }

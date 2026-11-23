@@ -47,6 +47,7 @@ use crate::types::constraints::{
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
 use crate::types::cyclic::PairVisitor;
+use crate::types::dedicated::attrs;
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
 use crate::types::diagnostic::{
     CALL_TO_FUNCTION_WITH_UNKNOWN_SIGNATURE, INVALID_ARGUMENT_TYPE, INVALID_DATACLASS,
@@ -2259,6 +2260,8 @@ impl<'db> Bindings<'db> {
                             found_any.then(|| (input_types.build(), output_types.build()))
                         });
 
+                        let field_instance_kind = attrs::field_instance_kind(db, function_type);
+
                         // `typeshed` pretends that `dataclasses.field()` returns the type of the
                         // default value directly. At runtime, however, this function returns an
                         // instance of `dataclasses.Field`. We also model it this way and return
@@ -2268,7 +2271,15 @@ impl<'db> Bindings<'db> {
                         // to `T`. Otherwise, we would error on `name: str = field(default="")`.
                         overload.set_return_type(Type::KnownInstance(KnownInstanceType::Field(
                             FieldInstance::new(
-                                db, default_ty, init, kw_only, alias, converter, strict, frozen,
+                                db,
+                                field_instance_kind,
+                                default_ty,
+                                init,
+                                kw_only,
+                                alias,
+                                converter,
+                                strict,
+                                frozen,
                             ),
                         )));
                     }

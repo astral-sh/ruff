@@ -96,7 +96,9 @@ use crate::types::function::{
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{ApplySpecialization, Specialization, bind_typevar};
 use crate::types::infer::InferenceFlags;
-use crate::types::known_instance::{InternedConstraintSet, InternedType, SentinelInstance};
+use crate::types::known_instance::{
+    FieldInstanceKind, InternedConstraintSet, InternedType, SentinelInstance,
+};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
@@ -6846,6 +6848,14 @@ impl<'db> Type<'db> {
                     };
 
                     ty.map_or_default(Place::bound).into()
+                }
+
+                // attrs defines the methods `validator` and `default` on field instances.
+                Type::KnownInstance(KnownInstanceType::Field(field))
+                    if matches!(name_str, "validator" | "default")
+                        && field.kind(db) == FieldInstanceKind::Attrs =>
+                {
+                    Place::bound(dedicated::attrs::generic_identity_function(db, env)).into()
                 }
 
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial))

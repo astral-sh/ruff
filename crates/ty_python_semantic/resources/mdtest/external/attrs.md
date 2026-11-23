@@ -144,25 +144,113 @@ reveal_type(p.data)  # revealed: bytes
 p.data = "not a dict"  # error: [invalid-assignment]
 ```
 
-## Dedicated support for the `default` decorator?
+## Field validators
 
-We currently do not support this:
+attrs supports validator functions, which can either be specified using `field(validator=...)` or by
+decorating a method with `@<field>.validator`:
+
+```py
+import attr
+from attrs import define, field, validators
+
+@attr.s
+class User1:
+    name: str = attr.ib(validator=attr.validators.instance_of(str))
+    age: int = attr.ib()
+
+    @age.validator
+    def non_negative(self, attr: object, value: int) -> None:
+        if value < 0:
+            raise ValueError
+
+@define
+class User2:
+    name: str = field(validator=validators.instance_of(str))
+    age: int = field()
+
+    @age.validator
+    def non_negative(self, attr: object, value: int) -> None:
+        if value < 0:
+            raise ValueError
+
+user1 = User1(name="John Doe", age=30)
+user2 = User2(name="John Doe", age=30)
+
+reveal_type(user1.age)  # revealed: int
+reveal_type(user2.age)  # revealed: int
+```
+
+The decorator `@<field>.validator` only registers the method as a validator. It does not modify the
+signature of the function:
+
+```py
+reveal_type(user1.non_negative)  # revealed: bound method User1.non_negative(attr: object, value: int) -> None
+reveal_type(user2.non_negative)  # revealed: bound method User2.non_negative(attr: object, value: int) -> None
+```
+
+We could plausibly go further here and also verify that the validator function's input type matches
+the type of the field it is validating:
+
+```py
+@define
+class Wrong:
+    age: int = field()
+
+    # TODO: emit an error here
+    @age.validator
+    def wrong_validator(self, attr: object, value: str) -> None:
+        if not value:
+            raise ValueError
+```
+
+## Field defaults
+
+A default value can be specified using a value on the right-hand side, or using the
+`@<field>.default` decorator.
 
 ```py
 from attrs import define, field
 
 @define
 class Person:
-    id: int = field()
-    name: str = field()
+    name: str = "Unnamed"
 
-    # error: [not-callable] "Object of type `_MISSING_TYPE` is not callable"
+    # TODO: This should not be an error once we recognize that `id` has a default
+    # error: [invalid-dataclass-field-order]
+    id: int = field()
+
     @id.default
     def _default_id(self) -> int:
-        raise NotImplementedError
+        return 0
 
+# TODO: No error here
 # error: [missing-argument] "No argument provided for required parameter `id`"
-person = Person(name="Alice")
+person = Person()
+```
+
+The types of the fields are not affected by this:
+
+```py
 reveal_type(person.id)  # revealed: int
 reveal_type(person.name)  # revealed: str
+```
+
+The `@<field>.default` decorator also doesn't modify the signature of the method it decorates:
+
+```py
+reveal_type(person._default_id)  # revealed: bound method Person._default_id() -> int
+```
+
+Similar to above, we could also verify that the return type of the default method matches the type
+of the field it is providing a default for:
+
+```py
+@define
+class WrongDefault:
+    age: int = field()
+
+    # TODO: emit an error here
+    @age.default
+    def _default_age(self) -> str:
+        return "0"
 ```
