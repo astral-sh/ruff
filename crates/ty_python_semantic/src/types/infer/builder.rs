@@ -1755,7 +1755,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && self.index.scope(file_scope_id).kind() == ScopeKind::Class
             && let Some(symbol) = place_id.as_symbol()
             && let Some(inherited) =
-                inherited_class_body_declaration(db, use_def, symbol)
+                inherited_class_body_declaration(db, binding.scope(db), symbol)
         {
             place_and_quals = inherited.member;
         }
@@ -3682,8 +3682,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 symbol.is_local()
                     && !symbol.is_reassigned()
                     && !symbol.is_declared()
-                    && inherited_class_body_declaration(db, self.index.use_def_map(scope), id)
-                        .is_none()
+                    && inherited_class_body_declaration(db, definition.scope(db), id).is_none()
             });
         let add = (!unconstrained).then(|| self.add_binding(target.into(), definition));
         let context = add.as_ref().map_or_default(|add| add.type_context);

@@ -1365,6 +1365,28 @@ reveal_type(m.augmented)  # revealed: str | Descriptor
 reveal_type(m.conditional)  # revealed: str | Descriptor | bytes
 ```
 
+#### A nested global write leaves the inherited annotation intact
+
+```py
+items = 1
+
+class Base:
+    items: list[int] = []
+
+class Child(Base):
+    def update(self):
+        global items
+        items = 2
+
+class Grandchild(Child):
+    items = []
+
+reveal_type(Child.items)  # revealed: list[int]
+Child.items.append(1)
+reveal_type(Grandchild.items)  # revealed: list[int]
+Grandchild.items.append("bad")  # error: [invalid-argument-type]
+```
+
 #### Deleting a class-level default
 
 An inherited annotation still guides the initializer if the subclass later deletes the name.

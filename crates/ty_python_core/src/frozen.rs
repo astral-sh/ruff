@@ -277,13 +277,6 @@ impl<K: Ord, S> From<std::collections::HashSet<K, S>> for FrozenSet<K> {
 }
 
 impl<K: Ord> FrozenSet<K> {
-    /// Creates a frozen set from keys in strictly increasing order.
-    pub fn from_sorted_unique(keys: impl IntoIterator<Item = K>) -> Self {
-        let keys: Box<[_]> = keys.into_iter().collect();
-        debug_assert!(keys.is_sorted_by(|a, b| a < b));
-        Self(keys)
-    }
-
     pub fn contains(&self, key: &K) -> bool {
         self.0.binary_search(key).is_ok()
     }
@@ -314,14 +307,7 @@ impl<K> Default for FrozenSet<K> {
 mod tests {
     use std::assert_matches;
 
-    use super::{FrozenMap, FrozenSet, FrozenValueMap, PackedIds};
-
-    #[test]
-    fn frozen_set_from_sorted_unique() {
-        let set = FrozenSet::from_sorted_unique([1, 3, 5]);
-        assert!(set.contains(&3));
-        assert!(!set.contains(&2));
-    }
+    use super::{FrozenMap, FrozenValueMap, PackedIds};
 
     #[test]
     fn packed_ids_preserve_values_at_width_boundaries() {
