@@ -25,20 +25,13 @@ impl UnknownRuleCommentKind {
             UnknownRuleCommentKind::Suppression => "suppression",
         }
     }
-
-    fn selector(&self) -> &str {
-        match self {
-            UnknownRuleCommentKind::Noqa => "code",
-            UnknownRuleCommentKind::Suppression => "selector",
-        }
-    }
 }
 
 /// ## What it does
-/// Checks for invalid rule names and codes in suppression comments.
+/// Checks for unknown rule names and codes in suppression comments.
 ///
 /// ## Why is this bad?
-/// Invalid rule selectors serve no purpose and may indicate outdated code suppressions.
+/// Unknown rules in suppression comments serve no purpose and may indicate outdated suppressions.
 ///
 /// ## Example
 /// ```python
@@ -83,8 +76,7 @@ impl AlwaysFixableViolation for UnknownRuleInSuppressionComment {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Invalid rule {selector} in {comment}: {rule}",
-            selector = self.kind.selector(),
+            "Unknown rule in {comment}: {rule}",
             comment = self.kind.as_str(),
             rule = self.rule,
         )
@@ -94,16 +86,12 @@ impl AlwaysFixableViolation for UnknownRuleInSuppressionComment {
         if self.whole_comment {
             format!("Remove the {} comment", self.kind.as_str())
         } else {
-            format!(
-                "Remove the rule {selector} `{rule}`",
-                selector = self.kind.selector(),
-                rule = self.rule,
-            )
+            format!("Remove the rule `{rule}`", rule = self.rule)
         }
     }
 }
 
-/// RUF102 for invalid noqa codes
+/// RUF102 for unknown noqa codes
 pub(crate) fn invalid_noqa_code(
     context: &LintContext,
     file_noqa_directives: &FileNoqaDirectives,

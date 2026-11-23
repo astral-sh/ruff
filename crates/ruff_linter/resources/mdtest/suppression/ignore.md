@@ -327,7 +327,7 @@ import math
 ```
 
 ```snapshot
-error[RUF102]: Invalid rule selector in suppression: unused-import
+error[RUF102]: Unknown rule in suppression: unused-import
  --> src/mdtest_snippet.py:2:16
   |
 2 | # ruff:disable[unused-import]
@@ -359,7 +359,7 @@ import sys
 ```
 
 ```snapshot
-error[RUF102]: Invalid rule selector in suppression: unknown-rule, unused-import
+error[RUF102]: Unknown rule in suppression: unknown-rule, unused-import
   --> src/mdtest_snippet.py:7:1
    |
  7 | # ruff:disable[unused-import, unknown-rule]
@@ -475,12 +475,12 @@ import pathlib
 ```
 
 ```snapshot
-error[RUF102]: Invalid rule selector in suppression: not-a-rule
+error[RUF102]: Unknown rule in suppression: not-a-rule
  --> src/mdtest_snippet.py:2:30
   |
 2 | # ruff:ignore[unused-import, not-a-rule]
   |                              ^^^^^^^^^^
-help: Remove the rule selector `not-a-rule`
+help: Remove the rule `not-a-rule`
   |
 1 | # snapshot: unknown-rule-in-suppression-comment
   - # ruff:ignore[unused-import, not-a-rule]
@@ -835,7 +835,7 @@ undefined_name
 ```
 
 ```snapshot
-error[RUF102]: Invalid rule selector in suppression: XYZ
+error[RUF102]: Unknown rule in suppression: XYZ
  --> src/mdtest_snippet.py:3:15
   |
 3 | # ruff:ignore[XYZ] # ruff:file-ignore[F821]
