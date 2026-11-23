@@ -793,7 +793,7 @@ impl<'db> UnionType<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum KnownUnion {
     Float,   // `int | float`
     Complex, // `int | float | complex`
@@ -819,7 +819,27 @@ impl KnownUnion {
         }
     }
 
+    /// Returns the normalized union for this program's numeric classes.
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None when the union participates in a cycle"
+    )]
     pub(crate) fn to_type<'db>(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        // Promotion can request the same union for every element of a collection. As with other
+        // unions, normalize in the caller if a built-in class is still being resolved in a cycle.
+        #[salsa::tracked(returns(copy), cycle_result=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn numeric_union<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            union: KnownUnion,
+        ) -> Option<Type<'db>> {
+            Some(union.build(db, &ProgramEnvironment::from_program(program)))
+        }
+
+        numeric_union(db, env.program(db), self).unwrap_or_else(|| self.build(db, env))
+    }
+
+    fn build<'db>(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self {
             KnownUnion::Float => UnionType::from_two_elements(
                 db,
