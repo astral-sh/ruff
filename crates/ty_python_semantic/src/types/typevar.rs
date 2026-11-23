@@ -67,6 +67,21 @@ impl<'db> Type<'db> {
         any_over_type(db, env, self, false, |ty| matches!(ty, Type::TypeVar(_)))
     }
 
+    /// Search for a bound type variable, treating aliases and recursive types as
+    /// possible matches without expanding them.
+    pub(super) fn may_contain_typevars(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        any_over_type(db, env, self, false, |ty| {
+            matches!(
+                ty,
+                Type::TypeVar(_) | Type::TypeAlias(_) | Type::Recursive(_)
+            )
+        })
+    }
+
     pub(crate) fn references_typevar(
         self,
         db: &'db dyn Db,
@@ -1016,48 +1031,23 @@ impl<'db> TypeVarNonceGenerator<'db> {
     }
 }
 
-/// Collect the parts of a union that can affect a type variable's freshness.
+/// Returns the union members to inspect for type variable collisions.
 ///
-/// Overloads often reuse the same annotations with different binders. Leave aliases and
-/// recursive types to the caller so that it expands them with its existing recursion guard.
+/// Keeping members intact bounds the size of the cached slice and lets the caller
+/// share its recursion guard across annotations.
 #[salsa::tracked(returns(deref), heap_size = ruff_memory_usage::heap_size)]
 fn freshening_candidates<'db>(
     db: &'db dyn Db,
     program: Program<'db>,
     union: UnionType<'db>,
 ) -> Box<[Type<'db>]> {
-    struct Candidates<'db> {
-        env: ProgramEnvironment<'db>,
-        seen: TypeCollector<'db>,
-        types: RefCell<FxIndexSet<Type<'db>>>,
-    }
-
-    impl<'db> TypeVisitor<'db> for Candidates<'db> {
-        fn program_environment(&self) -> &ProgramEnvironment<'db> {
-            &self.env
-        }
-
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            false
-        }
-
-        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-            match ty {
-                Type::TypeVar(_) | Type::TypeAlias(_) | Type::Recursive(_) => {
-                    self.types.borrow_mut().insert(ty);
-                }
-                _ => walk_type_with_recursion_guard(db, ty, self, &self.seen),
-            }
-        }
-    }
-
-    let candidates = Candidates {
-        env: ProgramEnvironment::from_program(program),
-        seen: TypeCollector::default(),
-        types: RefCell::default(),
-    };
-    candidates.visit_type(db, Type::Union(union));
-    candidates.types.into_inner().into_iter().collect()
+    let env = ProgramEnvironment::from_program(program);
+    union
+        .elements(db)
+        .iter()
+        .copied()
+        .filter(|ty| ty.may_contain_typevars(db, &env))
+        .collect()
 }
 
 /// Returns a freshening delta if a binder would collide with an occurrence in `types`.

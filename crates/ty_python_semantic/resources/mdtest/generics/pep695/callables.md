@@ -1773,6 +1773,11 @@ class Box[C]:
             ok_again: list[T] = from_definition
             wrong_again: list[int] = from_definition  # error: [invalid-assignment]
 
+        def optional(other: "Box[tuple[Items[T]] | None]", n: int) -> None:
+            result = other.get(n)
+            ok: tuple[list[T]] | None = result
+            wrong: tuple[list[int]] | None = result  # error: [invalid-assignment]
+
         def recursive(other: "Box[Nested[T]]", n: int) -> None:
             result = other.get(n)
             ok: Nested[T] = result

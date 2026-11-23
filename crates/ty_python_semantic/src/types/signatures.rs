@@ -2994,16 +2994,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 || signature.receiver_constraints().is_some()
                 || std::iter::once(signature.return_ty)
                     .chain(signature.parameters.iter().map(Parameter::annotated_type))
-                    .any(|ty| {
-                        // Aliases and recursive types can hide typevars. Avoid expanding them just
-                        // to decide whether to take a fast path.
-                        any_over_type(db, self.env, ty, false, |ty| {
-                            matches!(
-                                ty,
-                                Type::TypeVar(_) | Type::TypeAlias(_) | Type::Recursive(_)
-                            )
-                        })
-                    })
+                    .any(|ty| ty.may_contain_typevars(db, self.env))
         };
 
         // Fast path: If the source is the bottom signature or the target is the top signature,
