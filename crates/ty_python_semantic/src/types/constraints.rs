@@ -655,6 +655,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             self,
             inferable,
             budget,
+            UnspecializedTypeVarPolicy::Ignore,
             CandidateSearch::FirstValid(limit),
         )
         .ok()?;
@@ -1211,8 +1212,9 @@ struct ConstraintSetStorage<'db> {
     /// are stored in the dense local arenas below.
     compacted: Option<Arc<OwnedConstraintSetInner<'db>>>,
 
-    /// Raw paths from the last bounded projection in this builder, before solution selection.
-    last_projection: Option<Box<(projection::ProjectionKey<'db>, CandidateSolutions<'db>)>>,
+    /// Shared by recursive comparisons and diagram imports during inference.
+    /// Exact relation queries leave this unset.
+    construction_budget: Option<Result<usize, ProjectionError>>,
 
     /// Constraints are the variables of our BDD. They are interned to give them a space-efficient
     /// identity. Constraints are added to this arena as they are encountered when constructing
@@ -1264,20 +1266,43 @@ struct ConstraintSetStorage<'db> {
     /// the many shallow bounds that are cheap to walk once.
     constraint_bound_depth_cache: FxHashMap<AtomicConstraintId, (u16, u16)>,
     source_order_cache: FxHashMap<SourceOrder, SourceOrderId>,
+    cache: OperationCache<'db>,
+}
+
+/// These answers, unlike interned nodes, can depend on an incomplete computation.
+#[derive(Debug, Default)]
+struct OperationCache<'db> {
+    /// Raw paths from the last bounded projection in this builder, before solution selection.
+    projection: Option<Box<(projection::ProjectionKey<'db>, CandidateSolutions<'db>)>>,
+
     /// Only caches completed top-level results. Recursive results depend on active path
     /// assignments and must not use this cache. A BDD's satisfiability does not depend on the
     /// source order used to traverse it.
-    never_satisfied_cache: FxHashMap<(NodeId, TypeVarSet<'db>), bool>,
+    never_satisfied: FxHashMap<(NodeId, TypeVarSet<'db>), bool>,
 
-    negate_cache: FxHashMap<NodeId, NodeId>,
-    or_cache: FxHashMap<(NodeId, NodeId), NodeId>,
-    and_cache: FxHashMap<(NodeId, NodeId), NodeId>,
+    negate: FxHashMap<NodeId, NodeId>,
+    or: FxHashMap<(NodeId, NodeId), NodeId>,
+    and: FxHashMap<(NodeId, NodeId), NodeId>,
     /// Existential abstraction derives new constraints in source order and returns their
     /// source-order sidecar, so distinct orderings of the same BDD must not share a cache entry.
-    exists_cache: FxHashMap<ExistsCacheKey<'db>, Projection<'db>>,
+    exists: FxHashMap<ExistsCacheKey<'db>, Projection<'db>>,
 }
 
 impl<'db> ConstraintSetStorage<'db> {
+    fn visit_pair(&mut self) -> bool {
+        match &mut self.construction_budget {
+            None => true,
+            Some(Ok(remaining)) if *remaining > 0 => {
+                *remaining -= 1;
+                true
+            }
+            Some(budget) => {
+                *budget = Err(ProjectionError::TraversalBudgetExceeded);
+                false
+            }
+        }
+    }
+
     fn ensure_overlay_identity_caches(&mut self) {
         let Some(compacted) = &self.compacted else {
             return;
@@ -1366,6 +1391,59 @@ impl<'db> ConstraintSetStorage<'db> {
 impl<'db> ConstraintSetBuilder<'db> {
     pub(crate) fn new() -> Self {
         Self::default()
+    }
+
+    #[cfg(test)]
+    pub(super) fn allocated_nodes(&self) -> usize {
+        self.storage.borrow().nodes.len()
+    }
+
+    /// Bound uncached AND/OR pairs across a relation and its nested comparisons. The checker and
+    /// its visitors are local to `build`. If any nested operation runs out of budget,
+    /// discard the whole result, even if a later comparison short-circuited.
+    pub(super) fn try_build<T>(
+        &self,
+        visits: usize,
+        build: impl FnOnce() -> T,
+    ) -> Result<T, ProjectionError> {
+        // Also restore the builder if Salsa cancels a comparison.
+        struct Guard<'a, 'db>(&'a ConstraintSetBuilder<'db>);
+        impl Drop for Guard<'_, '_> {
+            fn drop(&mut self) {
+                let mut storage = self.0.storage.borrow_mut();
+                if matches!(storage.construction_budget.take(), Some(Err(_))) {
+                    // Arena entries still describe valid nodes, but memoized operations
+                    // may depend on the placeholder returned after exhaustion.
+                    storage.cache = OperationCache::default();
+                }
+            }
+        }
+
+        let _guard = {
+            let mut storage = self.storage.borrow_mut();
+            match storage.construction_budget {
+                Some(Err(error)) => return Err(error),
+                Some(Ok(_)) => None,
+                None => {
+                    storage.construction_budget = Some(Ok(visits));
+                    Some(Guard(self))
+                }
+            }
+        };
+        let result = build();
+        self.storage.borrow().construction_budget.unwrap()?;
+        Ok(result)
+    }
+
+    pub(super) fn try_into_owned(
+        self,
+        f: impl for<'c> FnOnce(&'c Self) -> ConstraintSet<'db, 'c>,
+    ) -> Option<OwnedConstraintSet<'db>> {
+        let root = self
+            .try_build(SolutionBudget::default().visits, || f(&self))
+            .ok()?;
+        let (node, order) = (root.node, root.source_order);
+        Some(self.into_owned(|builder| ConstraintSet::from_node(builder, node, order)))
     }
 
     /// Creates an [`OwnedConstraintSet`], consuming this builder in the process. You provide a
@@ -2894,7 +2972,7 @@ impl NodeId {
             Node::AlwaysFalse => ControlFlow::Continue(true),
             Node::Interior(_) => {
                 let key = (self, inferable);
-                if let Some(result) = storage.never_satisfied_cache.get(&key) {
+                if let Some(result) = storage.cache.never_satisfied.get(&key) {
                     return ControlFlow::Continue(*result);
                 }
 
@@ -2913,7 +2991,7 @@ impl NodeId {
                     );
                     walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Positive)?
                 };
-                storage.never_satisfied_cache.insert(key, result);
+                storage.cache.never_satisfied.insert(key, result);
                 ControlFlow::Continue(result)
             }
         }
@@ -3151,14 +3229,14 @@ impl NodeId {
         };
 
         let key = (self, inferable, bound_typevars, source_order);
-        if let Some(result) = storage.exists_cache.get(&key) {
+        if let Some(result) = storage.cache.exists.get(&key) {
             return *result;
         }
 
         let result =
             interior.exists_inner(db, env, storage, inferable, bound_typevars, source_order);
 
-        storage.exists_cache.insert(key, result);
+        storage.cache.exists.insert(key, result);
         result
     }
 
@@ -3925,8 +4003,8 @@ impl<'db> CandidateTypeVarSolution<'db> {
 }
 
 impl<'db> Type<'db> {
-    /// Calculates the [`CandidateSolutions`] that represent the valid solutions for when `self` is
-    /// constraint-set assignable to `target`.
+    /// Collects assignability bounds for inference. If constructing the relation or collecting
+    /// all its paths exceeds the budget, inference proceeds without these bounds.
     pub(crate) fn assignable_solutions_with_inferable(
         self,
         db: &'db dyn Db,
@@ -3944,11 +4022,8 @@ impl<'db> Type<'db> {
         )
     }
 
-    /// Calculates the [`CandidateSolutions`] that represent the valid solutions for when `self` is
-    /// constraint-set assignable to `target`.
-    ///
-    /// Unlike [`Self::assignable_solutions_with_inferable`], this method preserves unspecialized
-    /// type variables in the solution set.
+    /// Like [`Self::assignable_solutions_with_inferable`], but preserves unspecialized type
+    /// variables in the solution set.
     pub(crate) fn assignable_solutions_for_argument_context(
         self,
         db: &'db dyn Db,
@@ -3981,18 +4056,22 @@ fn assignable_solutions_impl<'db>(
     unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
 ) -> CandidateSolutions<'db> {
     let env = &ProgramEnvironment::from_program(program);
-    let when = source.when_constraint_set_assignable_to_owned(db, env, target, inferable);
-    when.query(|builder, when| {
-        let mut storage = builder.storage.borrow_mut();
-        CandidateSolutions::compute(
+    let Some(when) =
+        source.inference_relation(db, env, target, inferable, ConstraintProvenance::INFERRED)
+    else {
+        return CandidateSolutions::Unconstrained;
+    };
+    when.query(|_, when| {
+        CandidateSolutions::compute_bounded(
             db,
             env,
-            &mut storage,
-            when.node,
+            when,
             inferable,
-            when.source_order,
+            SolutionBudget::default(),
             unspecialized_type_var_policy,
+            CandidateSearch::All(ReportDiagnostics::Yes),
         )
+        .unwrap_or(CandidateSolutions::Unconstrained)
     })
 }
 
@@ -4117,6 +4196,7 @@ impl<'db> CandidateSolutions<'db> {
     ///
     /// Returns a list of paths, where each path contains the explicit lower/upper bounds for each
     /// typevar that appears in the path's constraints.
+    #[cfg(test)]
     fn compute(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -4151,6 +4231,7 @@ impl<'db> CandidateSolutions<'db> {
         set: ConstraintSet<'db, '_>,
         inferable: TypeVarSet<'db>,
         budget: SolutionBudget,
+        unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
         search: CandidateSearch,
     ) -> Result<Self, ProjectionError> {
         let limits = BoundedSolutionLimits {
@@ -4165,7 +4246,7 @@ impl<'db> CandidateSolutions<'db> {
             inferable,
             set.source_order,
             limits,
-            UnspecializedTypeVarPolicy::Ignore,
+            unspecialized_type_var_policy,
             search,
         ) {
             ControlFlow::Continue(result) => Ok(result),
@@ -4748,7 +4829,7 @@ impl InteriorNode {
 
     fn negate(self, storage: &mut ConstraintSetStorage<'_>) -> NodeId {
         let key = self.node();
-        if let Some(result) = storage.negate_cache.get(&key) {
+        if let Some(result) = storage.cache.negate.get(&key) {
             return *result;
         }
 
@@ -4765,14 +4846,17 @@ impl InteriorNode {
         let if_false = not_false.and(storage, not_uncertain);
         let result = NodeId::new(storage, interior.constraint, if_true, if_false);
 
-        storage.negate_cache.insert(key, result);
+        storage.cache.negate.insert(key, result);
         result
     }
 
     fn or(self, storage: &mut ConstraintSetStorage<'_>, other: Self) -> NodeId {
         let key = (self.node(), other.node());
-        if let Some(result) = storage.or_cache.get(&key) {
+        if let Some(result) = storage.cache.or.get(&key) {
             return *result;
+        }
+        if !storage.visit_pair() {
+            return ALWAYS_FALSE;
         }
 
         let self_interior = storage.interior_node_data(self.node());
@@ -4821,14 +4905,17 @@ impl InteriorNode {
             }
         };
 
-        storage.or_cache.insert(key, result);
+        storage.cache.or.insert(key, result);
         result
     }
 
     fn and(self, storage: &mut ConstraintSetStorage<'_>, other: Self) -> NodeId {
         let key = (self.node(), other.node());
-        if let Some(result) = storage.and_cache.get(&key) {
+        if let Some(result) = storage.cache.and.get(&key) {
             return *result;
+        }
+        if !storage.visit_pair() {
+            return ALWAYS_FALSE;
         }
 
         let self_interior = storage.interior_node_data(self.node());
@@ -4899,7 +4986,7 @@ impl InteriorNode {
             }
         };
 
-        storage.and_cache.insert(key, result);
+        storage.cache.and.insert(key, result);
         result
     }
 
@@ -5634,6 +5721,41 @@ mod tests {
         )
     }
 
+    #[test]
+    fn importing_separated_alternatives_respects_the_construction_budget() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let vars = ["A", "B", "C", "D"].map(|name| create_typevar(db, name));
+        let owned = ConstraintSetBuilder::new().into_owned(|builder| {
+            vars.into_iter().when_all(db, builder, |var| {
+                create_constraint(db, builder, var, KnownClass::Int).or(db, builder, || {
+                    create_constraint(db, builder, var, KnownClass::Str)
+                })
+            })
+        });
+        let fresh = ConstraintSetBuilder::new();
+        assert!(fresh.try_build(16, || fresh.load(db, &env, &owned)).is_ok());
+
+        // Separating the two choices for every variable expands the same diagram on import.
+        let builder = ConstraintSetBuilder::new();
+        for var in vars {
+            create_constraint(db, &builder, var, KnownClass::Int);
+        }
+        assert_matches!(
+            builder.try_build(16, || builder.load(db, &env, &owned)),
+            Err(ProjectionError::TraversalBudgetExceeded)
+        );
+
+        // A failed import must leave the builder usable and preserve every combination.
+        let loaded = builder.load(db, &env, &owned);
+        let inferable = TypeVarSet::from_typevars(db, vars);
+        assert_matches!(
+            loaded.solutions(db, &env, inferable),
+            Ok(Solutions::Constrained(SolutionPaths::Complete(paths))) if paths.len() == 1 << vars.len()
+        );
+    }
+
     fn create_constraint_set_with_bounds<'db, 'c>(
         db: &'db TestDb,
         env: &ProgramEnvironment<'db>,
@@ -5696,6 +5818,7 @@ mod tests {
                 visits: max_visits,
                 ..SolutionBudget::default()
             },
+            UnspecializedTypeVarPolicy::Ignore,
             CandidateSearch::All(ReportDiagnostics::Yes),
         )
     }
@@ -5857,6 +5980,7 @@ mod tests {
                 set,
                 TypeVarSet::All,
                 SolutionBudget::default(),
+                UnspecializedTypeVarPolicy::Ignore,
                 CandidateSearch::All(ReportDiagnostics::Yes),
             ),
             Ok(CandidateSolutions::Unsatisfiable)
@@ -6647,7 +6771,7 @@ class E: ...
         assert!(!first.is_never_satisfied(db, &env, TypeVarSet::All));
         assert!(!second.is_never_satisfied(db, &env, TypeVarSet::All));
         let storage = builder.storage.borrow();
-        assert_eq!(storage.never_satisfied_cache.len(), 1);
+        assert_eq!(storage.cache.never_satisfied.len(), 1);
     }
 
     #[derive(Clone, Copy)]

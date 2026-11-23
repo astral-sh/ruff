@@ -644,6 +644,25 @@ def consume_explicit(value: E | F) -> None: ...
 reveal_type(infer_from_consumers(consume_first, consume_second, consume_explicit))  # revealed: Unknown
 ```
 
+## Independent bounds after inference exhausts its budget
+
+Matching each string against both `T` and `Sequence[T]` can exhaust the construction budget. The
+callback still violates the upper bound on `U` in either argument order.
+
+```py
+from collections.abc import Callable, Sequence
+from typing import Literal
+
+type Words = Literal[
+    "abcdefghijklmnop", "aa", "bb", "cc", "dd", "ee", "ff", "gg", "hh", "ii", "jj", "kk", "ll", "mm", "nn", "oo", "pp"
+]
+
+def consume[T, U: int](value: T | Sequence[T], other: Callable[[], U]) -> None: ...
+def check(value: Words, other: Callable[[], str]) -> None:
+    consume(value=value, other=other)  # error: [invalid-argument-type] "does not satisfy upper bound `int`"
+    consume(other=other, value=value)  # error: [invalid-argument-type] "does not satisfy upper bound `int`"
+```
+
 ## Narrowing negated intersection aliases
 
 The negation of an aliased intersection acts as a union of negations. Intersecting three such upper

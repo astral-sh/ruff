@@ -812,6 +812,14 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         inferable: TypeVarSet<'db>,
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
+        // Receiver specialization and call inference often compare the same recursive protocols.
+        // Reuse the bounded relation whenever it completed, retrying without a limit otherwise.
+        if inferable != TypeVarSet::None
+            && let Some(when) =
+                self.inference_relation(db, env, target, inferable, ConstraintProvenance::INFERRED)
+        {
+            return when;
+        }
         self.when_constraint_set_assignable_to_owned_with_evaluation(
             db,
             env,
@@ -926,6 +934,70 @@ impl<'db> Type<'db> {
                 provenance,
             ),
         })
+    }
+
+    /// Keep construction failures separate from exact assignability answers.
+    pub(super) fn inference_relation(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+        inferable: TypeVarSet<'db>,
+        provenance: ConstraintProvenance,
+    ) -> Option<Cow<'db, OwnedConstraintSet<'db>>> {
+        fn build<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            source: Type<'db>,
+            target: Type<'db>,
+            inferable: TypeVarSet<'db>,
+            provenance: ConstraintProvenance,
+        ) -> Option<OwnedConstraintSet<'db>> {
+            ConstraintSetBuilder::new().try_into_owned(|constraints| {
+                source.has_relation_to_with_typevar_evaluation(
+                    db,
+                    env,
+                    target,
+                    constraints,
+                    inferable,
+                    TypeRelation::Assignability,
+                    TypeVarEvaluation::Lazy,
+                    provenance,
+                )
+            })
+        }
+
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial=|_, _, _, _, _, _| Some(OwnedConstraintSet::always()),
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn inference_relation_impl<'db>(
+            db: &'db dyn Db,
+            types: TypePair<'db>,
+            inferable: TypeVarSet<'db>,
+            provenance: ConstraintProvenance,
+        ) -> Option<OwnedConstraintSet<'db>> {
+            build(
+                db,
+                &ProgramEnvironment::from_program(types.program(db)),
+                types.first(db),
+                types.second(db),
+                inferable,
+                provenance,
+            )
+        }
+
+        if self.is_trivially_assignable_to(db, target) {
+            return Some(Cow::Owned(OwnedConstraintSet::always()));
+        }
+        if should_inline_assignability_check(self, target) {
+            return build(db, env, self, target, inferable, provenance).map(Cow::Owned);
+        }
+        let types = TypePair::new(db, env.program(db), self, target);
+        inference_relation_impl(db, types, inferable, provenance)
+            .as_ref()
+            .map(Cow::Borrowed)
     }
 
     pub(super) fn when_constraint_set_assignable_to<'c>(

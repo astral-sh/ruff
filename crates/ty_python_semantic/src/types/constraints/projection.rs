@@ -4,7 +4,7 @@ use rustc_hash::FxHashSet;
 
 use super::{
     CandidateSearch, CandidateSolutions, CandidateTypeVarSolution, ConstraintSet,
-    PathBoundSolution, ReportDiagnostics, Solutions, TypeVarSolution,
+    PathBoundSolution, ReportDiagnostics, Solutions, TypeVarSolution, UnspecializedTypeVarPolicy,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{Type, TypeVarVariance};
@@ -196,6 +196,7 @@ impl<'db> ConstraintSet<'db, '_> {
                 self,
                 inferable,
                 budget,
+                UnspecializedTypeVarPolicy::Ignore,
                 CandidateSearch::All(report_diagnostics),
             )
         };
@@ -214,13 +215,13 @@ impl<'db> ConstraintSet<'db, '_> {
             budget,
             diagnostics: report_diagnostics,
         };
-        let last = self.builder.storage.borrow_mut().last_projection.take();
+        let last = self.builder.storage.borrow_mut().cache.projection.take();
         let projection = match last {
             Some(previous) if previous.0 == key => previous,
             _ => Box::new((key, collect()?)),
         };
         let result = projection.1.solve_with_budget(db, budget, choose);
-        self.builder.storage.borrow_mut().last_projection = Some(projection);
+        self.builder.storage.borrow_mut().cache.projection = Some(projection);
         result
     }
 
@@ -259,6 +260,7 @@ impl<'db> ConstraintSet<'db, '_> {
             self,
             inferable,
             budget,
+            UnspecializedTypeVarPolicy::Ignore,
             // The fold consumes only valid solutions and never exposes violations.
             CandidateSearch::All(ReportDiagnostics::No),
         )?;
