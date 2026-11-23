@@ -215,7 +215,7 @@ from attrs import define, field
 class Person:
     name: str = "Unnamed"
 
-    # TODO: This should not be an error once we recognize that `name` has a default
+    # TODO: This should not be an error once we recognize that `id` has a default
     # error: [invalid-dataclass-field-order]
     id: int = field()
 
