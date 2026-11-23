@@ -169,8 +169,25 @@ fn inherited_declaration_candidates<'db>(
         bases.push(place_table(db, base.body_scope(db)));
     }
 
-    let candidates = index
-        .place_table(scope.file_scope_id(db))
+    let table = index.place_table(scope.file_scope_id(db));
+    // Looking up a single member of a large enum should not require scanning
+    // all its members if the base classes have only a few names.
+    if bases.iter().map(|base| base.symbols().len()).sum::<usize>() < table.symbols().len() {
+        let mut candidates: Vec<_> = bases
+            .iter()
+            .flat_map(|base| base.symbols())
+            .filter_map(|symbol| table.symbol_id(symbol.name()))
+            .filter(|id| {
+                let symbol = table.symbol(*id);
+                symbol.is_bound() && !symbol.is_declared()
+            })
+            .collect();
+        candidates.sort_unstable();
+        candidates.dedup();
+        return Some(FrozenSet::from_sorted_unique(candidates));
+    }
+
+    let candidates = table
         .symbols()
         .enumerate()
         .filter(|(_, symbol)| symbol.is_bound() && !symbol.is_declared())
