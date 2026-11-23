@@ -334,7 +334,7 @@ pub(crate) mod node_key {
     pub struct ExpressionNodeKey(NodeKey);
 
     impl ExpressionNodeKey {
-        pub(super) fn index(self) -> ast::NodeIndex {
+        pub(crate) fn index(self) -> ast::NodeIndex {
             self.0.index()
         }
     }

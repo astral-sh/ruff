@@ -1,7 +1,10 @@
 use std::hash::Hash;
 
+use itertools::Itertools;
 use ruff_index::{FrozenIndexVec, IndexVec, newtype_index};
 use rustc_hash::FxHashMap;
+
+use crate::ExpressionNodeKey;
 
 /// A slice of 32-bit IDs stored at the narrowest width that fits every entry.
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
@@ -75,6 +78,37 @@ impl<K, V> From<std::collections::BTreeMap<K, V>> for FrozenMap<K, V> {
 impl<K: Ord, V, S> From<std::collections::HashMap<K, V, S>> for FrozenMap<K, V> {
     fn from(map: std::collections::HashMap<K, V, S>) -> Self {
         Self::from_entries(map.into_iter().collect())
+    }
+}
+
+impl<V: Copy> FrozenMap<ExpressionNodeKey, V> {
+    /// Freezes expression types in node order.
+    pub fn from_expressions(map: FxHashMap<ExpressionNodeKey, V>) -> Self {
+        Self::from_expression_entries(map.into_iter().collect())
+    }
+
+    /// Large literals cover a dense range of node indices. Order their entries by
+    /// indexing directly into that range, leaving gaps for nodes without a type.
+    /// The keys must be unique.
+    fn from_expression_entries(mut entries: Vec<(ExpressionNodeKey, V)>) -> Self {
+        // Only scan large maps, and use at most two temporary slots per entry.
+        if entries.len() >= 1024
+            && let Some((Some(first), Some(last))) = entries
+                .iter()
+                .map(|(key, _)| key.index().as_u32())
+                .minmax()
+                .into_option()
+            && ((last - first) as usize) < entries.len() * 2
+        {
+            let mut ordered = vec![None; (last - first) as usize + 1];
+            for (key, value) in entries.drain(..) {
+                let index = key.index().as_u32().expect("all keys are indexed");
+                ordered[(index - first) as usize] = Some((key, value));
+            }
+            entries.extend(ordered.into_iter().flatten());
+            return Self(entries.into_boxed_slice());
+        }
+        Self::from_entries(entries)
     }
 }
 
@@ -259,6 +293,17 @@ where
     }
 }
 
+impl<V: Copy + Eq + Hash> FrozenValueMap<ExpressionNodeKey, V> {
+    /// Freezes expression types in node order, sharing repeated values.
+    pub fn from_expressions(map: FxHashMap<ExpressionNodeKey, V>) -> Self {
+        let (entries, values) = index_values(map);
+        Self {
+            entries: FrozenMap::from_expression_entries(entries),
+            values: values.into(),
+        }
+    }
+}
+
 impl<K, V> Default for FrozenValueMap<K, V> {
     fn default() -> Self {
         Self {
@@ -314,7 +359,32 @@ impl<K> Default for FrozenSet<K> {
 mod tests {
     use std::assert_matches;
 
+    use ruff_python_ast::Identifier;
+    use ruff_text_size::TextRange;
+    use rustc_hash::FxHashMap;
+
     use super::{FrozenMap, FrozenValueMap, PackedIds};
+    use crate::ExpressionNodeKey;
+
+    #[test]
+    fn expression_maps_preserve_dense_and_sparse_entries() {
+        for stride in [1, 2, 4] {
+            let mut expressions = FxHashMap::default();
+            let name = Identifier::new("x", TextRange::default());
+            for i in 0..1024u32 {
+                name.node_index.set((100 + i * stride).into());
+                expressions.insert(ExpressionNodeKey::from(&name), i % 5);
+            }
+
+            let sorted = FrozenMap::from(expressions.clone());
+            assert_eq!(FrozenMap::from_expressions(expressions.clone()), sorted);
+            assert!(
+                FrozenValueMap::from_expressions(expressions)
+                    .iter()
+                    .eq(sorted.iter().copied())
+            );
+        }
+    }
 
     #[test]
     fn packed_ids_preserve_values_at_width_boundaries() {

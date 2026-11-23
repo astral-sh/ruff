@@ -12781,7 +12781,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         StatementInferenceInner {
-            expressions: FrozenMap::from(expressions),
+            expressions: FrozenMap::from_expressions(expressions),
             #[cfg(debug_assertions)]
             scope,
             bindings: bindings.into_boxed_slice(),
@@ -12854,7 +12854,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         FunctionDecoratorInference {
             legacy_aliases: legacy_aliases.into_iter().collect(),
             deferred_name_loads: FrozenSet::from(deferred_name_loads),
-            expression_types: FrozenMap::from(expressions),
+            expression_types: FrozenMap::from_expressions(expressions),
             bindings: bindings.into_boxed_slice(),
             called_functions: called_functions
                 .into_iter()
@@ -13016,7 +13016,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         DefinitionInference {
-            expressions: FrozenMap::from(expressions),
+            expressions: FrozenMap::from_expressions(expressions),
             #[cfg(debug_assertions)]
             scope,
             types: DefinitionTypes::from_parts(
@@ -13147,7 +13147,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         ScopeInference {
-            expressions: FrozenValueMap::from(expressions),
+            expressions: FrozenValueMap::from_expressions(expressions),
             extra,
         }
     }
@@ -13494,7 +13494,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
         });
 
         ExpressionInference {
-            expressions: FrozenMap::from(self.expressions),
+            expressions: FrozenMap::from_expressions(self.expressions),
             extra,
             #[cfg(debug_assertions)]
             scope: self.scope,
