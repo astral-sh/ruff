@@ -41,7 +41,7 @@ impl Renderer for GithubRenderer<'_> {
                 code = escape_property(code),
             )?;
 
-            let location = if let Some(span) = diagnostic.primary_span_ref() {
+            if let Some(span) = diagnostic.primary_span_ref() {
                 let file = span.file();
                 write!(f, ",file={}", escape_property(file.path(self.resolver)))?;
 
@@ -68,7 +68,7 @@ impl Renderer for GithubRenderer<'_> {
                 if start_location.line == end_location.line {
                     write!(
                         f,
-                        ",line={row},col={column},endLine={end_row},endColumn={end_column}",
+                        ",line={row},col={column},endLine={end_row},endColumn={end_column}::",
                         row = start_location.line,
                         column = start_location.column,
                         end_row = end_location.line,
@@ -77,42 +77,38 @@ impl Renderer for GithubRenderer<'_> {
                 } else {
                     write!(
                         f,
-                        ",line={row},endLine={end_row}",
+                        ",line={row},endLine={end_row}::",
                         row = start_location.line,
                         end_row = end_location.line,
                     )?;
                 }
 
-                Some((file, start_location))
-            } else {
-                None
-            };
-            f.write_str("::")?;
-
-            let mut body = MessageWriter(f);
-            if let Some((file, start_location)) = location {
                 write!(
-                    body,
+                    f,
                     "{path}:{row}:{column}: ",
-                    path = file.relative_path(self.resolver).display(),
+                    path = escape_message(file.relative_path(self.resolver).display()),
                     row = start_location.line,
                     column = start_location.column,
                 )?;
+            } else {
+                write!(f, "::")?;
             }
 
             if !use_name && let Some(code) = diagnostic.secondary_code() {
-                write!(body, "{code}")?;
+                write!(f, "{}", escape_message(code))?;
             } else {
-                write!(body, "{id}:", id = diagnostic.id())?;
+                write!(f, "{}:", escape_message(diagnostic.id()))?;
             }
 
-            write!(body, " {}", diagnostic.concise_message())?;
+            write!(f, " {}", escape_message(diagnostic.concise_message()))?;
 
-            // Line breaks within the body become %0A. Only the final newline ends the command.
+            // After rendering the main diagnostic, render its secondary annotations and
+            // sub-diagnostics. Note that lines within a single diagnostic must be separated by
+            // URL-encoded newlines (`%0A`) to render properly in GitHub annotations.
             for annotation in diagnostic.secondary_annotations().filter_map(|annotation| {
                 GithubAnnotation::from_annotation(annotation, self.resolver)
             }) {
-                write!(body, "\n{annotation}")?;
+                write!(f, "%0A{}", escape_message(annotation))?;
             }
 
             for subdiagnostic in diagnostic.sub_diagnostics() {
@@ -122,6 +118,7 @@ impl Renderer for GithubRenderer<'_> {
                     SubDiagnosticSeverity::Warning => "warning",
                     SubDiagnosticSeverity::Error | SubDiagnosticSeverity::Fatal => "error",
                 };
+                let message = escape_message(subdiagnostic.concise_message());
                 if let Some(annotation) = subdiagnostic.primary_annotation()
                     && let span = annotation.get_span()
                     && let file = span.file()
@@ -129,17 +126,16 @@ impl Renderer for GithubRenderer<'_> {
                 {
                     let diagnostic_source = file.diagnostic_source(self.resolver);
                     let source_code = diagnostic_source.as_source_code();
-                    let message = subdiagnostic.concise_message();
                     let start_location = source_code.line_column(range.start());
                     write!(
-                        body,
-                        "\n  {path}:{row}:{column}: {severity}: {message}",
-                        path = file.relative_path(self.resolver).display(),
+                        f,
+                        "%0A  {path}:{row}:{column}: {severity}: {message}",
+                        path = escape_message(file.relative_path(self.resolver).display()),
                         row = start_location.line,
                         column = start_location.column,
                     )?;
                 } else {
-                    write!(body, "\n  {severity}: {}", subdiagnostic.concise_message())?;
+                    write!(f, "%0A  {severity}: {message}")?;
                 }
 
                 for annotation in subdiagnostic
@@ -148,7 +144,7 @@ impl Renderer for GithubRenderer<'_> {
                         GithubAnnotation::from_annotation(annotation, self.resolver)
                     })
                 {
-                    write!(body, "\n  {annotation}")?;
+                    write!(f, "%0A  {}", escape_message(annotation))?;
                 }
             }
 
@@ -198,27 +194,8 @@ impl Display for GithubAnnotation<'_> {
 /// Escape command data as in the [GitHub Actions toolkit].
 ///
 /// [GitHub Actions toolkit]: https://github.com/actions/toolkit/blob/0c3a9c332b678ff1e776f93d728a4ad279803abe/packages/core/src/command.ts#L103-L117
-fn escape_message(f: &mut fmt::Formatter<'_>, text: &str) -> fmt::Result {
-    let mut start = 0;
-    for i in memchr::memchr3_iter(b'%', b'\r', b'\n', text.as_bytes()) {
-        f.write_str(&text[start..i])?;
-        f.write_str(match text.as_bytes()[i] {
-            b'%' => "%25",
-            b'\r' => "%0D",
-            _ => "%0A",
-        })?;
-        start = i + 1;
-    }
-    f.write_str(&text[start..])
-}
-
-/// Escape each fragment of a formatted message without buffering it.
-struct MessageWriter<'a, 'b>(&'a mut fmt::Formatter<'b>);
-
-impl Write for MessageWriter<'_, '_> {
-    fn write_str(&mut self, text: &str) -> fmt::Result {
-        escape_message(self.0, text)
-    }
+fn escape_message(message: impl Display) -> impl Display {
+    fmt::from_fn(move |f| write!(MessageWriter(f), "{message}"))
 }
 
 /// Property values must also escape the delimiters in the command header.
@@ -226,7 +203,7 @@ fn escape_property(text: &str) -> impl Display + '_ {
     fmt::from_fn(move |f| {
         let mut start = 0;
         for i in memchr::memchr2_iter(b':', b',', text.as_bytes()) {
-            escape_message(f, &text[start..i])?;
+            MessageWriter(f).write_str(&text[start..i])?;
             f.write_str(if text.as_bytes()[i] == b':' {
                 "%3A"
             } else {
@@ -234,8 +211,27 @@ fn escape_property(text: &str) -> impl Display + '_ {
             })?;
             start = i + 1;
         }
-        escape_message(f, &text[start..])
+        MessageWriter(f).write_str(&text[start..])
     })
+}
+
+/// Escape each fragment of a formatted message without buffering it.
+struct MessageWriter<'a, 'b>(&'a mut fmt::Formatter<'b>);
+
+impl Write for MessageWriter<'_, '_> {
+    fn write_str(&mut self, text: &str) -> fmt::Result {
+        let mut start = 0;
+        for i in memchr::memchr3_iter(b'%', b'\r', b'\n', text.as_bytes()) {
+            self.0.write_str(&text[start..i])?;
+            self.0.write_str(match text.as_bytes()[i] {
+                b'%' => "%25",
+                b'\r' => "%0D",
+                _ => "%0A",
+            })?;
+            start = i + 1;
+        }
+        self.0.write_str(&text[start..])
+    }
 }
 
 #[cfg(test)]

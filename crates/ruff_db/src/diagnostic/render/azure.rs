@@ -55,9 +55,12 @@ impl Renderer for AzureRenderer<'_> {
             } else {
                 diag.secondary_code_or_id()
             };
-            write!(f, "code={};]", escape_property(code))?;
-            write!(MessageWriter(f), "{}", diag.concise_message())?;
-            writeln!(f)?;
+            writeln!(
+                f,
+                "code={};]{}",
+                escape_property(code),
+                escape_message(diag.concise_message()),
+            )?;
         }
 
         Ok(())
@@ -67,27 +70,8 @@ impl Renderer for AzureRenderer<'_> {
 /// Escape command data as in the [Azure Pipelines task library].
 ///
 /// [Azure Pipelines task library]: https://github.com/microsoft/azure-pipelines-task-lib/blob/43673c958dc5fb40b898c5c7b5b7b5bf0ebd14bd/node/taskcommand.ts#L93-L110
-fn escape_message(f: &mut fmt::Formatter<'_>, text: &str) -> fmt::Result {
-    let mut start = 0;
-    for i in memchr::memchr3_iter(b'%', b'\r', b'\n', text.as_bytes()) {
-        f.write_str(&text[start..i])?;
-        f.write_str(match text.as_bytes()[i] {
-            b'%' => "%AZP25",
-            b'\r' => "%0D",
-            _ => "%0A",
-        })?;
-        start = i + 1;
-    }
-    f.write_str(&text[start..])
-}
-
-/// Escape each fragment of a formatted message without buffering it.
-struct MessageWriter<'a, 'b>(&'a mut fmt::Formatter<'b>);
-
-impl Write for MessageWriter<'_, '_> {
-    fn write_str(&mut self, text: &str) -> fmt::Result {
-        escape_message(self.0, text)
-    }
+fn escape_message(message: impl Display) -> impl Display {
+    fmt::from_fn(move |f| write!(MessageWriter(f), "{message}"))
 }
 
 /// Property values must also escape the delimiters in the command header.
@@ -95,7 +79,7 @@ fn escape_property(text: &str) -> impl Display + '_ {
     fmt::from_fn(move |f| {
         let mut start = 0;
         for i in memchr::memchr2_iter(b';', b']', text.as_bytes()) {
-            escape_message(f, &text[start..i])?;
+            MessageWriter(f).write_str(&text[start..i])?;
             f.write_str(if text.as_bytes()[i] == b';' {
                 "%3B"
             } else {
@@ -103,8 +87,27 @@ fn escape_property(text: &str) -> impl Display + '_ {
             })?;
             start = i + 1;
         }
-        escape_message(f, &text[start..])
+        MessageWriter(f).write_str(&text[start..])
     })
+}
+
+/// Escape each fragment of a formatted message without buffering it.
+struct MessageWriter<'a, 'b>(&'a mut fmt::Formatter<'b>);
+
+impl Write for MessageWriter<'_, '_> {
+    fn write_str(&mut self, text: &str) -> fmt::Result {
+        let mut start = 0;
+        for i in memchr::memchr3_iter(b'%', b'\r', b'\n', text.as_bytes()) {
+            self.0.write_str(&text[start..i])?;
+            self.0.write_str(match text.as_bytes()[i] {
+                b'%' => "%AZP25",
+                b'\r' => "%0D",
+                _ => "%0A",
+            })?;
+            start = i + 1;
+        }
+        self.0.write_str(&text[start..])
+    }
 }
 
 #[cfg(test)]
