@@ -333,6 +333,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             total_ordering,
         );
 
+        // Class-body lookups need the original class even if the decorators currently
+        // preserve it. Cycle recovery can widen the public binding to a union.
+        if !decorator_list.is_empty() {
+            self.undecorated_type = Some(original_class_ty);
+        }
+
         // In the second pass, apply class decorators from inner to outer and use their return types
         // to update the public binding. `original_class_ty` remains the class object whose body and
         // metadata were inferred above.
@@ -414,10 +420,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 decorated_ty
             };
         }
-
-        // An intermediate decorator result can contain a cycle marker. Class-body checks need
-        // the original class even while the public binding is still being inferred.
-        self.undecorated_type = (inferred_ty != original_class_ty).then_some(original_class_ty);
 
         // A decorator can replace a nested class with a writable value, including another class.
         let qualifiers = if self.scope().scope(db).kind().is_class()
