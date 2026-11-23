@@ -105,6 +105,9 @@ of unknown length does not guarantee that any value is present.
 reveal_type("a" in [*("a", "b")])  # revealed: Literal[True]
 reveal_type("c" not in [*["a", "b"]])  # revealed: Literal[True]
 
+names = ("a", "b")
+reveal_type("b" in [*[*names]])  # revealed: Literal[True]
+
 def unpack_unknown(values: list[str]):
     reveal_type("a" in [*values])  # revealed: bool
 ```
