@@ -178,8 +178,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let env_options = Options::from_uv_mode(use_uv.map(RangedValue::cli));
     project_metadata.set_override_options(env_options.combine(args.into_options()));
-    if project_metadata.project_uses_uv()
-        && let [path] = check_paths.as_slice()
+    if let [path] = check_paths.as_slice()
         && system.is_file(path)
         && system
             .read_to_string(path)

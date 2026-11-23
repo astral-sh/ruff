@@ -3035,6 +3035,28 @@ fn project_reload_preserves_override_options() -> anyhow::Result<()> {
 }
 
 #[test]
+fn project_manager_override_prevents_uv_sync_after_reload() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("ty.toml", "project-manager.project = 'none'")?;
+        context.set_override_options(Options::from_toml_str(
+            "project-manager.project = 'none'",
+            ValueSource::Cli,
+        )?);
+        Ok(())
+    })?;
+
+    update_file(
+        case.project_path("ty.toml"),
+        "project-manager.project = 'uv'",
+    )?;
+    let changes = case.stop_watch(event_for_file("ty.toml"));
+    let changes = case.apply_changes(&changes);
+    assert!(!case.db().project().metadata(case.db()).project_uses_uv());
+    assert!(changes.project_sync_path().is_none());
+    Ok(())
+}
+
+#[test]
 fn project_reload_preserves_fallback_options() -> anyhow::Result<()> {
     let mut case = setup(|context: &mut SetupContext| {
         context.write_project_file("foo.py", "a = 10 / 0")?;
