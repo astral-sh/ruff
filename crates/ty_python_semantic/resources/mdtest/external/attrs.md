@@ -188,6 +188,21 @@ reveal_type(user1.non_negative)  # revealed: bound method User1.non_negative(att
 reveal_type(user2.non_negative)  # revealed: bound method User2.non_negative(attr: object, value: int) -> None
 ```
 
+We could plausibly go further here and also verify that the validator function's input type matches
+the type of the field it is validating:
+
+```py
+@define
+class Wrong:
+    age: int = field()
+
+    # TODO: emit an error here
+    @age.validator
+    def wrong_validator(self, attr: object, value: str) -> None:
+        if not value:
+            raise ValueError
+```
+
 ## Field defaults
 
 A default value can be specified using a value on the right-hand side, or using the
@@ -224,4 +239,18 @@ The `@<field>.default` decorator also doesn't modify the signature of the method
 
 ```py
 reveal_type(person._default_id)  # revealed: bound method Person._default_id() -> int
+```
+
+Similar to above, we could also verify that the return type of the default method matches the type
+of the field it is providing a default for:
+
+```py
+@define
+class WrongDefault:
+    age: int = field()
+
+    # TODO: emit an error here
+    @age.default
+    def _default_age(self) -> str:
+        return "0"
 ```
