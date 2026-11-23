@@ -24,7 +24,8 @@ pub(in crate::types) fn is_known_decorator<'db>(
     )
 }
 
-/// Returns the alias used by generated methods for a field declared in `class_name`.
+/// Returns the alias used to name the constructor parameter for the field `name` in `class_name`.
+/// If this returns `None`, the parameter takes the field's name.
 pub(in crate::types) fn effective_field_alias(
     class_name: &str,
     name: &str,
