@@ -1178,42 +1178,6 @@ MY_CONSTANT: Final[int]  # error
 INITIALIZED_CONSTANT: Final[int] = 1
 ```
 
-## `ignore-comment-unknown-rule`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22ignore-comment-unknown-rule%22" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Fsuppression.rs#L48" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-
-Checks for `ty: ignore[code]` or `type: ignore[ty:code]` comments where `code` isn't a known lint
-rule.
-
-**Why is this bad?**
-
-
-A `ty: ignore[code]` or a `type: ignore[ty:code]` directive with a `code` that doesn't match any
-known rule will not suppress any type errors, and is probably a mistake.
-
-**Examples**
-
-
-```py
-# error
-a = 20 / 1  # ty: ignore[division-by-zer]
-```
-
-Use instead:
-
-```py
-a = 20 / 0  # ty: ignore[division-by-zero]
-```
-
 <a id="implicit-concatenated-string-type-annotation"></a>
 
 ## `implicit-string-concatenation-in-annotation`
@@ -7942,6 +7906,51 @@ def f(x: int) -> int:
 
 f(x=1, y=2)  # error
 ```
+
+<a id="ignore-comment-unknown-rule"></a>
+
+## `unknown-rule-in-ignore-comment`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%28%22unknown-rule-in-ignore-comment%22+OR+%22ignore-comment-unknown-rule%22%29" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Fsuppression.rs#L48" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+
+Checks for `ty: ignore[code]` or `type: ignore[ty:code]` comments where `code` isn't a known lint
+rule.
+
+**Why is this bad?**
+
+
+A `ty: ignore[code]` or a `type: ignore[ty:code]` directive with a `code` that doesn't match any
+known rule will not suppress any type errors, and is probably a mistake.
+
+**Examples**
+
+
+```py
+# error
+a = 20 / 1  # ty: ignore[division-by-zer]
+```
+
+Use instead:
+
+```py
+a = 20 / 0  # ty: ignore[division-by-zero]
+```
+
+**Rule history**
+
+
+- v0.0.109: Renamed from [`ignore-comment-unknown-rule`](#ignore-comment-unknown-rule) to [`unknown-rule-in-ignore-comment`](#unknown-rule-in-ignore-comment).
+
+    [`ignore-comment-unknown-rule`](#ignore-comment-unknown-rule) remains as a compatibility alias for this rule.
 
 ## `unknown-typed-dict-constructor-key`
 

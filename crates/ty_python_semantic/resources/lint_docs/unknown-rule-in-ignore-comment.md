@@ -20,3 +20,9 @@ Use instead:
 ```py
 a = 20 / 0  # ty: ignore[division-by-zero]
 ```
+
+## Rule history
+
+- v0.0.109: Renamed from `ignore-comment-unknown-rule` to `unknown-rule-in-ignore-comment`.
+
+    `ignore-comment-unknown-rule` remains as a compatibility alias for this rule.
