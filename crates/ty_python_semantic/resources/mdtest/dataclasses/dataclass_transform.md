@@ -90,6 +90,27 @@ class CustomerModel:
 CustomerModel(id=1, name="Test")
 ```
 
+### Decorating a variadic function
+
+A decorator can accept the class through a variadic parameter.
+
+```py
+from typing import dataclass_transform
+
+class Base: ...
+
+@dataclass_transform()
+def record(*classes: type[Base]) -> type[Base]:
+    return classes[0]
+
+@record
+class Point(Base):
+    x: int
+
+Point(1)  # ok
+Point()  # error: [missing-argument]
+```
+
 ### Decorating a metaclass
 
 If the metaclass of a class `A` is decorated with `@dataclass_transform`, `A` will have
