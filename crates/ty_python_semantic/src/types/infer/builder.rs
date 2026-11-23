@@ -42,7 +42,7 @@ use crate::place::{
     place_from_declarations_with_reachability_cache,
 };
 use crate::place_load::{
-    ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolver, PlaceLoadSourceKind,
+    ConstraintKeys, ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolver, PlaceLoadSourceKind,
     ResolvedPlaceLoadSource,
 };
 use crate::reachability::{
@@ -11148,7 +11148,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         source_place: &SourcePlace,
         expr_ref: ast::ExprRef,
-    ) -> (PlaceAndQualifiers<'db>, crate::place_load::ConstraintKeys) {
+    ) -> (PlaceAndQualifiers<'db>, ConstraintKeys) {
         let mode = if self.is_deferred() && self.in_string_annotation() {
             PlaceLoadMode::StringAnnotation
         } else if self.is_deferred() {
@@ -11402,7 +11402,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::ExprAttribute { value, attr, .. } = attribute;
 
         let db = self.db();
-        let mut constraint_keys = crate::place_load::ConstraintKeys::new();
+        let mut constraint_keys = ConstraintKeys::new();
 
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
             && typevar.is_paramspec(db)

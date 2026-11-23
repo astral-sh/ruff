@@ -9,6 +9,7 @@ use ty_module_resolver::file_to_module;
 use super::TypeInferenceBuilder;
 use super::post_inference::type_param_validation::check_no_default_after_typevar_tuple;
 use crate::place::{DefinedPlace, Definedness, Place};
+use crate::place_load::ConstraintKeys;
 use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
@@ -214,7 +215,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.store_typed_dict_key_expected_type(slice, value_ty);
 
-        let mut constraint_keys = crate::place_load::ConstraintKeys::new();
+        let mut constraint_keys = ConstraintKeys::new();
 
         // If `value` is a valid reference, we attempt type narrowing by assignment.
         let source_place = (!value_ty.is_unknown())
