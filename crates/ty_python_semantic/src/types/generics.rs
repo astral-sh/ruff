@@ -36,7 +36,7 @@ use crate::types::typevar::{
 };
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
-    TypeCollector, TypeKind, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
+    TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
     any_over_type_including_alias_arguments, walk_type_with_recursion_guard,
 };
 use crate::types::{
@@ -1649,15 +1649,9 @@ impl<'db> Specialization<'db> {
                     }
                 }
                 TypeVarVariance::Invariant => {
-                    if has_unsimplified_dynamic_typevar
-                        && !may_materialize_recursive_type(db, visitor.env, vartype)
-                    {
-                        return vartype;
+                    if !has_unsimplified_dynamic_typevar {
+                        has_unsimplified_dynamic_typevar = *has_dynamic_type;
                     }
-                    // A later recursive reference may reuse this result at a cycle guard.
-                    let top = *top_materialization;
-                    has_unsimplified_dynamic_typevar = has_unsimplified_dynamic_typevar
-                        || !visitor.is_equivalent_to_materialization(db, vartype, top);
                     vartype
                 }
             }
@@ -2185,23 +2179,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
     }
-}
-
-/// Whether materializing an argument might also materialize a recursive specialization.
-/// Inspect ordinary containers and stop at types whose structure the walker may omit,
-/// such as an alias body or a function's original signature.
-fn may_materialize_recursive_type<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    argument: Type<'db>,
-) -> bool {
-    any_over_type(db, env, argument, false, |ty| match ty {
-        Type::NominalInstance(_)
-        | Type::GenericAlias(_)
-        | Type::Union(_)
-        | Type::Intersection(_) => false,
-        _ => !matches!(TypeKind::from(ty), TypeKind::Atomic),
-    })
 }
 
 pub(super) fn specialization_variance<'db>(
