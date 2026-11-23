@@ -1613,6 +1613,36 @@ class Base[T]:
 }
 
 #[test]
+fn generic_calls_update_after_changing_a_base_specialization() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file(
+        "/src/main.py",
+        "\
+from typing import TypeVar
+from typing_extensions import reveal_type
+from collection import Items
+
+T = TypeVar('T')
+
+def first(items: list[T]) -> T:
+    return items[0]
+
+def use(items: Items):
+    first(items)
+    reveal_type(first(items))
+",
+    )?;
+    for element in ["int", "str", "int"] {
+        db.write_file(
+            "/src/collection.py",
+            format!("class Items(list[{element}]): ..."),
+        )?;
+        assert_revealed_type(&db, "/src/main.py", element);
+    }
+    Ok(())
+}
+
+#[test]
 fn dynamic_class_metaclass_updates_after_base_change() -> anyhow::Result<()> {
     let mut db = setup_db();
     let base = "\
