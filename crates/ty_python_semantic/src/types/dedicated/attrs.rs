@@ -68,7 +68,7 @@ pub(in crate::types) fn field_instance_kind<'db>(
 ///
 /// We use this for the `<field>.validator` and `<field>.default` decorators, which simply return
 /// the original method unchanged.
-/// See [`_CountingAttr`](https://github.com/python-attrs/attrs/blob/7bfc49e9b22d5ba25b6e429524c3d49fee27cb36/src/attr/_make.py#L2811-L2841).
+/// <https://github.com/python-attrs/attrs/blob/7bfc49e9b22d5ba25b6e429524c3d49fee27cb36/src/attr/_make.py#L2811-L2841>
 pub(in crate::types) fn generic_identity_function<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
