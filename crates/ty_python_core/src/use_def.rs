@@ -1832,6 +1832,14 @@ impl FlowSnapshot {
 #[newtype_index]
 struct PendingReachabilityId;
 
+/// How control flow continues from a node in the pending constraint tree.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PendingNodeKind {
+    Linear,
+    /// Restoring a snapshot here lets another path start at this node.
+    Fork,
+}
+
 /// Narrowing from the node that stores this prefix through `fork`, starting at `ALWAYS_TRUE`.
 #[derive(Clone, Copy, Debug)]
 struct NarrowingPrefix {
@@ -1842,8 +1850,7 @@ struct NarrowingPrefix {
 #[derive(Debug)]
 struct PendingReachabilityConstraint {
     parent: PendingReachabilityId,
-    /// A flow snapshot has been restored at this cursor, so later paths can share it.
-    is_fork: bool,
+    kind: PendingNodeKind,
     narrowing_prefix: Option<NarrowingPrefix>,
     reachability_constraint: ScopedReachabilityConstraintId,
     narrowing_constraint: ScopedNarrowingConstraint,
@@ -1869,7 +1876,7 @@ impl Default for PendingReachability {
         let root = constraints.next_index();
         constraints.push(PendingReachabilityConstraint {
             parent: root,
-            is_fork: false,
+            kind: PendingNodeKind::Linear,
             narrowing_prefix: None,
             reachability_constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
@@ -1886,7 +1893,7 @@ impl Default for PendingReachability {
 impl PendingReachability {
     fn restore(&mut self, cursor: PendingReachabilityId) {
         self.current = cursor;
-        self.constraints[cursor].is_fork = true;
+        self.constraints[cursor].kind = PendingNodeKind::Fork;
     }
 
     fn push(
@@ -1906,7 +1913,7 @@ impl PendingReachability {
         };
         self.current = self.constraints.push(PendingReachabilityConstraint {
             parent: self.current,
-            is_fork: false,
+            kind: PendingNodeKind::Linear,
             narrowing_prefix: None,
             reachability_constraint,
             narrowing_constraint,
@@ -2166,7 +2173,9 @@ impl PendingReachability {
     fn branch_to_merge(&self, tip: PendingReachabilityId) -> PendingBranch {
         let common_ancestor = self.common_ancestor(self.current, tip);
         let mut last_fork = tip;
-        while last_fork != common_ancestor && !self.constraints[last_fork].is_fork {
+        while last_fork != common_ancestor
+            && self.constraints[last_fork].kind != PendingNodeKind::Fork
+        {
             last_fork = self.constraints[last_fork].parent;
         }
         PendingBranch {
