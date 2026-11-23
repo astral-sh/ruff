@@ -11320,6 +11320,8 @@ impl<'db> Type<'db> {
         }
 
         match self {
+            // The complement contains non-callable objects, which no callable can cover.
+            Type::Callable(_) if matches!(target, Type::Callable(_)) => false,
             Type::Intersection(intersection) => {
                 intersection.negation_is_subtype_of(db, env, target)
             }

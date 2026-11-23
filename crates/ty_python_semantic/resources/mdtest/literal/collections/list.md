@@ -31,6 +31,56 @@ The inferred `Callable` type is function-like, i.e. we can still access attribut
 reveal_type(x[0].__name__)  # revealed: str
 ```
 
+## Lists of functions with different parameter lists
+
+The inferred union keeps both signatures if each accepts a call that the other rejects.
+
+```pyi
+def left(x: int) -> int: ...
+def right(y: int) -> int: ...
+def two(x: int, y: int) -> int: ...
+def optional(x: int, y: int = 0) -> int: ...
+def positional(y: int, /) -> int: ...
+def other(y: int = 0) -> int: ...
+def fallback(y: int = 0, *args: object, **kwargs: object) -> int: ...
+
+reveal_type([left, right])  # revealed: list[((x: int) -> int) | ((y: int) -> int)]
+reveal_type([left, two])  # revealed: list[((x: int) -> int) | ((x: int, y: int) -> int)]
+reveal_type([left, other])  # revealed: list[((x: int) -> int) | ((y: int = 0) -> int)]
+
+# All three pairs still simplify to one signature.
+reveal_type([left, fallback])  # revealed: list[(x: int) -> int]
+reveal_type([left, optional])  # revealed: list[(x: int) -> int]
+reveal_type([left, positional])  # revealed: list[(y: int, /) -> int]
+```
+
+An overloaded function can require a different keyword in every overload, even with a gradual
+variadic tail.
+
+```pyi
+from typing import Any, overload
+
+@overload
+def convert(ctx: int, x: int, *args: Any, **kwargs: Any) -> int: ...
+@overload
+def convert(ctx: int, x: str, *args: Any, **kwargs: Any) -> str: ...
+
+# revealed: list[((x: int) -> int) | Overload[(ctx: int, x: int, *args: Any, **kwargs: Any) -> int, (ctx: int, x: str, *args: Any, **kwargs: Any) -> str]]
+reveal_type([left, convert])
+```
+
+ty can combine unary overloads to cover a union even when the names differ.
+
+```pyi
+@overload
+def by_count(count: str) -> int: ...
+@overload
+def by_count(count: int) -> int: ...
+def by_size(size: str | int) -> int: ...
+
+reveal_type([by_count, by_size])  # revealed: list[(size: str | int) -> int]
+```
+
 ## Mixed list
 
 ```py

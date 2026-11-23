@@ -181,6 +181,28 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
+    /// Whether the parameter lists rule out subtyping in both directions, even
+    /// after bottom materialization.
+    pub(super) fn has_incomparable_parameters(&self, other: &Self) -> bool {
+        let (single, signatures) = match (self.overloads.as_slice(), other.overloads.as_slice()) {
+            ([single], others) | (others, [single]) if !others.is_empty() => (single, others),
+            _ => return false,
+        };
+        let left = single.parameters();
+        signatures.iter().all(|signature| {
+            let right = signature.parameters();
+            // Unary overloads can collectively cover a union even when keyword names differ.
+            // Count only fixed slots: an unpacked variadic can disappear on materialization.
+            if signatures.len() > 1
+                && !left.get(1).is_some_and(Parameter::is_positional)
+                && !right.get(1).is_some_and(Parameter::is_positional)
+            {
+                return false;
+            }
+            left.has_incomparable_positional_prefix(right)
+        })
+    }
+
     /// Returns the union of all overload return types, or `Unknown` if there are no overloads.
     pub(crate) fn overload_return_type_or_unknown(
         &self,
@@ -5324,6 +5346,41 @@ impl<'db> Parameters<'db> {
             self.data.kind,
             ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
         )
+    }
+
+    /// Checks whether each signature accepts a call that the other must reject.
+    fn has_incomparable_positional_prefix(&self, other: &Self) -> bool {
+        // An unrestricted variadic source can still match a gradual target.
+        let can_compare = |target: &Self, source: &Self| {
+            target.is_standard() || (target.is_gradual() && source.keyword_variadic().is_none())
+        };
+        if !can_compare(self, other) || !can_compare(other, self) {
+            return false;
+        }
+
+        for pair in self.iter().zip_longest(other.iter()) {
+            match pair {
+                EitherOrBoth::Both(left, right)
+                    if left.is_positional() && right.is_positional() =>
+                {
+                    // An optional slot can be omitted if **kwargs accepts the other name.
+                    if let (Some(left_name), Some(right_name)) =
+                        (left.keyword_name(), right.keyword_name())
+                        && left_name != right_name
+                        && (!left.has_default() || self.keyword_variadic().is_none())
+                        && (!right.has_default() || other.keyword_variadic().is_none())
+                    {
+                        return true;
+                    }
+                }
+                // One signature requires more arguments than the other accepts.
+                EitherOrBoth::Left(extra) | EitherOrBoth::Right(extra) => {
+                    return extra.is_positional() && !extra.has_default();
+                }
+                EitherOrBoth::Both(..) => break,
+            }
+        }
+        false
     }
 
     /// Returns whether the entire parameter list is gradual, with no fixed parameters.
