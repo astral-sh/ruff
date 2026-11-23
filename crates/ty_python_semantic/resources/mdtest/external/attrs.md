@@ -6,7 +6,7 @@ python-version = "3.13"
 python-platform = "linux"
 
 [project]
-dependencies = ["attrs==25.4.0"]
+dependencies = ["attrs==26.1.0"]
 ```
 
 ## Basic class (`attr`)
