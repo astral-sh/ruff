@@ -2168,19 +2168,15 @@ pub(crate) fn evaluate_reachability(
 }
 
 #[derive(Default)]
-struct TruthinessCache(RefCell<Vec<Option<Truthiness>>>);
+struct TruthinessCache(RefCell<FxHashMap<usize, Truthiness>>);
 
 impl TruthinessCache {
     fn get_or_evaluate(&self, index: usize, evaluate: impl FnOnce() -> Truthiness) -> Truthiness {
-        if let Some(value) = self.0.borrow().get(index).copied().flatten() {
+        if let Some(value) = self.0.borrow().get(&index).copied() {
             return value;
         }
         let value = evaluate();
-        let mut entries = self.0.borrow_mut();
-        if entries.len() <= index {
-            entries.resize(index + 1, None);
-        }
-        entries[index] = Some(value);
+        self.0.borrow_mut().insert(index, value);
         value
     }
 }
@@ -2193,7 +2189,8 @@ impl TruthinessCache {
 /// avoids repeating non-trivial work.
 ///
 /// The common case is evaluating constraints from the inferred region's own use-def map. Those
-/// entries are stored in a dense vector indexed by [`ScopedReachabilityConstraintId`]. Distinct
+/// entries are keyed by [`ScopedReachabilityConstraintId`]. A region may consult only a few
+/// constraints in a large scope, so we store only the IDs it visits. Distinct
 /// paths through that graph can test the same predicate, so cache its truthiness for the lifetime
 /// of this inference, including when the surrounding query is iterating a cycle. Constraints
 /// from other use-def maps are less common and are stored separately, keyed by the address of their
@@ -2211,7 +2208,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
     /// Creates a cache optimized for the use-def map of `primary_scope`.
     ///
     /// `primary_constraints` must be the reachability graph for `primary_scope`'s use-def map. The
-    /// cache uses this graph's address to decide whether an evaluation can use the dense primary
+    /// cache uses this graph's address to decide whether an evaluation can use the primary
     /// storage or must fall back to the secondary map for another graph.
     pub(crate) fn new(
         primary_scope: ScopeId<'db>,
@@ -2230,7 +2227,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
     ///
     /// Trivial constraint ids return immediately and are not stored. For interior nodes, the
     /// predicate determines whether the constraint belongs to the primary scope. A primary-scope
-    /// constraint from the primary graph is cached by dense index; all other constraints are cached
+    /// constraint from the primary graph is cached by local ID; all other constraints are cached
     /// by graph identity and id.
     fn evaluate(
         &self,
