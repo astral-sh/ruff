@@ -121,7 +121,7 @@ impl PytestContextType {
 }
 
 /// RUF061
-pub(crate) fn legacy_raises_warns_deprecated_call(
+pub(crate) fn pytest_legacy_callable_form(
     checker: &Checker,
     call: &ast::ExprCall,
     qualified_name: &QualifiedName,

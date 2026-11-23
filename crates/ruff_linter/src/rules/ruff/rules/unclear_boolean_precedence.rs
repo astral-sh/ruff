@@ -52,7 +52,7 @@ impl AlwaysFixableViolation for UnclearBooleanPrecedence {
 }
 
 /// RUF021
-pub(crate) fn parenthesize_chained_logical_operators(checker: &Checker, expr: &ast::ExprBoolOp) {
+pub(crate) fn unclear_boolean_precedence(checker: &Checker, expr: &ast::ExprBoolOp) {
     // We're only interested in `and` expressions inside `or` expressions:
     // - `a or b or c` => `BoolOp(values=[Name("a"), Name("b"), Name("c")], op=Or)`
     // - `a and b and c` => `BoolOp(values=[Name("a"), Name("b"), Name("c")], op=And)`

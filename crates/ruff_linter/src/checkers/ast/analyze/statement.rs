@@ -352,7 +352,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ruff::rules::post_init_default(checker, function_def);
             }
             if checker.is_rule_enabled(Rule::PytestParameterWithDefaultValue) {
-                flake8_pytest_style::rules::parameter_with_default_argument(checker, function_def);
+                flake8_pytest_style::rules::pytest_parameter_with_default_value(
+                    checker,
+                    function_def,
+                );
             }
             if checker.is_rule_enabled(Rule::AirflowTaskBranchAsShortCircuit) {
                 airflow::rules::task_branch_as_short_circuit(checker, function_def);

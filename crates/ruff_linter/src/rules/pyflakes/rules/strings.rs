@@ -942,7 +942,7 @@ pub(crate) fn str_format_unused_positional_arguments(
 }
 
 /// F524
-pub(crate) fn string_dot_format_missing_argument(
+pub(crate) fn str_format_missing_arguments(
     checker: &Checker,
     call: &ast::ExprCall,
     summary: &FormatSummary,

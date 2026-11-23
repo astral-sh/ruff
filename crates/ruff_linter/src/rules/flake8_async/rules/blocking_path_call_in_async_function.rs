@@ -78,7 +78,7 @@ impl Violation for BlockingPathCallInAsyncFunction {
 }
 
 /// ASYNC240
-pub(crate) fn blocking_os_path(checker: &Checker, call: &ExprCall) {
+pub(crate) fn blocking_path_call_in_async_function(checker: &Checker, call: &ExprCall) {
     let semantic = checker.semantic();
     if !semantic.in_async_context() {
         return;

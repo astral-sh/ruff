@@ -523,7 +523,7 @@ mod tests {
     }
 
     #[test]
-    fn unnecessary_default_type_args_stubs_py312() -> Result<()> {
+    fn unnecessary_default_type_arguments_stubs_py312() -> Result<()> {
         let snapshot = "UP043.pyi";
         let diagnostics = test_path(
             Path::new("pyupgrade/UP043.pyi"),

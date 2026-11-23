@@ -7,7 +7,7 @@ use crate::codes::Category;
 use crate::fix::edits::delete_comment;
 use crate::noqa::{Code, Directive, FileNoqaDirectives};
 use crate::noqa::{Codes, NoqaDirectives};
-use crate::preview::is_file_level_invalid_rule_code_enabled;
+use crate::preview::is_file_level_unknown_rule_enabled;
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -92,7 +92,7 @@ impl AlwaysFixableViolation for UnknownRuleInSuppressionComment {
 }
 
 /// RUF102 for unknown noqa codes
-pub(crate) fn invalid_noqa_code(
+pub(crate) fn unknown_rule_in_noqa(
     context: &LintContext,
     file_noqa_directives: &FileNoqaDirectives,
     noqa_directives: &NoqaDirectives,
@@ -100,28 +100,28 @@ pub(crate) fn invalid_noqa_code(
     external: &[String],
 ) {
     let check_codes = |codes: &Codes<'_>| {
-        let all_valid = codes
+        let all_known = codes
             .iter()
             .all(|code| code_is_valid(code.as_str(), external));
 
-        if all_valid {
+        if all_known {
             return;
         }
 
-        let (valid_codes, invalid_codes): (Vec<_>, Vec<_>) = codes
+        let (valid_codes, unknown_rules): (Vec<_>, Vec<_>) = codes
             .iter()
             .partition(|&code| code_is_valid(code.as_str(), external));
 
         if valid_codes.is_empty() {
-            all_codes_invalid_diagnostic(codes, invalid_codes, locator, context);
+            all_rules_unknown_diagnostic(codes, unknown_rules, locator, context);
         } else {
-            for invalid_code in invalid_codes {
-                some_codes_are_invalid_diagnostic(codes, invalid_code, locator, context);
+            for unknown_rule in unknown_rules {
+                unknown_rule_diagnostic(codes, unknown_rule, locator, context);
             }
         }
     };
 
-    if is_file_level_invalid_rule_code_enabled(context.settings()) {
+    if is_file_level_unknown_rule_enabled(context.settings()) {
         for line in file_noqa_directives.lines() {
             if let Directive::Codes(codes) = &line.parsed_file_exemption {
                 check_codes(codes);
@@ -140,15 +140,15 @@ pub(crate) fn code_is_valid(code: &str, external: &[String]) -> bool {
         || external.iter().any(|ext| code.starts_with(ext))
 }
 
-fn all_codes_invalid_diagnostic(
+fn all_rules_unknown_diagnostic(
     directive: &Codes<'_>,
-    invalid_codes: Vec<&Code<'_>>,
+    unknown_rules: Vec<&Code<'_>>,
     locator: &Locator,
     context: &LintContext,
 ) {
     let mut diagnostic = context.report_custom_diagnostic(
         UnknownRuleInSuppressionComment {
-            rule: invalid_codes
+            rule: unknown_rules
                 .into_iter()
                 .map(Code::as_str)
                 .collect::<Vec<_>>()
@@ -162,29 +162,29 @@ fn all_codes_invalid_diagnostic(
     diagnostic.help("Add non-Ruff rule codes to the `lint.external` configuration option");
 }
 
-fn some_codes_are_invalid_diagnostic(
+fn unknown_rule_diagnostic(
     codes: &Codes,
-    invalid_code: &Code,
+    unknown_rule: &Code,
     locator: &Locator,
     context: &LintContext,
 ) {
     let mut diagnostic = context.report_custom_diagnostic(
         UnknownRuleInSuppressionComment {
-            rule: invalid_code.to_string(),
+            rule: unknown_rule.to_string(),
             kind: UnknownRuleCommentKind::Noqa,
             whole_comment: false,
         },
-        invalid_code.range(),
+        unknown_rule.range(),
     );
-    diagnostic.set_fix(Fix::safe_edit(remove_invalid_noqa(
+    diagnostic.set_fix(Fix::safe_edit(remove_unknown_rule_from_noqa(
         codes,
-        invalid_code,
+        unknown_rule,
         locator,
     )));
     diagnostic.help("Add non-Ruff rule codes to the `lint.external` configuration option");
 }
 
-fn remove_invalid_noqa(codes: &Codes, invalid_code: &Code, locator: &Locator) -> Edit {
+fn remove_unknown_rule_from_noqa(codes: &Codes, unknown_rule: &Code, locator: &Locator) -> Edit {
     // Is this the first code after the `:` that needs to get deleted
     // For the first element, delete from after the `:` to the next comma (including)
     // For any other element, delete from the previous comma (including) to the next comma (excluding)
@@ -192,7 +192,7 @@ fn remove_invalid_noqa(codes: &Codes, invalid_code: &Code, locator: &Locator) ->
 
     // Find the index of the previous comma or colon.
     let start = locator
-        .slice(TextRange::new(codes.start(), invalid_code.start()))
+        .slice(TextRange::new(codes.start(), unknown_rule.start()))
         .rmatch_indices([',', ':'])
         .next()
         .map(|(offset, text)| {
@@ -205,14 +205,14 @@ fn remove_invalid_noqa(codes: &Codes, invalid_code: &Code, locator: &Locator) ->
                 offset
             }
         })
-        .unwrap_or(invalid_code.start());
+        .unwrap_or(unknown_rule.start());
 
     // Find the index of the trailing comma (if any)
     let end = locator
-        .slice(TextRange::new(invalid_code.end(), codes.end()))
+        .slice(TextRange::new(unknown_rule.end(), codes.end()))
         .find(',')
         .map(|offset| {
-            let offset = invalid_code.end() + TextSize::try_from(offset).unwrap();
+            let offset = unknown_rule.end() + TextSize::try_from(offset).unwrap();
 
             if first {
                 offset + ','.text_len()
@@ -220,7 +220,7 @@ fn remove_invalid_noqa(codes: &Codes, invalid_code: &Code, locator: &Locator) ->
                 offset
             }
         })
-        .unwrap_or(invalid_code.end());
+        .unwrap_or(unknown_rule.end());
 
     Edit::range_deletion(TextRange::new(start, end))
 }

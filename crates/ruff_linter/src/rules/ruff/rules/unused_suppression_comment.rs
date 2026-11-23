@@ -6,7 +6,7 @@ use crate::AlwaysFixableViolation;
 use crate::codes::Category;
 
 #[derive(Debug, PartialEq, Eq, Default)]
-pub(crate) struct UnusedRuleSelectors<'a> {
+pub(crate) struct UnusedRules<'a> {
     pub(crate) disabled: &'a [&'a str],
     pub(crate) duplicated: &'a [&'a str],
     pub(crate) unmatched: &'a [&'a str],
@@ -90,53 +90,53 @@ impl UnusedSuppressionKind {
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.155", category = Category::Suspicious)]
 pub(crate) struct UnusedSuppressionComment<'a> {
-    pub selectors: Option<UnusedRuleSelectors<'a>>,
+    pub rules: Option<UnusedRules<'a>>,
     pub kind: UnusedSuppressionKind,
 }
 
 impl AlwaysFixableViolation for UnusedSuppressionComment<'_> {
     #[derive_message_formats]
     fn message(&self) -> String {
-        match &self.selectors {
-            Some(selectors) => {
-                let mut selectors_by_reason = vec![];
-                if !selectors.unmatched.is_empty() {
-                    selectors_by_reason.push(format!(
+        match &self.rules {
+            Some(rules) => {
+                let mut rules_by_reason = vec![];
+                if !rules.unmatched.is_empty() {
+                    rules_by_reason.push(format!(
                         "unused: {}",
-                        selectors
+                        rules
                             .unmatched
                             .iter()
-                            .map(|selector| format!("`{selector}`"))
+                            .map(|rule| format!("`{rule}`"))
                             .join(", ")
                     ));
                 }
-                if !selectors.disabled.is_empty() {
-                    selectors_by_reason.push(format!(
+                if !rules.disabled.is_empty() {
+                    rules_by_reason.push(format!(
                         "non-enabled: {}",
-                        selectors
+                        rules
                             .disabled
                             .iter()
-                            .map(|selector| format!("`{selector}`"))
+                            .map(|rule| format!("`{rule}`"))
                             .join(", ")
                     ));
                 }
-                if !selectors.duplicated.is_empty() {
-                    selectors_by_reason.push(format!(
+                if !rules.duplicated.is_empty() {
+                    rules_by_reason.push(format!(
                         "duplicated: {}",
-                        selectors
+                        rules
                             .duplicated
                             .iter()
-                            .map(|selector| format!("`{selector}`"))
+                            .map(|rule| format!("`{rule}`"))
                             .join(", ")
                     ));
                 }
-                if selectors_by_reason.is_empty() {
+                if rules_by_reason.is_empty() {
                     format!("Unused {}", self.kind.as_str())
                 } else {
                     format!(
                         "Unused {} ({})",
                         self.kind.as_str(),
-                        selectors_by_reason.join("; ")
+                        rules_by_reason.join("; ")
                     )
                 }
             }

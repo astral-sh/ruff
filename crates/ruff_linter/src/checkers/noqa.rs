@@ -16,7 +16,7 @@ use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
-use crate::rules::ruff::rules::{UnusedRuleSelectors, UnusedSuppressionComment};
+use crate::rules::ruff::rules::{UnusedRules, UnusedSuppressionComment};
 use crate::settings::LinterSettings;
 use crate::suppression::Suppressions;
 use crate::{Edit, Fix, Locator};
@@ -130,7 +130,7 @@ pub(crate) fn check_noqa(
                         let edit = delete_comment(all.range(), locator);
                         let mut diagnostic = context.report_diagnostic(
                             UnusedSuppressionComment {
-                                selectors: None,
+                                rules: None,
                                 kind: ruff::rules::UnusedSuppressionKind::Noqa,
                             },
                             all.range(),
@@ -235,7 +235,7 @@ pub(crate) fn check_noqa(
                         };
                         let mut diagnostic = context.report_diagnostic(
                             UnusedSuppressionComment {
-                                selectors: Some(UnusedRuleSelectors {
+                                rules: Some(UnusedRules {
                                     disabled: &disabled_codes,
                                     duplicated: &duplicated_codes,
                                     unmatched: &unmatched_codes,
@@ -284,7 +284,7 @@ pub(crate) fn check_noqa(
     if context.is_rule_enabled(Rule::UnknownRuleInSuppressionComment)
         && !exemption.enumerates(Rule::UnknownRuleInSuppressionComment)
     {
-        ruff::rules::invalid_noqa_code(
+        ruff::rules::unknown_rule_in_noqa(
             context,
             &file_noqa_directives,
             &noqa_directives,

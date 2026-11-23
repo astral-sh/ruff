@@ -622,7 +622,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                         );
                                     }
                                     if checker.is_rule_enabled(Rule::StrFormatMissingArguments) {
-                                        pyflakes::rules::string_dot_format_missing_argument(
+                                        pyflakes::rules::str_format_missing_arguments(
                                             checker, call, &summary, args, keywords,
                                         );
                                     }
@@ -706,7 +706,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_async::rules::blocking_open_call(checker, call);
             }
             if checker.is_rule_enabled(Rule::BlockingPathCallInAsyncFunction) {
-                flake8_async::rules::blocking_os_path(checker, call);
+                flake8_async::rules::blocking_path_call_in_async_function(checker, call);
             }
             if checker.any_rule_enabled(&[
                 Rule::CreateSubprocessInAsyncFunction,
@@ -1702,7 +1702,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 ruff::rules::unnecessary_key_check(checker, expr);
             }
             if checker.is_rule_enabled(Rule::UnclearBooleanPrecedence) {
-                ruff::rules::parenthesize_chained_logical_operators(checker, bool_op);
+                ruff::rules::unclear_boolean_precedence(checker, bool_op);
             }
         }
         Expr::Lambda(lambda) => {
@@ -2059,7 +2059,7 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
         flake8_pytest_style::rules::raises_call(checker, call, &qualified_name);
     }
     if checker.is_rule_enabled(Rule::PytestLegacyCallableForm) {
-        ruff::rules::legacy_raises_warns_deprecated_call(checker, call, &qualified_name);
+        ruff::rules::pytest_legacy_callable_form(checker, call, &qualified_name);
     }
     if checker.any_rule_enabled(&[Rule::PytestWarnsWithoutWarning, Rule::PytestWarnsTooBroad]) {
         flake8_pytest_style::rules::warns_call(checker, call, &qualified_name);

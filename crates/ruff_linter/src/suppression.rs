@@ -24,8 +24,8 @@ use crate::rule_redirects::{get_redirect, get_redirect_target};
 use crate::rules::ruff::rules::{
     InvalidSuppressionComment, InvalidSuppressionCommentKind, RenamedRuleInSuppressionComment,
     RuleCodesInSuppressionComments, UnknownRuleCommentKind, UnknownRuleInSuppressionComment,
-    UnmatchedSuppressionComment, UnusedRuleSelectors, UnusedSuppressionComment,
-    UnusedSuppressionKind, code_is_valid,
+    UnmatchedSuppressionComment, UnusedRules, UnusedSuppressionComment, UnusedSuppressionKind,
+    code_is_valid,
 };
 use crate::settings::LinterSettings;
 use crate::settings::types::PreviewMode;
@@ -516,7 +516,7 @@ impl Suppressions {
                     &codes,
                     false,
                     UnusedSuppressionComment {
-                        selectors: Some(UnusedRuleSelectors {
+                        rules: Some(UnusedRules {
                             disabled: &group.disabled_codes,
                             duplicated: &group.duplicated_codes,
                             unmatched: &group.unused_codes,
