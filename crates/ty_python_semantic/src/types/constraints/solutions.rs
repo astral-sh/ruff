@@ -78,7 +78,6 @@ pub(super) struct SolutionWalker<'db, L> {
     /// since derived bounds can obscure the original evidence.
     original_node: NodeId,
     inferable: TypeVarSet<'db>,
-    inferable_support: Support,
     limits: L,
     /// Number of valid candidates still needed, if the caller can stop early.
     remaining_valid: Option<usize>,
@@ -89,8 +88,8 @@ pub(super) struct SolutionWalker<'db, L> {
 
     /// Nodes that we have already explored. We can't cache this only on the node ID, since the
     /// constraints that are in scope when we encounter the node can affect how we interpret its
-    /// downstream edges. But we also don't want to consider _all_ of the constraints on the path;
-    /// we only want to consider the ones that are relevant to the node and its descendants.
+    /// downstream edges. Even assignments to variables absent from the remaining subtree
+    /// can determine whether a solution satisfies the variables' declared bounds.
     explored_nodes: FxHashSet<ExploredNodeKey>,
 
     /// Nodes that we have already checked the satisfiability of.
@@ -133,19 +132,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         let path = original_node.path_assignments(db, env, storage, &source_orders);
         let captures = inferable.captured_typevars(db, storage, || path.discovered_constraints());
         let inferable = inferable.merge(db, captures);
-        let inferable_support = if inferable == TypeVarSet::All {
-            storage
-                .node_support(original_node)
-                .cloned()
-                .unwrap_or_default()
-        } else {
-            Support::from_typevar_set(db, storage, inferable)
-        };
         let walker = Self {
             source_orders,
             original_node,
             inferable,
-            inferable_support,
             limits,
             remaining_valid: None,
             remaining_failed_paths: None,
@@ -173,15 +163,6 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     ) -> Self {
         self.unspecialized_type_var_policy = unspecialized_type_var_policy;
         self
-    }
-
-    /// Returns an iterator of the positive and negative constraints on the current path
-    fn constrained_assignments(
-        path: &PathAssignments,
-    ) -> impl Iterator<Item = AtomicConstraintId> + Clone {
-        path.assignments
-            .iter()
-            .filter_map(|(assignment, _)| assignment.as_constrained())
     }
 
     /// With every atom on this path false, the diagram reaches its false terminal.
@@ -391,10 +372,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             return ControlFlow::Continue(());
         }
 
-        // See if we've already visited this node on an "equivalent" path, where we only
-        // consider the typevars that can affect the solutions we'd find if we were to
-        // continue walking down the node.
-        let key = self.explored_node_key(storage, path, polarity, node, validations);
+        let key = Self::explored_node_key(path, polarity, node);
         let is_new = self.explored_nodes.insert(key);
         if !is_new {
             return ControlFlow::Continue(());
@@ -407,36 +385,6 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             return self.validate_solutions(db, env, storage, path, validations);
         }
 
-        // Next see if anything in this node can affect the solution we've already
-        // calculated on the current path.
-        let mut visible_typevars = self.inferable_support.clone();
-        visible_typevars.close_over_constraints(
-            storage,
-            Self::constrained_assignments(path).map(AtomicConstraintId::into_inner),
-        );
-        let node_can_affect_result = storage
-            .node_support(node)
-            .is_some_and(|node_support| visible_typevars.overlaps_with(node_support));
-
-        if !node_can_affect_result {
-            // This node cannot affect the solution we've found. Make sure that the node has
-            // _at least one_ satisfiable path, without walking them all. As long as it does,
-            // we can report the solution we have so far as-is.
-            if self.node_is_satisfiable_on_path(
-                db,
-                env,
-                storage,
-                path,
-                polarity,
-                node,
-                validations,
-            )? {
-                return self.validate_solutions(db, env, storage, path, validations);
-            }
-            return ControlFlow::Continue(());
-        }
-
-        // At this point we actually have to walk the outgoing edges of this node.
         self.visit_constraint(
             db,
             env,
@@ -557,7 +505,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             return ControlFlow::Continue(());
         }
 
-        let key = self.explored_node_key(storage, path, polarity, node, validations);
+        let key = Self::explored_node_key(path, polarity, node);
         if let Some(result) = self.node_is_satisfiable_on_path_cache.get(&key) {
             return bool_into_break(*result);
         }
@@ -606,39 +554,14 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     }
 
     fn explored_node_key(
-        &mut self,
-        storage: &mut ConstraintSetStorage<'db>,
-        path: &mut PathAssignments,
+        path: &PathAssignments,
         polarity: Polarity,
         node: NodeId,
-        validations: Option<&Validations<'db>>,
     ) -> ExploredNodeKey {
-        let mut relevant_typevars = self.inferable_support.clone();
-        // Declared domains can invalidate a path even when their typevars neither
-        // contribute a solution nor occur in the remaining subtree. Such paths must
-        // not share a cache entry with paths that satisfy those domains.
-        if let Some(validations) = validations {
-            relevant_typevars |= &validations.support;
-        }
-        let node_support = storage.node_support(node);
-        if let Some(node_support) = node_support {
-            relevant_typevars |= node_support;
-        }
-        let all_relevant = relevant_typevars.close_over_constraints(
-            storage,
-            Self::constrained_assignments(path).map(AtomicConstraintId::into_inner),
-        );
-
-        // Every constraint has a subject type variable. If all variables are relevant,
-        // every positive or negative assignment on the path belongs in the key.
+        // Every atom has an inferable subject, so every assignment can affect the solution.
         let mut relevant_path = Vec::with_capacity(path.assignments.len());
         for (assignment, (source, _)) in &path.assignments {
-            if let Some(constraint) = assignment.as_constrained()
-                && (all_relevant
-                    || storage
-                        .constraint_support(constraint.into_inner())
-                        .overlaps_with(&relevant_typevars))
-            {
+            if assignment.as_constrained().is_some() {
                 relevant_path.push((*assignment, *source));
             }
         }
@@ -1970,8 +1893,6 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
 /// Validations that must be verified for each candidate solution.
 #[derive(Default)]
 struct Validations<'db> {
-    /// Type variables whose assignments can affect declared-domain validation.
-    support: Support,
     upper_bounds: FxIndexMap<BoundTypeVarInstance<'db>, UpperBound>,
     constrained: FxIndexMap<BoundTypeVarInstance<'db>, Constrained<'db>>,
 }
@@ -2037,7 +1958,6 @@ impl<'db> Validations<'db> {
         else {
             return;
         };
-        self.support.insert(storage.typevar_id(db, bound_typevar));
         match bound_or_constraints {
             TypeVarBoundOrConstraints::UpperBound(bound) => self.add_upper_bound(
                 db,
@@ -2068,7 +1988,6 @@ impl<'db> Validations<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         typevar_queue: &mut Support,
         seen_typevars: &mut Support,
-        support: &mut Support,
         constraints: impl Iterator<Item = Result<AtomicConstraint<'db>, UnsatisfiableBound>>,
     ) -> ValidationConstraints {
         let constraints: ValidationConstraints = constraints
@@ -2083,7 +2002,6 @@ impl<'db> Validations<'db> {
         // set of typevars to check.
         for constraint in constraints.iter().flatten() {
             let constraint_support = storage.constraint_support(constraint.into_inner());
-            *support |= constraint_support;
             let new_typevars = constraint_support - &*seen_typevars;
             *typevar_queue |= &new_typevars;
         }
@@ -2118,7 +2036,6 @@ impl<'db> Validations<'db> {
                 storage,
                 typevar_queue,
                 seen_typevars,
-                &mut self.support,
                 constraints,
             );
             UpperBound { constraints }
@@ -2156,7 +2073,6 @@ impl<'db> Validations<'db> {
                         storage,
                         typevar_queue,
                         seen_typevars,
-                        &mut self.support,
                         constraints,
                     );
                     DeclaredConstraint {
