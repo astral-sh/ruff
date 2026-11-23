@@ -13,23 +13,23 @@ use crate::rule_redirects::get_redirect_target;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum InvalidRuleSelectorKind {
+pub(crate) enum UnknownRuleCommentKind {
     Noqa,
     Suppression,
 }
 
-impl InvalidRuleSelectorKind {
+impl UnknownRuleCommentKind {
     fn as_str(&self) -> &str {
         match self {
-            InvalidRuleSelectorKind::Noqa => "`# noqa`",
-            InvalidRuleSelectorKind::Suppression => "suppression",
+            UnknownRuleCommentKind::Noqa => "`# noqa`",
+            UnknownRuleCommentKind::Suppression => "suppression",
         }
     }
 
     fn selector(&self) -> &str {
         match self {
-            InvalidRuleSelectorKind::Noqa => "code",
-            InvalidRuleSelectorKind::Suppression => "selector",
+            UnknownRuleCommentKind::Noqa => "code",
+            UnknownRuleCommentKind::Suppression => "selector",
         }
     }
 }
@@ -73,13 +73,13 @@ impl InvalidRuleSelectorKind {
 /// - `lint.external`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
-pub(crate) struct InvalidRuleSelectorInSuppressionComment {
+pub(crate) struct UnknownRuleInSuppressionComment {
     pub(crate) rule: String,
-    pub(crate) kind: InvalidRuleSelectorKind,
+    pub(crate) kind: UnknownRuleCommentKind,
     pub(crate) whole_comment: bool,
 }
 
-impl AlwaysFixableViolation for InvalidRuleSelectorInSuppressionComment {
+impl AlwaysFixableViolation for UnknownRuleInSuppressionComment {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -159,13 +159,13 @@ fn all_codes_invalid_diagnostic(
     context: &LintContext,
 ) {
     let mut diagnostic = context.report_custom_diagnostic(
-        InvalidRuleSelectorInSuppressionComment {
+        UnknownRuleInSuppressionComment {
             rule: invalid_codes
                 .into_iter()
                 .map(Code::as_str)
                 .collect::<Vec<_>>()
                 .join(", "),
-            kind: InvalidRuleSelectorKind::Noqa,
+            kind: UnknownRuleCommentKind::Noqa,
             whole_comment: true,
         },
         directive.range(),
@@ -181,9 +181,9 @@ fn some_codes_are_invalid_diagnostic(
     context: &LintContext,
 ) {
     let mut diagnostic = context.report_custom_diagnostic(
-        InvalidRuleSelectorInSuppressionComment {
+        UnknownRuleInSuppressionComment {
             rule: invalid_code.to_string(),
-            kind: InvalidRuleSelectorKind::Noqa,
+            kind: UnknownRuleCommentKind::Noqa,
             whole_comment: false,
         },
         invalid_code.range(),

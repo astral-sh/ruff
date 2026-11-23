@@ -22,8 +22,8 @@ use crate::fix::edits::delete_comment;
 use crate::preview::{is_human_readable_names_enabled, is_redirected_suppression_code_enabled};
 use crate::rule_redirects::{get_redirect, get_redirect_target};
 use crate::rules::ruff::rules::{
-    InvalidRuleSelectorInSuppressionComment, InvalidRuleSelectorKind, InvalidSuppressionComment,
-    InvalidSuppressionCommentKind, RenamedRuleInSuppressionComment, RuleCodesInSuppressionComments,
+    InvalidSuppressionComment, InvalidSuppressionCommentKind, RenamedRuleInSuppressionComment,
+    RuleCodesInSuppressionComments, UnknownRuleCommentKind, UnknownRuleInSuppressionComment,
     UnmatchedSuppressionComment, UnusedCodes, UnusedNOQAKind, UnusedSuppressionComment,
     code_is_valid,
 };
@@ -494,9 +494,9 @@ impl Suppressions {
                     group.suppression,
                     &group.invalid_codes,
                     true,
-                    InvalidRuleSelectorInSuppressionComment {
+                    UnknownRuleInSuppressionComment {
                         rule: group.invalid_codes.iter().join(", "),
-                        kind: InvalidRuleSelectorKind::Suppression,
+                        kind: UnknownRuleCommentKind::Suppression,
                         whole_comment: group.suppression.codes().len() == group.invalid_codes.len(),
                     },
                 ) {
@@ -549,7 +549,7 @@ impl Suppressions {
             let name_is_valid = is_human_readable_names_enabled(self.preview) && name_is_known;
 
             if !code_is_valid && !name_is_valid {
-                // InvalidRuleSelectorInSuppressionComment
+                // UnknownRuleInSuppressionComment
                 let (_key, group) = grouped_diagnostic
                     .get_or_insert_with(|| (key, SuppressionDiagnostic::new(suppression)));
                 group.invalid_codes.push(code_str);
