@@ -1,8 +1,7 @@
 use ruff_python_stdlib::identifiers::is_mangled_private;
-use ty_module_resolver::{KnownModule, file_to_module};
 
 use crate::Db;
-use crate::types::{DataclassFlags, FunctionType, StaticClassLiteral};
+use crate::types::{DataclassFlags, FunctionType, KnownFunction, StaticClassLiteral};
 
 pub(in crate::types) fn is_attrs_class<'db>(
     db: &'db dyn Db,
@@ -13,12 +12,13 @@ pub(in crate::types) fn is_attrs_class<'db>(
         .is_some_and(|params| params.flags(db).contains(DataclassFlags::ATTRS))
 }
 
-/// Returns whether a dataclass-transform decorator is defined by attrs.
-pub(in crate::types) fn is_decorator<'db>(db: &'db dyn Db, decorator: FunctionType<'db>) -> bool {
+pub(in crate::types) fn is_attrs_decorator<'db>(
+    db: &'db dyn Db,
+    decorator: FunctionType<'db>,
+) -> bool {
     matches!(
-        file_to_module(db, decorator.program_file(db).resolver_file(db))
-            .and_then(|module| module.known(db)),
-        Some(KnownModule::Attr | KnownModule::Attrs)
+        decorator.known(db),
+        Some(KnownFunction::AttrAttrs | KnownFunction::AttrsDefine | KnownFunction::AttrsFrozen)
     )
 }
 
