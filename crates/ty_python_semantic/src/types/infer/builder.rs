@@ -8622,6 +8622,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     inferred_elt_ty
                 };
 
+                // Only exact tuples depend on the expression for tuple-size promotion.
+                // For example, a variable can block promotion even immediately after a
+                // tuple literal with the same promoted type.
+                let repeated = previous_evidence[i] == Some(inferred_type_for_typevar);
+                if repeated
+                    && !matches!(inferred_type_for_typevar, Type::NominalInstance(ty) if ty.is_exact_tuple())
+                {
+                    continue;
+                }
+
                 tuple_size_promotion_constraints.record_inferred_expression_type(
                     db,
                     env,
@@ -8630,7 +8640,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     inferred_type_for_typevar,
                 );
 
-                if previous_evidence[i] != Some(inferred_type_for_typevar) {
+                if !repeated {
                     builder
                         .infer(Type::TypeVar(elt_ty), inferred_type_for_typevar)
                         .ok()?;
