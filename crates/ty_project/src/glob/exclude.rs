@@ -120,6 +120,7 @@ struct Gitignore {
     #[get_size(ignore)]
     set: GlobSet,
     globs: Vec<IgnoreGlob>,
+    only_directories: bool,
     #[get_size(ignore)]
     matches: Arc<Pool<Vec<usize>>>,
 }
@@ -133,7 +134,7 @@ impl Gitignore {
     ///
     /// The path must be absolute or it will only match prefix-wildcard patterns.
     fn matched(&self, path: &SystemPath, is_dir: bool) -> Match {
-        if self.globs.is_empty() {
+        if self.globs.is_empty() || (!is_dir && self.only_directories) {
             return Match::None;
         }
 
@@ -235,6 +236,7 @@ impl GitignoreBuilder {
         Ok(Gitignore {
             set,
             globs: self.globs.clone(),
+            only_directories: self.globs.iter().all(|glob| glob.is_only_dir),
             matches: Arc::new(Pool::new(Vec::new)),
         })
     }
