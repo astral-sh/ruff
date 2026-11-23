@@ -127,7 +127,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
             // Ex) `x: int`
             StmtKind::AnnAssign(assign) if assign.value().is_none() => {
                 if let Some(name) = assign.target().as_name_expr() {
-                    self.stack.annotations.insert(name.id().as_str());
+                    self.stack.annotations.insert(name.id());
                 }
             }
             StmtKind::Return(stmt_return) => {

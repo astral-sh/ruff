@@ -68,7 +68,7 @@ pub(crate) fn unsupported_method_call_on_all(checker: &Checker, func: Expr<'_>) 
         return;
     };
     let id = name_node.id();
-    if id.as_str() != "__all__" {
+    if id != "__all__" {
         return;
     }
     if !is_unsupported_method(attr.as_str()) {

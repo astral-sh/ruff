@@ -85,7 +85,7 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &Checker, expr: Expr
             let identifier = match func.classify() {
                 ExprKind::Name(expr_name) => {
                     let id = expr_name.id();
-                    Some(id.as_str())
+                    Some(id)
                 }
                 ExprKind::Attribute(expr_attribute) => {
                     let attr = expr_attribute.attr();

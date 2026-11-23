@@ -9,7 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{Truthiness, contains_effect};
-use ruff_python_ast::name::Name;
+
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
@@ -306,7 +306,7 @@ impl AlwaysFixableViolation for ExprAndFalse {
 fn is_same_expr<'a>(a: Expr<'a>, b: Expr<'a>) -> Option<&'a str> {
     let a = a.as_name_expr()?.id();
     let b = b.as_name_expr()?.id();
-    (a == b).then_some(a.as_str())
+    (a == b).then_some(a)
 }
 
 /// If `call` is an `isinstance()` call, return its target.
@@ -441,7 +441,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: ExprBoolOp<'_>)
     }
 }
 
-fn match_eq_target(expr: Expr<'_>) -> Option<(&Name, Expr<'_>)> {
+fn match_eq_target(expr: Expr<'_>) -> Option<(&str, Expr<'_>)> {
     let (expr, CmpOp::Eq, comparator) = expr.as_compare_expr()?.as_single()? else {
         return None;
     };
@@ -464,7 +464,7 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: ExprBoolOp<'_>) {
 
     // Given `a == "foo" or a == "bar"`, we generate `{"a": [(0, "foo"), (1,
     // "bar")]}`.
-    let mut id_to_comparators: BTreeMap<&Name, Vec<(usize, Expr<'_>)>> = BTreeMap::new();
+    let mut id_to_comparators: BTreeMap<&str, Vec<(usize, Expr<'_>)>> = BTreeMap::new();
     for (index, value) in values.iter().enumerate() {
         if let Some((id, comparator)) = match_eq_target(value) {
             id_to_comparators
@@ -509,7 +509,7 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: ExprBoolOp<'_>) {
 
         // Create a `x in (a, b)` expression.
         let mut builder = Builder::default();
-        let name = syntax::name(&mut builder, id.as_str());
+        let name = syntax::name(&mut builder, id);
         let elts = builder.copy_nodes(comparators);
         let choices = syntax::tuple(&mut builder, elts);
         let ops = builder.list([CmpOp::In]);

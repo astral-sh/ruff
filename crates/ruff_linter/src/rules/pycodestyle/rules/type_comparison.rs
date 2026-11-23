@@ -94,7 +94,7 @@ fn is_type(expr: Expr<'_>, semantic: &SemanticModel) -> bool {
 
             // Ex) `type(obj) == int`
             matches!(
-                id.as_str(),
+                id,
                 "bool"
                     | "bytearray"
                     | "bytes"

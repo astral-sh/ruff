@@ -295,7 +295,7 @@ fn is_slots_assignment(node: SyntaxNode<'_>, value: SyntaxNode<'_>) -> bool {
             assign.value().is_same_node(value)
                 && matches!(
                     assign.targets().as_array().map(|items| items.map(ast::Expr::classify)),
-                    Some([ExprKind::Name(name)]) if name.id().as_str() == "__slots__"
+                    Some([ExprKind::Name(name)]) if name.id() == "__slots__"
                 )
         }
         AnyNode::StmtAnnAssign(assign) => {
@@ -304,7 +304,7 @@ fn is_slots_assignment(node: SyntaxNode<'_>, value: SyntaxNode<'_>) -> bool {
                 .is_some_and(|assigned| assigned.is_same_node(value))
                 && matches!(
                     assign.target().classify(),
-                    ExprKind::Name(name) if name.id().as_str() == "__slots__"
+                    ExprKind::Name(name) if name.id() == "__slots__"
                 )
         }
         _ => false,
@@ -616,7 +616,7 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
         match kind {
             AnyNode::ExprName(name_expr) => {
                 // If the name doesn't match our target text, this isn't a match
-                if name_expr.id().as_str() != self.search.target_text {
+                if name_expr.id() != self.search.target_text {
                     return TraversalSignal::Traverse;
                 }
 
@@ -709,7 +709,7 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                 }
                 // Only check the original name if it matches our target text
                 // This is for cases where we're renaming the imported symbol name itself
-                if *alias.name().id() == self.search.target_text {
+                if alias.name().id() == self.search.target_text {
                     self.check_declaration_identifier(alias.name());
                 }
             }
@@ -766,7 +766,7 @@ impl<'a> LocalReferencesFinder<'a> {
 
     fn check_identifier(&mut self, identifier: ast::Identifier<'_>, kind: OccurrenceKind) {
         // Quick text-based check first
-        if *identifier.id() != self.search.target_text {
+        if identifier.id() != self.search.target_text {
             return;
         }
 

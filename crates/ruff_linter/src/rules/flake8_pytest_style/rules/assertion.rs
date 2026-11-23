@@ -272,7 +272,7 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a, '_> {
                 let id = expr_name.id();
 
                 if let Some(pending_assert) = self.pending_assert
-                    && id.as_str() == self.exception_name
+                    && id == self.exception_name
                 {
                     self.checker.report_diagnostic(
                         PytestAssertInExcept {

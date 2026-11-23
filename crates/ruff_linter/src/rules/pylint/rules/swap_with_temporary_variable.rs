@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Applicability, Edit, Fix};
-use ruff_python_ast::name::Name;
+
 use ruff_python_ast::{Stmt, StmtKind, traversal};
 use ruff_python_semantic::{BindingId, Scope, ScopeId, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
@@ -42,8 +42,8 @@ use crate::codes::Category;
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.15.3", category = Category::Complexity)]
 pub(crate) struct SwapWithTemporaryVariable<'a> {
-    first: &'a Name,
-    second: &'a Name,
+    first: &'a str,
+    second: &'a str,
 }
 
 impl Violation for SwapWithTemporaryVariable<'_> {
@@ -147,8 +147,8 @@ fn match_consecutive_assignments<'a>(
 
 #[derive(Eq, PartialEq, Debug, Clone)]
 struct VarToVarAssignment<'a> {
-    target: &'a Name,
-    value: &'a Name,
+    target: &'a str,
+    value: &'a str,
     range: TextRange,
 }
 

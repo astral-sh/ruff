@@ -78,7 +78,6 @@ pub(crate) fn private_member_access(checker: &Checker, &expr: &Expr<'_>) {
         return;
     };
     let value = attribute.value();
-    let attr = attribute.attr();
 
     let semantic = checker.semantic();
     let current_scope = semantic.current_scope();
@@ -87,7 +86,8 @@ pub(crate) fn private_member_access(checker: &Checker, &expr: &Expr<'_>) {
         return;
     }
 
-    if !attr.starts_with('_') || is_dunder(attr.as_str()) || is_sunder(attr.as_str()) {
+    let attr = attribute.attr().as_str();
+    if !attr.starts_with('_') || is_dunder(attr) || is_sunder(attr) {
         return;
     }
 
@@ -95,7 +95,8 @@ pub(crate) fn private_member_access(checker: &Checker, &expr: &Expr<'_>) {
         .settings()
         .flake8_self
         .ignore_names
-        .contains(attr.id())
+        .iter()
+        .any(|name| name == attr)
     {
         return;
     }
@@ -315,8 +316,7 @@ impl TypeChecker for SameClassInstanceChecker {
             ExprKind::Subscript(_) => Self::match_annotation(call.func(), semantic),
 
             ExprKind::Name(name) => {
-                matches!(name.id().as_str(), "cls" | "mcs")
-                    || Self::is_current_class_name(name, semantic)
+                matches!(name.id(), "cls" | "mcs") || Self::is_current_class_name(name, semantic)
             }
 
             ExprKind::Attribute(expr_attribute) => {

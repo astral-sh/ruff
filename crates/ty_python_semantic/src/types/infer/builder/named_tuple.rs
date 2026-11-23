@@ -201,16 +201,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             // Skip keywords that were used for the required arguments (already inferred above).
             // These flags are only true for `collections.namedtuple`.
-            if name_from_keyword && arg.id().as_str() == "typename" {
+            if name_from_keyword && arg.id() == "typename" {
                 continue;
             }
-            if fields_from_keyword && arg.id().as_str() == "field_names" {
+            if fields_from_keyword && arg.id() == "field_names" {
                 continue;
             }
 
             let kw_type = self.infer_expression(kw.value(), TypeContext::default());
 
-            match arg.id().as_str() {
+            match arg.id() {
                 "defaults" if kind.is_collections() => {
                     defaults_kw = Some(kw);
                     if let Some(element_types) =

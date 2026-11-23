@@ -137,7 +137,7 @@ fn match_unittest_context_methods(semantic: &SemanticModel) -> bool {
     };
     let id = name_node.id();
     matches!(
-        (id.as_str(), attr.as_str()),
+        (id, attr.as_str()),
         ("cls", "enterClassContext") | ("self", "enterContext" | "enterAsyncContext")
     )
 }

@@ -421,7 +421,7 @@ impl SemanticSyntaxChecker {
                 }
                 if let Some(name_node) = target.as_name_expr() {
                     let id = name_node.id();
-                    if let Some(global_stmt) = ctx.global(id.as_str()) {
+                    if let Some(global_stmt) = ctx.global(id) {
                         let global_start = global_stmt.start();
                         if !ctx.in_module_scope() || target.start() < global_start {
                             Self::add_error(
@@ -2465,9 +2465,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         //     case Class(x=1, d={"x": 1, "x": 2}, other=Class(x=1, x=2)): ...
                         SemanticSyntaxChecker::add_error(
                             self.ctx,
-                            SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(
-                                attr.id().clone(),
-                            ),
+                            SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(attr.id().into()),
                             attr.range(),
                         );
                     }
@@ -2561,7 +2559,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
         if !self.names.insert(ident.name_id()) {
             SemanticSyntaxChecker::add_error(
                 self.ctx,
-                SemanticSyntaxErrorKind::MultipleCaseAssignment(ident.id().clone()),
+                SemanticSyntaxErrorKind::MultipleCaseAssignment(ident.id().into()),
                 ident.range(),
             );
         }

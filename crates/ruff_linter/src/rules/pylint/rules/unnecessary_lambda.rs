@@ -184,7 +184,7 @@ fn forwards_arguments(parameters: ast::Parameters<'_>, arguments: ast::Arguments
         let Some(name) = value.as_name_expr() else {
             return false;
         };
-        if slot.replace(name.id().as_str()).is_some() {
+        if slot.replace(name.id()).is_some() {
             return false;
         }
     }

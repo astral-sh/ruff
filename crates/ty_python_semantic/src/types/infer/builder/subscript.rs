@@ -1720,12 +1720,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 |(param, arg)| {
                     param
                         .is_typevartuple(db)
-                        .then(|| (param.name(db), arg.range()))
+                        .then(|| (param.name(db).as_str(), arg.range()))
                 },
                 |(param, arg)| {
                     (param.kind(db) == TypeVarKind::LegacyTypeVar
                         && param.typevar(db).default_type(db, env).is_some())
-                    .then(|| (param.name(db), arg.range()))
+                    .then(|| (param.name(db).as_str(), arg.range()))
                 },
             );
         }

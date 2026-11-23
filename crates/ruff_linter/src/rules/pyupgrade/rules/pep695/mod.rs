@@ -228,7 +228,7 @@ pub(crate) fn expr_name_to_type_var<'a>(
     name: ExprName<'a>,
 ) -> Option<TypeVar<'a>> {
     let stmt_assign = semantic
-        .lookup_symbol(name.id().as_str())
+        .lookup_symbol(name.id())
         .binding_id()
         .and_then(|binding_id| semantic.binding(binding_id).source)
         .map(|node_id| semantic.statement(node_id))?

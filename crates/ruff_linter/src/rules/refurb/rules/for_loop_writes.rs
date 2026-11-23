@@ -240,7 +240,7 @@ fn loop_variables_are_used_outside_loop(
 ) -> bool {
     let find_binding_id = |name: ExprName<'_>, offset: TextSize| {
         semantic.simulate_runtime_load_at_location_in_scope(
-            name.id().as_str(),
+            name.id(),
             TextRange::at(offset, 0.into()),
             scope_id,
             TypingOnlyBindingsStatus::Disallowed,

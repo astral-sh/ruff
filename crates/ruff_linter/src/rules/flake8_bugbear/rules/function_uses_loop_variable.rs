@@ -146,7 +146,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                     ExprKind::Name(expr_name) => {
                         let id = expr_name.id();
 
-                        if matches!(id.as_str(), "filter" | "reduce" | "map") {
+                        if matches!(id, "filter" | "reduce" | "map") {
                             for arg in arguments.args() {
                                 if arg.is_lambda_expr() {
                                     self.safe_functions.push(arg);
@@ -223,7 +223,7 @@ impl<'a> Visitor<'a> for NamesFromAssignmentsVisitor<'a> {
     fn visit_expr(&mut self, expr: Expr<'a>) {
         let elts = match expr.classify() {
             ExprKind::Name(name) => {
-                self.names.push(name.id().as_str());
+                self.names.push(name.id());
                 return;
             }
             ExprKind::Starred(starred) => {
@@ -315,7 +315,7 @@ pub(crate) fn function_uses_loop_variable(checker: &Checker, node: &Node) {
         // If a variable was used in a function or lambda body, and assigned in the
         // loop, flag it.
         for name in suspicious_variables {
-            if reassigned_in_loop.contains(&name.id().as_str()) {
+            if reassigned_in_loop.contains(&name.id()) {
                 if checker.insert_flake8_bugbear_range(name.range()) {
                     checker.report_diagnostic(
                         FunctionUsesLoopVariable {

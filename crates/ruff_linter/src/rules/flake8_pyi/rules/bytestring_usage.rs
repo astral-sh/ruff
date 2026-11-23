@@ -87,7 +87,7 @@ pub(crate) fn bytestring_import(checker: &Checker, import_from: StmtImportFrom<'
     let module = import_from.module();
 
     let module_id = match module {
-        Some(module) => module.id().as_str(),
+        Some(module) => module.id(),
         None => return,
     };
 

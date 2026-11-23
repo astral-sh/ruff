@@ -212,7 +212,7 @@ fn clock_module<'a>(checker: &Checker, target: Expr<'a>) -> Option<&'a str> {
 
     let attribute = target.as_attribute_expr()?;
     if let Some(receiver) = attribute.value().as_name_expr()
-        && matches!(receiver.id().as_str(), "self" | "cls")
+        && matches!(receiver.id(), "self" | "cls")
         && checker
             .semantic()
             .resolve_name(receiver)

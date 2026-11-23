@@ -391,7 +391,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         );
 
         if let Some(definition) = definition {
-            let name_str = name.id().as_str();
+            let name_str = name.id();
             if let Some(classification) = self.classify_from_definition(definition, name_str) {
                 return Some(classification);
             }
@@ -399,7 +399,7 @@ impl<'db> SemanticTokenVisitor<'db> {
 
         // Fall back to type-based classification.
         let ty = name.inferred_type(self.model).unwrap_or(Type::unknown());
-        let name_str = name.id().as_str();
+        let name_str = name.id();
         self.classify_from_type_and_name_str(ty, name_str)
     }
 
@@ -620,7 +620,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         }
 
         let db = self.model.db();
-        let attr_name_str = attr_name.id().as_str();
+        let attr_name_str = attr_name.id();
         let mut modifiers = SemanticTokenModifier::empty();
 
         if let Some(classification) = self.classify_type_form_expr(ty) {
@@ -725,7 +725,7 @@ impl<'db> SemanticTokenVisitor<'db> {
     }
 
     fn add_dotted_name_tokens(&mut self, name: ast::Identifier<'_>, token_type: SemanticTokenType) {
-        let name_str = name.id().as_str();
+        let name_str = name.id();
         let name_start = name.start();
 
         // Split the dotted name and calculate positions for each part
@@ -748,7 +748,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         ty: Type,
         local_name: ast::Identifier<'_>,
     ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
-        self.classify_from_type_and_name_str(ty, local_name.id().as_str())
+        self.classify_from_type_and_name_str(ty, local_name.id())
     }
 
     // Visit parameters for a function or lambda expression and classify

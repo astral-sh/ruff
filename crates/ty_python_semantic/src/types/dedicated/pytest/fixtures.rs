@@ -1435,7 +1435,7 @@ fn exposures_contributed_by_definition<'db>(
                 db,
                 definition,
                 import.import(&parsed),
-                import.alias(&parsed).name().id(),
+                Name::new(import.alias(&parsed).name().id()),
                 symbol_name,
             )
         }
@@ -1445,7 +1445,7 @@ fn exposures_contributed_by_definition<'db>(
                 db,
                 definition,
                 import.import(&parsed),
-                symbol_name,
+                symbol_name.clone(),
                 symbol_name,
             )
         }
@@ -1560,7 +1560,7 @@ fn fixture_exposures_from_import<'db>(
     db: &'db dyn Db,
     importing_definition: Definition<'db>,
     import: ast::StmtImportFrom<'_>,
-    imported_name: &Name,
+    imported_name: Name,
     local_name: &Name,
 ) -> Vec<FixtureExposure<'db>> {
     let program_file = importing_definition.program_file(db);
@@ -1579,7 +1579,7 @@ fn fixture_exposures_from_import<'db>(
             db,
             ProgramFile::new(db, imported_file, program_file.program(db)),
         ),
-        imported_name.clone(),
+        imported_name,
     );
 
     source_exposures

@@ -282,13 +282,13 @@ fn collect_attribute_chain(expr: Expr<'_>) -> Vec<&str> {
                 let value = expr_attribute.value();
                 let attr = expr_attribute.attr();
 
-                chain.push(attr.id().as_str());
+                chain.push(attr.id());
                 current = value;
             }
             ExprKind::Name(expr_name) => {
                 let id = expr_name.id();
 
-                chain.push(id.as_str());
+                chain.push(id);
                 break;
             }
             _ => return Vec::new(),
@@ -360,9 +360,10 @@ impl<'a> Visitor<'a> for ClassCellReferenceFinder {
     }
 
     fn visit_expr(&mut self, expr: Expr<'a>) {
-        if expr.as_name_expr().is_some_and(|name| {
-            matches!(name.id().as_str(), "super" | "__class__") && name.ctx().is_load()
-        }) {
+        if expr
+            .as_name_expr()
+            .is_some_and(|name| matches!(name.id(), "super" | "__class__") && name.ctx().is_load())
+        {
             self.has_class_cell = true;
             return;
         }

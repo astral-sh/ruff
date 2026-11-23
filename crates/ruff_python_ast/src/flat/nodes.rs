@@ -12,7 +12,7 @@ use crate::{
 impl<'a> Identifier<'a> {
     #[inline]
     pub fn as_str(self) -> &'a str {
-        self.id().as_str()
+        self.id()
     }
 
     pub fn is_valid(self) -> bool {
@@ -649,7 +649,7 @@ impl crate::Pattern<'_> {
                 let kind = node
                     .name()
                     .map_or(crate::IrrefutablePatternKind::Wildcard, |name| {
-                        crate::IrrefutablePatternKind::Name(name.id().clone())
+                        crate::IrrefutablePatternKind::Name(name.id().into())
                     });
                 Some(crate::IrrefutablePattern {
                     kind,

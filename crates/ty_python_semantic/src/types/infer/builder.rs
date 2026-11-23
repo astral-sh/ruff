@@ -3729,7 +3729,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
                 // at runtime, but is always considered `True` in type checking.
                 // See mdtest/known_constants.md#user-defined-type_checking for details.
-                if target.as_name_expr().map(|name| name.id().as_str()) == Some("TYPE_CHECKING") {
+                if target.as_name_expr().map(ast::ExprName::id) == Some("TYPE_CHECKING") {
                     if !matches!(
                         value
                             .as_boolean_literal_expr()
@@ -3843,7 +3843,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let target_name = name_node_view.id();
 
-        if name != Some(target_name.as_str()) {
+        if name != Some(target_name) {
             report_mismatched_type_name(
                 &self.context,
                 &MISMATCHED_NEWTYPE_NAME,
@@ -3860,7 +3860,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         Type::KnownInstance(KnownInstanceType::NewType(NewType::new(
             db,
-            name.unwrap_or(target_name.as_str()),
+            name.unwrap_or(target_name),
             definition,
             None,
         )))
@@ -3933,14 +3933,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Sentinel names can be unqualified or include their exact enclosing class path.
-    fn sentinel_name_matches_target(&self, name: &str, target_name: &Name) -> bool {
-        if name == target_name.as_str() {
+    fn sentinel_name_matches_target(&self, name: &str, target_name: &str) -> bool {
+        if name == target_name {
             return true;
         }
 
         let mut name_components = name.rsplit('.');
 
-        if name_components.next() != Some(target_name.as_str()) {
+        if name_components.next() != Some(target_name) {
             return false;
         }
 
@@ -4124,7 +4124,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ))
                     });
                 self.validate_typevar_default(
-                    target.as_name_expr().map(|name| name.id().as_str()),
+                    target.as_name_expr().map(ast::ExprName::id),
                     bound_or_constraints,
                     default_ty,
                     default.value(),
@@ -4262,7 +4262,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let target_name = name_node_view.id();
 
-        if name != Some(target_name.as_str()) {
+        if name != Some(target_name) {
             report_mismatched_type_name(
                 &self.context,
                 &MISMATCHED_TYPE_ALIAS_NAME,
@@ -4280,7 +4280,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Type::KnownInstance(KnownInstanceType::TypeAliasType(
             TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
                 db,
-                name.unwrap_or(target_name.as_str()),
+                name.unwrap_or(target_name),
                 definition,
                 typing_module,
                 None,
@@ -5055,7 +5055,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // members should not have explicit type annotations.
                 if let Some(name_expr) = target.as_name_expr()
                     && !name_expr.id().starts_with("__")
-                    && !matches!(name_expr.id().as_str(), "_ignore_" | "_value_" | "_name_")
+                    && !matches!(name_expr.id(), "_ignore_" | "_value_" | "_name_")
                     // Bare Final is allowed on enum members.
                     && !declared.is_bare_final()
                     && (
@@ -9126,25 +9126,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let parameters = parameters.items_in_binding_order().map(|item| {
                 let (parameter, default, positional) = match item {
                     ast::ParameterItem::PositionalOnly(p) => (
-                        Parameter::positional_only(Some(p.name().id().clone())),
+                        Parameter::positional_only(Some(p.name().id().into())),
                         p.default(),
                         true,
                     ),
                     ast::ParameterItem::PositionalOrKeyword(p) => (
-                        Parameter::positional_or_keyword(p.name().id().clone()),
+                        Parameter::positional_or_keyword(p.name().id().into()),
                         p.default(),
                         true,
                     ),
                     ast::ParameterItem::KeywordOnly(p) => (
-                        Parameter::keyword_only(p.name().id().clone()),
+                        Parameter::keyword_only(p.name().id().into()),
                         p.default(),
                         false,
                     ),
                     ast::ParameterItem::Vararg(p) => {
-                        (Parameter::variadic(p.name().id().clone()), None, false)
+                        (Parameter::variadic(p.name().id().into()), None, false)
                     }
                     ast::ParameterItem::Kwarg(p) => (
-                        Parameter::keyword_variadic(p.name().id().clone()),
+                        Parameter::keyword_variadic(p.name().id().into()),
                         None,
                         false,
                     ),
@@ -9586,7 +9586,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_class_literal()
                 .and_then(|class| class.known(self.db()))
             && matches!(
-                (name.id().as_str(), known_class),
+                (name.id(), known_class),
                 ("list", KnownClass::List) | ("set", KnownClass::Set) | ("dict", KnownClass::Dict)
             ) {
             Some(known_class)
@@ -9688,7 +9688,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let value = attribute_node.value();
             let attr = attribute_node.attr();
             let value_type = self.expression_type(value);
-            let method_name = attr.id().as_str();
+            let method_name = attr.id();
 
             if let Type::TypedDict(typed_dict_ty) = value_type
                 && matches!(method_name, "get" | "pop" | "setdefault")

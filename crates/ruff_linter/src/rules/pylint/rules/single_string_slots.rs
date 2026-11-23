@@ -70,7 +70,7 @@ pub(crate) fn single_string_slots(checker: &Checker, class: ast::StmtClassDef<'_
                 for target in targets {
                     if let ExprKind::Name(name_node) = target.classify() {
                         let id = name_node.id();
-                        if id.as_str() == "__slots__" {
+                        if id == "__slots__" {
                             if matches!(
                                 value.classify(),
                                 ExprKind::StringLiteral(_) | ExprKind::FString(_)
@@ -86,7 +86,7 @@ pub(crate) fn single_string_slots(checker: &Checker, class: ast::StmtClassDef<'_
 
                 if let ExprKind::Name(name_node) = target.classify() {
                     let id = name_node.id();
-                    if id.as_str() == "__slots__" {
+                    if id == "__slots__" {
                         if matches!(
                             value.classify(),
                             ExprKind::StringLiteral(_) | ExprKind::FString(_)

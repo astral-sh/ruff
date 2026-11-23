@@ -1863,7 +1863,7 @@ impl<'src> Parser<'src> {
                     );
                 }
                 let name = self.bump_identifier();
-                match self.storage.name(name).as_str() {
+                match self.storage.name(name) {
                     "s" => ConversionFlag::Str,
                     "r" => ConversionFlag::Repr,
                     "a" => ConversionFlag::Ascii,

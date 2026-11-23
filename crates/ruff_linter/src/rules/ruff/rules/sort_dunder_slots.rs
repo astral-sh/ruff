@@ -164,7 +164,7 @@ pub(crate) fn sort_dunder_slots(checker: &Checker, binding: &Binding) {
 
     let mut diagnostic = checker.report_diagnostic(
         UnsortedDunderSlots {
-            class_name: enclosing_class.name().id().clone(),
+            class_name: enclosing_class.name().id().into(),
         },
         display.range,
     );

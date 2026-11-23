@@ -212,7 +212,7 @@ fn generic_arguments_to_type_vars<'a>(
             _ => return None,
         };
 
-        if !encountered.insert(name.id().as_str()) {
+        if !encountered.insert(name.id()) {
             continue;
         }
 

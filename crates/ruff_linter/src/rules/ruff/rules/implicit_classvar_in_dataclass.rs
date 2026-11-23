@@ -96,11 +96,11 @@ pub(crate) fn implicit_class_var_in_dataclass(checker: &mut Checker, class_def: 
         };
         let id = name.id();
 
-        if checker.settings().dummy_variable_rgx.is_match(id.as_str()) {
+        if checker.settings().dummy_variable_rgx.is_match(id) {
             continue;
         }
 
-        if is_dunder(id.as_str()) {
+        if is_dunder(id) {
             continue;
         }
 

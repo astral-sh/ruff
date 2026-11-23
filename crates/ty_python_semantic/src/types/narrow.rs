@@ -1847,7 +1847,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let unbound_is_terminal = scope.node(db).scope_kind().is_function_like()
             && index
                 .place_table(scope.file_scope_id(db))
-                .symbol_by_name(name.id().as_str())
+                .symbol_by_name(name.id())
                 .is_some_and(Symbol::is_local);
 
         use_def
@@ -4448,7 +4448,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     if let Some(named) = expr.as_named_expr()
                         && let Some(name) = named.target().as_name_expr()
                     {
-                        let end = ends.entry(name.id().clone()).or_default();
+                        let end = ends.entry(name.id()).or_default();
                         *end = std::cmp::max(*end, named.end());
                     }
                     false

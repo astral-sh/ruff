@@ -1188,7 +1188,7 @@ impl<'src> Parser<'src> {
         fn unparse_expr(parser: &mut Parser, expr: id::Expr, buffer: &mut String) {
             match parser.storage.get(expr).classify() {
                 ExprKind::Name(name) => {
-                    buffer.push_str(name.id().as_str());
+                    buffer.push_str(name.id());
                 }
                 ExprKind::Subscript(subscript) => {
                     let value = subscript.value().build_id();

@@ -82,7 +82,7 @@ fn async_generator_stub_declaration<'db>(
         .map_or(node.parameters().end(), |returns| returns.end());
     Some((
         Span::from(definition.file(db)).with_range(TextRange::new(start, end)),
-        node.name().id().clone(),
+        node.name().id().into(),
     ))
 }
 

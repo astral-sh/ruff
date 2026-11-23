@@ -81,7 +81,7 @@ fn logging_f_string(
                             match interpolated.expression().classify() {
                                 ExprKind::Name(name) => {
                                     format_string.push_str("%s");
-                                    args.push(name.id().as_str());
+                                    args.push(name.id());
                                 }
                                 _ => return,
                             }

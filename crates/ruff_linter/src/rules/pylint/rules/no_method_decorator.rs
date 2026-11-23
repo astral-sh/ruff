@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::Name;
-use ruff_python_ast::{ExprKind, Stmt, StmtKind};
+use ruff_python_ast::{ExprKind, NameId, Stmt, StmtKind};
 use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -105,7 +104,7 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: Stmt<'_>, method_type:
         return;
     };
 
-    let mut explicit_decorator_calls: HashMap<Name, Stmt<'_>> = HashMap::default();
+    let mut explicit_decorator_calls: HashMap<NameId, Stmt<'_>> = HashMap::default();
 
     let method_name = match method_type {
         MethodType::Classmethod => "classmethod",
@@ -125,7 +124,7 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: Stmt<'_>, method_type:
             && let Some(arg) = arg.as_name_expr()
             && arg.name_id() == target.name_id()
         {
-            explicit_decorator_calls.insert(arg.id().clone(), stmt);
+            explicit_decorator_calls.insert(arg.name_id(), stmt);
         }
     }
 
@@ -137,7 +136,8 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: Stmt<'_>, method_type:
         if let StmtKind::FunctionDef(function_def) = stmt.classify() {
             let name = function_def.name();
             let decorator_list = function_def.decorator_list();
-            let Some(decorator_call_statement) = explicit_decorator_calls.get(name.id()) else {
+            let Some(decorator_call_statement) = explicit_decorator_calls.get(&name.name_id())
+            else {
                 continue;
             };
 

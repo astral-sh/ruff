@@ -200,7 +200,7 @@ fn is_attributes_not_in_slots(body: Suite<'_>) -> Vec<AttributeAssignment<'_>> {
                 else {
                     continue;
                 };
-                slots.insert(id.as_str());
+                slots.insert(id);
             }
         }
     }

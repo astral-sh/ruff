@@ -77,7 +77,7 @@ fn nfkc_normalizes_names() {
         panic!("expected name expression, got {:?}", parsed.expr());
     };
 
-    assert_eq!(name.id().as_str(), "C");
+    assert_eq!(name.id(), "C");
 }
 
 #[test]
@@ -692,7 +692,7 @@ fn descendants_visit_a_subtree_in_source_order() {
     let names: Vec<_> = nodes
         .by_ref()
         .filter_map(ast::AstNode::cast::<ast::ExprName>)
-        .map(|name| name.id().as_str())
+        .map(ast::ExprName::id)
         .collect();
     assert_eq!(names, ["call", "x", "ys"]);
     assert!(nodes.next().is_none());

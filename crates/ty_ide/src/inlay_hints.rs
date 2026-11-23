@@ -678,7 +678,7 @@ fn arg_matches_name(argument: Expr<'_>, name: &str) -> bool {
             ExprKind::Subscript(expr_subscript) => expr = expr_subscript.value(),
             // `x=x` is a match
             ExprKind::Name(expr_name) => {
-                return name_matches_parameter(expr_name.id().as_str(), name);
+                return name_matches_parameter(expr_name.id(), name);
             }
             // `x=y.x` is a match
             ExprKind::Attribute(expr_attribute) => {
@@ -719,7 +719,7 @@ fn call_matches_name(expr: Expr<'_>, name: &str) -> bool {
 
     match call.func().classify() {
         // `x: T = T()` is a match
-        ExprKind::Name(expr_name) => expr_name.id().as_str() == name,
+        ExprKind::Name(expr_name) => expr_name.id() == name,
         // `x: T = a.T()` is a match
         ExprKind::Attribute(expr_attribute) => expr_attribute.attr().as_str() == name,
         _ => false,
@@ -769,7 +769,7 @@ fn is_ignored_variable_assignment_target(expr: Expr<'_>) -> bool {
         return false;
     };
 
-    let name = name.id().as_str();
+    let name = name.id();
     let is_dunder = name.starts_with("__") && name.ends_with("__") && name.len() > 4;
 
     name.starts_with('_') && !is_dunder

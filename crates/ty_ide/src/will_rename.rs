@@ -1060,7 +1060,7 @@ impl<'a> SourceOrderVisitor<'a> for ModuleReferenceVisitor<'a, '_> {
                     && self
                         .analyzer
                         .module_name_changes
-                        .is_renamed_component(name.id().as_str()) =>
+                        .is_renamed_component(name.id()) =>
             {
                 self.edit_name_reference(name);
             }

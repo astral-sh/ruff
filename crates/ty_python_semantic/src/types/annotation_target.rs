@@ -89,7 +89,7 @@ pub(super) fn receiver_method_scope(
     scope: ScopeId,
     receiver: ast::ExprName<'_>,
 ) -> Option<FileScopeId> {
-    let receiver_name = receiver.id().as_str();
+    let receiver_name = receiver.id();
     let (receiver_scope_id, receiver_scope, receiver_symbol) = index
         .visible_ancestor_scopes(scope.file_scope_id(db))
         .find_map(|(scope_id, scope)| {

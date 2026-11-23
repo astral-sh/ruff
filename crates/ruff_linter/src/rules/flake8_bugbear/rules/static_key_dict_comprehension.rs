@@ -78,7 +78,7 @@ pub(crate) fn static_key_dict_comprehension(checker: &Checker, dict_comp: ast::E
 fn is_constant(key: Expr<'_>, names: &FxHashMap<&str, ExprName<'_>>) -> bool {
     match key.classify() {
         ast::ExprKind::Tuple(tuple) => tuple.iter().all(|elem| is_constant(elem, names)),
-        ast::ExprKind::Name(name) => !names.contains_key(name.id().as_str()),
+        ast::ExprKind::Name(name) => !names.contains_key(name.id()),
         ast::ExprKind::Attribute(attribute) => is_constant(attribute.value(), names),
         ast::ExprKind::Subscript(subscript) => {
             is_constant(subscript.value(), names) && is_constant(subscript.slice(), names)

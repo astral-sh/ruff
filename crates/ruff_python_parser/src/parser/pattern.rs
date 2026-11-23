@@ -302,7 +302,7 @@ impl Parser<'_> {
         &mut self,
         ident: build::Identifier,
     ) -> Option<ast::BuildId<ast::kind::Identifier>> {
-        (self.storage.name(ident.id).as_str() != "_").then(|| self.storage.add(ident))
+        (self.storage.name(ident.id) != "_").then(|| self.storage.add(ident))
     }
 
     /// Parses a binding target in an `as` or mapping pattern.
@@ -313,7 +313,7 @@ impl Parser<'_> {
         //     case {**_}: ...
         // after = 1
         let identifier = self.parse_identifier_with_context(ExpressionContext::default());
-        if self.storage.name(identifier.id).as_str() == "_" {
+        if self.storage.name(identifier.id) == "_" {
             self.add_error(ParseErrorType::InvalidMatchPatternTarget, identifier.range);
         }
         identifier.emit(&mut self.storage)

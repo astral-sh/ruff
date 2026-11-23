@@ -48,7 +48,7 @@ use crate::expression::{Expression, ExpressionContext, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
 use crate::place::{
-    PlaceExpr, PlaceTable, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId,
+    PlaceExprBuilder, PlaceTable, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId,
     match_subject_place_expressions,
 };
 use crate::predicate::{
@@ -1152,16 +1152,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // Don't register if the target itself is one of the narrowed places (e.g. `x = x is None`),
         // since the alias would be invalidated immediately by this same assignment.
-        let target_is_narrowed = place_table
-            .symbol_id(target_name)
-            .is_some_and(|symbol| narrowed_places.contains(&symbol.into()));
+        let target_symbol = place_table.symbol_id(target_name);
+        let target_is_narrowed =
+            target_symbol.is_some_and(|symbol| narrowed_places.contains(&symbol.into()));
 
         if !narrowed_places.is_empty() && !target_is_narrowed {
+            let name = target_symbol.map_or_else(
+                || Name::new(target_name),
+                |id| place_table.symbol(id).name().clone(),
+            );
             self.narrowing_aliases
                 .narrowed_places
                 .extend(&narrowed_places);
             self.narrowing_aliases.by_name.insert(
-                target_name.clone(),
+                name,
                 NarrowingAlias {
                     expression: value,
                     expression_scope: self.current_scope(),
@@ -1367,8 +1371,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Add a symbol to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the symbol in both.
-    fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
-        let (symbol_id, added) = self.current_place_table_mut().add_symbol(Symbol::new(name));
+    fn add_symbol(&mut self, name: impl AsRef<str> + Into<Name>) -> ScopedSymbolId {
+        let (symbol_id, added) = self.current_place_table_mut().add_symbol(name);
         if added {
             self.current_use_def_map_mut().add_place(symbol_id.into());
         }
@@ -1377,7 +1381,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Add a place to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the place in both.
-    fn add_place(&mut self, place_expr: PlaceExpr) -> ScopedPlaceId {
+    fn add_place(&mut self, place_expr: PlaceExprBuilder<'_>) -> ScopedPlaceId {
         let (place_id, added) = self.current_place_table_mut().add_place(place_expr);
         if added {
             self.current_use_def_map_mut().add_place(place_id);
@@ -1670,7 +1674,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         };
         node.value()?;
 
-        let place = self.add_symbol(name.id().clone()).into();
+        let place = self.add_symbol(name.id()).into();
         let definition =
             self.create_definition(place, AnnotatedAssignmentDefinitionNodeRef { node });
         self.mark_place_declared(place);
@@ -1747,8 +1751,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             return;
         };
 
-        if let Some(target) = MemberExprBuilder::visit_expr(target.classify()) {
-            self.add_dict_key_assignment_definitions_impl(&target, dict.classify(), assignment);
+        // Building the member path takes ownership of the target's spelling. Avoid
+        // copying it out of the AST when the value cannot contain dictionary keys.
+        let kind = dict.classify();
+        if matches!(
+            kind,
+            ExprKind::Dict(_) | ExprKind::List(_) | ExprKind::Tuple(_)
+        ) && let Some(target) = MemberExprBuilder::visit_expr(target.classify())
+        {
+            self.add_dict_key_assignment_definitions_impl(&target, kind, assignment);
         }
     }
 
@@ -1805,7 +1816,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 continue;
             };
 
-            if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr.clone()) {
+            if let Some(place_expr) = PlaceExprBuilder::try_from_member_expr(member_expr.clone()) {
                 let place_id = self.add_place(place_expr);
                 let value = item.value();
 
@@ -1837,7 +1848,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn synthesize_loop_header_definitions(
         &mut self,
         loop_stmt: LoopStmtRef<'ast>,
-        bound_places: Vec<PlaceExpr>,
+        bound_places: Vec<PlaceExprBuilder<'_>>,
     ) -> (LoopHeaderId, FxHashSet<ScopedPlaceId>, ScopedDefinitionId) {
         let loop_header_id = self.current_use_def_map_mut().reserve_loop_header();
         let bound_places: Vec<_> = bound_places
@@ -2165,7 +2176,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .mark_global();
         } else {
             let (containing_symbol, added) =
-                self.place_tables[containing_scope_id].add_symbol(Symbol::new(name.clone()));
+                self.place_tables[containing_scope_id].add_symbol(name.clone());
             if added {
                 self.use_def_maps[containing_scope_id].add_place(containing_symbol.into());
             }
@@ -2499,7 +2510,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .has_active_exception_handler(self)
             && self
                 .current_place_table()
-                .symbol_id(name.id().as_str())
+                .symbol_id(name.id())
                 .is_none_or(|symbol| {
                     self.current_use_def_map_mut()
                         .symbol_live_binding_status(symbol)
@@ -2752,7 +2763,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         .keywords()
                         .iter()
                         .map(|keyword| ClassPatternKeywordPredicateKind {
-                            attr: keyword.attr().id().clone(),
+                            attr: keyword.attr().id().into(),
                             pattern: self.predicate_kind(keyword.pattern()),
                         })
                         .collect(),
@@ -2776,7 +2787,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Retain keyed entries for subject-aware exhaustiveness analysis.
                 PatternPredicateKind::Mapping(MappingPatternPredicateKind {
                     entries: entries.into_boxed_slice(),
-                    rest: rest.map(|name| name.id().clone()),
+                    rest: rest.map(|name| name.id().into()),
                 })
             }
             PatternKind::MatchSequence(pattern) => {
@@ -2799,10 +2810,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             PatternKind::MatchAs(pattern) => PatternPredicateKind::As(
                 pattern.pattern().map(|p| Box::new(self.predicate_kind(p))),
-                pattern.name().map(|name| name.id().clone()),
+                pattern.name().map(|name| name.id().into()),
             ),
             PatternKind::MatchStar(pattern) => {
-                PatternPredicateKind::Star(pattern.name().map(|name| name.id().clone()))
+                PatternPredicateKind::Star(pattern.name().map(|name| name.id().into()))
             }
         }
     }
@@ -3070,7 +3081,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                 };
                 self.ast_ids.record_expression(&name, self.current_scope());
-                let symbol = self.add_symbol(name.id().clone());
+                let symbol = self.add_symbol(name.id());
                 // TODO create Definition for PEP 695 typevars
                 // note that the "bound" on the typevar is a totally different thing than whether
                 // or not a name is "bound" by a typevar declaration; the latter is always true.
@@ -3233,7 +3244,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             if let Some(stub_parameters) = &mut stub_parameters {
                 stub_parameters.push(self.declare_stub_parameter(node));
             } else {
-                let symbol = self.add_symbol(node.parameter().name().id().clone());
+                let symbol = self.add_symbol(node.parameter().name().id());
                 self.add_definition(symbol.into(), node);
                 self.current_place_table_mut()
                     .symbol_mut(symbol)
@@ -3264,7 +3275,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let parameter = node.parameter();
         let (symbol, _) = self
             .current_place_table_mut()
-            .add_symbol(Symbol::new(parameter.name().id().clone()));
+            .add_symbol(parameter.name().id());
         let info = self.current_place_table_mut().symbol_mut(symbol);
         info.mark_bound();
         info.mark_parameter();
@@ -3300,7 +3311,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     (p, ParameterDefinitionNodeRef::VariadicKeywordParameter(p))
                 }
             };
-            let symbol = self.add_symbol(p.name().id().clone());
+            let symbol = self.add_symbol(p.name().id());
             self.current_place_table_mut()
                 .symbol_mut(symbol)
                 .mark_parameter();
@@ -3321,7 +3332,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         parameter: ParameterWithDefault<'ast>,
         lambda: ExprLambda<'ast>,
     ) {
-        let symbol = self.add_symbol(parameter.name().id().clone());
+        let symbol = self.add_symbol(parameter.name().id());
 
         self.add_definition(
             symbol.into(),
@@ -3674,9 +3685,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // child evaluation can introduce bindings (for example via walrus operators),
         // and those bindings need to exist before we register parent/member associations.
         let mut deferred_effects = None;
-        if let Some(mut place_expr) = PlaceExpr::try_from_expr_kind(kind) {
+        if let Some(mut place_expr) = PlaceExprBuilder::try_from_expr(kind) {
             if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
-                && let PlaceExpr::Member(member) = &mut place_expr
+                && let PlaceExprBuilder::Member(member) = &mut place_expr
                 && member.is_instance_attribute_candidate()
                 && let ExprKind::Attribute(attribute) = kind
             {
@@ -4014,7 +4025,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // The symbol for the function name itself has to be evaluated
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
-                let symbol = self.add_symbol(name.id().clone());
+                let symbol = self.add_symbol(name.id());
 
                 // Record a use of the function name in the scope that it is defined in, so that it
                 // can be used to find previously defined functions with the same name. This is
@@ -4058,7 +4069,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.record_exception_checkpoint();
 
                 // In Python runtime semantics, a class is registered after its scope is evaluated.
-                let symbol = self.add_symbol(class.name().id().clone());
+                let symbol = self.add_symbol(class.name().id());
                 self.add_definition(symbol.into(), class);
             }
             StmtKind::TypeAlias(type_alias) => {
@@ -4066,8 +4077,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     type_alias
                         .name()
                         .as_name_expr()
-                        .map(|name| name.id().clone())
-                        .unwrap_or("<unknown>".into()),
+                        .map_or("<unknown>", ast::ExprName::id),
                 );
                 self.add_definition(symbol.into(), type_alias);
                 self.visit_expr(type_alias.name());
@@ -4095,15 +4105,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     let (symbol_name, is_reexported) = if let Some(asname) = alias.asname() {
                         self.ast_ids
                             .record_expression(&asname, self.current_scope());
-                        (
-                            asname.id().clone(),
-                            asname.name_id() == alias.name().name_id(),
-                        )
+                        (asname.id(), asname.name_id() == alias.name().name_id())
                     } else {
-                        (
-                            Name::new(alias.name().id().split('.').next().unwrap()),
-                            false,
-                        )
+                        (alias.name().id().split('.').next().unwrap(), false)
                     };
 
                     let symbol = self.add_symbol(symbol_name);
@@ -4169,12 +4173,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             }
 
                             let bound_name = alias.asname().unwrap_or(alias.name());
-                            bound_name.id().as_str() == direct_submodule
+                            bound_name.id() == direct_submodule
                         });
 
                         if !is_immediately_shadowed {
-                            let direct_submodule_name = Name::new(direct_submodule);
-                            let symbol = self.add_symbol(direct_submodule_name);
+                            let symbol = self.add_symbol(direct_submodule);
 
                             let module_index = if node.level() == 0 {
                                 // "whatever.thispackage.x.y" we want `x`
@@ -4325,7 +4328,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         && node.is_future_import(self.python_version())
                         && alias.name().id() == "annotations";
 
-                    let symbol = self.add_symbol(symbol_name.clone());
+                    let symbol = self.add_symbol(symbol_name);
 
                     self.add_definition(
                         symbol.into(),
@@ -4445,14 +4448,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
 
                 if let ExprKind::Name(name) = node.target().classify() {
-                    let symbol_id = self.add_symbol(name.id().clone());
+                    let symbol_id = self.add_symbol(name.id());
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has been declared global.
                     if symbol.is_global() {
                         self.report_semantic_error(SemanticSyntaxError {
-                            kind: SemanticSyntaxErrorKind::AnnotatedGlobal(
-                                name.id().as_str().into(),
-                            ),
+                            kind: SemanticSyntaxErrorKind::AnnotatedGlobal(name.id().into()),
                             range: name.range(),
                             python_version: self.python_version(),
                         });
@@ -4460,9 +4461,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // Check whether the variable has been declared nonlocal.
                     if symbol.is_nonlocal() {
                         self.report_semantic_error(SemanticSyntaxError {
-                            kind: SemanticSyntaxErrorKind::AnnotatedNonlocal(
-                                name.id().as_str().into(),
-                            ),
+                            kind: SemanticSyntaxErrorKind::AnnotatedNonlocal(name.id().into()),
                             range: name.range(),
                             python_version: self.python_version(),
                         });
@@ -4522,7 +4521,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 self.record_exception_checkpoint();
 
-                if is_place_target && let Some(place_expr) = PlaceExpr::try_from_expr(target) {
+                if is_place_target
+                    && let Some(place_expr) = PlaceExprBuilder::try_from_expr(target.classify())
+                {
                     let place_id = self.add_place(place_expr);
                     self.push_assignment(CurrentAssignment::AugAssign(aug_assign));
                     self.record_place_definition(place_id, target);
@@ -4941,9 +4942,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let subject_places = match_subject_place_expressions(subject)
                     .into_iter()
                     .filter_map(|expression| {
-                        let place = PlaceExpr::try_from_expr(expression).and_then(|place| {
-                            self.current_place_table().place_id((&place).into())
-                        })?;
+                        let place = self.current_place_table().expr_place_id(expression)?;
                         Some((
                             place,
                             self.ast_ids
@@ -4969,8 +4968,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     };
                     subject_targets.push((place, bindings));
                 }
-                let subject_place = PlaceExpr::try_from_expr(subject)
-                    .and_then(|place| self.current_place_table().place_id((&place).into()));
+                let subject_place = self.current_place_table().expr_place_id(subject);
                 let places = self.current_place_table();
                 let scope = self.current_scope();
                 let ast_ids = &self.ast_ids;
@@ -4986,8 +4984,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         ExprKind::List(list) => subject_elements.extend(list.elts()),
                         ExprKind::Tuple(tuple) => subject_elements.extend(tuple.elts()),
                         _ => {
-                            let Some(target) = PlaceExpr::try_from_expr(element)
-                                .and_then(|place| places.place_id((&place).into()))
+                            let Some(target) = places
+                                .expr_place_id(element)
                                 .zip(ast_ids.try_scoped_use(scope, element))
                             else {
                                 continue;
@@ -5191,7 +5189,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         // which is invalid syntax. However, it's still pretty obvious here that the user
                         // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
                         let symbol = if let Some(symbol_name) = symbol_name {
-                            let symbol = self.add_symbol(symbol_name.id().clone());
+                            let symbol = self.add_symbol(symbol_name.id());
 
                             self.add_definition(
                                 symbol.into(),
@@ -5402,7 +5400,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 for name in names {
                     self.ast_ids.record_expression(&name, self.current_scope());
-                    let symbol_id = self.add_symbol(name.id().clone());
+                    let symbol_id = self.add_symbol(name.id());
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has already been accessed in this scope.
                     if (symbol.is_bound() || symbol.is_declared() || symbol.is_used())
@@ -5443,9 +5441,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     let symbol = self.current_place_table_mut().symbol_mut(symbol_id);
                     symbol.mark_global();
                     symbol.mark_scope_declaration();
+                    let name = symbol.name().clone();
                     self.current_scope_info_mut()
                         .this_scope_global_or_nonlocal_declarations
-                        .insert(name.id().clone(), range);
+                        .insert(name, range);
                 }
                 walk_stmt(self, kind);
             }
@@ -5455,7 +5454,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 for name in names {
                     self.ast_ids.record_expression(&name, self.current_scope());
-                    let symbol_id = self.add_symbol(name.id().clone());
+                    let symbol_id = self.add_symbol(name.id());
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has already been accessed in this scope.
                     if (symbol.is_bound() || symbol.is_declared() || symbol.is_used())
@@ -5494,9 +5493,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     let symbol = self.current_place_table_mut().symbol_mut(symbol_id);
                     symbol.mark_nonlocal();
                     symbol.mark_scope_declaration();
+                    let name = symbol.name().clone();
                     self.current_scope_info_mut()
                         .this_scope_global_or_nonlocal_declarations
-                        .insert(name.id().clone(), range);
+                        .insert(name, range);
                 }
                 walk_stmt(self, kind);
             }
@@ -5506,8 +5506,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // We will check the target expressions and then delete them.
                 walk_stmt(self, kind);
                 for target in targets {
-                    if let Some(mut target) = PlaceExpr::try_from_expr(target) {
-                        if let PlaceExpr::Symbol(symbol) = &mut target {
+                    if let Some(target) = PlaceExprBuilder::try_from_expr(target.classify()) {
+                        let place_id = self.add_place(target);
+                        if let ScopedPlaceId::Symbol(symbol) = place_id {
                             // `del x` behaves like an assignment in that it forces all references
                             // to `x` in the current scope (including *prior* references) to refer
                             // to the current scope's binding (unless `x` is declared `global` or
@@ -5521,11 +5522,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             //         del x
                             // foo()
                             // ```
-                            symbol.mark_bound();
-                            symbol.mark_used();
+                            self.current_place_table_mut()
+                                .symbol_mut(symbol)
+                                .mark_deleted();
                         }
 
-                        let place_id = self.add_place(target);
                         self.invalidate_narrowing_aliases_for(place_id);
                         self.delete_binding(place_id);
                     }
@@ -5721,11 +5722,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
         // Record a use of all members of `x` for a splatted keyword argument `**x`.
         let current_scope = self.current_scope();
-        let member_places = PlaceExpr::try_from_expr(keyword.value())
-            .and_then(|value_place_expr| {
-                self.current_place_table()
-                    .place_id((&value_place_expr).into())
-            })
+        let member_places = self
+            .current_place_table()
+            .expr_place_id(keyword.value())
             .map(|value_place_id| {
                 let place_table = &self.place_tables[current_scope];
                 place_table
@@ -5807,7 +5806,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         walk_pattern(self, kind);
 
         if let Some(name) = kind.capture_name() {
-            let symbol = self.add_symbol(name.id().clone());
+            let symbol = self.add_symbol(name.id());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol.into(),
@@ -6232,7 +6231,7 @@ fn is_empty_collection_constructor_call(expr: Expr<'_>) -> bool {
     arguments.is_empty()
         && func
             .as_name_expr()
-            .is_some_and(|name| matches!(name.id().as_str(), "list" | "set" | "dict"))
+            .is_some_and(|name| matches!(name.id(), "list" | "set" | "dict"))
 }
 
 fn is_collection_initializer(expr: Expr<'_>) -> bool {

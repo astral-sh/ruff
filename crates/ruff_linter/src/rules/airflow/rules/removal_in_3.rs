@@ -541,7 +541,7 @@ fn is_kwarg_parameter(semantic: &SemanticModel, name: ExprName<'_>) -> bool {
     function
         .parameters()
         .kwarg()
-        .is_some_and(|kwarg| kwarg.name().as_str() == name.id().as_str())
+        .is_some_and(|kwarg| kwarg.name().as_str() == name.id())
 }
 
 /// Check whether a removed Airflow class method is called.

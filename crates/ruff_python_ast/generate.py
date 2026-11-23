@@ -307,7 +307,7 @@ def field_codec(field: Field, nodes: set[str]) -> WireField:
     if inner == "Name":
         return codec(
             4,
-            "&'a crate::name::Name",
+            "&'a str",
             f"u64::from({value}.0)",
             "self.syntax_node().stored_name(split_words(word)[0])",
             build_type="super::super::NameId",
@@ -731,7 +731,7 @@ def copy_field(field: Field, nodes: set[str]) -> str:
             else f"self.copy_with({value}, rewriter)"
         )
     if inner == "Name":
-        return f"self.intern_name({value}.as_str())"
+        return f"self.intern_name({value})"
     if inner == "DebugText":
         return f"{value}.map(crate::DebugText::parts)"
     if inner == "str":
@@ -1060,8 +1060,13 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
             debug_fields.insert(0, "id")
         else:
             debug_fields.extend(field.name for field in fields)
+        name_fields = {field.name for field in n.fields if field.ty == "Name"}
+        # Keep the parser's spelling of Name in debug output without allocating an owned name.
         debug_fields = "".join(
-            f'.field("{name}", &v.{name}())' for name in debug_fields
+            f'.field("{name}", &format_args!("Name({{:?}})", v.{name}()))'
+            if name in name_fields
+            else f'.field("{name}", &v.{name}())'
+            for name in debug_fields
         )
         out.append(f"""impl NodeType for crate::kind::{n.name} {{
              type Borrowed<'ast> = crate::{n.name}<'ast>;
@@ -1162,7 +1167,7 @@ def generate_flat(ast: Ast) -> tuple[str, str]:
                     read = f"self.syntax_node().ast.extra_word::<{str(f.width == 8).lower()}>({index})"
                     raw = f"{{ let base = {base}; {read} }}"
                     shared = f"{{ let base = {shared_base}; {read} }}"
-                if f.result == "&'a crate::name::Name":
+                if f.name in name_fields:
                     out.append(
                         f"#[inline] pub fn name_id(self) -> super::NameId {{ super::NameId(split_words({raw})[0]) }}"
                     )

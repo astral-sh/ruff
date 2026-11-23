@@ -60,7 +60,7 @@ struct ExportFinder<'db> {
     db: &'db dyn Db,
     program_file: ProgramFile<'db>,
     visiting_stub_file: bool,
-    exports: FxHashMap<&'db Name, PossibleExportKind>,
+    exports: FxHashMap<&'db str, PossibleExportKind>,
     dunder_all: DunderAll,
 }
 
@@ -75,7 +75,7 @@ impl<'db> ExportFinder<'db> {
         }
     }
 
-    fn possibly_add_export(&mut self, export: &'db Name, kind: PossibleExportKind) {
+    fn possibly_add_export(&mut self, export: &'db str, kind: PossibleExportKind) {
         self.exports.insert(export, kind);
 
         if export == "__all__" {
@@ -95,10 +95,10 @@ impl<'db> ExportFinder<'db> {
                     if name.starts_with('_') {
                         return None;
                     }
-                    Some(name.clone())
+                    Some(Name::new(name))
                 })
                 .collect(),
-            DunderAll::Present => self.exports.into_keys().cloned().collect(),
+            DunderAll::Present => self.exports.into_keys().map(Name::new).collect(),
         }
     }
 }

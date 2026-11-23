@@ -102,7 +102,7 @@ pub(crate) fn is_guarded_by_try_except(
         ExprKind::Name(expr_name) => {
             let id = expr_name.id();
 
-            let Some(binding_id) = semantic.lookup_symbol(id.as_str()).binding_id() else {
+            let Some(binding_id) = semantic.lookup_symbol(id).binding_id() else {
                 return false;
             };
             let binding = semantic.binding(binding_id);

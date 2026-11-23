@@ -58,7 +58,7 @@ pub(crate) fn ssl_with_bad_defaults(checker: &Checker, function_def: ast::StmtFu
         .filter_map(ruff_python_ast::ParameterWithDefault::default)
     {
         match default.classify() {
-            ExprKind::Name(expr_name) if is_insecure_protocol(expr_name.id().as_str()) => {
+            ExprKind::Name(expr_name) if is_insecure_protocol(expr_name.id()) => {
                 let id = expr_name.id();
                 let range = expr_name.range();
 

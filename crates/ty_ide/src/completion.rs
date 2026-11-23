@@ -2218,7 +2218,7 @@ fn detect_set_function_args<'m>(cursor: &ContextCursor<'m>) -> FxHashSet<&'m str
         .map_or_default(|args| {
             args.keywords()
                 .iter()
-                .filter_map(|kw| kw.arg().map(|ident| ident.id().as_str()))
+                .filter_map(|kw| kw.arg().map(Identifier::id))
                 .collect()
         })
 }

@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ruff_python_ast::ExprKind;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::Name;
+
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Stmt, StmtAnnAssign, StmtAssign};
@@ -158,7 +158,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: StmtAssign<'_>
     let Some(name) = name.as_string_literal_expr() else {
         return;
     };
-    if name.value() != target_name.id().as_str() {
+    if name.value() != target_name.id() {
         return;
     }
 
@@ -270,7 +270,7 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: StmtAnnAssign<'_>) 
 fn create_diagnostic(
     checker: &Checker,
     stmt: Stmt<'_>,
-    name: &Name,
+    name: &str,
     type_vars: &[TypeVar],
     type_alias_kind: TypeAliasKind,
     value_source: &str,

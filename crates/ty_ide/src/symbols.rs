@@ -642,13 +642,13 @@ enum ImportModuleKind<'db> {
 #[derive(Debug, Clone, Copy, get_size2::GetSize)]
 enum ImportModuleName<'db> {
     /// The `foo` in `import quux, foo as blah, baz`.
-    Import(&'db Name),
+    Import(&'db str),
     /// A possible module in a `from ... import ...` statement.
     ImportFrom {
         /// The `..foo` in `from ..foo import quux`.
         parent: StmtImportFrom<'db>,
         /// The `foo` in `from quux import foo`.
-        child: &'db Name,
+        child: &'db str,
     },
 }
 
@@ -866,7 +866,7 @@ impl<'db> SymbolVisitor<'db> {
     fn add_name_symbol(
         &mut self,
         stmt: Stmt<'_>,
-        name: &Name,
+        name: &str,
         name_range: TextRange,
         kind: SymbolKind,
     ) {
@@ -895,13 +895,13 @@ impl<'db> SymbolVisitor<'db> {
     }
 
     /// Adds a symbol introduced via an assignment.
-    fn add_assignment(&mut self, stmt: Stmt<'_>, name: &Name, name_range: TextRange) {
+    fn add_assignment(&mut self, stmt: Stmt<'_>, name: &str, name_range: TextRange) {
         // Include assignments only when we're in global or class scope.
         if self.in_function {
             return;
         }
 
-        let kind = if Self::is_constant_name(name.as_str()) {
+        let kind = if Self::is_constant_name(name) {
             SymbolKind::Constant
         } else if self
             .iter_symbol_stack()

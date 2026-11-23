@@ -395,6 +395,19 @@ impl<'db> SemanticIndex<'db> {
         &self.place_tables[scope_id]
     }
 
+    /// The symbol that owns this definition's name. Reuse it when interning a
+    /// function or class, or building its signature, to share long spellings.
+    ///
+    /// The definition must belong to this index and define a symbol.
+    pub fn definition_symbol(
+        &self,
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+    ) -> &symbol::Symbol {
+        self.place_table(definition.file_scope(db))
+            .symbol(definition.place(db).expect_symbol())
+    }
+
     /// Shares the existing place table with another per-scope query result.
     pub fn shared_place_table(&self, scope_id: FileScopeId) -> Arc<PlaceTable> {
         Arc::clone(&self.place_tables[scope_id])
@@ -1540,6 +1553,35 @@ y = 2
     }
 
     #[test]
+    fn symbol_survives_ast_eviction() {
+        let TestCase { db, file } =
+            test_case("connection_timeout_seconds = 30\nconnection_timeout_seconds");
+        let file = program_file(&db, file);
+        let table = semantic_index(&db, file).shared_place_table(FileScopeId::global());
+        parsed_module(&db, file.python_file(&db)).clear();
+        drop(db);
+
+        assert_eq!(names(&table), ["connection_timeout_seconds"]);
+        let symbol = table.symbol_by_name("connection_timeout_seconds").unwrap();
+        assert!(symbol.is_bound() && symbol.is_used());
+    }
+
+    #[test]
+    fn deleting_a_name_preserves_its_reassignment_status() {
+        for (source, reassigned) in [
+            ("del x", false),
+            ("x = 1\ndel x", false),
+            ("x = 1\nx = 2\ndel x", true),
+        ] {
+            let TestCase { db, file } = test_case(source);
+            let table = place_table(&db, global_scope(&db, program_file(&db, file)));
+            let symbol = table.symbol_by_name("x").unwrap();
+            assert!(symbol.is_used() && symbol.is_bound(), "{source}");
+            assert_eq!(symbol.is_reassigned(), reassigned, "{source}");
+        }
+    }
+
+    #[test]
     fn function_parameter_symbols() {
         let TestCase { db, file } = test_case(
             "
@@ -1791,7 +1833,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             panic!("expected generator definition")
         };
         let target = comprehension.target(&module);
-        let name = target.as_name_expr().unwrap().id().as_str();
+        let name = target.as_name_expr().unwrap().id();
 
         assert_eq!(name, "x");
         assert_eq!(target.range(), TextRange::new(23.into(), 24.into()));

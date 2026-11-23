@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, TypeParamKind, name::Name};
+use ruff_python_ast::{self as ast, TypeParamKind};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::diagnostic::format_enumeration;
@@ -9,8 +9,8 @@ use crate::types::{
 
 #[derive(Clone, Copy)]
 pub(crate) enum TypeParameterOwner<'a> {
-    GenericClass(&'a Name),
-    TypeAlias(&'a Name),
+    GenericClass(&'a str),
+    TypeAlias(&'a str),
 }
 
 /// Check that a PEP 695 class or type alias parameter list contains at most one `TypeVarTuple`.
@@ -90,8 +90,8 @@ pub(crate) fn check_no_default_after_typevar_tuple_pep695(
 pub(in crate::types::infer::builder) fn check_no_default_after_typevar_tuple<'a, P>(
     context: &InferContext<'_, '_>,
     mut parameters: impl Iterator<Item = P>,
-    as_pack: impl FnMut(P) -> Option<(&'a Name, TextRange)>,
-    as_defaulted_typevar: impl FnMut(P) -> Option<(&'a Name, TextRange)>,
+    as_pack: impl FnMut(P) -> Option<(&'a str, TextRange)>,
+    as_defaulted_typevar: impl FnMut(P) -> Option<(&'a str, TextRange)>,
 ) {
     if !context.is_lint_enabled(&INVALID_TYPE_VARIABLE_DEFAULT) {
         return;

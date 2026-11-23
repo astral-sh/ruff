@@ -968,8 +968,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
         if let Some(name) = handler_inner.name() {
             if let Some(exceptions) = self.currently_suspended_exceptions {
                 // Store the exception expression(s) for later resolution
-                self.exception_variables
-                    .insert(name.id().as_str(), exceptions);
+                self.exception_variables.insert(name.id(), exceptions);
             }
         }
 
@@ -997,9 +996,7 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                     } else if let ExprKind::Name(name) = exc.classify() {
                         // If it's a variable name, check if it's bound to an exception in the
                         // current except clause
-                        if let Some(exception_expr) =
-                            self.exception_variables.get(name.id().as_str())
-                        {
+                        if let Some(exception_expr) = self.exception_variables.get(name.id()) {
                             if let ExprKind::Tuple(tuple) = exception_expr.classify() {
                                 for exception in tuple {
                                     self.maybe_store_exception(exception, stmt.range());

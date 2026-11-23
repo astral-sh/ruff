@@ -398,7 +398,7 @@ impl<'a> Dependency<'a> {
                 .filter_map(|stmt| {
                     stmt.as_ann_assign_stmt()
                         .and_then(|ann_assign| ann_assign.target().as_name_expr())
-                        .map(|name| name.id().as_str())
+                        .map(ast::ExprName::id)
                 })
                 .collect()
         } else {

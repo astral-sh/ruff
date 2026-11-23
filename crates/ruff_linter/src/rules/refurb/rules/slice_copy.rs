@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::Name;
+
 use ruff_python_ast::{self as ast, ExprSubscript};
 use ruff_text_size::Ranged;
 
@@ -69,7 +69,7 @@ pub(crate) fn slice_copy(checker: &Checker, subscript: ast::ExprSubscript<'_>) {
         return;
     };
     let mut diagnostic = checker.report_diagnostic(SliceCopy, subscript.range());
-    let replacement = generate_method_call(name.as_str(), "copy", checker.generator());
+    let replacement = generate_method_call(name, "copy", checker.generator());
 
     let applicability = if checker.comment_ranges().intersects(subscript.range()) {
         Applicability::Unsafe
@@ -91,7 +91,7 @@ pub(crate) fn slice_copy(checker: &Checker, subscript: ast::ExprSubscript<'_>) {
 fn match_list_full_slice<'a>(
     subscript: ExprSubscript<'a>,
     semantic: &SemanticModel,
-) -> Option<&'a Name> {
+) -> Option<&'a str> {
     // Check that it is `obj[:]`.
     if !matches!(
         subscript.slice().fields(),

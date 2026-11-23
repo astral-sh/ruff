@@ -88,7 +88,7 @@ fn key_in_dict(
     // ```
     if value
         .as_name_expr()
-        .is_some_and(|name| matches!(name.id().as_str(), "self"))
+        .is_some_and(|name| matches!(name.id(), "self"))
     {
         return;
     }

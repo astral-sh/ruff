@@ -115,7 +115,7 @@ pub(crate) fn self_or_cls_assignment(checker: &Checker, target: Expr<'_>) {
 fn check_expr(checker: &Checker, target: Expr<'_>, method_type: MethodType) {
     let elts = match target.classify() {
         ExprKind::Name(name) => {
-            if name.id().as_str() == method_type.arg_name() {
+            if name.id() == method_type.arg_name() {
                 checker.report_diagnostic(SelfOrClsAssignment { method_type }, target.range());
             }
             return;

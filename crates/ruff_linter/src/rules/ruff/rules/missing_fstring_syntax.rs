@@ -151,7 +151,7 @@ fn is_gettext(call_expr: ast::ExprCall<'_>, semantic: &SemanticModel) -> bool {
         ExprKind::Name(expr_name) => {
             let id = expr_name.id();
 
-            matches!(id.as_str(), "gettext" | "ngettext" | "_")
+            matches!(id, "gettext" | "ngettext" | "_")
         }
         ExprKind::Attribute(expr_attribute) => {
             let attr = expr_attribute.attr();

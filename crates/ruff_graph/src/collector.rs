@@ -179,10 +179,7 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
 fn is_type_checking_condition(expr: Expr<'_>) -> bool {
     match expr.classify() {
         // `if TYPE_CHECKING:`
-        ast::ExprKind::Name(name) => {
-            let id = name.id();
-            id.as_str() == "TYPE_CHECKING"
-        }
+        ast::ExprKind::Name(name) => name.id() == "TYPE_CHECKING",
         // `if typing.TYPE_CHECKING:`
         ast::ExprKind::Attribute(attribute) => {
             let value = attribute.value();
@@ -190,7 +187,7 @@ fn is_type_checking_condition(expr: Expr<'_>) -> bool {
             attr.as_str() == "TYPE_CHECKING"
                 && value
                     .as_name_expr()
-                    .is_some_and(|name| name.id().as_str() == "typing")
+                    .is_some_and(|name| name.id() == "typing")
         }
         _ => false,
     }

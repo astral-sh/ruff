@@ -152,6 +152,11 @@ impl Symbol {
         self.insert_flags(SymbolFlags::IS_BOUND);
     }
 
+    /// Deletion binds the name locally and uses it without counting as reassignment.
+    pub(super) fn mark_deleted(&mut self) {
+        self.insert_flags(SymbolFlags::IS_BOUND | SymbolFlags::IS_USED);
+    }
+
     pub(super) fn mark_used(&mut self) {
         self.insert_flags(SymbolFlags::IS_USED);
     }
@@ -189,11 +194,11 @@ impl SymbolReverseTable {
     fn entry<'a>(
         &'a mut self,
         symbols: &IndexVec<ScopedSymbolId, Symbol>,
-        symbol: &Symbol,
+        name: &str,
     ) -> Entry<'a, ScopedSymbolId> {
         self.0.entry(
-            Self::hash_name(symbol.name()),
-            |id| &symbols[*id].name == symbol.name(),
+            Self::hash_name(name),
+            |id| symbols[*id].name == name,
             |id| Self::hash_name(&symbols[*id].name),
         )
     }
@@ -282,22 +287,13 @@ impl SymbolTableBuilder {
         self.reverse.symbol_id(&self.table.symbols, name)
     }
 
-    /// Add a new symbol to this scope or update the flags if a symbol with the same name already exists.
-    pub(super) fn add(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
-        let entry = self.reverse.entry(&self.table.symbols, &symbol);
-
-        match entry {
-            Entry::Occupied(entry) => {
-                let id = *entry.get();
-
-                if !symbol.flags.is_empty() {
-                    self.symbols[id].flags.insert(symbol.flags);
-                }
-
-                (id, false)
-            }
+    /// Look up the spelling before taking ownership. An AST name borrows from the
+    /// file's buffer, and repeated uses in this scope need no additional copies.
+    pub(super) fn add(&mut self, name: impl AsRef<str> + Into<Name>) -> (ScopedSymbolId, bool) {
+        match self.reverse.entry(&self.table.symbols, name.as_ref()) {
+            Entry::Occupied(entry) => (*entry.get(), false),
             Entry::Vacant(entry) => {
-                let id = self.table.symbols.push(symbol);
+                let id = self.table.symbols.push(Symbol::new(name.into()));
                 entry.insert(id);
                 (id, true)
             }
