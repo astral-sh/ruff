@@ -36,7 +36,7 @@ const DFA_SIZE_LIMIT: usize = 1_000_000;
 #[derive(Clone, get_size2::GetSize)]
 pub(crate) struct IncludeFilter {
     #[get_size(ignore)]
-    glob_set: GlobSet,
+    glob_set: Option<GlobSet>,
     /// The original absolute globs, before adding patterns for descendants.
     original_patterns: Box<[Box<str>]>,
     #[get_size(size_fn = bit_box_size)]
@@ -59,10 +59,13 @@ fn dfa_memory_usage(dfa: &Option<dfa::dense::DFA<Vec<u32>>>) -> usize {
 impl IncludeFilter {
     /// Whether the file matches any of the globs.
     pub(crate) fn match_file(&self, path: impl AsRef<SystemPath>) -> MatchFile {
+        let Some(glob_set) = &self.glob_set else {
+            return MatchFile::Pattern;
+        };
         let path = path.as_ref();
 
         if self.literal_pattern_indices.is_empty() {
-            return if self.glob_set.is_match(path) {
+            return if glob_set.is_match(path) {
                 MatchFile::Pattern
             } else {
                 MatchFile::No
@@ -70,7 +73,7 @@ impl IncludeFilter {
         }
 
         let mut matches = self.matches.get();
-        self.glob_set.matches_into(path, &mut matches);
+        glob_set.matches_into(path, &mut matches);
 
         if matches.is_empty() {
             MatchFile::No
@@ -276,7 +279,11 @@ impl IncludeFilterBuilder {
     ///
     /// See <https://github.com/BurntSushi/ripgrep/discussions/2927> for the error returned.
     pub(crate) fn build(self) -> Result<IncludeFilter, globset::Error> {
-        let glob_set = self.set.build()?;
+        // The default unanchored `**` matches every file and cannot be a literal match.
+        let glob_set = match self.original_patterns.as_slice() {
+            [pattern] if pattern.as_ref() == "**" => None,
+            _ => Some(self.set.build()?),
+        };
 
         let dfa_builder = dfa::dense::Builder::new()
             .syntax(
