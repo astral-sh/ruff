@@ -3201,6 +3201,14 @@ impl<'db> Type<'db> {
         }
     }
 
+    fn single_callable_signature(self, db: &'db dyn Db) -> Option<&'db Signature<'db>> {
+        let callable = self.resolve_type_alias(db).as_callable()?;
+        let [signature] = callable.signatures(db).overloads.as_slice() else {
+            return None;
+        };
+        Some(signature)
+    }
+
     fn as_paramspec_value(self, db: &'db dyn Db) -> Option<ParamSpecValue<'db>> {
         match self {
             Self::Callable(callable) if callable.kind(db) == CallableTypeKind::ParamSpecValue => {
@@ -9878,7 +9886,11 @@ impl<'db> Type<'db> {
         {
             match specialization.get(db, typevar) {
                 Some(mapped) if specialization.materialization_kind(db).is_none() => return mapped,
-                None if !specialize_self_domain || !typevar.typevar(db).is_self(db) => return self,
+                None if (!specialize_self_domain || !typevar.typevar(db).is_self(db))
+                    && typevar.deferred_bound(db).is_none() =>
+                {
+                    return self;
+                }
                 _ => {}
             }
         }
@@ -11861,8 +11873,22 @@ impl<'db> TypeMapping<'_, 'db> {
     ) -> Option<GenericContext<'db>> {
         let env = visitor.env;
         match self {
-            TypeMapping::FreshenBoundTypeVars { .. } => {
-                // A default can refer back to this signature, so keep the enclosing
+            TypeMapping::BindSelf(_)
+            | TypeMapping::ReplaceSelf { .. }
+            | TypeMapping::FreshenBoundTypeVars { .. } => {
+                let mut context = context;
+                if let TypeMapping::BindSelf(binding) = self {
+                    if binding.binding_context().is_some() {
+                        context = context.remove_self(db, binding.binding_context())?;
+                    }
+                    if context
+                        .variables(db)
+                        .all(|var| var.deferred_bound(db).is_none())
+                    {
+                        return Some(context);
+                    }
+                }
+                // A bound or default can refer back to this signature, so keep the enclosing
                 // traversal's recursion guard when mapping its generic context.
                 Some(GenericContext::from_typevar_instances(
                     db,
@@ -11891,7 +11917,9 @@ impl<'db> TypeMapping<'_, 'db> {
                         Some(_) => false, // Specialized to a concrete type, filter out
                     }
                 });
-                if specialization.specialize_self_domain() {
+                if specialization.specialize_self_domain()
+                    || kept.clone().any(|var| var.deferred_bound(db).is_some())
+                {
                     let kept = kept.filter_map(|bound_typevar| {
                         Type::TypeVar(bound_typevar)
                             .apply_type_mapping(
@@ -11915,32 +11943,6 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::EagerExpansion
             | TypeMapping::GeneralizeLocalTypes(_)
             | TypeMapping::RescopeReturnCallables(_) => Some(context),
-            TypeMapping::BindSelf(binding) => {
-                if binding.binding_context().is_some() {
-                    context.remove_self(db, binding.binding_context())
-                } else {
-                    Some(context)
-                }
-            }
-            TypeMapping::ReplaceSelf {
-                new_origin,
-                new_upper_bound,
-            } => Some(GenericContext::from_typevar_instances(
-                db,
-                env,
-                context.variables(db).map(|typevar| {
-                    if typevar.typevar(db).is_self(db) {
-                        BoundTypeVarInstance::synthetic_self(
-                            db,
-                            *new_origin,
-                            *new_upper_bound,
-                            typevar.binding_context(db),
-                        )
-                    } else {
-                        typevar
-                    }
-                }),
-            )),
         }
     }
 

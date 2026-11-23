@@ -6474,6 +6474,36 @@ reveal_type(compose(identity, identity))
 reveal_type(compose_reversed(identity, identity))
 ```
 
+## Specializing a generic callback in a stateful factory
+
+The collector can receive values of different types on successive calls. Its result includes all
+previously collected values, so we choose one specialization of `present` when creating the
+collector.
+
+```py
+from typing import Callable, overload
+
+def collector[T, U](pick: Callable[[T], tuple[U] | None]) -> Callable[[T], list[U]]:
+    collected: list[U] = []
+
+    def collect(item: T) -> list[U]:
+        collected.extend(pick(item) or ())
+        return collected
+
+    return collect
+
+@overload
+def present(value: None) -> None: ...
+@overload
+def present[T](value: T | None) -> tuple[T] | None: ...
+def present(value: object) -> tuple[object] | None:
+    return None if value is None else (value,)
+
+collect = collector(present)
+reveal_type(collect(1))  # revealed: list[object]
+only_words: list[str] = collect("word")  # error: [invalid-assignment]
+```
+
 ## Dictionary value context containing a bounded type variable
 
 The return annotation lets `dict.fromkeys` initialize a dictionary of `T | str` with a string. An

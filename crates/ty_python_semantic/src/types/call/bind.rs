@@ -7249,6 +7249,10 @@ impl<'db> CallInference<'_, 'db> {
         );
 
         let (return_ty, arguments_validated) = self.select_return_type(inference);
+        let return_ty = self
+            .signature
+            .defer_captured_variables(db, self.env, inference.merged_specialization(db), return_ty)
+            .unwrap_or(return_ty);
         InferredCall {
             inferable_typevars: self.inferable_typevars,
             inference: Some(inference),
@@ -7782,7 +7786,11 @@ impl<'db> CallInference<'_, 'db> {
                 continue;
             }
 
-            if let Err(error) = builder.infer(relation.declared_type, relation.argument_type) {
+            if let Err(error) = builder.infer_call_argument(
+                self.signature,
+                relation.declared_type,
+                relation.argument_type,
+            ) {
                 constraint_set_errors[relation.argument_index] = true;
                 specialization_errors.push(BindingError::SpecializationError {
                     error,
