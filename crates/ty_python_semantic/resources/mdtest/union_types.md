@@ -529,6 +529,19 @@ def f(
     reveal_type(h)  # revealed: tuple[Any | str, ...]
 ```
 
+A registry can store a class object in each tuple. Even when one class inherits from the other, the
+two class objects are distinct. A `type[A]` element can cover both.
+
+```py
+class A: ...
+class B(A): ...
+
+def _(flag: bool, cls: type[A]):
+    pair = (1, A) if flag else (1, B)
+    reveal_type(pair)  # revealed: tuple[Literal[1], <class 'A'>] | tuple[Literal[1], <class 'B'>]
+    reveal_type(pair if flag else (1, cls))  # revealed: tuple[Literal[1], type[A]]
+```
+
 ## Tuple unions with narrowed built-in elements
 
 A tuple alternative is redundant when its element type is covered by another alternative, including
