@@ -283,6 +283,23 @@ class GenericChild(GenericBase[T]):
 def add_generic(left: GenericBase[int], right: GenericChild[str]) -> Literal["left", "right"]:
     reveal_type(left + right)  # revealed: Literal["right", "left"]
     return left + right
+
+from types import NotImplementedType
+from typing import final
+
+@final
+class Box(Generic[T]):
+    value: T
+
+    def __add__(self, other: object) -> NotImplementedType:
+        return NotImplemented
+
+    def __radd__(self, other: object) -> int:
+        return 1
+
+def same_runtime_class(left: Box[int], right: Box[str]):
+    # error: [unsupported-operator]
+    reveal_type(left + right)  # revealed: Unknown
 ```
 
 ## Class objects use their metaclasses for reflected precedence
@@ -383,6 +400,65 @@ class B:
         return B()
 
 reveal_type(A() - B())  # revealed: B
+```
+
+## Methods returning `NotImplemented`
+
+An explicit or inferred `NotImplemented` return tries the next method. Direct calls retain the
+method's return type:
+
+```toml
+[analysis]
+return-type-inference = "always"
+```
+
+```py
+from types import NotImplementedType
+from typing import final
+
+class Reflected:
+    def __radd__(self, other: object) -> int:
+        return 1
+
+@final
+class Inferred:
+    def __add__(self, other: object):
+        if isinstance(other, bytes):
+            return other
+        return NotImplemented
+
+reveal_type(Inferred().__add__(Reflected()))  # revealed: bytes | NotImplementedType
+reveal_type(Inferred() + Reflected())  # revealed: bytes | int
+
+# error: [unsupported-operator]
+reveal_type(Inferred() + object())  # revealed: Unknown
+
+class Declines:
+    def __add__(self, other: object) -> NotImplementedType:
+        return NotImplemented
+
+    def __radd__(self, other: object) -> int:
+        return 1
+
+reveal_type(Declines() + Reflected())  # revealed: int
+
+# Reflected methods are not tried for two operands of the same runtime type.
+# error: [unsupported-operator]
+reveal_type(Declines() + Declines())  # revealed: Unknown
+
+class Refuses:
+    def __radd__(self, other: object) -> NotImplementedType:
+        return NotImplemented
+
+# error: [unsupported-operator]
+reveal_type(Declines() + Refuses())  # revealed: Unknown
+
+class Blocked:
+    __add__ = None
+
+# A non-callable method raises instead of trying the reflected method.
+# error: [unsupported-operator]
+reveal_type(Blocked() + Reflected())  # revealed: Unknown
 ```
 
 ## Callable instances as dunders
