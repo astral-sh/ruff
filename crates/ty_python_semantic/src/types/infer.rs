@@ -283,6 +283,36 @@ pub(crate) fn infer_definition_types<'db>(
         .finish_definition(definition)
 }
 
+/// Infer an initializer independently of a possibly recursive inherited declaration.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, id, _, _| Type::divergent(id),
+    cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, definition: Definition<'db>| {
+        result.cycle_normalized(db, &ProgramEnvironment::from_definition(definition), *previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(super) fn infer_class_initializer<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Type<'db> {
+    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+        return Type::unknown();
+    };
+    let Some(class) = definition.scope(db).node(db).as_class() else {
+        return Type::unknown();
+    };
+    let module = parsed_module(db, definition.python_file(db)).load(db);
+    let class = class.node(&module);
+    if assignment.unpack().is_some() || class.bases().is_empty() || class.decorator_list.is_empty()
+    {
+        return Type::unknown();
+    }
+    let env = ProgramEnvironment::from_definition(definition);
+    TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+        .infer_class_initializer(definition, assignment)
+}
+
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.
 ///
 /// For example, inference synthesizes an `x["a"] = "bad"` binding for:
@@ -1704,6 +1734,20 @@ impl<'db> DefinitionInference<'db> {
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, &env, previous_ty, cycle);
+        }
+        // Class-body lookup needs the original class and its bases before a decorator can
+        // match protocols against inherited members. If the first pass returns the original
+        // class, expose it to the body but keep the public binding provisional. Otherwise a
+        // reference like `Outer.Child.Value` can pick an alias on the undecorated class and
+        // make the same overload match on every subsequent pass.
+        if let Some(pending) = previous_inference.fallback_type()
+            && let Some(original @ Type::ClassLiteral(ClassLiteral::Static(class))) =
+                self.undecorated_type()
+            && class.has_explicit_bases(db)
+            && let DefinitionTypes::BindingAndDeclaration(declaration) = &mut self.types
+            && declaration.inner_type() == Some(original)
+        {
+            *declaration = declaration.map_type(|_| pending);
         }
         self.types = std::mem::take(&mut self.types).cycle_normalized(
             db,

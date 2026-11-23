@@ -295,8 +295,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let invalid_reference =
-            Type::Dynamic(DynamicType::Unknown(UnknownOrigin::InvalidTypeReference));
+        let invalid_reference = || match definition {
+            Some(def) if def.scope(db).node(db).as_class().is_some() => Type::Dynamic(
+                DynamicType::Unknown(UnknownOrigin::InvalidClassMember(def.scope(db))),
+            ),
+            _ => Type::unknown(),
+        };
         match self.legacy_type_alias_reference(ty, definition, annotation) {
             LegacyTypeAliasReference::Alias(alias, parameters) => {
                 let specialization =
@@ -304,7 +308,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let ty = alias.apply_optional_specialization(db, specialization);
                 return self.check_type_variable_scope(annotation, ty);
             }
-            LegacyTypeAliasReference::Invalid => return invalid_reference,
+            LegacyTypeAliasReference::Invalid => return invalid_reference(),
             LegacyTypeAliasReference::ValueFallback => {}
         }
         if annotation.is_attribute_expr()
@@ -323,7 +327,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if result.as_ref().is_ok_and(|result| !result.is_todo())
             && self.reject_non_alias_reference(ty, definition, annotation)
         {
-            return invalid_reference;
+            return invalid_reference();
         }
         report_missing_type_arguments(&self.context, ty, annotation);
         let result_ty = result.unwrap_or_else(|error| {
@@ -354,7 +358,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 invalid.add_subdiagnostics(db, env, diagnostic, annotation);
             }
             if error.fallback_type == Type::unknown() {
-                invalid_reference
+                invalid_reference()
             } else {
                 error.fallback_type
             }

@@ -1772,6 +1772,147 @@ fn recursive_class_decorator_is_independent_of_query_order(
     Ok(())
 }
 
+/// The original class has a valid alias for the wrong type. Selecting the identity
+/// overload before inferring the initializer would make that choice self-reinforcing.
+#[test_case::test_case("1", "int"; "integer")]
+#[test_case::test_case("[1]", "list[int | None]"; "contextual list")]
+#[test_case::test_case("value()", "int | None"; "computed value")]
+fn nested_decorator_checks_the_initializer_before_committing_to_an_alias(
+    initializer: &str,
+    annotation: &str,
+) -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY313)
+        .build()?;
+    let path = "/src/main.py";
+    db.write_dedented(
+        path,
+        &format!(
+            r#"
+        from typing import Protocol, assert_type, overload
+
+        def value() -> int | None: return 1
+
+        class Text(Protocol):
+            item: str
+
+        class Other(Protocol):
+            item: {annotation}
+
+        class Fallback:
+            type Value = {annotation}
+
+        @overload
+        def choose[T: Text](cls: type[T]) -> type[T]: ...
+        @overload
+        def choose(cls: type[Other]) -> type[Fallback]: ...
+        def choose(cls):
+            return cls if isinstance(cls.item, str) else Fallback
+
+        class Base[T = "Outer.Child.Value"]:
+            item: T
+
+        class Outer:
+            @choose
+            class Child(Base):
+                item = {initializer}
+                type Value = str
+
+        assert_type(Outer.Child, type[Fallback])
+        "#
+        ),
+    )?;
+    let file = program_file(&db, system_path_to_file(&db, path)?);
+    let module = parsed_module(&db, file.python_file(&db)).load(&db);
+    let child = semantic_index(&db, file)
+        .scope_ids()
+        .find(|scope| scope.name(&db, &module) == "Child")
+        .unwrap();
+    infer_complete_scope_types(&db, child);
+    assert_file_diagnostics(&db, path, &[]);
+    Ok(())
+}
+
+/// An editor can ask about the alias body or the initializer before checking the file.
+#[test]
+fn recursive_inherited_member_preserves_the_decorator_overload() -> anyhow::Result<()> {
+    for (first_scope, source) in [
+        (
+            "Item",
+            r#"
+            from typing import Protocol, overload
+
+            class HasItem(Protocol):
+                item: type[str]
+
+            @overload
+            def wrap[T: HasItem](cls: type[T]) -> type[T]: ...
+            @overload
+            def wrap(cls: object) -> object: ...
+            def wrap(cls: object) -> object:
+                return cls
+
+            class Base[T = type['Child.Item']]:
+                item: T
+
+            @wrap
+            class Child(Base):
+                item = str
+                type Item = item
+
+            assert Child.item is Child.Item.__value__ is str
+        "#,
+        ),
+        (
+            "Child",
+            r#"
+            from typing import Protocol, overload, ClassVar
+
+            class F:
+                Item = 1
+
+            class Other(Protocol):
+                item: ClassVar[int]
+
+            class HasItem(Protocol):
+                item: ClassVar[object]
+
+            @overload
+            def wrap[T: HasItem](cls: type[T]) -> type[T]: ...
+            @overload
+            def wrap(cls: type[Other]) -> type[F]: ...
+            def wrap(cls: object) -> object:
+                return cls if hasattr(cls, "Item") else F
+
+            class Base:
+                item: ClassVar["Child.Item"]
+
+            @wrap
+            class Child(Base):
+                item = 1
+                type Item = object
+
+            assert Child.item == 1
+        "#,
+        ),
+    ] {
+        let mut db = TestDbBuilder::new()
+            .with_python_version(PythonVersion::PY313)
+            .build()?;
+        let path = "/src/main.py";
+        db.write_dedented(path, source)?;
+        let file = program_file(&db, system_path_to_file(&db, path)?);
+        let module = parsed_module(&db, file.python_file(&db)).load(&db);
+        let scope = semantic_index(&db, file)
+            .scope_ids()
+            .find(|scope| scope.name(&db, &module) == first_scope)
+            .unwrap();
+        infer_complete_scope_types(&db, scope);
+        assert_file_diagnostics(&db, path, &[]);
+    }
+    Ok(())
+}
+
 #[test]
 fn recursive_protocol_materialization_tracks_member_type_changes() -> anyhow::Result<()> {
     // Changing an imported type must invalidate the cached proof even when the protocol and its

@@ -41,8 +41,8 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
-    KnownInstanceType, MaterializationKind, RecursiveType, RecursiveTypeNormalizer,
+    ClassLiteral, DynamicType, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType,
+    KnownClass, KnownInstanceType, MaterializationKind, RecursiveType, RecursiveTypeNormalizer,
     SelfTypeVarOrigin, SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping,
     TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
     binding_type, infer_definition_types, inferred_declaration,
@@ -1255,11 +1255,8 @@ impl<'db> Specialization<'db> {
             .zip(self.types(db))
             .map(|(previous, current)| match (*previous, *current) {
                 (previous, current) if previous == current => Some(current),
-                (previous, current)
-                    if previous == Type::unknown() || current == Type::unknown() =>
-                {
-                    Some(Type::unknown())
-                }
+                (Type::Dynamic(DynamicType::Unknown(_)), _)
+                | (_, Type::Dynamic(DynamicType::Unknown(_))) => Some(Type::unknown()),
                 _ => None,
             })
             .collect::<Option<Box<[_]>>>()?;

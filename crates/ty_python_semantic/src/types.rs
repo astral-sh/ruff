@@ -9501,7 +9501,11 @@ impl<'db> Type<'db> {
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db, env);
                 let mut invalid_expressions = smallvec::SmallVec::default();
-                for element in union.elements(db) {
+                let alternatives = union.elements(db);
+                let has_alias = std::cell::LazyCell::new(|| {
+                    alternatives.iter().any(|ty| ty.as_type_alias().is_some())
+                });
+                for element in alternatives {
                     match element.in_type_expression_impl(
                         db,
                         scope_id,
@@ -9514,7 +9518,13 @@ impl<'db> Type<'db> {
                             invalid_expressions: new_invalid_expressions,
                         }) => {
                             invalid_expressions.extend(new_invalid_expressions);
-                            builder = builder.add(fallback_type);
+                            // An invalid value cannot add a possible type to an alias.
+                            // In particular, a provisional decorator result may expose both
+                            // an alias and a variable. Adding Unknown here would let a writable
+                            // member declared with the alias accept arbitrary writes.
+                            if fallback_type != Type::unknown() || !*has_alias {
+                                builder = builder.add(fallback_type);
+                            }
                         }
                     }
                 }
@@ -12115,11 +12125,11 @@ impl DivergentType {
 
 /// Why inference produced an `Unknown` type.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub enum UnknownOrigin {
+pub enum UnknownOrigin<'db> {
     /// Missing type information or an unspecified source of error.
     Unspecified,
-    /// A name or attribute used as a type resolved to an invalid value.
-    InvalidTypeReference,
+    /// A member of this class resolved to a value that cannot serve as a type.
+    InvalidClassMember(ScopeId<'db>),
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
@@ -12127,7 +12137,7 @@ pub enum DynamicType<'db> {
     /// An explicitly annotated `typing.Any`
     Any,
     /// An unannotated value, or a dynamic type resulting from an error
-    Unknown(UnknownOrigin),
+    Unknown(UnknownOrigin<'db>),
     /// Similar to `Unknown`, this represents a dynamic type that has been explicitly specialized
     /// with legacy typevars, e.g. `UnknownClass[T]`, where `T` is a legacy typevar. We keep track
     /// of the type variables in the generic context in case this type is later specialized again.

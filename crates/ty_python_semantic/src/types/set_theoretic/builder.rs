@@ -2892,9 +2892,9 @@ mod tests {
     use crate::types::tuple::TupleType;
     use crate::types::type_alias::TypeAliasType;
     use crate::types::{
-        BoundTypeVarInstance, BytesLiteralType, KnownClass, KnownInstanceType, LiteralValueType,
-        LiteralValueTypeKind, Signature, StringLiteralType, Truthiness, TypePair,
-        TypeVarBoundOrConstraints, TypeVarVariance,
+        BoundTypeVarInstance, BytesLiteralType, DynamicType, KnownClass, KnownInstanceType,
+        LiteralValueType, LiteralValueTypeKind, Signature, StringLiteralType, Truthiness, TypePair,
+        TypeVarBoundOrConstraints, TypeVarVariance, UnknownOrigin,
     };
 
     use ruff_db::system::DbWithWritableSystem as _;
@@ -3080,11 +3080,18 @@ mod tests {
 
     #[test]
     fn cycle_recovery_deduplicates_unknowns_with_different_origins() {
-        use crate::types::{DynamicType, UnknownOrigin};
-
-        let db = setup_db();
+        let mut db = setup_db();
+        db.write_dedented("/src/a.py", "class A: ...").unwrap();
         let env = db.program_environment();
-        let invalid = Type::Dynamic(DynamicType::Unknown(UnknownOrigin::InvalidTypeReference));
+        let file = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+        let file = ProgramFile::new(&db, file, env.program(&db));
+        let scope = ty_python_core::semantic_index(&db, file)
+            .scope_ids()
+            .find(|scope| scope.node(&db).as_class().is_some())
+            .unwrap();
+        let invalid = Type::Dynamic(DynamicType::Unknown(UnknownOrigin::InvalidClassMember(
+            scope,
+        )));
         for elements in [[invalid, Type::unknown()], [Type::unknown(), invalid]] {
             assert!(UnionType::from_elements_cycle_recovery(&db, &env, elements).is_unknown());
         }

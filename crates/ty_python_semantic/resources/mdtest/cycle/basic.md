@@ -163,6 +163,236 @@ class Child(Base):
     Item = "int" if item else "str"
 ```
 
+### The decorator preserves a class with an invalid type reference
+
+The integer initializer rules out the string overload. The decorated class still has
+`Value = type(x)`, a computed value that cannot serve as a type alias.
+
+```py
+from typing import Protocol, overload
+
+class Fallback:
+    type Value = int
+
+class HasText(Protocol):
+    x: str
+
+class HasNumber(Protocol):
+    x: int
+
+@overload
+def choose(cls: type[HasText]) -> type[Fallback]: ...
+@overload
+def choose[T: HasNumber](cls: type[T]) -> type[T]: ...
+def choose(cls):
+    return Fallback if isinstance(cls.x, str) else cls
+
+class Base:
+    x: "Child.Value"  # error: [invalid-type-form]
+
+@choose
+class Child(Base):
+    x = 1
+    Value = type(x)
+
+reveal_type(Child)  # revealed: <class 'Child'>
+```
+
+### Reading an inherited attribute before applying a decorator
+
+The writable attribute accepts both integers and `None`. Reading it before the decorator runs leaves
+its declared type intact, so the first overload still matches.
+
+```py
+from typing import Protocol, overload
+
+class Fallback:
+    Item = 1
+
+class Wide(Protocol):
+    item: int | None
+
+@overload
+def wrap[T: Wide](cls: type[T]) -> type[T]: ...
+@overload
+def wrap[U](cls: type[U]) -> type[Fallback] | type[U]: ...
+def wrap(cls: object) -> object:
+    return cls
+
+class Base[T = "Child.Item"]:
+    item: T
+
+class Parent(Base):
+    item = 1
+    type Item = int | None
+
+class Middle(Parent): ...
+
+value = Middle.item
+
+@wrap
+class Child(Middle): ...
+
+reveal_type(Child.item)  # revealed: int | None
+```
+
+### An explicit type argument refers to an alias on a nested class
+
+Both possible results of the decorator inherit `answer() -> int`. As `Outer.Child.Value` changes
+during inference, the single base expression can produce successive specializations of `Base`.
+Treating them as alternative bases would lose the inherited return type.
+
+```py
+from typing import Protocol, assert_type, overload
+
+class Base[T]:
+    x: T
+
+    def answer(self) -> T:
+        return self.x
+
+class Fallback(Base[int]):
+    type Value = int
+    x = 1
+
+class HasText(Protocol):
+    x: str
+
+class HasNumber(Protocol):
+    @property
+    def x(self) -> int | None: ...
+
+@overload
+def choose(cls: type[HasText]) -> type[Fallback]: ...
+@overload
+def choose[T: HasNumber](cls: type[T]) -> type[T]: ...
+def choose(cls):
+    return Fallback if isinstance(cls.x, str) else cls
+
+class Outer:
+    @choose
+    class Child(Base["Outer.Child.Value"]):
+        x = 1
+        type Value = int
+
+assert Outer.Child.Value.__value__ is int
+assert_type(Outer.Child().answer(), int)
+```
+
+### An invalid alternative leaves a writable member's alias intact
+
+A writable `str | None` member cannot implement a protocol that permits writing arbitrary objects.
+While checking the first overload, ty can temporarily see both `Parent.Value` and `Fallback.Value`.
+Only the alias provides a type for `item`.
+
+```py
+from typing import Protocol, overload
+
+class Wide(Protocol):
+    item: object
+
+class Nullable(Protocol):
+    item: str | None
+
+class Fallback:
+    Value = 1
+
+@overload
+def wrap[T: Wide](cls: type[T]) -> type[T] | type[Fallback]: ...
+@overload
+def wrap[T: Nullable](cls: type[T]) -> type[T]: ...
+def wrap(cls):
+    return cls
+
+class Base[T]:
+    item: T
+
+class Parent(Base["Child.Value"]):
+    item = "abc"
+    type Value = str | None
+
+class Middle(Parent): ...
+
+value = Middle.item
+
+@wrap
+class Child(Middle): ...
+
+reveal_type(Child.item)  # revealed: str | None
+reveal_type(Child)  # revealed: <class 'Child'>
+```
+
+### A list initializer leaves its element type open
+
+The list initializer rules out the string overload. The second overload supplies the element type
+through the alias on the replacement class.
+
+```py
+from typing import Protocol, overload
+
+class HasText(Protocol):
+    item: str
+
+class HasList(Protocol):
+    item: list[int | None]
+
+class Replacement:
+    type Value = list[int | None]
+    size: int = 1
+
+@overload
+def wrap[T: HasText](cls: type[T]) -> type[T]: ...
+@overload
+def wrap(cls: type[HasList]) -> type[Replacement]: ...
+def wrap(cls):
+    return cls if isinstance(cls.item, str) else Replacement
+
+class Base[T = "Outer.Child.Value"]:
+    item: T
+
+class Outer:
+    @wrap
+    class Child(Base):
+        item = [1]
+        Value = 1
+
+reveal_type(Outer.Child)  # revealed: type[Replacement]
+assert Outer.Child.size == 1
+```
+
+### A list initializer is compatible with a wider element type
+
+```py
+from typing import Protocol, overload
+
+class HasList(Protocol):
+    item: list[int | None]
+
+class Fallback:
+    type Value = str
+
+@overload
+def wrap[T: HasList](cls: type[T]) -> type[T]: ...
+@overload
+def wrap[T](cls: type[T]) -> type[T] | type[Fallback]: ...
+def wrap(cls):
+    return cls
+
+class Base[T]:
+    item: T
+
+class Outer:
+    @wrap
+    class Child(Base["Outer.Child.Value"]):
+        item = [1]
+        type Value = list[int | None]
+
+reveal_type(Outer.Child.item)  # revealed: list[int | None]
+
+def check(flag: bool):
+    class Other(Base[int] if flag else Base[str]): ...  # error: [unsupported-base]
+```
+
 ## A `TypeVar` name depends on its own `__name__`
 
 The name passed to `TypeVar` comes from `T.__name__` in another module. Inferring `T.__name__` leads

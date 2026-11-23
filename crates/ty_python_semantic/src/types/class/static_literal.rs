@@ -3936,7 +3936,20 @@ fn explicit_bases_cycle_fn<'db>(
         current
             .iter()
             .zip(previous.iter())
-            .map(|(curr, prev)| curr.cycle_normalized(db, &env, *prev, cycle))
+            .map(|(curr, prev)| {
+                let normalized = curr.cycle_normalized(db, &env, *prev, cycle);
+                // The base expression already participates in cycle recovery. Don't
+                // turn successive specializations of the same class into a union of
+                // class objects here. Preserve unions from the expression itself and
+                // the ordinary fallback to Unknown if the iteration budget runs out.
+                if let (Type::GenericAlias(current), Type::GenericAlias(previous), Type::Union(_)) =
+                    (*curr, *prev, normalized)
+                    && current.origin(db) == previous.origin(db)
+                {
+                    return curr.recursive_type_normalized(db, &env, cycle);
+                }
+                normalized
+            })
             .collect()
     } else {
         // The length of bases has changed, presumably because we expanded a starred expression. We

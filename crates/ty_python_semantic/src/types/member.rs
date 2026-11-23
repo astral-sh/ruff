@@ -4,7 +4,10 @@ use crate::place::{
     TypeOrigin, place_by_id, place_from_bindings, place_from_declarations,
 };
 use crate::types::{
-    ProgramEnvironment, StaticClassLiteral, Type, class::MroLookup, infer::nearest_enclosing_class,
+    ClassType, DivergentFlags, DynamicType, ProgramEnvironment, StaticClassLiteral, Type,
+    TypeQualifiers, UnionType, UnknownOrigin,
+    class::MroLookup,
+    infer::{infer_class_initializer, nearest_enclosing_class},
 };
 use ty_python_core::{
     place_table, scope::ScopeId, semantic_index, symbol::ScopedSymbolId, use_def_map,
@@ -87,19 +90,14 @@ pub(super) fn class_member_with_symbol<'db>(
 
         if let Place::Defined(ref mut place) = place_and_quals.place
             && place.origin == TypeOrigin::Inferred
-            && let Some(inherited) = inherited_class_body_declaration(db, scope, symbol_id)
         {
-            if let Place::Defined(declared) = inherited.member.place {
-                // The annotation determines the public type, but the value is still supplied
-                // by this class. Consumers such as Pydantic inspect that value's definition.
-                *place = DefinedPlace {
-                    ty: declared.ty,
-                    origin: declared.origin,
-                    public_type_policy: declared.public_type_policy,
-                    ..*place
-                };
-            }
-            place_and_quals.qualifiers = inherited.member.qualifiers;
+            apply_inherited_declaration(
+                db,
+                scope,
+                symbol_id,
+                place,
+                &mut place_and_quals.qualifiers,
+            );
         }
 
         if !place_and_quals.is_undefined() && !place_and_quals.is_init_var() {
@@ -142,6 +140,108 @@ pub(super) fn class_member_with_symbol<'db>(
             Member::unbound()
         }
     })
+}
+
+/// Use the inherited annotation for a class-body assignment, retaining the initializer
+/// as a lower bound until a recursive reference to the subclass resolves.
+fn apply_inherited_declaration<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    symbol: ScopedSymbolId,
+    place: &mut DefinedPlace<'db>,
+    qualifiers: &mut TypeQualifiers,
+) {
+    // Looking up the binding or the assignment first can re-enter member lookup
+    // before the initializer has been inferred. Infer it without the declaration.
+    if is_unresolved_member(place.ty)
+        && let Some(definition) = place.provenance.definition().or_else(|| {
+            // A provisional place has no provenance. Only use a unique binding.
+            let mut bindings = use_def_map(db, scope).end_of_scope_symbol_bindings(symbol);
+            let definition = bindings.next()?.binding.definition()?;
+            bindings.next().is_none().then_some(definition)
+        })
+        && definition.scope(db) == scope
+    {
+        let initializer = infer_class_initializer(db, definition);
+        place.ty = provisional_member_type(
+            db,
+            &ProgramEnvironment::from_scope(scope),
+            initializer,
+            place.ty,
+        );
+    }
+
+    let Some(inherited) = inherited_class_body_declaration(db, scope, symbol) else {
+        return;
+    };
+    *qualifiers = inherited.member.qualifiers;
+    let Place::Defined(declared) = inherited.member.place else {
+        return;
+    };
+
+    // For `x = 1`, a writable `x: int | None` is still possible, but `x: str` is not.
+    // An unrelated invalid reference or an omitted argument supplies no such constraint.
+    let unresolved = match declared.ty {
+        Type::Dynamic(DynamicType::Unknown(UnknownOrigin::InvalidClassMember(owner))) => {
+            owner == scope
+        }
+        ty => is_unresolved_member(ty),
+    };
+    let ty = if unresolved {
+        provisional_member_type(
+            db,
+            &ProgramEnvironment::from_scope(scope),
+            place.ty,
+            declared.ty,
+        )
+    } else {
+        declared.ty
+    };
+    // The annotation determines the public type, but the value is still supplied
+    // by this class. Consumers such as Pydantic inspect that value's definition.
+    *place = DefinedPlace {
+        ty,
+        origin: declared.origin,
+        public_type_policy: declared.public_type_policy,
+        ..*place
+    };
+}
+
+/// A recursive alias or a materialized bound conveys more than an unresolved member.
+fn is_unresolved_member(ty: Type<'_>) -> bool {
+    matches!(ty, Type::Divergent(d) if ty.is_recursive_divergent()
+        && !d.flags.contains(DivergentFlags::FROM_TYPE_ALIAS)
+        && d.materialization.is_none())
+}
+
+/// Keep context-independent information from the initializer while the annotation is unresolved.
+fn provisional_member_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    initializer: Type<'db>,
+    pending: Type<'db>,
+) -> Type<'db> {
+    let lower_bound = match initializer {
+        Type::LiteralValue(literal) => Type::LiteralValue(literal.to_unpromotable()),
+        Type::NominalInstance(instance) => match instance.class(db, env) {
+            // For example, `[1]` can initialize a `list[int | None]`.
+            ClassType::Generic(alias) => {
+                Type::instance(db, env, alias.origin(db).unknown_specialization(db))
+            }
+            ClassType::NonGeneric(_) => initializer,
+        },
+        Type::Union(u) => {
+            return u.map(db, env, |ty| provisional_member_type(db, env, *ty, pending));
+        }
+        // A lambda needs the annotation to infer its signature. Its provisional
+        // function type can also bind as a method when accessed on an instance.
+        Type::Callable(callable) if pending.is_divergent() && callable.is_method_like(db) => {
+            return pending;
+        }
+        Type::Dynamic(_) | Type::Divergent(_) => return pending,
+        _ => initializer,
+    };
+    UnionType::from_elements(db, env, [lower_bound, pending])
 }
 
 /// Returns the inherited class-body annotation governing an unannotated class attribute.

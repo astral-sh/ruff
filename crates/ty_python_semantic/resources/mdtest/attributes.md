@@ -3415,9 +3415,8 @@ Child.class_only = 1
 
 ### Invalid inherited type references
 
-If a base annotation names a value that cannot be used as a type, the subclass initializer supplies
-the type. The qualifier still applies. Omitting a type argument leaves the corresponding attribute
-gradual.
+An omitted type argument and invalid references to values outside the subclass leave the inherited
+attributes gradual. The qualifier still applies.
 
 ```toml
 [environment]
@@ -3429,17 +3428,57 @@ from typing import ClassVar
 
 value = 1
 
+class Other:
+    value = 1
+
 class Base[T]:
     item: T
     count: ClassVar[value]  # error: [invalid-type-form]
+    size: Other.value  # error: [invalid-type-form]
 
 class Child(Base):  # error: [missing-type-argument]
     item = 1
     count = 1
+    size = 1
 
 reveal_type(Child.item)  # revealed: Unknown
-reveal_type(Child.count)  # revealed: int
+reveal_type(Child.count)  # revealed: Unknown
+reveal_type(Child.size)  # revealed: Unknown
 Child().count = 2  # error: [invalid-attribute-access]
+```
+
+### One possible attribute is an alias and another is a value
+
+The invalid alternative produces an error. The usable alias still gives the parameter a type. An
+alias for `Any` remains a valid gradual alternative.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+class Text:
+    type Item = str
+
+class Invalid:
+    Item = 1
+
+class Gradual:
+    type Item = Any
+
+def check(flag: bool):
+    choice = Text if flag else Invalid
+
+    def f(value: "choice.Item"):  # error: [invalid-type-form]
+        reveal_type(value)  # revealed: str
+
+    other = Text if flag else Gradual
+
+    def g(value: "other.Item"):
+        reveal_type(value)  # revealed: str | Any
 ```
 
 ### Inherited declarations follow the MRO

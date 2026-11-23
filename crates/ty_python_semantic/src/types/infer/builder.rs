@@ -3591,6 +3591,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Infer the right-hand side without looking up the target's declaration.
+    pub(super) fn infer_class_initializer(
+        mut self,
+        definition: Definition<'db>,
+        assignment: &AssignmentDefinitionKind<'db>,
+    ) -> Type<'db> {
+        let ty =
+            self.infer_assignment_definition_impl(assignment, definition, TypeContext::default());
+        // The ordinary assignment query will check the initializer with its full context.
+        let _ = self.context.finish();
+        ty
+    }
+
     fn infer_assignment_definition(
         &mut self,
         assignment: &AssignmentDefinitionKind<'db>,

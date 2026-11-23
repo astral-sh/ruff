@@ -22,9 +22,8 @@ pub(super) use self::typed_dict::{
 use super::dedicated::pydantic;
 use super::display;
 use super::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, DivergentFlags, DynamicType, MemberLookupPolicy,
-    MroIterator, SpecialFormType, SubclassOfType, Type, TypeQualifiers, UnknownOrigin,
-    class_base::ClassBase, function::FunctionType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
+    SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Provenance, RequiresExplicitReExport, TypeOrigin,
@@ -2964,29 +2963,12 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 });
                 declaration.class = base;
             }
-            let declared = declaration.member.place.ignore_possibly_undefined();
-            declaration.member = declaration
-                .member
-                .map_type(|ty| ty.apply_optional_specialization(db, specialization));
-
-            // A decorator can depend on the initializer while its result supplies the
-            // inherited type. Use the initializer if the reference is invalid or a bare type
-            // parameter has no concrete substitution yet. Other cycle markers can represent
-            // an annotation such as `type[Child.Item]` or an alias still being constructed.
-            let use_initializer = match declaration.member.place.ignore_possibly_undefined() {
-                Some(Type::Dynamic(DynamicType::Unknown(UnknownOrigin::InvalidTypeReference))) => {
-                    true
-                }
-                Some(Type::Divergent(divergent)) => {
-                    matches!(declared, Some(Type::TypeVar(_)))
-                        && !divergent.flags.contains(DivergentFlags::FROM_TYPE_ALIAS)
-                }
-                _ => false,
-            };
-            if use_initializer {
-                declaration.member.place = Place::Undefined;
-            }
-            return Some(declaration);
+            return Some(ClassBodyDeclaration {
+                member: declaration
+                    .member
+                    .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                ..declaration
+            });
         }
         None
     }
