@@ -6073,6 +6073,30 @@ fn enumerate_argument_types<'a, 'db>(
     })
 }
 
+/// The return annotation and expected type that constrain argument inference.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct ReturnTypeContext<'db> {
+    return_ty: Type<'db>,
+    expected: Type<'db>,
+    kind: TypeContextKind,
+}
+
+impl<'db> ReturnTypeContext<'db> {
+    fn bounds(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        generic_context: GenericContext<'db>,
+    ) -> &'db CandidateSolutions<'db> {
+        self.return_ty.assignable_solutions_for_argument_context(
+            db,
+            env,
+            self.expected,
+            generic_context.inferable_typevars(db),
+        )
+    }
+}
+
 /// The inputs to parameter specialization for one pass of argument inference.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype)]
 enum ParameterContextKey<'db> {
@@ -6090,7 +6114,7 @@ struct ExplicitParameterContext<'db> {
     #[returns(copy)]
     inference: Option<TypeVarInference<'db>>,
     #[returns(copy)]
-    return_context: Option<(Type<'db>, Type<'db>, TypeContextKind)>,
+    return_context: Option<ReturnTypeContext<'db>>,
 }
 
 impl<'db> ParameterContextKey<'db> {
@@ -6099,7 +6123,7 @@ impl<'db> ParameterContextKey<'db> {
         env: &ProgramEnvironment<'db>,
         generic_context: GenericContext<'db>,
         inference: Option<TypeVarInference<'db>>,
-        return_context: Option<(Type<'db>, Type<'db>, TypeContextKind)>,
+        return_context: Option<ReturnTypeContext<'db>>,
     ) -> Self {
         let program = env.program(db);
         if return_context.is_none() {
@@ -6213,32 +6237,25 @@ fn parameter_context_specialization<'db>(
     generic_context: GenericContext<'db>,
     inference: Option<TypeVarInference<'db>>,
     constraints: &ConstraintSetBuilder<'db>,
-    return_context: Option<(Type<'db>, Type<'db>, TypeContextKind)>,
+    return_context: Option<ReturnTypeContext<'db>>,
 ) -> ArgumentContextSpecialization<'db> {
     let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
         FxHashMap::default();
-    let return_bounds = return_context.map(|(return_ty, expected, _)| {
-        return_ty.assignable_solutions_for_argument_context(
-            db,
-            env,
-            expected,
-            generic_context.inferable_typevars(db),
-        )
-    });
-    if let Some(path_bounds) = return_bounds {
-        let solutions = path_bounds.solve_for_argument_context(db, env, constraints);
-        if let Solutions::Constrained(solutions) = solutions {
-            for solution in solutions.into_vec() {
-                for binding in solution.solved_typevars {
-                    let identity = binding.bound_typevar.identity(db);
-                    return_type_solutions
-                        .entry(identity)
-                        .and_modify(|existing| {
-                            *existing =
-                                UnionType::from_two_elements(db, env, *existing, binding.solution);
-                        })
-                        .or_insert(binding.solution);
-                }
+    let return_bounds = return_context.map(|context| context.bounds(db, env, generic_context));
+    if let Some(bounds) = return_bounds
+        && let Solutions::Constrained(solutions) =
+            bounds.solve_for_argument_context(db, env, constraints)
+    {
+        for solution in solutions.into_vec() {
+            for binding in solution.solved_typevars {
+                let identity = binding.bound_typevar.identity(db);
+                return_type_solutions
+                    .entry(identity)
+                    .and_modify(|existing| {
+                        *existing =
+                            UnionType::from_two_elements(db, env, *existing, binding.solution);
+                    })
+                    .or_insert(binding.solution);
             }
         }
     }
@@ -6274,7 +6291,7 @@ fn parameter_context_specialization<'db>(
         .map(|typevar| {
             let identity = typevar.identity(db);
             if return_type_solutions.contains_key(&identity) {
-                return_context.map(|(_, _, kind)| kind)
+                return_context.map(|context| context.kind)
             } else {
                 inference
                     .is_some_and(|inference| inference.has_inferred_type(db, identity))
@@ -9384,23 +9401,21 @@ impl<'db> Binding<'db> {
             ))
         }
 
-        // An expected type that contributes no bounds can share the context of calls
-        // without an expected type. Otherwise, include both sides of the comparison and
-        // the preference given to the expected type in the query key.
-        let return_context = call_expression_tcx.expected_type().and_then(|expected| {
-            let return_ty = self.unspecialized_return_type(db);
-            let bounds = return_ty.assignable_solutions_for_argument_context(
-                db,
-                env,
+        // Calls whose expected type contributes no bounds can share a cache entry
+        // with calls that have no expected type.
+        let return_context = call_expression_tcx
+            .expected_type()
+            .map(|expected| ReturnTypeContext {
+                return_ty: self.unspecialized_return_type(db),
                 expected,
-                generic_context.inferable_typevars(db),
-            );
-            matches!(bounds, CandidateSolutions::Constrained(_)).then_some((
-                return_ty,
-                expected,
-                call_expression_tcx.kind(),
-            ))
-        });
+                kind: call_expression_tcx.kind(),
+            })
+            .filter(|context| {
+                matches!(
+                    context.bounds(db, env, generic_context),
+                    CandidateSolutions::Constrained(_)
+                )
+            });
         if let Some(specialization) = inferred_parameter_context(
             db,
             ParameterContextKey::new(db, env, generic_context, inference, return_context),
