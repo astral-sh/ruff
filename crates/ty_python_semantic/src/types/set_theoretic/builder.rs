@@ -478,7 +478,7 @@ impl<'db> UnionElement<'db> {
 
     /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
     fn try_reduce(
-        &mut self,
+        &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         other_type: Type<'db>,
@@ -545,28 +545,30 @@ impl<'db> UnionElement<'db> {
         }
     }
 
-    /// Reduce a group whose literals all have the same kind.
+    /// Decide which literals to keep if we add `other_type`, without modifying the group.
     fn reduce_literals<L: Copy + Into<LiteralValueTypeKind<'db>>>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         other_type: Type<'db>,
         kind: LiteralKind<'db>,
-        literals: &mut FxOrderMap<L, bool>,
+        literals: &FxOrderMap<L, bool>,
     ) -> ReduceResult<'db> {
+        let mut types = literals
+            .iter()
+            .map(|(&literal, &promotable)| Type::from(LiteralValueType::new(literal, promotable)));
         if !other_type.splits_literals(db, kind) {
-            let (&literal, &promotable) = literals.first().unwrap();
-            let ty = Type::from(LiteralValueType::new(literal, promotable));
+            let ty = types.next().expect("literal groups are nonempty");
             return ReduceResult::KeepIf(!ty.is_redundant_with(db, env, other_type));
         }
 
+        let mut keep = SmallVec::new();
         let mut other_type_negated_cache = None;
         let mut collapse = false;
-        let mut ignore = false;
-        literals.retain(|literal, promotable| {
-            let ty = Type::from(LiteralValueType::new(*literal, *promotable));
-            if ignore || other_type.is_redundant_with(db, env, ty) {
-                ignore = true;
-                return true;
+        for ty in types {
+            // Even if an earlier literal would collapse the union, a later one can
+            // make the incoming type redundant and leave the whole group unchanged.
+            if other_type.is_redundant_with(db, env, ty) {
+                return ReduceResult::Ignore;
             }
             if collapse
                 || other_type.negation_is_subtype_of_cached(
@@ -577,17 +579,32 @@ impl<'db> UnionElement<'db> {
                 )
             {
                 collapse = true;
-                return true;
+                continue;
             }
-            !ty.is_redundant_with(db, env, other_type)
-        });
-
-        if ignore {
-            ReduceResult::Ignore
-        } else if collapse {
+            keep.push(!ty.is_redundant_with(db, env, other_type));
+        }
+        if collapse {
             ReduceResult::CollapseToObject
+        } else if !keep.contains(&false) {
+            ReduceResult::KeepIf(true)
+        } else if !keep.contains(&true) {
+            ReduceResult::KeepIf(false)
         } else {
-            ReduceResult::KeepIf(!literals.is_empty())
+            ReduceResult::RetainLiterals(keep)
+        }
+    }
+
+    /// Apply the decisions from `reduce_literals` in the group's original iteration order.
+    fn retain_literals(&mut self, keep: &[bool]) {
+        debug_assert_eq!(self.type_count(), keep.len());
+        let mut keep = keep.iter();
+        let mut retain_next = || *keep.next().expect("one decision per literal");
+        match self {
+            UnionElement::IntLiterals(literals) => literals.retain(|_, _| retain_next()),
+            UnionElement::StringLiterals(literals) => literals.retain(|_, _| retain_next()),
+            UnionElement::BytesLiterals(literals) => literals.retain(|_, _| retain_next()),
+            UnionElement::EnumLiterals { literals, .. } => literals.retain(|_, _| retain_next()),
+            UnionElement::Type(_) => unreachable!("only literal groups can be partially reduced"),
         }
     }
 }
@@ -596,6 +613,8 @@ enum ReduceResult<'db> {
     /// Reduction of this `UnionElement` is complete; keep it in the union if the nested
     /// boolean is true, eliminate it from the union if false.
     KeepIf(bool),
+    /// Retain a nonempty subset of the literal group if the new element is added.
+    RetainLiterals(SmallVec<[bool; 8]>),
     /// Collapse this entire union to `object`.
     CollapseToObject,
     /// The new element is a subtype of an existing part of the `UnionElement`, ignore it.
@@ -605,16 +624,24 @@ enum ReduceResult<'db> {
     Type(Type<'db>),
 }
 
-/// Whole union members replaced by an insertion or merge.
+/// Removals to apply if the incoming type is added to the union or merged with an
+/// existing member. If a later comparison makes the incoming type redundant, we
+/// discard these decisions and leave the union intact.
 #[derive(Default)]
 struct UnionReductions {
     to_remove: SmallVec<[usize; 2]>,
+    literal_filters: Vec<(usize, SmallVec<[bool; 8]>)>,
 }
 
 impl UnionReductions {
     /// Apply all removals before restarting a merge, or insert `replacement` in
     /// the first vacated slot when no further comparisons are needed.
     fn apply<'db>(self, elements: &mut Vec<UnionElement<'db>>, replacement: Option<Type<'db>>) {
+        // Filter groups before any swap can move them. A merge may restore a literal
+        // that would otherwise complete an enum or push a group over its widening limit.
+        for (index, keep) in self.literal_filters {
+            elements[index].retain_literals(&keep);
+        }
         let mut to_remove = self.to_remove.into_iter();
         if let Some(ty) = replacement {
             if let Some(first) = to_remove.next() {
@@ -1236,7 +1263,7 @@ impl<'db> UnionBuilder<'db> {
         let mut ty_negated: Option<Type> = None;
         let mut reductions = UnionReductions::default();
 
-        for (i, element) in self.elements.iter_mut().enumerate() {
+        for (i, element) in self.elements.iter().enumerate() {
             let element_type = match element.try_reduce(
                 db,
                 &self.env,
@@ -1248,6 +1275,10 @@ impl<'db> UnionBuilder<'db> {
                     if !keep {
                         reductions.to_remove.push(i);
                     }
+                    continue;
+                }
+                ReduceResult::RetainLiterals(keep) => {
+                    reductions.literal_filters.push((i, keep));
                     continue;
                 }
                 ReduceResult::Type(ty) => ty,
@@ -2822,11 +2853,13 @@ mod tests {
     use crate::types::tuple::TupleType;
     use crate::types::type_alias::TypeAliasType;
     use crate::types::{
-        BytesLiteralType, KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
-        Signature, StringLiteralType, Truthiness, TypePair,
+        BoundTypeVarInstance, BytesLiteralType, KnownClass, KnownInstanceType, LiteralValueType,
+        LiteralValueTypeKind, Signature, StringLiteralType, Truthiness, TypePair,
+        TypeVarBoundOrConstraints, TypeVarVariance,
     };
 
     use ruff_db::system::DbWithWritableSystem as _;
+    use ruff_python_ast::name::Name;
     use ty_module_resolver::KnownModule;
     use ty_python_core::ProgramFile;
 
@@ -2862,6 +2895,66 @@ mod tests {
         let union = UnionType::from_elements(db, &env, [t0, t1]).expect_union();
 
         assert_eq!(union.elements(db), &[t0, t1]);
+    }
+
+    #[test]
+    fn discarding_a_member_preserves_partially_covered_literal_groups() {
+        let db = setup_db();
+        let env = db.program_environment();
+        // Recovery skips redundancy checks, so the group still contains the truthy literal.
+        let builder = UnionBuilder::new(&db, &env)
+            .cycle_recovery(true)
+            .add(Type::int_literal(0))
+            .add(Type::int_literal(1))
+            .add(Type::AlwaysTruthy)
+            .cycle_recovery(false);
+
+        assert_eq!(
+            builder.clone().add(Type::AlwaysTruthy).build(),
+            builder.build()
+        );
+    }
+
+    #[test]
+    fn restoring_an_excluded_literal_does_not_widen_a_full_group() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let limit =
+            i64::try_from(MAX_NON_RECURSIVE_UNION_LITERALS).expect("literal limit fits in i64");
+        let [t, u] = ["T", "U"].map(|name| {
+            let var = BoundTypeVarInstance::synthetic(
+                db,
+                &env,
+                Name::new_static(name),
+                TypeVarVariance::Invariant,
+            );
+            Type::TypeVar(var.map_bound_or_constraints(db, |_| {
+                Some(TypeVarBoundOrConstraints::UpperBound(Type::AlwaysTruthy))
+            }))
+        });
+        let last = IntersectionBuilder::new(db, &env)
+            .add_positive(Type::int_literal(limit))
+            .add_negative(t)
+            .build();
+        let t_without_u = IntersectionBuilder::new(db, &env)
+            .add_positive(t)
+            .add_negative(u)
+            .build();
+
+        // AlwaysTruthy can restore the last literal directly or by first restoring T.
+        // In either case, adding the literal to the still-full group would widen it to int.
+        for intermediate in [None, Some(t_without_u)] {
+            let elements = (0..limit)
+                .map(Type::int_literal)
+                .chain(intermediate)
+                .chain([last, Type::AlwaysTruthy]);
+            let union = UnionType::from_elements(db, &env, elements);
+            assert_eq!(
+                union.expect_union().elements(db),
+                &[Type::int_literal(0), Type::AlwaysTruthy]
+            );
+        }
     }
 
     #[test]
