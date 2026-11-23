@@ -3581,7 +3581,8 @@ struct BuilderNode {
 /// factored to avoid distributing intersections over unions.
 #[derive(Default)]
 struct CandidateTypeVarSolver<'db> {
-    lower: FxIndexSet<(ConstraintProvenance, Type<'db>)>,
+    // Deduplicate types after filtering by provenance in `finish`.
+    lower: SmallVec<[(ConstraintProvenance, Type<'db>); 1]>,
     upper: UpperBound<'db>,
     has_declared_evidence: bool,
     has_declared_lower_evidence: bool,
@@ -3639,7 +3640,7 @@ impl<'db> CandidateTypeVarSolver<'db> {
         self.has_declared_evidence |= provenance.contains(ConstraintProvenance::DECLARED);
         self.has_declared_lower_evidence |= provenance.contains(ConstraintProvenance::DECLARED);
         if provenance.is_evidence() || !ty.is_never() {
-            self.lower.insert((provenance, ty));
+            self.lower.push((provenance, ty));
         }
     }
 
@@ -3704,7 +3705,11 @@ impl<'db> CandidateTypeVarSolver<'db> {
             });
 
         let union_lower_bounds = |source, include_validity| {
-            let bounds: FxIndexSet<_> = iter_lower_bounds(source, include_validity).collect();
+            let mut bounds = iter_lower_bounds(source, include_validity);
+            if lower.len() <= 1 {
+                return bounds.next();
+            }
+            let bounds: FxIndexSet<_> = bounds.collect();
             (!bounds.is_empty()).then(|| UnionType::from_elements(db, env, bounds))
         };
 
