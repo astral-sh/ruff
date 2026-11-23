@@ -12,7 +12,7 @@ pub(in crate::types) fn is_attrs_class<'db>(
         .is_some_and(|params| params.flags(db).contains(DataclassFlags::ATTRS))
 }
 
-pub(in crate::types) fn is_attrs_decorator<'db>(
+pub(in crate::types) fn is_known_decorator<'db>(
     db: &'db dyn Db,
     decorator: FunctionType<'db>,
 ) -> bool {

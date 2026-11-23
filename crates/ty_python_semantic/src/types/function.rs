@@ -1529,7 +1529,7 @@ impl<'db> FunctionType<'db> {
             .rev()
             .find_map(|overload| overload.dataclass_transformer_params(db))?;
         let mut flags = DataclassFlags::from(params.flags(db));
-        flags.set(DataclassFlags::ATTRS, attrs::is_attrs_decorator(db, self));
+        flags.set(DataclassFlags::ATTRS, attrs::is_known_decorator(db, self));
         Some(DataclassParams::new(db, flags, params.field_specifiers(db)))
     }
 
