@@ -65,7 +65,7 @@ use crate::types::generics::{
 };
 use crate::types::infer::{TypeContextKind, original_class_type};
 use crate::types::known_instance::{
-    FieldInstance, InternedConstraintSetSolution, MethodWrapper, MethodWrapperKind,
+    FieldInstance, InternedConstraintSetSolution, MethodWrapper, MethodWrapperKind, Validator,
 };
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
@@ -2256,6 +2256,13 @@ impl<'db> Bindings<'db> {
                             found_any.then(|| (input_types.build(), output_types.build()))
                         });
 
+                        let validator = match function_type.known(db) {
+                            Some(KnownFunction::AttrAttrib | KnownFunction::AttrsField) => {
+                                Validator::Attrs
+                            }
+                            _ => Validator::None,
+                        };
+
                         // `typeshed` pretends that `dataclasses.field()` returns the type of the
                         // default value directly. At runtime, however, this function returns an
                         // instance of `dataclasses.Field`. We also model it this way and return
@@ -2265,7 +2272,8 @@ impl<'db> Bindings<'db> {
                         // to `T`. Otherwise, we would error on `name: str = field(default="")`.
                         overload.set_return_type(Type::KnownInstance(KnownInstanceType::Field(
                             FieldInstance::new(
-                                db, default_ty, init, kw_only, alias, converter, strict, frozen,
+                                db, validator, default_ty, init, kw_only, alias, converter, strict,
+                                frozen,
                             ),
                         )));
                     }

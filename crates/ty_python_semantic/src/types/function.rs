@@ -2379,6 +2379,12 @@ pub enum KnownFunction {
     /// `attr.attrs`, also exported as `attr.s`, `attr.attributes`, and `attr.dataclass`.
     #[strum(serialize = "attrs")]
     AttrAttrs,
+    /// `attr.attrib`, also exported as `attr.ib` and `attr.attr`.
+    #[strum(serialize = "attrib")]
+    AttrAttrib,
+    /// `attrs.field` shares its name with `dataclasses.field`.
+    #[strum(serialize = "attrs.field")]
+    AttrsField,
     /// `attrs.define`, also exported as `attrs.mutable`.
     #[strum(serialize = "define")]
     AttrsDefine,
@@ -2469,11 +2475,12 @@ impl KnownFunction {
         }
 
         let candidate = Self::from_str(name).ok()?;
-        candidate
-            .check_module(
-                file_to_module(db, definition.program_file(db).resolver_file(db))?.known(db)?,
-            )
-            .then_some(candidate)
+        let module =
+            file_to_module(db, definition.program_file(db).resolver_file(db))?.known(db)?;
+        if candidate == Self::Field && Self::AttrsField.check_module(module) {
+            return Some(Self::AttrsField);
+        }
+        candidate.check_module(module).then_some(candidate)
     }
 
     /// Return `true` if `self` is defined in `module`
@@ -2506,9 +2513,9 @@ impl KnownFunction {
             Self::Dataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
             }
-            Self::AttrAttrs => matches!(module, KnownModule::Attr),
-            // Older attrs stubs define the modern decorators in `attr`.
-            Self::AttrsDefine | Self::AttrsFrozen => {
+            Self::AttrAttrs | Self::AttrAttrib => matches!(module, KnownModule::Attr),
+            // Older attrs stubs define the modern API in `attr`.
+            Self::AttrsDefine | Self::AttrsFrozen | Self::AttrsField => {
                 matches!(module, KnownModule::Attr | KnownModule::Attrs)
             }
             Self::PydanticField => matches!(module, KnownModule::PydanticFields),
@@ -2551,7 +2558,10 @@ impl KnownFunction {
     }
 
     pub(crate) fn name(self) -> &'static str {
-        self.into()
+        match self {
+            Self::AttrsField => "field",
+            _ => self.into(),
+        }
     }
 }
 
@@ -2601,8 +2611,10 @@ pub(crate) mod tests {
 
                 KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
 
-                KnownFunction::AttrAttrs => KnownModule::Attr,
-                KnownFunction::AttrsDefine | KnownFunction::AttrsFrozen => KnownModule::Attrs,
+                KnownFunction::AttrAttrs | KnownFunction::AttrAttrib => KnownModule::Attr,
+                KnownFunction::AttrsDefine
+                | KnownFunction::AttrsFrozen
+                | KnownFunction::AttrsField => KnownModule::Attrs,
                 KnownFunction::PydanticField => KnownModule::PydanticFields,
                 KnownFunction::PydanticFieldValidator => KnownModule::PydanticFunctionalValidators,
                 KnownFunction::PytestFixture | KnownFunction::PytestYieldFixture => {

@@ -1,7 +1,11 @@
+use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
 
-use crate::Db;
-use crate::types::{DataclassFlags, FunctionType, KnownFunction, StaticClassLiteral};
+use crate::types::{
+    BoundTypeVarInstance, DataclassFlags, FunctionType, GenericContext, KnownFunction, Parameter,
+    Parameters, Signature, StaticClassLiteral, Type, TypeVarVariance,
+};
+use crate::{Db, ProgramEnvironment};
 
 /// Returns whether `class` is directly decorated with an `attrs` class decorator.
 pub(in crate::types) fn is_attrs_class<'db>(
@@ -46,4 +50,33 @@ pub(in crate::types) fn effective_field_alias(
     } else {
         Some(name.trim_start_matches('_').into())
     }
+}
+
+/// Returns the generic callable type `[F](F, /) -> F` for an attrs field's `validator`
+/// decorator. This preserves the type of the decorated method.
+///
+/// ```python
+/// import attrs
+///
+/// @attrs.define
+/// class User:
+///     age: int = attrs.field()
+///
+///     @age.validator
+///     def non_negative(self, attr: object, value: int) -> None: ...
+/// ```
+pub(in crate::types) fn validator<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+) -> Type<'db> {
+    let f =
+        BoundTypeVarInstance::synthetic(db, env, Name::new_static("F"), TypeVarVariance::Invariant);
+    let signature = Signature::new_generic(
+        Some(GenericContext::from_typevar_instances(db, env, [f])),
+        Parameters::standard([
+            Parameter::positional_only(None).with_annotated_type(Type::TypeVar(f))
+        ]),
+        Type::TypeVar(f),
+    );
+    Type::function_like_callable(db, signature)
 }

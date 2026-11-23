@@ -720,10 +720,20 @@ pub struct DeprecatedInstance<'db> {
     pub(crate) message: Option<StringLiteralType<'db>>,
 }
 
+/// The validator decorator supported by a field, whether or not one has been registered.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum Validator {
+    None,
+    Attrs,
+}
+
 /// Contains information about instances of `dataclasses.Field`, typically created using
 /// `dataclasses.field()`.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FieldInstance<'db> {
+    #[returns(copy)]
+    pub(crate) validator: Validator,
+
     /// The type of the default value for this field. This is derived from the `default` or
     /// `default_factory` arguments to `dataclasses.field()`.
     #[returns(copy)]
@@ -779,6 +789,7 @@ impl<'db> FieldInstance<'db> {
         });
         Self::new(
             db,
+            self.validator(db),
             default_type,
             self.init(db),
             self.kw_only(db),
@@ -824,6 +835,7 @@ impl<'db> FieldInstance<'db> {
         };
         Some(FieldInstance::new(
             db,
+            self.validator(db),
             default_type,
             self.init(db),
             self.kw_only(db),

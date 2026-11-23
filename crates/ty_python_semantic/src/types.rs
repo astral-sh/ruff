@@ -96,7 +96,9 @@ use crate::types::function::{
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{ApplySpecialization, Specialization, bind_typevar};
 use crate::types::infer::InferenceFlags;
-use crate::types::known_instance::{InternedConstraintSet, InternedType, SentinelInstance};
+use crate::types::known_instance::{
+    InternedConstraintSet, InternedType, SentinelInstance, Validator,
+};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
@@ -6846,6 +6848,12 @@ impl<'db> Type<'db> {
                     };
 
                     ty.map_or_default(Place::bound).into()
+                }
+
+                Type::KnownInstance(KnownInstanceType::Field(field))
+                    if name_str == "validator" && field.validator(db) == Validator::Attrs =>
+                {
+                    Place::bound(dedicated::attrs::validator(db, env)).into()
                 }
 
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial))

@@ -144,6 +144,43 @@ reveal_type(p.data)  # revealed: bytes
 p.data = "not a dict"  # error: [invalid-assignment]
 ```
 
+## Field validators
+
+Registering validators leaves the stored field type unchanged. Each validator keeps its method
+signature.
+
+```py
+import attr
+from attrs import define, field
+
+@attr.s
+class User1:
+    age: int = attr.ib()
+
+    @age.validator
+    def non_negative(self, attr: object, value: int) -> None:
+        if value < 0:
+            raise ValueError
+
+@define
+class User2:
+    age: int = field()
+
+    @age.validator
+    def non_negative(self, attr: object, value: int) -> None:
+        if value < 0:
+            raise ValueError
+
+user1 = User1(age=42)
+user2 = User2(age=42)
+
+reveal_type(user1.age)  # revealed: int
+reveal_type(user2.age)  # revealed: int
+
+reveal_type(user1.non_negative)  # revealed: bound method User1.non_negative(attr: object, value: int) -> None
+reveal_type(user2.non_negative)  # revealed: bound method User2.non_negative(attr: object, value: int) -> None
+```
+
 ## Dedicated support for the `default` decorator?
 
 We currently do not support this:
