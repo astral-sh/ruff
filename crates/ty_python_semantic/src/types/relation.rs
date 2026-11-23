@@ -2145,6 +2145,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self.always();
         }
 
+        // Recursive schemas can revisit the same pairs many times. Go straight to the
+        // recursion guard so a cache hit skips the general type dispatch below.
+        if let (Type::TypedDict(source_td), Type::TypedDict(target_td)) = (source, target) {
+            return self.with_recursion_guard(db, source, target, || {
+                self.check_typeddict_pair(db, source_td, target_td)
+            });
+        }
+
         let env = self.env;
 
         // With lazy evaluation, comparisons with a type variable are translated directly into a
@@ -2982,12 +2990,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // A protocol instance can never be a subtype of a nominal type, with the *sole* exception of `object`.
             (Type::ProtocolInstance(_), _) => self.never(),
-
-            (Type::TypedDict(source_td), Type::TypedDict(target_td)) => {
-                self.with_recursion_guard(db, source, target, || {
-                    self.check_typeddict_pair(db, source_td, target_td)
-                })
-            }
 
             (Type::TypedDict(typed_dict), _) => {
                 self.with_recursion_guard(db, source, target, || {
