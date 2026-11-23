@@ -3269,7 +3269,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         }
 
                         if origin.is_declared() {
-                            if combined_type(&types).is_never() {
+                            if combined_type(&types) == Type::Never {
                                 return InstanceMemberResult::Done(class_member.inner);
                             }
 
@@ -3299,8 +3299,9 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             }
         }
 
+        // The builder drops Never but retains a bottom-materialized divergent type.
         let ty = combined_type(&types);
-        let result = if ty.is_never() {
+        let result = if ty == Type::Never {
             Place::Undefined.with_qualifiers(TypeQualifiers::empty())
         } else {
             let boundness = if definitely_bound_member.is_some() {
