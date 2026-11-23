@@ -1,6 +1,7 @@
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
 
+use crate::types::known_instance::FieldInstanceKind;
 use crate::types::{
     BoundTypeVarInstance, DataclassFlags, FunctionType, GenericContext, KnownFunction, Parameter,
     Parameters, Signature, StaticClassLiteral, Type, TypeVarVariance,
@@ -52,20 +53,23 @@ pub(in crate::types) fn effective_field_alias(
     }
 }
 
-/// Returns the generic callable type `[F](F, /) -> F` for an attrs field's `validator`
-/// decorator. This preserves the type of the decorated method.
+/// Recognizes attrs field specifiers like `attr.ib` and `attrs.field`.
+pub(in crate::types) fn field_instance_kind<'db>(
+    db: &'db dyn Db,
+    specifier: FunctionType<'db>,
+) -> FieldInstanceKind {
+    match specifier.known(db) {
+        Some(KnownFunction::AttrAttrib | KnownFunction::AttrsField) => FieldInstanceKind::Attrs,
+        _ => FieldInstanceKind::Other,
+    }
+}
+
+/// Returns the type of a generic identity function `[F](F, /) -> F`.
 ///
-/// ```python
-/// import attrs
-///
-/// @attrs.define
-/// class User:
-///     age: int = attrs.field()
-///
-///     @age.validator
-///     def non_negative(self, attr: object, value: int) -> None: ...
-/// ```
-pub(in crate::types) fn validator<'db>(
+/// We use this for the `<field>.validator` and `<field>.default` decorators, which simply return
+/// the original method unchanged.
+/// See [`_CountingAttr`](https://github.com/python-attrs/attrs/blob/7bfc49e9b22d5ba25b6e429524c3d49fee27cb36/src/attr/_make.py#L2811-L2841).
+pub(in crate::types) fn generic_identity_function<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
 ) -> Type<'db> {

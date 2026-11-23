@@ -146,7 +146,8 @@ p.data = "not a dict"  # error: [invalid-assignment]
 
 ## Field validators
 
-attrs supports validator functions, which can either be specified using `field(validator=...)` or by decorating a method with `@<field>.validator`:
+attrs supports validator functions, which can either be specified using `field(validator=...)` or by
+decorating a method with `@<field>.validator`:
 
 ```py
 import attr
@@ -179,32 +180,48 @@ reveal_type(user1.age)  # revealed: int
 reveal_type(user2.age)  # revealed: int
 ```
 
-The decorator `@<field>.validator` only registers the method as a validator. It does not modify the signature of the function:
+The decorator `@<field>.validator` only registers the method as a validator. It does not modify the
+signature of the function:
 
 ```py
 reveal_type(user1.non_negative)  # revealed: bound method User1.non_negative(attr: object, value: int) -> None
 reveal_type(user2.non_negative)  # revealed: bound method User2.non_negative(attr: object, value: int) -> None
 ```
 
-## Dedicated support for the `default` decorator?
+## Field defaults
 
-We currently do not support this:
+A default value can be specified using a value on the right-hand side, or using the
+`@<field>.default` decorator.
 
 ```py
 from attrs import define, field
 
 @define
 class Person:
-    id: int = field()
-    name: str = field()
+    name: str = "Unnamed"
 
-    # error: [not-callable] "Object of type `_MISSING_TYPE` is not callable"
+    # TODO: Account for `@id.default` when checking field order.
+    # error: [invalid-dataclass-field-order]
+    id: int = field()
+
     @id.default
     def _default_id(self) -> int:
-        raise NotImplementedError
+        return 0
 
+# TODO: Make `id` optional in the generated constructor.
 # error: [missing-argument] "No argument provided for required parameter `id`"
-person = Person(name="Alice")
+person = Person()
+```
+
+The types of the fields are not affected by this:
+
+```py
 reveal_type(person.id)  # revealed: int
 reveal_type(person.name)  # revealed: str
+```
+
+The `@<field>.default` decorator also doesn't modify the signature of the method it decorates:
+
+```py
+reveal_type(person._default_id)  # revealed: bound method Person._default_id() -> int
 ```

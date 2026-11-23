@@ -2382,8 +2382,7 @@ pub enum KnownFunction {
     /// `attr.attrib`, also exported as `attr.ib` and `attr.attr`.
     #[strum(serialize = "attrib")]
     AttrAttrib,
-    /// `attrs.field` shares its name with `dataclasses.field`.
-    #[strum(serialize = "attrs.field")]
+    /// `attrs.field`
     AttrsField,
     /// `attrs.define`, also exported as `attrs.mutable`.
     #[strum(serialize = "define")]
@@ -2474,13 +2473,18 @@ impl KnownFunction {
             return Some(Self::DataclassTransform);
         }
 
-        let candidate = Self::from_str(name).ok()?;
-        let module =
-            file_to_module(db, definition.program_file(db).resolver_file(db))?.known(db)?;
-        if candidate == Self::Field && Self::AttrsField.check_module(module) {
-            return Some(Self::AttrsField);
-        }
-        candidate.check_module(module).then_some(candidate)
+        let candidates: &[Self] = match name {
+            "field" => &[Self::Field, Self::AttrsField],
+            _ => &[Self::from_str(name).ok()?],
+        };
+
+        let file = definition.program_file(db).resolver_file(db);
+        let module = file_to_module(db, file)?.known(db)?;
+
+        candidates
+            .iter()
+            .copied()
+            .find(|candidate| candidate.check_module(module))
     }
 
     /// Return `true` if `self` is defined in `module`
@@ -2559,7 +2563,7 @@ impl KnownFunction {
 
     pub(crate) fn name(self) -> &'static str {
         match self {
-            Self::AttrsField => "field",
+            Self::Field | Self::AttrsField => "field",
             _ => self.into(),
         }
     }
