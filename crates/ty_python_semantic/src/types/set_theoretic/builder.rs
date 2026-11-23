@@ -49,9 +49,10 @@ use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
-    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
-    StringLiteralType, SubclassOfType, Type, TypePair, TypeVarBoundOrConstraints, UnionType,
+    BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownBoundMethodType,
+    KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
+    NegativeIntersectionElements, StringLiteralType, SubclassOfType, Type, TypePair,
+    TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, ProgramEnvironment};
 use itertools::Itertools;
@@ -1211,6 +1212,11 @@ impl<'db> UnionBuilder<'db> {
             {
                 true
             }
+            // Each `str.startswith` here is bound to a distinct string literal.
+            (
+                Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)),
+                Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)),
+            ) => true,
             (Type::BoundMethod(left), Type::BoundMethod(right))
                 if left.has_distinct_function(db, right) =>
             {
