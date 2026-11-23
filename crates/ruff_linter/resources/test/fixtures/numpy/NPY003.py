@@ -16,3 +16,12 @@ def func():
     cumproduct(np.random.rand(5, 5))
     sometrue(np.random.rand(5, 5))
     alltrue(np.random.rand(5, 5))
+
+
+# https://github.com/astral-sh/ruff/issues/30770
+# Top-level import produces safe fixes.
+import numpy as top_level_np
+
+top_level_np.round_(top_level_np.random.rand(5, 5), 2)
+top_level_np.product(top_level_np.random.rand(5, 5))
+

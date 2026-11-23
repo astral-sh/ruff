@@ -108,6 +108,7 @@ help: Replace with `ast.literal_eval`
 17 +     literal_eval
 18 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 NPY201 `np.sctype2char` will be removed without replacement in NumPy 2.0
   --> NPY201_2.py:18:5
@@ -209,6 +210,7 @@ help: Replace with `inspect.getsource`
 33 +     getsource
 34 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 NPY201 [*] `np.tracemalloc_domain` will be removed in NumPy 2.0. Use `numpy.lib.tracemalloc_domain` instead.
   --> NPY201_2.py:34:5
@@ -230,6 +232,7 @@ help: Replace with `numpy.lib.tracemalloc_domain`
 35 +     tracemalloc_domain
 36 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 NPY201 [*] `np.unicode_` will be removed in NumPy 2.0. Use `numpy.str_` instead.
   --> NPY201_2.py:36:5
@@ -400,6 +403,7 @@ help: Replace with `numpy.exceptions.AxisError`
 55 +     AxisError
 56 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 NPY201 [*] `np.ComplexWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.ComplexWarning` instead.
   --> NPY201_2.py:56:5
@@ -421,6 +425,7 @@ help: Replace with `numpy.exceptions.ComplexWarning`
 57 +     ComplexWarning
 58 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 NPY201 [*] `np.compare_chararrays` will be removed in NumPy 2.0. Use `numpy.char.compare_chararrays` instead.
   --> NPY201_2.py:58:5

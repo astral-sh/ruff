@@ -86,7 +86,7 @@ help: Replace with `np.all`
 9 |
   |
 
-NPY003 [*] `np.round_` is deprecated; use `np.round` instead
+NPY003 `np.round_` is deprecated; use `np.round` instead
   --> NPY003.py:14:5
    |
 12 |     from numpy import round_, product, cumproduct, sometrue, alltrue
@@ -97,17 +97,8 @@ NPY003 [*] `np.round_` is deprecated; use `np.round` instead
 16 |     cumproduct(np.random.rand(5, 5))
    |
 help: Replace with `np.round`
-   |
-1  + from numpy import round
-2  | def func():
---------------------------------------------------------------------------------
-14 |
-   -     round_(np.random.rand(5, 5), 2)
-15 +     round(np.random.rand(5, 5), 2)
-16 |     product(np.random.rand(5, 5))
-   |
 
-NPY003 [*] `np.product` is deprecated; use `np.prod` instead
+NPY003 `np.product` is deprecated; use `np.prod` instead
   --> NPY003.py:15:5
    |
 14 |     round_(np.random.rand(5, 5), 2)
@@ -117,17 +108,8 @@ NPY003 [*] `np.product` is deprecated; use `np.prod` instead
 17 |     sometrue(np.random.rand(5, 5))
    |
 help: Replace with `np.prod`
-   |
-1  + from numpy import prod
-2  | def func():
---------------------------------------------------------------------------------
-15 |     round_(np.random.rand(5, 5), 2)
-   -     product(np.random.rand(5, 5))
-16 +     prod(np.random.rand(5, 5))
-17 |     cumproduct(np.random.rand(5, 5))
-   |
 
-NPY003 [*] `np.cumproduct` is deprecated; use `np.cumprod` instead
+NPY003 `np.cumproduct` is deprecated; use `np.cumprod` instead
   --> NPY003.py:16:5
    |
 14 |     round_(np.random.rand(5, 5), 2)
@@ -138,17 +120,8 @@ NPY003 [*] `np.cumproduct` is deprecated; use `np.cumprod` instead
 18 |     alltrue(np.random.rand(5, 5))
    |
 help: Replace with `np.cumprod`
-   |
-1  + from numpy import cumprod
-2  | def func():
---------------------------------------------------------------------------------
-16 |     product(np.random.rand(5, 5))
-   -     cumproduct(np.random.rand(5, 5))
-17 +     cumprod(np.random.rand(5, 5))
-18 |     sometrue(np.random.rand(5, 5))
-   |
 
-NPY003 [*] `np.sometrue` is deprecated; use `np.any` instead
+NPY003 `np.sometrue` is deprecated; use `np.any` instead
   --> NPY003.py:17:5
    |
 15 |     product(np.random.rand(5, 5))
@@ -158,17 +131,8 @@ NPY003 [*] `np.sometrue` is deprecated; use `np.any` instead
 18 |     alltrue(np.random.rand(5, 5))
    |
 help: Replace with `np.any`
-   |
-1  + from numpy import any
-2  | def func():
---------------------------------------------------------------------------------
-17 |     cumproduct(np.random.rand(5, 5))
-   -     sometrue(np.random.rand(5, 5))
-18 +     any(np.random.rand(5, 5))
-19 |     alltrue(np.random.rand(5, 5))
-   |
 
-NPY003 [*] `np.alltrue` is deprecated; use `np.all` instead
+NPY003 `np.alltrue` is deprecated; use `np.all` instead
   --> NPY003.py:18:5
    |
 16 |     cumproduct(np.random.rand(5, 5))
@@ -176,11 +140,34 @@ NPY003 [*] `np.alltrue` is deprecated; use `np.all` instead
 18 |     alltrue(np.random.rand(5, 5))
    |     ^^^^^^^
 help: Replace with `np.all`
+
+NPY003 [*] `np.round_` is deprecated; use `np.round` instead
+  --> NPY003.py:25:1
    |
-1  + from numpy import all
-2  | def func():
---------------------------------------------------------------------------------
-18 |     sometrue(np.random.rand(5, 5))
-   -     alltrue(np.random.rand(5, 5))
-19 +     all(np.random.rand(5, 5))
+23 | import numpy as top_level_np
+24 |
+25 | top_level_np.round_(top_level_np.random.rand(5, 5), 2)
+   | ^^^^^^^^^^^^^^^^^^^
+26 | top_level_np.product(top_level_np.random.rand(5, 5))
+   |
+help: Replace with `np.round`
+   |
+24 |
+   - top_level_np.round_(top_level_np.random.rand(5, 5), 2)
+25 + top_level_np.round(top_level_np.random.rand(5, 5), 2)
+26 | top_level_np.product(top_level_np.random.rand(5, 5))
+   |
+
+NPY003 [*] `np.product` is deprecated; use `np.prod` instead
+  --> NPY003.py:26:1
+   |
+25 | top_level_np.round_(top_level_np.random.rand(5, 5), 2)
+26 | top_level_np.product(top_level_np.random.rand(5, 5))
+   | ^^^^^^^^^^^^^^^^^^^^
+help: Replace with `np.prod`
+   |
+25 | top_level_np.round_(top_level_np.random.rand(5, 5), 2)
+   - top_level_np.product(top_level_np.random.rand(5, 5))
+26 + top_level_np.prod(top_level_np.random.rand(5, 5))
+27 |
    |

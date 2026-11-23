@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
@@ -31,6 +32,11 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// np.all([True, False])
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if the original import originates from a
+/// local scope, as adding a top-level import could cause runtime errors if the
+/// dependency is optional.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.276", category = Category::Suspicious)]
 pub(crate) struct NumpyDeprecatedFunction {
@@ -90,7 +96,21 @@ pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr) {
                 checker.semantic(),
             )?;
             let replacement_edit = Edit::range_replacement(binding, expr.range());
-            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
+            let applicability = if checker.semantic().is_local_binding(expr)
+                && checker
+                    .semantic()
+                    .resolve_qualified_import_name("numpy", replacement)
+                    .is_none()
+            {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+            Ok(Fix::applicable_edits(
+                import_edit,
+                [replacement_edit],
+                applicability,
+            ))
         });
     }
 }

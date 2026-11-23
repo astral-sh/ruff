@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedNameBuilder;
 use ruff_python_ast::statement_visitor::StatementVisitor;
@@ -32,6 +33,11 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// This rule flags all uses of removed members, along with automatic fixes for
 /// any backwards-compatible replacements.
+///
+/// ## Fix safety
+/// Fixes are considered unsafe if the replacement is not backwards-compatible
+/// or if the original import originates from a local scope, as adding a
+/// top-level import could cause runtime errors if the dependency is optional.
 ///
 /// ## Example
 /// ```python
@@ -704,9 +710,19 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
                     binding
                 };
                 let replacement_edit = Edit::range_replacement(replacement, expr.range());
+                let is_local = checker.semantic().is_local_binding(expr)
+                    && checker
+                        .semantic()
+                        .resolve_qualified_import_name(path, name)
+                        .is_none();
                 Ok(match compatibility {
                     Compatibility::BackwardsCompatible => {
-                        Fix::safe_edits(import_edit, [replacement_edit])
+                        let applicability = if is_local {
+                            Applicability::Unsafe
+                        } else {
+                            Applicability::Safe
+                        };
+                        Fix::applicable_edits(import_edit, [replacement_edit], applicability)
                     }
                     Compatibility::Breaking => Fix::unsafe_edits(import_edit, [replacement_edit]),
                 })

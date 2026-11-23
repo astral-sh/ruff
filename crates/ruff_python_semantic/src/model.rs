@@ -1197,6 +1197,32 @@ impl<'a> SemanticModel<'a> {
         }
     }
 
+    /// Return the [`ast::ExprName`] at the head of the expression, if any.
+    const fn match_head(value: &Expr) -> Option<&ast::ExprName> {
+        match value {
+            Expr::Attribute(ast::ExprAttribute { value, .. }) => Self::match_head(value),
+            Expr::Name(name) => Some(name),
+            _ => None,
+        }
+    }
+
+    /// Return `true` if the binding for the head of the given expression was defined in a
+    /// non-global (local) scope.
+    pub fn is_local_binding(&self, expr: &Expr) -> bool {
+        let Some(head) = Self::match_head(expr) else {
+            return false;
+        };
+
+        let symbol = self
+            .resolve_name(head)
+            .map_or_else(|| self.lookup_symbol(&head.id), Symbol::Binding);
+
+        match symbol {
+            Symbol::Binding(binding_id) => !self.binding(binding_id).scope.is_global(),
+            _ => false,
+        }
+    }
+
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported
     /// or builtin symbol.
     ///
@@ -1216,17 +1242,8 @@ impl<'a> SemanticModel<'a> {
     where
         'a: 'name,
     {
-        /// Return the [`ast::ExprName`] at the head of the expression, if any.
-        const fn match_head(value: &Expr) -> Option<&ast::ExprName> {
-            match value {
-                Expr::Attribute(ast::ExprAttribute { value, .. }) => match_head(value),
-                Expr::Name(name) => Some(name),
-                _ => None,
-            }
-        }
-
         // If the name was already resolved, look it up; otherwise, search for the symbol.
-        let head = match_head(value)?;
+        let head = Self::match_head(value)?;
         let symbol = self
             .resolve_name(head)
             .map_or_else(|| self.lookup_symbol(&head.id), Symbol::Binding);

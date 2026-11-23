@@ -186,3 +186,12 @@ async def func():
     from anyio import sleep as anyio_sleep
 
     await anyio_sleep(0)  # ASYNC115
+
+
+# https://github.com/astral-sh/ruff/issues/30770
+# Top-level module import produces a safe fix because it doesn't hoist a local import.
+import trio as top_level_trio
+
+
+async def func_top_level():
+    await top_level_trio.sleep(0)  # ASYNC115
