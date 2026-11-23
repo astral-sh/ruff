@@ -2197,6 +2197,10 @@ impl<'db> UpperBound<'db> {
         source: EvidenceSource,
         lower: Type<'db>,
     ) -> bool {
+        if self.iter_clauses(source).next().is_none() {
+            return true;
+        }
+
         // TODO: Detect recursive bound comparisons that keep growing, so termination
         // doesn't depend on finding a common specialization here.
         if inferable != TypeVarSet::None
