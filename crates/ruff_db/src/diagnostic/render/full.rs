@@ -8,7 +8,7 @@ use annotate_snippets::{
 };
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::OneIndexed;
+use ruff_source_file::{OneIndexed, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::diagnostic::render::{FileResolver, Renderer, Resolved};
@@ -77,6 +77,14 @@ impl Renderer for FullRenderer<'_> {
 
         Ok(())
     }
+}
+
+/// Split source with a byte search, preserving each line's terminator.
+fn diff_lines(source: &str) -> Vec<&str> {
+    source
+        .universal_newlines()
+        .map(|line| line.as_full_str())
+        .collect()
 }
 
 const FIX_CONTEXT: usize = 1;
@@ -170,7 +178,11 @@ impl<'a> Diff<'a> {
 
             output.push_str(&source_text[usize::from(last_end)..usize::from(range.end())]);
 
-            let diff = TextDiff::from_lines(input, &output);
+            // Keep the original terminators so the diff treats CR, LF, and CRLF
+            // the same way as `TextDiff::from_lines`.
+            let diff = TextDiff::configure()
+                .newline_terminated(true)
+                .diff_slices(&diff_lines(input), &diff_lines(&output));
 
             let mut grouped_ops: Vec<Vec<DiffOp>> = Vec::new();
             for group in diff.grouped_ops(FIX_CONTEXT) {
