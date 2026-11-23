@@ -1,0 +1,47 @@
+---
+source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 4
+
+--- Added ---
+TID251 `pathlib.Path.unlink` is banned: Use the project cleanup helper.
+  --> TID251.py:53:5
+   |
+52 | def remove(path: Path) -> None:
+53 |     path.unlink()  # TID251 in preview
+   |     ^^^^^^^^^^^
+54 |     Path.unlink(path)
+   |
+
+
+TID251 `pytest.MonkeyPatch.setattr` is banned: Avoid patching attributes in tests.
+  --> TID251.py:58:5
+   |
+57 | def test_example(monkeypatch: pytest.MonkeyPatch) -> None:
+58 |     monkeypatch.setattr("os.getcwd", lambda: "/")  # TID251 in preview
+   |     ^^^^^^^^^^^^^^^^^^^
+59 |     pytest.MonkeyPatch.setattr(monkeypatch, "os.getcwd", lambda: "/")
+   |
+
+
+TID251 `pathlib.Path.unlink` is banned: Use the project cleanup helper.
+  --> TID251.py:63:5
+   |
+62 | def remove_annotated(path: Annotated[Path, "meta"]) -> None:
+63 |     path.unlink()  # TID251 in preview
+   |     ^^^^^^^^^^^
+
+
+TID251 `pathlib.Path.unlink` is banned: Use the project cleanup helper.
+  --> TID251.py:68:5
+   |
+66 | def remove_assigned() -> None:
+67 |     target: Path = Path("file.txt")
+68 |     target.unlink()  # TID251 in preview
+   |     ^^^^^^^^^^^^^

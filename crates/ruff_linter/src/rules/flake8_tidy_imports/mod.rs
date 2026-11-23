@@ -14,6 +14,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::assert_diagnostics;
+    use crate::assert_diagnostics_diff;
     use crate::registry::Rule;
     use crate::rules::flake8_tidy_imports;
     use crate::rules::flake8_tidy_imports::settings::{
@@ -23,38 +24,66 @@ mod tests {
     use crate::source_kind::SourceKind;
     use crate::test::{test_contents, test_path};
 
+    fn banned_api_settings() -> LinterSettings {
+        LinterSettings {
+            flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
+                banned_api: FxHashMap::from_iter([
+                    (
+                        "cgi".to_string(),
+                        ApiBan {
+                            msg: "The cgi module is deprecated.".to_string(),
+                        },
+                    ),
+                    (
+                        "typing.TypedDict".to_string(),
+                        ApiBan {
+                            msg: "Use typing_extensions.TypedDict instead.".to_string(),
+                        },
+                    ),
+                    (
+                        ".dict.fromkeys".to_string(),
+                        ApiBan {
+                            msg: "Use a dict comprehension instead.".to_string(),
+                        },
+                    ),
+                    (
+                        "pathlib.Path.unlink".to_string(),
+                        ApiBan {
+                            msg: "Use the project cleanup helper.".to_string(),
+                        },
+                    ),
+                    (
+                        "pytest.MonkeyPatch.setattr".to_string(),
+                        ApiBan {
+                            msg: "Avoid patching attributes in tests.".to_string(),
+                        },
+                    ),
+                ]),
+                ..Default::default()
+            },
+            ..LinterSettings::for_rules(vec![Rule::BannedApi])
+        }
+    }
+
     #[test]
     fn banned_api() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID251.py"),
-            &LinterSettings {
-                flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    banned_api: FxHashMap::from_iter([
-                        (
-                            "cgi".to_string(),
-                            ApiBan {
-                                msg: "The cgi module is deprecated.".to_string(),
-                            },
-                        ),
-                        (
-                            "typing.TypedDict".to_string(),
-                            ApiBan {
-                                msg: "Use typing_extensions.TypedDict instead.".to_string(),
-                            },
-                        ),
-                        (
-                            ".dict.fromkeys".to_string(),
-                            ApiBan {
-                                msg: "Use a dict comprehension instead.".to_string(),
-                            },
-                        ),
-                    ]),
-                    ..Default::default()
-                },
-                ..LinterSettings::for_rules(vec![Rule::BannedApi])
-            },
+            &banned_api_settings(),
         )?;
         assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn banned_api_preview() -> Result<()> {
+        let settings = banned_api_settings();
+        assert_diagnostics_diff!(
+            "preview__banned_api_TID251.py",
+            Path::new("flake8_tidy_imports/TID251.py"),
+            &settings,
+            &settings.clone().with_preview_mode()
+        );
         Ok(())
     }
 
