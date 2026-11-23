@@ -1566,6 +1566,53 @@ fn parameter_default_presence_invalidates_caller() -> anyhow::Result<()> {
 }
 
 #[test]
+fn inherited_writes_follow_changes_to_frozen_bases() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let path = "/src/main.py";
+    db.write_file(
+        path,
+        "\
+from base import Base
+
+class Child[T](Base[T]): ...
+
+def update(a: Child[int], b: Child[str]):
+    a.value = 42
+    del b.value
+",
+    )?;
+
+    for frozen in [false, true, false] {
+        let flag = if frozen { "True" } else { "False" };
+        db.write_file(
+            "/src/base.py",
+            format!(
+                "\
+from dataclasses import dataclass
+
+@dataclass(frozen={flag})
+class Base[T]:
+    value: T
+"
+            ),
+        )?;
+        if frozen {
+            assert_file_diagnostics(
+                &db,
+                path,
+                &[
+                    "Property `value` defined in `Child[int]` is read-only",
+                    "Cannot delete attribute `value` on type `Child[str]` whose `__delattr__` method returns `Never`/`NoReturn`",
+                ],
+            );
+        } else {
+            assert_file_diagnostics(&db, path, &[]);
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn dynamic_class_metaclass_updates_after_base_change() -> anyhow::Result<()> {
     let mut db = setup_db();
     let base = "\
