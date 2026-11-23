@@ -867,17 +867,20 @@ fn specialization_argument_is_static<'db>(
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
-    /// Return `true` if `ty` conforms to the interface described by `protocol`.
+    /// Check whether `ty` conforms to `protocol`. If `ty` is a variable's protocol bound, look up
+    /// members and nominal bases on the bound and bind `Self` to the variable.
     pub(super) fn check_type_satisfies_protocol(
         &self,
         db: &'db dyn Db,
         ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
+        fixed_receiver: Option<BoundTypeVarInstance<'db>>,
     ) -> ConstraintSet<'db, 'c> {
         // Explicit protocol inheritance establishes subtyping even when a subclass overrides
         // members incompatibly.
         let mut result = self.never();
         let source_protocol = ty.as_protocol_instance();
+        let receiver = fixed_receiver.map_or(ty, Type::TypeVar);
 
         // Every gradual type lies between its bottom and top materializations, and is assignable
         // to and from either one. Each materialization is a subtype of itself. For the same class
@@ -936,7 +939,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // A no-op source materialization can be removed before comparing method-only
             // interfaces. For recursive properties and attributes, keep the wrapper: removing
             // it can make the cycle guard reject distinct specializations that stabilize.
-            if source.materialization_kind(db).is_some()
+            if fixed_receiver.is_none()
+                && source.materialization_kind(db).is_some()
                 && source.interface(db).has_only_methods(db)
                 && protocol_materialization_is_noop(db, self.env.program(db), source_origin)
             {
@@ -951,10 +955,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let source_protocol_as_nominal =
             source_protocol.and_then(|source| source.nominal_origin_instance(db));
         if let Some(nominal_instance) = protocol.nominal_origin_instance(db) {
-            // if `ty` and `protocol` are *both* protocols, we also need to treat `ty` as if it
-            // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
-            // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
-            // `Q`'s members in a Liskov-incompatible way.
+            // A protocol `P` that explicitly inherits from `Q` is a nominal subtype of `Q`,
+            // even if `P` overrides a member incompatibly.
             let type_to_test = source_protocol_as_nominal
                 .map(Type::NominalInstance)
                 .unwrap_or(ty);
@@ -1022,9 +1024,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             if (self.typevar_evaluation == TypeVarEvaluation::Lazy || !can_use_nominal_redundancy)
                 && let Some(structurally_satisfied) = self.try_check_non_recursive_protocol_members(
                     db,
-                    ty,
+                    receiver,
                     protocol,
-                    source_protocol_as_nominal,
+                    source_protocol,
                     nominal_instance,
                     nominally_satisfied,
                 )
@@ -1047,10 +1049,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
-        let structurally_satisfied = if let Type::ProtocolInstance(source_protocol) = ty {
+        let structurally_satisfied = if let Some(source_protocol) = source_protocol {
             self.check_protocol_interface_pair(
                 db,
-                ty,
+                receiver,
                 source_protocol.interface(db),
                 protocol.interface(db),
             )
@@ -1073,7 +1075,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && structurally_satisfied.is_never_satisfied(db, env, self.inferable)
         {
             context.push(ErrorContext::TypeNotCompatibleWithProtocol {
-                ty,
+                ty: receiver,
                 protocol: Type::ProtocolInstance(protocol),
             });
         }
@@ -1242,9 +1244,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     fn try_check_non_recursive_protocol_members(
         &self,
         db: &'db dyn Db,
-        ty: Type<'db>,
+        receiver: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
-        source_protocol_as_nominal: Option<NominalInstanceType<'db>>,
+        source_protocol: Option<ProtocolInstanceType<'db>>,
         nominal_instance: NominalInstanceType<'db>,
         nominally_satisfied: ConstraintSet<'db, 'c>,
     ) -> Option<ConstraintSet<'db, 'c>> {
@@ -1252,10 +1254,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return None;
         }
 
-        let Type::ProtocolInstance(source_protocol) = ty else {
-            return None;
-        };
-        let source_instance = source_protocol_as_nominal?;
+        let source_protocol = source_protocol?;
+        let source_instance = source_protocol.nominal_origin_instance(db)?;
         let env = self.env;
         let (ClassType::Generic(source_alias), ClassType::Generic(target_alias)) = (
             source_instance.class(db, env),
@@ -1328,7 +1328,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // comparison.
         let structurally_satisfied = self.check_protocol_interface_pair(
             db,
-            ty,
+            receiver,
             source_interface,
             ProtocolInterfaceView::new(
                 target_non_recursive,
@@ -1988,7 +1988,7 @@ impl<'db> ProtocolInstanceType<'db> {
                 &materialization_visitor,
             );
             checker
-                .check_type_satisfies_protocol(db, receiver, protocol)
+                .check_type_satisfies_protocol(db, receiver, protocol, None)
                 .is_always_satisfied(db, &env, TypeVarSet::None)
         }
 

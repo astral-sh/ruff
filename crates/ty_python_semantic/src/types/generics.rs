@@ -3832,6 +3832,32 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             db,
             self.constraints,
             |(source, target)| {
+                if let Type::ProtocolInstance(protocol) = target
+                    && let Type::TypeVar(variable) = source.resolve_type_alias(db)
+                    && !variable.is_inferable(db, self.inferable)
+                    && let Some(bounds) = variable.typevar(db).bound_or_constraints(db, self.env)
+                    && let Some(bound) = bounds.protocol_upper_bound(db)
+                    && bound != protocol
+                {
+                    // The cached relation below records `variable <= target` because a later
+                    // solve may specialize `variable`. Here the caller fixes `variable`, so
+                    // matching the bound's members with `Self = variable` lets us infer the
+                    // target's type arguments.
+                    return TypeRelationChecker::constraint_set_assignability(
+                        self.env,
+                        self.constraints,
+                        &HasRelationToVisitor::default(self.constraints),
+                        &IsDisjointVisitor::default(self.constraints),
+                        &SignatureRelationVisitor::default(),
+                        &ApplyTypeMappingVisitor::new(self.env),
+                    )
+                    .check_type_satisfies_protocol(
+                        db,
+                        Type::ProtocolInstance(bound),
+                        protocol,
+                        Some(variable),
+                    );
+                }
                 let when = source.when_constraint_set_assignable_to_owned(db, self.env, target);
                 self.constraints.load(db, self.env, &when)
             },
