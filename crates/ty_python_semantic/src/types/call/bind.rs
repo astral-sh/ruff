@@ -3640,7 +3640,16 @@ impl<'db> OverloadFilter<'db> {
             .take(max_slot_count)
             .collect::<Vec<_>>();
 
-        for (index, current) in candidates.iter().enumerate().take(candidates.len() - 1) {
+        // Variadic contributions come from the entire candidate set. Only the ordinary
+        // argument types can change between prefixes, through contextual inference.
+        let mut prefix_len = 0;
+        for group in candidates[..candidates.len() - 1].chunk_by(|left, right| {
+            left.slots
+                .iter()
+                .map(|slot| slot.argument)
+                .eq(right.slots.iter().map(|slot| slot.argument))
+        }) {
+            let arguments = &group[0].slots;
             let mut union_argument_type_builders =
                 std::iter::repeat_with(|| UnionBuilder::new(db, env))
                     .take(max_slot_count)
@@ -3649,8 +3658,7 @@ impl<'db> OverloadFilter<'db> {
             for candidate in candidates {
                 for (slot_index, slot) in candidate.slots.iter().enumerate() {
                     let argument_type = slot.variadic_argument.unwrap_or_else(|| {
-                        current
-                            .slots
+                        arguments
                             .get(slot_index)
                             .map_or(Type::unknown(), |slot| slot.argument)
                     });
@@ -3673,26 +3681,29 @@ impl<'db> OverloadFilter<'db> {
                     }),
             );
 
-            for (builder, slot) in union_parameter_types.iter_mut().zip(&current.slots) {
-                builder.add_in_place(slot.parameter);
-            }
+            for current in group {
+                prefix_len += 1;
+                for (builder, slot) in union_parameter_types.iter_mut().zip(&current.slots) {
+                    builder.add_in_place(slot.parameter);
+                }
 
-            let parameter_types = Type::heterogeneous_tuple(
-                db,
-                env,
-                union_parameter_types
-                    .iter()
-                    .filter(|builder| !builder.is_empty())
-                    .cloned()
-                    .map(UnionBuilder::build),
-            );
+                let parameter_types = Type::heterogeneous_tuple(
+                    db,
+                    env,
+                    union_parameter_types
+                        .iter()
+                        .filter(|builder| !builder.is_empty())
+                        .cloned()
+                        .map(UnionBuilder::build),
+                );
 
-            let inferable = current.inferable;
-            if top_materialized_argument_type
-                .when_assignable_to_owned(db, env, parameter_types, inferable)
-                .query(|_, when| when.is_always_satisfied(db, env, inferable))
-            {
-                return index + 1;
+                let inferable = current.inferable;
+                if top_materialized_argument_type
+                    .when_assignable_to_owned(db, env, parameter_types, inferable)
+                    .query(|_, when| when.is_always_satisfied(db, env, inferable))
+                {
+                    return prefix_len;
+                }
             }
         }
 
