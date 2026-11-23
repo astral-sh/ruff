@@ -197,6 +197,51 @@ def check(closure: Closure, partial: Partial) -> None:
     assert_type(partial.entries, int | Leaf)
 ```
 
+### Mutually recursive named tuples
+
+Each field accepts the other named tuple or a tuple of integers. Whether ty can simplify either
+union depends on the other field's type.
+
+```py
+from __future__ import annotations
+from typing import NamedTuple
+from typing_extensions import assert_type
+
+class A(NamedTuple):
+    x: B | tuple[int, ...]
+
+class B(NamedTuple):
+    x: A | tuple[int, ...]
+
+def check(a: A, b: B):
+    assert_type(a.x, B | tuple[int, ...])
+    assert_type(a[0], B | tuple[int, ...])
+    assert_type(b.x, A | tuple[int, ...])
+    assert_type(b[0], A | tuple[int, ...])
+```
+
+### Fixed-length tuples in a recursive field
+
+A tree can hold two children or any number of rows. The pair of children must keep its length even
+if ty initially infers just the rows.
+
+```py
+from typing import NamedTuple
+from typing_extensions import assert_type
+
+class Tree(NamedTuple):
+    children: "Children"
+
+Row = tuple[int, ...]
+Children = tuple[Tree, Tree] | tuple[Row, ...]
+
+def check(tree: Tree) -> Children:
+    Tree((tree, tree))
+    Tree((tree,))  # error: [invalid-argument-type]
+    assert_type(tree[0], Children)
+    return tree.children
+```
+
 ### Named tuple fields with mutually recursive protocols
 
 The wide unions in the two protocols refer back to `Leaf`. As ty compares the protocols, the
@@ -231,6 +276,41 @@ def check(leaf: Leaf):
     assert_type(leaf[0], Metadata)
     assert_type(leaf.tag, Literal[42])
     assert_type(leaf[1], Literal[42])
+```
+
+### Recursive protocols that converge without recovery
+
+The protocols have identical members. While ty compares them, the field can revert to an earlier
+type before it settles. Both protocols allow `a.x` to be an `A[int]`, so `a.x.x` can be an integer.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from __future__ import annotations
+from typing import NamedTuple, Protocol
+
+class Node(NamedTuple):
+    x: Metadata
+
+class A[T](Protocol):
+    @property
+    def x(self) -> B[T] | A[int] | A[T] | T | str | A[Node]: ...
+
+class B[T](Protocol):
+    @property
+    def x(self) -> B[T] | A[int] | A[T] | T | str | A[Node]: ...
+
+Metadata = A[str] | B[str]
+
+def check(a: A[str]):
+    if not isinstance(a.x, str) and not isinstance(a.x.x, str):
+        a.x.x.x  # error: [missing-union-attribute]
+
+def forward(b: B[str]) -> A[str]:
+    return b
 ```
 
 ### Explicit dataclass-transform metaclass

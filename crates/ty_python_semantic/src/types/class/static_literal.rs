@@ -10,6 +10,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use std::cell::{LazyCell, RefCell};
+use std::sync::Arc;
 
 use super::implicit_attributes::implicit_attribute_names;
 use crate::{
@@ -207,6 +208,14 @@ struct InheritedFrozenDataclassFields<'db> {
 struct OwnClassFields<'db> {
     fields: FxIndexMap<Name, Field<'db>>,
     class_variables: Box<[Name]>,
+    /// Allocated only if a named tuple field changes type during cycle recovery.
+    field_changes: Option<Arc<FxIndexMap<Name, NamedTupleFieldChanges<'db>>>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+enum NamedTupleFieldChanges<'db> {
+    Transitions(Vec<(Type<'db>, Type<'db>)>),
+    Oscillating,
 }
 
 #[salsa::tracked]
@@ -3055,6 +3064,7 @@ impl<'db> StaticClassLiteral<'db> {
         OwnClassFields {
             fields: attributes,
             class_variables: class_variables.into_boxed_slice(),
+            field_changes: None,
         }
     }
 
@@ -3861,11 +3871,11 @@ fn mro_ancestors_cycle_initial<'db>(
     )))
 }
 
-/// A named tuple's field types determine its tuple base. If a field alternates between
-/// equivalent protocols during inference, the class's MRO can't converge until the field does.
+/// A named tuple's field types determine its tuple base. Simplifying a field's union
+/// can in turn depend on that base and repeatedly discard different alternatives.
 fn own_fields_cycle_fn<'db>(
     db: &'db dyn Db,
-    cycle: &salsa::Cycle,
+    _: &salsa::Cycle,
     previous: &OwnClassFields<'db>,
     mut current: OwnClassFields<'db>,
     class: StaticClassLiteral<'db>,
@@ -3876,16 +3886,40 @@ fn own_fields_cycle_fn<'db>(
         return current;
     }
 
-    let env = ProgramEnvironment::from_scope(class.body_scope(db));
+    current.field_changes.clone_from(&previous.field_changes);
     for (name, field) in &mut current.fields {
-        if let Some(prev) = previous.fields.get(name)
-            && prev.declared_ty != field.declared_ty
-        {
-            field.declared_ty =
-                field
-                    .declared_ty
-                    .cycle_normalized(db, &env, prev.declared_ty, cycle);
+        let Some(prev) = previous.fields.get(name) else {
+            continue;
+        };
+        if prev.declared_ty == field.declared_ty {
+            continue;
         }
+
+        // A field can change from A to B and back to A as other queries settle.
+        // Wait until the same field makes the same transition twice.
+        let changes = current.field_changes.get_or_insert_default();
+        if !matches!(changes.get(name), Some(NamedTupleFieldChanges::Oscillating)) {
+            let history = Arc::make_mut(changes)
+                .entry(name.clone())
+                .or_insert_with(|| NamedTupleFieldChanges::Transitions(Vec::with_capacity(1)));
+            let transition = (prev.declared_ty, field.declared_ty);
+            if let NamedTupleFieldChanges::Transitions(seen) = history
+                && !seen.contains(&transition)
+            {
+                seen.push(transition);
+                continue;
+            }
+            *history = NamedTupleFieldChanges::Oscillating;
+        }
+
+        // Keep the alternatives without redoing the comparison that caused the
+        // cycle or widening any fixed-length tuples in the annotation.
+        let env = ProgramEnvironment::from_scope(class.body_scope(db));
+        field.declared_ty = UnionType::from_elements_cycle_recovery(
+            db,
+            &env,
+            [prev.declared_ty, field.declared_ty],
+        );
     }
     current
 }
