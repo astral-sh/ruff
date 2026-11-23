@@ -4203,6 +4203,27 @@ def f(
     reveal_type(close_and_return(g))  # revealed: Unknown
 ```
 
+## Generic decorators on methods returning `Self`
+
+A method returning `Self` can pass through a generic decorator. Calling the decorated method accepts
+the bound instance.
+
+```py
+from collections.abc import Callable
+from typing import Self
+
+def identity[T, R](callback: Callable[[T], R]) -> Callable[[T], R]:
+    return callback
+
+class Chart:
+    @identity
+    def mark_point(self) -> Self:
+        return self
+
+# TODO: Infer `Chart` (https://github.com/astral-sh/ty/issues/3186).
+reveal_type(Chart().mark_point())  # revealed: R@identity
+```
+
 ## Opaque decorators don't affect typevar binding
 
 Inside the body of a generic function, we should be able to see that the typevars bound by that
