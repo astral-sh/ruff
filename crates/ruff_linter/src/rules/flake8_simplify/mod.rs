@@ -30,7 +30,7 @@ mod tests {
     #[test_case(Rule::UncapitalizedEnvironmentVariables, Path::new("SIM112.py"))]
     #[test_case(Rule::ManualLoopCounter, Path::new("SIM113.py"))]
     #[test_case(Rule::IfWithIdenticalBranches, Path::new("SIM114.py"))]
-    #[test_case(Rule::OpenFileWithContextHandler, Path::new("SIM115.py"))]
+    #[test_case(Rule::OpenFileWithoutContextManager, Path::new("SIM115.py"))]
     #[test_case(Rule::IfElseBlockInsteadOfDictLookup, Path::new("SIM116.py"))]
     #[test_case(Rule::MultipleWithStatements, Path::new("SIM117.py"))]
     #[test_case(Rule::InDictKeys, Path::new("SIM118.py"))]

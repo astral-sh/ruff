@@ -33,9 +33,9 @@ use crate::codes::Category;
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.255", category = Category::Correctness)]
-pub(crate) struct InvalidEnvvarValue;
+pub(crate) struct InvalidGetenvKey;
 
-impl Violation for InvalidEnvvarValue {
+impl Violation for InvalidGetenvKey {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Invalid type for initial `os.getenv` argument; expected `str`".to_string()
@@ -65,6 +65,6 @@ pub(crate) fn invalid_envvar_value(
             return;
         }
 
-        checker.report_diagnostic(InvalidEnvvarValue, expr.range());
+        checker.report_diagnostic(InvalidGetenvKey, expr.range());
     }
 }

@@ -180,7 +180,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::SortedMinMax) {
                 refurb::rules::sorted_min_max(checker, subscript);
             }
-            if checker.is_rule_enabled(Rule::FStringNumberFormat) {
+            if checker.is_rule_enabled(Rule::SlicedIntegerBaseConversion) {
                 refurb::rules::fstring_number_format(checker, subscript);
             }
             if checker.is_rule_enabled(Rule::IncorrectlyParenthesizedTupleInSubscript) {
@@ -558,10 +558,10 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::StringDotFormatMissingArguments,
                 Rule::StringDotFormatMixingAutomatic,
                 // pyupgrade
-                Rule::FormatLiterals,
-                Rule::FString,
+                Rule::UnnecessaryPositionalStrFormatIndices,
+                Rule::StrFormat,
                 // flynt
-                Rule::StaticJoinToFString,
+                Rule::UnnecessaryStrJoin,
                 // refurb
                 Rule::HashlibDigestHex,
                 // flake8-simplify
@@ -576,7 +576,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     {
                         if attr == "join" {
                             // "...".join(...) call
-                            if checker.is_rule_enabled(Rule::StaticJoinToFString) {
+                            if checker.is_rule_enabled(Rule::UnnecessaryStrJoin) {
                                 flynt::rules::static_join_to_fstring(
                                     checker,
                                     expr,
@@ -634,10 +634,12 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                             checker, call, &summary,
                                         );
                                     }
-                                    if checker.is_rule_enabled(Rule::FormatLiterals) {
+                                    if checker.is_rule_enabled(
+                                        Rule::UnnecessaryPositionalStrFormatIndices,
+                                    ) {
                                         pyupgrade::rules::format_literals(checker, call, &summary);
                                     }
-                                    if checker.is_rule_enabled(Rule::FString) {
+                                    if checker.is_rule_enabled(Rule::StrFormat) {
                                         pyupgrade::rules::f_strings(checker, call, &summary);
                                     }
                                 }
@@ -675,17 +677,17 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::UnnecessaryEncodeUTF8) {
                 pyupgrade::rules::unnecessary_encode_utf8(checker, call);
             }
-            if checker.is_rule_enabled(Rule::NativeLiterals) {
+            if checker.is_rule_enabled(Rule::UnnecessaryLiteralConstructor) {
                 pyupgrade::rules::native_literals(
                     checker,
                     call,
                     checker.semantic().current_expression_parent(),
                 );
             }
-            if checker.is_rule_enabled(Rule::ReplaceUniversalNewlines) {
+            if checker.is_rule_enabled(Rule::SubprocessRunWithUniversalNewlines) {
                 pyupgrade::rules::replace_universal_newlines(checker, call);
             }
-            if checker.is_rule_enabled(Rule::ReplaceStdoutStderr) {
+            if checker.is_rule_enabled(Rule::SubprocessRunWithPipedStdoutAndStderr) {
                 pyupgrade::rules::replace_stdout_stderr(checker, call);
             }
             if checker.is_rule_enabled(Rule::NonPEP604Isinstance) {
@@ -702,7 +704,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::BlockingOpenCallInAsyncFunction) {
                 flake8_async::rules::blocking_open_call(checker, call);
             }
-            if checker.is_rule_enabled(Rule::BlockingPathMethodInAsyncFunction) {
+            if checker.is_rule_enabled(Rule::BlockingPathCallInAsyncFunction) {
                 flake8_async::rules::blocking_os_path(checker, call);
             }
             if checker.any_rule_enabled(&[
@@ -754,7 +756,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     checker, expr, func, args, keywords,
                 );
             }
-            if checker.is_rule_enabled(Rule::StripWithMultiCharacters) {
+            if checker.is_rule_enabled(Rule::StripWithDuplicateCharacters) {
                 flake8_bugbear::rules::strip_with_multi_characters(checker, expr, func, args);
             }
             if keywords.is_empty() {
@@ -798,7 +800,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::HardcodedPasswordFuncArg) {
                 flake8_bandit::rules::hardcoded_password_func_arg(checker, keywords);
             }
-            if checker.is_rule_enabled(Rule::HardcodedSQLExpression) {
+            if checker.is_rule_enabled(Rule::SuspiciousSqlStringConstruction) {
                 flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
             }
             if checker.is_rule_enabled(Rule::HashlibInsecureHashFunction) {
@@ -985,7 +987,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::UncapitalizedEnvironmentVariables) {
                 flake8_simplify::rules::use_capital_environment_variables(checker, expr);
             }
-            if checker.is_rule_enabled(Rule::OpenFileWithContextHandler) {
+            if checker.is_rule_enabled(Rule::OpenFileWithoutContextManager) {
                 flake8_simplify::rules::open_file_with_context_handler(checker, call);
             }
             if checker.is_rule_enabled(Rule::DictGetWithNoneDefault) {
@@ -1046,7 +1048,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::ImplicitCwd) {
                 refurb::rules::no_implicit_cwd(checker, call);
             }
-            if checker.is_rule_enabled(Rule::TrioSyncCall) {
+            if checker.is_rule_enabled(Rule::TrioCallNotAwaited) {
                 flake8_async::rules::sync_call(checker, call);
             }
             if checker.is_rule_enabled(Rule::AsyncZeroSleep) {
@@ -1188,7 +1190,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     ruff::rules::explicit_f_string_type_conversion(checker, f_string);
                 }
             }
-            if checker.is_rule_enabled(Rule::HardcodedSQLExpression) {
+            if checker.is_rule_enabled(Rule::SuspiciousSqlStringConstruction) {
                 flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
             }
             if checker.is_rule_enabled(Rule::UnicodeKindPrefix) {
@@ -1308,7 +1310,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 if checker.is_rule_enabled(Rule::BadStringFormatType) {
                     pylint::rules::bad_string_format_type(checker, bin_op, format_string);
                 }
-                if checker.is_rule_enabled(Rule::HardcodedSQLExpression) {
+                if checker.is_rule_enabled(Rule::SuspiciousSqlStringConstruction) {
                     flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
                 }
             }
@@ -1325,7 +1327,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::CollectionLiteralConcatenation) {
                 ruff::rules::collection_literal_concatenation(checker, expr);
             }
-            if checker.is_rule_enabled(Rule::HardcodedSQLExpression) {
+            if checker.is_rule_enabled(Rule::SuspiciousSqlStringConstruction) {
                 flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
             }
         }
@@ -1470,7 +1472,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             {
                 flake8_pyi::rules::numeric_literal_too_long(checker, expr);
             }
-            if checker.is_rule_enabled(Rule::MathConstant) {
+            if checker.is_rule_enabled(Rule::HardcodedMathConstant) {
                 refurb::rules::math_constant(checker, number_literal);
             }
         }
@@ -1743,7 +1745,7 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
         Rule::CallDateToday,
         Rule::CallDateFromtimestamp,
         Rule::InvalidEnvvarDefault,
-        Rule::InvalidEnvvarValue,
+        Rule::InvalidGetenvKey,
         Rule::OsPathJoin,
         Rule::OsPathSplitext,
         Rule::PyPath,
@@ -1794,7 +1796,7 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
         Rule::PytestDuplicateParametrizeTestCases,
         Rule::PytestRaisesWithoutException,
         Rule::PytestRaisesTooBroad,
-        Rule::LegacyFormPytestRaises,
+        Rule::PytestLegacyCallableForm,
         Rule::PytestWarnsWithoutWarning,
         Rule::PytestWarnsTooBroad,
         Rule::PytestFailWithoutMessage,
@@ -1904,7 +1906,7 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
     if checker.is_rule_enabled(Rule::InvalidEnvvarDefault) {
         pylint::rules::invalid_envvar_default(checker, call, &qualified_name);
     }
-    if checker.is_rule_enabled(Rule::InvalidEnvvarValue) {
+    if checker.is_rule_enabled(Rule::InvalidGetenvKey) {
         pylint::rules::invalid_envvar_value(checker, call, &qualified_name);
     }
     if checker.any_rule_enabled(&[
@@ -2050,7 +2052,7 @@ fn call_with_qualified_name(checker: &Checker, call: &ast::ExprCall) {
     ]) {
         flake8_pytest_style::rules::raises_call(checker, call, &qualified_name);
     }
-    if checker.is_rule_enabled(Rule::LegacyFormPytestRaises) {
+    if checker.is_rule_enabled(Rule::PytestLegacyCallableForm) {
         ruff::rules::legacy_raises_warns_deprecated_call(checker, call, &qualified_name);
     }
     if checker.any_rule_enabled(&[Rule::PytestWarnsWithoutWarning, Rule::PytestWarnsTooBroad]) {

@@ -90,7 +90,7 @@ pub(super) fn replace_with_identity_check(
     Fix::applicable_edit(edit, applicability)
 }
 
-// Helpers for read-whole-file and write-whole-file
+// Helpers for `manual-path-read` and `manual-path-write`
 #[derive(Debug, Copy, Clone)]
 pub(super) enum OpenMode {
     /// "r"

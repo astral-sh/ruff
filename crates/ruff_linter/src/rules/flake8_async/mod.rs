@@ -16,7 +16,7 @@ mod tests {
     use ruff_python_ast::PythonVersion;
 
     #[test_case(Rule::CancelScopeNoCheckpoint, Path::new("ASYNC100.py"))]
-    #[test_case(Rule::TrioSyncCall, Path::new("ASYNC105.py"))]
+    #[test_case(Rule::TrioCallNotAwaited, Path::new("ASYNC105.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_0.py"))]
     #[test_case(Rule::AsyncFunctionWithTimeout, Path::new("ASYNC109_1.py"))]
     #[test_case(Rule::YieldInContextManagerInAsyncGenerator, Path::new("ASYNC119.py"))]
@@ -29,7 +29,7 @@ mod tests {
     #[test_case(Rule::RunProcessInAsyncFunction, Path::new("ASYNC22x.py"))]
     #[test_case(Rule::WaitForProcessInAsyncFunction, Path::new("ASYNC22x.py"))]
     #[test_case(Rule::BlockingOpenCallInAsyncFunction, Path::new("ASYNC230.py"))]
-    #[test_case(Rule::BlockingPathMethodInAsyncFunction, Path::new("ASYNC240.py"))]
+    #[test_case(Rule::BlockingPathCallInAsyncFunction, Path::new("ASYNC240.py"))]
     #[test_case(Rule::BlockingInputInAsyncFunction, Path::new("ASYNC250.py"))]
     #[test_case(Rule::BlockingSleepInAsyncFunction, Path::new("ASYNC251.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {

@@ -24,7 +24,7 @@ mod tests {
     #[test_case(Rule::HardcodedPasswordDefault, Path::new("S107.py"))]
     #[test_case(Rule::HardcodedPasswordFuncArg, Path::new("S106.py"))]
     #[test_case(Rule::HardcodedPasswordString, Path::new("S105.py"))]
-    #[test_case(Rule::HardcodedSQLExpression, Path::new("S608.py"))]
+    #[test_case(Rule::SuspiciousSqlStringConstruction, Path::new("S608.py"))]
     #[test_case(Rule::HardcodedTempFile, Path::new("S108.py"))]
     #[test_case(Rule::HashlibInsecureHashFunction, Path::new("S324.py"))]
     #[test_case(Rule::Jinja2AutoescapeFalse, Path::new("S701.py"))]

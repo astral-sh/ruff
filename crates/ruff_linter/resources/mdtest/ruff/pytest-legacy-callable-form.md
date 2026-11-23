@@ -1,4 +1,4 @@
-# `legacy-form-pytest-raises` (`RUF061`)
+# `pytest-legacy-callable-form` (`RUF061`)
 
 ```toml
 lint.select = ["RUF061"]
@@ -21,7 +21,7 @@ def func(a, b):
 
 def test_error_nested_in_with():
     with pytest.raises(ValueError, "oops"):  # ok
-        pytest.raises(ZeroDivisionError, func, 1, b=0)  # error: [legacy-form-pytest-raises]
+        pytest.raises(ZeroDivisionError, func, 1, b=0)  # error: [pytest-legacy-callable-form]
 ```
 
 ## `pytest.warns`

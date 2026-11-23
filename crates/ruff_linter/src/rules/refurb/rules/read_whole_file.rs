@@ -43,13 +43,13 @@ use crate::{FixAvailability, Violation};
 /// - [Python documentation: `Path.read_text`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_text)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.1.2", category = Category::Pedantic)]
-pub(crate) struct ReadWholeFile<'a> {
+pub(crate) struct ManualPathRead<'a> {
     filename: SourceCodeSnippet,
     suggestion: SourceCodeSnippet,
     argument: OpenArgument<'a>,
 }
 
-impl Violation for ReadWholeFile<'_> {
+impl Violation for ManualPathRead<'_> {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -132,7 +132,7 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
                 let filename_display = open.argument.display(self.checker.source());
                 let suggestion = make_suggestion(&open, self.checker.generator());
                 let mut diagnostic = self.checker.report_diagnostic(
-                    ReadWholeFile {
+                    ManualPathRead {
                         filename: SourceCodeSnippet::from_str(filename_display),
                         suggestion: SourceCodeSnippet::from_str(&suggestion),
                         argument: open.argument,
