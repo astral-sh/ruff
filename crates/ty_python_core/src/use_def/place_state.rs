@@ -696,22 +696,31 @@ impl PlaceState {
             .merge(b.declarations, reachability_constraints);
     }
 
-    /// Replaces the shared reachability of a sole binding and declaration if both match `previous`.
+    /// Updates reachability if every live binding and declaration starts at `previous`.
     pub(super) fn try_replace_reachability(
         &mut self,
         previous: ScopedReachabilityConstraintId,
         next: ScopedReachabilityConstraintId,
     ) -> bool {
-        if self
-            .singleton()
-            .is_some_and(|(binding, _)| binding.reachability_constraint == previous)
+        let bindings = &mut self.bindings.live_bindings;
+        let declarations = &mut self.declarations.live_declarations;
+        if bindings
+            .iter()
+            .any(|b| b.reachability_constraint != previous)
+            || declarations
+                .iter()
+                .any(|d| d.reachability_constraint != previous)
         {
-            self.bindings.live_bindings[0].reachability_constraint = next;
-            self.declarations.live_declarations[0].reachability_constraint = next;
-            true
-        } else {
-            false
+            return false;
         }
+
+        for binding in bindings {
+            binding.reachability_constraint = next;
+        }
+        for declaration in declarations {
+            declaration.reachability_constraint = next;
+        }
+        true
     }
 
     /// Return the sole binding and declaration if they share a reachability constraint and the
