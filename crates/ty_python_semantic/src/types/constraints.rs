@@ -1165,6 +1165,8 @@ struct ConstraintSetStorage<'db> {
     constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
     node_cache: FxHashMap<InteriorNodeData, NodeId>,
+    /// Pairs whose sequent maps are empty need no work on subsequent walks in this builder.
+    empty_sequent_pairs: FxHashSet<(Program<'db>, AtomicConstraintId, AtomicConstraintId)>,
     /// Avoid repeatedly walking deep constraint bounds without imposing Salsa-query overhead on
     /// the many shallow bounds that are cheap to walk once.
     constraint_bound_depth_cache: FxHashMap<AtomicConstraintId, (u16, u16)>,

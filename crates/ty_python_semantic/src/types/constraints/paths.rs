@@ -80,8 +80,6 @@ pub(crate) struct PathAssignments {
     /// ensures a stable order for all of the derived constraints that we create, while still
     /// letting us create them lazily.)
     discovered: FxIndexMap<AtomicConstraintId, bool>,
-    /// Constraint pairs that we have already checked and added to `sequents`.
-    elaborated_pairs: FxHashSet<(AtomicConstraintId, AtomicConstraintId)>,
 
     /// Consequents grouped by the discovery call that introduced their sequents.
     single_replay_consequents: FxHashMap<AtomicConstraintId, Vec<AtomicConstraintId>>,
@@ -204,7 +202,6 @@ impl Default for PathAssignments {
             fuel_undo: Vec::default(),
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
             discovered: FxIndexMap::default(),
-            elaborated_pairs: FxHashSet::default(),
             single_replay_consequents: FxHashMap::default(),
             pair_replay_consequents: FxHashMap::default(),
             independent_typevars: FxHashSet::default(),
@@ -253,11 +250,9 @@ impl PathAssignments {
                 let earlier = ordered[earlier_index];
                 // Pair rules are not commutative. Replay the orientation used by this walk,
                 // which can differ from the order in which the replay reaches its inputs.
-                let pair = [(earlier, constraint), (constraint, earlier)]
-                    .into_iter()
-                    .find(|pair| self.elaborated_pairs.contains(pair));
-                if let Some(consequents) =
-                    pair.and_then(|pair| self.pair_replay_consequents.get(&pair))
+                if let Some(consequents) = [(earlier, constraint), (constraint, earlier)]
+                    .iter()
+                    .find_map(|pair| self.pair_replay_consequents.get(pair))
                 {
                     ordered.extend(
                         consequents
@@ -297,7 +292,6 @@ impl PathAssignments {
             negative_assignment_indices: IndexVec::default(),
             fuel_undo: Vec::default(),
             discovered,
-            elaborated_pairs: FxHashSet::default(),
             single_replay_consequents: FxHashMap::default(),
             pair_replay_consequents: FxHashMap::default(),
             independent_typevars,
@@ -834,15 +828,22 @@ impl PathAssignments {
             } else {
                 (constraint, constraint_data, *existing, existing_data)
             };
-            if self.elaborated_pairs.contains(&(a, b)) {
-                // We've already elaborated this pair of constraints.
+            let key = (env.program(db), a, b);
+            if storage.empty_sequent_pairs.contains(&key)
+                || self.pair_replay_consequents.contains_key(&(a, b))
+            {
                 continue;
             }
 
             let Some(map) = SequentMap::for_constraint_pair(db, env, a_data, b_data) else {
                 continue;
             };
-            self.elaborated_pairs.insert((a, b));
+            // Empty maps have no path-local effects. Nonempty maps must still be
+            // imported once per walk, even when they produce no replay consequents.
+            if map.sequents.is_empty() {
+                storage.empty_sequent_pairs.insert(key);
+                continue;
+            }
             let added = self.add_sequents(db, env, storage, map);
 
             // `projection_source_order` depends on knowing the order that sequents were discovered for
