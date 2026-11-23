@@ -286,52 +286,14 @@ User("John")  # error: [missing-argument]
 reveal_type(User.__attrs_init__)  # revealed: (self: User, /, name: str, roles: list[str] = ...) -> None
 ```
 
-## Generated initializer without a custom constructor
-
-The helper takes the same parameters as a generated `__init__`. The class still inherits its base
-class's constructor.
-
-```py
-import attr
-
-def parse_count(value: str) -> int:
-    return int(value)
-
-@attr.s
-class Base[T]:
-    _id: T = attr.ib()
-
-@attr.s(init=False)
-class Item[T](Base[T]):
-    count: int = attr.ib(alias="quantity", converter=parse_count, kw_only=True)
-    cached: bool = attr.ib(init=False, default=False)
-
-reveal_type(Item[int].__attrs_init__)  # revealed: (self: Item[int], /, id: int, *, quantity: str) -> None
-
-item = Item[int](id=1)
-Item[int](id=1, quantity="2")  # error: [unknown-argument]
-
-item.__attrs_init__(id=1, quantity="2")  # ok
-item.__attrs_init__("one", quantity="2")  # error: [invalid-argument-type]
-item.__attrs_init__(1, quantity=2)  # error: [invalid-argument-type]
-item.__attrs_init__(1)  # error: [missing-argument]
-item.__attrs_init__(1, quantity="2", cached=True)  # error: [unknown-argument]
-```
-
-## Classes without `__attrs_init__`
+When attrs generates `__init__`, it does not generate `__attrs_init__`.
 
 ```py
 from attrs import define
-from dataclasses import dataclass
 
 @define
-class User:
-    name: str
-
-@dataclass(init=False)
 class Person:
     name: str
 
-User.__attrs_init__  # error: [missing-attribute]
 Person.__attrs_init__  # error: [missing-attribute]
 ```
