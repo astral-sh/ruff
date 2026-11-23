@@ -215,7 +215,7 @@ from attrs import define, field
 class Person:
     name: str = "Unnamed"
 
-    # TODO: Account for `@id.default` when checking field order.
+    # TODO: This should not be an error once we recognize that `name` has a default
     # error: [invalid-dataclass-field-order]
     id: int = field()
 
@@ -223,7 +223,7 @@ class Person:
     def _default_id(self) -> int:
         return 0
 
-# TODO: Make `id` optional in the generated constructor.
+# TODO: No error here
 # error: [missing-argument] "No argument provided for required parameter `id`"
 person = Person()
 ```
