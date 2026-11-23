@@ -1653,6 +1653,96 @@ fn benchmark_typed_dict_get_large_literal_union(criterion: &mut Criterion) {
     );
 }
 
+fn benchmark_typed_dict_union_assignability(criterion: &mut Criterion) {
+    let variants = |name: &str, count| {
+        (0..count)
+            .map(|i| format!("{name}[Literal[{i}]]"))
+            .join(", ")
+    };
+
+    // Each source only matches Default. Checking child before tag compares Leaf to Nodes
+    // for every source and target pair. The trailing None prevents caching the whole union
+    // result, so each comparison walks all the arms even when the Node results are cached.
+    let [nodes, sources, targets] = ["Node", "Source", "Target"].map(|name| variants(name, 160));
+    let nullable = format!(
+        "
+        from typing import Literal, TypedDict, Union
+
+        class Leaf(TypedDict):
+            extra: int
+
+        class Node[T](TypedDict):
+            value: T
+
+        Nodes = Union[{nodes}, None]
+
+        class Source[T](TypedDict):
+            child: Leaf
+            tag: T
+
+        class Target[T](TypedDict):
+            child: Nodes
+            tag: T
+
+        class Default(TypedDict):
+            child: Leaf
+
+        Sources = Union[{sources}]
+        Targets = Union[{targets}, Default]
+
+        def assign(source: Sources) -> Targets:
+            return source
+        "
+    );
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[nullable_typed_dict_union_assignability]",
+        &nullable,
+    );
+
+    // The envelopes compare the same two recursive schemas before checking their tags.
+    // Once the individual comparisons complete, each source node can reuse its result
+    // against the entire target schema.
+    let [sources, targets, source_envelopes, target_envelopes] =
+        ["Source", "Target", "SourceEnvelope", "TargetEnvelope"].map(|name| variants(name, 59));
+    let recursive = format!(
+        "
+        from typing import Literal, NotRequired, TypedDict, Union
+        from typing_extensions import ReadOnly
+
+        class Source[T](TypedDict):
+            tag: T
+            child: ReadOnly[NotRequired['Sources']]
+
+        class Target[T](TypedDict):
+            tag: T
+            child: ReadOnly[NotRequired['Targets']]
+
+        Sources = Union[{sources}]
+        Targets = Union[{targets}]
+
+        class SourceEnvelope[T](TypedDict):
+            child: ReadOnly[Sources]
+            tag: T
+
+        class TargetEnvelope[T](TypedDict):
+            child: ReadOnly[Targets]
+            tag: T
+
+        SourceEnvelopes = Union[{source_envelopes}]
+        TargetEnvelopes = Union[{target_envelopes}]
+
+        def assign(source: SourceEnvelopes) -> TargetEnvelopes:
+            return source
+        "
+    );
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[recursive_typed_dict_union_assignability]",
+        &recursive,
+    );
+}
+
 fn benchmark_union_construction(criterion: &mut Criterion) {
     const NUM_CLASSES: usize = 256;
 
@@ -3044,6 +3134,7 @@ criterion_group!(
     benchmark_paramspec_bounded_overloads,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
+    benchmark_typed_dict_union_assignability,
     benchmark_very_large_tuple,
     benchmark_nested_tuple_comparison,
     benchmark_union_construction,

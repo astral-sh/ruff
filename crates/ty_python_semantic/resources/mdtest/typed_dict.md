@@ -2457,6 +2457,29 @@ static_assert(is_assignable_to(Person1, Person2))
 static_assert(is_equivalent_to(Person1, Person2))
 ```
 
+`Tree` lacks the `name` field required by both `Other` and `NamedNode`. When checking the child
+field of `NamedNode`, ty reuses the failure against `Other` and provisionally accepts `Tree` as a
+`NamedNode` to break the cycle. Caching that union result would incorrectly make `Tree` assignable
+to `Parent`.
+
+```py
+from typing_extensions import ReadOnly
+
+class Tree(TypedDict):
+    child: "Tree | None"
+
+class Other(TypedDict):
+    name: int
+
+class Parent(TypedDict):
+    child: ReadOnly["Other | NamedNode | None"]
+
+class NamedNode(Parent):
+    name: str
+
+static_assert(not is_assignable_to(Tree, Other | NamedNode | Parent))
+```
+
 ## Recursively-specialized generic `TypedDict`s
 
 ```toml
