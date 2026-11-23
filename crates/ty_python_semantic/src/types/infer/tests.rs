@@ -1766,6 +1766,28 @@ fn recursive_protocol_materialization_tracks_member_type_changes() -> anyhow::Re
 }
 
 #[test]
+fn abstract_methods_track_changes_to_identity_decorators() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let module = "/src/main.py";
+    db.write_file(
+        module,
+        "from decorate import decorate\nclass Base:\n    @decorate\n    def method(self) -> int: return 1\nBase()",
+    )?;
+    let decorator = "/src/decorate.py";
+    let identity = "from typing import Callable, TypeVar\nF = TypeVar('F', bound=Callable)\ndef decorate(f: F) -> F: return f";
+
+    db.write_file(decorator, identity)?;
+    assert_file_diagnostics(&db, module, &[]);
+
+    db.write_file(decorator, "from abc import abstractmethod as decorate")?;
+    assert_file_diagnostics(&db, module, &["Cannot instantiate abstract class `Base`"]);
+
+    db.write_file(decorator, identity)?;
+    assert_file_diagnostics(&db, module, &[]);
+    Ok(())
+}
+
+#[test]
 fn dependency_internal_symbol_change() -> anyhow::Result<()> {
     let mut db = setup_db();
 
