@@ -3102,7 +3102,7 @@ class Chart:
         return self
 
 # TODO: Infer `Chart` (https://github.com/astral-sh/ty/issues/3186).
-reveal_type(Chart().mark_point())  # revealed: R@identity
+reveal_type(Chart().mark_point())  # revealed: Unknown
 ```
 
 ## Opaque decorators don't affect typevar binding

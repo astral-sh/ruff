@@ -924,6 +924,51 @@ class Closed:
     def method(cls, value: int) -> None: ...
 ```
 
+## Decorating a binary method with a bounded receiver
+
+Both `self` and `abs(self)` satisfy the bound on `M`. The decorated method accepts another matrix,
+even though the decorator's signature doesn't tell us whether the result keeps the receiver's type.
+
+```py
+from typing import Callable, Self
+
+def decorate[A, B, R](fn: Callable[[A, B], R]) -> Callable[[A, B], R]:
+    return fn
+
+class Matrix:
+    def __abs__(self) -> Self:
+        return self
+
+    @decorate
+    def __add__[M: Matrix](self: M, other: M) -> M:
+        return self
+
+    def check(self):
+        reveal_type(abs(self))  # revealed: Self@check
+        reveal_type(self + self)  # revealed: Unknown
+        reveal_type(abs(self) + self)  # revealed: Unknown
+        abs(self) + 1  # error: [unsupported-operator]
+```
+
+## Decorating a generic function with a bounded decorator
+
+`identity` accepts any value, but the decorator limits the wrapped function to integers.
+
+```py
+from typing import Callable
+
+def integers[A: int, R: int](fn: Callable[[A], R]) -> Callable[[A], R]:
+    return fn
+
+@integers
+def identity[T](value: T) -> T:
+    return value
+
+identity("x")  # error: [invalid-argument-type]
+# TODO: Solve for the decorator's bounded variables and accept this call.
+identity(1)  # error: [invalid-argument-type]
+```
+
 ## Gradual class parameters
 
 A callback that accepts `type[Any]` or `type[Unknown]` can accept any class object.
