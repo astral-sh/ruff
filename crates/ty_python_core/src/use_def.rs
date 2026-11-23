@@ -3401,9 +3401,8 @@ impl<'db> UseDefMapBuilder<'db> {
         bindings.iter().copied()
     }
 
-    /// Restore the current builder places state to the given snapshot.
-    pub(super) fn restore(&mut self, snapshot: FlowSnapshot) {
-        self.checkpoint_state.restore(snapshot.checkpoint_state);
+    /// Restore a snapshot, returning the outgoing state without cloning its place tables.
+    pub(super) fn restore(&mut self, snapshot: FlowSnapshot) -> FlowSnapshot {
         // We never remove places from `place_states` (it's an IndexVec, and the place
         // IDs must line up), so the current number of known places must always be equal to or
         // greater than the number of known places in a previously-taken snapshot.
@@ -3412,8 +3411,15 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert!(num_symbols >= snapshot.symbol_states.len());
 
         // Restore the current visible-definitions state to the given snapshot.
-        self.symbol_states = snapshot.symbol_states;
-        self.member_states = snapshot.member_states;
+        let previous = FlowSnapshot {
+            symbol_states: std::mem::replace(&mut self.symbol_states, snapshot.symbol_states),
+            member_states: std::mem::replace(&mut self.member_states, snapshot.member_states),
+            reachability: self.reachability,
+            checkpoint_flow: self.checkpoint_flow,
+            checkpoint_state: self.checkpoint_state.snapshot(),
+            pending_reachability: self.pending_reachability.current,
+        };
+        self.checkpoint_state.restore(snapshot.checkpoint_state);
         self.reachability = snapshot.reachability;
         self.checkpoint_flow = snapshot.checkpoint_flow;
         self.pending_reachability
@@ -3428,6 +3434,7 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         self.symbol_states.resize(num_symbols, undefined.clone());
         self.member_states.resize(num_members, undefined);
+        previous
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
