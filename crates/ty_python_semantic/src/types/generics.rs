@@ -1649,7 +1649,9 @@ impl<'db> Specialization<'db> {
                     }
                 }
                 TypeVarVariance::Invariant => {
-                    has_unsimplified_dynamic_typevar |= *has_dynamic_type;
+                    if !has_unsimplified_dynamic_typevar {
+                        has_unsimplified_dynamic_typevar = *has_dynamic_type;
+                    }
                     vartype
                 }
             }
