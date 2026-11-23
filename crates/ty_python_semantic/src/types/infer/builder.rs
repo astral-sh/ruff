@@ -12495,6 +12495,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             matches!(signature.return_ty, Type::NominalInstance(_))
         }
 
+        // With a single decorator of type `(F) -> F`, the argument is the undecorated
+        // method. Keep the full check if specialization could pick a different function
+        // from a TypeVar constraint, bound, or default.
+        fn is_identity_decorator<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            decorator: Type<'db>,
+        ) -> bool {
+            let Type::FunctionLiteral(function) = decorator else {
+                return false;
+            };
+            if function.known(db).is_some() {
+                return false;
+            }
+            let [signature] = function.signature(db).overloads.as_slice() else {
+                return false;
+            };
+            let Type::TypeVar(variable) = signature.return_ty else {
+                return false;
+            };
+            let [parameter] = signature.parameters().as_slice() else {
+                return false;
+            };
+            parameter.is_positional()
+                && parameter.annotated_type() == signature.return_ty
+                && signature
+                    .generic_context
+                    .is_some_and(|context| context.variables(db).eq([variable]))
+                && !variable.is_paramspec(db)
+                && !variable.is_typevartuple(db)
+                && matches!(
+                    variable.typevar(db).bound_or_constraints(db, env),
+                    None | Some(TypeVarBoundOrConstraints::UpperBound(Type::Callable(_)))
+                )
+                && variable.typevar(db).default_type(db, env).is_none()
+        }
+
         self.infer_region();
 
         let mut known_decorators = FunctionDecorators::empty();
@@ -12511,7 +12548,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if flags.is_empty()
                     && !matches!(ty, Type::ClassLiteral(class)
                         if class.known(self.db()) == Some(KnownClass::Property))
-                    && !(decorators.len() == 1 && returns_nominal_instance(self.db(), ty))
+                    && !(decorators.len() == 1
+                        && (returns_nominal_instance(self.db(), ty)
+                            || is_identity_decorator(self.db(), self.program_environment(), ty)))
                 {
                     may_produce_abstract_method = true;
                 }
