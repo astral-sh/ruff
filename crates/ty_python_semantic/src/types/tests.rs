@@ -414,6 +414,10 @@ fn divergent_type() {
         UnionType::from_elements(db, &env, [bottom_div, other]),
         other
     );
+    assert_eq!(
+        UnionType::from_elements(db, &env, [other, bottom_div]),
+        other
+    );
 
     assert!(top_div.is_divergent());
     assert!(bottom_div.is_divergent());
