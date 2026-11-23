@@ -1391,8 +1391,8 @@ def as_sequence[T](x: T, y: list[T], z: list[T]) -> Sequence[T]:
 def _(x: int, z: list[int]):
     x1: Sequence[int] = as_sequence(x, [x], z)
 
-    # TODO: A covariant type context should not cause us to unnecessarily widen call arguments.
-    x2: Sequence[int | str] = as_sequence(x, [x], z)  # error: [invalid-argument-type]
+    # The invariant sibling fixes T to int even under a wider covariant return annotation.
+    x2: Sequence[int | str] = as_sequence(x, [x], z)  # ok
 ```
 
 Partially specialized type context is not ignored:
@@ -3150,9 +3150,8 @@ def _(a: A, b: list[A]):
     x3 = pair_with_sequence(a, [{"a": 1, "b": 2}])
     reveal_type(x3)  # revealed: A
 
-    # TODO: This should solve to `A`.
-    x4 = list_pair(b, [{"a": 1, "b": 2}])  # error: [invalid-argument-type]
-    reveal_type(x4)  # revealed: A | dict[str, int]
+    x4 = list_pair(b, [{"a": 1, "b": 2}])
+    reveal_type(x4)  # revealed: A
 
     x5 = pair({"a": 1, "b": 2}, a)
     reveal_type(x5)  # revealed: A

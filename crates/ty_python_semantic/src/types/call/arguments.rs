@@ -492,6 +492,8 @@ impl<'db> KeywordArgument<'db> {
 /// with type context across multiple bindings.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct CallArgumentTypes<'db> {
+    /// Whether the expression can change type when we revisit it with a hint.
+    pub(super) context_sensitive: bool,
     fallback_type: Option<Type<'db>>,
     types: ContextualTypes<'db>,
 }
@@ -510,6 +512,7 @@ enum ContextualTypes<'db> {
 impl<'db> CallArgumentTypes<'db> {
     fn new(fallback_ty: Option<Type<'db>>) -> Self {
         Self {
+            context_sensitive: false,
             fallback_type: fallback_ty,
             types: ContextualTypes::Empty,
         }
@@ -614,7 +617,11 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     }
                 }
             };
-            call_arguments.items.push(CallArgument::new(argument, ty));
+            let mut item = CallArgument::new(argument, ty);
+            let expr = arg_or_keyword.value();
+            item.source_types_mut().context_sensitive =
+                !arg_or_keyword.is_variadic() && !expr.is_name_expr() && !expr.is_attribute_expr();
+            call_arguments.items.push(item);
         }
 
         call_arguments
