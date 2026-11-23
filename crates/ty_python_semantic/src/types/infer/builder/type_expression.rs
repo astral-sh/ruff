@@ -36,7 +36,7 @@ use crate::types::{
     IntersectionType, InvalidTypeExpression, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeCheckDiagnostics,
     TypeContext, TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder,
-    UnionType, any_over_type, binding_type, todo_type,
+    UnionType, UnknownOrigin, any_over_type, binding_type, todo_type,
 };
 use crate::{FxOrderSet, SemanticModel, add_inferred_python_version_hint_to_diagnostic};
 
@@ -295,6 +295,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
+        let invalid_reference =
+            Type::Dynamic(DynamicType::Unknown(UnknownOrigin::InvalidTypeReference));
         match self.legacy_type_alias_reference(ty, definition, annotation) {
             LegacyTypeAliasReference::Alias(alias, parameters) => {
                 let specialization =
@@ -302,7 +304,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let ty = alias.apply_optional_specialization(db, specialization);
                 return self.check_type_variable_scope(annotation, ty);
             }
-            LegacyTypeAliasReference::Invalid => return Type::unknown(),
+            LegacyTypeAliasReference::Invalid => return invalid_reference,
             LegacyTypeAliasReference::ValueFallback => {}
         }
         if annotation.is_attribute_expr()
@@ -321,7 +323,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if result.as_ref().is_ok_and(|result| !result.is_todo())
             && self.reject_non_alias_reference(ty, definition, annotation)
         {
-            return Type::unknown();
+            return invalid_reference;
         }
         report_missing_type_arguments(&self.context, ty, annotation);
         let result_ty = result.unwrap_or_else(|error| {
@@ -351,7 +353,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 };
                 invalid.add_subdiagnostics(db, env, diagnostic, annotation);
             }
-            error.fallback_type
+            if error.fallback_type == Type::unknown() {
+                invalid_reference
+            } else {
+                error.fallback_type
+            }
         });
         self.check_type_variable_scope(annotation, result_ty)
     }

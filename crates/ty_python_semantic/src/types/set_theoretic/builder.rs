@@ -49,8 +49,8 @@ use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
+    BytesLiteralType, ClassLiteral, DynamicType, EnumLiteralType, IntersectionType,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
     NegativeIntersectionElements, StringLiteralType, SubclassOfType, Type, TypePair,
     TypeVarBoundOrConstraints, UnionType,
 };
@@ -1313,6 +1313,15 @@ impl<'db> UnionBuilder<'db> {
             }
 
             if ty == element_type {
+                return;
+            }
+
+            // Cycle recovery skips relation checks. Different origins still denote
+            // the same gradual type, so retain the first `Unknown`.
+            if self.cycle_recovery
+                && matches!(ty, Type::Dynamic(DynamicType::Unknown(_)))
+                && matches!(element_type, Type::Dynamic(DynamicType::Unknown(_)))
+            {
                 return;
             }
 
@@ -3066,6 +3075,18 @@ mod tests {
                 assert!(union.elements(db).contains(&left));
                 assert!(union.elements(db).contains(&right));
             }
+        }
+    }
+
+    #[test]
+    fn cycle_recovery_deduplicates_unknowns_with_different_origins() {
+        use crate::types::{DynamicType, UnknownOrigin};
+
+        let db = setup_db();
+        let env = db.program_environment();
+        let invalid = Type::Dynamic(DynamicType::Unknown(UnknownOrigin::InvalidTypeReference));
+        for elements in [[invalid, Type::unknown()], [Type::unknown(), invalid]] {
+            assert!(UnionType::from_elements_cycle_recovery(&db, &env, elements).is_unknown());
         }
     }
 

@@ -2509,7 +2509,7 @@ impl<'db> Type<'db> {
     }
 
     pub const fn unknown() -> Self {
-        Self::Dynamic(DynamicType::Unknown)
+        Self::Dynamic(DynamicType::unknown())
     }
 
     pub(crate) fn divergent(id: salsa::Id) -> Self {
@@ -2622,7 +2622,7 @@ impl<'db> Type<'db> {
         matches!(
             self,
             Type::Dynamic(
-                DynamicType::Unknown
+                DynamicType::Unknown(_)
                     | DynamicType::UnknownGeneric(_)
                     | DynamicType::UnknownLambdaParameter
                     | DynamicType::AmbiguousOverload
@@ -2811,7 +2811,7 @@ impl<'db> Type<'db> {
     fn is_todo(&self) -> bool {
         self.as_dynamic().is_some_and(|dynamic| match dynamic {
             DynamicType::Any
-            | DynamicType::Unknown
+            | DynamicType::Unknown(_)
             | DynamicType::InvalidConcatenateUnknown
             | DynamicType::UnknownGeneric(_)
             | DynamicType::UnspecializedTypeVar
@@ -3712,7 +3712,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(dynamic) => match dynamic {
                 DynamicType::Any => true,
-                DynamicType::Unknown
+                DynamicType::Unknown(_)
                 | DynamicType::UnknownGeneric(_)
                 | DynamicType::UnspecializedTypeVar
                 | DynamicType::UnknownLambdaParameter
@@ -11153,7 +11153,7 @@ impl<'db> Type<'db> {
                 Type::SpecialForm(SpecialFormType::Any).definition(db, env)
             }
             Self::Dynamic(
-                DynamicType::Unknown
+                DynamicType::Unknown(_)
                 | DynamicType::UnknownGeneric(_)
                 | DynamicType::UnknownLambdaParameter
                 | DynamicType::AmbiguousOverload,
@@ -12113,12 +12113,21 @@ impl DivergentType {
     }
 }
 
+/// Why inference produced an `Unknown` type.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum UnknownOrigin {
+    /// Missing type information or an unspecified source of error.
+    Unspecified,
+    /// A name or attribute used as a type resolved to an invalid value.
+    InvalidTypeReference,
+}
+
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum DynamicType<'db> {
     /// An explicitly annotated `typing.Any`
     Any,
     /// An unannotated value, or a dynamic type resulting from an error
-    Unknown,
+    Unknown(UnknownOrigin),
     /// Similar to `Unknown`, this represents a dynamic type that has been explicitly specialized
     /// with legacy typevars, e.g. `UnknownClass[T]`, where `T` is a legacy typevar. We keep track
     /// of the type variables in the generic context in case this type is later specialized again.
@@ -12156,6 +12165,11 @@ pub enum DynamicType<'db> {
 }
 
 impl DynamicType<'_> {
+    /// Constructs an `Unknown` without a specific origin.
+    const fn unknown() -> Self {
+        Self::Unknown(UnknownOrigin::Unspecified)
+    }
+
     fn recursive_type_normalized(self) -> Self {
         self
     }
@@ -12169,7 +12183,7 @@ impl std::fmt::Display for DynamicType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DynamicType::Any => f.write_str("Any"),
-            DynamicType::Unknown
+            DynamicType::Unknown(_)
             | DynamicType::UnknownGeneric(_)
             | DynamicType::UnknownLambdaParameter
             | DynamicType::InvalidConcatenateUnknown

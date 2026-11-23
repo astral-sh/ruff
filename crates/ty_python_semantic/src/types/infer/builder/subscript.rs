@@ -476,7 +476,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.infer_explicit_type_alias_specialization(subscript, value_ty, false)
                 );
             }
-            Type::Dynamic(DynamicType::Unknown) => {
+            Type::Dynamic(DynamicType::Unknown(_)) => {
                 let slice_ty = self.infer_expression(slice, TypeContext::default());
                 let mut variables = FxOrderSet::default();
                 slice_ty.bind_and_find_all_legacy_typevars(

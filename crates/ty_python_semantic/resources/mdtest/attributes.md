@@ -3413,6 +3413,35 @@ def check(child: Child) -> None:
 Child.class_only = 1
 ```
 
+### Invalid inherited type references
+
+If a base annotation names a value that cannot be used as a type, the subclass initializer supplies
+the type. The qualifier still applies. Omitting a type argument leaves the corresponding attribute
+gradual.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar
+
+value = 1
+
+class Base[T]:
+    item: T
+    count: ClassVar[value]  # error: [invalid-type-form]
+
+class Child(Base):  # error: [missing-type-argument]
+    item = 1
+    count = 1
+
+reveal_type(Child.item)  # revealed: Unknown
+reveal_type(Child.count)  # revealed: int
+Child().count = 2  # error: [invalid-attribute-access]
+```
+
 ### Inherited declarations follow the MRO
 
 The first member in the MRO supplies the declaration. An unannotated member with no inherited

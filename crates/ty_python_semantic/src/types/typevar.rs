@@ -783,7 +783,7 @@ impl<'db> TypeVarInstance<'db> {
                 Type::Dynamic(dynamic) => match dynamic {
                     DynamicType::Todo(_) => Parameters::todo(),
                     DynamicType::Any
-                    | DynamicType::Unknown
+                    | DynamicType::Unknown(_)
                     | DynamicType::UnknownGeneric(_)
                     | DynamicType::UnspecializedTypeVar
                     | DynamicType::UnknownLambdaParameter

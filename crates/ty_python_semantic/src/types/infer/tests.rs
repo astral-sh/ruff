@@ -1711,6 +1711,67 @@ class Model(ModelBase):
     Ok(())
 }
 
+/// The decorator selects an overload based on `x`, whose inherited type refers back to
+/// the decorated class. Looking up `x` first, as an editor can, must select the same overload.
+#[test_case::test_case(r#"T = "Child.Value""#, "Base"; "default argument")]
+#[test_case::test_case("T", r#"Base["Child.Value"]"#; "explicit argument")]
+fn recursive_class_decorator_is_independent_of_query_order(
+    parameters: &str,
+    base: &str,
+) -> anyhow::Result<()> {
+    for infer_member_first in [false, true] {
+        let mut db = TestDbBuilder::new()
+            .with_python_version(PythonVersion::PY313)
+            .build()?;
+        let path = "/src/main.py";
+        db.write_dedented(
+            path,
+            &format!(
+                r#"
+            from typing import Protocol, assert_type, overload
+
+            class Fallback:
+                type Value = int
+
+            class HasStr(Protocol):
+                x: str
+
+            class HasInt(Protocol):
+                x: int
+
+            @overload
+            def choose[T: HasStr](cls: type[T]) -> type[T]: ...
+            @overload
+            def choose(cls: type[HasInt]) -> type[Fallback]: ...
+            def choose(cls):
+                return cls if isinstance(cls.x, str) else Fallback
+
+            class Base[{parameters}]:
+                x: T
+
+            @choose
+            class Child({base}):
+                x = 1
+                Value = x
+
+            assert_type(Child, type[Fallback])
+            "#
+            ),
+        )?;
+        if infer_member_first {
+            let file = program_file(&db, system_path_to_file(&db, path)?);
+            let module = parsed_module(&db, file.python_file(&db)).load(&db);
+            let child = semantic_index(&db, file)
+                .scope_ids()
+                .find(|scope| scope.name(&db, &module) == "Child")
+                .unwrap();
+            symbol(&db, child, "x", ConsideredDefinitions::EndOfScope);
+        }
+        assert_file_diagnostics(&db, path, &[]);
+    }
+    Ok(())
+}
+
 #[test]
 fn recursive_protocol_materialization_tracks_member_type_changes() -> anyhow::Result<()> {
     // Changing an imported type must invalidate the cached proof even when the protocol and its

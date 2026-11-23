@@ -5433,10 +5433,9 @@ impl<'db> Parameters<'db> {
     pub(crate) fn unknown() -> Self {
         Self::new(
             [
-                Parameter::variadic(Name::new_static("args"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
+                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::unknown()),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
+                    .with_annotated_type(Type::unknown()),
             ],
             ParametersKind::Gradual,
         )

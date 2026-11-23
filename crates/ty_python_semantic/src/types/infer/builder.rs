@@ -2002,7 +2002,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if has_explicit_type
                         && !should_preserve_inferred_binding_type(inferred_ty)
                         && !matches!(declared_type, Type::Divergent(_))
-                        && (!matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
+                        && (!matches!(declared_type, Type::Dynamic(DynamicType::Unknown(_)))
                             || declared_ty
                                 .qualifiers()
                                 .intersects(TypeQualifiers::FINAL | TypeQualifiers::CLASS_VAR))
@@ -4198,7 +4198,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             // `Unknown` is likely to be the result of an unresolved import or a typo, which will
             // already get a diagnostic, so don't pile on an extra diagnostic here.
-            Type::Dynamic(DynamicType::Unknown) => return,
+            Type::Dynamic(DynamicType::Unknown(_)) => return,
             _ => {}
         }
         if let Some(builder) = self
@@ -9435,7 +9435,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // return type as type context.
         let return_tcx = if let Some(signature) = callable_tcx {
             match signature.return_ty {
-                Type::Dynamic(DynamicType::Unknown) => TypeContext::preference(None),
+                Type::Dynamic(DynamicType::Unknown(_)) => TypeContext::preference(None),
                 _ => tcx.with_expected_type(Some(signature.return_ty)),
             }
         } else {

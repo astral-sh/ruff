@@ -44,7 +44,7 @@ pub enum ClassBase<'db> {
 
 impl<'db> ClassBase<'db> {
     pub(crate) const fn unknown() -> Self {
-        Self::Dynamic(DynamicType::Unknown)
+        Self::Dynamic(DynamicType::unknown())
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -70,7 +70,7 @@ impl<'db> ClassBase<'db> {
             ClassBase::Class(class) => class.name(db),
             ClassBase::Dynamic(DynamicType::Any) => "Any",
             ClassBase::Dynamic(
-                DynamicType::Unknown
+                DynamicType::Unknown(_)
                 | DynamicType::UnknownGeneric(_)
                 | DynamicType::UnknownLambdaParameter
                 | DynamicType::InvalidConcatenateUnknown

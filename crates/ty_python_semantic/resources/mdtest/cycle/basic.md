@@ -36,6 +36,133 @@ def f(x: f):
 reveal_type(f)  # revealed: def f(x: Unknown) -> Unknown
 ```
 
+## An inherited annotation refers to a type alias on the decorated subclass
+
+The decorator checks `Child.item` while ty is still resolving `Child.Item`. The inherited annotation
+must retain the reference to the alias so that `item` resolves to `type[str]`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+### Reference through a type parameter default
+
+```py
+from typing import Protocol, overload
+
+class HasItem(Protocol):
+    item: type[str]
+
+@overload
+def wrap[T: HasItem](cls: type[T]) -> type[T]: ...
+@overload
+def wrap(cls: object) -> object: ...
+def wrap(cls: object) -> object:
+    return cls
+
+class Base[T = "Child.Item"]:
+    item: type[T]
+
+@wrap
+class Child(Base):
+    item = str
+    type Item = item
+
+reveal_type(Child.item)  # revealed: type[str]
+```
+
+### Direct reference to the subclass alias
+
+Writing the reference directly in the annotation should yield the same result.
+
+```py
+from typing import Protocol, overload
+
+class HasItem(Protocol):
+    item: type[str]
+
+@overload
+def wrap[T: HasItem](cls: type[T]) -> type[T]: ...
+@overload
+def wrap(cls: object) -> object: ...
+def wrap(cls: object) -> object:
+    return cls
+
+class Base:
+    item: type["Child.Item"]
+
+@wrap
+class Child(Base):
+    item = str
+    type Item = item
+
+reveal_type(Child.item)  # revealed: type[str]
+```
+
+### The fallback overload can return a different class
+
+Only `Child` has a `name`. Its initializer satisfies `HasItem`, so the decorator preserves it.
+
+```py
+from typing import Protocol, overload
+
+class Fallback:
+    type Item = int
+
+class HasItem(Protocol):
+    item: type[str]
+
+@overload
+def wrap[T: HasItem](cls: type[T]) -> type[T]: ...
+@overload
+def wrap[U](cls: type[U]) -> type[Fallback] | type[U]: ...
+def wrap(cls: object) -> object:
+    return cls if getattr(cls, "item", None) is str else Fallback
+
+class Base:
+    item: type["Child.Item"]
+
+@wrap
+class Child(Base):
+    item = str
+    name = "child"
+    type Item = item
+
+reveal_type(Child)  # revealed: <class 'Child'>
+assert Child.name == "child"
+```
+
+### Invalid reference on the decorated subclass
+
+Even if the inferred decorator result changes during the cycle, member lookup in the class body must
+still see the original class. The string variable cannot serve as a type alias.
+
+```py
+from typing import Protocol, overload
+
+class Fallback:
+    type Item = type[str]
+
+class HasItem(Protocol):
+    item: type[str]
+
+@overload
+def wrap[T: HasItem](cls: type[T]) -> type[T]: ...
+@overload
+def wrap(cls: object) -> type[Fallback]: ...
+def wrap(cls):
+    return cls if cls.item is str else Fallback
+
+class Base:
+    item: "Child.Item"  # error: [invalid-type-form]
+
+@wrap
+class Child(Base):
+    item = str
+    Item = "int" if item else "str"
+```
+
 ## A `TypeVar` name depends on its own `__name__`
 
 The name passed to `TypeVar` comes from `T.__name__` in another module. Inferring `T.__name__` leads

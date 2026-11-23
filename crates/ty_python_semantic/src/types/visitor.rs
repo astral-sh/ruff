@@ -1282,7 +1282,7 @@ mod tests {
             Type::AlwaysTruthy,
             Type::AlwaysFalsy,
             Type::Dynamic(DynamicType::Any),
-            Type::Dynamic(DynamicType::Unknown),
+            Type::unknown(),
             Type::Dynamic(DynamicType::UnspecializedTypeVar),
             Type::Dynamic(DynamicType::InvalidConcatenateUnknown),
             Type::Dynamic(DynamicType::AmbiguousOverload),

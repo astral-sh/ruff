@@ -647,7 +647,7 @@ impl<'db> BoundSuperType<'db> {
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
-            Type::Never => SuperOwnerKind::Dynamic(DynamicType::Unknown),
+            Type::Never => SuperOwnerKind::Dynamic(DynamicType::unknown()),
             Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
             Type::Divergent(divergent) => SuperOwnerKind::Divergent(divergent),
             Type::Recursive(recursive) => {
@@ -682,7 +682,7 @@ impl<'db> BoundSuperType<'db> {
                 }
                 // `type[Protocol]` is structural: an inhabitant need not inherit from the protocol
                 // class, so its MRO cannot be recovered from the protocol's nominal origin.
-                SubclassOfInner::Protocol(_) => SuperOwnerKind::Dynamic(DynamicType::Unknown),
+                SubclassOfInner::Protocol(_) => SuperOwnerKind::Dynamic(DynamicType::unknown()),
                 SubclassOfInner::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
                 SubclassOfInner::TypeVar(bound_typevar) => {
                     match bound_typevar.require_bound_or_constraints(db, env) {
@@ -911,7 +911,7 @@ impl<'db> BoundSuperType<'db> {
         mro_iter: impl Iterator<Item = ClassBase<'db>> + Clone,
     ) -> impl Iterator<Item = ClassBase<'db>> + Clone {
         let Some(pivot_class) = self.pivot_class(db).into_class() else {
-            return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db, env, None));
+            return Either::Left(ClassBase::Dynamic(DynamicType::unknown()).mro(db, env, None));
         };
 
         let mut pivot_found = false;
