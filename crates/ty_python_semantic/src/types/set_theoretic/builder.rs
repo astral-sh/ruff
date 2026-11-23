@@ -3070,6 +3070,31 @@ mod tests {
     }
 
     #[test]
+    fn cycle_recovery_deduplicates_structurally_substituted_instances() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let mut elements: Vec<_> = (0..8)
+            .map(|i| Type::heterogeneous_tuple(&db, &env, [Type::int_literal(i)]))
+            .collect();
+        let expected = UnionType::from_elements_cycle_recovery(&db, &env, elements.iter().copied());
+
+        // Structural substitutions can construct a union without going through the builder.
+        elements.push(elements[0]);
+        let duplicate = UnionType::new(&db, elements.into_boxed_slice(), RecursivelyDefined::No);
+        for union in [expected.expect_union(), duplicate] {
+            assert_eq!(
+                Type::Union(union).recursive_type_normalized_impl(
+                    &db,
+                    &env,
+                    Type::pending_narrowing(),
+                    true
+                ),
+                Some(expected)
+            );
+        }
+    }
+
+    #[test]
     fn cycle_recovery_preserves_same_length_tuples() {
         let db = setup_db();
         let env = db.program_environment();
