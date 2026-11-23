@@ -587,6 +587,18 @@ def payload(pair: Top[tuple[dict[Any, Node[Any]], Node[Node[Any]]]]) -> int:
     return pair[1][0][0]  # error: [invalid-explicit-return] "expected `int`, found `object`"
 ```
 
+The dictionary value can also refer to `Node[Any]` through a function's return annotation.
+
+```py
+from ty_extensions._internal import TypeOf
+
+def make_node() -> Node[Any]:
+    return (1, ())
+
+def indirect(pair: Top[tuple[dict[Any, tuple[TypeOf[make_node]]], Node[Node[Any]]]]):
+    reveal_type(pair[1][0][0])  # revealed: object
+```
+
 ## Recursive tuple elements in a protocol
 
 Each element of `A` must be both another `A` and an `Items`. We can inspect an element without
