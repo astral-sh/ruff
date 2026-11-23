@@ -12,7 +12,7 @@ use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
 use crate::types::{
     ApplyTypeMappingVisitor, InstanceProjection, LiteralValueType, PromotionKind, PromotionMode,
-    Type, TypeContext, TypeMapping, TypePair, TypeQualifiers,
+    RecursiveTypeNormalizer, Type, TypeContext, TypeMapping, TypePair, TypeQualifiers,
 };
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet, Program};
@@ -717,30 +717,14 @@ impl<'db> UnionType<'db> {
         }
     }
 
-    /// Reuse cycle recovery for unions shared by multiple type arguments.
-    /// For example, both arms of `list[U] | set[U]` normalize `U` as a nested type.
-    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-    pub(super) fn normalize_nested_union(
+    pub(super) fn normalize_recursive(
         self,
         db: &'db dyn Db,
-        program: Program<'db>,
-        div: Type<'db>,
-    ) -> Option<Type<'db>> {
-        self.recursive_type_normalized_impl(
-            db,
-            &ProgramEnvironment::from_program(program),
-            div,
-            true,
-        )
-    }
-
-    pub(crate) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalizer: &mut RecursiveTypeNormalizer<'_, 'db>,
         nested: bool,
     ) -> Option<Type<'db>> {
+        let env = normalizer.env;
+        let div = normalizer.div;
         let mut builder = UnionBuilder::new(db, env)
             .unpack_aliases(false)
             .cycle_recovery(true)
@@ -749,7 +733,7 @@ impl<'db> UnionType<'db> {
         for ty in self.elements(db) {
             if nested {
                 // list[T | Divergent] => list[Divergent]
-                let ty = ty.recursive_type_normalized_impl(db, env, div, nested)?;
+                let ty = ty.normalize_recursive(db, normalizer, nested)?;
                 if ty.same_divergent_marker(div) {
                     return Some(ty);
                 }
@@ -763,7 +747,7 @@ impl<'db> UnionType<'db> {
                     continue;
                 }
                 builder.add_in_place(
-                    ty.recursive_type_normalized_impl(db, env, div, nested)
+                    ty.normalize_recursive(db, normalizer, nested)
                         .unwrap_or(div),
                 );
                 empty = false;

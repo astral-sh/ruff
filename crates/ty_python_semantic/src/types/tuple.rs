@@ -33,7 +33,7 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
-    IntersectionType, Type, TypeContext, TypeMapping, UnionType,
+    IntersectionType, RecursiveTypeNormalizer, Type, TypeContext, TypeMapping, UnionType,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::Truthiness;
@@ -288,24 +288,23 @@ impl<'db> TupleType<'db> {
         })
     }
 
-    pub(super) fn recursive_type_normalized_impl(
+    pub(super) fn normalize_recursive(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalizer: &mut RecursiveTypeNormalizer<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
-        let program = env.program(db);
+        let program = normalizer.env.program(db);
         let normalized = match self.tuple(db) {
             Tuple::Fixed(tuple) => {
-                let normalized = tuple.recursive_type_normalized_impl(db, env, div, nested)?;
+                let normalized = tuple.normalize_recursive(db, normalizer, nested)?;
                 if matches!(normalized, Cow::Borrowed(_)) && self.program(db) == program {
                     return Some(self);
                 }
                 Tuple::Fixed(normalized.into_owned())
             }
             Tuple::Variable(tuple) => {
-                Tuple::Variable(tuple.recursive_type_normalized_impl(db, env, div, nested)?)
+                Tuple::Variable(tuple.normalize_recursive(db, normalizer, nested)?)
             }
         };
         Some(Self::new_internal(db, program, normalized))
@@ -1023,21 +1022,15 @@ impl<T> FixedLengthTuple<T> {
 }
 
 impl<'db> FixedLengthTuple<Type<'db>> {
-    fn recursive_type_normalized_impl(
+    fn normalize_recursive(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalizer: &mut RecursiveTypeNormalizer<'_, 'db>,
         nested: bool,
     ) -> Option<Cow<'_, Self>> {
         let mut tuple = Cow::Borrowed(self);
         for (index, element) in self.0.iter().enumerate() {
-            let normalized = element.recursive_type_normalized_impl(db, env, div, true);
-            let normalized = if nested {
-                normalized?
-            } else {
-                normalized.unwrap_or(div)
-            };
+            let normalized = normalizer.normalize_argument(db, *element, nested)?;
             if normalized != *element {
                 tuple.to_mut().0[index] = normalized;
             }
@@ -1157,37 +1150,6 @@ impl<T, V> VariableLengthTuple<T, V> {
         suffix: impl IntoIterator<Item = T>,
     ) -> Tuple<T, V> {
         Tuple::Variable(Self::new(prefix, variable, suffix))
-    }
-
-    fn try_new<P, S>(prefix: P, variable: V, suffix: S) -> Option<Self>
-    where
-        P: IntoIterator<Item = Option<T>>,
-        P::IntoIter: ExactSizeIterator,
-        S: IntoIterator<Item = Option<T>>,
-        S::IntoIter: ExactSizeIterator,
-    {
-        let prefix = prefix.into_iter();
-        let suffix = suffix.into_iter();
-
-        let mut fixed_elements = SmallVec::with_capacity(prefix.len().saturating_add(suffix.len()));
-
-        for element in prefix {
-            fixed_elements.push(element?);
-        }
-
-        let prefix_len = fixed_elements.len();
-
-        for element in suffix {
-            fixed_elements.push(element?);
-        }
-
-        fixed_elements.shrink_to_fit();
-
-        Some(Self {
-            fixed_elements,
-            prefix_len,
-            variable_segment: variable,
-        })
     }
 
     fn new(
@@ -2183,58 +2145,20 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
         })
     }
 
-    fn recursive_type_normalized_impl(
+    fn normalize_recursive(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalizer: &mut RecursiveTypeNormalizer<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
-        if nested {
-            let prefix = self
-                .prefix_elements()
-                .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, env, div, true));
-
-            let variable_segment = match self.variable() {
-                VariableSegment::Homogeneous(variable) => VariableSegment::Homogeneous(
-                    variable.recursive_type_normalized_impl(db, env, div, true)?,
-                ),
-                VariableSegment::TypeVarTuple(typevartuple) => {
-                    VariableSegment::TypeVarTuple(typevartuple)
-                }
-            };
-
-            let suffix = self
-                .suffix_elements()
-                .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, env, div, true));
-
-            Self::try_new(prefix, variable_segment, suffix)
-        } else {
-            let prefix = self.prefix_elements().iter().map(|ty| {
-                ty.recursive_type_normalized_impl(db, env, div, true)
-                    .unwrap_or(div)
-            });
-
-            let variable_segment = match self.variable() {
-                VariableSegment::Homogeneous(variable) => VariableSegment::Homogeneous(
-                    variable
-                        .recursive_type_normalized_impl(db, env, div, true)
-                        .unwrap_or(div),
-                ),
-                VariableSegment::TypeVarTuple(typevartuple) => {
-                    VariableSegment::TypeVarTuple(typevartuple)
-                }
-            };
-
-            let suffix = self.suffix_elements().iter().map(|ty| {
-                ty.recursive_type_normalized_impl(db, env, div, true)
-                    .unwrap_or(div)
-            });
-
-            Some(Self::new(prefix, variable_segment, suffix))
+        let mut tuple = self.clone();
+        if let VariableSegment::Homogeneous(ty) = &mut tuple.variable_segment {
+            *ty = normalizer.normalize_argument(db, *ty, nested)?;
         }
+        for ty in &mut tuple.fixed_elements {
+            *ty = normalizer.normalize_argument(db, *ty, nested)?;
+        }
+        Some(tuple)
     }
 
     fn apply_type_mapping_impl<'a>(
