@@ -11148,7 +11148,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         source_place: &SourcePlace,
         expr_ref: ast::ExprRef,
-    ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
+    ) -> (PlaceAndQualifiers<'db>, crate::place_load::ConstraintKeys) {
         let mode = if self.is_deferred() && self.in_string_annotation() {
             PlaceLoadMode::StringAnnotation
         } else if self.is_deferred() {
@@ -11402,7 +11402,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::ExprAttribute { value, attr, .. } = attribute;
 
         let db = self.db();
-        let mut constraint_keys = vec![];
+        let mut constraint_keys = crate::place_load::ConstraintKeys::new();
 
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
             && typevar.is_paramspec(db)
@@ -11422,7 +11422,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(place_expr) = &place_expr {
             let (resolved, keys) =
                 self.infer_place_load(place_expr, ast::ExprRef::Attribute(attribute));
-            constraint_keys.extend(keys);
+            constraint_keys = keys;
             if let Place::Defined(
                 place @ DefinedPlace {
                     definedness: Definedness::AlwaysDefined,

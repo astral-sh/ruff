@@ -214,7 +214,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.store_typed_dict_key_expected_type(slice, value_ty);
 
-        let mut constraint_keys = vec![];
+        let mut constraint_keys = crate::place_load::ConstraintKeys::new();
 
         // If `value` is a valid reference, we attempt type narrowing by assignment.
         let source_place = (!value_ty.is_unknown())
@@ -223,7 +223,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             if let Some(expr) = &source_place {
                 let (place, keys) = self.infer_place_load(expr, ast::ExprRef::Subscript(subscript));
-                constraint_keys.extend(keys);
+                constraint_keys = keys;
                 if let Place::Defined(DefinedPlace {
                     ty,
                     definedness: Definedness::AlwaysDefined,

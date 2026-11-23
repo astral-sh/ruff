@@ -32,6 +32,9 @@ use crate::place::{
 use crate::reachability::ReachabilityEvaluationCache;
 use crate::types::{ProgramEnvironment, Type, original_class_type};
 
+/// A read usually needs at most the constraint from its own scope.
+pub(crate) type ConstraintKeys = SmallVec<[(FileScopeId, ConstraintKey); 1]>;
+
 /// Evaluates the possible sources of a place load's value.
 ///
 /// The value may come from bindings in the load's own scope, an enclosing scope,
@@ -260,7 +263,7 @@ pub(crate) struct ResolvedPlaceLoad<'db> {
     /// or the `reveal_type` fallback.
     pub(crate) deprecation_target: PlaceAndQualifiers<'db>,
     /// Constraint keys accumulated for expression-level narrowing.
-    pub(crate) constraint_keys: Vec<(FileScopeId, ConstraintKey)>,
+    pub(crate) constraint_keys: ConstraintKeys,
     /// Whether resolution followed a `global` or `nonlocal` declaration.
     pub(crate) crosses_scope_declaration: bool,
 }
@@ -858,7 +861,7 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
         self.constraints.narrowing_constraints_for(source)
     }
 
-    fn into_constraints(self) -> Vec<(FileScopeId, ConstraintKey)> {
+    fn into_constraints(self) -> ConstraintKeys {
         self.constraints.into_constraints()
     }
 
@@ -1395,7 +1398,7 @@ struct ForwardedGlobalSnapshot<'db> {
 /// Narrowing constraints accumulated while a consumer advances through a place load.
 #[derive(Default)]
 struct PlaceLoadConstraints {
-    constraint_keys: Vec<(FileScopeId, ConstraintKey)>,
+    constraint_keys: ConstraintKeys,
 }
 
 impl PlaceLoadConstraints {
@@ -1458,7 +1461,7 @@ impl PlaceLoadConstraints {
     }
 
     /// Returns the constraints activated by the sources that were requested.
-    fn into_constraints(self) -> Vec<(FileScopeId, ConstraintKey)> {
+    fn into_constraints(self) -> ConstraintKeys {
         self.constraint_keys
     }
 }
