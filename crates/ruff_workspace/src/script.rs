@@ -132,7 +132,7 @@ pub fn script(
         return Ok(None);
     }
 
-    let Some(metadata) = script_metadata(path, source)? else {
+    let Some(metadata) = script_metadata(path, source, script_configuration)? else {
         return Ok(None);
     };
 
@@ -189,6 +189,7 @@ struct ScriptMetadata {
 fn script_metadata(
     path: Option<&Path>,
     source: &str,
+    script_configuration: ScriptConfiguration,
 ) -> Result<Option<ScriptMetadata>, ScriptSettingsError> {
     let Some(tag) = ScriptTag::parse(source) else {
         return Ok(None);
@@ -201,8 +202,12 @@ fn script_metadata(
     };
 
     let root = toml::de::DeTable::parse(tag.metadata()).map_err(toml_error)?;
-    check_required_version(root.get_ref(), &["tool", "ruff"])
-        .map_err(|err| ScriptSettingsError::configuration(path, &err))?;
+    // As with project configuration, report a version mismatch before an unknown
+    // option introduced in a newer Ruff. Only enforce the version if we use these settings.
+    if script_configuration == ScriptConfiguration::Enabled {
+        check_required_version(root.get_ref(), &["tool", "ruff"])
+            .map_err(|err| ScriptSettingsError::configuration(path, &err))?;
+    }
 
     let source = path.map_or(ValueSource::Cli, |path| {
         ValueSource::File(Arc::new(SystemPathBuf::from_path_buf_lossy(

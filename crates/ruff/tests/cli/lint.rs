@@ -4541,6 +4541,7 @@ fn isolated_ignores_script_settings() -> Result<()> {
         r#"
             # /// script
             # requires-python = '>=3.9'
+            # tool.ruff.required-version = '>=99'
             # tool.ruff.extend = 'missing.toml'
             # ///
             from typing import Optional
@@ -4551,7 +4552,7 @@ fn isolated_ignores_script_settings() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    script.py:7:4: non-pep604-annotation-optional: [*] Use `X | None` for type annotations
+    script.py:8:4: non-pep604-annotation-optional: [*] Use `X | None` for type annotations
     Found 1 error.
     [*] 1 fixable with `--fix`.
 
