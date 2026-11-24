@@ -8,7 +8,7 @@ use ruff_python_ast::visitor::source_order::{
 use ruff_python_ast::{
     AnyNodeRef, ExprAttribute, ExprCall, ExprGenerator, ExprRef, ExprSubscript, Stmt,
 };
-use ruff_python_trivia::{CommentLinePosition, is_python_whitespace};
+use ruff_python_trivia::{CommentLinePosition, PythonWhitespace, is_python_whitespace};
 use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -328,17 +328,16 @@ impl<'a> FoldingRangeVisitor<'a> {
             if !self.intersects_range_filter(comment_range) {
                 continue;
             }
-            let text = &self.source[comment_range];
-            let trimmed = text.strip_prefix('#').unwrap_or(text).trim_start();
-            if trimmed.starts_with("region") {
+            let text = self.comment_body(comment_range);
+            if text.starts_with("region") {
                 region_starts.push(comment_range.start());
-            } else if trimmed.starts_with("endregion") {
-                if let Some(start) = region_starts.pop() {
-                    self.add_range(
-                        FoldingRange::from(TextRange::new(start, comment_range.end()))
-                            .with_kind(FoldingRangeKind::Region),
-                    );
-                }
+            } else if text.starts_with("endregion")
+                && let Some(start) = region_starts.pop()
+            {
+                self.add_range(
+                    FoldingRange::from(TextRange::new(start, comment_range.end()))
+                        .with_kind(FoldingRangeKind::Region),
+                );
             }
         }
     }
@@ -356,8 +355,7 @@ impl<'a> FoldingRangeVisitor<'a> {
                 continue;
             }
 
-            let comment = &self.source[comment_range];
-            let text = comment.strip_prefix('#').unwrap_or(comment).trim_start();
+            let text = self.comment_body(comment_range);
 
             // Check if this is a comment line (but not a region marker)
             let is_non_region_comment =
@@ -396,6 +394,11 @@ impl<'a> FoldingRangeVisitor<'a> {
         if let Some(range) = comment_block_range {
             self.add_range(FoldingRange::from(range).with_kind(FoldingRangeKind::Comment));
         }
+    }
+
+    fn comment_body(&self, range: TextRange) -> &str {
+        let comment = self.source[range].trim_whitespace_start();
+        comment.strip_prefix('#').unwrap_or(comment).trim_start()
     }
 
     /// Add a folding range for a docstring if present at the start of a body.
@@ -2143,6 +2146,47 @@ def main():
          9 | |     pass
         10 | | # endregion
            | |___________^
+        ");
+    }
+
+    #[test]
+    fn folding_region_inside_function() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                def total(prices):
+                    # region Apply discount
+                    # Members get 10% off.
+                    discounted = sum(prices) * 0.9
+                    # endregion
+                    return discounted
+                <CURSOR>
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:19
+          |
+        2 |   def total(prices):
+          |  ___________________^
+        3 | |     # region Apply discount
+        4 | |     # Members get 10% off.
+        5 | |     discounted = sum(prices) * 0.9
+        6 | |     # endregion
+        7 | |     return discounted
+          | |_____________________^
+
+        info[folding-range]: Folding Range (region)
+         --> main.py:3:1
+          |
+        3 | /     # region Apply discount
+        4 | |     # Members get 10% off.
+        5 | |     discounted = sum(prices) * 0.9
+        6 | |     # endregion
+          | |_______________^
         ");
     }
 
