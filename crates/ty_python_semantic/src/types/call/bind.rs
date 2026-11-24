@@ -9476,13 +9476,15 @@ impl<'db> Binding<'db> {
         let mut ambiguous = FxHashSet::default();
         let mut invariant = FxHashMap::default();
         let mut omitted = SmallVec::<[_; 2]>::new();
-        let mut siblings = self.argument_matches.clone();
-        for (matched, argument) in siblings.iter_mut().zip(arguments.iter()) {
+        let concrete = |actual: Type<'db>| !actual.is_union() && actual.is_fully_static(db, env);
+        let mut pending = SmallVec::<[_; 4]>::new();
+        let matches = self.argument_matches.iter().zip(arguments.iter());
+        for (index, (matched, argument)) in matches.enumerate() {
             let fixed = !argument.source_types().context_sensitive;
-            matched.parameters.retain(|param| {
+            for mut param in matched.iter() {
                 let raw = self.signature.parameters()[param.index].annotated_type();
                 let Some(actual) = argument.matched_type(raw, param.argument_type) else {
-                    return false;
+                    continue;
                 };
                 let ty = param
                     .expected_type
@@ -9523,28 +9525,48 @@ impl<'db> Binding<'db> {
                         invariant.insert(var, hint);
                     }
                 }
-                if !circular {
-                    let concrete = || !actual.is_union() && actual.is_fully_static(db, env);
-                    if arms.is_empty() {
-                        // [1, "x"] supplies its own element types for list[T]. A Tree
-                        // inside Tree[T] could come from substituting a previous hint.
-                        if keep
-                            || (concrete()
-                                && !any_over_type(db, env, actual, false, |part| {
-                                    part != actual && accepts(ty, part)
-                                }))
-                        {
-                            return true;
-                        }
-                    } else if ty.is_union() && (fixed || concrete()) {
-                        // An intersection still requires the bare variable.
-                        param.expected_type = Some(UnionType::from_elements(db, env, arms));
-                        return true;
-                    }
+                if circular {
+                    omitted.push(ty);
+                    continue;
                 }
+                if !arms.is_empty() {
+                    // An intersection still requires the bare variable.
+                    if !ty.is_union() || !(fixed || concrete(actual)) {
+                        omitted.push(ty);
+                        continue;
+                    }
+                    param.expected_type = Some(UnionType::from_elements(db, env, arms));
+                }
+                pending.push((index, param, (!keep).then_some((ty, actual))));
+            }
+        }
+        // Without either source of a growing hint, skip checking whether other arguments
+        // contain their own parameter type. For `next(generator, None)`, that would
+        // test every member of the generator's yield type against `SupportsNext[T]`.
+        if ambiguous.is_empty() && invariant.is_empty() {
+            return None;
+        }
+        let mut siblings: Vec<_> = self
+            .argument_matches
+            .iter()
+            .map(|matched| MatchedArgument {
+                parameters: SmallVec::new(),
+                ..*matched
+            })
+            .collect();
+        for (index, param, check) in pending {
+            // [1, "x"] supplies its own element types for list[T]. A Tree
+            // inside Tree[T] could come from substituting a previous hint.
+            if let Some((ty, actual)) = check
+                && (!concrete(actual)
+                    || any_over_type(db, env, actual, false, |part| {
+                        part != actual && accepts(ty, part)
+                    }))
+            {
                 omitted.push(ty);
-                false
-            });
+                continue;
+            }
+            siblings[index].parameters.push(param);
         }
         // In `select(xs, Tree(Branch()))`, the inner call can add `Branch[Unknown]`
         // to T. Substituting T into the outer `tree: Tree[T]` parameter then puts
