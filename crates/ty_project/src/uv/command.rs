@@ -10,6 +10,7 @@ use ty_static::EnvVars;
 use super::{UvMetadata, UvMetadataError};
 
 pub(super) const MINIMUM_UV_VERSION: [u64; 3] = [0, 12, 3];
+const OUTPUT_VERSION_UV_VERSION: [u64; 3] = [0, 13, 7];
 
 #[derive(Clone)]
 pub(crate) struct Uv {
@@ -52,25 +53,55 @@ impl Uv {
         executor: &dyn CommandExecutor,
         target: &MetadataTarget<'_>,
     ) -> Result<Output, UvMetadataError> {
+        let output = self.execute_metadata(executor, target, Some("preview"))?;
+
+        if output.status.code() == Some(2)
+            && let Some(version) = self.version(executor, target.directory())
+        {
+            if version < Version::new(MINIMUM_UV_VERSION) {
+                return Err(UvMetadataError::UnsupportedVersion {
+                    executable: self.executable.clone(),
+                    version,
+                });
+            }
+
+            if version < Version::new(OUTPUT_VERSION_UV_VERSION) {
+                tracing::debug!(
+                    "Retrying uv metadata without --output-version because uv {version} does not support it"
+                );
+                return self.execute_metadata(executor, target, None);
+            }
+        }
+
+        Ok(output)
+    }
+
+    fn execute_metadata(
+        &self,
+        executor: &dyn CommandExecutor,
+        target: &MetadataTarget<'_>,
+        output_version: Option<&str>,
+    ) -> Result<Output, UvMetadataError> {
         let mut command = Command::new(self.executable.as_str());
         command.args(["workspace", "metadata", "--quiet"]);
+        if let Some(output_version) = output_version {
+            command.args(["--output-version", output_version]);
+        }
 
-        let directory = match target {
-            MetadataTarget::Workspace(path) => {
+        match target {
+            MetadataTarget::Workspace(_) => {
                 // Use the environment selected by `uv check` without synchronizing it.
                 // Let uv apply its configured lockfile policy.
                 command.arg("--active");
-                Some(*path)
             }
             MetadataTarget::Script { path, python } => {
                 command.args(["--sync", "--script", path.as_str()]);
                 if let Some(python) = python {
                     command.args(["--python", python.as_str()]);
                 }
-                path.parent()
             }
-        };
-        if let Some(directory) = directory {
+        }
+        if let Some(directory) = target.directory() {
             command.current_dir(directory);
         }
 
@@ -88,24 +119,11 @@ impl Uv {
             start.elapsed().as_secs_f64()
         );
 
-        let output = output.map_err(|error| UvMetadataError::Invocation {
+        output.map_err(|error| UvMetadataError::Invocation {
             executable: self.executable.clone(),
             from_env: self.from_env,
             error: Arc::new(error),
-        })?;
-
-        // Before uv 0.12.3, `--quiet` suppresses the metadata JSON even on success.
-        if (!output.status.success() || output.stdout.is_empty())
-            && let Some(version) = self.version(executor, directory)
-            && version < Version::new(MINIMUM_UV_VERSION)
-        {
-            return Err(UvMetadataError::UnsupportedVersion {
-                executable: self.executable.clone(),
-                version,
-            });
-        }
-
-        Ok(output)
+        })
     }
 
     fn version(
@@ -162,6 +180,15 @@ pub(crate) enum MetadataTarget<'path> {
         /// The optional `--python` argument.
         python: Option<&'path SystemPath>,
     },
+}
+
+impl MetadataTarget<'_> {
+    fn directory(&self) -> Option<&SystemPath> {
+        match self {
+            Self::Workspace(path) => Some(*path),
+            Self::Script { path, .. } => path.parent(),
+        }
+    }
 }
 
 pub(super) fn unsupported_command_execution() -> std::io::Error {
