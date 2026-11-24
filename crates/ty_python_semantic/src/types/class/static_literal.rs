@@ -2934,7 +2934,7 @@ impl<'db> StaticClassLiteral<'db> {
             // us to generate a union of `__init__` methods.
             if !declarations.clone().contains_only_annotated_assignments(db) {
                 if is_attrs {
-                    decorated_defaults.collect(db, declarations);
+                    decorated_defaults.collect_default_generator(db, declarations);
                 }
                 continue;
             }
@@ -3022,7 +3022,7 @@ impl<'db> StaticClassLiteral<'db> {
                 {
                     default_ty = field.default_type(db).or_else(|| {
                         decorated_defaults
-                            .contains(db, symbol_id.into(), field)
+                            .has_default(db, symbol_id.into(), field)
                             .then_some(Type::unknown())
                     });
                     init = field.init(db);

@@ -93,6 +93,21 @@ pub(in crate::types) fn generic_identity_function<'db>(
 }
 
 /// Keeps track of fields that have a default value provided through a `@<field>.default`-decorated method.
+///
+/// For the following class, `collect_default_generator` will be called for the `default_id` method. It will
+/// then record the field so that it can later be recognized as having a default value.
+///
+/// ```python
+/// from attrs import define, field
+///
+/// @define
+/// class User:
+///     id: int = field()
+///
+///     @id.default
+///     def default_id(self) -> int:
+///         return 0
+/// ```
 pub(in crate::types) struct DecoratedDefaults {
     fields: FxHashSet<ScopedPlaceId>,
 }
@@ -104,7 +119,8 @@ impl DecoratedDefaults {
         }
     }
 
-    pub(in crate::types) fn contains<'db>(
+    /// Whether or not the attrs class contains a `@<field>.default`-decorated method for the given field.
+    pub(in crate::types) fn has_default<'db>(
         &self,
         db: &'db dyn Db,
         place: ScopedPlaceId,
@@ -113,7 +129,10 @@ impl DecoratedDefaults {
         self.fields.contains(&place) && field.kind(db) == FieldInstanceKind::Attrs
     }
 
-    pub(in crate::types) fn collect<'db>(
+    /// This function is called for declarations in the attrs class. If the declaration refers
+    /// to a method with a `@<field>.default` decorator, it records the field so that we can
+    /// later determine if it has a default value.
+    pub(in crate::types) fn collect_default_generator<'db>(
         &mut self,
         db: &'db dyn Db,
         declarations: DeclarationsIterator<'_, 'db>,
