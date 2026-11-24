@@ -55,7 +55,7 @@ impl Uv {
     ) -> Result<Output, UvMetadataError> {
         let output = self.execute_metadata(executor, target, Some("preview"))?;
 
-        if !output.status.success()
+        if output.status.code() == Some(2)
             && let Some(version) = self.version(executor, target.directory())
         {
             if version < Version::new(MINIMUM_UV_VERSION) {
