@@ -770,7 +770,8 @@ pub static DUMMY_VARIABLE_RGX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^(_+|(_+[\p{XID_Continue}]*[\p{XID_Continue}--_]+?))$").unwrap());
 
 impl LinterSettings {
-    pub fn for_rule(rule_code: Rule) -> Self {
+    #[cfg(test)]
+    pub(crate) fn for_rule(rule_code: Rule) -> Self {
         Self {
             rules: RuleTable::from_iter([rule_code]),
             unresolved_target_version: PythonVersion::latest().into(),
