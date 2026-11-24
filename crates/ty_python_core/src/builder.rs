@@ -47,6 +47,7 @@ use crate::place::{
     PlaceExpr, PlaceTable, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId,
     match_subject_place_expressions,
 };
+use crate::platform::PythonPlatform;
 use crate::predicate::{
     CallableAndCallExpr, ClassPatternKeywordPredicateKind, ClassPatternPredicateKind,
     MappingPatternEntryPredicateKind, MappingPatternPredicateKind, PatternPredicate,
@@ -2237,7 +2238,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         self.register_narrowing_alias_predicates(predicate_node);
 
-        if let Some(literal) = resolve_to_literal(predicate_node) {
+        let literal = resolve_to_literal(predicate_node).or_else(|| {
+            // Only the bundled stubs can assume that `sys` refers to the standard library.
+            if !self.source_type.is_stub()
+                || !self.file.file(self.db).path(self.db).is_vendored_path()
+            {
+                return None;
+            }
+            environment_check(
+                predicate_node,
+                self.python_version,
+                self.file.program(self.db).python_platform(self.db),
+            )
+        });
+        if let Some(literal) = literal {
             if registered.is_none() {
                 self.add_standalone_expression(predicate_node);
             }
@@ -6251,6 +6265,53 @@ fn literal_iterable_truthiness(expr: &ast::Expr) -> Truthiness {
         | ast::Expr::StringLiteral(_)
         | ast::Expr::BytesLiteral(_) => Truthiness::from_expr(expr, |_| false),
         _ => Truthiness::Unknown,
+    }
+}
+
+/// Resolve common version and platform guards before building constraints for both branches.
+pub(super) fn environment_check(
+    expr: &ast::Expr,
+    version: PythonVersion,
+    platform: &PythonPlatform,
+) -> Option<bool> {
+    let (left, op, right) = expr.as_compare_expr()?.as_single()?;
+    let attribute = left.as_attribute_expr()?;
+    if attribute.value.as_name_expr()?.id != "sys" {
+        return None;
+    }
+    match attribute.attr.as_str() {
+        "version_info" => {
+            let [major, minor] = right.as_tuple_expr()?.elts.as_slice() else {
+                return None;
+            };
+            let component = |expr: &ast::Expr| match &expr.as_number_literal_expr()?.value {
+                ast::Number::Int(value) => value.as_u8(),
+                _ => None,
+            };
+            let cutoff = PythonVersion {
+                major: component(major)?,
+                minor: component(minor)?,
+            };
+            // For these operators, truncating `sys.version_info` preserves the
+            // comparison even when the first two components match the cutoff.
+            match op {
+                ast::CmpOp::GtE => Some(version >= cutoff),
+                ast::CmpOp::Lt => Some(version < cutoff),
+                _ => None,
+            }
+        }
+        "platform" => {
+            let PythonPlatform::Identifier(platform) = platform else {
+                return None;
+            };
+            let name = right.as_string_literal_expr()?.value.to_str();
+            match op {
+                ast::CmpOp::Eq => Some(platform == name),
+                ast::CmpOp::NotEq => Some(platform != name),
+                _ => None,
+            }
+        }
+        _ => None,
     }
 }
 
