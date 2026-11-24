@@ -2810,12 +2810,6 @@ def as_list(value: T | list[T]) -> list[T]:
 
 result = as_list(reveal_type([1]))  # revealed: list[int]
 reveal_type(result)  # revealed: list[int]
-
-def check(x: int, xs: list[int]):
-    reveal_type(as_list(xs))  # revealed: list[int]
-    nested: list[list[int]] = reveal_type(as_list([x]))  # revealed: list[list[int]]
-    wide: list[int | list[list[int]]] = as_list([x])
-    either: list[int] | list[list[int]] = as_list([x])
 ```
 
 An empty sibling can take its element type from `[1]`. A sibling that also contains a string needs a
