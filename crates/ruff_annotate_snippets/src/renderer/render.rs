@@ -538,7 +538,7 @@ fn format_origin(origin: &Origin<'_>, anonymized_line_numbers: bool) -> String {
 
     let mut buffer = String::new();
     if let Some(path) = &origin.path {
-        write!(&mut buffer, "{path}").unwrap();
+        push_escaped(&mut buffer, path);
     }
     if let Some(cell_index) = origin.cell_index {
         if !buffer.is_empty() {
@@ -2597,7 +2597,6 @@ const OUTPUT_REPLACEMENTS: &[(char, &str)] = &[
     ('\u{0018}', "␘"),
     ('\u{0019}', "␙"),
     ('\u{001a}', "␚"),
-    ('\u{001b}', "␛"),
     ('\u{001c}', "␜"),
     ('\u{001d}', "␝"),
     ('\u{001e}', "␞"),
@@ -2615,21 +2614,54 @@ const OUTPUT_REPLACEMENTS: &[(char, &str)] = &[
     ('\u{2069}', "�"),
 ];
 
+/// Some terminals also recognize the C1 equivalents of ESC sequences.
+fn terminal_escape(ch: char) -> Option<char> {
+    match ch {
+        '\u{001b}' => Some('␛'),
+        '\u{0080}'..='\u{009f}' => Some('�'),
+        _ => None,
+    }
+}
+
+/// Escape labels before measuring them for layout.
+pub(crate) fn escape_label(label: Cow<'_, str>) -> Cow<'_, str> {
+    let Some(start) = label.find(|ch| terminal_escape(ch).is_some()) else {
+        return label;
+    };
+
+    let mut escaped = String::with_capacity(label.len());
+    escaped.push_str(&label[..start]);
+    push_escaped(&mut escaped, &label[start..]);
+    Cow::Owned(escaped)
+}
+
+/// Escape paths only for display, so file comparisons use the original paths.
+pub(super) fn push_escaped(output: &mut String, text: &str) {
+    let mut start = 0;
+    for (i, ch) in text.char_indices() {
+        if let Some(visible) = terminal_escape(ch) {
+            output.push_str(&text[start..i]);
+            output.push(visible);
+            start = i + ch.len_utf8();
+        }
+    }
+    output.push_str(&text[start..]);
+}
+
 pub(crate) fn normalize_whitespace(s: &str) -> Cow<'_, str> {
-    // All non-ASCII characters in OUTPUT_REPLACEMENTS start with 0xE2 in UTF-8.
+    // Non-ASCII replacements start with 0xC2 (C1 controls) or 0xE2 in UTF-8.
     let mut may_need_replacement = false;
     for byte in s.bytes() {
         let control = byte.is_ascii_control() && byte != b'\n';
-        may_need_replacement |= control | (byte == 0xe2);
+        may_need_replacement |= control | (byte == 0xc2) | (byte == 0xe2);
     }
     if !may_need_replacement {
         return Cow::Borrowed(s);
     }
 
-    if !s
-        .chars()
-        .any(|user| OUTPUT_REPLACEMENTS.iter().any(|(bad, _)| user == *bad))
-    {
+    if !s.chars().any(|user| {
+        terminal_escape(user).is_some() || OUTPUT_REPLACEMENTS.iter().any(|(bad, _)| user == *bad)
+    }) {
         return Cow::Borrowed(s);
     }
 
@@ -2639,7 +2671,7 @@ pub(crate) fn normalize_whitespace(s: &str) -> Cow<'_, str> {
     let normalized = s.chars().fold(String::with_capacity(s.len()), |mut s, c| {
         match OUTPUT_REPLACEMENTS.binary_search_by_key(&c, |(k, _)| *k) {
             Ok(i) => s.push_str(OUTPUT_REPLACEMENTS[i].1),
-            _ => s.push(c),
+            _ => s.push(terminal_escape(c).unwrap_or(c)),
         }
         s
     });
