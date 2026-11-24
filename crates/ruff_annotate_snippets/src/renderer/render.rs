@@ -2581,7 +2581,7 @@ pub(crate) fn normalize_whitespace(s: &str) -> Cow<'_, str> {
     let mut start = 0;
     for (i, ch) in s.char_indices() {
         // Skip the match for the common case of printable ASCII between replacements.
-        if matches!(ch, ' '..='~') {
+        if ch.is_ascii_graphic() || ch == ' ' {
             continue;
         }
         let replacement = match ch {
