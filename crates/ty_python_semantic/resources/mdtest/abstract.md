@@ -641,10 +641,17 @@ class Example(ABC):
 Example()  # error: [abstract-class-instantiation]
 ```
 
-## Descriptor classes and optional fields
+## Descriptor classes and optional fields in dependencies
 
-A descriptor that just initializes an instance is concrete. A decorator class with a custom
-`__new__` can return an abstract method.
+A dependency can export a concrete class with a cached property and an optional field. A decorator
+class with a custom `__new__` can return an abstract method.
+
+```toml
+[environment]
+python = "/.venv"
+```
+
+`/.venv/<path-to-site-packages>/dependency.py`:
 
 ```py
 from abc import ABC, abstractmethod
@@ -665,10 +672,8 @@ class Concrete(ABC):
     def value(self) -> int:
         return 1
 
-Concrete()
-
 class Decorator:
-    def __new__(cls, func: "t.Annotated[object, Abstract()]") -> TypeOf[Base.method]:  # error: [abstract-class-instantiation]
+    def __new__(cls, func: "t.Annotated[object, Abstract()]") -> TypeOf[Base.method]:
         return Base.method
 
 class Abstract(ABC):
@@ -676,13 +681,6 @@ class Abstract(ABC):
     def method(self) -> int:
         return 1
 
-Abstract()  # error: [abstract-class-instantiation]
-```
-
-Narrowing the runtime value of a legacy alias to `typing.Optional` does not change what the alias
-means in a type expression. The invalid assignment below retains the abstract method.
-
-```py
 T = t.TypeVar("T")
 
 def is_optional(value: object) -> t.TypeGuard[TypeOf[t.Optional]]:
@@ -691,19 +689,33 @@ def is_optional(value: object) -> t.TypeGuard[TypeOf[t.Optional]]:
 class Narrowed(ABC):
     Alias: t.TypeAlias = t.Annotated[T, 1]
     assert is_optional(Alias)
-    method: Alias[Method] = None  # error: [invalid-assignment]
+    method: Alias[Method] = None
+```
 
+Narrowing the runtime value of a legacy alias to `typing.Optional` does not change what the alias
+means in a type expression. The invalid assignment in `Narrowed` retains the abstract method.
+
+`main.py`:
+
+```py
+from dependency import Abstract, Concrete, Narrowed
+
+Concrete()
+Abstract()  # error: [abstract-class-instantiation]
 Narrowed()  # error: [abstract-class-instantiation]
 ```
 
-## Recursive constructor annotation
+## Recursive constructor annotation in a dependency
 
 Checking whether a class is abstract can depend on constructing that same class through an alias.
 
 ```toml
 [environment]
+python = "/.venv"
 python-version = "3.12"
 ```
+
+`/.venv/<path-to-site-packages>/dependency.py`:
 
 ```py
 from __future__ import annotations
@@ -713,10 +725,15 @@ from ty_extensions._internal import TypeOf
 class C:
     __new__: Optional[Result] = None
 
+type Result = TypeOf[C()]
+```
+
+`main.py`:
+
+```py
+from dependency import C
+
 # error: [not-callable]
 # error: [not-callable]
 C()
-# error: [not-callable]
-# error: [not-callable]
-type Result = TypeOf[C()]
 ```

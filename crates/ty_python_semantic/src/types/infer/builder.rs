@@ -12837,6 +12837,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .returns
                             .as_deref()
                             .is_some_and(super::is_simple_annotation)
+                        && super::is_in_site_packages(self.db(), definition)
                         && class.constructs_plain_instance(self.db())
                     {
                         continue;

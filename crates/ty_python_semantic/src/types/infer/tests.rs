@@ -1782,7 +1782,7 @@ fn recursive_protocol_materialization_tracks_member_type_changes() -> anyhow::Re
 }
 
 #[test]
-fn abstract_methods_track_changes_to_decorators() -> anyhow::Result<()> {
+fn abstract_methods_track_changes_to_identity_decorators() -> anyhow::Result<()> {
     let mut db = setup_db();
     let module = "/src/main.py";
     db.write_file(
@@ -1800,7 +1800,20 @@ fn abstract_methods_track_changes_to_decorators() -> anyhow::Result<()> {
 
     db.write_file(decorator, identity)?;
     assert_file_diagnostics(&db, module, &[]);
+    Ok(())
+}
 
+#[test]
+fn abstract_methods_track_changes_to_library_decorators() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new().with_third_party_packages().build()?;
+    let module = "/src/main.py";
+    db.write_file(module, "from dependency import Base\nBase()")?;
+    db.write_file(
+        "/.venv/lib/python3.13/site-packages/dependency.py",
+        "from decorate import decorate\nclass Base:\n    @decorate\n    def method(self) -> int: return 1",
+    )?;
+
+    let decorator = "/.venv/lib/python3.13/site-packages/decorate.py";
     let descriptor = "class decorate:\n    def __init__(self, f: object): pass";
     db.write_file(decorator, descriptor)?;
     assert_file_diagnostics(&db, module, &[]);

@@ -283,6 +283,15 @@ pub(crate) fn infer_definition_types<'db>(
         .finish_definition(definition)
 }
 
+/// Limit these checks to installed dependencies, where we may never need to
+/// infer the full declaration. In project files, inspecting the syntax again
+/// can reload an AST that we discarded after checking the file.
+fn is_in_site_packages<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+    ty_module_resolver::file_to_module(db, definition.program_file(db).resolver_file(db))
+        .and_then(|module| module.search_path(db))
+        .is_some_and(ty_module_resolver::SearchPath::is_site_packages)
+}
+
 /// Limit shortcuts during abstract-method discovery to names and generic types.
 /// Skipping expressions such as `TypeOf[C().attr]` can change the order in
 /// which ty resolves a cycle involving construction of the enclosing class.
@@ -303,7 +312,10 @@ pub(super) fn is_optional_none_assignment<'db>(
     definition: Definition<'db>,
     assignment: &AnnotatedAssignmentDefinitionKind,
 ) -> bool {
-    if !assignment.has_value() || definition.file(db).is_stub(db) {
+    if !assignment.has_value()
+        || definition.file(db).is_stub(db)
+        || !is_in_site_packages(db, definition)
+    {
         return false;
     }
     let module = parsed_module(db, definition.python_file(db)).load(db);
