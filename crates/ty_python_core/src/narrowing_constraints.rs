@@ -79,8 +79,8 @@ impl Idx for ScopedNarrowingConstraint {
 const ALWAYS_TRUE: ScopedNarrowingConstraint = ScopedNarrowingConstraint::ALWAYS_TRUE;
 const ALWAYS_FALSE: ScopedNarrowingConstraint = ScopedNarrowingConstraint::ALWAYS_FALSE;
 
-/// Once a scope reaches this limit, operations return `ALWAYS_TRUE`. Dropping narrowing is less
-/// precise, but avoids exponential growth on pathological input.
+/// Once a scope reaches this limit, approximate uncached combinations to avoid exponential
+/// growth on pathological input.
 const MAX_INTERIOR_NODES: usize = 512 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
@@ -382,7 +382,9 @@ impl NarrowingConstraintsBuilder {
         b: ScopedNarrowingConstraint,
     ) -> ScopedNarrowingConstraint {
         if self.interiors.len() >= MAX_INTERIOR_NODES {
-            return ALWAYS_TRUE;
+            // A conjunction implies either operand. Keep the more recently interned one
+            // so a new check can still narrow a binding after a complex merge.
+            return b;
         }
 
         // See the "Lazier BDDs (for intersections)" section for the edge calculations below:
@@ -473,6 +475,18 @@ mod tests {
                     }
             }
         }
+    }
+
+    #[test]
+    fn conjunction_keeps_new_checks_at_the_node_limit() {
+        let mut constraints = NarrowingConstraintsBuilder::default();
+        let earlier = constraints.add_atom(predicate(0));
+        for i in 1..MAX_INTERIOR_NODES {
+            constraints.add_atom(predicate(i));
+        }
+        let check = constraints.add_negated_atom(predicate(MAX_INTERIOR_NODES));
+        assert_eq!(constraints.add_and_constraint(earlier, check), check);
+        assert_eq!(constraints.add_and_constraint(check, earlier), check);
     }
 
     #[test]
