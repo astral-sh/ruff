@@ -30,7 +30,7 @@ use ty_python_core::statement::StatementInner;
 use super::{
     CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
     DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
-    FrozenMap, FrozenSet, FunctionDecoratorInference, InferenceRegion,
+    FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
     OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
     infer_definition_types, infer_expression_types, infer_unpack_types,
 };
@@ -355,11 +355,18 @@ impl<'db> ExpressionMap<'db> {
     }
 
     /// Return entries in node order, sorting only if we switched to a hash map.
-    fn freeze(self) -> FrozenMap<ExpressionNodeKey, Type<'db>> {
+    fn into_sorted(self) -> Vec<(ExpressionNodeKey, Type<'db>)> {
         if let Some(map) = self.spill {
-            return FrozenMap::from(*map);
+            let mut entries: Vec<_> = map.into_iter().collect();
+            entries.sort_unstable_by_key(|(key, _)| *key);
+            entries
+        } else {
+            self.sorted
         }
-        FrozenMap::from_sorted(self.sorted)
+    }
+
+    fn freeze(self) -> FrozenMap<ExpressionNodeKey, Type<'db>> {
+        FrozenMap::from_sorted(self.into_sorted())
     }
 }
 
@@ -1084,7 +1091,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend_scope(&mut self, inference: &ScopeInference<'db>) {
-        self.extend_sorted(inference.expressions.iter().as_slice());
+        self.extend_expression_types(inference.expressions.iter());
 
         if let Some(extra) = &inference.extra {
             self.legacy_aliases
@@ -13272,7 +13279,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         ScopeInference {
-            expressions: expressions.freeze(),
+            expressions: FrozenValueMap::from_sorted(expressions.into_sorted()),
             extra,
         }
     }
@@ -14381,6 +14388,21 @@ mod expression_map_tests {
         let frozen = map.freeze();
         assert!(frozen.iter().map(|(k, _)| *k).eq((0..128).map(key)));
         assert_eq!(frozen.get(&key(100)), Some(&Type::unknown()));
+    }
+
+    #[test]
+    fn scope_value_indices_are_independent_of_insertion_order() {
+        let entries = (0..128).map(|i| (key(i), Type::int_literal(i64::from(i % 3))));
+        let mut sorted = ExpressionMap::default();
+        sorted.extend(entries.clone());
+        let mut reversed = ExpressionMap::default();
+        reversed.extend(entries.rev());
+        assert!(reversed.spill.is_some());
+
+        assert_eq!(
+            FrozenValueMap::from_sorted(sorted.into_sorted()),
+            FrozenValueMap::from_sorted(reversed.into_sorted())
+        );
     }
 
     #[test]
