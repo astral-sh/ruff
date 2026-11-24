@@ -7,8 +7,8 @@ use crate::predicate::PatternPredicate;
 use crate::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
 use crate::{Db, PossiblyNarrowedPlaces};
 use ruff_db::parsed::ParsedModuleRef;
-use ruff_index::IndexVec;
 use ruff_python_ast as ast;
+use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use std::hash::{Hash, Hasher};
 use std::iter::FusedIterator;
@@ -77,7 +77,7 @@ impl PlaceExpr {
             return Some(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
         }
 
-        MemberExprBuilder::visit_expr(expr).and_then(Self::try_from_member_expr)
+        MemberExpr::try_from_expr(expr).map(|member| Self::Member(Member::new(member)))
     }
 
     /// Tries to create a `PlaceExpr` from a member expression.
@@ -217,24 +217,8 @@ pub struct PlaceTable {
 impl Hash for PlaceTable {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // The reverse-lookup indexes are also ignored by equality.
-        self.symbols.iter().len().hash(state);
-        for symbol in self.symbols.iter() {
-            symbol.name().hash(state);
-            symbol.is_used().hash(state);
-            symbol.is_bound().hash(state);
-            symbol.is_declared().hash(state);
-            symbol.is_global().hash(state);
-            symbol.is_nonlocal().hash(state);
-            symbol.is_reassigned().hash(state);
-            symbol.is_parameter().hash(state);
-        }
-        self.members.iter().len().hash(state);
-        for member in self.members.iter() {
-            member.expression().as_ref().hash(state);
-            member.is_bound().hash(state);
-            member.is_declared().hash(state);
-            member.is_instance_attribute().hash(state);
-        }
+        self.symbols.iter().as_slice().hash(state);
+        self.members.iter().as_slice().hash(state);
     }
 }
 
@@ -348,8 +332,8 @@ pub struct PlaceTableBuilder {
     symbols: SymbolTableBuilder,
     member: MemberTableBuilder,
 
-    associated_symbol_members: IndexVec<ScopedSymbolId, SmallVec<[ScopedMemberId; 4]>>,
-    associated_sub_members: IndexVec<ScopedMemberId, SmallVec<[ScopedMemberId; 4]>>,
+    /// Only places with descendants need an entry.
+    associated_members: FxHashMap<ScopedPlaceId, SmallVec<[ScopedMemberId; 4]>>,
 }
 
 impl PlaceTableBuilder {
@@ -395,10 +379,9 @@ impl PlaceTableBuilder {
     }
 
     pub(crate) fn associated_place_ids(&self, place: ScopedPlaceId) -> &[ScopedMemberId] {
-        match place {
-            ScopedPlaceId::Symbol(symbol) => &self.associated_symbol_members[symbol],
-            ScopedPlaceId::Member(member) => &self.associated_sub_members[member],
-        }
+        self.associated_members
+            .get(&place)
+            .map_or(&[], SmallVec::as_slice)
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = PlaceExprRef<'_>> {
@@ -412,38 +395,29 @@ impl PlaceTableBuilder {
         self.symbols.iter()
     }
 
+    /// Add an unmarked symbol, taking ownership of a name only on its first occurrence.
+    pub(crate) fn add_name(&mut self, name: &ast::name::Name) -> (ScopedSymbolId, bool) {
+        self.symbols.add_name(name)
+    }
+
     pub(crate) fn add_symbol(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
-        let (id, is_new) = self.symbols.add(symbol);
-
-        if is_new {
-            let new_id = self.associated_symbol_members.push(SmallVec::new_const());
-            debug_assert_eq!(new_id, id);
-        }
-
-        (id, is_new)
+        self.symbols.add(symbol)
     }
 
     fn add_member(&mut self, member: Member) -> (ScopedMemberId, bool) {
         let (id, is_new) = self.member.add(member);
 
         if is_new {
-            let new_id = self.associated_sub_members.push(SmallVec::new_const());
-            debug_assert_eq!(new_id, id);
-
             let member = self.member.member(id);
 
             for parent_id in PlaceExprRef::Member(member).parent_place_ids(
                 |name| self.symbols.symbol_id(name),
                 |expr| self.member.member_id(expr),
             ) {
-                match parent_id {
-                    ScopedPlaceId::Symbol(scoped_symbol_id) => {
-                        self.associated_symbol_members[scoped_symbol_id].push(id);
-                    }
-                    ScopedPlaceId::Member(scoped_member_id) => {
-                        self.associated_sub_members[scoped_member_id].push(id);
-                    }
-                }
+                self.associated_members
+                    .entry(parent_id)
+                    .or_default()
+                    .push(id);
             }
         }
 

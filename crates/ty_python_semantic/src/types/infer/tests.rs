@@ -1663,6 +1663,23 @@ reveal_type(type(C))
 }
 
 #[test]
+fn collection_type_follows_edits_to_its_receiver() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    for (statement, expected) in [
+        ("items.append(1)", "list[int]"),
+        ("consume(items)", "list[Unknown]"),
+        ("items.append('x')", "list[str]"),
+    ] {
+        db.write_file(
+            "/src/main.py",
+            format!("from typing_extensions import reveal_type\ndef consume(x: list[int]): ...\nitems = []\n{statement}\nreveal_type(items)"),
+        )?;
+        assert_revealed_type(&db, "/src/main.py", expected);
+    }
+    Ok(())
+}
+
+#[test]
 fn iteration_follows_changes_to_the_iterator() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_file(
