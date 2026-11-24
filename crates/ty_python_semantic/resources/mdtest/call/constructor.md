@@ -604,6 +604,27 @@ class Simple:
 reveal_type(Simple())  # revealed: Simple
 ```
 
+## A generic receiver that matches the bound on `Self`
+
+```pyi
+from types import MappingProxyType
+from typing import Generic, TypeVar
+from typing_extensions import Self, assert_type
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Box(Generic[T_co]):
+    def __new__(cls, value: T_co) -> Self: ...
+    def pick(self, peer: Self) -> Self: ...
+
+def f(d: dict[str, str], a: Box[str], b: Box[int]) -> None:
+    assert_type(MappingProxyType(d), MappingProxyType[str, str])
+    assert_type(Box(d["key"]), Box[str])
+    assert_type(a.pick(a), Box[str])
+    a.pick(b)  # error: [invalid-argument-type]
+    MappingProxyType[str, int](d)  # error: [invalid-argument-type]
+```
+
 ## `__new__` defined as a classmethod
 
 Marking it as a classmethod, on the other hand, breaks at runtime.

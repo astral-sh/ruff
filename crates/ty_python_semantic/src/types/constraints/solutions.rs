@@ -1145,6 +1145,35 @@ impl<'db, 'budget> SolutionWalker<'db, 'budget> {
             return ControlFlow::Continue(());
         }
 
+        // If the only constraint on Self is C[T] <= Self and its declared bound
+        // is the same C[T], the lower bound already supplies a valid solution
+        // for every choice of T. Adding the upper bound here would derive
+        // implications for every partially substituted version of C[T].
+        if upper_bounds.is_empty()
+            && constrained.is_empty()
+            && bound_typevar.typevar(db).is_self(db)
+            && let [upper] = constraints
+            && let AtomicConstraint::ConcreteUpper(upper) = storage.atomic_constraint_data(*upper)
+        {
+            let id = storage.typevar_id(db, bound_typevar);
+            let mut mentions = self.source_orders.iter().copied().filter(|constraint| {
+                storage
+                    .constraint_support(constraint.into_inner())
+                    .iter()
+                    .any(|var| var == id)
+            });
+            if let Some(lower) = mentions.next()
+                && mentions.next().is_none()
+                && path.assignments.contains_key(&Assignment::Positive(lower))
+                && let AtomicConstraint::ConcreteLower(lower) =
+                    storage.atomic_constraint_data(lower)
+                && lower.typevar == upper.typevar
+                && lower.bound == upper.bound
+            {
+                return process_satisfied(self, storage, path);
+            }
+        }
+
         // Verify that we can add all of the upper bound's constraints to the current path without
         // making it unsatisfiable. If we can, make a recursive call to check the next typevar with
         // an upper bound.
