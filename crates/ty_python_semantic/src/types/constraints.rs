@@ -4448,13 +4448,12 @@ impl<'db> CandidateSolutions<'db> {
 
     /// Solves a constraint set when it represents a _simple conjunction_: it can be expressed as a
     /// single conjunction of constraints, and the lower/upper bounds of those constraints do not
-    /// mention any other typevars. That lets us use a fast path that doesn't require constructing
+    /// mention inferable typevars. That lets us use a fast path that doesn't require constructing
     /// a [`PathAssignments`] or its sequent map.
     ///
     /// We do still have to consider the declared upper bound/constraints of the typevars in the
-    /// constraint set. To be eligible for this fast path, the solution cannot mention any
-    /// _constrained_ typevars, since those introduce a disjunction. And like the constraints in
-    /// the BDD itself, the declared upper bound of each type cannot mention any other typevars.
+    /// constraint set. No variable being solved can have declared constraints, since those
+    /// introduce a disjunction. Declared upper bounds must still be free of typevars.
     #[expect(clippy::too_many_arguments)]
     fn compute_simple_bound_conjunction(
         db: &'db dyn Db,
@@ -4468,11 +4467,13 @@ impl<'db> CandidateSolutions<'db> {
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
         report_diagnostics: ReportDiagnostics,
     ) -> ControlFlow<ProjectionError, Option<Self>> {
-        let mentions_typevar =
-            |bound| any_over_type_expanding_aliases(db, env, bound, Type::is_type_var);
         let bound_is_eligible = |constraint: AtomicConstraint<'db>, bound| {
             constraint.provides_candidate_bound(db, env, Some(bound), unspecialized_type_var_policy)
-                && !mentions_typevar(bound)
+                && !any_over_type_expanding_aliases(db, env, bound, |ty| {
+                    // A fixed variable in a bound cannot acquire constraints in this solve.
+                    ty.as_typevar()
+                        .is_some_and(|var| var.is_inferable(db, inferable))
+                })
         };
 
         let mut constraints = SmallVec::<[_; 1]>::new();
@@ -4560,7 +4561,7 @@ impl<'db> CandidateSolutions<'db> {
                 None => continue,
             };
 
-            if mentions_typevar(bound) {
+            if any_over_type_expanding_aliases(db, env, bound, Type::is_type_var) {
                 // If this declared upper bound mentions other typevars, we don't have a simple
                 // conjunction that's eligible for this fast path.
                 return ControlFlow::Continue(None);
@@ -6521,6 +6522,30 @@ mod tests {
             ),
             Ok(CandidateSolutions::Constrained(_))
         ));
+    }
+
+    #[test]
+    fn simple_conjunction_can_contain_fixed_typevars() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let builder = ConstraintSetBuilder::new();
+        let build = builder.unlimited();
+        let t = create_typevar(db, "T");
+        let u = create_typevar(db, "U");
+        let lower = Type::homogeneous_tuple(db, &env, Type::TypeVar(u));
+        let set = create_constraint_set_with_bounds(db, &env, build, t, Some(lower), None);
+
+        // Two visits suffice for the constraint and its terminal when U is fixed.
+        let inferable = TypeVarSet::from_typevars(db, [t]);
+        assert_matches!(
+            bounded_path_bounds(db, build.budget, set, inferable, 1, 2),
+            Ok(CandidateSolutions::Constrained(_))
+        );
+        assert_eq!(
+            bounded_path_bounds(db, build.budget, set, TypeVarSet::All, 1, 2),
+            Err(ProjectionError::TraversalBudgetExceeded)
+        );
     }
 
     #[test]
