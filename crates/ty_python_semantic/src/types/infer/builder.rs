@@ -1034,6 +1034,55 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .with_call_site_scope(self.scope())
     }
 
+    /// Prepares `get` with a literal string key and at most one positional default.
+    /// Synthesized `TypedDict.get` overloads use fixed arities and include a general
+    /// string fallback, so we can skip unrelated keys before matching arguments.
+    fn bindings_for_get(
+        &self,
+        callable_type: Type<'db>,
+        key: &ast::ExprStringLiteral,
+        arity: usize,
+    ) -> Bindings<'db> {
+        let db = self.db();
+        let env = self.program_environment();
+        let bind = |ty: Type<'db>| {
+            if let Type::BoundMethod(method) = ty
+                && let receiver @ Type::TypedDict(_) = method.self_instance(db)
+                && let Type::Callable(callable) = method.func(db)
+                && key.value.len() <= Self::MAX_STRING_LITERAL_SIZE
+                && !self.collects_expected_types()
+                // An attribute named `get` can also hold another bound method.
+                && receiver.member(db, env, "get").ignore_possibly_undefined() == Some(ty)
+            {
+                let key = key.value.to_str();
+                let overloads = callable.signatures(db).iter().filter(|signature| {
+                    let parameters = signature.parameters();
+                    parameters.len() == arity + 1
+                        && parameters[1]
+                            .annotated_type()
+                            .as_string_literal()
+                            .is_none_or(|expected| expected.value(db) == key)
+                });
+                return CallableBinding::from_overloads(ty, overloads.cloned())
+                    .with_bound_type(receiver)
+                    .into();
+            }
+            ty.bindings(db, env)
+        };
+        match callable_type {
+            Type::Union(union)
+                if union
+                    .elements(db)
+                    .iter()
+                    .all(|ty| matches!(ty, Type::BoundMethod(_))) =>
+            {
+                Bindings::from_union(callable_type, union.elements(db).iter().copied().map(bind))
+            }
+            _ => bind(callable_type),
+        }
+        .with_call_site_scope(self.scope())
+    }
+
     fn settings(&self) -> &AnalysisSettings {
         self.db().analysis_settings(self.file())
     }
@@ -10531,9 +10580,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 _ => {}
             }
         }
-        let bindings =
+        let bindings = if let ast::Expr::Attribute(attr) = func.as_ref()
+            && attr.attr.id == "get"
+            && let Some(ast::Expr::StringLiteral(key)) = arguments.args.first()
+            && arguments.keywords.is_empty()
+            && arguments.args.len() <= 2
+            && !arguments.args.iter().any(ast::Expr::is_starred_expr)
+        {
+            self.bindings_for_get(callable_type, key, arguments.args.len())
+        } else {
             self.bindings_for_call(callable_type)
-                .match_parameters(db, env, &call_arguments);
+        }
+        .match_parameters(db, env, &call_arguments);
 
         report_missing_implicit_constructor_call(
             &self.context,

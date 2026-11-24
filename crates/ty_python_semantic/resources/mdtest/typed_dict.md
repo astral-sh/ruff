@@ -3244,9 +3244,20 @@ def _(u: HasX | NoX) -> None:
     # Key "x" is missing from `NoX`, so specialization does not apply.
     reveal_type(u.get("x"))  # revealed: int | Unknown | None
 
-def union_get(u: HasX | OptX) -> None:
+def union_get(u: HasX | OptX, default: bytes) -> None:
     # `HasX.x` is required (returns `int`), `OptX.x` is not (returns `int | None`).
     reveal_type(u.get("x"))  # revealed: int | None
+    reveal_type(u.get("x", default))  # revealed: int | bytes
+
+def mixed_get(u: OptX | dict[str, bytes]) -> None:
+    reveal_type(u.get("x"))  # revealed: int | None | bytes
+
+class Wrapper:
+    def __init__(self, record: OptX):
+        self.get = record.pop
+
+def stored_method(wrapper: Wrapper) -> None:
+    reveal_type(wrapper.get("x"))  # revealed: int
 ```
 
 `pop()` also uses the field type as bidirectional context for the default argument:
