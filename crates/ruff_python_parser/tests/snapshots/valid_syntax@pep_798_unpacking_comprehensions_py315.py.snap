@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/pep_798_unpacking_comp
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..239,
+        range: 0..275,
         body: [
             Expr(
                 StmtExpr {
@@ -538,6 +538,81 @@ Module(
                                     is_async: false,
                                 },
                             ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 239..274,
+                    value: Generator(
+                        ExprGenerator {
+                            node_index: NodeIndex(None),
+                            range: 239..274,
+                            elt: Starred(
+                                ExprStarred {
+                                    node_index: NodeIndex(None),
+                                    range: 240..255,
+                                    value: If(
+                                        ExprIf {
+                                            node_index: NodeIndex(None),
+                                            range: 241..255,
+                                            test: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 246..247,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            body: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 241..242,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            orelse: Tuple(
+                                                ExprTuple {
+                                                    node_index: NodeIndex(None),
+                                                    range: 253..255,
+                                                    elts: [],
+                                                    ctx: Load,
+                                                    parenthesized: true,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 256..273,
+                                    node_index: NodeIndex(None),
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 266..267,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 271..273,
+                                            id: Name("xs"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: true,
+                                },
+                            ],
+                            parenthesized: true,
                         },
                     ),
                 },

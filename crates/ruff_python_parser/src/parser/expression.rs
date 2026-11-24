@@ -424,8 +424,8 @@ impl<'src> Parser<'src> {
         self.parse_primary_expression(context)
     }
 
-    /// Parses the operand after `{**`. A dict comprehension allows an `expression`,
-    /// while a dict display requires `bitwise_or`.
+    /// Parses the operand after `{**` or `(*`. A dict comprehension or generator
+    /// allows an `expression`, while a dict display or tuple requires `bitwise_or`.
     fn parse_initial_unpacking_operand(&mut self) -> ParsedExpr {
         let operand = self.parse_conditional_expression_or_higher_impl(
             ExpressionContext::default().with_for_excluded(),
@@ -2122,6 +2122,12 @@ impl<'src> Parser<'src> {
         // {**x async for x in y}
         // (*x async for x in y)
         // {**x or {} for x in xs}
+        // (*x if x else () async for x in xs)
+
+        // test_err pep_798_invalid_starred_comprehensions_py315
+        // # parse_options: {"target-version": "3.15"}
+        // [*x or () for x in xs]
+        // {*x or () for x in xs}
 
         // test_err pep_798_unpacking_comprehensions_py314
         // # parse_options: {"target-version": "3.14"}
@@ -2322,9 +2328,8 @@ impl<'src> Parser<'src> {
 
         // Use the more general rule of the three to parse the first element
         // and limit it later.
-        let mut parsed_expr = self.parse_named_expression_or_higher(
-            ExpressionContext::yield_or_starred_bitwise_or().with_for_excluded(),
-        );
+        let mut parsed_expr =
+            self.parse_named_expression_or_higher(ExpressionContext::first_parenthesized_element());
 
         match self.current_token_kind() {
             TokenKind::Comma => {
@@ -2701,12 +2706,12 @@ impl<'src> Parser<'src> {
 
     /// Parses a starred expression with the given precedence.
     ///
-    /// The expression is parsed with the highest precedence. If the precedence
+    /// The operand is parsed as a full `expression`. If the precedence
     /// of the parsed expression is lower than the given precedence, an error
     /// is reported.
     ///
-    /// For example, if the given precedence is [`StarredExpressionPrecedence::BitOr`],
-    /// the comparison expression is not allowed.
+    /// For example, if the given precedence is [`StarredExpressionPrecedence::BitwiseOr`],
+    /// an unparenthesized comparison expression is not allowed.
     ///
     /// Refer to the [Python grammar] for more information.
     ///
@@ -2729,6 +2734,9 @@ impl<'src> Parser<'src> {
                     context.disallow_starred_expressions(),
                 ),
             StarredExpressionPrecedence::BitwiseOr => self.parse_bitwise_or(),
+            StarredExpressionPrecedence::BitwiseOrUnlessGenerator => {
+                self.parse_initial_unpacking_operand()
+            }
         };
 
         ast::ExprStarred {
@@ -3124,7 +3132,7 @@ impl BinaryLikeOperator {
 
 /// Represents the precedence used for parsing the value part of a starred expression.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum StarredExpressionPrecedence {
+enum StarredExpressionPrecedence {
     /// Matches `'*' bitwise_or` which is part of the `star_expression` rule in the
     /// [Python grammar](https://docs.python.org/3/reference/grammar.html).
     BitwiseOr,
@@ -3132,6 +3140,9 @@ pub(super) enum StarredExpressionPrecedence {
     /// Matches `'*' expression` which is part of the `starred_expression` rule in the
     /// [Python grammar](https://docs.python.org/3/reference/grammar.html).
     Conditional,
+
+    /// After `(*`, the rule depends on whether a comprehension clause follows.
+    BitwiseOrUnlessGenerator,
 }
 
 /// Represents the expression parsing context.
@@ -3162,6 +3173,9 @@ bitflags! {
         /// This flag is set when the `for` keyword, or `async` starting `async for`, should be
         /// excluded from an expression.
         const EXCLUDE_FOR = 1 << 4;
+
+        /// The first element after `(` may start a starred generator.
+        const ALLOW_STARRED_GENERATOR = 1 << 5;
     }
 }
 
@@ -3176,6 +3190,14 @@ impl ExpressionContext {
     pub(super) fn starred_bitwise_or() -> Self {
         ExpressionContext::default()
             .with_starred_expression_allowed(StarredExpressionPrecedence::BitwiseOr)
+    }
+
+    /// The first expression in a group, tuple, or generator.
+    fn first_parenthesized_element() -> Self {
+        ExpressionContext::default()
+            .with_starred_expression_allowed(StarredExpressionPrecedence::BitwiseOrUnlessGenerator)
+            .with_yield_expression_allowed()
+            .with_for_excluded()
     }
 
     /// Create a new context allowing starred expression at bitwise OR precedence or yield
@@ -3197,14 +3219,14 @@ impl ExpressionContext {
     /// precedence.
     fn with_starred_expression_allowed(self, precedence: StarredExpressionPrecedence) -> Self {
         let mut flags = self.0 | ExpressionContextFlags::ALLOW_STARRED_EXPRESSION;
-        match precedence {
-            StarredExpressionPrecedence::BitwiseOr => {
-                flags |= ExpressionContextFlags::STARRED_BITWISE_OR_PRECEDENCE;
-            }
-            StarredExpressionPrecedence::Conditional => {
-                flags -= ExpressionContextFlags::STARRED_BITWISE_OR_PRECEDENCE;
-            }
-        }
+        flags.set(
+            ExpressionContextFlags::STARRED_BITWISE_OR_PRECEDENCE,
+            precedence == StarredExpressionPrecedence::BitwiseOr,
+        );
+        flags.set(
+            ExpressionContextFlags::ALLOW_STARRED_GENERATOR,
+            precedence == StarredExpressionPrecedence::BitwiseOrUnlessGenerator,
+        );
         ExpressionContext(flags)
     }
 
@@ -3253,6 +3275,11 @@ impl ExpressionContext {
             .contains(ExpressionContextFlags::STARRED_BITWISE_OR_PRECEDENCE)
         {
             StarredExpressionPrecedence::BitwiseOr
+        } else if self
+            .0
+            .contains(ExpressionContextFlags::ALLOW_STARRED_GENERATOR)
+        {
+            StarredExpressionPrecedence::BitwiseOrUnlessGenerator
         } else {
             StarredExpressionPrecedence::Conditional
         }

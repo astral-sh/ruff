@@ -1,0 +1,169 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/pep_798_invalid_starred_comprehensions_py315.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..90,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 44..66,
+                    value: ListComp(
+                        ExprListComp {
+                            node_index: NodeIndex(None),
+                            range: 44..66,
+                            elt: Starred(
+                                ExprStarred {
+                                    node_index: NodeIndex(None),
+                                    range: 45..53,
+                                    value: BoolOp(
+                                        ExprBoolOp {
+                                            node_index: NodeIndex(None),
+                                            range: 46..53,
+                                            op: Or,
+                                            values: [
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 46..47,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Tuple(
+                                                    ExprTuple {
+                                                        node_index: NodeIndex(None),
+                                                        range: 51..53,
+                                                        elts: [],
+                                                        ctx: Load,
+                                                        parenthesized: true,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 54..65,
+                                    node_index: NodeIndex(None),
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 58..59,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 63..65,
+                                            id: Name("xs"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 67..89,
+                    value: SetComp(
+                        ExprSetComp {
+                            node_index: NodeIndex(None),
+                            range: 67..89,
+                            elt: Starred(
+                                ExprStarred {
+                                    node_index: NodeIndex(None),
+                                    range: 68..76,
+                                    value: BoolOp(
+                                        ExprBoolOp {
+                                            node_index: NodeIndex(None),
+                                            range: 69..76,
+                                            op: Or,
+                                            values: [
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 69..70,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Tuple(
+                                                    ExprTuple {
+                                                        node_index: NodeIndex(None),
+                                                        range: 74..76,
+                                                        elts: [],
+                                                        ctx: Load,
+                                                        parenthesized: true,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                    ctx: Load,
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 77..88,
+                                    node_index: NodeIndex(None),
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 81..82,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 86..88,
+                                            id: Name("xs"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: {"target-version": "3.15"}
+2 | [*x or () for x in xs]
+  |   ^^^^^^^ Syntax Error: Boolean expression cannot be used here
+3 | {*x or () for x in xs}
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.15"}
+2 | [*x or () for x in xs]
+3 | {*x or () for x in xs}
+  |   ^^^^^^^ Syntax Error: Boolean expression cannot be used here
