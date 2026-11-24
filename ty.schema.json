@@ -2078,7 +2078,7 @@
           ]
         },
         "exclude-scripts": {
-          "description": "Whether to exclude files containing PEP 723 inline script metadata unless they are\nexplicitly passed on the command line.",
+          "description": "Whether to exclude files containing PEP 723 inline script metadata.\n\nty checks scripts passed explicitly on the command line unless you use `--force-exclude`.",
           "anyOf": [
             {
               "$ref": "#/definitions/boolean"

@@ -391,7 +391,8 @@ impl Project {
     /// that won't be included when checking the project because they're ignored in a `.gitignore` file.
     pub fn is_file_included(self, db: &dyn Db, path: &SystemPath) -> IncludeResult {
         ProjectFilesFilter::from_project(db, self)
-            .is_file_included(path, GlobFilterCheckMode::Adhoc)
+            .match_file(path, GlobFilterCheckMode::Adhoc)
+            .inclusion
     }
 
     fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
@@ -789,15 +790,6 @@ impl Project {
         };
 
         index.set_diagnostics(diagnostics);
-    }
-
-    /// Returns whether `file` itself is an explicit check path.
-    ///
-    /// Including a parent directory does not count as explicitly including the file.
-    fn is_file_explicitly_included(self, db: &dyn Db, file: File) -> bool {
-        self.included_paths_or_root(db)
-            .iter()
-            .any(|path| file.path(db) == path)
     }
 
     /// Returns the files belonging to this project.
