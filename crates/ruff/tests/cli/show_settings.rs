@@ -66,11 +66,11 @@ fn display_settings_from_nested_directory() -> anyhow::Result<()> {
 }
 
 #[test]
-fn show_inline_script_settings_path() -> anyhow::Result<()> {
+fn show_inline_script_settings() -> anyhow::Result<()> {
     let test = CliTest::with_settings(|_, mut settings| {
         settings.add_filter(
-            r"(?s)# General Settings.*----- stderr -----",
-            "[settings omitted]\n\n----- stderr -----",
+            r"(?ms)^# General Settings.*?^(linter\.line_length = \d+)$.*?(\s+----- stderr -----)",
+            "$1$2",
         );
         settings
     })?;
@@ -79,6 +79,7 @@ fn show_inline_script_settings_path() -> anyhow::Result<()> {
         r#"
             # /// script
             # [tool.ruff]
+            # line-length = 100
             # ///
         "#,
     )?;
@@ -90,7 +91,7 @@ fn show_inline_script_settings_path() -> anyhow::Result<()> {
     Resolved settings for: "[TMP]/script.py"
     Settings path: "[TMP]/script.py"
 
-    [settings omitted]
+    linter.line_length = 100
 
     ----- stderr -----
     "#);
