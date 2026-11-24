@@ -8,7 +8,7 @@ use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_python_ast::SourceType;
 use ruff_workspace::FormatterSettings;
 use ruff_workspace::resolver::{Resolver, RootProject, match_exclusion, project_file_at_path};
-use ruff_workspace::script::{ScriptSettingsError, script};
+use ruff_workspace::script::script;
 
 use crate::ExitStatus;
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
@@ -70,15 +70,22 @@ pub(crate) fn format_stdin(
         }
     };
     let project = &root_project.project;
-    let script = script(
+    let script = match script(
         project,
         config_arguments,
         config_arguments.script_configuration(),
         path,
         source_type,
         &source_code,
-    )
-    .map_err(ScriptSettingsError::into_anyhow)?;
+    ) {
+        Ok(script) => script,
+        Err(err) => {
+            let path = path.unwrap_or_else(|| Path::new("-"));
+            let err = FormatCommandError::Configuration(path.to_owned(), err);
+            error!("{err}");
+            return Ok(ExitStatus::Error);
+        }
+    };
     if let Some(script) = &script {
         warn_incompatible_formatter_settings(std::iter::once(script.settings(&project.settings)));
     }

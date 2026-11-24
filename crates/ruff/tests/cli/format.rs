@@ -2709,27 +2709,30 @@ fn invalid_inline_setting_location() -> Result<()> {
 fn stdin_invalid_script_metadata() -> Result<()> {
     let test = CliTest::new()?;
 
+    let script = indoc! {r#"
+        # /// script
+        # requires-python = 42
+        # ///
+    "#};
     assert_cmd_snapshot!(test.format_command()
         .args(["--preview", "--stdin-filename=script.py", "-"])
-        .pass_stdin(indoc! {r#"
-            # /// script
-            # requires-python = 42
-            # ///
-        "#}), @"
+        .pass_stdin(script), @"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    ruff failed
-      Cause: invalid-script-metadata: invalid type: integer `42`, expected a string
-     --> script.py:2:21
-      |
-    1 | # /// script
-    2 | # requires-python = 42
-      |                     ^^
-    3 | # ///
-      |
+    error: Failed to parse script metadata in script.py:2:21: invalid type: integer `42`, expected a string
+    ");
+
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--preview", "--silent", "--stdin-filename=script.py", "-"])
+        .pass_stdin(script), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
     ");
 
     Ok(())
