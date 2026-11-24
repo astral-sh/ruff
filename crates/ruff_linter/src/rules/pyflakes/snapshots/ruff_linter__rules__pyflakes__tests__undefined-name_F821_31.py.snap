@@ -28,29 +28,3 @@ F821 Undefined name `B`
 8 |     def f(self, arg: "B") -> "S":
 9 |         x: "B" = 1
   |             ^
-
-F821 Undefined name `A`
-  --> F821_31.py:15:13
-   |
-14 | @typing.no_type_check
-15 | def f(arg: "A") -> "R":
-   |             ^
-16 |     x: "A" = 1
-   |
-
-F821 Undefined name `R`
-  --> F821_31.py:15:21
-   |
-14 | @typing.no_type_check
-15 | def f(arg: "A") -> "R":
-   |                     ^
-16 |     x: "A" = 1
-   |
-
-F821 Undefined name `A`
-  --> F821_31.py:16:9
-   |
-14 | @typing.no_type_check
-15 | def f(arg: "A") -> "R":
-16 |     x: "A" = 1
-   |         ^
