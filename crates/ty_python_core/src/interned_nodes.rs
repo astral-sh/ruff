@@ -9,7 +9,7 @@ use std::ops::Index;
 
 use hashbrown::{HashTable, hash_table::Entry};
 use ruff_index::{Idx, IndexVec};
-use rustc_hash::FxBuildHasher;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 /// An indexed collection of distinct nodes with a reverse table of their IDs.
 ///
@@ -79,5 +79,59 @@ impl<I: Idx, N> Index<I> for InternedNodes<I, N> {
 
     fn index(&self, id: I) -> &N {
         &self.nodes[id]
+    }
+}
+
+/// Constraint IDs that can occur in a commutative binary operation after its terminal cases.
+pub(crate) trait ConstraintId: Idx {
+    /// A terminal handled before consulting the operation cache.
+    const EMPTY: Self;
+
+    /// Select an interior node for the direct slot and use the other operand as its key.
+    fn cache_key(a: Self, b: Self) -> (Self, Self) {
+        (b, a)
+    }
+}
+
+/// Store the first partner of an interior node at its index and hash additional partners.
+#[derive(Debug)]
+pub(crate) struct BinaryConstraintCache<I> {
+    direct: Vec<(I, I)>,
+    overflow: FxHashMap<(I, I), I>,
+}
+
+impl<I> Default for BinaryConstraintCache<I> {
+    fn default() -> Self {
+        Self {
+            direct: Vec::new(),
+            overflow: FxHashMap::default(),
+        }
+    }
+}
+
+impl<I: ConstraintId> BinaryConstraintCache<I> {
+    pub(crate) fn get(&self, a: I, b: I) -> Option<I> {
+        let (node, partner) = I::cache_key(a, b);
+        let &(first, result) = self.direct.get(node.index())?;
+        if first == partner {
+            Some(result)
+        } else if first == I::EMPTY {
+            None
+        } else {
+            self.overflow.get(&(node, partner)).copied()
+        }
+    }
+
+    pub(crate) fn insert(&mut self, a: I, b: I, result: I) {
+        let (node, partner) = I::cache_key(a, b);
+        if node.index() >= self.direct.len() {
+            self.direct.resize(node.index() + 1, (I::EMPTY, I::EMPTY));
+        }
+        let slot = &mut self.direct[node.index()];
+        if slot.0 == I::EMPTY || slot.0 == partner {
+            *slot = (partner, result);
+        } else {
+            self.overflow.insert((node, partner), result);
+        }
     }
 }
