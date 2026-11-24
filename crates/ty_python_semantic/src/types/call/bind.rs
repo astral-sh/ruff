@@ -9394,7 +9394,6 @@ impl<'db> Binding<'db> {
         }
 
         let mut tcx_kind = TypeContextKind::preference();
-        let mut leaf = None;
 
         // If this is a generic call, specialize the parameter type using the computed constraints.
         if let Some(generic_context) = self.signature.generic_context {
@@ -9468,35 +9467,48 @@ impl<'db> Binding<'db> {
             {
                 specialization = hint.specialization;
             }
-            // Normalizing `T | Tree[T]` can absorb a subtype in T, even though
-            // that subtype supplies context for a subclass's own type parameters.
-            if let Type::Union(union) = parameter_type.expand_top_level_aliases(db, env) {
-                leaf = union.elements(db).iter().find_map(|t| {
-                    let var = t.as_typevar()?;
-                    let hint = specialization.get(db, var)?;
-                    (!hint.is_dynamic()
-                        && nested_members(db, env, Type::Union(union), var).is_some()
-                        && !hint.is_fully_static(db, env))
-                    .then_some(hint)
-                });
-            }
-            parameter_type = if specialization == ordinary_context.specialization
-                || !specialization
-                    .types(db)
-                    .contains(&Type::Dynamic(DynamicType::UnspecializedTypeVar))
-            {
-                parameter_type.apply_specialization(db, specialization)
-            } else {
-                parameter_type.apply_type_mapping(
-                    db,
-                    env,
-                    &TypeMapping::ApplySpecialization(ApplySpecialization::ArgumentHint {
-                        siblings: specialization,
-                        ordinary: ordinary_context.specialization,
-                        flipped: false,
-                    }),
-                    TypeContext::default(),
-                )
+            let specialize = |ty: Type<'db>| {
+                if specialization == ordinary_context.specialization
+                    || !specialization
+                        .types(db)
+                        .contains(&Type::Dynamic(DynamicType::UnspecializedTypeVar))
+                {
+                    ty.apply_specialization(db, specialization)
+                } else {
+                    ty.apply_type_mapping(
+                        db,
+                        env,
+                        &TypeMapping::ApplySpecialization(ApplySpecialization::ArgumentHint {
+                            siblings: specialization,
+                            ordinary: ordinary_context.specialization,
+                            flipped: false,
+                        }),
+                        TypeContext::default(),
+                    )
+                }
+            };
+            // In T | Tree[T], a subtype in T can supply a hint for a subclass's
+            // own type parameters. As in cycle recovery, flatten and deduplicate
+            // the temporary union without dropping subtypes. Validation still
+            // specializes the ordinary parameter type.
+            parameter_type = match parameter_type.expand_top_level_aliases(db, env) {
+                Type::Union(union)
+                    if union.elements(db).iter().any(|member| {
+                        member.as_typevar().is_some_and(|var| {
+                            nested_members(db, env, Type::Union(union), var).is_some()
+                        })
+                    }) =>
+                {
+                    UnionType::from_elements_cycle_recovery(
+                        db,
+                        env,
+                        union
+                            .elements(db)
+                            .iter()
+                            .map(|&ty| specialize(ty).expand_top_level_aliases(db, env)),
+                    )
+                }
+                _ => specialize(parameter_type),
             };
             if let Some(expected_return_ty) = call_expression_tcx.expected_type()
                 && let Some(expected) = self.typevartuple_argument_context(
@@ -9528,7 +9540,7 @@ impl<'db> Binding<'db> {
 
         Some(ArgumentTypeContext::standard(
             original_parameter_type,
-            TypeContext::new(Some(parameter_type), tcx_kind).with_additional_target(db, leaf),
+            TypeContext::new(Some(parameter_type), tcx_kind),
         ))
     }
 
