@@ -72,7 +72,7 @@ impl<'db> StaticClassLiteral<'db> {
         ClassMemberSources {
             scope,
             table: index.shared_place_table(scope.file_scope_id(db)),
-            implicit_names: collect_implicit_attribute_names(db, scope, true),
+            implicit_names: collect_implicit_attribute_names(db, scope, true).into(),
         }
     }
 
@@ -467,11 +467,11 @@ pub(super) fn implicit_attribute_names<'db>(
 }
 
 /// Syntax-derived sources for an explicit class member or an implicit receiver attribute.
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ClassMemberSources<'db> {
     pub(super) scope: ScopeId<'db>,
     pub(super) table: Arc<ty_python_core::place::PlaceTable>,
-    implicit_names: Box<[Name]>,
+    implicit_names: Arc<[Name]>,
 }
 
 impl<'db> ClassMemberSources<'db> {

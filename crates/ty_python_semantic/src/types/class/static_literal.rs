@@ -11,7 +11,7 @@ use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use std::cell::{LazyCell, RefCell};
 
-use super::implicit_attributes::implicit_attribute_names;
+use super::implicit_attributes::{ClassMemberSources, implicit_attribute_names};
 use crate::{
     Db, FxIndexMap, FxIndexSet, TypeQualifiers,
     place::{
@@ -207,6 +207,14 @@ struct InheritedFrozenDataclassFields<'db> {
 struct OwnClassFields<'db> {
     fields: FxIndexMap<Name, Field<'db>>,
     class_variables: Box<[Name]>,
+}
+
+/// Class-wide inputs shared by lookups of different names and specializations.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct ClassNamespace<'db> {
+    sources: ClassMemberSources<'db>,
+    generator: Option<CodeGeneratorKind<'db>>,
+    may_have_slot_descriptors: bool,
 }
 
 #[salsa::tracked]
@@ -1624,6 +1632,28 @@ impl<'db> StaticClassLiteral<'db> {
         member
     }
 
+    /// Collects the namespace and generated-member sources for a class lookup.
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial=|db, _, _, class: StaticClassLiteral<'db>| ClassNamespace {
+            sources: class.member_sources(db).clone(),
+            generator: None,
+            may_have_slot_descriptors: true,
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn class_namespace(self, db: &'db dyn Db) -> ClassNamespace<'db> {
+        let generator = CodeGeneratorKind::from_static_class(db, self);
+        // Keep generated slots lazy because they can depend on field types.
+        let may_have_slot_descriptors =
+            generator.is_some() || self.slot_names(db).is_some_and(|names| !names.is_empty());
+        ClassNamespace {
+            sources: self.member_sources(db).clone(),
+            generator,
+            may_have_slot_descriptors,
+        }
+    }
+
     /// Returns the inferred type of the class member named `name`. Only bound members
     /// or those marked as `ClassVars` are considered.
     ///
@@ -1660,7 +1690,8 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        let code_generator = CodeGeneratorKind::from_static_class(db, self);
+        let namespace = self.class_namespace(db);
+        let code_generator = namespace.generator;
         if code_generator.is_some_and(CodeGeneratorKind::is_dataclass_like) {
             if name == "__dataclass_fields__" {
                 // Make this class look like a subclass of the `DataClassInstance` protocol
@@ -1700,7 +1731,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        let sources = self.member_sources(db);
+        let sources = &namespace.sources;
         let symbol = sources.table.symbol_id(name);
         let member = class_member_with_symbol(db, sources.scope, symbol).map_type(|ty| {
             let ty = ty.freshen_member_for_owner_specialization(db, env, specialization);
@@ -1734,7 +1765,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
         });
 
-        if self.has_own_slot_descriptor(db, name) {
+        if namespace.may_have_slot_descriptors && self.has_own_slot_descriptor(db, name) {
             return Member::definitely_declared(self.own_slot_descriptor(
                 db,
                 env,
