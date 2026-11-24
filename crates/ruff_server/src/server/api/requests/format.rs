@@ -98,7 +98,7 @@ fn format_text_document(
     is_notebook: bool,
     backend: crate::format::FormatBackend,
 ) -> Result<super::FormatResponse> {
-    let settings = query.settings();
+    let settings = query.project_settings();
     let file_path = query.virtual_file_path();
     let source_type = query.source_type_for_format();
 

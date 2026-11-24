@@ -79,7 +79,7 @@ pub(crate) fn check(
     show_syntax_errors: bool,
     supports_related_information: bool,
 ) -> DiagnosticsMap {
-    let settings = query.settings();
+    let settings = query.project_settings();
     let document_path = query.virtual_file_path();
 
     // If the document is excluded, return an empty list of diagnostics.
@@ -170,7 +170,7 @@ fn check_python(
     query: &DocumentQuery,
     source_type: ruff_python_ast::PySourceType,
 ) -> CheckResult<'_> {
-    let settings = query.settings();
+    let settings = query.project_settings();
     let document_path = query.virtual_file_path();
     let source_kind = query.make_python_source_kind(source_type);
 
@@ -264,7 +264,7 @@ fn check_toml<'a>(
     document: &'a TextDocument,
     source_type: TomlSourceType,
 ) -> CheckResult<'a> {
-    let settings = query.settings();
+    let settings = query.project_settings();
     let diagnostics = if settings
         .linter
         .rules

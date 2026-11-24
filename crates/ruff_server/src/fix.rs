@@ -28,7 +28,7 @@ pub(crate) fn fix_all(
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    let settings = query.settings();
+    let settings = query.project_settings();
     let document_path = query.virtual_file_path();
 
     // If the document is excluded, return an empty list of fixes.
@@ -158,7 +158,7 @@ fn fix_toml(
         document.contents(),
         linter_settings,
         source_type,
-        query.settings().unsafe_fixes,
+        query.project_settings().unsafe_fixes,
     )
     .transformed;
 

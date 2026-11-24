@@ -127,7 +127,7 @@ pub(super) fn fix_all_edit(
     query: &DocumentQuery,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    crate::fix::fix_all(query, &query.settings().linter, encoding)
+    crate::fix::fix_all(query, &query.project_settings().linter, encoding)
 }
 
 pub(super) fn resolve_edit_for_organize_imports(
@@ -144,7 +144,7 @@ pub(super) fn organize_imports_edit(
     query: &DocumentQuery,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    let mut linter_settings = query.settings().linter.clone();
+    let mut linter_settings = query.project_settings().linter.clone();
     linter_settings.rules = [
         Rule::UnsortedImports,       // I001
         Rule::MissingRequiredImport, // I002

@@ -554,8 +554,8 @@ impl DocumentQuery {
         }
     }
 
-    /// Get the document settings associated with this query.
-    pub(crate) fn settings(&self) -> &RuffSettings {
+    /// Project settings control discovery, exclusions, and whether unsafe fixes are allowed.
+    pub(crate) fn project_settings(&self) -> &RuffSettings {
         match self {
             Self::Text { settings, .. } | Self::Notebook { settings, .. } => settings,
         }
