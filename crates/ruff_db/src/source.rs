@@ -72,7 +72,7 @@ pub fn script_tag(db: &dyn Db, file: File) -> Option<Box<ScriptTag>> {
 }
 
 /// Returns whether a file is a notebook without reading its contents.
-pub fn is_notebook(db: &dyn Db, file: File) -> bool {
+fn is_notebook(db: &dyn Db, file: File) -> bool {
     if let Some(source) = file.source_text_override(db) {
         return source.is_notebook();
     }

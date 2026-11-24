@@ -9,8 +9,7 @@ use std::hash::{Hash, Hasher};
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, LintName, Severity, Span,
 };
-use ruff_db::source::{script_tag, source_text};
-use ruff_db::{PythonFile, files::File, parsed::parsed_module};
+use ruff_db::{PythonFile, files::File, parsed::parsed_module, source::source_text};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::indentation_at_offset;
@@ -91,7 +90,7 @@ pub(crate) fn suppressions(db: &dyn Db, file: PythonFile<'_>) -> Suppressions {
     let source_file = file.file(db);
     let parsed = parsed_module(db, file).load(db);
     let source = source_text(db, source_file);
-    let script_range = script_tag(db, source_file).map(Ranged::range);
+    let script_range = ruff_db::source::script_tag(db, source_file).map(Ranged::range);
 
     let respect_type_ignore = db
         .analysis_settings(source_file)
