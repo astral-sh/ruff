@@ -259,7 +259,8 @@ impl<'db> ConstraintSet<'db, '_> {
             self,
             inferable,
             budget,
-            CandidateSearch::All(ReportDiagnostics::Yes),
+            // The fold consumes only valid solutions and never exposes violations.
+            CandidateSearch::All(ReportDiagnostics::No),
         )?;
 
         path_bounds.try_fold_with(
