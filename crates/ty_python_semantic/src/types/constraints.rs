@@ -374,13 +374,10 @@ impl<'db> OwnedConstraintSet<'db> {
     where
         F: for<'c> FnOnce(&'c ConstraintSetBuilder<'db>, ConstraintSet<'db, 'c>) -> R,
     {
-        let storage = ConstraintSetStorage {
-            compacted: self.inner.clone(),
-            ..ConstraintSetStorage::default()
-        };
-        let builder = ConstraintSetBuilder {
-            storage: RefCell::new(storage),
-        };
+        let builder = ConstraintSetBuilder::new();
+        if let Some(inner) = &self.inner {
+            builder.storage.borrow_mut().compacted = Some(Arc::clone(inner));
+        }
         let set = ConstraintSet::from_node(&builder, self.node, self.source_order);
         f(&builder, set)
     }
@@ -572,6 +569,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
     ) -> bool {
+        if self.node.is_terminal() {
+            return self.node == ALWAYS_FALSE;
+        }
+
         let mut storage = self.builder.storage.borrow_mut();
         self.node
             .is_never_satisfied(db, env, &mut storage, inferable, self.source_order)
@@ -585,6 +586,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
     ) -> Option<bool> {
+        if self.node.is_terminal() {
+            return Some(self.node == ALWAYS_FALSE);
+        }
+
         let budget = SolutionBudget::default();
         let limits = BoundedSolutionLimits {
             remaining_paths: budget.paths,
@@ -692,6 +697,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
     ) -> bool {
+        if self.node.is_terminal() {
+            return self.node == ALWAYS_TRUE;
+        }
+
         let mut storage = self.builder.storage.borrow_mut();
         self.node
             .is_always_satisfied(db, env, &mut storage, inferable, self.source_order)
@@ -729,6 +738,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
     ) -> Option<bool> {
+        if self.node.is_terminal() {
+            return Some(self.node == ALWAYS_TRUE);
+        }
+
         let budget = SolutionBudget::default();
         let limits = BoundedSolutionLimits {
             remaining_paths: budget.paths,
@@ -808,6 +821,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: Self,
     ) -> Self {
         self.verify_builder(builder);
+        if self.node == ALWAYS_FALSE && self.source_order.is_none() {
+            self.node = other.node;
+            self.source_order = other.source_order;
+            return *self;
+        }
+        if other.node == ALWAYS_FALSE && other.source_order.is_none() {
+            return *self;
+        }
         let mut storage = builder.storage.borrow_mut();
         self.node = self.node.or(&mut storage, other.node);
         self.source_order = storage.ordered_source_order(self.source_order, other.source_order);
@@ -824,6 +845,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: Self,
     ) -> Self {
         self.verify_builder(builder);
+        if self.node == ALWAYS_TRUE && self.source_order.is_none() {
+            self.node = other.node;
+            self.source_order = other.source_order;
+            return *self;
+        }
+        if other.node == ALWAYS_TRUE && other.source_order.is_none() {
+            return *self;
+        }
         let mut storage = builder.storage.borrow_mut();
         self.node = self.node.and(&mut storage, other.node);
         self.source_order = storage.ordered_source_order(self.source_order, other.source_order);
@@ -833,6 +862,17 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// Returns the negation of this constraint set.
     pub(crate) fn negate(self, _db: &'db dyn Db, builder: &'c ConstraintSetBuilder<'db>) -> Self {
         self.verify_builder(builder);
+        if self.node.is_terminal() {
+            return Self::from_node(
+                builder,
+                if self.node == ALWAYS_TRUE {
+                    ALWAYS_FALSE
+                } else {
+                    ALWAYS_TRUE
+                },
+                self.source_order,
+            );
+        }
         let mut storage = builder.storage.borrow_mut();
         Self::from_node(builder, self.node.negate(&mut storage), self.source_order)
     }
@@ -1142,7 +1182,8 @@ impl Debug for ConstraintSet<'_, '_> {
 /// the definitions and expressions in that region, in a stable order.
 #[derive(Default)]
 pub(crate) struct ConstraintSetBuilder<'db> {
-    storage: RefCell<ConstraintSetStorage<'db>>,
+    // Terminal constraint sets need none of the decision diagram's arenas or caches.
+    storage: LazyCell<Box<RefCell<ConstraintSetStorage<'db>>>>,
 }
 
 type ExistsCacheKey<'db> = (
@@ -1352,7 +1393,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         let source_order = constraint
             .source_order
             .expect("non-terminal BDD should have source_order");
-        let storage = self.storage.into_inner();
+        let storage = self.storage.take();
         OwnedConstraintSetBuilder::build(storage, root, source_order)
     }
 
@@ -1372,6 +1413,9 @@ impl<'db> ConstraintSetBuilder<'db> {
         env: &ProgramEnvironment<'db>,
         other: &OwnedConstraintSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if other.node.is_terminal() {
+            return ConstraintSet::from_node(self, other.node, None);
+        }
         let mut storage = self.storage.borrow_mut();
         let (node, source_order) = storage.load(db, env, other);
         ConstraintSet::from_node(self, node, source_order)
@@ -1385,6 +1429,9 @@ impl<'db> ConstraintSetBuilder<'db> {
         other: &OwnedConstraintSet<'db>,
         provenance: ConstraintProvenance,
     ) -> ConstraintSet<'db, 'c> {
+        if other.node.is_terminal() {
+            return ConstraintSet::from_node(self, other.node, None);
+        }
         let mut storage = self.storage.borrow_mut();
         let (node, source_order) = storage.load_with_provenance(db, env, other, Some(provenance));
         ConstraintSet::from_node(self, node, source_order)
@@ -7883,6 +7930,7 @@ class E: ...
 
         owned.query(|builder, set| {
             assert!(set.is_always_satisfied(db, &env, TypeVarSet::All));
+            assert!(std::cell::LazyCell::get(&builder.storage).is_none());
             let storage = builder.storage.borrow();
             assert!(storage.compacted.is_none());
             assert!(storage.nodes.is_empty());
@@ -7893,6 +7941,9 @@ class E: ...
         let builder = ConstraintSetBuilder::new();
         let loaded = builder.load(db, &env, &owned);
         assert!(loaded.is_always_satisfied(db, &env, TypeVarSet::All));
+        let opposite = loaded.negate(db, &builder);
+        assert!(opposite.is_never_satisfied(db, &env, TypeVarSet::All));
+        assert!(std::cell::LazyCell::get(&builder.storage).is_none());
     }
 
     /// Round-trip through `OwnedConstraintSet`: build a TDD with uncertain branches, convert to
