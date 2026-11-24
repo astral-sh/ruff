@@ -727,6 +727,12 @@ pub enum FieldInstanceKind {
     Attrs,
 }
 
+impl FieldInstanceKind {
+    pub(super) fn is_attrs(self) -> bool {
+        matches!(self, Self::Attrs)
+    }
+}
+
 /// Contains information about instances of `dataclasses.Field`, typically created using
 /// `dataclasses.field()`.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
