@@ -189,6 +189,10 @@ pub struct AnalyzeGraphCommand {
     /// to files that depend on it.
     #[clap(long, value_enum, default_value_t)]
     direction: Direction,
+    /// Group files by their enclosing Python package and omit dependencies within the same package.
+    /// Files outside a package remain individual nodes.
+    #[arg(long)]
+    package: bool,
     /// Attempt to detect imports from string literals.
     #[clap(long)]
     detect_string_imports: bool,
@@ -896,6 +900,7 @@ impl AnalyzeGraphCommand {
         let format_arguments = AnalyzeGraphArgs {
             files: self.files,
             direction: self.direction,
+            package: self.package,
             python: self.python,
         };
 
@@ -1376,6 +1381,7 @@ impl LineColumnParseError {
 pub struct AnalyzeGraphArgs {
     pub(crate) files: Vec<PathBuf>,
     pub(crate) direction: Direction,
+    pub(crate) package: bool,
     pub(crate) python: Option<PathBuf>,
 }
 

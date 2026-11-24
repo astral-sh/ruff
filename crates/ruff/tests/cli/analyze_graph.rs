@@ -1,6 +1,7 @@
 use std::process::Command;
 
 use insta_cmd::assert_cmd_snapshot;
+use serde_json::json;
 
 use crate::CliTest;
 
@@ -150,6 +151,44 @@ fn type_checking_imports_from_config() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn package_dependencies_and_dependents() -> anyhow::Result<()> {
+    let test = AnalyzeTest::with_files([
+        ("app/__init__.py", ""),
+        ("app/one.py", "import lib.a"),
+        ("app/two.py", "import lib.b"),
+        ("lib/__init__.py", ""),
+        ("lib/a.py", ""),
+        ("lib/b.py", ""),
+    ])?;
+
+    assert_eq!(test.package_graph(&[])?, json!({"app": ["lib"], "lib": []}));
+    assert_eq!(
+        test.package_graph(&["--direction", "dependents"])?,
+        json!({"app": [], "lib": ["app"]})
+    );
+    Ok(())
+}
+
+#[test]
+fn package_dependencies_for_selected_files() -> anyhow::Result<()> {
+    let test = AnalyzeTest::with_files([
+        ("app/__init__.py", ""),
+        ("app/one.py", "import lib.a"),
+        ("app/two.py", "import app.one\nimport lib.sub.b"),
+        ("lib/__init__.py", ""),
+        ("lib/a.py", ""),
+        ("lib/sub/__init__.py", ""),
+        ("lib/sub/b.py", ""),
+    ])?;
+
+    assert_eq!(
+        test.package_graph(&["app"])?,
+        json!({"app": ["lib", std::path::Path::new("lib").join("sub")]})
+    );
+    Ok(())
+}
+
 struct AnalyzeTest {
     cli_test: CliTest,
 }
@@ -175,6 +214,16 @@ impl AnalyzeTest {
         let fixture = Self::new()?;
         fixture.write_file(path, content)?;
         Ok(fixture)
+    }
+
+    fn package_graph(&self, args: &[&str]) -> anyhow::Result<serde_json::Value> {
+        let output = self.command().arg("--package").args(args).output()?;
+        anyhow::ensure!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        Ok(serde_json::from_slice(&output.stdout)?)
     }
 
     fn command(&self) -> Command {
