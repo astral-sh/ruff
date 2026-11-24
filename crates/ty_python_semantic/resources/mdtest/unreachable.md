@@ -103,6 +103,27 @@ def f():
     print("unreachable")
 ```
 
+### Reading an unchanged parameter after nested branches
+
+Both inner branches end in a call that never returns. The read of `y` must see the merged
+conditions even though neither branch assigns to `y`.
+
+```py
+from typing_extensions import Never
+
+def stop() -> Never:
+    raise RuntimeError
+
+def f(x: int, y: str):
+    if isinstance(x, str):
+        if x:
+            stop()
+        else:
+            stop()
+        reveal_type(y)  # revealed: Never
+        assert y
+```
+
 ### Calls to unions of functions returning `Never`
 
 In the example below, either function raises an exception, so calling the selected function makes
