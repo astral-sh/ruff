@@ -264,7 +264,7 @@ Range(1)  # ok
 Range()  # error: [missing-argument] "No argument provided for required parameter `start`"
 ```
 
-A required positional field cannot follow a field with a decorated default.
+A required positional field cannot follow a field with a default.
 
 ```py
 @define

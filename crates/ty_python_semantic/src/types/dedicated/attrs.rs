@@ -118,9 +118,6 @@ impl DecoratedDefaults {
         db: &'db dyn Db,
         declarations: DeclarationsIterator<'_, 'db>,
     ) {
-        // A conditional method can have multiple declarations at the end of the class body,
-        // including an undefined alternative. We skip these cases because we do not check
-        // whether every path registers a default for the same field.
         let Ok(declaration) = declarations.exactly_one() else {
             return;
         };
