@@ -946,10 +946,17 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other: impl FnOnce() -> Self,
     ) -> Self {
         self.verify_builder(build.builder);
-        if !self.short_circuits_and() {
-            self.intersect(db, build, other());
+        if self.short_circuits_and() {
+            return self;
         }
-        self
+        let other = other();
+        // Protocol member comparisons often succeed without adding any constraints.
+        if matches!(self, Self::Valid(left) if left.node == ALWAYS_TRUE && left.source_order.is_none())
+        {
+            other.verify_builder(build.builder);
+            return other;
+        }
+        self.intersect(db, build, other)
     }
 
     /// Returns the union of this constraint set and another. The other constraint set is provided
@@ -3139,13 +3146,17 @@ impl NodeId {
             {
                 let (existing_node, existing_source_order, _) =
                     accumulator.pop().expect("accumulator should not be empty");
+                depth += 1;
+                // Keep the tree shape, but avoid borrowing storage for an identity.
+                if existing_node == zero && existing_source_order.is_none() {
+                    continue;
+                }
                 let mut storage = builder.storage.borrow_mut();
                 node = combine(existing_node, &mut storage, node, budget)?;
                 source_order = storage.ordered_source_order(existing_source_order, source_order);
                 if node == one {
                     return Ok((node, source_order));
                 }
-                depth += 1;
             }
             accumulator.push((node, source_order, depth));
         }
@@ -5812,6 +5823,10 @@ mod tests {
         assert_matches!(exhausted, ConstraintSet::BudgetExceeded);
         assert_matches!(
             exhausted.or(db, build, || unreachable!()),
+            ConstraintSet::BudgetExceeded
+        );
+        assert_matches!(
+            ConstraintSet::always(&builder).and(db, build, || exhausted),
             ConstraintSet::BudgetExceeded
         );
         let mut never = ConstraintSet::never(&builder);
