@@ -1,8 +1,3 @@
-use std::hash::Hash;
-
-use ruff_index::{FrozenIndexVec, IndexVec, newtype_index};
-use rustc_hash::FxHashMap;
-
 /// A slice of 32-bit IDs stored at the narrowest width that fits every entry.
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(super) enum PackedIds<T> {
@@ -79,6 +74,14 @@ impl<K: Ord, V, S> From<std::collections::HashMap<K, V, S>> for FrozenMap<K, V> 
 }
 
 impl<K: Ord, V> FrozenMap<K, V> {
+    /// Freeze entries that are already in strictly increasing key order.
+    ///
+    /// Duplicate or unsorted keys would make lookups by binary search unreliable.
+    pub fn from_sorted(entries: Vec<(K, V)>) -> Self {
+        debug_assert!(entries.windows(2).all(|w| w[0].0 < w[1].0));
+        Self(entries.into_boxed_slice())
+    }
+
     /// Creates a frozen map from entries with unique keys.
     pub(crate) fn from_entries(mut entries: Vec<(K, V)>) -> Self {
         entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
@@ -142,10 +145,6 @@ impl<'a, K, V> IntoIterator for &'a mut FrozenMap<K, V> {
     }
 }
 
-#[newtype_index]
-#[derive(get_size2::GetSize, salsa::SalsaValue)]
-struct FrozenValueIndex;
-
 /// Sorts entries by key and removes duplicate keys, retaining the last value for each key.
 ///
 /// Stable sorting preserves the input order of equal-key entries, allowing the deduplication
@@ -163,109 +162,6 @@ fn sort_and_deduplicate<K: Ord, V>(mut entries: Vec<(K, V)>) -> Vec<(K, V)> {
     });
 
     entries
-}
-
-fn index_values<K, V>(
-    entries: impl IntoIterator<Item = (K, V)>,
-) -> (Vec<(K, FrozenValueIndex)>, IndexVec<FrozenValueIndex, V>)
-where
-    V: Copy + Eq + Hash,
-{
-    let mut values = IndexVec::new();
-    let mut value_indices = FxHashMap::default();
-    let entries = entries
-        .into_iter()
-        .map(|(key, value)| {
-            let index = *value_indices
-                .entry(value)
-                .or_insert_with(|| values.push(value));
-            (key, index)
-        })
-        .collect();
-
-    (entries, values)
-}
-
-/// Compact immutable key-value entries that deduplicate repeated values.
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub struct FrozenValueMap<K, V> {
-    entries: FrozenMap<K, FrozenValueIndex>,
-    values: FrozenIndexVec<FrozenValueIndex, V>,
-}
-
-impl<K, V> FrozenValueMap<K, V> {
-    pub fn get(&self, key: &K) -> Option<&V>
-    where
-        K: Ord,
-    {
-        self.entries.get(key).map(|index| &self.values[*index])
-    }
-
-    pub fn iter(&self) -> impl DoubleEndedIterator<Item = (K, V)> + ExactSizeIterator + '_
-    where
-        K: Copy,
-        V: Copy,
-    {
-        self.entries
-            .iter()
-            .map(|(key, index)| (*key, self.values[*index]))
-    }
-
-    pub fn map_values<F>(&mut self, mut map: F)
-    where
-        K: Copy + Ord,
-        V: Copy + Eq + Hash,
-        F: FnMut(K, V) -> V,
-    {
-        let (entries, values) =
-            index_values(self.iter().map(|(key, value)| (key, map(key, value))));
-        *self = Self {
-            entries: FrozenMap(entries.into_boxed_slice()),
-            values: values.into(),
-        };
-    }
-}
-
-impl<K, V> FromIterator<(K, V)> for FrozenValueMap<K, V>
-where
-    K: Ord,
-    V: Copy + Eq + Hash,
-{
-    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let source_entries = sort_and_deduplicate(iter.into_iter().collect());
-
-        let (entries, values) = index_values(source_entries);
-
-        Self {
-            entries: FrozenMap(entries.into_boxed_slice()),
-            values: values.into(),
-        }
-    }
-}
-
-impl<K, V, S> From<std::collections::HashMap<K, V, S>> for FrozenValueMap<K, V>
-where
-    K: Ord,
-    V: Copy + Eq + Hash,
-{
-    fn from(map: std::collections::HashMap<K, V, S>) -> Self {
-        let (mut entries, values) = index_values(map);
-        entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
-
-        Self {
-            entries: FrozenMap(entries.into_boxed_slice()),
-            values: values.into(),
-        }
-    }
-}
-
-impl<K, V> Default for FrozenValueMap<K, V> {
-    fn default() -> Self {
-        Self {
-            entries: FrozenMap::default(),
-            values: IndexVec::new().into(),
-        }
-    }
 }
 
 /// Compact immutable keys stored in ascending order.
@@ -314,7 +210,7 @@ impl<K> Default for FrozenSet<K> {
 mod tests {
     use std::assert_matches;
 
-    use super::{FrozenMap, FrozenValueMap, PackedIds};
+    use super::{FrozenMap, PackedIds};
 
     #[test]
     fn packed_ids_preserve_values_at_width_boundaries() {
@@ -353,50 +249,6 @@ mod tests {
         assert_eq!(
             map.iter().copied().collect::<Vec<_>>(),
             vec![(1, 11), (2, 22)]
-        );
-    }
-
-    #[test]
-    fn frozen_value_map_deduplicates_values() {
-        let map = FrozenValueMap::from_iter([(3, [1; 4]), (1, [2; 4]), (2, [1; 4])]);
-
-        assert_eq!(map.values.len(), 2);
-        assert_eq!(map.get(&1), Some(&[2; 4]));
-        assert_eq!(map.get(&2), Some(&[1; 4]));
-        assert_eq!(
-            map.iter().collect::<Vec<_>>(),
-            vec![(1, [2; 4]), (2, [1; 4]), (3, [1; 4])]
-        );
-    }
-
-    #[test]
-    fn frozen_value_map_preserves_last_value_for_duplicate_keys() {
-        let map = FrozenValueMap::from_iter([(2, 20), (1, 10), (1, 11)]);
-
-        assert_eq!(map.iter().collect::<Vec<_>>(), vec![(1, 11), (2, 20)]);
-    }
-
-    #[test]
-    fn frozen_value_map_updates_and_rededuplicates_values() {
-        let mut map = FrozenValueMap::from_iter([(1, 10), (2, 20), (3, 30)]);
-
-        map.map_values(|_, _| 42);
-
-        assert_eq!(&map.values.raw, &[42]);
-        assert_eq!(
-            map.iter().collect::<Vec<_>>(),
-            vec![(1, 42), (2, 42), (3, 42)]
-        );
-    }
-
-    #[test]
-    fn frozen_value_map_uses_less_heap_for_repeated_large_values() {
-        let entries = [(1, [1; 8]), (2, [1; 8]), (3, [1; 8]), (4, [2; 8])];
-        let direct = FrozenMap::from_iter(entries);
-        let deduplicated = FrozenValueMap::from_iter(entries);
-
-        assert!(
-            ruff_memory_usage::heap_size(&deduplicated) < ruff_memory_usage::heap_size(&direct)
         );
     }
 }

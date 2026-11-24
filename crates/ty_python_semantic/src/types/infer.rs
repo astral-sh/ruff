@@ -51,7 +51,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
-pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
+pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet};
 
 use crate::types::context::InferContextResult;
 use crate::types::diagnostic::TypeCheckDiagnostics;
@@ -1020,8 +1020,10 @@ impl<'db> InferenceRegion<'db> {
 /// The inferred types for a scope region.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ScopeInference<'db> {
-    /// The types of every expression in this region.
-    expressions: FrozenValueMap<ExpressionNodeKey, Type<'db>>,
+    /// Storing each type alongside its node lets us freeze sorted entries without
+    /// hashing their values. Scopes with many repeated types retain more memory
+    /// than they would with a separate table of distinct values.
+    expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<ScopeInferenceExtra<'db>>>,
@@ -1078,7 +1080,7 @@ impl<'db> ScopeInference<'db> {
                 return_type: Some(cycle_recovery),
                 ..ScopeInferenceExtra::default()
             })),
-            expressions: FrozenValueMap::default(),
+            expressions: FrozenMap::default(),
         }
     }
 
@@ -1089,9 +1091,9 @@ impl<'db> ScopeInference<'db> {
         previous_inference: &ScopeInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
-        self.expressions.map_values(|expr, ty| {
-            ty.cycle_normalized(db, env, previous_inference.expression_type(expr), cycle)
-        });
+        for (expr, ty) in &mut self.expressions {
+            *ty = ty.cycle_normalized(db, env, previous_inference.expression_type(*expr), cycle);
+        }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
             && let Some(previous_extra) = previous_inference.extra.as_deref()
