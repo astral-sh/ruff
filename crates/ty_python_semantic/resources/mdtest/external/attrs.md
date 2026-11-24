@@ -229,11 +229,8 @@ class Person:
     def _default_id(self) -> int:
         return 0
 
+reveal_type(Person.__init__)  # revealed: (self: Person, /, name: str = ..., id: int = ...) -> None
 person = Person()
-Person(name="Alice")  # ok
-Person(id=1)  # ok
-Person(name="Alice", id=1)  # ok
-Person(id="1")  # error: [invalid-argument-type]
 ```
 
 The types of the fields are not affected by this:
