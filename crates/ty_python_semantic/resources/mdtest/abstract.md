@@ -640,3 +640,83 @@ class Example(ABC):
 
 Example()  # error: [abstract-class-instantiation]
 ```
+
+## Descriptor classes and optional fields
+
+A descriptor that just initializes an instance is concrete. A decorator class with a custom
+`__new__` can return an abstract method.
+
+```py
+from abc import ABC, abstractmethod
+from functools import cached_property
+import typing as t
+from ty_extensions._internal import TypeOf
+
+class Base(ABC):
+    @abstractmethod
+    def method(self) -> int: ...
+
+Method = TypeOf[Base.method]
+
+class Concrete(ABC):
+    field: t.Optional[Method] = None
+
+    @cached_property
+    def value(self) -> int:
+        return 1
+
+Concrete()
+
+class Decorator:
+    def __new__(cls, func: "t.Annotated[object, Abstract()]") -> TypeOf[Base.method]:  # error: [abstract-class-instantiation]
+        return Base.method
+
+class Abstract(ABC):
+    @Decorator
+    def method(self) -> int:
+        return 1
+
+Abstract()  # error: [abstract-class-instantiation]
+```
+
+Narrowing the runtime value of a legacy alias to `typing.Optional` does not change what the alias
+means in a type expression. The invalid assignment below retains the abstract method.
+
+```py
+T = t.TypeVar("T")
+
+def is_optional(value: object) -> t.TypeGuard[TypeOf[t.Optional]]:
+    return value is t.Optional
+
+class Narrowed(ABC):
+    Alias: t.TypeAlias = t.Annotated[T, 1]
+    assert is_optional(Alias)
+    method: Alias[Method] = None  # error: [invalid-assignment]
+
+Narrowed()  # error: [abstract-class-instantiation]
+```
+
+## Recursive constructor annotation
+
+Checking whether a class is abstract can depend on constructing that same class through an alias.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+from typing import Optional
+from ty_extensions._internal import TypeOf
+
+class C:
+    __new__: Optional[Result] = None
+
+# error: [not-callable]
+# error: [not-callable]
+C()
+# error: [not-callable]
+# error: [not-callable]
+type Result = TypeOf[C()]
+```

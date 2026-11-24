@@ -64,7 +64,7 @@ use crate::{Db, FxIndexSet};
 
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
-use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::definition::{AnnotatedAssignmentDefinitionKind, Definition, DefinitionKind};
 use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::statement::StatementInner;
@@ -281,6 +281,52 @@ pub(crate) fn infer_definition_types<'db>(
     let env = ProgramEnvironment::from_file(program_file);
     TypeInferenceBuilder::for_definition(db, &env, definition, &module)
         .finish_definition(definition)
+}
+
+/// Limit shortcuts during abstract-method discovery to names and generic types.
+/// Skipping expressions such as `TypeOf[C().attr]` can change the order in
+/// which ty resolves a cycle involving construction of the enclosing class.
+fn is_simple_annotation(annotation: &ast::Expr) -> bool {
+    match annotation {
+        ast::Expr::Name(_) => true,
+        ast::Expr::Subscript(subscript) => {
+            subscript.value.is_name_expr() && is_simple_annotation(&subscript.slice)
+        }
+        ast::Expr::Tuple(tuple) => tuple.elts.iter().all(is_simple_annotation),
+        _ => false,
+    }
+}
+
+/// Whether a field assigned `None` accepts that value regardless of its type argument.
+pub(super) fn is_optional_none_assignment<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    assignment: &AnnotatedAssignmentDefinitionKind,
+) -> bool {
+    if !assignment.has_value() || definition.file(db).is_stub(db) {
+        return false;
+    }
+    let module = parsed_module(db, definition.python_file(db)).load(db);
+    let (Some(ast::Expr::NoneLiteral(_)), ast::Expr::Subscript(annotation)) =
+        (assignment.value(&module), assignment.annotation(&module))
+    else {
+        return false;
+    };
+    let file = definition.program_file(db);
+    // A constructor annotation can depend on constructing the same class,
+    // even through an alias. Preserve the order of inference for special methods.
+    if !matches!(assignment.target(&module), ast::Expr::Name(name) if !ast::helpers::is_dunder(&name.id))
+        || !is_simple_annotation(&annotation.slice)
+        || !ast::helpers::is_dotted_name(&annotation.value)
+        || semantic_index(db, file)
+            .use_def_map(definition.file_scope(db))
+            .may_narrow(definition.place(db))
+    {
+        return false;
+    }
+    let env = ProgramEnvironment::from_file(file);
+    TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+        .resolves_to_optional(&annotation.value)
 }
 
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.

@@ -1782,7 +1782,7 @@ fn recursive_protocol_materialization_tracks_member_type_changes() -> anyhow::Re
 }
 
 #[test]
-fn abstract_methods_track_changes_to_identity_decorators() -> anyhow::Result<()> {
+fn abstract_methods_track_changes_to_decorators() -> anyhow::Result<()> {
     let mut db = setup_db();
     let module = "/src/main.py";
     db.write_file(
@@ -1799,6 +1799,25 @@ fn abstract_methods_track_changes_to_identity_decorators() -> anyhow::Result<()>
     assert_file_diagnostics(&db, module, &["Cannot instantiate abstract class `Base`"]);
 
     db.write_file(decorator, identity)?;
+    assert_file_diagnostics(&db, module, &[]);
+
+    let descriptor = "class decorate:\n    def __init__(self, f: object): pass";
+    db.write_file(decorator, descriptor)?;
+    assert_file_diagnostics(&db, module, &[]);
+
+    db.write_file(
+        decorator,
+        "from abc import abstractmethod
+from ty_extensions._internal import TypeOf
+class Parent:
+    @abstractmethod
+    def f(self): ...
+class decorate:
+    def __new__(cls, f: object) -> TypeOf[Parent.f]: return Parent.f",
+    )?;
+    assert_file_diagnostics(&db, module, &["Cannot instantiate abstract class `Base`"]);
+
+    db.write_file(decorator, descriptor)?;
     assert_file_diagnostics(&db, module, &[]);
     Ok(())
 }

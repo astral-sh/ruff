@@ -444,13 +444,18 @@ pub(super) fn decorator_preserves_concreteness<'db>(
 /// metadata to avoid reloading ASTs that were discarded after checking their files.
 #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| true)]
 fn might_be_explicitly_abstract<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
-    let DefinitionKind::Function(function) = definition.kind(db) else {
-        return true;
-    };
-    if !function.has_decorators() {
-        return false;
+    match definition.kind(db) {
+        DefinitionKind::Function(function) => {
+            function.has_decorators()
+                && function_known_decorators(db, definition).may_produce_abstract_method()
+        }
+        // An invalid assignment can bind the declared type, including an abstract
+        // method. With `Optional[T] = None` we know the assigned value is valid.
+        DefinitionKind::AnnotatedAssignment(assignment) => {
+            !super::infer::is_optional_none_assignment(db, definition, assignment)
+        }
+        _ => true,
     }
-    function_known_decorators(db, definition).may_produce_abstract_method()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]

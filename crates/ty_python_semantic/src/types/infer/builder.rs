@@ -4772,6 +4772,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Whether an annotation uses `typing.Optional`, without inferring its type argument.
+    pub(super) fn resolves_to_optional(mut self, reference: &ast::Expr) -> bool {
+        self.deferred_state = DeferredExpressionState::from(self.defer_annotations());
+        self.context.inference_flags |= InferenceFlags::CHECK_UNBOUND_TYPEVARS;
+        let (ty, source) = self.infer_type_expression_reference(reference);
+        let db = self.db();
+        // Normal assignment inference collects diagnostics for the complete annotation.
+        let _ = self.context.finish();
+        // A legacy alias takes precedence over its runtime value in a type expression.
+        ty == Type::SpecialForm(SpecialFormType::Optional)
+            && source.is_none_or(|source| super::legacy_type_alias_definition(db, source).is_none())
+    }
+
     /// Infer an annotated assignment's annotation using the file's deferred-annotation semantics.
     fn infer_annotated_assignment_annotation(
         &mut self,
@@ -12799,7 +12812,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let DefinitionKind::Function(function) = definition.kind(self.db())
         {
             may_produce_abstract_method = false;
-            for decorator in &function.node(self.module()).decorator_list {
+            let node = function.node(self.module());
+            for decorator in &node.decorator_list {
                 let ty = self.expression_type(&decorator.expression);
                 let flags = FunctionDecorators::from_decorator_type(self.db(), ty);
                 known_decorators |= flags;
@@ -12813,8 +12827,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Even if the decorator preserves concreteness, a later TypeGuard in the
                 // class body can narrow the member's type to that of an abstract method.
                 let bindings = self.index.use_def_map(definition.file_scope(self.db()));
-                may_produce_abstract_method = bindings.may_narrow(definition.place(self.db()))
-                    || !decorator_preserves_concreteness(self.db(), self.program_environment(), ty);
+                if !bindings.may_narrow(definition.place(self.db())) {
+                    if decorator_preserves_concreteness(self.db(), self.program_environment(), ty) {
+                        continue;
+                    }
+                    if let Type::ClassLiteral(ClassLiteral::Static(class)) = ty
+                        && node.decorator_list.len() == 1
+                        && node
+                            .returns
+                            .as_deref()
+                            .is_some_and(super::is_simple_annotation)
+                        && class.constructs_plain_instance(self.db())
+                    {
+                        continue;
+                    }
+                }
+                may_produce_abstract_method = true;
             }
             may_produce_abstract_method |=
                 known_decorators.contains(FunctionDecorators::ABSTRACT_METHOD);

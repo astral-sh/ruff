@@ -235,6 +235,30 @@ impl<'db> StaticClassLiteral<'db> {
         self.header(db).has_explicit_metaclass
     }
 
+    /// Whether a decorator class can only construct ordinary instances. Checking
+    /// the header and symbol table avoids inferring constructor annotations, which
+    /// can themselves refer to the decorated method.
+    pub(in crate::types) fn constructs_plain_instance(self, db: &'db dyn Db) -> bool {
+        if self.known(db).is_some()
+            || self.has_decorators(db)
+            || self.has_explicit_metaclass(db)
+            || place_table(db, self.body_scope(db))
+                .symbol_id("__new__")
+                .is_some()
+        {
+            return false;
+        }
+        // `Generic[T]` allows a descriptor like `cached_property` to capture
+        // the getter's return type without inheriting a custom constructor.
+        !self.has_explicit_bases(db)
+            || matches!(
+                self.explicit_bases(db),
+                [Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(
+                    _
+                ))]
+            )
+    }
+
     /// Return `true` if this class represents `known_class`
     pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
