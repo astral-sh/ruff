@@ -1214,6 +1214,22 @@ fn changing_a_name_use_keeps_an_imported_declaration_cached() -> anyhow::Result<
 }
 
 #[test]
+fn project_builtins_follow_file_creation_and_removal() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let main = "/src/main.py";
+    let builtins = "/src/__builtins__.pyi";
+    db.write_file(main, "value = project_value")?;
+
+    let missing = &["Name `project_value` used when not defined"];
+    assert_file_diagnostics(&db, main, missing);
+    db.write_file(builtins, "project_value: int")?;
+    assert_file_diagnostics(&db, main, &[]);
+    db.remove_file(builtins)?;
+    assert_file_diagnostics(&db, main, missing);
+    Ok(())
+}
+
+#[test]
 fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
     let mut db = setup_db();
 
