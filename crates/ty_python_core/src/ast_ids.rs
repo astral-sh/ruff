@@ -110,32 +110,30 @@ impl AstIdsBuilder {
     /// Stores use IDs and their lexical places in node-index order.
     /// The IDs themselves keep the order in which the flow builder visited uses in each scope.
     pub(super) fn finish(self) -> AstIds {
-        let mut pages: Vec<UsePage> = Vec::new();
+        let mut pages = Vec::with_capacity(self.root.len().div_ceil(64));
         let mut use_ids = Vec::new();
         let mut places_plus_one = Vec::new();
         let mut scopes = Vec::new();
-        for (node, row) in (0..).map(ast::NodeIndex::from).zip(self.root) {
-            if let Some(scope) = row.scope {
-                ScopeRange::record(&mut scopes, node, scope);
+        for (first_node, rows) in (0_u32..).step_by(64).zip(self.root.chunks(64)) {
+            let first_use = u32::try_from(use_ids.len()).expect("more uses than node indices");
+            let mut mask = 0;
+            for (offset, row) in (0_u32..).zip(rows) {
+                if let Some(scope) = row.scope {
+                    let node = ast::NodeIndex::from(first_node + offset);
+                    ScopeRange::record(&mut scopes, node, scope);
+                }
+                if let Some(use_id) = row.use_id {
+                    mask |= 1_u64 << offset;
+                    use_ids.push(use_id);
+                    places_plus_one.push(row.place_plus_one);
+                }
             }
-            let Some(use_id) = row.use_id else { continue };
-            if let Some(page) = pages.last_mut()
-                && let Some(bit) = page.bit(node)
-            {
-                page.mask |= bit;
-            } else {
-                // Each set bit accounts for one distinct node in the use array.
-                let first_use = pages
-                    .last()
-                    .map_or(0, |last| last.first_use + last.mask.count_ones());
-                pages.push(UsePage {
-                    first_node: node,
-                    first_use,
-                    mask: 1,
-                });
-            }
-            use_ids.push(use_id);
-            places_plus_one.push(row.place_plus_one);
+            pages.push(UsePage {
+                first_use,
+                scope_count: u32::try_from(scopes.len())
+                    .expect("more scope ranges than node indices"),
+                mask,
+            });
         }
         AstIds {
             pages: pages.into_boxed_slice(),
@@ -146,23 +144,13 @@ impl AstIdsBuilder {
     }
 }
 
-/// The set bits locate uses within 64 node indices of the first use on this page.
-/// Gaps between pages occupy no storage.
+/// Set bits identify uses in a group of 64 consecutive root nodes.
 #[derive(Debug, get_size2::GetSize)]
 struct UsePage {
-    first_node: ast::NodeIndex,
     first_use: u32,
+    /// Number of scope ranges started by the end of this page.
+    scope_count: u32,
     mask: u64,
-}
-
-impl UsePage {
-    fn bit(&self, node: ast::NodeIndex) -> Option<u64> {
-        if node == self.first_node {
-            return Some(1);
-        }
-        let offset = node.as_u32()?.checked_sub(self.first_node.as_u32()?)?;
-        1_u64.checked_shl(offset)
-    }
 }
 
 #[derive(Debug, get_size2::GetSize)]
@@ -204,9 +192,9 @@ impl AstIds {
     /// Looks up a node in the packed use array. Each earlier set bit on the same page
     /// accounts for one preceding entry in the array.
     fn use_index(&self, node: ast::NodeIndex) -> Option<usize> {
-        let end = self.pages.partition_point(|page| page.first_node <= node);
-        let page = self.pages[..end].last()?;
-        let bit = page.bit(node)?;
+        let node = node.as_u32()?;
+        let page = self.pages.get(node as usize / 64)?;
+        let bit = 1_u64 << (node % 64);
         if page.mask & bit == 0 {
             return None;
         }
@@ -215,8 +203,15 @@ impl AstIds {
     }
 
     fn scope_at(&self, node: ast::NodeIndex) -> Option<FileScopeId> {
-        let index = self.scopes.partition_point(|range| range.end < node);
-        let range = self.scopes.get(index)?;
+        let page_index = node.as_u32()? as usize / 64;
+        let end = self.pages.get(page_index)?.scope_count as usize;
+        // A range started on an earlier page may extend across the boundary.
+        let start = page_index.checked_sub(1).map_or(0, |previous| {
+            self.pages[previous].scope_count.saturating_sub(1) as usize
+        });
+        let scopes = &self.scopes[start..end];
+        let index = scopes.partition_point(|range| range.end < node);
+        let range = scopes.get(index)?;
         (range.start <= node).then_some(range.scope)
     }
 
@@ -389,9 +384,29 @@ mod tests {
     use super::*;
 
     #[test]
+    fn scopes_across_empty_pages() {
+        let mut builder = AstIdsBuilder::with_node_count(385);
+        let first = FileScopeId::from_usize(1);
+        let second = FileScopeId::from_usize(2);
+        for node in [69u32, 192] {
+            builder.entry(node.into()).scope = Some(first);
+        }
+        builder.entry(384u32.into()).scope = Some(second);
+
+        let ids = builder.finish();
+        assert_eq!(ids.scope_at(0u32.into()), None);
+        assert_eq!(ids.scope_at(68u32.into()), None);
+        assert_eq!(ids.scope_at(128u32.into()), Some(first));
+        assert_eq!(ids.scope_at(192u32.into()), Some(first));
+        assert_eq!(ids.scope_at(193u32.into()), None);
+        assert_eq!(ids.scope_at(256u32.into()), None);
+        assert_eq!(ids.scope_at(384u32.into()), Some(second));
+    }
+
+    #[test]
     fn use_ids_across_page_boundary() {
-        let mut builder = AstIdsBuilder::with_node_count(129);
-        for (use_id, node) in [64u32, 0, 63, 128].into_iter().enumerate() {
+        let mut builder = AstIdsBuilder::with_node_count(193);
+        for (use_id, node) in [64u32, 0, 63, 192].into_iter().enumerate() {
             builder.entry(node.into()).use_id = Some(ScopedUseId::from_usize(use_id));
         }
 
@@ -404,6 +419,9 @@ mod tests {
         assert_eq!(lookup(62), None);
         assert_eq!(lookup(63), Some(2));
         assert_eq!(lookup(64), Some(0));
-        assert_eq!(lookup(128), Some(3));
+        assert_eq!(lookup(128), None);
+        assert_eq!(lookup(192), Some(3));
+        assert_eq!(lookup(193), None);
+        assert_eq!(lookup(256), None);
     }
 }
