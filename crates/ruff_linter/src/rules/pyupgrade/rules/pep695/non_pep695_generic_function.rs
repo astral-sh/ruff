@@ -1,9 +1,12 @@
+use rustc_hash::FxHashSet;
+
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtFunctionDef;
 use ruff_python_ast::visitor::Visitor;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
@@ -29,14 +32,11 @@ use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested
 ///
 /// ## Fix safety
 ///
-/// This fix is marked unsafe, as [PEP 695] uses inferred variance for type parameters, instead of
-/// the `covariant` and `contravariant` keywords used by `TypeVar` variables. As such, replacing a
-/// `TypeVar` variable with an inline type parameter may change its variance.
-///
-/// Additionally, if the rule cannot determine whether a parameter annotation corresponds to a type
-/// variable (e.g. for a type imported from another module), it will not add the type to the generic
-/// type parameter list. This causes the function to have a mix of old-style type variables and
-/// new-style generic type parameters, which will be rejected by type checkers.
+/// This fix is marked unsafe because the rule may be unable to determine whether a parameter
+/// annotation corresponds to a type variable (e.g. for a type imported from another module). In
+/// that case, the fix does not add the type to the generic type parameter list. This causes the
+/// function to have a mix of old-style type variables and new-style generic type parameters, which
+/// will be rejected by type checkers.
 ///
 /// ## Example
 ///
@@ -82,7 +82,7 @@ use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 /// [fail]: https://github.com/python/mypy/issues/18507
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Complexity)]
 pub(crate) struct NonPEP695GenericFunction {
     name: String,
 }
@@ -158,6 +158,10 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
             type_vars.extend(vars);
         }
     }
+
+    // Deduplicate type vars that appear in multiple parameter annotations
+    let mut seen = FxHashSet::default();
+    type_vars.retain(|tv| seen.insert(tv.name));
 
     let Some(type_vars) = check_type_vars(type_vars, checker) else {
         return;

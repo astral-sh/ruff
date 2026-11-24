@@ -1,12 +1,13 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+use ruff_python_ast::{PythonVersion, helpers};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -43,7 +44,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
 /// - [a simpler `try`/`except` (and why maybe shouldn't)](https://www.youtube.com/watch?v=MZAJ8qnC7mk)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.211")]
+#[violation_metadata(stable_since = "v0.0.211", category = Category::Pedantic)]
 pub(crate) struct SuppressibleException {
     exception: String,
 }
@@ -83,6 +84,7 @@ fn is_empty(body: &[Stmt]) -> bool {
 pub(crate) fn suppressible_exception(
     checker: &Checker,
     stmt: &Stmt,
+    is_star: bool,
     try_body: &[Stmt],
     handlers: &[ExceptHandler],
     orelse: &[Stmt],
@@ -101,6 +103,7 @@ pub(crate) fn suppressible_exception(
             | Stmt::Pass(_)]
     ) || !orelse.is_empty()
         || !finalbody.is_empty()
+        || (is_star && checker.target_version() <= PythonVersion::PY311)
     {
         return;
     }

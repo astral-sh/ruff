@@ -147,7 +147,7 @@ assumed to be Python code examples and also formatted.
 * reStructuredText [literal blocks]. While literal blocks may contain things
 other than Python, this is meant to reflect a long-standing convention in the
 Python ecosystem where literal blocks often contain Python code.
-* reStructuredText [`code-block` and `sourcecode` directives]. As with
+* reStructuredText [`code-block` and `sourcecode` directives][directives]. As with
 Markdown, the language names recognized for Python are `python`, `py`,
 `python3`, or `py3`.
 
@@ -223,7 +223,109 @@ def f(x):
 [doctest]: https://docs.python.org/3/library/doctest.html
 [fenced code blocks]: https://spec.commonmark.org/0.30/#fenced-code-blocks
 [literal blocks]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
-[`code-block` and `sourcecode` directives]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
+[directives]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
+
+## Markdown code formatting
+
+The Ruff formatter can also format Python code blocks in Markdown files.
+In these files, Ruff will format any CommonMark [fenced code blocks][] with
+the following info strings: `python`, `py`, `python3`, `py3`, `pyi`, or `pycon`.
+The formatter will automatically skip a code block if the code does not parse as
+valid Python or if the reformatted code would produce an invalid Python program.
+
+Code blocks marked as `pyi` are formatted like stub files, `pycon` blocks as
+REPL sessions, and the others use normal Python file formatting. For example:
+
+````markdown
+```py
+print("hello")
+```
+
+```pyi
+def foo(): ...
+def bar(): ...
+```
+````
+
+Ruff also supports [Quarto](https://quarto.org/) style executable code blocks
+with curly braces surrounding the language name:
+
+````markdown
+```{python}
+print("hello")
+```
+````
+
+While [formatting suppression](#format-suppression) comments will be handled as
+usual within code blocks, the formatter will also skip formatting any code block
+surrounded by appropriate HTML comments, such as:
+
+````markdown
+<!-- fmt:off -->
+```py
+print( 'hello' )
+```
+<!-- fmt:on -->
+````
+
+Any number of code blocks may be contained within a matching pair of `off` and
+`on` HTML comments. An `off` comment *without* a matching `on` comment covers
+the rest of the document.
+
+The Ruff formatter will also recognize HTML comments from [blacken-docs][],
+`<!-- blacken-docs:off -->` and `<!-- blacken-docs:on -->`, which are equivalent
+to `<!-- fmt:off -->` and `<!-- fmt:on -->` respectively.
+
+[blacken-docs]: https://github.com/adamchainz/blacken-docs/
+
+To format Markdown files with extensions other than `.md`, configure custom
+[`extension`](settings.md#extension) mappings. Ruff will automatically include
+these mapped extensions in file discovery:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    # Treat `.mdx` and `.qmd` files as Markdown
+    extension = { mdx = "markdown", qmd = "markdown" }
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    # Treat `.mdx` and `.qmd` files as Markdown
+    extension = {mdx="markdown", qmd="markdown"}
+    ```
+
+If you run Ruff via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit), Markdown
+support needs to be explicitly included by adding it to `types_or`:
+
+```yaml title=".pre-commit-config.yaml"
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.6
+    hooks:
+      - id: ruff-format
+        types_or: [python, pyi, jupyter, markdown]
+```
+
+To *disable* formatting of Markdown files, add them to
+[`extend-exclude`](settings.md#extend-exclude) in your project settings:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    # Disable formatting in Markdown files
+    extend-exclude = ["*.md"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    # Disable formatting in Markdown files
+    extend-exclude = ["*.md"]
+    ```
 
 ## Format suppression
 
@@ -325,14 +427,16 @@ When using Ruff as a formatter, we recommend avoiding the following lint rules:
 - [`indentation-with-invalid-multiple`](rules/indentation-with-invalid-multiple.md) (`E111`)
 - [`indentation-with-invalid-multiple-comment`](rules/indentation-with-invalid-multiple-comment.md) (`E114`)
 - [`over-indented`](rules/over-indented.md) (`E117`)
+- [`incorrect-blank-line-before-class-docstring`](rules/incorrect-blank-line-before-class-docstring.md) (`D203`)
 - [`docstring-tab-indentation`](rules/docstring-tab-indentation.md) (`D206`)
-- [`triple-single-quotes`](rules/triple-single-quotes.md) (`D300`)
+- [`unconventional-docstring-quotes`](rules/unconventional-docstring-quotes.md) (`D300`)
 - [`bad-quotes-inline-string`](rules/bad-quotes-inline-string.md) (`Q000`)
 - [`bad-quotes-multiline-string`](rules/bad-quotes-multiline-string.md) (`Q001`)
 - [`bad-quotes-docstring`](rules/bad-quotes-docstring.md) (`Q002`)
 - [`avoidable-escaped-quote`](rules/avoidable-escaped-quote.md) (`Q003`)
+- [`unnecessary-escaped-quote`](rules/unnecessary-escaped-quote.md) (`Q004`)
 - [`missing-trailing-comma`](rules/missing-trailing-comma.md) (`COM812`)
-- [`prohibited-trailing-comma`](rules/prohibited-trailing-comma.md) (`COM819`)
+- [`unnecessary-trailing-comma`](rules/unnecessary-trailing-comma.md) (`COM819`)
 - [`multi-line-implicit-string-concatenation`](rules/multi-line-implicit-string-concatenation.md) (`ISC002`) if used without `ISC001` and `flake8-implicit-str-concat.allow-multiline = false`
 
 While the [`line-too-long`](rules/line-too-long.md) (`E501`) rule _can_ be used alongside the
@@ -447,8 +551,9 @@ f'{1=:"foo}'
 f"{1=:"foo}"
 ```
 
-For nested f-strings, Ruff alternates quote styles, starting with the [configured quote style] for the
-outermost f-string. For example, consider the following f-string:
+By default, or when targeting Python versions below 3.12, Ruff alternates quote styles for nested
+f-strings, starting with the [configured quote style] for the outermost f-string.
+For example, consider the following f-string:
 
 ```python
 # format.quote-style = "double"
@@ -456,10 +561,17 @@ outermost f-string. For example, consider the following f-string:
 f"outer f-string {f"nested f-string {f"another nested f-string"} end"} end"
 ```
 
-Ruff formats it as:
+With default settings, Ruff formats it as:
 
 ```python
 f"outer f-string {f'nested f-string {f"another nested f-string"} end'} end"
+```
+
+When targeting Python 3.12+ and with `nested-string-quote-style = "preferred"`,
+Ruff will use the configured quote style for nested strings:
+
+```python
+f"outer f-string {f"nested f-string {f"another nested f-string"} end"} end"
 ```
 
 #### Line breaks
@@ -549,7 +661,7 @@ while the stable formatting breaks _after_ the call or subscript.
 
 ## Sorting imports
 
-Currently, the Ruff formatter does not sort imports. In order to both sort imports and format,
+Currently, the Ruff formatter does not sort imports. To sort imports and format,
 call the Ruff linter and then the formatter:
 
 ```shell

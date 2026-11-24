@@ -18,3 +18,5 @@ from itertools import chain  # noqa: E402, INVALID300, F401
 import json  # noqa: E402, INVALID400, V100
 # Test for rule redirects
 import pandas as pd  # noqa: TCH002
+# Invalid code with trailing reason (single comment)
+import pathlib  # noqa: INVALID123 some reason

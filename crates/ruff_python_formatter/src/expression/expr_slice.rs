@@ -153,7 +153,7 @@ impl FormatNodeRule<ExprSlice> for FormatExprSlice {
 /// to find out whether there is a second one, too, e.g. `[1:2]` and `[1:10:2]`.
 ///
 /// Returns the first and optionally the second colon.
-pub(crate) fn find_colons(
+fn find_colons(
     contents: &str,
     range: TextRange,
     lower: Option<&Expr>,

@@ -47,7 +47,9 @@ exit_code: 1
       "row": 1
     },
     "message": "`os` imported but unused",
+    "name": "unused-import",
     "noqa_row": 1,
+    "severity": "error",
     "url": "https://docs.astral.sh/ruff/rules/unused-import"
   }
 ]

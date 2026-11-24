@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 
 /// ## What it does
@@ -41,7 +42,7 @@ use crate::docstrings::Docstring;
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.70")]
+#[violation_metadata(stable_since = "v0.0.70", category = Category::Pedantic)]
 pub(crate) struct SignatureInDocstring;
 
 impl Violation for SignatureInDocstring {
@@ -78,13 +79,8 @@ pub(crate) fn no_signature(checker: &Checker, docstring: &Docstring) {
             }
 
             // The function name must be followed by an open parenthesis.
-            let followed_by_open_parenthesis =
-                first_line[index + function.name.len()..].starts_with('(');
-            if !followed_by_open_parenthesis {
-                return false;
-            }
 
-            true
+            first_line[index + function.name.len()..].starts_with('(')
         })
     {
         checker.report_diagnostic(SignatureInDocstring, docstring.range());

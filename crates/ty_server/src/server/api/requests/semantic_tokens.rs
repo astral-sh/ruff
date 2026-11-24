@@ -1,10 +1,9 @@
 use std::borrow::Cow;
 
-use lsp_types::{SemanticTokens, SemanticTokensParams, SemanticTokensResult, Url};
-use ruff_db::source::source_text;
+use lsp_types::{SemanticTokens, SemanticTokensParams, Uri};
 use ty_project::ProjectDatabase;
 
-use crate::db::Db;
+use crate::document::cell_range;
 use crate::server::api::semantic_tokens::generate_semantic_tokens;
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
@@ -15,11 +14,11 @@ use crate::session::client::Client;
 pub(crate) struct SemanticTokensRequestHandler;
 
 impl RequestHandler for SemanticTokensRequestHandler {
-    type RequestType = lsp_types::request::SemanticTokensFullRequest;
+    type RequestType = lsp_types::SemanticTokensRequest;
 }
 
 impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
-    fn document_url(params: &SemanticTokensParams) -> Cow<'_, Url> {
+    fn document_uri(params: &SemanticTokensParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -28,7 +27,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
         snapshot: &DocumentSnapshot,
         _client: &Client,
         _params: SemanticTokensParams,
-    ) -> crate::server::Result<Option<SemanticTokensResult>> {
+    ) -> crate::server::Result<Option<SemanticTokens>> {
         if snapshot
             .workspace_settings()
             .is_language_services_disabled()
@@ -36,7 +35,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_notebook_or_file(db) else {
+        let Some(file) = snapshot.document().to_notebook_or_file(db) else {
             return Ok(None);
         };
 
@@ -44,16 +43,17 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
         // to the lines of this cell (instead of highlighting the entire notebook).
         // Not only avoids this unnecessary work, this is also required
         // because all ranges in the response must be within this **this document**.
-        let mut cell_range = None;
-
-        if snapshot.document().is_cell()
-            && let Some(notebook_document) = db.notebook_document(file)
-            && let Some(notebook) = source_text(db, file).as_notebook()
-        {
-            let cell_index = notebook_document.cell_index_by_uri(snapshot.url());
-
-            cell_range = cell_index.and_then(|index| notebook.cell_range(index));
-        }
+        //
+        // A cell without a range in the notebook's Python source, such as one that uses a cell
+        // magic, has nothing to highlight.
+        let cell_range = if snapshot.document().is_cell() {
+            let Some(range) = cell_range(db, file, snapshot.document().uri()) else {
+                return Ok(None);
+            };
+            Some(range)
+        } else {
+            None
+        };
 
         let lsp_tokens = generate_semantic_tokens(
             db,
@@ -65,10 +65,10 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
                 .supports_multiline_semantic_tokens(),
         );
 
-        Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
+        Ok(Some(SemanticTokens {
             result_id: None,
             data: lsp_tokens,
-        })))
+        }))
     }
 }
 

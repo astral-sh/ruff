@@ -117,8 +117,8 @@ class dircmp(Generic[AnyStr]):
             ignore: Sequence[AnyStr] | None = None,
             hide: Sequence[AnyStr] | None = None,
         ) -> None: ...
-    left: AnyStr
-    right: AnyStr
+    left: GenericPath[AnyStr]
+    right: GenericPath[AnyStr]
     hide: Sequence[AnyStr]
     ignore: Sequence[AnyStr]
     # These properties are created at runtime by __getattr__
@@ -147,7 +147,8 @@ class dircmp(Generic[AnyStr]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 def clear_cache() -> None:

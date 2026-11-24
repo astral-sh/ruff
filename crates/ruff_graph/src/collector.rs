@@ -46,6 +46,7 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                 names,
                 module,
                 level,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             }) => {
@@ -89,6 +90,7 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
             }
             Stmt::Import(ast::StmtImport {
                 names,
+                is_lazy: _,
                 range: _,
                 node_index: _,
             }) => {
@@ -164,7 +166,10 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                         >= self.string_imports.min_dots
                 {
                     if let Some(module_name) = ModuleName::new(value) {
-                        self.imports.push(CollectedImport::Import(module_name));
+                        self.imports.push(CollectedImport::StringImport(
+                            module_name,
+                            self.string_imports.min_dots,
+                        ));
                     }
                 }
             }
@@ -204,4 +209,9 @@ pub(crate) enum CollectedImport {
     Import(ModuleName),
     /// The import was part of an `import from` statement.
     ImportFrom(ModuleName),
+    /// The import was detected from a string literal (e.g., `"a.b.c.MyClass"`).
+    ///
+    /// Unlike regular imports, the trailing components may refer to attributes rather than
+    /// modules. The resolver will try progressively shorter prefixes until one resolves.
+    StringImport(ModuleName, usize),
 }

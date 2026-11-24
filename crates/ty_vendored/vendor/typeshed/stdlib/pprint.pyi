@@ -31,7 +31,8 @@ from typing import IO
 
 __all__ = ["pprint", "pformat", "isreadable", "isrecursive", "saferepr", "PrettyPrinter", "pp"]
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 15):
+    # The `expand` parameter was added in Python 3.15.
     def pformat(
         object: object,
         indent: int = 1,
@@ -39,6 +40,7 @@ if sys.version_info >= (3, 10):
         depth: int | None = None,
         *,
         compact: bool = False,
+        expand: bool = False,
         sort_dicts: bool = True,
         underscore_numbers: bool = False,
     ) -> str:
@@ -53,10 +55,12 @@ else:
         *,
         compact: bool = False,
         sort_dicts: bool = True,
+        underscore_numbers: bool = False,
     ) -> str:
         """Format a Python object into a pretty-printed representation."""
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 15):
+    # The `expand` parameter was added in Python 3.15.
     def pp(
         object: object,
         stream: IO[str] | None = None,
@@ -65,6 +69,7 @@ if sys.version_info >= (3, 10):
         depth: int | None = None,
         *,
         compact: bool = False,
+        expand: bool = False,
         sort_dicts: bool = False,
         underscore_numbers: bool = False,
     ) -> None:
@@ -80,10 +85,12 @@ else:
         *,
         compact: bool = False,
         sort_dicts: bool = False,
+        underscore_numbers: bool = False,
     ) -> None:
         """Pretty-print a Python object"""
 
-if sys.version_info >= (3, 10):
+if sys.version_info >= (3, 15):
+    # The `expand` parameter was added in Python 3.15.
     def pprint(
         object: object,
         stream: IO[str] | None = None,
@@ -92,6 +99,7 @@ if sys.version_info >= (3, 10):
         depth: int | None = None,
         *,
         compact: bool = False,
+        expand: bool = False,
         sort_dicts: bool = True,
         underscore_numbers: bool = False,
     ) -> None:
@@ -107,6 +115,7 @@ else:
         *,
         compact: bool = False,
         sort_dicts: bool = True,
+        underscore_numbers: bool = False,
     ) -> None:
         """Pretty-print a Python object to a stream [default is sys.stdout]."""
 
@@ -120,7 +129,54 @@ def saferepr(object: object) -> str:
     """Version of repr() which can handle recursive data structures."""
 
 class PrettyPrinter:
-    if sys.version_info >= (3, 10):
+    if sys.version_info >= (3, 15):
+        # The `expand` parameter was added in Python 3.15.
+        def __init__(
+            self,
+            indent: int = 1,
+            width: int = 80,
+            depth: int | None = None,
+            stream: IO[str] | None = None,
+            *,
+            compact: bool = False,
+            expand: bool = False,
+            sort_dicts: bool = True,
+            underscore_numbers: bool = False,
+        ) -> None:
+            """Handle pretty printing operations onto a stream using a set of
+            configured parameters.
+
+            indent
+                Number of spaces to indent for each level of nesting.
+
+            width
+                Attempted maximum number of columns in the output.
+
+            depth
+                The maximum depth to print out nested structures.
+
+            stream
+                The desired output stream.  If omitted (or false), the standard
+                output stream available at construction will be used.
+
+            compact
+                If true, several items will be combined in one line.
+                Incompatible with expand mode.
+
+            expand
+                If true, the output will be formatted similar to
+                pretty-printed json.dumps() when ``indent`` is supplied.
+                Incompatible with compact mode.
+
+            sort_dicts
+                If true, dict keys are sorted.
+
+            underscore_numbers
+                If true, digit groups are separated with underscores.
+
+            """
+
+    else:
         def __init__(
             self,
             indent: int = 1,
@@ -156,40 +212,6 @@ class PrettyPrinter:
 
             underscore_numbers
                 If true, digit groups are separated with underscores.
-
-            """
-    else:
-        def __init__(
-            self,
-            indent: int = 1,
-            width: int = 80,
-            depth: int | None = None,
-            stream: IO[str] | None = None,
-            *,
-            compact: bool = False,
-            sort_dicts: bool = True,
-        ) -> None:
-            """Handle pretty printing operations onto a stream using a set of
-            configured parameters.
-
-            indent
-                Number of spaces to indent for each level of nesting.
-
-            width
-                Attempted maximum number of columns in the output.
-
-            depth
-                The maximum depth to print out nested structures.
-
-            stream
-                The desired output stream.  If omitted (or false), the standard
-                output stream available at construction will be used.
-
-            compact
-                If true, several items will be combined in one line.
-
-            sort_dicts
-                If true, dict keys are sorted.
 
             """
 
@@ -246,5 +268,4 @@ class PrettyPrinter:
         self, items: list[object], stream: SupportsWrite[str], indent: int, allowance: int, context: dict[int, int], level: int
     ) -> None: ...
     def _repr(self, object: object, context: dict[int, int], level: int) -> str: ...
-    if sys.version_info >= (3, 10):
-        def _safe_repr(self, object: object, context: dict[int, int], maxlevels: int, level: int) -> tuple[str, bool, bool]: ...
+    def _safe_repr(self, object: object, context: dict[int, int], maxlevels: int, level: int) -> tuple[str, bool, bool]: ...

@@ -1,0 +1,56 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 4
+
+--- Added ---
+S103 `os.chmod` setting a permissive mask `0o664` on file or directory
+  --> S103.py:8:25
+   |
+ 6 | os.chmod("/etc/passwd", 0o227)  # Error
+ 7 | os.chmod("/etc/passwd", 0o7)  # Error
+ 8 | os.chmod("/etc/passwd", 0o664)  # OK (stable); Error (preview, S_IWGRP)
+   |                         ^^^^^
+ 9 | os.chmod("/etc/passwd", 0o777)  # Error
+10 | os.chmod("/etc/passwd", 0o770)  # Error
+   |
+
+
+S103 `os.chmod` setting a permissive mask `0o760` on file or directory
+  --> S103.py:12:25
+   |
+10 | os.chmod("/etc/passwd", 0o770)  # Error
+11 | os.chmod("/etc/passwd", 0o776)  # Error
+12 | os.chmod("/etc/passwd", 0o760)  # OK (stable); Error (preview, S_IWGRP)
+   |                         ^^^^^
+13 | os.chmod("~/.bashrc", 511)  # Error
+14 | os.chmod("/etc/hosts", 0o777)  # Error
+   |
+
+
+S103 `os.chmod` setting a permissive mask `0o1` on file or directory
+  --> S103.py:21:27
+   |
+19 | os.chmod(keyfile, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)  # Error
+20 | os.chmod("~/hidden_exec", stat.S_IXGRP)  # Error
+21 | os.chmod("~/hidden_exec", stat.S_IXOTH)  # OK (stable); Error (preview, S_IXOTH)
+   |                           ^^^^^^^^^^^^
+22 | os.chmod("/etc/passwd", stat.S_IWOTH)  # Error
+23 | os.chmod("/etc/passwd", 0o100000000)  # Error
+   |
+
+
+S103 `os.chmod` setting a permissive mask `0o21` on file or directory
+  --> S103.py:26:30
+   |
+25 | # https://github.com/astral-sh/ruff/issues/18863
+26 | os.chmod("/etc/secrets.txt", 0o21)  # OK (stable); Error (preview, S_IWGRP)
+   |                              ^^^^
+27 | os.chmod("/etc/secrets.txt", 0o11)  # Error (S_IXGRP)
+   |

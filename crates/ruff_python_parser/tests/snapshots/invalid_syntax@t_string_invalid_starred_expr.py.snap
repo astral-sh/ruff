@@ -221,4 +221,3 @@ Module(
 4 | t"{*x and y}"
 5 | t"{*yield x}"
   |     ^^^^^^^ Syntax Error: Yield expression cannot be used here
-  |

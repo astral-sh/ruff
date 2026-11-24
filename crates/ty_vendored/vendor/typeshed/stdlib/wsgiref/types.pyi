@@ -2,8 +2,7 @@
 
 from _typeshed import OptExcInfo
 from collections.abc import Callable, Iterable, Iterator
-from typing import Any, Protocol
-from typing_extensions import TypeAlias
+from typing import Any, Protocol, TypeAlias
 
 __all__ = ["StartResponse", "WSGIEnvironment", "WSGIApplication", "InputStream", "ErrorStream", "FileWrapper"]
 

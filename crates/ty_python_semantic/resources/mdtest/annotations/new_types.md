@@ -13,6 +13,15 @@ def _(user_id: UserId):
     reveal_type(user_id)  # revealed: UserId
 ```
 
+A `NewType` constructor preserves its argument's runtime identity but gives the result its own
+static tag. Applying an unrelated `NewType` constructor replaces the previous tag.
+
+```py
+MediaId = NewType("MediaId", int)
+
+reveal_type(MediaId(UserId(1)))  # revealed: MediaId
+```
+
 ## Subtyping
 
 The basic purpose of `NewType` is that it acts like a subtype of its base, but not the exact same
@@ -20,12 +29,14 @@ type (i.e. not an alias).
 
 ```py
 from typing_extensions import NewType
-from ty_extensions import static_assert, is_subtype_of, is_equivalent_to
+from ty_extensions import static_assert, Not, Intersection, AlwaysFalsy
+from ty_extensions._internal import is_subtype_of, is_equivalent_to, is_assignable_to
 
 Foo = NewType("Foo", int)
 Bar = NewType("Bar", Foo)
 
 static_assert(is_subtype_of(Foo, int))
+static_assert(is_subtype_of(Foo, int | None))
 static_assert(not is_equivalent_to(Foo, int))
 
 static_assert(is_subtype_of(Bar, Foo))
@@ -53,6 +64,30 @@ g(Bar(Foo(42)))
 h(42)  # error: [invalid-argument-type] "Argument to function `h` is incorrect: Expected `Bar`, found `Literal[42]`"
 h(Foo(42))  # error: [invalid-argument-type] "Argument to function `h` is incorrect: Expected `Bar`, found `Foo`"
 h(Bar(Foo(42)))
+
+FloatNewType = NewType("FloatNewType", float)
+
+static_assert(is_subtype_of(FloatNewType, float))
+static_assert(is_subtype_of(FloatNewType, FloatNewType | None))
+static_assert(is_subtype_of(Intersection[FloatNewType, AlwaysFalsy], float))
+static_assert(is_subtype_of(Intersection[FloatNewType, AlwaysFalsy], FloatNewType))
+static_assert(is_subtype_of(Intersection[FloatNewType, AlwaysFalsy], FloatNewType | None))
+static_assert(is_subtype_of(Intersection[FloatNewType, Not[AlwaysFalsy]], float))
+static_assert(is_subtype_of(Intersection[FloatNewType, Not[AlwaysFalsy]], FloatNewType))
+static_assert(is_subtype_of(Intersection[FloatNewType, Not[AlwaysFalsy]], FloatNewType | None))
+
+ComplexNewType = NewType("ComplexNewType", complex)
+
+static_assert(is_subtype_of(ComplexNewType, complex))
+static_assert(is_subtype_of(Intersection[ComplexNewType, AlwaysFalsy], complex))
+static_assert(is_subtype_of(Intersection[ComplexNewType, AlwaysFalsy], ComplexNewType))
+static_assert(is_subtype_of(Intersection[ComplexNewType, AlwaysFalsy], ComplexNewType | None))
+static_assert(is_subtype_of(Intersection[ComplexNewType, Not[AlwaysFalsy]], complex))
+static_assert(is_subtype_of(Intersection[ComplexNewType, Not[AlwaysFalsy]], ComplexNewType))
+static_assert(is_subtype_of(Intersection[ComplexNewType, Not[AlwaysFalsy]], ComplexNewType | None))
+static_assert(not is_assignable_to(ComplexNewType, float))
+static_assert(not is_assignable_to(Intersection[ComplexNewType, AlwaysFalsy], float))
+static_assert(not is_assignable_to(Intersection[ComplexNewType, Not[AlwaysFalsy]], float))
 ```
 
 ## Member and method lookup work
@@ -84,11 +119,11 @@ reveal_type(Baz.__supertype__)  # revealed: type | NewType
 ```py
 from collections.abc import Callable
 from typing_extensions import NewType
-from ty_extensions import CallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 Foo = NewType("Foo", int)
 
-def _(obj: CallableTypeOf[Foo]):
+def _(obj: RegularCallableTypeOf[Foo]):
     reveal_type(obj)  # revealed: (int, /) -> Foo
 
 def f(_: Callable[[int], Foo]): ...
@@ -101,19 +136,30 @@ def g(_: Callable[[str], Foo]): ...
 g(Foo)  # error: [invalid-argument-type]
 ```
 
+## `NewType` pseudo-classes participate in PEP 604 unions
+
+```py
+from typing import NewType
+
+Foo = NewType("Foo", int)
+
+reveal_type(Foo | str)  # revealed: <types.UnionType special-form 'Foo | str'>
+reveal_type(str | Foo)  # revealed: <types.UnionType special-form 'str | Foo'>
+```
+
 ## `NewType` instances are `Callable` if the base type is
 
 ```py
 from typing import NewType, Callable, Any
-from ty_extensions import CallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 N = NewType("N", int)
 i = N(42)
 
 y: Callable[..., Any] = i  # error: [invalid-assignment] "Object of type `N` is not assignable to `(...) -> Any`"
 
-# error: [invalid-type-form] "Expected the first argument to `ty_extensions.CallableTypeOf` to be a callable object, but got an object of type `N`"
-def f(x: CallableTypeOf[i]):
+# error: [invalid-type-form] "Expected the first argument to `ty_extensions._internal.RegularCallableTypeOf` to be a callable object, but got an object of type `N`"
+def f(x: RegularCallableTypeOf[i]):
     reveal_type(x)  # revealed: Unknown
 
 class SomethingCallable:
@@ -125,25 +171,81 @@ j = N2(SomethingCallable())
 
 z: Callable[[str], bytes] = j  # fine
 
-def g(x: CallableTypeOf[j]):
+def g(x: RegularCallableTypeOf[j]):
     reveal_type(x)  # revealed: (a: str) -> bytes
 ```
 
-## The name must be a string literal
+## Names passed through a variable
+
+When the name argument has type `str`, `mismatched-newtype-name` reports that ty cannot verify that
+it matches the assignment target. The assigned variable still defines a new type, and diagnostics
+display it using the assigned name.
 
 ```py
 from typing_extensions import NewType
 
 def _(name: str) -> None:
-    _ = NewType(name, int)  # error: [invalid-newtype] "The first argument to `NewType` must be a string literal"
+    UserId = NewType(name, int)  # error: [mismatched-newtype-name]
+    reveal_type(UserId(1))  # revealed: UserId
+
+    def as_user_id(value: int) -> UserId:
+        # snapshot: invalid-explicit-return
+        return value
 ```
 
-However, the literal doesn't necessarily need to be inline, as long as we infer it:
+```snapshot
+error[invalid-explicit-return]: Return type does not match returned value
+ --> src/mdtest_snippet.py:9:16
+  |
+7 |     def as_user_id(value: int) -> UserId:
+  |                                   ------ Expected `UserId` because of return type
+8 |         # snapshot: invalid-explicit-return
+9 |         return value
+  |                ^^^^^ expected `UserId`, found `int`
+```
+
+If ty infers a string literal type for the name argument, it can compare the value with the assigned
+variable:
 
 ```py
 name = "Foo"
 Foo = NewType(name, int)
 reveal_type(Foo)  # revealed: <NewType pseudo-class 'Foo'>
+```
+
+## The assigned name should match the constructor name
+
+```py
+from typing_extensions import NewType
+from ty_extensions._internal import is_subtype_of
+
+# snapshot: mismatched-newtype-name
+UserId = NewType("Id", int)
+reveal_type(UserId)  # revealed: <NewType pseudo-class 'Id'>
+reveal_type(is_subtype_of(UserId, int))  # revealed: ConstraintSet[Literal[True]]
+```
+
+```snapshot
+warning[mismatched-newtype-name]: The name passed to `NewType` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:5:18
+  |
+5 | UserId = NewType("Id", int)
+  |                  ^^^^ Expected "UserId", got "Id"
+```
+
+```py
+Id = int
+# snapshot: mismatched-newtype-name
+UsesExistingId = NewType("Id", "Id")
+UsesExistingId(1)
+```
+
+```snapshot
+warning[mismatched-newtype-name]: The name passed to `NewType` must match the variable it is assigned to
+  --> src/mdtest_snippet.py:10:26
+   |
+10 | UsesExistingId = NewType("Id", "Id")
+   |                          ^^^^ Expected "UsesExistingId", got "Id"
 ```
 
 ## The base must be a class type or another newtype
@@ -228,15 +330,16 @@ and we accept the unions they expand into.
 
 ```py
 from typing import NewType
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 Foo = NewType("Foo", float)
 Foo(3.14)
 Foo(42)
-Foo("hello")  # error: [invalid-argument-type] "Argument is incorrect: Expected `int | float`, found `Literal["hello"]`"
+Foo("hello")  # error: [invalid-argument-type] "Argument is incorrect: Expected `float`, found `Literal["hello"]`"
 
-reveal_type(Foo(3.14).__class__)  # revealed: type[int | float]
-reveal_type(Foo(42).__class__)  # revealed: type[int | float]
+reveal_type(Foo(3.14).__class__)  # revealed: type[float]
+reveal_type(Foo(42).__class__)  # revealed: type[float]
 static_assert(is_assignable_to(Foo, float))
 static_assert(is_assignable_to(Foo, int | float))
 static_assert(is_assignable_to(Foo, int | float | None))
@@ -253,14 +356,28 @@ Bar(3.14)
 Bar(42)
 Bar("goodbye")  # error: [invalid-argument-type]
 
-reveal_type(Bar(1 + 2j).__class__)  # revealed: type[int | float | complex]
-reveal_type(Bar(3.14).__class__)  # revealed: type[int | float | complex]
-reveal_type(Bar(42).__class__)  # revealed: type[int | float | complex]
+reveal_type(Bar(1 + 2j).__class__)  # revealed: type[complex]
+reveal_type(Bar(3.14).__class__)  # revealed: type[complex]
+reveal_type(Bar(42).__class__)  # revealed: type[complex]
 static_assert(is_assignable_to(Bar, complex))
 static_assert(is_assignable_to(Bar, int | float | complex))
 static_assert(is_assignable_to(Bar, int | float | complex | None))
 # See the `Foo | None` case above.
 static_assert(is_assignable_to(Bar, Bar | None))
+```
+
+`NewType`s can be arbitrarily deeply nested. Check the same properties on a doubly nested example:
+
+```py
+FooFoo = NewType("FooFoo", Foo)
+reveal_type(FooFoo(Foo(3.14)).__class__)  # revealed: type[float]
+reveal_type(FooFoo(Foo(42)).__class__)  # revealed: type[float]
+static_assert(is_assignable_to(FooFoo, float))
+static_assert(is_assignable_to(FooFoo, Foo))
+static_assert(is_assignable_to(FooFoo, int | float))
+static_assert(is_assignable_to(FooFoo, int | float | None))
+static_assert(is_assignable_to(FooFoo, FooFoo | None))
+static_assert(is_assignable_to(FooFoo, Foo | None))
 ```
 
 We don't currently try to distinguish between an implicit union (e.g. `float`) and the equivalent
@@ -297,8 +414,12 @@ explicit `Union` on the left side:
 ```py
 reveal_type(Foo(3.14) < Foo(42))  # revealed: bool
 reveal_type(Foo(3.14) == Foo(42))  # revealed: bool
-reveal_type(Foo(3.14) + Foo(42))  # revealed: int | float
-reveal_type(Foo(3.14) / Foo(42))  # revealed: int | float
+reveal_type(Foo(3.14) + Foo(42))  # revealed: float
+reveal_type(Foo(3.14) / Foo(42))  # revealed: float
+reveal_type(FooFoo(Foo(3.14)) < FooFoo(Foo(42)))  # revealed: bool
+reveal_type(FooFoo(Foo(3.14)) == FooFoo(Foo(42)))  # revealed: bool
+reveal_type(FooFoo(Foo(3.14)) + FooFoo(Foo(42)))  # revealed: float
+reveal_type(FooFoo(Foo(3.14)) / FooFoo(Foo(42)))  # revealed: float
 ```
 
 But again as above, we can't _always_ lower `Foo` to `int | float`, because there are also binary
@@ -334,17 +455,35 @@ Bing() < 3.14  # error: [unsupported-operator]
 3.14 in Bing()  # error: [unsupported-operator]
 ```
 
+`Unknown` should still propagate through these operations.
+
+```py
+from typing import NewType
+from doesnotexist import unknown  # error: [import-not-found]
+
+MyFloat = NewType("MyFloat", float)
+
+reveal_type(unknown)  # revealed: Unknown
+reveal_type(1.0 * unknown)  # revealed: Unknown
+reveal_type(MyFloat(1.0) * unknown)  # revealed: Unknown
+reveal_type(unknown * MyFloat(1.0))  # revealed: Unknown
+```
+
 Unary operations take a different codepath and need their own test cases:
 
 ```py
-reveal_type(-Foo(3.14))  # revealed: int | float
-reveal_type(+Foo(3.14))  # revealed: int | float
+reveal_type(-Foo(3.14))  # revealed: float
+reveal_type(+Foo(3.14))  # revealed: float
 ~Foo(3.14)  # error: [unsupported-operator]
 reveal_type(not Foo(3.14))  # revealed: bool
-reveal_type(-Bar(1 + 2j))  # revealed: int | float | complex
-reveal_type(+Bar(1 + 2j))  # revealed: int | float | complex
+reveal_type(-Bar(1 + 2j))  # revealed: complex
+reveal_type(+Bar(1 + 2j))  # revealed: complex
 ~Bar(1 + 2j)  # error: [unsupported-operator]
 reveal_type(not Bar(1 + 2j))  # revealed: bool
+reveal_type(-FooFoo(Foo(3.14)))  # revealed: float
+reveal_type(+FooFoo(Foo(3.14)))  # revealed: float
+~FooFoo(Foo(3.14))  # error: [unsupported-operator]
+reveal_type(not FooFoo(Foo(3.14)))  # revealed: bool
 
 class Unary:
     # __pos__ is deliberately left out, giving an error below.
@@ -367,15 +506,26 @@ union:
 
 ```py
 def _(x: Foo | float, y: Bar | complex):
-    reveal_type(-x)  # revealed: int | float
-    reveal_type(+x)  # revealed: int | float
+    reveal_type(-x)  # revealed: float
+    reveal_type(+x)  # revealed: float
     ~x  # error: [unsupported-operator]
     reveal_type(not x)  # revealed: bool
 
-    reveal_type(-y)  # revealed: int | float | complex
-    reveal_type(+y)  # revealed: int | float | complex
+    reveal_type(-y)  # revealed: complex
+    reveal_type(+y)  # revealed: complex
     ~y  # error: [unsupported-operator]
     reveal_type(not y)  # revealed: bool
+```
+
+Intersections with `NewType`s solve to `Never` if the intersection with the `NewType`'s concrete
+base type would also solve to `Never`:
+
+```py
+TFloat = NewType("TFloat", float)
+
+def f(x: TFloat) -> None:
+    if not isinstance(x, float | int):
+        reveal_type(x)  # revealed: Never
 ```
 
 ## A `NewType` definition must be a simple variable assignment
@@ -444,23 +594,21 @@ E(["foo"])  # error: [invalid-argument-type]
 E(E(E(["foo"])))  # error: [invalid-argument-type]
 ```
 
-## `NewType` wrapping preserves singleton-ness and single-valued-ness
+## `NewType` wrapping preserves singleton-ness
 
 ```py
 from typing_extensions import NewType
-from ty_extensions import is_singleton, is_single_valued, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_singleton
 from types import EllipsisType
 
 A = NewType("A", EllipsisType)
 static_assert(is_singleton(A))
-static_assert(is_single_valued(A))
 reveal_type(type(A(...)) is EllipsisType)  # revealed: Literal[True]
-# TODO: This should be `Literal[True]` also.
-reveal_type(A(...) is ...)  # revealed: bool
+reveal_type(A(...) is ...)  # revealed: Literal[True]
 
 B = NewType("B", int)
 static_assert(not is_singleton(B))
-static_assert(not is_single_valued(B))
 ```
 
 ## `NewType`s of tuples can be iterated/unpacked
@@ -507,19 +655,30 @@ def f(x: N | str):
 
 ## Trying to subclass a `NewType` produces an error matching CPython
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing import NewType
 
 X = NewType("X", int)
 
-class Foo(X): ...  # error: [invalid-base]
+# snapshot: invalid-base
+class Foo(X): ...
 ```
 
-## Don't narrow `NewType`-wrapped `Enum`s inside of match arms
+```snapshot
+error[invalid-base]: Cannot subclass an instance of NewType
+ --> src/mdtest_snippet.py:6:11
+  |
+6 | class Foo(X): ...
+  |           ^
+info: Perhaps you were looking for: `Foo = NewType('Foo', X)`
+info: Definition of class `Foo` will raise `TypeError` at runtime
+```
 
-`Literal[Foo.X]` is actually disjoint from `N` here:
+## `NewType`-wrapped enums match their members
+
+A `NewType` constructor returns its argument unchanged at runtime, and an ordinary literal does not
+restrict `NewType` tags. An enum member can therefore inhabit both its literal type and a `NewType`
+based on the enum. Each arm retains both types, and matching every enum member is exhaustive.
 
 ```py
 from enum import Enum
@@ -534,42 +693,14 @@ N = NewType("N", Foo)
 def f(x: N):
     match x:
         case Foo.X:
-            reveal_type(x)  # revealed: N
+            reveal_type(x)  # revealed: N & Literal[Foo.X]
         case Foo.Y:
-            reveal_type(x)  # revealed: N
+            reveal_type(x)  # revealed: N & Literal[Foo.Y]
         case _:
-            reveal_type(x)  # revealed: N
-```
-
-## We don't support `NewType` on Python 3.9
-
-We implement `typing.NewType` as a `KnownClass`, but in Python 3.9 it's actually a function, so all
-we get is the `Any` annotations from typeshed. However, `typing_extensions.NewType` is always a
-class. This could be improved in the future, but Python 3.9 is now end-of-life, so it's not
-high-priority.
-
-```toml
-[environment]
-python-version = "3.9"
-```
-
-```py
-from typing import NewType
-
-Foo = NewType("Foo", int)
-reveal_type(Foo)  # revealed: Any
-reveal_type(Foo(42))  # revealed: Any
-
-from typing_extensions import NewType
-
-Bar = NewType("Bar", int)
-reveal_type(Bar)  # revealed: <NewType pseudo-class 'Bar'>
-reveal_type(Bar(42))  # revealed: Bar
+            reveal_type(x)  # revealed: Never
 ```
 
 ## The base of a `NewType` can't be a protocol class or a `TypedDict`
-
-<!-- snapshot-diagnostics -->
 
 ```py
 from typing import NewType, Protocol, TypedDict
@@ -577,21 +708,43 @@ from typing import NewType, Protocol, TypedDict
 class Id(Protocol):
     code: int
 
-UserId = NewType("UserId", Id)  # error: [invalid-newtype]
+# snapshot: invalid-newtype
+UserId = NewType("UserId", Id)
+```
 
+```snapshot
+error[invalid-newtype]: invalid base for `typing.NewType`
+ --> src/mdtest_snippet.py:7:28
+  |
+7 | UserId = NewType("UserId", Id)
+  |                            ^^ type `Id`
+info: The base of a `NewType` is not allowed to be a protocol class.
+```
+
+```py
 class Foo(TypedDict):
     a: int
 
-Bar = NewType("Bar", Foo)  # error: [invalid-newtype]
+# snapshot: invalid-newtype
+Bar = NewType("Bar", Foo)
+```
+
+```snapshot
+error[invalid-newtype]: invalid base for `typing.NewType`
+  --> src/mdtest_snippet.py:12:22
+   |
+12 | Bar = NewType("Bar", Foo)
+   |                      ^^^ type `Foo`
+info: The base of a `NewType` is not allowed to be a `TypedDict`.
 ```
 
 ## A `NewType` cannot be generic
 
 ```py
-from typing import Any, NewType, TypeVar
+from typing import Any, NewType, TypeVar, Generic
 
 # All of these are allowed.
-A = NewType("A", list)
+A = NewType("A", list)  # error: [missing-type-argument]
 B = NewType("B", list[int])
 B = NewType("B", list[Any])
 
@@ -601,6 +754,9 @@ C = NewType("C", list[T])  # error: [invalid-newtype]
 
 D = dict[str, T]
 E = NewType("E", D[T])  # error: [invalid-newtype]
+
+class Foo(Generic[T]):
+    N = NewType("N", list[T])  # error: [invalid-newtype]
 
 # this is fine: omitting the type argument means that this is equivalent
 # to `F = NewType("F", dict[str, Any])
@@ -651,4 +807,38 @@ NT = NewType("NT", C)
 
 x = NT(C())
 reveal_type(x.copy())  # revealed: NT
+```
+
+## TypeVar solving for `NewType`s in combination with generic `Protocol`s
+
+In an early version of <https://github.com/astral-sh/ruff/pull/24109>, we revealed `F[Baz]` on the
+final line here, rather than `F[N]`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import NewType, Protocol, overload
+
+class Foo: ...
+class Bar: ...
+class Baz: ...
+
+N = NewType("N", Baz)
+
+class I[T](Protocol):
+    def f(self) -> T: ...
+
+class F[T]:
+    @overload
+    def __new__(cls, xs: I[T | Foo]): ...
+    @overload
+    def __new__(cls, xs: I[T]): ...
+    def __new__(cls, xs):
+        raise NotImplementedError
+
+def taxa(xs: I[N]):
+    reveal_type(F(xs))  # revealed: F[N]
 ```

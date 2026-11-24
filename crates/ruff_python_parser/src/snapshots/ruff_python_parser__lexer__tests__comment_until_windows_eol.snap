@@ -5,29 +5,10 @@ expression: comment_until_eol(WINDOWS_EOL)
 ## Tokens
 ```
 [
-    (
-        Int(
-            123,
-        ),
-        0..3,
-    ),
-    (
-        Comment,
-        5..10,
-    ),
-    (
-        Newline,
-        10..12,
-    ),
-    (
-        Int(
-            456,
-        ),
-        12..15,
-    ),
-    (
-        Newline,
-        15..15,
-    ),
+    Int 0..3,
+    Comment 5..10,
+    Newline 10..12,
+    Int 12..15,
+    Newline 15..15,
 ]
 ```

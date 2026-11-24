@@ -28,3 +28,14 @@ class E(D):
     mixedCase: bool
     _mixedCase: list
     mixed_Case: set
+
+
+class F:
+    tP = 0
+    match tP:
+        case int(fN):  # N815
+            ...
+        case fN2 as fN3:  # N815 (both capture and alias)
+            ...
+        case ok_name:
+            ...

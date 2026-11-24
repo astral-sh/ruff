@@ -1,0 +1,137 @@
+---
+source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
+---
+ISC004 [*] Unparenthesized implicit string concatenation in collection
+ --> ISC004.py:4:5
+  |
+2 |       "Lobsters have blue blood.",
+3 |       "The liver is the only human organ that can fully regenerate itself.",
+4 | /     "Clarinets are made almost entirely out of wood from the mpingo tree."
+5 | |     "In 1971, astronaut Alan Shepard played golf on the moon.",
+  | |______________________________________________________________^
+6 |   )
+  |
+help: Did you forget a comma?
+help: Wrap implicitly concatenated strings in parentheses
+  |
+3 |     "The liver is the only human organ that can fully regenerate itself.",
+  -     "Clarinets are made almost entirely out of wood from the mpingo tree."
+  -     "In 1971, astronaut Alan Shepard played golf on the moon.",
+4 +     ("Clarinets are made almost entirely out of wood from the mpingo tree."
+5 +     "In 1971, astronaut Alan Shepard played golf on the moon."),
+6 | )
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+ISC004 [*] Unparenthesized implicit string concatenation in collection
+  --> ISC004.py:11:5
+   |
+ 9 |       "Lobsters have blue blood.",
+10 |       "The liver is the only human organ that can fully regenerate itself.",
+11 | /     "Clarinets are made almost entirely out of wood from the mpingo tree."
+12 | |     "In 1971, astronaut Alan Shepard played golf on the moon.",
+   | |______________________________________________________________^
+13 |   ]
+   |
+help: Did you forget a comma?
+help: Wrap implicitly concatenated strings in parentheses
+   |
+10 |     "The liver is the only human organ that can fully regenerate itself.",
+   -     "Clarinets are made almost entirely out of wood from the mpingo tree."
+   -     "In 1971, astronaut Alan Shepard played golf on the moon.",
+11 +     ("Clarinets are made almost entirely out of wood from the mpingo tree."
+12 +     "In 1971, astronaut Alan Shepard played golf on the moon."),
+13 | ]
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ISC004 [*] Unparenthesized implicit string concatenation in collection
+  --> ISC004.py:18:5
+   |
+16 |       "Lobsters have blue blood.",
+17 |       "The liver is the only human organ that can fully regenerate itself.",
+18 | /     "Clarinets are made almost entirely out of wood from the mpingo tree."
+19 | |     "In 1971, astronaut Alan Shepard played golf on the moon.",
+   | |______________________________________________________________^
+20 |   }
+   |
+help: Did you forget a comma?
+help: Wrap implicitly concatenated strings in parentheses
+   |
+17 |     "The liver is the only human organ that can fully regenerate itself.",
+   -     "Clarinets are made almost entirely out of wood from the mpingo tree."
+   -     "In 1971, astronaut Alan Shepard played golf on the moon.",
+18 +     ("Clarinets are made almost entirely out of wood from the mpingo tree."
+19 +     "In 1971, astronaut Alan Shepard played golf on the moon."),
+20 | }
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ISC004 [*] Unparenthesized implicit string concatenation in collection
+  --> ISC004.py:30:5
+   |
+29 |   facts = (
+30 | /     "Octopuses have three hearts."
+31 | |     # Missing comma here.
+32 | |     "Honey never spoils.",
+   | |_________________________^
+33 |   )
+   |
+help: Did you forget a comma?
+help: Wrap implicitly concatenated strings in parentheses
+   |
+29 | facts = (
+   -     "Octopuses have three hearts."
+30 +     ("Octopuses have three hearts."
+31 |     # Missing comma here.
+   -     "Honey never spoils.",
+32 +     "Honey never spoils."),
+33 | )
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ISC004 [*] Unparenthesized implicit string concatenation in collection
+  --> ISC004.py:36:5
+   |
+35 |   facts = [
+36 | /     "Octopuses have three hearts."
+37 | |     # Missing comma here.
+38 | |     "Honey never spoils.",
+   | |_________________________^
+39 |   ]
+   |
+help: Did you forget a comma?
+help: Wrap implicitly concatenated strings in parentheses
+   |
+35 | facts = [
+   -     "Octopuses have three hearts."
+36 +     ("Octopuses have three hearts."
+37 |     # Missing comma here.
+   -     "Honey never spoils.",
+38 +     "Honey never spoils."),
+39 | ]
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+ISC004 [*] Unparenthesized implicit string concatenation in collection
+  --> ISC004.py:42:5
+   |
+41 |   facts = {
+42 | /     "Octopuses have three hearts."
+43 | |     # Missing comma here.
+44 | |     "Honey never spoils.",
+   | |_________________________^
+45 |   }
+   |
+help: Did you forget a comma?
+help: Wrap implicitly concatenated strings in parentheses
+   |
+41 | facts = {
+   -     "Octopuses have three hearts."
+42 +     ("Octopuses have three hearts."
+43 |     # Missing comma here.
+   -     "Honey never spoils.",
+44 +     "Honey never spoils."),
+45 | }
+   |
+note: This is an unsafe fix and may change runtime behavior

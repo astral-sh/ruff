@@ -1,11 +1,11 @@
-//! Tests for [`ruff_python_ast::tokens::parentheses_iterator`] and
-//! [`ruff_python_ast::tokens::parenthesized_range`].
+//! Tests for [`ruff_python_ast::token::parentheses_iterator`] and
+//! [`ruff_python_ast::token::parenthesized_range`].
 
 use ruff_python_ast::{
     self as ast, Expr,
     token::{parentheses_iterator, parenthesized_range},
 };
-use ruff_python_parser::parse_module;
+use ruff_python_parser::{parse_expression, parse_module};
 
 #[test]
 fn test_no_parentheses() {
@@ -179,6 +179,43 @@ fn test_call_with_parenthesized_argument() {
 
     let range = result.expect("should find parentheses around argument");
     assert_eq!(&source[range], "(x)");
+}
+
+#[test]
+fn multiply_parenthesized_argument() {
+    let source = "f(((a + 1)))";
+    let parsed = parse_expression(source).expect("valid expression");
+    let call = parsed.expr().as_call_expr().expect("call expression");
+    let argument = call.arguments.args.first().expect("call argument");
+
+    let range = parenthesized_range(argument.into(), (&call.arguments).into(), parsed.tokens())
+        .expect("parenthesized argument");
+    assert_eq!(&source[range], "((a + 1))");
+}
+
+#[test]
+fn parenthesized_tuple_member() {
+    let source = "(a, (b))";
+    let parsed = parse_expression(source).expect("valid expression");
+    let tuple = parsed.expr().as_tuple_expr().expect("tuple expression");
+    let member = tuple.elts.last().expect("tuple member");
+
+    let range = parenthesized_range(member.into(), tuple.into(), parsed.tokens())
+        .expect("parenthesized tuple member");
+    assert_eq!(&source[range], "(b)");
+}
+
+#[test]
+fn tuple_parentheses_do_not_parenthesize_member() {
+    let source = "(a, b)";
+    let parsed = parse_expression(source).expect("valid expression");
+    let tuple = parsed.expr().as_tuple_expr().expect("tuple expression");
+    let member = tuple.elts.last().expect("tuple member");
+
+    assert_eq!(
+        parenthesized_range(member.into(), tuple.into(), parsed.tokens()),
+        None
+    );
 }
 
 #[test]

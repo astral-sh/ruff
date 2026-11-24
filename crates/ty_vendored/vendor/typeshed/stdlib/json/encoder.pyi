@@ -17,16 +17,10 @@ def py_encode_basestring_ascii(s: str) -> str:  # undocumented
     """Return an ASCII-only JSON representation of a Python string"""
 
 def encode_basestring(s: str, /) -> str:  # undocumented
-    """encode_basestring(string) -> string
-
-    Return a JSON representation of a Python string
-    """
+    """Return a JSON representation of a Python string"""
 
 def encode_basestring_ascii(s: str, /) -> str:  # undocumented
-    """encode_basestring_ascii(string) -> string
-
-    Return an ASCII-only JSON representation of a Python string
-    """
+    """Return an ASCII-only JSON representation of a Python string"""
 
 class JSONEncoder:
     """Extensible JSON <https://json.org> encoder for Python data structures.
@@ -36,7 +30,7 @@ class JSONEncoder:
     +-------------------+---------------+
     | Python            | JSON          |
     +===================+===============+
-    | dict              | object        |
+    | dict, frozendict  | object        |
     +-------------------+---------------+
     | list, tuple       | array         |
     +-------------------+---------------+

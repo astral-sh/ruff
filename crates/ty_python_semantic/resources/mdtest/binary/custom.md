@@ -260,20 +260,21 @@ class No:
     def __rfloordiv__(self, other) -> Literal["r//"]:
         return "r//"
 
-# Subclass reflected dunder methods take precedence over the superclass's regular dunders.
-reveal_type(Yes() + Sub())  # revealed: Literal["r+"]
-reveal_type(Yes() - Sub())  # revealed: Literal["r-"]
-reveal_type(Yes() * Sub())  # revealed: Literal["r*"]
-reveal_type(Yes() @ Sub())  # revealed: Literal["r@"]
-reveal_type(Yes() / Sub())  # revealed: Literal["r/"]
-reveal_type(Yes() % Sub())  # revealed: Literal["r%"]
-reveal_type(Yes() ** Sub())  # revealed: Literal["r**"]
-reveal_type(Yes() << Sub())  # revealed: Literal["r<<"]
-reveal_type(Yes() >> Sub())  # revealed: Literal["r>>"]
-reveal_type(Yes() | Sub())  # revealed: Literal["r|"]
-reveal_type(Yes() ^ Sub())  # revealed: Literal["r^"]
-reveal_type(Yes() & Sub())  # revealed: Literal["r&"]
-reveal_type(Yes() // Sub())  # revealed: Literal["r//"]
+# Subclass reflected dunder methods may take precedence over the superclass's regular dunders,
+# depending on the operands' runtime classes.
+reveal_type(Yes() + Sub())  # revealed: Literal["r+", "+"]
+reveal_type(Yes() - Sub())  # revealed: Literal["r-", "-"]
+reveal_type(Yes() * Sub())  # revealed: Literal["r*", "*"]
+reveal_type(Yes() @ Sub())  # revealed: Literal["r@", "@"]
+reveal_type(Yes() / Sub())  # revealed: Literal["r/", "/"]
+reveal_type(Yes() % Sub())  # revealed: Literal["r%", "%"]
+reveal_type(Yes() ** Sub())  # revealed: Literal["r**", "**"]
+reveal_type(Yes() << Sub())  # revealed: Literal["r<<", "<<"]
+reveal_type(Yes() >> Sub())  # revealed: Literal["r>>", ">>"]
+reveal_type(Yes() | Sub())  # revealed: Literal["r|", "|"]
+reveal_type(Yes() ^ Sub())  # revealed: Literal["r^", "^"]
+reveal_type(Yes() & Sub())  # revealed: Literal["r&", "&"]
+reveal_type(Yes() // Sub())  # revealed: Literal["r//", "//"]
 
 # But for an unrelated class, the superclass regular dunders are used.
 reveal_type(Yes() + No())  # revealed: Literal["+"]
@@ -293,8 +294,6 @@ reveal_type(Yes() // No())  # revealed: Literal["//"]
 
 ## Classes
 
-<!-- snapshot-diagnostics -->
-
 Dunder methods defined in a class are available to instances of that class, but not to the class
 itself. (For these operators to work on the class itself, they would have to be defined on the
 class's type, i.e. `type`.)
@@ -309,12 +308,48 @@ class Yes:
 class Sub(Yes): ...
 class No: ...
 
-# error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'Yes'>`"
+# snapshot: unsupported-operator
 reveal_type(Yes + Yes)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'Sub'>`"
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `+` operation
+  --> src/mdtest_snippet.py:11:13
+   |
+11 | reveal_type(Yes + Yes)  # revealed: Unknown
+   |             ---^^^---
+   |             |
+   |             Both operands have type `<class 'Yes'>`
+```
+
+```py
+# snapshot: unsupported-operator
 reveal_type(Sub + Sub)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'No'>`"
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `+` operation
+  --> src/mdtest_snippet.py:13:13
+   |
+13 | reveal_type(Sub + Sub)  # revealed: Unknown
+   |             ---^^^---
+   |             |
+   |             Both operands have type `<class 'Sub'>`
+```
+
+```py
+# snapshot: unsupported-operator
 reveal_type(No + No)  # revealed: Unknown
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `+` operation
+  --> src/mdtest_snippet.py:15:13
+   |
+15 | reveal_type(No + No)  # revealed: Unknown
+   |             --^^^--
+   |             |
+   |             Both operands have type `<class 'No'>`
 ```
 
 ## Subclass
@@ -385,8 +420,6 @@ reveal_type(f // f)  # revealed: Unknown
 We use the fully qualified names in diagnostics if the two classes have the same unqualified name,
 but are nonetheless different.
 
-<!-- snapshot-diagnostics -->
-
 `mod1.py`:
 
 ```py
@@ -400,6 +433,17 @@ import mod1
 
 class A: ...
 
-# error: [unsupported-operator] "Operator `+` is not supported between objects of type `mod2.A` and `mod1.A`"
+# snapshot: unsupported-operator
 A() + mod1.A()
+```
+
+```snapshot
+error[unsupported-operator]: Unsupported `+` operation
+ --> src/mod2.py:6:1
+  |
+6 | A() + mod1.A()
+  | ---^^^--------
+  | |     |
+  | |     Has type `mod1.A`
+  | Has type `mod2.A`
 ```

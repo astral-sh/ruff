@@ -7,8 +7,8 @@ use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
     self as ast, Alias, AnyStringFlags, ArgOrKeyword, BoolOp, BytesLiteralFlags, CmpOp,
     Comprehension, ConversionFlag, DebugText, ExceptHandler, Expr, Identifier, MatchCase, Operator,
-    Parameter, Parameters, Pattern, Singleton, Stmt, StringFlags, Suite, TypeParam,
-    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
+    Parameter, Parameters, Pattern, PatternOrKeyword, Singleton, Stmt, StringFlags, Suite,
+    TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
 };
 use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
@@ -245,7 +245,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    pub(crate) fn unparse_stmt(&mut self, ast: &Stmt) {
+    fn unparse_stmt(&mut self, ast: &Stmt) {
         macro_rules! statement {
             ($body:block) => {{
                 self.newline();
@@ -321,7 +321,7 @@ impl<'a> Generator<'a> {
                     if let Some(arguments) = arguments {
                         self.p("(");
                         let mut first = true;
-                        for arg_or_keyword in arguments.arguments_source_order() {
+                        for arg_or_keyword in arguments.iter_source_order() {
                             match arg_or_keyword {
                                 ArgOrKeyword::Arg(arg) => {
                                     self.p_delim(&mut first, ", ");
@@ -634,10 +634,14 @@ impl<'a> Generator<'a> {
             }
             Stmt::Import(ast::StmtImport {
                 names,
+                is_lazy,
                 range: _,
                 node_index: _,
             }) => {
                 statement!({
+                    if *is_lazy {
+                        self.p("lazy ");
+                    }
                     self.p("import ");
                     let mut first = true;
                     for alias in names {
@@ -650,10 +654,14 @@ impl<'a> Generator<'a> {
                 module,
                 names,
                 level,
+                is_lazy,
                 range: _,
                 node_index: _,
             }) => {
                 statement!({
+                    if *is_lazy {
+                        self.p("lazy ");
+                    }
                     self.p("from ");
                     if *level > 0 {
                         for _ in 0..*level {
@@ -809,7 +817,28 @@ impl<'a> Generator<'a> {
                 }
                 self.p("}");
             }
-            Pattern::MatchClass(_) => {}
+            Pattern::MatchClass(ast::PatternMatchClass {
+                cls,
+                arguments,
+                range: _,
+                node_index: _,
+            }) => {
+                self.unparse_expr(cls, precedence::MAX);
+                self.p("(");
+                let mut first = true;
+                for pattern_or_keyword in arguments.iter_source_order() {
+                    self.p_delim(&mut first, ", ");
+                    match pattern_or_keyword {
+                        PatternOrKeyword::Pattern(pattern) => self.unparse_pattern(pattern),
+                        PatternOrKeyword::Keyword(keyword) => {
+                            self.p_id(&keyword.attr);
+                            self.p("=");
+                            self.unparse_pattern(&keyword.pattern);
+                        }
+                    }
+                }
+                self.p(")");
+            }
             Pattern::MatchStar(ast::PatternMatchStar {
                 name,
                 range: _,
@@ -866,14 +895,14 @@ impl<'a> Generator<'a> {
     fn unparse_type_params(&mut self, type_params: &TypeParams) {
         self.p("[");
         let mut first = true;
-        for type_param in type_params.iter() {
+        for type_param in type_params {
             self.p_delim(&mut first, ", ");
             self.unparse_type_param(type_param);
         }
         self.p("]");
     }
 
-    pub(crate) fn unparse_type_param(&mut self, ast: &TypeParam) {
+    fn unparse_type_param(&mut self, ast: &TypeParam) {
         match ast {
             TypeParam::TypeVar(TypeParamTypeVar {
                 name,
@@ -910,7 +939,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    pub(crate) fn unparse_expr(&mut self, ast: &Expr, level: u8) {
+    fn unparse_expr(&mut self, ast: &Expr, level: u8) {
         macro_rules! opprec {
             ($opty:ident, $x:expr, $enu:path, $($var:ident($op:literal, $prec:ident)),*$(,)?) => {
                 match $x {
@@ -1103,8 +1132,12 @@ impl<'a> Generator<'a> {
                 node_index: _,
             }) => {
                 self.p("{");
-                self.unparse_expr(key, precedence::COMPREHENSION_ELEMENT);
-                self.p(": ");
+                if let Some(key) = key {
+                    self.unparse_expr(key, precedence::COMPREHENSION_ELEMENT);
+                    self.p(": ");
+                } else {
+                    self.p("**");
+                }
                 self.unparse_expr(value, precedence::COMPREHENSION_ELEMENT);
                 self.unparse_comp(generators);
                 self.p("}");
@@ -1154,17 +1187,11 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(value, precedence::MAX);
                 });
             }
-            Expr::Compare(ast::ExprCompare {
-                left,
-                ops,
-                comparators,
-                range: _,
-                node_index: _,
-            }) => {
+            Expr::Compare(compare) => {
                 group_if!(precedence::CMP, {
                     let new_lvl = precedence::CMP + 1;
-                    self.unparse_expr(left, new_lvl);
-                    for (op, cmp) in ops.iter().zip(comparators) {
+                    self.unparse_expr(compare.first_operand(), new_lvl);
+                    for (_, op, cmp) in compare.iter() {
                         let op = match op {
                             CmpOp::Eq => " == ",
                             CmpOp::NotEq => " != ",
@@ -1185,7 +1212,7 @@ impl<'a> Generator<'a> {
             Expr::Call(ast::ExprCall {
                 func,
                 arguments,
-                range: _,
+                range_start: _,
                 node_index: _,
             }) => {
                 self.unparse_expr(func, precedence::MAX);
@@ -1209,7 +1236,7 @@ impl<'a> Generator<'a> {
                 } else {
                     let mut first = true;
 
-                    for arg_or_keyword in arguments.arguments_source_order() {
+                    for arg_or_keyword in arguments.iter_source_order() {
                         match arg_or_keyword {
                             ArgOrKeyword::Arg(arg) => {
                                 self.p_delim(&mut first, ", ");
@@ -1364,7 +1391,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    pub(crate) fn unparse_singleton(&mut self, singleton: Singleton) {
+    fn unparse_singleton(&mut self, singleton: Singleton) {
         match singleton {
             Singleton::None => self.p("None"),
             Singleton::True => self.p("True"),
@@ -1453,10 +1480,10 @@ impl<'a> Generator<'a> {
         for f_string_part in value {
             self.p_delim(&mut first, " ");
             match f_string_part {
-                ast::FStringPart::Literal(string_literal) => {
+                ast::FStringPartRef::Literal(string_literal) => {
                     self.unparse_string_literal(string_literal);
                 }
-                ast::FStringPart::FString(f_string) => {
+                ast::FStringPartRef::FString(f_string) => {
                     self.unparse_interpolated_string(&f_string.elements, f_string.flags.into());
                 }
             }
@@ -1492,13 +1519,13 @@ impl<'a> Generator<'a> {
         self.p(brace);
 
         if let Some(debug_text) = debug_text {
-            self.buffer += debug_text.leading.as_str();
+            self.buffer += debug_text.leading();
         }
 
         self.buffer += &generator.buffer;
 
         if let Some(debug_text) = debug_text {
-            self.buffer += debug_text.trailing.as_str();
+            self.buffer += debug_text.trailing();
         }
 
         if !conversion.is_none() {

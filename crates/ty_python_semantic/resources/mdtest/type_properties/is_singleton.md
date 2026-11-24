@@ -4,9 +4,11 @@ A type is a singleton type iff it has exactly one inhabitant.
 
 ## Basic
 
-```py
-from typing_extensions import Literal, Never, Callable
-from ty_extensions import is_singleton, static_assert
+```pyi
+from types import UnionType
+from typing_extensions import Any, Callable, Literal, Never, TypeAliasType
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_singleton
 from enum import Enum
 
 class Answer(Enum):
@@ -24,6 +26,16 @@ static_assert(is_singleton(Literal[Answer.NO]))
 static_assert(is_singleton(Literal[Single.VALUE]))
 static_assert(is_singleton(Single))
 
+def _(answer: Answer) -> None:
+    if answer is Answer.NO:
+        return
+    static_assert(is_singleton(TypeOf[answer]))
+
+def _(answer: Answer & Any) -> None:
+    if answer is Answer.NO:
+        return
+    static_assert(not is_singleton(TypeOf[answer]))
+
 static_assert(is_singleton(type[bool]))
 
 static_assert(not is_singleton(Never))
@@ -38,6 +50,10 @@ static_assert(not is_singleton(tuple[None, Literal[True]]))
 
 static_assert(not is_singleton(Callable[..., None]))
 static_assert(not is_singleton(Callable[[int, str], None]))
+
+static_assert(not is_singleton(TypeAliasType))
+static_assert(not is_singleton(UnionType))
+static_assert(not is_singleton(TypeOf[list[int]]))
 ```
 
 ## `NoDefault`
@@ -51,7 +67,8 @@ python-version = "3.12"
 
 ```py
 from typing_extensions import _NoDefaultType
-from ty_extensions import is_singleton, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_singleton
 
 static_assert(is_singleton(_NoDefaultType))
 ```
@@ -65,7 +82,8 @@ python-version = "3.13"
 
 ```py
 from typing import _NoDefaultType
-from ty_extensions import is_singleton, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_singleton
 
 static_assert(is_singleton(_NoDefaultType))
 ```
@@ -84,10 +102,10 @@ python-version = "3.9"
 ```
 
 ```py
-from ty_extensions import is_singleton, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_singleton
 
 static_assert(is_singleton(Ellipsis.__class__))
-static_assert(is_singleton((...).__class__))
 ```
 
 ### Python 3.10+
@@ -102,7 +120,8 @@ python-version = "3.10"
 
 ```py
 import types
-from ty_extensions import static_assert, is_singleton
+from ty_extensions import static_assert
+from ty_extensions._internal import is_singleton
 
 static_assert(is_singleton(types.EllipsisType))
 ```
@@ -120,7 +139,8 @@ python-version = "3.9"
 ```
 
 ```py
-from ty_extensions import is_singleton, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_singleton
 
 static_assert(is_singleton(NotImplemented.__class__))
 ```
@@ -138,7 +158,8 @@ python-version = "3.10"
 
 ```py
 import types
-from ty_extensions import static_assert, is_singleton
+from ty_extensions import static_assert
+from ty_extensions._internal import is_singleton
 
 static_assert(is_singleton(types.NotImplementedType))
 ```
@@ -157,7 +178,8 @@ have to hold true; it's more of a unit test for our current implementation.
 ```py
 import types
 from typing import Callable
-from ty_extensions import static_assert, is_singleton, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_singleton
 
 class A:
     def method(self): ...

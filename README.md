@@ -28,11 +28,11 @@ An extremely fast Python linter and code formatter, written in Rust.
 - ⚡️ 10-100x faster than existing linters (like Flake8) and formatters (like Black)
 - 🐍 Installable via `pip`
 - 🛠️ `pyproject.toml` support
-- 🤝 Python 3.14 compatibility
-- ⚖️ Drop-in parity with [Flake8](https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8), isort, and [Black](https://docs.astral.sh/ruff/faq/#how-does-ruffs-formatter-compare-to-black)
+- 🤝 Python 3.15 compatibility
+- ⚖️ Drop-in parity with [Flake8](https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8), [isort](https://docs.astral.sh/ruff/faq/#how-does-ruffs-import-sorting-compare-to-isort), and [Black](https://docs.astral.sh/ruff/faq/#how-does-ruffs-formatter-compare-to-black)
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
 - 🔧 Fix support, for automatic error correction (e.g., automatically remove unused imports)
-- 📏 Over [800 built-in rules](https://docs.astral.sh/ruff/rules/), with native re-implementations
+- 📏 Over [900 built-in rules](https://docs.astral.sh/ruff/rules/), with native re-implementations
     of popular Flake8 plugins, like flake8-bugbear
 - ⌨️ First-party [editor integrations](https://docs.astral.sh/ruff/editors) for [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://docs.astral.sh/ruff/editors/setup)
 - 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://docs.astral.sh/ruff/configuration/#config-file-discovery)
@@ -46,7 +46,7 @@ Ruff can be used to replace [Flake8](https://pypi.org/project/flake8/) (plus doz
 [autoflake](https://pypi.org/project/autoflake/), and more, all while executing tens or hundreds of
 times faster than any individual tool.
 
-Ruff is extremely actively developed and used in major open-source projects like:
+Ruff is actively developed and used in major open-source projects like:
 
 - [Apache Airflow](https://github.com/apache/airflow)
 - [Apache Superset](https://github.com/apache/superset)
@@ -55,13 +55,13 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Pandas](https://github.com/pandas-dev/pandas)
 - [SciPy](https://github.com/scipy/scipy)
 
-...and [many more](#whos-using-ruff).
-
 Ruff is backed by [Astral](https://astral.sh), the creators of
 [uv](https://github.com/astral-sh/uv) and [ty](https://github.com/astral-sh/ty).
 
-Read the [launch post](https://astral.sh/blog/announcing-astral-the-company-behind-ruff), or the
-original [project announcement](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
+Read the [launch
+post](https://astral.sh/blog/announcing-astral-the-company-behind-ruff), or the
+original [project
+announcement](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
 ## Testimonials
 
@@ -108,7 +108,7 @@ For more, see the [documentation](https://docs.astral.sh/ruff/).
 1. [Contributing](#contributing)
 1. [Support](#support)
 1. [Acknowledgements](#acknowledgements)
-1. [Who's Using Ruff?](#whos-using-ruff)
+1. [Show Your Support](#show-your-support)
 1. [License](#license)
 
 ## Getting Started<a id="getting-started"></a>
@@ -122,8 +122,8 @@ Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI.
 Invoke Ruff directly with [`uvx`](https://docs.astral.sh/uv/):
 
 ```shell
-uvx ruff check   # Lint all files in the current directory.
-uvx ruff format  # Format all files in the current directory.
+uvx ruff@0.17.6 check   # Lint all files in the current directory.
+uvx ruff@0.17.6 format  # Format all files in the current directory.
 ```
 
 Or install Ruff with `uv` (recommended), `pip`, or `pipx`:
@@ -150,8 +150,8 @@ curl -LsSf https://astral.sh/ruff/install.sh | sh
 powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
 
 # For a specific version.
-curl -LsSf https://astral.sh/ruff/0.14.14/install.sh | sh
-powershell -c "irm https://astral.sh/ruff/0.14.14/install.ps1 | iex"
+curl -LsSf https://astral.sh/ruff/0.17.6/install.sh | sh
+powershell -c "irm https://astral.sh/ruff/0.17.6/install.ps1 | iex"
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
@@ -184,7 +184,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.14.14
+  rev: v0.17.6
   hooks:
     # Run the linter.
     - id: ruff-check
@@ -214,6 +214,8 @@ jobs:
 Ruff can be configured through a `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (see:
 [_Configuration_](https://docs.astral.sh/ruff/configuration/), or [_Settings_](https://docs.astral.sh/ruff/settings/)
 for a complete list of all configuration options).
+
+For the complete list of enabled rules, see [_Default Rules_](https://docs.astral.sh/ruff/default-rules/).
 
 If left unspecified, Ruff's default configuration is equivalent to the following `ruff.toml` file:
 
@@ -252,12 +254,11 @@ exclude = [
 line-length = 88
 indent-width = 4
 
-# Assume Python 3.9
-target-version = "py39"
+# Assume Python 3.11
+target-version = "py311"
 
 [lint]
-# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`) codes by default.
-select = ["E4", "E7", "E9", "F"]
+# select = [...]  # See the Default Rules page for the full listing.
 ignore = []
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
@@ -265,7 +266,7 @@ fixable = ["ALL"]
 unfixable = []
 
 # Allow unused variables when underscore-prefixed.
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+dummy-variable-rgx = "^(_+|(_+[\\p{XID_Continue}]*[\\p{XID_Continue}--_]+?))$"
 
 [format]
 # Like Black, use double quotes for strings.
@@ -298,7 +299,7 @@ ruff check --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
 ```
 
 To opt in to the latest lint rules, formatter style changes, interface updates, and more, enable
-[preview mode](https://docs.astral.sh/ruff/rules/) by setting `preview = true` in your configuration
+[preview mode](https://docs.astral.sh/ruff/preview/) by setting `preview = true` in your configuration
 file or passing `--preview` on the command line. Preview mode enables a collection of unstable
 features that may change prior to stabilization.
 
@@ -309,16 +310,17 @@ for more on the linting and formatting commands, respectively.
 
 <!-- Begin section: Rules -->
 
-**Ruff supports over 800 lint rules**, many of which are inspired by popular tools like Flake8,
+**Ruff supports over 900 lint rules**, many of which are inspired by popular tools like Flake8,
 isort, pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
 Rust as a first-party feature.
 
-By default, Ruff enables Flake8's `F` rules, along with a subset of the `E` rules, omitting any
-stylistic rules that overlap with the use of a formatter, like `ruff format` or
-[Black](https://github.com/psf/black).
+By default, Ruff enables rules from the `F`, `E`, `B`, `UP`, and `RUF` categories,
+as well as many more, omitting any stylistic rules that overlap with the use of a formatter, like
+`ruff format` or [Black](https://github.com/psf/black).
 
 If you're just getting started with Ruff, **the default rule set is a great place to start**: it
-catches a wide variety of common errors (like unused imports) with zero configuration.
+catches a wide variety of common errors (like unused imports) with zero configuration. See
+[_Default Rules_](https://docs.astral.sh/ruff/default-rules/) for the complete list.
 
 <!-- End section: Rules -->
 
@@ -379,7 +381,7 @@ quality tools, including:
 - [tryceratops](https://pypi.org/project/tryceratops/)
 - [yesqa](https://pypi.org/project/yesqa/)
 
-For a complete enumeration of the supported rules, see [_Rules_](https://docs.astral.sh/ruff/rules/).
+For the complete list of supported rules, see [_Rules_](https://docs.astral.sh/ruff/rules/).
 
 ## Contributing<a id="contributing"></a>
 
@@ -419,110 +421,7 @@ Ruff is the beneficiary of a large number of [contributors](https://github.com/a
 
 Ruff is released under the MIT license.
 
-## Who's Using Ruff?<a id="whos-using-ruff"></a>
-
-Ruff is used by a number of major open-source projects and companies, including:
-
-- [Albumentations](https://github.com/albumentations-team/AlbumentationsX)
-- Amazon ([AWS SAM](https://github.com/aws/serverless-application-model))
-- [Anki](https://apps.ankiweb.net/)
-- Anthropic ([Python SDK](https://github.com/anthropics/anthropic-sdk-python))
-- [Apache Airflow](https://github.com/apache/airflow)
-- AstraZeneca ([Magnus](https://github.com/AstraZeneca/magnus-core))
-- [Babel](https://github.com/python-babel/babel)
-- Benchling ([Refac](https://github.com/benchling/refac))
-- [Bokeh](https://github.com/bokeh/bokeh)
-- Capital One ([datacompy](https://github.com/capitalone/datacompy))
-- CrowdCent ([NumerBlox](https://github.com/crowdcent/numerblox)) <!-- typos: ignore -->
-- [Cryptography (PyCA)](https://github.com/pyca/cryptography)
-- CERN ([Indico](https://getindico.io/))
-- [DVC](https://github.com/iterative/dvc)
-- [Dagger](https://github.com/dagger/dagger)
-- [Dagster](https://github.com/dagster-io/dagster)
-- Databricks ([MLflow](https://github.com/mlflow/mlflow))
-- [Dify](https://github.com/langgenius/dify)
-- [FastAPI](https://github.com/tiangolo/fastapi)
-- [Godot](https://github.com/godotengine/godot)
-- [Gradio](https://github.com/gradio-app/gradio)
-- [Great Expectations](https://github.com/great-expectations/great_expectations)
-- [HTTPX](https://github.com/encode/httpx)
-- [Hatch](https://github.com/pypa/hatch)
-- [Home Assistant](https://github.com/home-assistant/core)
-- Hugging Face ([Transformers](https://github.com/huggingface/transformers),
-    [Datasets](https://github.com/huggingface/datasets),
-    [Diffusers](https://github.com/huggingface/diffusers))
-- IBM ([Qiskit](https://github.com/Qiskit/qiskit))
-- ING Bank ([popmon](https://github.com/ing-bank/popmon), [probatus](https://github.com/ing-bank/probatus))
-- [Ibis](https://github.com/ibis-project/ibis)
-- [ivy](https://github.com/unifyai/ivy)
-- [JAX](https://github.com/jax-ml/jax)
-- [Jupyter](https://github.com/jupyter-server/jupyter_server)
-- [Kraken Tech](https://kraken.tech/)
-- [LangChain](https://github.com/hwchase17/langchain)
-- [Litestar](https://litestar.dev/)
-- [LlamaIndex](https://github.com/jerryjliu/llama_index)
-- Matrix ([Synapse](https://github.com/matrix-org/synapse))
-- [MegaLinter](https://github.com/oxsecurity/megalinter)
-- Meltano ([Meltano CLI](https://github.com/meltano/meltano), [Singer SDK](https://github.com/meltano/sdk))
-- Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel),
-    [ONNX Runtime](https://github.com/microsoft/onnxruntime),
-    [LightGBM](https://github.com/microsoft/LightGBM))
-- Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python))
-- Mozilla ([Firefox](https://github.com/mozilla/gecko-dev))
-- [Mypy](https://github.com/python/mypy)
-- [Nautobot](https://github.com/nautobot/nautobot)
-- Netflix ([Dispatch](https://github.com/Netflix/dispatch))
-- [Neon](https://github.com/neondatabase/neon)
-- [Nokia](https://nokia.com/)
-- [NoneBot](https://github.com/nonebot/nonebot2)
-- [NumPyro](https://github.com/pyro-ppl/numpyro)
-- [ONNX](https://github.com/onnx/onnx)
-- [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
-- [Open Wine Components](https://github.com/Open-Wine-Components/umu-launcher)
-- [PDM](https://github.com/pdm-project/pdm)
-- [PaddlePaddle](https://github.com/PaddlePaddle/Paddle)
-- [Pandas](https://github.com/pandas-dev/pandas)
-- [Pillow](https://github.com/python-pillow/Pillow)
-- [Poetry](https://github.com/python-poetry/poetry)
-- [Polars](https://github.com/pola-rs/polars)
-- [PostHog](https://github.com/PostHog/posthog)
-- Prefect ([Python SDK](https://github.com/PrefectHQ/prefect), [Marvin](https://github.com/PrefectHQ/marvin))
-- [PyInstaller](https://github.com/pyinstaller/pyinstaller)
-- [PyMC](https://github.com/pymc-devs/pymc/)
-- [PyMC-Marketing](https://github.com/pymc-labs/pymc-marketing)
-- [pytest](https://github.com/pytest-dev/pytest)
-- [PyTorch](https://github.com/pytorch/pytorch)
-- [Pydantic](https://github.com/pydantic/pydantic)
-- [Pylint](https://github.com/PyCQA/pylint)
-- [PyScripter](https://github.com/pyscripter/pyscripter)
-- [PyVista](https://github.com/pyvista/pyvista)
-- [Reflex](https://github.com/reflex-dev/reflex)
-- [River](https://github.com/online-ml/river)
-- [Rippling](https://rippling.com)
-- [Robyn](https://github.com/sansyrox/robyn)
-- [Saleor](https://github.com/saleor/saleor)
-- Scale AI ([Launch SDK](https://github.com/scaleapi/launch-python-client))
-- [SciPy](https://github.com/scipy/scipy)
-- Snowflake ([SnowCLI](https://github.com/Snowflake-Labs/snowcli))
-- [Sphinx](https://github.com/sphinx-doc/sphinx)
-- [Stable Baselines3](https://github.com/DLR-RM/stable-baselines3)
-- [Starlette](https://github.com/encode/starlette)
-- [Streamlit](https://github.com/streamlit/streamlit)
-- [The Algorithms](https://github.com/TheAlgorithms/Python)
-- [Vega-Altair](https://github.com/altair-viz/altair)
-- [Weblate](https://weblate.org/)
-- WordPress ([Openverse](https://github.com/WordPress/openverse))
-- [ZenML](https://github.com/zenml-io/zenml)
-- [Zulip](https://github.com/zulip/zulip)
-- [build (PyPA)](https://github.com/pypa/build)
-- [cibuildwheel (PyPA)](https://github.com/pypa/cibuildwheel)
-- [delta-rs](https://github.com/delta-io/delta-rs)
-- [featuretools](https://github.com/alteryx/featuretools)
-- [meson-python](https://github.com/mesonbuild/meson-python)
-- [nox](https://github.com/wntrblm/nox)
-- [pip](https://github.com/pypa/pip)
-
-### Show Your Support
+## Show Your Support
 
 If you're using Ruff, consider adding the Ruff badge to your project's `README.md`:
 

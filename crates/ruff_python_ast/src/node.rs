@@ -2,8 +2,7 @@ use ruff_text_size::Ranged;
 
 use crate::visitor::source_order::SourceOrderVisitor;
 use crate::{
-    self as ast, Alias, AnyNodeRef, AnyParameterRef, ArgOrKeyword, MatchCase, PatternArguments,
-    PatternKeyword,
+    self as ast, Alias, AnyNodeRef, AnyParameterRef, ArgOrKeyword, MatchCase, PatternKeyword,
 };
 
 impl ast::ElifElseClause {
@@ -75,19 +74,10 @@ impl ast::ExprCompare {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ExprCompare {
-            left,
-            ops,
-            comparators,
-            range: _,
-            node_index: _,
-        } = self;
-
-        visitor.visit_expr(left);
-
-        for (op, comparator) in ops.iter().zip(comparators) {
+        visitor.visit_expr(self.first_operand());
+        for (_, op, right) in self.iter() {
             visitor.visit_cmp_op(op);
-            visitor.visit_expr(comparator);
+            visitor.visit_expr(right);
         }
     }
 }
@@ -149,10 +139,10 @@ impl ast::ExprFString {
 
         for f_string_part in value {
             match f_string_part {
-                ast::FStringPart::Literal(string_literal) => {
+                ast::FStringPartRef::Literal(string_literal) => {
                     visitor.visit_string_literal(string_literal);
                 }
-                ast::FStringPart::FString(f_string) => {
+                ast::FStringPartRef::FString(f_string) => {
                     visitor.visit_f_string(f_string);
                 }
             }
@@ -272,19 +262,13 @@ impl ast::PatternArguments {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let PatternArguments {
-            range: _,
-            node_index: _,
-            patterns,
-            keywords,
-        } = self;
-
-        for pattern in patterns {
-            visitor.visit_pattern(pattern);
-        }
-
-        for keyword in keywords {
-            visitor.visit_pattern_keyword(keyword);
+        for pattern_or_keyword in self.iter_source_order() {
+            match pattern_or_keyword {
+                crate::PatternOrKeyword::Pattern(pattern) => visitor.visit_pattern(pattern),
+                crate::PatternOrKeyword::Keyword(keyword) => {
+                    visitor.visit_pattern_keyword(keyword);
+                }
+            }
         }
     }
 }
@@ -333,7 +317,7 @@ impl ast::Arguments {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        for arg_or_keyword in self.arguments_source_order() {
+        for arg_or_keyword in self.iter_source_order() {
             match arg_or_keyword {
                 ArgOrKeyword::Arg(arg) => visitor.visit_expr(arg),
                 ArgOrKeyword::Keyword(keyword) => visitor.visit_keyword(keyword),
@@ -347,7 +331,7 @@ impl ast::Parameters {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        for parameter in self {
+        for parameter in self.iter_source_order() {
             match parameter {
                 AnyParameterRef::NonVariadic(parameter_with_default) => {
                     visitor.visit_parameter_with_default(parameter_with_default);

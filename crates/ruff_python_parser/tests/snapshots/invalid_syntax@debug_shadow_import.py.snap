@@ -26,6 +26,7 @@ Module(
                             asname: None,
                         },
                     ],
+                    is_lazy: false,
                 },
             ),
             Import(
@@ -50,6 +51,7 @@ Module(
                             ),
                         },
                     ],
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -76,6 +78,7 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -108,6 +111,7 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
         ],
@@ -147,4 +151,3 @@ Module(
 3 | from x import __debug__
 4 | from x import debug as __debug__
   |                        ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
-  |

@@ -4,8 +4,8 @@ import csv
 import sys
 from _typeshed import SupportsWrite
 from collections.abc import Iterable
-from typing import Any, Final, Literal, type_check_only
-from typing_extensions import Self, TypeAlias, disjoint_base
+from typing import Any, Final, Literal, TypeAlias
+from typing_extensions import Self, disjoint_base
 
 __version__: Final[str]
 
@@ -54,84 +54,62 @@ class Dialect:
         strict: bool = False,
     ) -> Self: ...
 
-if sys.version_info >= (3, 10):
-    # This class calls itself _csv.reader.
-    @disjoint_base
-    class Reader:
-        """CSV reader
+# This class calls itself _csv.reader.
+@disjoint_base
+class Reader:
+    """CSV reader
 
-        Reader objects are responsible for reading and parsing tabular data
-        in CSV format.
-        """
+    Reader objects are responsible for reading and parsing tabular data
+    in CSV format.
+    """
 
-        @property
-        def dialect(self) -> Dialect: ...
-        line_num: int
-        def __iter__(self) -> Self:
-            """Implement iter(self)."""
+    @property
+    def dialect(self) -> Dialect: ...
+    line_num: int
+    def __iter__(self) -> Self:
+        """Implement iter(self)."""
 
-        def __next__(self) -> list[str]:
-            """Implement next(self)."""
+    def __next__(self) -> list[str]:
+        """Implement next(self)."""
 
-    # This class calls itself _csv.writer.
-    @disjoint_base
-    class Writer:
-        """CSV writer
+# This class calls itself _csv.writer.
+@disjoint_base
+class Writer:
+    """CSV writer
 
-        Writer objects are responsible for generating tabular data
-        in CSV format from sequence input.
-        """
+    Writer objects are responsible for generating tabular data
+    in CSV format from sequence input.
+    """
 
-        @property
-        def dialect(self) -> Dialect: ...
-        if sys.version_info >= (3, 13):
-            def writerow(self, row: Iterable[Any], /) -> Any:
-                """Construct and write a CSV record from an iterable of fields.
+    @property
+    def dialect(self) -> Dialect: ...
+    if sys.version_info >= (3, 13):
+        def writerow(self, row: Iterable[Any], /) -> Any:
+            """Construct and write a CSV record from an iterable of fields.
 
-                Non-string elements will be converted to string.
-                """
+            Non-string elements will be converted to string.
+            """
 
-            def writerows(self, rows: Iterable[Iterable[Any]], /) -> None:
-                """Construct and write a series of iterables to a csv file.
+        def writerows(self, rows: Iterable[Iterable[Any]], /) -> None:
+            """Construct and write a series of iterables to a csv file.
 
-                Non-string elements will be converted to string.
-                """
-        else:
-            def writerow(self, row: Iterable[Any]) -> Any:
-                """writerow(iterable)
+            Non-string elements will be converted to string.
+            """
 
-                Construct and write a CSV record from an iterable of fields.  Non-string
-                elements will be converted to string.
-                """
+    else:
+        def writerow(self, row: Iterable[Any]) -> Any:
+            """writerow(iterable)
 
-            def writerows(self, rows: Iterable[Iterable[Any]]) -> None:
-                """writerows(iterable of iterables)
+            Construct and write a CSV record from an iterable of fields.  Non-string
+            elements will be converted to string.
+            """
 
-                Construct and write a series of iterables to a csv file.  Non-string
-                elements will be converted to string.
-                """
+        def writerows(self, rows: Iterable[Iterable[Any]]) -> None:
+            """writerows(iterable of iterables)
 
-    # For the return types below.
-    # These aliases can be removed when typeshed drops support for 3.9.
-    _reader = Reader
-    _writer = Writer
-else:
-    # This class is not exposed. It calls itself _csv.reader.
-    @type_check_only
-    class _reader:
-        @property
-        def dialect(self) -> Dialect: ...
-        line_num: int
-        def __iter__(self) -> Self: ...
-        def __next__(self) -> list[str]: ...
-
-    # This class is not exposed. It calls itself _csv.writer.
-    @type_check_only
-    class _writer:
-        @property
-        def dialect(self) -> Dialect: ...
-        def writerow(self, row: Iterable[Any]) -> Any: ...
-        def writerows(self, rows: Iterable[Iterable[Any]]) -> None: ...
+            Construct and write a series of iterables to a csv file.  Non-string
+            elements will be converted to string.
+            """
 
 def writer(
     fileobj: SupportsWrite[str],
@@ -146,7 +124,7 @@ def writer(
     lineterminator: str = "\r\n",
     quoting: _QuotingType = 0,
     strict: bool = False,
-) -> _writer:
+) -> Writer:
     """Return a writer object that will write user data on the given file object.
 
     The "fileobj" argument can be any object that supports the file API.
@@ -168,7 +146,7 @@ def reader(
     lineterminator: str = "\r\n",
     quoting: _QuotingType = 0,
     strict: bool = False,
-) -> _reader:
+) -> Reader:
     """Return a reader object that will process lines from the given iterable.
 
     The "iterable" argument can be any object that returns a line

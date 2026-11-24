@@ -86,3 +86,17 @@ getattr(
     # text
     "foo",
 )
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/28732
+getattr(1, "real", extra=0)
+getattr(1, "real", **(events.append("kw") or {}))
+setattr(1, "real", 0, extra=0)
+setattr(1, "real", 0, **(events.append("kw") or {}))
+
+# Parenthesized `setattr` statements: the fix must drop the parentheses too,
+# since `(foo.bar = None)` is a syntax error.
+(setattr(foo, "bar", None))
+((setattr(foo, "bar", None)))
+(  # comment
+    setattr(foo, "bar", None)
+)

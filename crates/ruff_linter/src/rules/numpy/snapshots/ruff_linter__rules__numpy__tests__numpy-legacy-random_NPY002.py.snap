@@ -565,4 +565,3 @@ NPY002 Replace legacy `np.random.zipf` call with `np.random.Generator`
 66 | numpy.random.weibull()
 67 | numpy.random.zipf()
    | ^^^^^^^^^^^^^^^^^
-   |

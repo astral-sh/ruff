@@ -244,5 +244,5 @@ class Foo4: ...
 
 @decorator
 # comment
-@decorato2
+@decorator2
 class Foo5: ...

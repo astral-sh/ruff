@@ -1,4 +1,16 @@
 #!/usr/bin/env python3
+#
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["ruff"]
+#
+# [tool.uv]
+# no-build = true
+# exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
+# ///
+
 """Check code snippets in docs are formatted by Ruff."""
 
 from __future__ import annotations
@@ -45,20 +57,20 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "bad-quotes-inline-string",
     "bad-quotes-multiline-string",
     "blank-line-after-decorator",
-    "blank-line-before-class",
-    "blank-line-before-function",
-    "blank-line-between-methods",
-    "blank-lines-after-function-or-class",
-    "blank-lines-before-nested-definition",
-    "blank-lines-top-level",
+    "blank-line-before-class-docstring",
+    "blank-line-before-function-docstring",
     "docstring-tab-indentation",
     "explicit-string-concatenation",
     "f-string-missing-placeholders",
-    "incorrect-blank-line-after-class",
-    "incorrect-blank-line-before-class",
+    "incorrect-blank-line-after-class-docstring",
+    "incorrect-blank-line-before-class-docstring",
     "indentation-with-invalid-multiple",
     "indentation-with-invalid-multiple-comment",
     "line-too-long",
+    "missing-blank-line-before-method",
+    "missing-blank-line-before-nested-definition",
+    "missing-blank-lines-after-top-level-definition",
+    "missing-blank-lines-before-top-level-definition",
     "missing-trailing-comma",
     "missing-whitespace",
     "missing-whitespace-after-keyword",
@@ -78,45 +90,50 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "multiple-statements-on-one-line-colon",
     "multiple-statements-on-one-line-semicolon",
     "no-indented-block-comment",
-    "no-return-argument-annotation-in-stub",
     "no-space-after-block-comment",
     "no-space-after-inline-comment",
     "non-empty-stub-body",
-    "over-indentation",
     "over-indented",
+    "over-indented-docstring-line",
+    "parameter-annotated-with-no-return",
     "pass-statement-stub-body",
-    "prohibited-trailing-comma",
     "redundant-backslash",
     "shebang-leading-whitespace",
     "single-line-implicit-string-concatenation",
-    "surrounding-whitespace",
     "too-few-spaces-before-inline-comment",
     "too-many-blank-lines",
     "too-many-boolean-expressions",
     "trailing-comma-on-bare-tuple",
-    "triple-single-quotes",
-    "under-indentation",
+    "unconventional-docstring-quotes",
+    "under-indented-docstring-line",
     "unexpected-indentation-comment",
-    "unexpected-spaces-around-keyword-parameter-equals",
+    "unexpected-spaces-around-argument-or-parameter-equals",
     "unicode-kind-prefix",
     "unnecessary-class-parentheses",
     "unnecessary-escaped-quote",
+    "unnecessary-trailing-comma",
     "useless-semicolon",
     "whitespace-after-decorator",
     "whitespace-after-open-bracket",
+    "whitespace-around-docstring-text",
     "whitespace-before-close-bracket",
-    "whitespace-before-parameters",
+    "whitespace-before-open-bracket",
     "whitespace-before-punctuation",
 ]
 
 # For some docs, Ruff is unable to parse the example code.
 KNOWN_PARSE_ERRORS = [
+    "ban-lazy",  # requires Python 3.15
     "blank-line-with-whitespace",
     "indented-form-feed",
+    "lazy-import-immediately-resolved",  # requires Python 3.15
+    "lazy-import-mismatch",  # requires Python 3.15
     "missing-newline-at-end-of-file",
     "mixed-spaces-and-tabs",
     "no-indented-block",
     "non-pep695-type-alias",  # requires Python 3.12
+    "quadratic-list-summation",  # requires Python 3.15
+    "require-lazy",  # requires Python 3.15
     "syntax-error",
     "tab-after-comma",
     "tab-after-keyword",
@@ -183,8 +200,8 @@ def format_contents(src: str) -> tuple[str, Sequence[CodeBlockError]]:
             code = format_str(code, extension)
         except InvalidInput as e:
             errors.append(CodeBlockError(e))
-        except NotImplementedError as e:
-            raise e
+        except NotImplementedError:
+            raise
 
         code = textwrap.indent(code, match["indent"])
         return f"{match['before']}{code}{match['after']}"
@@ -281,14 +298,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="Check code snippets in docs are formatted by Ruff.",
     )
     parser.add_argument("--skip-errors", action="store_true")
-    parser.add_argument("--generate-docs", action="store_true")
     args = parser.parse_args(argv)
-
-    if args.generate_docs:
-        # Generate docs
-        from generate_mkdocs import main as generate_docs
-
-        generate_docs()
 
     # Get static docs
     static_docs = [Path("docs") / f for f in os.listdir("docs") if f.endswith(".md")]

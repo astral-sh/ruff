@@ -26,6 +26,26 @@ from typing import TYPE_CHECKING as TC
 reveal_type(TC)  # revealed: Literal[True]
 ```
 
+### Qualified conditions
+
+Qualified references to `TYPE_CHECKING` are evaluated eagerly, allowing narrowing from the
+statically reachable branch to be preserved after the condition:
+
+```py
+import typing
+import typing as t
+
+def typing_qualified(value: int | None) -> None:
+    if typing.TYPE_CHECKING:
+        assert isinstance(value, int)
+    reveal_type(value)  # revealed: int
+
+def typing_alias_qualified(value: int | None) -> None:
+    if t.TYPE_CHECKING:
+        assert isinstance(value, int)
+    reveal_type(value)  # revealed: int
+```
+
 ### `typing_extensions` re-export
 
 This should behave in the same way as `typing.TYPE_CHECKING`:

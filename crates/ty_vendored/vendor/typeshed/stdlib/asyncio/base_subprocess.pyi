@@ -1,8 +1,7 @@
 import subprocess
 from collections import deque
 from collections.abc import Callable, Sequence
-from typing import IO, Any
-from typing_extensions import TypeAlias
+from typing import IO, Any, TypeAlias
 
 from . import events, futures, protocols, transports
 

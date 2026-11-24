@@ -9,13 +9,13 @@ reveal_type({})  # revealed: dict[Unknown, Unknown]
 ## Basic dict
 
 ```py
-reveal_type({1: 1, 2: 1})  # revealed: dict[Unknown | int, Unknown | int]
+reveal_type({1: 1, 2: 1})  # revealed: dict[int, int]
 ```
 
 ## Dict of tuples
 
 ```py
-reveal_type({1: (1, 2), 2: (3, 4)})  # revealed: dict[Unknown | int, Unknown | tuple[int, int]]
+reveal_type({1: (1, 2), 2: (3, 4)})  # revealed: dict[int, tuple[int, int]]
 ```
 
 ## Unpacked dict
@@ -26,7 +26,7 @@ from typing import Mapping, KeysView
 a = {"a": 1, "b": 2}
 b = {"c": 3, "d": 4}
 c = {**a, **b}
-reveal_type(c)  # revealed: dict[Unknown | str, Unknown | int]
+reveal_type(c)  # revealed: dict[str, int]
 
 # revealed: list[int | str]
 # revealed: list[int | str]
@@ -41,9 +41,9 @@ class HasKeysAndGetItem:
         return 42
 
 def _(a: dict[str, int], b: Mapping[str, int], c: HasKeysAndGetItem, d: object):
-    reveal_type({**a})  # revealed: dict[Unknown | str, Unknown | int]
-    reveal_type({**b})  # revealed: dict[Unknown | str, Unknown | int]
-    reveal_type({**c})  # revealed: dict[Unknown | str, Unknown | int]
+    reveal_type({**a})  # revealed: dict[str, int]
+    reveal_type({**b})  # revealed: dict[str, int]
+    reveal_type({**c})  # revealed: dict[str, int]
 
     # error: [invalid-argument-type] "Argument expression after ** must be a mapping type: Found `object`"
     reveal_type({**d})  # revealed: dict[Unknown, Unknown]
@@ -59,19 +59,433 @@ def b(_: int) -> int:
     return 1
 
 x = {1: a, 2: b}
-reveal_type(x)  # revealed: dict[Unknown | int, Unknown | ((_: int) -> int)]
+reveal_type(x)  # revealed: dict[int, (_: int) -> int]
 ```
 
 ## Mixed dict
 
 ```py
-# revealed: dict[Unknown | str, Unknown | int | tuple[int, int] | tuple[int, int, int]]
+# revealed: dict[str, int | tuple[int, ...]]
 reveal_type({"a": 1, "b": (1, 2), "c": (1, 2, 3)})
 ```
 
 ## Dict comprehensions
 
 ```py
-# revealed: dict[Unknown | int, Unknown | int]
+# revealed: dict[int, int]
 reveal_type({x: y for x, y in enumerate(range(42))})
+```
+
+## Immediately indexed dictionary literals
+
+Indexing a dictionary literal preserves the literal types of its values, since the dictionary cannot
+be mutated before the lookup. The result is the union of the value types.
+
+```py
+reveal_type({1: "a", 2: "b"}[1])  # revealed: Literal["a", "b"]
+reveal_type({"a": 1, "b": 2}["a"])  # revealed: Literal[1, 2]
+
+{"a": 1}[0]  # error: [invalid-argument-type]
+```
+
+This also allows a lookup table to convert between literal unions:
+
+```py
+from typing import Literal
+
+Letter = Literal["A", "B", "C"]
+Word = Literal["Alpha", "Beta", "Charlie"]
+
+def expand_letter(letter: Letter) -> Word:
+    return {"A": "Alpha", "B": "Beta", "C": "Charlie"}[letter]  # ok
+```
+
+The key need not itself have a literal type:
+
+```py
+def _(string_key: str, integer_key: int):
+    reveal_type({"a": 1, "b": 2}[string_key])  # revealed: Literal[1, 2]
+    reveal_type({1: "a", 2: "b"}[integer_key])  # revealed: Literal["a", "b"]
+```
+
+Nested mutable values still permit mutation:
+
+```py
+values = {"a": [1]}["a"]
+reveal_type(values)  # revealed: list[int]
+values.append(2)  # ok
+```
+
+A dictionary stored in a variable still permits later mutation and promotes its value type:
+
+```py
+def _(key: str):
+    values = {"a": 1, "b": 2}
+    reveal_type(values)  # revealed: dict[str, int]
+    reveal_type(values[key])  # revealed: int
+    values["c"] = 3  # ok
+```
+
+## Dictionary escaping through a bound view method
+
+A saved view method exposes its dictionary through `__self__`, so its key and value types still
+permit mutation:
+
+```py
+method = {"a": 1}.values
+dictionary = method.__self__
+reveal_type(dictionary)  # revealed: dict[str, int]
+dictionary["b"] = 2  # ok
+reveal_type(method())  # revealed: dict_values[str, int]
+```
+
+## Key narrowing
+
+The original assignment to each key, as well as future assignments, are used to narrow access to
+individual keys:
+
+```py
+from typing import TypedDict
+
+x1 = {"a": 1, "b": "2"}
+reveal_type(x1)  # revealed: dict[str, int | str]
+reveal_type(x1["a"])  # revealed: Literal[1]
+reveal_type(x1["b"])  # revealed: Literal["2"]
+
+x1["a"] = 2
+reveal_type(x1["a"])  # revealed: Literal[2]
+
+x2: dict[str, int | str] = {"a": 1, "b": "2"}
+reveal_type(x2)  # revealed: dict[str, int | str]
+reveal_type(x2["a"])  # revealed: Literal[1]
+reveal_type(x2["b"])  # revealed: Literal["2"]
+
+class TD(TypedDict):
+    td: int
+
+x3: dict[int, int | TD] = {1: 1, 2: {"td": 1}}
+reveal_type(x3)  # revealed: dict[int, int | TD]
+reveal_type(x3[1])  # revealed: Literal[1]
+reveal_type(x3[2])  # revealed: TD
+
+x4 = {"a": 1, "b": {"c": 2, "d": "3"}}
+reveal_type(x4["a"])  # revealed: Literal[1]
+reveal_type(x4["b"])  # revealed: dict[str, int | str]
+reveal_type(x4["b"]["c"])  # revealed: Literal[2]
+reveal_type(x4["b"]["d"])  # revealed: Literal["3"]
+
+x5: dict[str, int | dict[str, int | TD]] = {"a": 1, "b": {"c": 2, "d": {"td": 1}}}
+reveal_type(x5["a"])  # revealed: Literal[1]
+reveal_type(x5["b"])  # revealed: dict[str, int | TD]
+reveal_type(x5["b"]["c"])  # revealed: Literal[2]
+reveal_type(x5["b"]["d"])  # revealed: TD
+
+x6 = x7 = {"a": 1}
+# TODO: This should reveal `Literal[1]`.
+reveal_type(x6["a"])  # revealed: int
+reveal_type(x7["a"])  # revealed: int
+
+x8: list[dict[str, int | str]] = [{"a": 1, "b": "2"}, {"a": 3, "b": "4"}]
+reveal_type(x8[0]["a"])  # revealed: Literal[1]
+reveal_type(x8[1]["b"])  # revealed: Literal["4"]
+
+x9: dict[str, list[dict[str, int | str]]] = {"a": [{"a": 1, "b": "2"}, {"a": 3, "b": "4"}]}
+reveal_type(x9["a"][0]["a"])  # revealed: Literal[1]
+reveal_type(x9["a"][1]["b"])  # revealed: Literal["4"]
+
+x10: tuple[dict[str, int | str], ...] = ({"a": 1, "b": "2"}, {"a": 3, "b": "4"})
+reveal_type(x10[0]["a"])  # revealed: Literal[1]
+reveal_type(x10[1]["b"])  # revealed: Literal["4"]
+
+x11: dict[str, tuple[dict[str, int | str], ...]] = {"a": ({"a": 1, "b": "2"}, {"a": 3, "b": "4"})}
+reveal_type(x11["a"][0]["a"])  # revealed: Literal[1]
+reveal_type(x11["a"][1]["b"])  # revealed: Literal["4"]
+
+x12 = [({"a": 1, "b": "2"}, {"a": 3, "b": "4"}, *[{"a": 5}], {"a": 6})]
+reveal_type(x12[0][0]["a"])  # revealed: Literal[1]
+reveal_type(x12[0][1]["b"])  # revealed: Literal["4"]
+
+# Starred expressions and any elements that follow them are not narrowed.
+reveal_type(x12[0][2]["a"])  # revealed: int
+reveal_type(x12[0][3]["b"])  # revealed: int
+```
+
+## Key narrowing through dictionary unpacking
+
+Unpacking a dictionary literal preserves its key bindings. Later entries replace earlier entries,
+including any narrowing for their nested keys.
+
+```py
+d = {"outer": {"stale": 1}, **{"outer": {"current": 2}}}
+reveal_type(d["outer"]["current"])  # revealed: Literal[2]
+reveal_type(d["outer"]["stale"])  # revealed: int
+
+d = {"keep": 1, **{**{"outer": {"current": 2}}}, "outer": {"last": "value"}}
+reveal_type(d["keep"])  # revealed: Literal[1]
+reveal_type(d["outer"]["last"])  # revealed: Literal["value"]
+reveal_type(d["outer"]["current"])  # revealed: str
+```
+
+## Dict unpacking in function calls
+
+Narrowing is also performed for dictionary unpacking expressions:
+
+```py
+def f1(a: int): ...
+def f2(a: int, b: str): ...
+def f3(a: int, b: str, c: float): ...
+def accepts_inner(inner: dict[str, int]): ...
+
+x1: dict[str, float | str] = {"a": 1, "b": "a"}
+
+f2(**x1)  # ok
+
+# N.B. We only use dictionary narrowing to narrow known keys to a more precise type, and fallback
+# to the dictionary value type otherwise. We avoid making assumptions about which keys may or may
+# not be present in ways that could lead to false positives.
+f1(**x1)  # ok
+
+# error: [invalid-argument-type]
+f3(**x1)
+
+x1["c"] = 1.0
+f3(**x1)  # ok
+
+def _(x: dict[str, int]):
+    # error: [invalid-argument-type]
+    f2(**x)
+
+def _(x: dict[str, int | str]):
+    # error: [invalid-argument-type]
+    f1(**x)
+
+    x["a"] = 1
+    f1(**x)  # ok
+
+def _(x: dict[str, int | str], flag: bool):
+    if flag:
+        x["a"] = 1
+
+    # error: [invalid-argument-type]
+    f1(**x)
+
+x2: dict[str, object] = {"inner": {"a": 1}}
+# error: [invalid-argument-type]
+f1(**x2)
+
+x3: dict[str, dict[str, object]] = {"inner": {"a": 1, "b": "a"}}
+
+f2(**x3["inner"])  # ok
+f1(**x3["inner"])  # ok
+# error: [invalid-argument-type]
+f3(**x3["inner"])
+
+x3["inner"]["c"] = 1.0
+f3(**x3["inner"])  # ok
+
+x3["inner"] = {"inner": {"a": 1}}
+# error: [invalid-argument-type]
+f1(**x3["inner"])
+
+def _(x: dict[str, object]):
+    # error: [invalid-type-form]
+    x["inner"]: dict[str, float | str] = {"a": 1, "b": "a"}
+
+    f2(**x["inner"])  # ok
+    f1(**x["inner"])  # ok
+    # error: [invalid-argument-type]
+    f3(**x["inner"])
+
+    # The rejected annotation does not widen the assigned dictionary's value type.
+    # error: [invalid-assignment]
+    x["inner"]["c"] = 1.0
+
+    x["inner"] = {"inner": {"a": 1}}
+    accepts_inner(**x["inner"])  # ok
+    # error: [invalid-argument-type]
+    f1(**x["inner"])
+
+def _(x: dict[str, object]):
+    # An annotation-only subscript likewise cannot declare the nested dictionary's type.
+    # error: [invalid-type-form]
+    x["inner"]: dict[str, float | str]
+
+    x["inner"] = {"inner": {"a": 1}}
+    accepts_inner(**x["inner"])  # ok
+    # error: [invalid-argument-type]
+    f1(**x["inner"])
+
+def _(x: dict[str, dict[str, float | str]]):
+    # A rejected dictionary assignment does not establish known key types.
+    # error: [invalid-assignment]
+    x["kwargs"] = {"nested": {"a": 1}}
+    reveal_type(x["kwargs"]["nested"])  # revealed: float | str
+    # error: [invalid-argument-type]
+    f1(**x["kwargs"])
+
+def _(x: dict[str, dict[str, float | str]]):
+    x["kwargs"] = {"nested": 1}
+    reveal_type(x["kwargs"]["nested"])  # revealed: Literal[1]
+
+    # A rejected replacement also invalidates a prior known-key type.
+    # error: [invalid-assignment]
+    x["kwargs"] = {"nested": {"a": 1}}
+    reveal_type(x["kwargs"]["nested"])  # revealed: float | str
+
+def accepts_value(**kwargs: object): ...
+def _(x: dict[str, dict[str, float | str]]):
+    # error: [invalid-assignment]
+    x = {"kwargs": {"nested": {"a": object()}}}
+    reveal_type(x["kwargs"]["nested"])  # revealed: float | str
+    # error: [invalid-argument-type]
+    accepts_value(**x["kwargs"]["nested"])
+
+def _(x: list[dict[str, float | str]]):
+    # error: [invalid-assignment]
+    x = [{"nested": {"a": object()}}]
+    # error: [invalid-argument-type]
+    accepts_value(**x[0]["nested"])
+
+def _(x: dict[str, object], y: int):
+    # An invalid nested binding does not reject the dictionary assignment itself.
+    # error: [invalid-assignment]
+    x = {"a": (y := "bad")}
+    reveal_type(x["a"])  # revealed: int
+
+class Normalizing:
+    def __getitem__(self, key: str) -> dict[str, object]:
+        return {}
+    def __setitem__(self, key: str, value: dict[str, object]) -> None:
+        pass
+
+def _(normalizing: Normalizing):
+    # An arbitrary setter may transform the assigned value, so its children are not narrowed.
+    normalizing["mapping"] = {"a": 1}
+    reveal_type(normalizing["mapping"]["a"])  # revealed: object
+
+class NormalizingDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> dict[str, object]:
+        return {}
+    def __set__(self, instance: object, value: object) -> None:
+        pass
+
+class WithNormalizingDescriptor:
+    mapping: NormalizingDescriptor = NormalizingDescriptor()
+
+def _(normalizing: WithNormalizingDescriptor):
+    # A data descriptor may likewise transform the assigned value.
+    normalizing.mapping = {"a": 1}
+    reveal_type(normalizing.mapping["a"])  # revealed: object
+
+class Y:
+    inner: dict[str, object]
+
+def _(y: Y):
+    # error: [invalid-type-form]
+    y.inner: dict[str, float | str] = {"a": 1, "b": "a"}
+
+    y.inner = {"inner": {"a": 1}}
+    accepts_inner(**y.inner)  # ok
+    # error: [invalid-argument-type]
+    f1(**y.inner)
+
+def _(y: Y):
+    y.inner = {"a": 1, "b": "a"}
+
+    f2(**y.inner)  # ok
+    f1(**y.inner)  # ok
+    # error: [invalid-argument-type]
+    f3(**y.inner)
+
+    y.inner["c"] = 1.0
+    f3(**y.inner)  # ok
+
+    y.inner = {"inner": {"a": 1}}
+    # error: [invalid-argument-type]
+    f1(**y.inner)
+```
+
+## Known key values after loop replacements
+
+An accepted dictionary replacement contributes its known key values to subsequent iterations.
+
+```py
+def accepted():
+    values: dict[str, int] = {"a": 1}
+    for _ in range(2):
+        reveal_type(values["a"])  # revealed: Literal[1, 2]
+        values = {"a": 2}
+    reveal_type(values["a"])  # revealed: Literal[2]
+```
+
+## Rejected dictionary replacements in loops
+
+A rejected replacement instead falls back to the declared value type. An assertion after the
+replacement narrows that fallback on the next iteration, rather than preserving the original key's
+literal type or using the rejected value.
+
+```py
+def rejected(repeat: bool):
+    values: dict[str, int | None] = {"a": 1}
+    while repeat:
+        reveal_type(values["a"])  # revealed: int
+        values = {"a": "bad"}  # error: [invalid-assignment]
+        assert values["a"] is not None
+    reveal_type(values["a"])  # revealed: int
+```
+
+## Setter dictionary assignments in loops
+
+A property setter need not store the assigned dictionary. Key reads use the getter's value type,
+including when a key was already read before the loop and the setter accepts a different value type.
+
+```py
+class C:
+    @property
+    def values(self) -> dict[str, int]:
+        return {"a": 1}
+
+    @values.setter
+    def values(self, value: dict[str, str]) -> None:
+        pass
+
+def f(c: C, repeat: bool) -> int:
+    reveal_type(c.values["a"])  # revealed: int
+    while repeat:
+        reveal_type(c.values["a"])  # revealed: int
+        c.values = {"a": "bad"}
+    return c.values["a"]
+```
+
+The same applies when the assigned dictionary depends on a key read from an earlier iteration.
+Inferring that assignment must converge without using the setter's input type for getter reads.
+
+```py
+def loop_carried_value(c: C, repeat: bool) -> int:
+    reveal_type(c.values["a"])  # revealed: int
+    while repeat:
+        reveal_type(c.values["a"])  # revealed: int
+        c.values = {"a": str(c.values["a"])}
+    return c.values["a"]
+```
+
+## Rejected annotations in stubs
+
+Annotation-only declarations in stubs are also bindings. A rejected annotation should fall back to
+the type obtained by normal member lookup:
+
+`stub.pyi`:
+
+```pyi
+x: dict[str, object]
+# error: [invalid-type-form]
+x["a"]: int
+reveal_type(x["a"])  # revealed: object
+
+x["b"] = ...
+reveal_type(x["b"])  # revealed: Unknown
+
+# error: [invalid-type-form]
+x["c"]: int = ...
+reveal_type(x["c"])  # revealed: Unknown
 ```

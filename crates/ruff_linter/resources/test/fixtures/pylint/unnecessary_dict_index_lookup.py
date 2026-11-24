@@ -51,3 +51,39 @@ def rewrite_client_arrays(value_arrays: dict[str, list[int]]) -> dict[str, list[
         else:
             mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
     return mapped_arrays
+
+
+def for_else_no_false_positive(result: dict[str, float]) -> dict[str, float]:
+    for res_glob, res_priority in result.items():
+        if res_priority > 0:
+            break
+    else:
+        for res_glob in result.keys():
+            if result[res_glob] <= 0:  # okay, res_glob from loop may be unbound
+                result.pop(res_glob)
+    return result
+
+
+def issue_29842():
+    # Issue #29842: do not flag d[k] when d[k] is mutated in a while loop
+    for fruit, count in FRUITS.items():
+        while FRUITS[fruit] >= 2:
+            print("eating banana")
+            FRUITS[fruit] -= 2
+
+    # unpack assignment to key
+    for fruit_name, fruit_count in FRUITS.items():
+        fruit_name, _ = 0, 0
+        assert FRUITS[fruit_name] == 0
+
+    # unpack assignment to value
+    for fruit_name, fruit_count in FRUITS.items():
+        _, fruit_count = 0, 0
+        assert FRUITS[fruit_name] == 0
+
+    # list unpack assignment
+    for fruit_name, fruit_count in FRUITS.items():
+        [fruit_name, _] = 0, 0
+        assert FRUITS[fruit_name] == 0
+
+

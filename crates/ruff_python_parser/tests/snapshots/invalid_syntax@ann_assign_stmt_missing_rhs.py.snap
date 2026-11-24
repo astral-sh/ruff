@@ -43,4 +43,3 @@ Module(
   |
 1 | x: int =
   |         ^ Syntax Error: Expected an expression
-  |

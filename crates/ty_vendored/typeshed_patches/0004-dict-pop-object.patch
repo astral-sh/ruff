@@ -1,0 +1,21 @@
+--- a/stdlib/builtins.pyi
++++ b/stdlib/builtins.pyi
+@@ -3153,16 +3153,16 @@
+     def get(self, key: object, default: _T, /) -> _VT | _T: ...
+ 
+     @overload
+     def pop(self, key: _KT, /) -> _VT:
+         """D.pop(k[,d]) -> v, remove specified key and return the corresponding value.
+ 
+         If the key is not found, return the default if given; otherwise,
+         raise a KeyError.
+         """
+     @overload
+-    def pop(self, key: _KT, default: _VT, /) -> _VT: ...
++    def pop(self, key: object, default: _VT, /) -> _VT: ...
+     @overload
+-    def pop(self, key: _KT, default: _T, /) -> _VT | _T: ...
++    def pop(self, key: object, default: _T, /) -> _VT | _T: ...
+ 
+     def __len__(self) -> int:
+         """Return len(self)."""

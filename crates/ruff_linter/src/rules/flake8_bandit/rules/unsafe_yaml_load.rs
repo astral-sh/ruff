@@ -1,9 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
+use crate::preview::is_baseloader_safe_in_yaml_load_enabled;
 
 /// ## What it does
 /// Checks for uses of the `yaml.load` function.
@@ -35,7 +38,7 @@ use crate::checkers::ast::Checker;
 /// - [PyYAML documentation: Loading YAML](https://pyyaml.org/wiki/PyYAMLDocumentation)
 /// - [Common Weakness Enumeration: CWE-20](https://cwe.mitre.org/data/definitions/20.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.212")]
+#[violation_metadata(stable_since = "v0.0.212", category = Category::Security)]
 pub(crate) struct UnsafeYAMLLoad {
     pub loader: Option<String>,
 }
@@ -60,12 +63,12 @@ impl Violation for UnsafeYAMLLoad {
 }
 
 /// S506
-pub(crate) fn unsafe_yaml_load(checker: &Checker, call: &ast::ExprCall) {
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["yaml", "load"]))
-    {
+pub(crate) fn unsafe_yaml_load(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
+    if matches!(qualified_name.segments(), ["yaml", "load"]) {
         if let Some(loader_arg) = call.arguments.find_argument_value("Loader", 1) {
             if !checker
                 .semantic()
@@ -76,7 +79,13 @@ pub(crate) fn unsafe_yaml_load(checker: &Checker, call: &ast::ExprCall) {
                         ["yaml", "SafeLoader" | "CSafeLoader"]
                             | ["yaml", "loader", "SafeLoader" | "CSafeLoader"]
                             | ["yaml", "cyaml", "CSafeLoader"]
-                    )
+                    ) || (is_baseloader_safe_in_yaml_load_enabled(checker.settings())
+                        && matches!(
+                            qualified_name.segments(),
+                            ["yaml", "BaseLoader" | "CBaseLoader"]
+                                | ["yaml", "loader", "BaseLoader" | "CBaseLoader"]
+                                | ["yaml", "cyaml", "CBaseLoader"]
+                        ))
                 })
             {
                 let loader = match loader_arg {

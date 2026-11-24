@@ -1,27 +1,29 @@
 use crate::goto::find_goto_target;
 use crate::{Db, HasNavigationTargets, NavigationTargets, RangedValue};
-use ruff_db::files::{File, FileRange};
+use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
+use ty_python_core::ProgramFile;
 use ty_python_semantic::SemanticModel;
 
 pub fn goto_type_definition(
     db: &dyn Db,
-    file: File,
+    file: ProgramFile<'_>,
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
 
     let ty = goto_target.inferred_type(&model)?;
+    let env = model.program_environment();
 
-    tracing::debug!("Inferred type of covering node is {}", ty.display(db));
+    tracing::debug!("Inferred type of covering node is {}", ty.display(db, &env));
 
-    let navigation_targets = ty.navigation_targets(db);
+    let navigation_targets = ty.navigation_targets(db, &env);
 
     Some(RangedValue {
-        range: FileRange::new(file, goto_target.range()),
+        range: FileRange::new(file.file(db), goto_target.range()),
         value: navigation_targets,
     })
 }
@@ -46,19 +48,38 @@ mod tests {
         info[goto-type definition]: Go to type definition
          --> main.py:4:1
           |
-        2 | class Test: ...
-        3 |
         4 | ab = Test()
           | ^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:2:7
           |
         2 | class Test: ...
           |       ----
-        3 |
-        4 | ab = Test()
-          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_slot_descriptor() {
+        let test = cursor_test(
+            r#"
+            class Slotted:
+                __slots__ = ("value",)
+
+            descriptor = Slotted.va<CURSOR>lue
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:22
+           |
+        LL | descriptor = Slotted.value
+           |                      ^^^^^ Clicking here
+        info: Found 1 type definition
+          --> stdlib/types.pyi:LL:7
+           |
+        LL | class MemberDescriptorType:
+           |       --------------------
         ");
     }
 
@@ -72,25 +93,18 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:1
-          |
-        2 | from typing import Literal
-        3 |
-        4 | ab = Literal
-          | ^^ Clicking here
-          |
+          --> main.py:LL:1
+           |
+        LL | ab = Literal
+           | ^^ Clicking here
         info: Found 1 type definition
-           --> stdlib/typing.pyi:487:1
-            |
-        485 | """
-        486 |
-        487 | Literal: _SpecialForm
-            | -------
-        488 | """Special typing form to define literal types (a.k.a. value types).
-            |
-        "#);
+          --> stdlib/typing.pyi:LL:1
+           |
+        LL | Literal: _SpecialForm
+           | -------
+        ");
     }
 
     // this is a slightly different case to the one above,
@@ -105,25 +119,18 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:1
-          |
-        2 | from typing import Any
-        3 |
-        4 | ab = Any
-          | ^^ Clicking here
-          |
+          --> main.py:LL:1
+           |
+        LL | ab = Any
+           | ^^ Clicking here
         info: Found 1 type definition
-           --> stdlib/typing.pyi:166:7
-            |
-        164 | # from _typeshed import AnnotationForm
-        165 |
-        166 | class Any:
-            |       ---
-        167 |     """Special type indicating an unconstrained type.
-            |
-        "#);
+          --> stdlib/typing.pyi:LL:7
+           |
+        LL | class Any:
+           |       ---
+        ");
     }
 
     // Similarly, `Generic` is a `type[]` type in typeshed
@@ -137,25 +144,18 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:1
-          |
-        2 | from typing import Generic
-        3 |
-        4 | ab = Generic
-          | ^^ Clicking here
-          |
+          --> main.py:LL:1
+           |
+        LL | ab = Generic
+           | ^^ Clicking here
         info: Found 1 type definition
-            --> stdlib/typing.pyi:1268:1
-             |
-        1266 |         def __class_getitem__(cls, args: TypeVar | tuple[TypeVar, ...]) -> _Final: ...
-        1267 |
-        1268 | Generic: type[_Generic]
-             | -------
-        1269 | """Abstract base class for generic types.
-             |
-        "#);
+          --> stdlib/typing.pyi:LL:1
+           |
+        LL | Generic: type[_Generic]
+           | -------
+        ");
     }
 
     #[test]
@@ -170,22 +170,41 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:1
-          |
-        2 | from ty_extensions import AlwaysTruthy
-        3 |
-        4 | ab = AlwaysTruthy
-          | ^^ Clicking here
-          |
+          --> main.py:LL:1
+           |
+        LL | ab = AlwaysTruthy
+           | ^^ Clicking here
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:15:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
-        13 | # Types
-        14 | Unknown = object()
-        15 | AlwaysTruthy = object()
+        LL | AlwaysTruthy: _SpecialForm
            | ------------
-        16 | AlwaysFalsy = object()
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_divergent() {
+        let test = cursor_test(
+            r#"
+            class D:
+                def copy(self, other: "D"):
+                    self.x = other.x
+
+            D().x<CURSOR>
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:5
            |
+        LL | D().x
+           |     ^ Clicking here
+        info: Found 1 type definition
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
+           |
+        LL | Divergent: _SpecialForm
+           | ---------
         ");
     }
 
@@ -205,19 +224,13 @@ mod tests {
         info[goto-type definition]: Go to type definition
          --> main.py:6:1
           |
-        4 | ab = foo
-        5 |
         6 | ab
           | ^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:2:5
           |
         2 | def foo(a, b): ...
           |     ---
-        3 |
-        4 | ab = foo
-          |
         ");
     }
 
@@ -243,11 +256,8 @@ mod tests {
         info[goto-type definition]: Go to type definition
           --> main.py:12:1
            |
-        10 |     a = bar
-        11 |
         12 | a
            | ^ Clicking here
-           |
         info: Found 2 type definitions
          --> main.py:3:5
           |
@@ -256,10 +266,74 @@ mod tests {
         4 |
         5 | def bar(a, b): ...
           |     ---
-        6 |
-        7 | if random.choice():
-          |
         ");
+    }
+
+    #[test]
+    fn goto_type_of_narrowed_singleton_enum_complement() {
+        let test = cursor_test(
+            r#"
+            from enum import Enum
+
+            class Color(Enum):
+                RED = 1
+                BLUE = 2
+
+            def f(color: Color):
+                if color is Color.RED:
+                    return
+
+                color<CURSOR>
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+          --> main.py:12:5
+           |
+        12 |     color
+           |     ^^^^^ Clicking here
+        info: Found 1 type definition
+         --> main.py:6:5
+          |
+        6 |     BLUE = 2
+          |     ----
+        "#);
+    }
+
+    #[test]
+    fn goto_type_of_narrowed_multi_member_enum_complement() {
+        let test = cursor_test(
+            r#"
+            from enum import Enum
+
+            class Color(Enum):
+                RED = 1
+                GREEN = 2
+                BLUE = 3
+
+            def f(color: Color):
+                if color is Color.RED:
+                    return
+
+                color<CURSOR>
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+          --> main.py:13:5
+           |
+        13 |     color
+           |     ^^^^^ Clicking here
+        info: Found 2 type definitions
+         --> main.py:6:5
+          |
+        6 |     GREEN = 2
+          |     -----
+        7 |     BLUE = 3
+          |     ----
+        "#);
     }
 
     #[test]
@@ -278,13 +352,11 @@ mod tests {
           |
         2 | import lib
           |        ^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib.py:1:1
           |
         1 | a = 10
           | ------
-          |
         ");
     }
 
@@ -305,13 +377,11 @@ mod tests {
           |
         2 | import lib.submod
           |        ^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib/__init__.py:1:1
           |
         1 | b = 7
           | -----
-          |
         ");
     }
 
@@ -332,13 +402,11 @@ mod tests {
           |
         2 | import lib.submod
           |            ^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib/submod.py:1:1
           |
         1 | a = 10
           | ------
-          |
         ");
     }
 
@@ -358,13 +426,11 @@ mod tests {
           |
         2 | from lib import a
           |      ^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib.py:1:1
           |
         1 | a = 10
           | ------
-          |
         ");
     }
 
@@ -385,13 +451,11 @@ mod tests {
           |
         2 | from lib.submod import a
           |      ^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib/__init__.py:1:1
           |
         1 | b = 7
           | -----
-          |
         ");
     }
 
@@ -412,13 +476,11 @@ mod tests {
           |
         2 | from lib.submod import a
           |          ^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib/submod.py:1:1
           |
         1 | a = 10
           | ------
-          |
         ");
     }
 
@@ -448,14 +510,11 @@ mod tests {
           |
         2 | from .bot.botmod import *
           |           ^^^^^^ Clicking here
-        3 | sub = 2
-          |
         info: Found 1 type definition
          --> lib/sub/bot/botmod.py:1:1
           |
         1 | botmod = 31
           | -----------
-          |
         ");
     }
 
@@ -485,14 +544,11 @@ mod tests {
           |
         2 | from .bot.botmod import *
           |       ^^^ Clicking here
-        3 | sub = 2
-          |
         info: Found 1 type definition
          --> lib/sub/bot/__init__.py:1:1
           |
         1 | bot = 3
           | -------
-          |
         ");
     }
 
@@ -522,14 +578,11 @@ mod tests {
           |
         2 | from .bot.botmod import *
           |       ^^^ Clicking here
-        3 | sub = 2
-          |
         info: Found 1 type definition
          --> lib/sub/bot/__init__.py:1:1
           |
         1 | bot = 3
           | -------
-          |
         ");
     }
 
@@ -572,17 +625,13 @@ mod tests {
         info[goto-type definition]: Go to type definition
          --> main.py:4:1
           |
-        2 | import lib
-        3 |
         4 | lib
           | ^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib.py:1:1
           |
         1 | a = 10
           | ------
-          |
         ");
     }
 
@@ -596,25 +645,18 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:1
-          |
-        2 | a: str = "test"
-        3 |
-        4 | a
-          | ^ Clicking here
-          |
+          --> main.py:LL:1
+           |
+        LL | a
+           | ^ Clicking here
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
-            |
-        914 | @disjoint_base
-        915 | class str(Sequence[str]):
-            |       ---
-        916 |     """str(object='') -> str
-        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
-            |
-        "#);
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+        ");
     }
     #[test]
     fn goto_type_of_expression_with_literal_node() {
@@ -626,20 +668,15 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:10
-          |
-        2 | a: str = "test"
-          |          ^^^^^^ Clicking here
-          |
+          --> main.py:LL:10
+           |
+        LL | a: str = "test"
+           |          ^^^^^^ Clicking here
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
-            |
-        914 | @disjoint_base
-        915 | class str(Sequence[str]):
-            |       ---
-        916 |     """str(object='') -> str
-        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
-            |
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
         "#);
     }
 
@@ -657,13 +694,11 @@ mod tests {
           |
         2 | type Alias[T: int = bool] = list[T]
           |                                  ^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:2:12
           |
         2 | type Alias[T: int = bool] = list[T]
           |            -
-          |
         ");
     }
 
@@ -681,13 +716,11 @@ mod tests {
           |
         2 | type Alias[**P = [int, str]] = Callable[P, int]
           |                                         ^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:2:14
           |
         2 | type Alias[**P = [int, str]] = Callable[P, int]
           |              -
-          |
         ");
     }
 
@@ -699,10 +732,18 @@ mod tests {
             "#,
         );
 
-        // TODO: Goto type definition currently doesn't work for type var tuples
-        // because the inference doesn't support them yet.
-        // This snapshot should show a single target pointing to `T`
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:31
+          |
+        2 | type Alias[*Ts = ()] = tuple[*Ts]
+          |                               ^^ Clicking here
+        info: Found 1 type definition
+         --> main.py:2:13
+          |
+        2 | type Alias[*Ts = ()] = tuple[*Ts]
+          |             --
+        ");
     }
 
     #[test]
@@ -717,8 +758,18 @@ mod tests {
             "#,
         );
 
-        // TODO: This should jump to the definition of `Alias` above.
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:6:1
+          |
+        6 | Alias
+          | ^^^^^ Clicking here
+        info: Found 1 type definition
+         --> main.py:4:1
+          |
+        4 | Alias = TypeAliasType("Alias", tuple[int, int])
+          | -----
+        "#);
     }
 
     #[test]
@@ -738,18 +789,11 @@ mod tests {
           |
         2 | a: "MyClass" = 1
           |     ^^^^^^^ Clicking here
-        3 |
-        4 | class MyClass:
-          |
         info: Found 1 type definition
          --> main.py:4:7
           |
-        2 | a: "MyClass" = 1
-        3 |
         4 | class MyClass:
           |       -------
-        5 |     """some docs"""
-          |
         "#);
     }
 
@@ -764,7 +808,18 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^ Clicking here
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        4 | class MyClass:
+          |       -------
+        "#);
     }
 
     #[test]
@@ -780,30 +835,20 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:4
-          |
-        2 | a: "None | MyClass" = 1
-          |    ^^^^^^^^^^^^^^^^ Clicking here
-        3 |
-        4 | class MyClass:
-          |
+          --> main.py:LL:4
+           |
+        LL | a: "None | MyClass" = 1
+           |    ^^^^^^^^^^^^^^^^ Clicking here
         info: Found 2 type definitions
-           --> main.py:4:7
-            |
-          2 | a: "None | MyClass" = 1
-          3 |
-          4 | class MyClass:
-            |       -------
-          5 |     """some docs"""
-            |
-           ::: stdlib/types.pyi:969:11
-            |
-        967 | if sys.version_info >= (3, 10):
-        968 |     @final
-        969 |     class NoneType:
-            |           --------
-        970 |         """The type of the None singleton."""
-            |
+          --> main.py:LL:7
+           |
+        LL | class MyClass:
+           |       -------
+           |
+          ::: stdlib/types.pyi:LL:7
+           |
+        LL | class NoneType:
+           |       --------
         "#);
     }
 
@@ -818,7 +863,18 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^ Clicking here
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        4 | class MyClass:
+          |       -------
+        "#);
     }
 
     #[test]
@@ -834,30 +890,20 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:4
-          |
-        2 | a: "None | MyClass" = 1
-          |    ^^^^^^^^^^^^^^^^ Clicking here
-        3 |
-        4 | class MyClass:
-          |
+          --> main.py:LL:4
+           |
+        LL | a: "None | MyClass" = 1
+           |    ^^^^^^^^^^^^^^^^ Clicking here
         info: Found 2 type definitions
-           --> main.py:4:7
-            |
-          2 | a: "None | MyClass" = 1
-          3 |
-          4 | class MyClass:
-            |       -------
-          5 |     """some docs"""
-            |
-           ::: stdlib/types.pyi:969:11
-            |
-        967 | if sys.version_info >= (3, 10):
-        968 |     @final
-        969 |     class NoneType:
-            |           --------
-        970 |         """The type of the None singleton."""
-            |
+          --> main.py:LL:7
+           |
+        LL | class MyClass:
+           |       -------
+           |
+          ::: stdlib/types.pyi:LL:7
+           |
+        LL | class NoneType:
+           |       --------
         "#);
     }
 
@@ -874,22 +920,15 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:4
-          |
-        2 | a: "MyClass |" = 1
-          |    ^^^^^^^^^^^ Clicking here
-        3 |
-        4 | class MyClass:
-          |
+          --> main.py:LL:4
+           |
+        LL | a: "MyClass |" = 1
+           |    ^^^^^^^^^^^ Clicking here
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:14:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
-        13 | # Types
-        14 | Unknown = object()
+        LL | Unknown: _SpecialForm
            | -------
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
         "#);
     }
 
@@ -904,7 +943,18 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:5
+          |
+        2 | a: "MyClass | No" = 1
+          |     ^^^^^^^ Clicking here
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        4 | class MyClass:
+          |       -------
+        "#);
     }
 
     #[test]
@@ -918,7 +968,18 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:15
+           |
+        LL | a: "MyClass | No" = 1
+           |               ^^ Clicking here
+        info: Found 1 type definition
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
+           |
+        LL | Unknown: _SpecialForm
+           | -------
+        "#);
     }
 
     #[test]
@@ -931,20 +992,15 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:6
-          |
-        2 | ab: "ab"
-          |      ^^ Clicking here
-          |
+          --> main.py:LL:6
+           |
+        LL | ab: "ab"
+           |      ^^ Clicking here
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:14:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
-        13 | # Types
-        14 | Unknown = object()
+        LL | Unknown: _SpecialForm
            | -------
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
         "#);
     }
 
@@ -958,20 +1014,190 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:5
-          |
-        2 | x: "foobar"
-          |     ^^^^^^ Clicking here
-          |
+          --> main.py:LL:5
+           |
+        LL | x: "foobar"
+           |     ^^^^^^ Clicking here
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:14:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
-        13 | # Types
-        14 | Unknown = object()
+        LL | Unknown: _SpecialForm
            | -------
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested1() {
+        let test = cursor_test(
+            r#"
+        x: "list['My<CURSOR>Class | int'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:11
+          |
+        2 | x: "list['MyClass | int'] | None"
+          |           ^^^^^^^ Clicking here
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        4 | class MyClass:
+          |       -------
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested2() {
+        let test = cursor_test(
+            r#"
+        x: "list['int | My<CURSOR>Class'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:17
+          |
+        2 | x: "list['int | MyClass'] | None"
+          |                 ^^^^^^^ Clicking here
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        4 | class MyClass:
+          |       -------
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested3() {
+        let test = cursor_test(
+            r#"
+        x: "list['int | None'] | My<CURSOR>Class"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:26
+          |
+        2 | x: "list['int | None'] | MyClass"
+          |                          ^^^^^^^ Clicking here
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        4 | class MyClass:
+          |       -------
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested4() {
+        let test = cursor_test(
+            r#"
+        x: "list['int' | 'My<CURSOR>Class'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:19
+          |
+        2 | x: "list['int' | 'MyClass'] | None"
+          |                   ^^^^^^^ Clicking here
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        4 | class MyClass:
+          |       -------
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested5() {
+        let test = cursor_test(
+            r#"
+        x: "list['My<CURSOR>Class' | 'str'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:11
+          |
+        2 | x: "list['MyClass' | 'str'] | None"
+          |           ^^^^^^^ Clicking here
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        4 | class MyClass:
+          |       -------
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_too_nested1() {
+        let test = cursor_test(
+            r#"
+        x: """'list["My<CURSOR>Class" | "str"]' | None"""
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:13
            |
+        LL | x: """'list["MyClass" | "str"]' | None"""
+           |             ^^^^^^^^^ Clicking here
+        info: Found 1 type definition
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
+           |
+        LL | Unknown: _SpecialForm
+           | -------
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_too_nested2() {
+        let test = cursor_test(
+            r#"
+        x: """'list["int" | "str"]' | My<CURSOR>Class"""
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:31
+          |
+        2 | x: """'list["int" | "str"]' | MyClass"""
+          |                               ^^^^^^^ Clicking here
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        4 | class MyClass:
+          |       -------
         "#);
     }
 
@@ -1000,7 +1226,18 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:17
+           |
+        LL |             x = ab
+           |                 ^^ Clicking here
+        info: Found 1 type definition
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+        "#);
     }
 
     #[test]
@@ -1028,7 +1265,18 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:17
+           |
+        LL |             x = ab
+           |                 ^^ Clicking here
+        info: Found 1 type definition
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class list(MutableSequence[_T]):
+           |       ----
+        "#);
     }
 
     #[test]
@@ -1056,7 +1304,18 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:17
+           |
+        LL |             x = ab
+           |                 ^^ Clicking here
+        info: Found 1 type definition
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+        "#);
     }
 
     #[test]
@@ -1096,7 +1355,18 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:17
+           |
+        LL |             x = ab
+           |                 ^^ Clicking here
+        info: Found 1 type definition
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+        ");
     }
 
     #[test]
@@ -1116,25 +1386,18 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
           --> main.py:10:14
            |
-         8 | def my_func(event: Click):
-         9 |     match event:
         10 |         case Click(x, button=ab):
            |              ^^^^^ Clicking here
-        11 |             x = ab
-           |
         info: Found 1 type definition
          --> main.py:2:7
           |
         2 | class Click:
           |       -----
-        3 |     __match_args__ = ("position", "button")
-        4 |     def __init__(self, pos, btn):
-          |
-        "#);
+        ");
     }
 
     #[test]
@@ -1171,13 +1434,11 @@ mod tests {
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |             ^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:2:13
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |             --
-          |
         ");
     }
 
@@ -1195,13 +1456,11 @@ mod tests {
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |                                     ^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:2:13
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |             --
-          |
         ");
     }
 
@@ -1214,7 +1473,18 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @"
+        info[goto-type definition]: Go to type definition
+         --> main.py:3:15
+          |
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |               ^^ Clicking here
+        info: Found 1 type definition
+         --> main.py:3:15
+          |
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |               --
+        ");
     }
 
     #[test]
@@ -1248,7 +1518,18 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:38
+          |
+        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+          |                                      ^^ Clicking here
+        info: Found 1 type definition
+         --> main.py:2:14
+          |
+        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+          |              --
+        ");
     }
 
     #[test]
@@ -1263,22 +1544,15 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:6
-          |
-        2 | def test(a: str): ...
-        3 |
-        4 | test(a= "123")
-          |      ^ Clicking here
-          |
+          --> main.py:LL:6
+           |
+        LL | test(a= "123")
+           |      ^ Clicking here
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
-            |
-        914 | @disjoint_base
-        915 | class str(Sequence[str]):
-            |       ---
-        916 |     """str(object='') -> str
-        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
-            |
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
         "#);
     }
 
@@ -1295,25 +1569,18 @@ mod tests {
         // TODO: This should jump to `str` and not `int` because
         //   the keyword is typed as a string. It's only the passed argument that
         //   is an int. Navigating to `str` would match pyright's behavior.
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:6
-          |
-        2 | def test(a: str): ...
-        3 |
-        4 | test(a= 123)
-          |      ^ Clicking here
-          |
+          --> main.py:LL:6
+           |
+        LL | test(a= 123)
+           |      ^ Clicking here
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:348:7
-            |
-        347 | @disjoint_base
-        348 | class int:
-            |       ---
-        349 |     """int([x]) -> integer
-        350 |     int(x, base=10) -> integer
-            |
-        "#);
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class int:
+           |       ---
+        ");
     }
 
     #[test]
@@ -1328,25 +1595,18 @@ f(**kwargs<CURSOR>)
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:6:5
-          |
-        4 | kwargs = { "name": "test"}
-        5 |
-        6 | f(**kwargs)
-          |     ^^^^^^ Clicking here
-          |
+          --> main.py:LL:5
+           |
+        LL | f(**kwargs)
+           |     ^^^^^^ Clicking here
         info: Found 1 type definition
-            --> stdlib/builtins.pyi:2947:7
-             |
-        2946 | @disjoint_base
-        2947 | class dict(MutableMapping[_KT, _VT]):
-             |       ----
-        2948 |     """dict() -> new empty dictionary
-        2949 |     dict(mapping) -> new dictionary initialized from a mapping object's
-             |
-        "#);
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class dict(MutableMapping[_KT, _VT]):
+           |       ----
+        ");
     }
 
     #[test]
@@ -1366,27 +1626,18 @@ def outer():
         );
 
         // Should find the variable declaration in the outer scope, not the nonlocal statement
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-          --> main.py:8:16
+          --> main.py:LL:16
            |
-         6 |         nonlocal x
-         7 |         x = "modified"
-         8 |         return x  # Should find the nonlocal x declaration in outer scope
+        LL |         return x  # Should find the nonlocal x declaration in outer scope
            |                ^ Clicking here
-         9 |
-        10 |     return inner
-           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
-            |
-        914 | @disjoint_base
-        915 | class str(Sequence[str]):
-            |       ---
-        916 |     """str(object='') -> str
-        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
-            |
-        "#);
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+        ");
     }
 
     #[test]
@@ -1423,25 +1674,18 @@ def function():
         );
 
         // Should find the global variable declaration, not the global statement
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:7:12
-          |
-        5 |     global global_var
-        6 |     global_var = "modified"
-        7 |     return global_var  # Should find the global variable declaration
-          |            ^^^^^^^^^^ Clicking here
-          |
+          --> main.py:LL:12
+           |
+        LL |     return global_var  # Should find the global variable declaration
+           |            ^^^^^^^^^^ Clicking here
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
-            |
-        914 | @disjoint_base
-        915 | class str(Sequence[str]):
-            |       ---
-        916 |     """str(object='') -> str
-        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
-            |
-        "#);
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+        ");
     }
 
     #[test]
@@ -1470,24 +1714,18 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:3:5
-          |
-        2 | def foo(a: str):
-        3 |     a
-          |     ^ Clicking here
-          |
+          --> main.py:LL:5
+           |
+        LL |     a
+           |     ^ Clicking here
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
-            |
-        914 | @disjoint_base
-        915 | class str(Sequence[str]):
-            |       ---
-        916 |     """str(object='') -> str
-        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
-            |
-        "#);
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+        ");
     }
 
     #[test]
@@ -1507,18 +1745,13 @@ def function():
         info[goto-type definition]: Go to type definition
          --> main.py:7:1
           |
-        5 | x = X()
-        6 |
         7 | x.foo()
           | ^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:2:7
           |
         2 | class X:
           |       -
-        3 |     def foo(a, b): ...
-          |
         ");
     }
 
@@ -1536,19 +1769,13 @@ def function():
         info[goto-type definition]: Go to type definition
          --> main.py:4:1
           |
-        2 | def foo(a, b): ...
-        3 |
         4 | foo()
           | ^^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:2:5
           |
         2 | def foo(a, b): ...
           |     ---
-        3 |
-        4 | foo()
-          |
         ");
     }
 
@@ -1562,25 +1789,18 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:15
-          |
-        2 | def foo(a: str | None, b):
-        3 |     if a is not None:
-        4 |         print(a)
-          |               ^ Clicking here
-          |
+          --> main.py:LL:15
+           |
+        LL |         print(a)
+           |               ^ Clicking here
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:915:7
-            |
-        914 | @disjoint_base
-        915 | class str(Sequence[str]):
-            |       ---
-        916 |     """str(object='') -> str
-        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
-            |
-        "#);
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+        ");
     }
 
     #[test]
@@ -1592,32 +1812,23 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:3:5
-          |
-        2 | def foo(a: str | None, b):
-        3 |     a
-          |     ^ Clicking here
-          |
+          --> main.py:LL:5
+           |
+        LL |     a
+           |     ^ Clicking here
         info: Found 2 type definitions
-           --> stdlib/builtins.pyi:915:7
-            |
-        914 | @disjoint_base
-        915 | class str(Sequence[str]):
-            |       ---
-        916 |     """str(object='') -> str
-        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
-            |
-           ::: stdlib/types.pyi:969:11
-            |
-        967 | if sys.version_info >= (3, 10):
-        968 |     @final
-        969 |     class NoneType:
-            |           --------
-        970 |         """The type of the None singleton."""
-            |
-        "#);
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+           |
+          ::: stdlib/types.pyi:LL:7
+           |
+        LL | class NoneType:
+           |       --------
+        ");
     }
 
     #[test]
@@ -1645,15 +1856,13 @@ def function():
         info[goto-type definition]: Go to type definition
          --> mypackage/__init__.py:4:5
           |
-        2 | from .subpkg.submod import val
-        3 |
         4 | x = subpkg
           |     ^^^^^^ Clicking here
-          |
         info: Found 1 type definition
-        --> mypackage/subpkg/__init__.py:1:1
-         |
-         |
+         --> mypackage/subpkg/__init__.py:1:1
+          |
+        1 |
+          | -
         ");
     }
 
@@ -1684,13 +1893,11 @@ def function():
           |
         2 | from .subpkg.submod import val
           |       ^^^^^^ Clicking here
-        3 |
-        4 | x = subpkg
-          |
         info: Found 1 type definition
-        --> mypackage/subpkg/__init__.py:1:1
-         |
-         |
+         --> mypackage/subpkg/__init__.py:1:1
+          |
+        1 |
+          | -
         ");
     }
 
@@ -1717,22 +1924,15 @@ def function():
         // Unknown is correct, `submod` is not in scope
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> mypackage/__init__.py:4:5
-          |
-        2 | from .subpkg.submod import val
-        3 |
-        4 | x = submod
-          |     ^^^^^^ Clicking here
-          |
+          --> mypackage/__init__.py:LL:5
+           |
+        LL | x = submod
+           |     ^^^^^^ Clicking here
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:14:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
-        13 | # Types
-        14 | Unknown = object()
+        LL | Unknown: _SpecialForm
            | -------
-        15 | AlwaysTruthy = object()
-        16 | AlwaysFalsy = object()
-           |
         ");
     }
 
@@ -1763,16 +1963,12 @@ def function():
           |
         2 | from .subpkg.submod import val
           |              ^^^^^^ Clicking here
-        3 |
-        4 | x = submod
-          |
         info: Found 1 type definition
          --> mypackage/subpkg/submod.py:1:1
           |
         1 | /
         2 | | val: int = 0
           | |_____________-
-          |
         ");
     }
 
@@ -1802,16 +1998,12 @@ def function():
           |
         2 | from .subpkg import subpkg
           |       ^^^^^^ Clicking here
-        3 |
-        4 | x = subpkg
-          |
         info: Found 1 type definition
          --> mypackage/subpkg/__init__.py:1:1
           |
         1 | /
         2 | | subpkg: int = 10
           | |_________________-
-          |
         ");
     }
 
@@ -1835,25 +2027,18 @@ def function():
             .build();
 
         // `int` is correct
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> mypackage/__init__.py:2:21
-          |
-        2 | from .subpkg import subpkg
-          |                     ^^^^^^ Clicking here
-        3 |
-        4 | x = subpkg
-          |
+          --> mypackage/__init__.py:LL:21
+           |
+        LL | from .subpkg import subpkg
+           |                     ^^^^^^ Clicking here
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:348:7
-            |
-        347 | @disjoint_base
-        348 | class int:
-            |       ---
-        349 |     """int([x]) -> integer
-        350 |     int(x, base=10) -> integer
-            |
-        "#);
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class int:
+           |       ---
+        ");
     }
 
     #[test]
@@ -1876,31 +2061,28 @@ def function():
             .build();
 
         // `int` is correct
-        assert_snapshot!(test.goto_type_definition(), @r#"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> mypackage/__init__.py:4:5
-          |
-        2 | from .subpkg import subpkg
-        3 |
-        4 | x = subpkg
-          |     ^^^^^^ Clicking here
-          |
+          --> mypackage/__init__.py:LL:5
+           |
+        LL | x = subpkg
+           |     ^^^^^^ Clicking here
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:348:7
-            |
-        347 | @disjoint_base
-        348 | class int:
-            |       ---
-        349 |     """int([x]) -> integer
-        350 |     int(x, base=10) -> integer
-            |
-        "#);
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class int:
+           |       ---
+        ");
     }
 
     impl CursorTest {
         fn goto_type_definition(&self) -> String {
             let Some(targets) = salsa::attach(&self.db, || {
-                goto_type_definition(&self.db, self.cursor.file, self.cursor.offset)
+                goto_type_definition(
+                    &self.db,
+                    self.program_file(self.cursor.file),
+                    self.cursor.offset,
+                )
             }) else {
                 return "No goto target found".to_string();
             };

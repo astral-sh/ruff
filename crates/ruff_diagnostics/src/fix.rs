@@ -104,7 +104,8 @@ impl Fix {
         }
     }
 
-    /// Create a new [`Fix`] that should only [display](Applicability::DisplayOnly) and not apply from multiple [`Edit`] elements.
+    // Create a new [`Fix`] from multiple [`Edit`] elements, but which should only [display](Applicability::DisplayOnly)
+    // and not apply.
     pub fn display_only_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
         edits.sort_by_key(|edit| (edit.start(), edit.end()));

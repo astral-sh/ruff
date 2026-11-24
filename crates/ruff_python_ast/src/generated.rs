@@ -3822,12 +3822,6 @@ impl ruff_text_size::Ranged for crate::ExprCompare {
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprCall {
-    fn range(&self) -> ruff_text_size::TextRange {
-        self.range
-    }
-}
-
 impl ruff_text_size::Ranged for crate::ExprFString {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
@@ -7464,7 +7458,114 @@ pub enum AnyRootNodeRef<'a> {
     Identifier(&'a crate::Identifier),
 }
 
+/// The unflattened enum or struct type stored by an [`AnyRootNodeRef`].
+///
+/// Unlike [`NodeKind`], this does not distinguish variants of root enums such as [`Stmt`]
+/// and [`Expr`].
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+#[repr(u8)]
+pub enum RootNodeKind {
+    Mod,
+    Stmt,
+    Expr,
+    ExceptHandler,
+    InterpolatedStringElement,
+    Pattern,
+    TypeParam,
+    InterpolatedStringFormatSpec,
+    PatternArguments,
+    PatternKeyword,
+    Comprehension,
+    Arguments,
+    Parameters,
+    Parameter,
+    ParameterWithDefault,
+    Keyword,
+    Alias,
+    WithItem,
+    MatchCase,
+    Decorator,
+    ElifElseClause,
+    TypeParams,
+    FString,
+    TString,
+    StringLiteral,
+    BytesLiteral,
+    Identifier,
+}
+
+impl RootNodeKind {
+    /// All root node kinds in discriminant order.
+    pub const ALL: &'static [Self] = &[
+        Self::Mod,
+        Self::Stmt,
+        Self::Expr,
+        Self::ExceptHandler,
+        Self::InterpolatedStringElement,
+        Self::Pattern,
+        Self::TypeParam,
+        Self::InterpolatedStringFormatSpec,
+        Self::PatternArguments,
+        Self::PatternKeyword,
+        Self::Comprehension,
+        Self::Arguments,
+        Self::Parameters,
+        Self::Parameter,
+        Self::ParameterWithDefault,
+        Self::Keyword,
+        Self::Alias,
+        Self::WithItem,
+        Self::MatchCase,
+        Self::Decorator,
+        Self::ElifElseClause,
+        Self::TypeParams,
+        Self::FString,
+        Self::TString,
+        Self::StringLiteral,
+        Self::BytesLiteral,
+        Self::Identifier,
+    ];
+
+    /// Returns the root node kind with the given discriminant.
+    #[inline]
+    pub fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(Self::Mod),
+            1 => Some(Self::Stmt),
+            2 => Some(Self::Expr),
+            3 => Some(Self::ExceptHandler),
+            4 => Some(Self::InterpolatedStringElement),
+            5 => Some(Self::Pattern),
+            6 => Some(Self::TypeParam),
+            7 => Some(Self::InterpolatedStringFormatSpec),
+            8 => Some(Self::PatternArguments),
+            9 => Some(Self::PatternKeyword),
+            10 => Some(Self::Comprehension),
+            11 => Some(Self::Arguments),
+            12 => Some(Self::Parameters),
+            13 => Some(Self::Parameter),
+            14 => Some(Self::ParameterWithDefault),
+            15 => Some(Self::Keyword),
+            16 => Some(Self::Alias),
+            17 => Some(Self::WithItem),
+            18 => Some(Self::MatchCase),
+            19 => Some(Self::Decorator),
+            20 => Some(Self::ElifElseClause),
+            21 => Some(Self::TypeParams),
+            22 => Some(Self::FString),
+            23 => Some(Self::TString),
+            24 => Some(Self::StringLiteral),
+            25 => Some(Self::BytesLiteral),
+            26 => Some(Self::Identifier),
+
+            _ => None,
+        }
+    }
+}
+
 impl<'a> From<&'a Mod> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a Mod) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Mod(node)
     }
@@ -7501,6 +7602,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ModExpression {
 }
 
 impl<'a> From<&'a Stmt> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a Stmt) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Stmt(node)
     }
@@ -7767,6 +7869,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtIpyEscapeCommand {
 }
 
 impl<'a> From<&'a Expr> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a Expr) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Expr(node)
     }
@@ -8113,6 +8216,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprIpyEscapeCommand {
 }
 
 impl<'a> From<&'a ExceptHandler> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a ExceptHandler) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::ExceptHandler(node)
     }
@@ -8139,6 +8243,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExceptHandlerExceptHandler {
 }
 
 impl<'a> From<&'a InterpolatedStringElement> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a InterpolatedStringElement) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::InterpolatedStringElement(node)
     }
@@ -8181,6 +8286,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::InterpolatedStringLiteralEle
 }
 
 impl<'a> From<&'a Pattern> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a Pattern) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Pattern(node)
     }
@@ -8277,6 +8383,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::PatternMatchOr {
 }
 
 impl<'a> From<&'a TypeParam> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a TypeParam) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::TypeParam(node)
     }
@@ -8323,6 +8430,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::TypeParamParamSpec {
 }
 
 impl<'a> From<&'a crate::InterpolatedStringFormatSpec> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::InterpolatedStringFormatSpec) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::InterpolatedStringFormatSpec(node)
     }
@@ -8339,6 +8447,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::InterpolatedStringFormatSpec
 }
 
 impl<'a> From<&'a crate::PatternArguments> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::PatternArguments) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::PatternArguments(node)
     }
@@ -8355,6 +8464,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::PatternArguments {
 }
 
 impl<'a> From<&'a crate::PatternKeyword> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::PatternKeyword) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::PatternKeyword(node)
     }
@@ -8371,6 +8481,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::PatternKeyword {
 }
 
 impl<'a> From<&'a crate::Comprehension> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::Comprehension) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Comprehension(node)
     }
@@ -8387,6 +8498,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Comprehension {
 }
 
 impl<'a> From<&'a crate::Arguments> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::Arguments) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Arguments(node)
     }
@@ -8403,6 +8515,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Arguments {
 }
 
 impl<'a> From<&'a crate::Parameters> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::Parameters) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Parameters(node)
     }
@@ -8419,6 +8532,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Parameters {
 }
 
 impl<'a> From<&'a crate::Parameter> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::Parameter) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Parameter(node)
     }
@@ -8435,6 +8549,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Parameter {
 }
 
 impl<'a> From<&'a crate::ParameterWithDefault> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::ParameterWithDefault) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::ParameterWithDefault(node)
     }
@@ -8451,6 +8566,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ParameterWithDefault {
 }
 
 impl<'a> From<&'a crate::Keyword> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::Keyword) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Keyword(node)
     }
@@ -8467,6 +8583,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Keyword {
 }
 
 impl<'a> From<&'a crate::Alias> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::Alias) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Alias(node)
     }
@@ -8483,6 +8600,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Alias {
 }
 
 impl<'a> From<&'a crate::WithItem> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::WithItem) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::WithItem(node)
     }
@@ -8499,6 +8617,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::WithItem {
 }
 
 impl<'a> From<&'a crate::MatchCase> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::MatchCase) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::MatchCase(node)
     }
@@ -8515,6 +8634,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::MatchCase {
 }
 
 impl<'a> From<&'a crate::Decorator> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::Decorator) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Decorator(node)
     }
@@ -8531,6 +8651,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Decorator {
 }
 
 impl<'a> From<&'a crate::ElifElseClause> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::ElifElseClause) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::ElifElseClause(node)
     }
@@ -8547,6 +8668,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ElifElseClause {
 }
 
 impl<'a> From<&'a crate::TypeParams> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::TypeParams) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::TypeParams(node)
     }
@@ -8563,6 +8685,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::TypeParams {
 }
 
 impl<'a> From<&'a crate::FString> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::FString) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::FString(node)
     }
@@ -8579,6 +8702,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::FString {
 }
 
 impl<'a> From<&'a crate::TString> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::TString) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::TString(node)
     }
@@ -8595,6 +8719,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::TString {
 }
 
 impl<'a> From<&'a crate::StringLiteral> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::StringLiteral) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::StringLiteral(node)
     }
@@ -8611,6 +8736,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StringLiteral {
 }
 
 impl<'a> From<&'a crate::BytesLiteral> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::BytesLiteral) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::BytesLiteral(node)
     }
@@ -8627,6 +8753,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::BytesLiteral {
 }
 
 impl<'a> From<&'a crate::Identifier> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::Identifier) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Identifier(node)
     }
@@ -8711,6 +8838,204 @@ impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
 }
 
 impl<'a> AnyRootNodeRef<'a> {
+    /// Decomposes this reference into its root node kind and a type-erased pointer.
+    #[inline]
+    pub fn into_raw_parts(self) -> (RootNodeKind, std::ptr::NonNull<()>) {
+        match self {
+            AnyRootNodeRef::Mod(node) => (RootNodeKind::Mod, std::ptr::NonNull::from(node).cast()),
+            AnyRootNodeRef::Stmt(node) => {
+                (RootNodeKind::Stmt, std::ptr::NonNull::from(node).cast())
+            }
+            AnyRootNodeRef::Expr(node) => {
+                (RootNodeKind::Expr, std::ptr::NonNull::from(node).cast())
+            }
+            AnyRootNodeRef::ExceptHandler(node) => (
+                RootNodeKind::ExceptHandler,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::InterpolatedStringElement(node) => (
+                RootNodeKind::InterpolatedStringElement,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::Pattern(node) => {
+                (RootNodeKind::Pattern, std::ptr::NonNull::from(node).cast())
+            }
+            AnyRootNodeRef::TypeParam(node) => (
+                RootNodeKind::TypeParam,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::InterpolatedStringFormatSpec(node) => (
+                RootNodeKind::InterpolatedStringFormatSpec,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::PatternArguments(node) => (
+                RootNodeKind::PatternArguments,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::PatternKeyword(node) => (
+                RootNodeKind::PatternKeyword,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::Comprehension(node) => (
+                RootNodeKind::Comprehension,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::Arguments(node) => (
+                RootNodeKind::Arguments,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::Parameters(node) => (
+                RootNodeKind::Parameters,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::Parameter(node) => (
+                RootNodeKind::Parameter,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::ParameterWithDefault(node) => (
+                RootNodeKind::ParameterWithDefault,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::Keyword(node) => {
+                (RootNodeKind::Keyword, std::ptr::NonNull::from(node).cast())
+            }
+            AnyRootNodeRef::Alias(node) => {
+                (RootNodeKind::Alias, std::ptr::NonNull::from(node).cast())
+            }
+            AnyRootNodeRef::WithItem(node) => {
+                (RootNodeKind::WithItem, std::ptr::NonNull::from(node).cast())
+            }
+            AnyRootNodeRef::MatchCase(node) => (
+                RootNodeKind::MatchCase,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::Decorator(node) => (
+                RootNodeKind::Decorator,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::ElifElseClause(node) => (
+                RootNodeKind::ElifElseClause,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::TypeParams(node) => (
+                RootNodeKind::TypeParams,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::FString(node) => {
+                (RootNodeKind::FString, std::ptr::NonNull::from(node).cast())
+            }
+            AnyRootNodeRef::TString(node) => {
+                (RootNodeKind::TString, std::ptr::NonNull::from(node).cast())
+            }
+            AnyRootNodeRef::StringLiteral(node) => (
+                RootNodeKind::StringLiteral,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::BytesLiteral(node) => (
+                RootNodeKind::BytesLiteral,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::Identifier(node) => (
+                RootNodeKind::Identifier,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+        }
+    }
+
+    /// Reconstructs an AST reference from its root node kind and type-erased pointer.
+    ///
+    /// # Safety
+    ///
+    /// - `pointer` must be properly aligned for and point to the exact root node type
+    ///   represented by `kind`.
+    /// - The pointer's provenance must permit reads of a complete, initialized, and valid
+    ///   value of that type.
+    /// - The pointed-to value must not be moved, dropped, or accessed mutably for `'a`.
+    #[inline]
+    #[expect(unsafe_code, reason = "reconstructs a type-erased AST reference")]
+    pub unsafe fn from_raw_parts(kind: RootNodeKind, pointer: std::ptr::NonNull<()>) -> Self {
+        let pointer = pointer.as_ptr();
+        // SAFETY: The caller guarantees that `pointer` is readable as the exact root node
+        // type selected by `kind` and remains valid and immutable for `'a`.
+        unsafe {
+            match kind {
+                RootNodeKind::Mod => AnyRootNodeRef::Mod(&*pointer.cast::<Mod>()),
+                RootNodeKind::Stmt => AnyRootNodeRef::Stmt(&*pointer.cast::<Stmt>()),
+                RootNodeKind::Expr => AnyRootNodeRef::Expr(&*pointer.cast::<Expr>()),
+                RootNodeKind::ExceptHandler => {
+                    AnyRootNodeRef::ExceptHandler(&*pointer.cast::<ExceptHandler>())
+                }
+                RootNodeKind::InterpolatedStringElement => {
+                    AnyRootNodeRef::InterpolatedStringElement(
+                        &*pointer.cast::<InterpolatedStringElement>(),
+                    )
+                }
+                RootNodeKind::Pattern => AnyRootNodeRef::Pattern(&*pointer.cast::<Pattern>()),
+                RootNodeKind::TypeParam => AnyRootNodeRef::TypeParam(&*pointer.cast::<TypeParam>()),
+                RootNodeKind::InterpolatedStringFormatSpec => {
+                    AnyRootNodeRef::InterpolatedStringFormatSpec(
+                        &*pointer.cast::<crate::InterpolatedStringFormatSpec>(),
+                    )
+                }
+                RootNodeKind::PatternArguments => {
+                    AnyRootNodeRef::PatternArguments(&*pointer.cast::<crate::PatternArguments>())
+                }
+                RootNodeKind::PatternKeyword => {
+                    AnyRootNodeRef::PatternKeyword(&*pointer.cast::<crate::PatternKeyword>())
+                }
+                RootNodeKind::Comprehension => {
+                    AnyRootNodeRef::Comprehension(&*pointer.cast::<crate::Comprehension>())
+                }
+                RootNodeKind::Arguments => {
+                    AnyRootNodeRef::Arguments(&*pointer.cast::<crate::Arguments>())
+                }
+                RootNodeKind::Parameters => {
+                    AnyRootNodeRef::Parameters(&*pointer.cast::<crate::Parameters>())
+                }
+                RootNodeKind::Parameter => {
+                    AnyRootNodeRef::Parameter(&*pointer.cast::<crate::Parameter>())
+                }
+                RootNodeKind::ParameterWithDefault => AnyRootNodeRef::ParameterWithDefault(
+                    &*pointer.cast::<crate::ParameterWithDefault>(),
+                ),
+                RootNodeKind::Keyword => {
+                    AnyRootNodeRef::Keyword(&*pointer.cast::<crate::Keyword>())
+                }
+                RootNodeKind::Alias => AnyRootNodeRef::Alias(&*pointer.cast::<crate::Alias>()),
+                RootNodeKind::WithItem => {
+                    AnyRootNodeRef::WithItem(&*pointer.cast::<crate::WithItem>())
+                }
+                RootNodeKind::MatchCase => {
+                    AnyRootNodeRef::MatchCase(&*pointer.cast::<crate::MatchCase>())
+                }
+                RootNodeKind::Decorator => {
+                    AnyRootNodeRef::Decorator(&*pointer.cast::<crate::Decorator>())
+                }
+                RootNodeKind::ElifElseClause => {
+                    AnyRootNodeRef::ElifElseClause(&*pointer.cast::<crate::ElifElseClause>())
+                }
+                RootNodeKind::TypeParams => {
+                    AnyRootNodeRef::TypeParams(&*pointer.cast::<crate::TypeParams>())
+                }
+                RootNodeKind::FString => {
+                    AnyRootNodeRef::FString(&*pointer.cast::<crate::FString>())
+                }
+                RootNodeKind::TString => {
+                    AnyRootNodeRef::TString(&*pointer.cast::<crate::TString>())
+                }
+                RootNodeKind::StringLiteral => {
+                    AnyRootNodeRef::StringLiteral(&*pointer.cast::<crate::StringLiteral>())
+                }
+                RootNodeKind::BytesLiteral => {
+                    AnyRootNodeRef::BytesLiteral(&*pointer.cast::<crate::BytesLiteral>())
+                }
+                RootNodeKind::Identifier => {
+                    AnyRootNodeRef::Identifier(&*pointer.cast::<crate::Identifier>())
+                }
+            }
+        }
+    }
+
     pub fn visit_source_order<'b, V>(self, visitor: &mut V)
     where
         V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
@@ -8955,7 +9280,7 @@ impl AnyNodeRef<'_> {
 pub struct ModModule {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub body: Vec<Stmt>,
+    pub body: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
@@ -8977,12 +9302,12 @@ pub struct StmtFunctionDef {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub is_async: bool,
-    pub decorator_list: Vec<crate::Decorator>,
+    pub decorator_list: thin_vec::ThinVec<crate::Decorator>,
     pub name: crate::Identifier,
     pub type_params: Option<Box<crate::TypeParams>>,
     pub parameters: Box<crate::Parameters>,
     pub returns: Option<Box<Expr>>,
-    pub body: Vec<Stmt>,
+    pub body: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)
@@ -8991,11 +9316,11 @@ pub struct StmtFunctionDef {
 pub struct StmtClassDef {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub decorator_list: Vec<crate::Decorator>,
+    pub decorator_list: thin_vec::ThinVec<crate::Decorator>,
     pub name: crate::Identifier,
     pub type_params: Option<Box<crate::TypeParams>>,
     pub arguments: Option<Box<crate::Arguments>>,
-    pub body: Vec<Stmt>,
+    pub body: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [Return](https://docs.python.org/3/library/ast.html#ast.Return)
@@ -9072,8 +9397,8 @@ pub struct StmtFor {
     pub is_async: bool,
     pub target: Box<Expr>,
     pub iter: Box<Expr>,
-    pub body: Vec<Stmt>,
-    pub orelse: Vec<Stmt>,
+    pub body: thin_vec::ThinVec<Stmt>,
+    pub orelse: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [While](https://docs.python.org/3/library/ast.html#ast.While)
@@ -9084,8 +9409,8 @@ pub struct StmtWhile {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
-    pub body: Vec<Stmt>,
-    pub orelse: Vec<Stmt>,
+    pub body: thin_vec::ThinVec<Stmt>,
+    pub orelse: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [If](https://docs.python.org/3/library/ast.html#ast.If)
@@ -9095,7 +9420,7 @@ pub struct StmtIf {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub test: Box<Expr>,
-    pub body: Vec<Stmt>,
+    pub body: thin_vec::ThinVec<Stmt>,
     pub elif_else_clauses: Vec<crate::ElifElseClause>,
 }
 
@@ -9110,7 +9435,7 @@ pub struct StmtWith {
     pub range: ruff_text_size::TextRange,
     pub is_async: bool,
     pub items: Vec<crate::WithItem>,
-    pub body: Vec<Stmt>,
+    pub body: thin_vec::ThinVec<Stmt>,
 }
 
 /// See also [Match](https://docs.python.org/3/library/ast.html#ast.Match)
@@ -9140,10 +9465,10 @@ pub struct StmtRaise {
 pub struct StmtTry {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub body: Vec<Stmt>,
+    pub body: thin_vec::ThinVec<Stmt>,
     pub handlers: Vec<ExceptHandler>,
-    pub orelse: Vec<Stmt>,
-    pub finalbody: Vec<Stmt>,
+    pub orelse: thin_vec::ThinVec<Stmt>,
+    pub finalbody: thin_vec::ThinVec<Stmt>,
     pub is_star: bool,
 }
 
@@ -9164,6 +9489,7 @@ pub struct StmtImport {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub names: Vec<crate::Alias>,
+    pub is_lazy: bool,
 }
 
 /// See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)
@@ -9175,6 +9501,7 @@ pub struct StmtImportFrom {
     pub module: Option<crate::Identifier>,
     pub names: Vec<crate::Alias>,
     pub level: u32,
+    pub is_lazy: bool,
 }
 
 /// See also [Global](https://docs.python.org/3/library/ast.html#ast.Global)
@@ -9397,9 +9724,9 @@ pub struct ExprSetComp {
 pub struct ExprDictComp {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub key: Box<Expr>,
+    pub key: Option<Box<Expr>>,
     pub value: Box<Expr>,
-    pub generators: Vec<crate::Comprehension>,
+    pub generators: Box<[crate::Comprehension]>,
 }
 
 /// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
@@ -9440,23 +9767,33 @@ pub struct ExprYieldFrom {
     pub value: Box<Expr>,
 }
 
-/// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)
+/// A comparison or chain of comparisons.
+///
+/// `operands` contains all operands in source order, including the leftmost operand.
+/// For example, `a < b <= c` has operands `[a, b, c]` and operators `[Lt, LtE]`.
+/// There is at least one operator, and `operands.len() == ops.len() + 1`.
+///
+/// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare).
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprCompare {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub left: Box<Expr>,
     pub ops: Box<[crate::CmpOp]>,
-    pub comparators: Box<[Expr]>,
+    pub operands: Box<[Expr]>,
 }
 
+/// A call expression whose end offset is derived from its arguments.
+///
+/// The parser and error-recovery code must ensure that the call and its arguments
+/// end at the same offset.
+///
 /// See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprCall {
     pub node_index: crate::AtomicNodeIndex,
-    pub range: ruff_text_size::TextRange,
+    pub range_start: ruff_text_size::TextSize,
     pub func: Box<Expr>,
     pub arguments: crate::Arguments,
 }
@@ -9670,8 +10007,8 @@ pub struct PatternMatchSequence {
 pub struct PatternMatchMapping {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub keys: Vec<Expr>,
-    pub patterns: Vec<Pattern>,
+    pub keys: thin_vec::ThinVec<Expr>,
+    pub patterns: thin_vec::ThinVec<Pattern>,
     pub rest: Option<crate::Identifier>,
 }
 
@@ -10126,6 +10463,7 @@ impl StmtImport {
     {
         let StmtImport {
             names,
+            is_lazy: _,
             range: _,
             node_index: _,
         } = self;
@@ -10145,6 +10483,7 @@ impl StmtImportFrom {
             module,
             names,
             level: _,
+            is_lazy: _,
             range: _,
             node_index: _,
         } = self;
@@ -10412,7 +10751,11 @@ impl ExprDictComp {
             range: _,
             node_index: _,
         } = self;
-        visitor.visit_expr(key);
+
+        if let Some(key) = key {
+            visitor.visit_expr(key);
+        }
+
         visitor.visit_expr(value);
 
         for elm in generators {
@@ -10492,9 +10835,9 @@ impl ExprCall {
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ExprCall {
+            range_start: _,
             func,
             arguments,
-            range: _,
             node_index: _,
         } = self;
         visitor.visit_expr(func);

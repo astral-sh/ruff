@@ -14,7 +14,7 @@ class IncrementalEncoder(mbc.MultibyteIncrementalEncoder, codecs.IncrementalEnco
 class IncrementalDecoder(mbc.MultibyteIncrementalDecoder, codecs.IncrementalDecoder):
     codec: ClassVar[mbc._MultibyteCodec] = ...
 
-class StreamReader(Codec, mbc.MultibyteStreamReader, codecs.StreamReader):  # type: ignore[misc]
+class StreamReader(Codec, mbc.MultibyteStreamReader, codecs.StreamReader):  # type: ignore[misc]  # pyrefly: ignore [inconsistent-inheritance]
     codec: ClassVar[mbc._MultibyteCodec] = ...
 
 class StreamWriter(Codec, mbc.MultibyteStreamWriter, codecs.StreamWriter):

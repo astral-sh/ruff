@@ -25,9 +25,9 @@ from asyncio.transports import BaseTransport, DatagramTransport, ReadTransport, 
 from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import Executor, ThreadPoolExecutor
 from contextvars import Context
-from socket import AddressFamily, AddressInfo, SocketKind, _Address, _RetAddress, socket
-from typing import IO, Any, Literal, TypeVar, overload
-from typing_extensions import TypeAlias, TypeVarTuple, Unpack
+from socket import AddressFamily, AddressInfo, _Address, _GetAddrInfoResult, _RetAddress, socket
+from typing import IO, Any, Literal, TypeAlias, TypeVar, overload
+from typing_extensions import TypeVarTuple, Unpack
 
 # Keep asyncio.__all__ updated with any changes to __all__ here
 __all__ = ("BaseEventLoop", "Server")
@@ -38,7 +38,7 @@ _ProtocolT = TypeVar("_ProtocolT", bound=BaseProtocol)
 _Context: TypeAlias = dict[str, Any]
 _ExceptionHandler: TypeAlias = Callable[[AbstractEventLoop, _Context], object]
 _ProtocolFactory: TypeAlias = Callable[[], BaseProtocol]
-_SSLContext: TypeAlias = bool | None | ssl.SSLContext
+_SSLContext: TypeAlias = bool | ssl.SSLContext | None
 
 class Server(AbstractServer):
     if sys.version_info >= (3, 11):
@@ -111,8 +111,8 @@ class BaseEventLoop(AbstractEventLoop):
     def stop(self) -> None:
         """Stop running the event loop.
 
-        Every callback already scheduled will still run.  This simply informs
-        run_forever to stop looping after a complete iteration.
+        Every callback already scheduled will still run.  This simply
+        informs run_forever to stop looping after a complete iteration.
         """
 
     def is_running(self) -> bool:
@@ -132,6 +132,7 @@ class BaseEventLoop(AbstractEventLoop):
 
     async def shutdown_asyncgens(self) -> None:
         """Shutdown all active asynchronous generators."""
+
     # Methods scheduling callbacks.  All these return Handles.
     def call_soon(self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None) -> Handle:
         """Arrange for a callback to be called as soon as possible.
@@ -178,11 +179,14 @@ class BaseEventLoop(AbstractEventLoop):
         epoch, precision, accuracy and drift are unspecified and may
         differ per event loop.
         """
+
     # Future methods
     def create_future(self) -> Future[Any]:
         """Create a Future object attached to the loop."""
+
     # Tasks methods
-    if sys.version_info >= (3, 14):
+    # `eager_start` is supported as an arbitrary kwarg starting in 3.13.3.
+    if sys.version_info >= (3, 13):
         def create_task(
             self,
             coro: _CoroutineLike[_T],
@@ -195,12 +199,14 @@ class BaseEventLoop(AbstractEventLoop):
 
             Return a task object.
             """
+
     elif sys.version_info >= (3, 11):
         def create_task(self, coro: _CoroutineLike[_T], *, name: object = None, context: Context | None = None) -> Task[_T]:
             """Schedule a coroutine object.
 
             Return a task object.
             """
+
     else:
         def create_task(self, coro: _CoroutineLike[_T], *, name: object = None) -> Task[_T]:
             """Schedule a coroutine object.
@@ -214,14 +220,15 @@ class BaseEventLoop(AbstractEventLoop):
         If factory is None the default task factory will be set.
 
         If factory is a callable, it should have a signature matching
-        '(loop, coro, **kwargs)', where 'loop' will be a reference to the active
-        event loop, 'coro' will be a coroutine object, and **kwargs will be
-        arbitrary keyword arguments that should be passed on to Task.
-        The callable must return a Task.
+        '(loop, coro, **kwargs)', where 'loop' will be a reference to the
+        active event loop, 'coro' will be a coroutine object, and **kwargs
+        will be arbitrary keyword arguments that should be passed on to
+        Task.  The callable must return a Task.
         """
 
     def get_task_factory(self) -> _TaskFactory | None:
         """Return a task factory, or None if the default one is in use."""
+
     # Methods for interacting with threads
     def call_soon_threadsafe(
         self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
@@ -240,8 +247,9 @@ class BaseEventLoop(AbstractEventLoop):
         type: int = 0,
         proto: int = 0,
         flags: int = 0,
-    ) -> list[tuple[AddressFamily, SocketKind, int, str, tuple[str, int] | tuple[str, int, int, int]]]: ...
+    ) -> _GetAddrInfoResult: ...
     async def getnameinfo(self, sockaddr: tuple[str, int] | tuple[str, int, int, int], flags: int = 0) -> tuple[str, str]: ...
+
     if sys.version_info >= (3, 12):
         @overload
         async def create_connection(
@@ -267,14 +275,13 @@ class BaseEventLoop(AbstractEventLoop):
 
             Create a streaming transport connection to a given internet host and
             port: socket family AF_INET or socket.AF_INET6 depending on host (or
-            family if specified), socket type SOCK_STREAM. protocol_factory must be
-            a callable returning a protocol instance.
+            family if specified), socket type SOCK_STREAM. protocol_factory must
+            be a callable returning a protocol instance.
 
-            This method is a coroutine which will try to establish the connection
-            in the background.  When successful, the coroutine returns a
-            (transport, protocol) pair.
+            This method is a coroutine which will try to establish the
+            connection in the background.  When successful, the coroutine
+            returns a (transport, protocol) pair.
             """
-
         @overload
         async def create_connection(
             self,
@@ -326,7 +333,6 @@ class BaseEventLoop(AbstractEventLoop):
             in the background.  When successful, the coroutine returns a
             (transport, protocol) pair.
             """
-
         @overload
         async def create_connection(
             self,
@@ -376,7 +382,6 @@ class BaseEventLoop(AbstractEventLoop):
             in the background.  When successful, the coroutine returns a
             (transport, protocol) pair.
             """
-
         @overload
         async def create_connection(
             self,
@@ -402,8 +407,8 @@ class BaseEventLoop(AbstractEventLoop):
         async def create_server(
             self,
             protocol_factory: _ProtocolFactory,
-            host: str | Sequence[str] | None = None,
-            port: int = ...,
+            host: str | Sequence[str] | None,
+            port: int,
             *,
             family: int = 0,
             flags: int = 1,
@@ -422,17 +427,54 @@ class BaseEventLoop(AbstractEventLoop):
             The host parameter can be a string, in that case the TCP server is
             bound to host and port.
 
-            The host parameter can also be a sequence of strings and in that case
-            the TCP server is bound to all hosts of the sequence. If a host
-            appears multiple times (possibly indirectly e.g. when hostnames
-            resolve to the same IP address), the server is only bound once to that
-            host.
+            The host parameter can also be a sequence of strings and in that
+            case the TCP server is bound to all hosts of the sequence.  If
+            a host appears multiple times (possibly indirectly e.g. when
+            hostnames resolve to the same IP address), the server is only bound
+            once to that host.
 
             Return a Server object which can be used to stop the service.
 
             This method is a coroutine.
             """
-
+        @overload
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
+            host: str | Sequence[str],
+            port: int | None = None,
+            *,
+            family: int = 0,
+            flags: int = 1,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            keep_alive: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
+        @overload
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
+            host: None = None,
+            *,
+            port: int,
+            family: int = 0,
+            flags: int = 1,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            keep_alive: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
         @overload
         async def create_server(
             self,
@@ -442,7 +484,7 @@ class BaseEventLoop(AbstractEventLoop):
             *,
             family: int = 0,
             flags: int = 1,
-            sock: socket = ...,
+            sock: socket,
             backlog: int = 100,
             ssl: _SSLContext = None,
             reuse_address: bool | None = None,
@@ -457,8 +499,8 @@ class BaseEventLoop(AbstractEventLoop):
         async def create_server(
             self,
             protocol_factory: _ProtocolFactory,
-            host: str | Sequence[str] | None = None,
-            port: int = ...,
+            host: str | Sequence[str] | None,
+            port: int,
             *,
             family: int = AddressFamily.AF_UNSPEC,
             flags: int = AddressInfo.AI_PASSIVE,
@@ -486,7 +528,42 @@ class BaseEventLoop(AbstractEventLoop):
 
             This method is a coroutine.
             """
-
+        @overload
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
+            host: str | Sequence[str],
+            port: int | None = None,
+            *,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
+        @overload
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
+            host: None = None,
+            *,
+            port: int,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
         @overload
         async def create_server(
             self,
@@ -496,7 +573,7 @@ class BaseEventLoop(AbstractEventLoop):
             *,
             family: int = AddressFamily.AF_UNSPEC,
             flags: int = AddressInfo.AI_PASSIVE,
-            sock: socket = ...,
+            sock: socket,
             backlog: int = 100,
             ssl: _SSLContext = None,
             reuse_address: bool | None = None,
@@ -510,8 +587,8 @@ class BaseEventLoop(AbstractEventLoop):
         async def create_server(
             self,
             protocol_factory: _ProtocolFactory,
-            host: str | Sequence[str] | None = None,
-            port: int = ...,
+            host: str | Sequence[str] | None,
+            port: int,
             *,
             family: int = AddressFamily.AF_UNSPEC,
             flags: int = AddressInfo.AI_PASSIVE,
@@ -538,7 +615,40 @@ class BaseEventLoop(AbstractEventLoop):
 
             This method is a coroutine.
             """
-
+        @overload
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
+            host: str | Sequence[str],
+            port: int | None = None,
+            *,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
+        @overload
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
+            host: None = None,
+            *,
+            port: int,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
         @overload
         async def create_server(
             self,
@@ -548,7 +658,7 @@ class BaseEventLoop(AbstractEventLoop):
             *,
             family: int = AddressFamily.AF_UNSPEC,
             flags: int = AddressInfo.AI_PASSIVE,
-            sock: socket = ...,
+            sock: socket,
             backlog: int = 100,
             ssl: _SSLContext = None,
             reuse_address: bool | None = None,
@@ -608,15 +718,7 @@ class BaseEventLoop(AbstractEventLoop):
             *,
             ssl: _SSLContext = None,
             ssl_handshake_timeout: float | None = None,
-        ) -> tuple[Transport, _ProtocolT]:
-            """Handle an accepted connection.
-
-            This is used by servers that accept connections outside of
-            asyncio but that use asyncio to handle connections.
-
-            This method is a coroutine.  When completed, the coroutine
-            returns a (transport, protocol) pair.
-            """
+        ) -> tuple[Transport, _ProtocolT]: ...
 
     async def sock_sendfile(
         self, sock: socket, file: IO[bytes], offset: int = 0, count: int | None = None, *, fallback: bool | None = True
@@ -646,6 +748,7 @@ class BaseEventLoop(AbstractEventLoop):
         Raise SendfileNotAvailableError if the system does not support
         sendfile syscall and fallback is False.
         """
+
     if sys.version_info >= (3, 11):
         async def create_datagram_endpoint(  # type: ignore[override]
             self,
@@ -661,6 +764,7 @@ class BaseEventLoop(AbstractEventLoop):
             sock: socket | None = None,
         ) -> tuple[DatagramTransport, _ProtocolT]:
             """Create datagram connection."""
+
     else:
         async def create_datagram_endpoint(
             self,
@@ -677,6 +781,7 @@ class BaseEventLoop(AbstractEventLoop):
             sock: socket | None = None,
         ) -> tuple[DatagramTransport, _ProtocolT]:
             """Create datagram connection."""
+
     # Pipes and subprocesses.
     async def connect_read_pipe(
         self, protocol_factory: Callable[[], _ProtocolT], pipe: Any
@@ -791,6 +896,7 @@ class BaseEventLoop(AbstractEventLoop):
         For custom exception handling, use the
         `set_exception_handler()` method.
         """
+
     # Debug flag management.
     def get_debug(self) -> bool: ...
     def set_debug(self, enabled: bool) -> None: ...
@@ -802,6 +908,7 @@ class BaseEventLoop(AbstractEventLoop):
             be given to finish joining. The default value is None, which means
             that the executor will be given an unlimited amount of time.
             """
+
     else:
         async def shutdown_default_executor(self) -> None:
             """Schedule the shutdown of the default executor."""

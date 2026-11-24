@@ -4,6 +4,7 @@ use ruff_python_ast::{ArgOrKeyword, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_chmod_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
@@ -51,7 +52,7 @@ use crate::{FixAvailability, Violation};
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.231")]
+#[violation_metadata(stable_since = "v0.0.231", category = Category::Pedantic)]
 pub(crate) struct OsChmod;
 
 impl Violation for OsChmod {
@@ -132,10 +133,7 @@ pub(crate) fn os_chmod(checker: &Checker, call: &ExprCall, segments: &[&str]) {
             _ => None,
         };
 
-        let chmod_args = itertools::join(
-            call.arguments.arguments_source_order().filter_map(args),
-            ", ",
-        );
+        let chmod_args = itertools::join(call.arguments.iter_source_order().filter_map(args), ", ");
 
         let replacement = if is_pathlib_path_call(checker, path_arg) {
             format!("{path_code}.chmod({chmod_args})")

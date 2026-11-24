@@ -93,16 +93,24 @@ impl<'a> Insertion<'a> {
             contents.bom_start_offset()
         };
 
-        // Skip over commented lines, with whitespace separation.
+        // Skip over commented lines, with whitespace separation. Track blank
+        // lines after comments so we can preserve them between comments and
+        // the first statement.
+        let mut seen_comment = false;
         for line in
             UniversalNewlineIterator::with_offset(&contents[location.to_usize()..], location)
         {
             let trimmed_line = line.trim_whitespace_start();
             if trimmed_line.is_empty() {
+                if seen_comment {
+                    location = line.full_end();
+                }
                 continue;
             }
+
             if trimmed_line.starts_with('#') {
                 location = line.full_end();
+                seen_comment = true;
             } else {
                 break;
             }
@@ -523,6 +531,35 @@ x = 1
         assert_eq!(
             insert(contents)?,
             Insertion::inline(" ", TextSize::from(20), ";")
+        );
+
+        // Script metadata comments followed by a blank line and imports.
+        // The blank line between the comments and the import should be preserved.
+        let contents = r"
+# /// script
+# dependencies = ['anyio']
+# ///
+
+import datetime as dt
+"
+        .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::own_line("", TextSize::from(47), "\n")
+        );
+
+        // Comments without a blank line before imports should insert right
+        // after the comments (no blank line to preserve).
+        let contents = r"
+# /// script
+# dependencies = ['anyio']
+# ///
+import datetime as dt
+"
+        .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::own_line("", TextSize::from(46), "\n")
         );
 
         Ok(())

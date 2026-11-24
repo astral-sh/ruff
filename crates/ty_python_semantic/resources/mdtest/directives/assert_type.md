@@ -2,16 +2,42 @@
 
 ## Basic
 
-<!-- snapshot-diagnostics -->
-
 ```py
 from typing_extensions import assert_type
 
 def _(x: int, y: bool):
     assert_type(x, int)  # fine
-    assert_type(x, str)  # error: [type-assertion-failure]
+    # snapshot: type-assertion-failure
+    assert_type(x, str)
+```
+
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `str`
+ --> src/mdtest_snippet.py:6:5
+  |
+6 |     assert_type(x, str)
+  |     ^^^^^^^^^^^^-^^^^^^
+  |                 |
+  |                 Inferred type is `int`
+info: `str` and `int` are not equivalent types
+```
+
+```py
+def _(x: int, y: bool):
     assert_type(assert_type(x, int), int)
-    assert_type(y, int)  # error: [type-assertion-failure]
+    # snapshot: type-assertion-failure
+    assert_type(y, int)
+```
+
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `int`
+  --> src/mdtest_snippet.py:10:5
+   |
+10 |     assert_type(y, int)
+   |     ^^^^^^^^^^^^-^^^^^^
+   |                 |
+   |                 Inferred type is `bool`
+info: `bool` is a subtype of `int`, but they are not equivalent
 ```
 
 ## Narrowing
@@ -42,20 +68,33 @@ from typing_extensions import assert_type
 
 # Subtype does not count
 def _(x: bool):
-    assert_type(x, int)  # error: [type-assertion-failure] "Type `int` does not match asserted type `bool`"
+    assert_type(x, int)  # error: [type-assertion-failure] "Type `bool` does not match asserted type `int`"
 
 def _(a: type[int], b: type[Any]):
-    assert_type(a, type[Any])  # error: [type-assertion-failure] "Type `type[Any]` does not match asserted type `type[int]`"
-    assert_type(b, type[int])  # error: [type-assertion-failure] "Type `type[int]` does not match asserted type `type[Any]`"
+    assert_type(a, type[Any])  # error: [type-assertion-failure] "Type `type[int]` does not match asserted type `type[Any]`"
+    assert_type(b, type[int])  # error: [type-assertion-failure] "Type `type[Any]` does not match asserted type `type[int]`"
 
 # The expression constructing the type is not taken into account
 def _(a: type[int]):
     assert_type(a, Type[int])  # fine
 ```
 
-## Unspellable types
+## Recursive type aliases
 
-<!-- snapshot-diagnostics -->
+A named recursive alias can be written in an annotation, as can a union containing it. Asserting
+that either type is equivalent to its strict supertype reports an ordinary type assertion failure.
+
+```py
+from typing_extensions import assert_type
+
+Tree = tuple[int, "Tree | None"]
+
+def check(value: Tree, optional: Tree | None):
+    assert_type(value, object)  # error: [type-assertion-failure]
+    assert_type(optional, object)  # error: [type-assertion-failure]
+```
+
+## Unspellable types
 
 If the actual type is an unspellable subtype, we emit `assert-type-unspellable-subtype` instead of
 `type-assertion-failure`, on the grounds that it is often useful to distinguish this from cases
@@ -69,13 +108,68 @@ class Bar: ...
 class Baz: ...
 
 def f(x: Foo):
-    assert_type(x, Bar)  # error: [type-assertion-failure] "Type `Bar` does not match asserted type `Foo`"
-    if isinstance(x, Bar):
-        assert_type(x, Bar)  # error: [assert-type-unspellable-subtype] "Type `Bar` does not match asserted type `Foo & Bar`"
+    assert_type(x, Bar)  # snapshot: type-assertion-failure
+```
 
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `Bar`
+ --> src/mdtest_snippet.py:8:5
+  |
+8 |     assert_type(x, Bar)  # snapshot: type-assertion-failure
+  |     ^^^^^^^^^^^^-^^^^^^
+  |                 |
+  |                 Inferred type is `Foo`
+info: `Bar` and `Foo` are not equivalent types
+```
+
+```py
+    if isinstance(x, Bar):
+        assert_type(x, Bar)  # snapshot: assert-type-unspellable-subtype
+```
+
+```snapshot
+error[assert-type-unspellable-subtype]: Argument does not have asserted type `Bar`
+  --> src/mdtest_snippet.py:10:9
+   |
+10 |         assert_type(x, Bar)  # snapshot: assert-type-unspellable-subtype
+   |         ^^^^^^^^^^^^-^^^^^^
+   |                     |
+   |                     Inferred type is `Foo & Bar`
+info: `Foo & Bar` is a subtype of `Bar`, but they are not equivalent
+```
+
+```py
         # The actual type must be a subtype of the asserted type, as well as being unspellable,
         # in order for `assert-type-unspellable-subtype` to be emitted instead of `type-assertion-failure`
-        assert_type(x, Baz)  # error: [type-assertion-failure]
+        assert_type(x, Baz)  # snapshot: type-assertion-failure
+```
+
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `Baz`
+  --> src/mdtest_snippet.py:13:9
+   |
+13 |         assert_type(x, Baz)  # snapshot: type-assertion-failure
+   |         ^^^^^^^^^^^^-^^^^^^
+   |                     |
+   |                     Inferred type is `Foo & Bar`
+info: `Baz` and `Foo & Bar` are not equivalent types
+```
+
+Compact enum complements that are equivalent to a literal union are still spellable.
+
+```py
+from enum import Enum
+from typing_extensions import assert_type
+
+class F(Enum):
+    A = 1
+    B = 2
+    C = 4
+
+def _(f: F):
+    if f is F.A or f is F.B:
+        return
+    assert_type(f, F)  # error: [type-assertion-failure] "Type `Literal[F.C]` does not match asserted type `F`"
 ```
 
 ## Gradual types
@@ -84,7 +178,7 @@ def f(x: Foo):
 from typing import Any
 from typing_extensions import Literal, assert_type
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 # Any and Unknown are considered equivalent
 def _(a: Unknown, b: Any):
@@ -109,7 +203,7 @@ Tuple types with the same elements are the same.
 ```py
 from typing_extensions import Any, assert_type
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(a: tuple[int, str, bytes]):
     assert_type(a, tuple[int, str, bytes])  # fine
@@ -164,4 +258,39 @@ def _(a: A):
 
         assert_type(a, Intersection[A, B, Not[C], Not[D]])
         assert_type(a, Intersection[B, A, Not[D], Not[C]])
+```
+
+## Generic call narrowing
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+When generic call narrowing produces multiple valid specializations of a call to `assert_type`, a
+single type assertion is performed against the union of all inferred results.
+
+```py
+from typing import assert_type
+
+x: list[int | str] | list[int | None] = assert_type(list((1,)), list[int | str] | list[int | None])
+reveal_type(x)  # revealed: list[int | str] | list[int | None]
+```
+
+Note that when nested inside an outer generic call that produces multiple valid specializations, the
+type assertion is performed against the type of the inner expression when inferred without type
+context:
+
+```py
+from typing import assert_type
+from ty_extensions._internal import Unknown
+
+def identity[T](x: T) -> T:
+    return x
+
+x: list[list[int | str]] | list[list[int | None]] = [assert_type([1], list[int])]
+reveal_type(x)  # revealed: list[list[int | str]] | list[list[int | None]]
+
+x: list[int | str] | list[int | None] = identity(assert_type(list((1,)), list[int]))
+reveal_type(x)  # revealed: list[int | str] | list[int | None]
 ```

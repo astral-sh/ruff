@@ -39,8 +39,8 @@ from re import Pattern
 from socket import socket
 from ssl import SSLContext
 from types import TracebackType
-from typing import Any, Final, Protocol, overload, type_check_only
-from typing_extensions import Self, TypeAlias, deprecated
+from typing import Any, Final, Protocol, TypeAlias, overload, type_check_only
+from typing_extensions import Self, deprecated
 
 __all__ = [
     "SMTPException",
@@ -328,6 +328,7 @@ class SMTP:
 
     def verify(self, address: str) -> _Reply:
         """SMTP 'verify' command -- checks for address validity."""
+
     vrfy = verify
     def expn(self, address: str) -> _Reply:
         """SMTP 'expn' command -- expands a mailing list."""
@@ -343,6 +344,7 @@ class SMTP:
          SMTPHeloError            The server didn't reply properly to
                                   the helo greeting.
         """
+
     user: str
     password: str
     def auth(self, mechanism: str, authobject: _AuthObject, *, initial_response_ok: bool = True) -> _Reply:
@@ -370,9 +372,9 @@ class SMTP:
         """Authobject to use with CRAM-MD5 authentication. Requires self.user
         and self.password to be set.
         """
-
     @overload
     def auth_cram_md5(self, challenge: ReadableBuffer) -> str: ...
+
     def auth_plain(self, challenge: ReadableBuffer | None = None) -> str:
         """Authobject to use with PLAIN authentication. Requires self.user and
         self.password to be set.
@@ -410,6 +412,7 @@ class SMTP:
          SMTPException            No suitable authentication method was
                                   found.
         """
+
     if sys.version_info >= (3, 12):
         def starttls(self, *, context: SSLContext | None = None) -> _Reply:
             """Puts the connection to the SMTP server into TLS mode.
@@ -428,6 +431,7 @@ class SMTP:
              SMTPHeloError            The server didn't reply properly to
                                       the helo greeting.
             """
+
     else:
         @overload
         def starttls(self, keyfile: None = None, certfile: None = None, context: SSLContext | None = None) -> _Reply:
@@ -447,7 +451,6 @@ class SMTP:
              SMTPHeloError            The server didn't reply properly to
                                       the helo greeting.
             """
-
         @overload
         @deprecated(
             "The `keyfile`, `certfile` parameters are deprecated since Python 3.6; "
@@ -614,6 +617,7 @@ class SMTP_SSL(SMTP):
             source_address: _SourceAddress | None = None,
             context: None = None,
         ) -> None: ...
+
         keyfile: StrOrBytesPath | None
         certfile: StrOrBytesPath | None
 

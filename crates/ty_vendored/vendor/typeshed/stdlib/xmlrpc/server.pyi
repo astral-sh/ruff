@@ -107,8 +107,7 @@ import socketserver
 from _typeshed import ReadableBuffer
 from collections.abc import Callable, Iterable, Mapping
 from re import Pattern
-from typing import Any, ClassVar, Protocol, type_check_only
-from typing_extensions import TypeAlias
+from typing import Any, ClassVar, Protocol, TypeAlias, type_check_only
 from xmlrpc.client import Fault, _Marshallable
 
 # The dispatch accepts anywhere from 0 to N arguments, no easy way to allow this in mypy

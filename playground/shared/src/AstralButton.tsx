@@ -5,7 +5,7 @@ export default function AstralButton({
   className,
   children,
   ...otherProps
-}: ButtonHTMLAttributes<any>) {
+}: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       className={classNames(

@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 use crate::rules::flake8_bandit::helpers::{matches_password_name, string_literal};
 
@@ -34,7 +35,7 @@ use crate::rules::flake8_bandit::helpers::{matches_password_name, string_literal
 /// ## References
 /// - [Common Weakness Enumeration: CWE-259](https://cwe.mitre.org/data/definitions/259.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.116")]
+#[violation_metadata(stable_since = "v0.0.116", category = Category::Security)]
 pub(crate) struct HardcodedPasswordString {
     name: String,
 }
@@ -72,16 +73,12 @@ fn password_target(target: &Expr) -> Option<&str> {
 }
 
 /// S105
-pub(crate) fn compare_to_hardcoded_password_string(
-    checker: &Checker,
-    left: &Expr,
-    comparators: &[Expr],
-) {
-    for comp in comparators {
+pub(crate) fn compare_to_hardcoded_password_string(checker: &Checker, compare: &ast::ExprCompare) {
+    for comp in compare.comparators() {
         if string_literal(comp).is_none_or(str::is_empty) {
             continue;
         }
-        let Some(name) = password_target(left) else {
+        let Some(name) = password_target(compare.first_operand()) else {
             continue;
         };
         checker.report_diagnostic(
@@ -96,8 +93,8 @@ pub(crate) fn compare_to_hardcoded_password_string(
 /// S105
 pub(crate) fn assign_hardcoded_password_string(checker: &Checker, value: &Expr, targets: &[Expr]) {
     if string_literal(value)
-        .filter(|string| !string.is_empty())
-        .is_some()
+        .as_ref()
+        .is_some_and(|string| !string.is_empty())
     {
         for target in targets {
             if let Some(name) = password_target(target) {

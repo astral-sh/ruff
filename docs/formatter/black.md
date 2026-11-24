@@ -39,6 +39,8 @@ has already been formatted by Black.
 ### Pragma comments are ignored when computing line width
 
 Pragma comments (`# type`, `# noqa`, `# pyright`, `# pylint`, etc.) are ignored when computing the width of a line.
+For mixed comments such as `# explanation  # noqa: F401`, only the pragma suffix is ignored;
+the preceding comment text still contributes to the line width.
 This prevents Ruff from moving pragma comments around, thereby modifying their meaning and behavior:
 
 See Ruff's [pragma comment handling proposal](https://github.com/astral-sh/ruff/discussions/6670)
@@ -132,47 +134,43 @@ We agree that Ruff's formatting (that matches Black's 23) is hard to read and ne
 
 ### Call expressions with a single multiline string argument
 
-Unlike Black, Ruff preserves the indentation of a single multiline-string argument in a call expression:
+Black and Ruff both preserve the indentation inside the multiline-string argument in a call expression. The key difference is the placement of the opening quotation marks and the placement of the closing parenthesis:
 
 ```python
 # Input
 call(
-  """"
-  A multiline
-  string
-  """
+    """
+    A multiline
+    string
+    """
 )
 
-dedent(""""
+dedent("""
     A multiline
     string
 """)
 
 # Black
-call(
-  """"
-  A multiline
-  string
-  """
-)
+call("""
+    A multiline
+    string
+    """)
 
-dedent(
-  """"
-  A multiline
-  string
-"""
-)
+dedent("""
+    A multiline
+    string
+""")
 
 
 # Ruff
 call(
-  """"
-  A multiline
-  string
-  """
+    """
+    A multiline
+    string
+    """
 )
 
-dedent(""""
+dedent("""
     A multiline
     string
 """)
@@ -242,8 +240,8 @@ def test(max_history):
 
 Black's unstable style applies the same formatting.
 
-There are few rare cases where Ruff can't merge the implicitly concatenated strings automatically.
-In those cases, Ruff preserves if the implicit concatenated strings are formatted over multiple lines:
+In a few rare cases, Ruff can't merge implicitly concatenated strings automatically. In those
+cases, Ruff keeps the strings on multiple lines if they were written that way:
 
 ```python
 # Input
@@ -344,7 +342,7 @@ Ruff will instead remove them:
 await [1, 2, 3]
 ```
 
-This is more consistent to the formatting of other awaited expressions: Ruff and Black both
+This is more consistent with the formatting of other awaited expressions: Ruff and Black both
 remove parentheses around, e.g., `await (1)`, only retaining them when syntactically required,
 as in, e.g., `await (x := 1)`.
 
@@ -745,63 +743,26 @@ items = {(123)}
 
 ### Long lambda expressions
 
-In [preview](../preview.md), Ruff will keep lambda parameters on a single line,
-just like Black:
+Both Ruff and Black will keep lambda parameters on a single
+line. However, if the body expression exceeds the configured line length,
+Ruff will additionally add parentheses around the lambda body and break
+it over multiple lines:
+
 
 ```python
-# Input
+# Ruff
 def a():
     return b(
         c,
         d,
         e,
-        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
-            *args, **kwargs
-        ),
-    )
-
-# Ruff Stable
-def a():
-    return b(
-        c,
-        d,
-        e,
-        f=lambda self,
-        *args,
-        **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs),
-    )
-
-# Black and Ruff Preview
-def a():
-    return b(
-        c,
-        d,
-        e,
-        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
-            *args, **kwargs
-        ),
-    )
-```
-
-However, if the body expression exceeds the configured line length, Ruff will
-additionally add parentheses around the lambda body and break it over multiple
-lines:
-
-```python
-# Input
-def a():
-    return b(
-        c,
-        d,
-        e,
-        # Additional `b` character pushes this over the line length
-        f=lambda self, *args, **kwargs: baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
-            *args, **kwargs
+        f=lambda self, *args, **kwargs: (
+            baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
         ),
         # More complex expressions also trigger wrapping
-        g=lambda self, *args, **kwargs: baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
-            *args, **kwargs
-        ) + 1,
+        g=lambda self, *args, **kwargs: (
+            baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+        ),
     )
 
 # Black
@@ -810,8 +771,7 @@ def a():
         c,
         d,
         e,
-        # Additional `b` character pushes this over the line length
-        f=lambda self, *args, **kwargs: baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+        f=lambda self, *args, **kwargs: baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
             *args, **kwargs
         ),
         # More complex expressions also trigger wrapping
@@ -820,20 +780,46 @@ def a():
         )
         + 1,
     )
+```
 
-# Ruff Preview
-def a():
-    return b(
-        c,
-        d,
-        e,
-        # Additional `b` character pushes this over the line length
-        f=lambda self, *args, **kwargs: (
-            baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
-        ),
-        # More complex expressions also trigger wrapping
-        g=lambda self, *args, **kwargs: (
-            baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
-        ),
-    )
+### Require single blank line between function and decorated class in stubs
+
+In stub files, Ruff enforces a single blank line between functions
+and decorated classes, whereas Black does not.
+
+```python
+# Input and Ruff
+def hello(): ...
+
+@lambda _, /: _
+class A: ...
+
+# Black
+def foo(): ...
+@decorator
+class Bar: ...
+```
+
+### Avoiding additional space around escaped quote in triple-quoted docstring
+
+In certain cases it is required to maintain a trailing space in a
+triple-quoted docstring in order to avoid escaping a quote or ending
+with too many quotes. However, if the last quote is escaped this
+is not necessary, and Ruff respects this. Black, however, adds the
+extra space.
+
+```python
+# Input and Ruff
+class Sample:
+    """Hello "World\""""
+
+    def __init__(self, name):
+        self.name = name
+
+# Black
+class Sample:
+    """Hello "World\" """
+
+    def __init__(self, name):
+        self.name = name
 ```

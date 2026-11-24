@@ -122,7 +122,7 @@ for user_id, name in session.execute(stmt).tuples():
 result = session.execute(stmt)
 row = result.one_or_none()
 assert row is not None
-(user_id, name) = row._tuple()
+user_id, name = row._tuple()
 reveal_type(user_id)  # revealed: int
 reveal_type(name)  # revealed: str
 

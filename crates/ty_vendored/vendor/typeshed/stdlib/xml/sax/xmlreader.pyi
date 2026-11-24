@@ -4,8 +4,8 @@ should be based on this code.
 
 from _typeshed import ReadableBuffer
 from collections.abc import Mapping
-from typing import Generic, Literal, TypeVar, overload
-from typing_extensions import Self, TypeAlias
+from typing import Generic, Literal, TypeAlias, TypeVar, overload
+from typing_extensions import Self
 from xml.sax import _Source, _SupportsReadClose
 from xml.sax.handler import _ContentHandlerProtocol, _DTDHandlerProtocol, _EntityResolverProtocol, _ErrorHandlerProtocol
 
@@ -72,7 +72,7 @@ class XMLReader:
         """Sets the value of a SAX2 property."""
 
 class IncrementalParser(XMLReader):
-    """This interface adds three extra methods to the XMLReader
+    """This interface adds four extra methods to the XMLReader
     interface that allow XML parsers to support incremental
     parsing. Support for this interface is optional, since not all
     underlying XML parsers support this functionality.
@@ -87,7 +87,7 @@ class IncrementalParser(XMLReader):
     is, after parse has been called and before it returns.
 
     By default, the class also implements the parse method of the XMLReader
-    interface using the feed, close and reset methods of the
+    interface using the prepareParser, feed and close methods of the
     IncrementalParser interface as a convenience to SAX 2.0 driver
     writers.
     """
@@ -226,6 +226,8 @@ class InputSource:
 _AttrKey = TypeVar("_AttrKey", default=str)
 
 class AttributesImpl(Generic[_AttrKey]):
+    """Implementation of the Attributes interface."""
+
     def __init__(self, attrs: Mapping[_AttrKey, str]) -> None:
         """Non-NS-aware implementation.
 
@@ -244,10 +246,12 @@ class AttributesImpl(Generic[_AttrKey]):
     def __getitem__(self, name: _AttrKey) -> str: ...
     def keys(self) -> list[_AttrKey]: ...
     def __contains__(self, name: _AttrKey) -> bool: ...
+
     @overload
     def get(self, name: _AttrKey, alternative: None = None) -> str | None: ...
     @overload
     def get(self, name: _AttrKey, alternative: str) -> str: ...
+
     def copy(self) -> Self: ...
     def items(self) -> list[tuple[_AttrKey, str]]: ...
     def values(self) -> list[str]: ...
@@ -269,8 +273,10 @@ class AttributesNSImpl(AttributesImpl[_NSName]):
     def __getitem__(self, name: _NSName) -> str: ...
     def keys(self) -> list[_NSName]: ...
     def __contains__(self, name: _NSName) -> bool: ...
+
     @overload
     def get(self, name: _NSName, alternative: None = None) -> str | None: ...
     @overload
     def get(self, name: _NSName, alternative: str) -> str: ...
+
     def items(self) -> list[tuple[_NSName, str]]: ...

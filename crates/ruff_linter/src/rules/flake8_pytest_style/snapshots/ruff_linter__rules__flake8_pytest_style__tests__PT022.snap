@@ -8,16 +8,14 @@ PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
 16 |     resource = acquire_resource()
 17 |     yield resource
    |     ^^^^^^^^^^^^^^
-   |
 help: Replace `yield` with `return`
-14 | @pytest.fixture()
-15 | def error():
+   |
 16 |     resource = acquire_resource()
    -     yield resource
 17 +     return resource
-18 | 
-19 | 
-20 | import typing
+18 |
+   |
+note: This is an unsafe fix and may change runtime behavior
 
 PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
   --> PT022.py:37:5
@@ -26,19 +24,17 @@ PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
 36 |     resource = acquire_resource()
 37 |     yield resource
    |     ^^^^^^^^^^^^^^
-   |
 help: Replace `yield` with `return`
-32 | 
-33 | 
+   |
 34 | @pytest.fixture()
    - def error() -> typing.Generator[typing.Any, None, None]:
 35 + def error() -> typing.Any:
 36 |     resource = acquire_resource()
    -     yield resource
 37 +     return resource
-38 | 
-39 | 
-40 | @pytest.fixture()
+38 |
+   |
+note: This is an unsafe fix and may change runtime behavior
 
 PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
   --> PT022.py:43:5
@@ -47,13 +43,13 @@ PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
 42 |     resource = acquire_resource()
 43 |     yield resource
    |     ^^^^^^^^^^^^^^
-   |
 help: Replace `yield` with `return`
-38 | 
-39 | 
+   |
 40 | @pytest.fixture()
    - def error() -> Generator[Resource, None, None]:
 41 + def error() -> Resource:
 42 |     resource = acquire_resource()
    -     yield resource
 43 +     return resource
+   |
+note: This is an unsafe fix and may change runtime behavior

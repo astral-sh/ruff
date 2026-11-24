@@ -7,6 +7,7 @@ use ruff_text_size::{Ranged, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Violation};
 use crate::{Edit, Fix};
 
@@ -29,7 +30,7 @@ use crate::{Edit, Fix};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.245")]
+#[violation_metadata(stable_since = "v0.0.245", category = Category::Formatting)]
 pub(crate) struct MultipleStatementsOnOneLineColon;
 
 impl Violation for MultipleStatementsOnOneLineColon {
@@ -60,7 +61,7 @@ impl Violation for MultipleStatementsOnOneLineColon {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.245")]
+#[violation_metadata(stable_since = "v0.0.245", category = Category::Formatting)]
 pub(crate) struct MultipleStatementsOnOneLineSemicolon;
 
 impl Violation for MultipleStatementsOnOneLineSemicolon {
@@ -86,7 +87,7 @@ impl Violation for MultipleStatementsOnOneLineSemicolon {
 /// do_four()
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.245")]
+#[violation_metadata(stable_since = "v0.0.245", category = Category::Formatting)]
 pub(crate) struct UselessSemicolon;
 
 impl AlwaysFixableViolation for UselessSemicolon {
@@ -135,17 +136,11 @@ pub(crate) fn compound_statements(
     // Use an iterator to allow passing it around.
     let mut token_iter = tokens.iter_with_context();
 
-    loop {
-        let Some(token) = token_iter.next() else {
-            break;
-        };
-
+    while let Some(token) = token_iter.next() {
         match token.kind() {
-            TokenKind::Ellipsis => {
-                if allow_ellipsis {
-                    allow_ellipsis = false;
-                    continue;
-                }
+            TokenKind::Ellipsis if allow_ellipsis => {
+                allow_ellipsis = false;
+                continue;
             }
             TokenKind::Indent => {
                 indent = indent.saturating_add(1);

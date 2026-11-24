@@ -1,10 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{Expr, ExprCall, token::parenthesized_range};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -41,7 +43,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// This rule will emit a diagnostic but not suggest a fix if `map` has been shadowed from its
 /// builtin binding.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Complexity)]
 pub(crate) struct StarmapZip;
 
 impl Violation for StarmapZip {
@@ -58,7 +60,7 @@ impl Violation for StarmapZip {
 }
 
 /// RUF058
-pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall) {
+pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall, qualified_name: &QualifiedName) {
     let semantic = checker.semantic();
 
     if !call.arguments.keywords.is_empty() {
@@ -96,10 +98,7 @@ pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    if !semantic
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|it| matches!(it.segments(), ["itertools", "starmap"]))
-    {
+    if !matches!(qualified_name.segments(), ["itertools", "starmap"]) {
         return;
     }
 
@@ -107,7 +106,7 @@ pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(StarmapZip, call.range);
+    let mut diagnostic = checker.report_diagnostic(StarmapZip, call.range());
 
     if let Some(fix) = replace_with_map(call, iterable_call, checker) {
         diagnostic.set_fix(fix);

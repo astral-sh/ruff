@@ -3,9 +3,10 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::find_assigned_value;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -51,7 +52,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     print(i)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.276")]
+#[violation_metadata(stable_since = "v0.0.276", category = Category::Performance)]
 pub(crate) struct UnnecessaryListCast;
 
 impl AlwaysFixableViolation for UnnecessaryListCast {
@@ -76,7 +77,7 @@ pub(crate) fn unnecessary_list_cast(checker: &Checker, iter: &Expr, body: &[Stmt
                 range: _,
                 node_index: _,
             },
-        range: list_range,
+        range_start: _,
         node_index: _,
     }) = iter
     else {
@@ -104,8 +105,8 @@ pub(crate) fn unnecessary_list_cast(checker: &Checker, iter: &Expr, body: &[Stmt
             range: iterable_range,
             ..
         }) => {
-            let mut diagnostic = checker.report_diagnostic(UnnecessaryListCast, *list_range);
-            diagnostic.set_fix(remove_cast(checker, *list_range, *iterable_range));
+            let mut diagnostic = checker.report_diagnostic(UnnecessaryListCast, iter.range());
+            diagnostic.set_fix(remove_cast(checker, iter.range(), *iterable_range));
         }
         Expr::Name(ast::ExprName {
             id,
@@ -131,8 +132,8 @@ pub(crate) fn unnecessary_list_cast(checker: &Checker, iter: &Expr, body: &[Stmt
                     return;
                 }
 
-                let mut diagnostic = checker.report_diagnostic(UnnecessaryListCast, *list_range);
-                diagnostic.set_fix(remove_cast(checker, *list_range, *iterable_range));
+                let mut diagnostic = checker.report_diagnostic(UnnecessaryListCast, iter.range());
+                diagnostic.set_fix(remove_cast(checker, iter.range(), *iterable_range));
             }
         }
         _ => {}
@@ -159,12 +160,12 @@ fn remove_cast(checker: &Checker, list_range: TextRange, iterable_range: TextRan
 /// A [`StatementVisitor`] that (conservatively) identifies mutations to a variable.
 #[derive(Default)]
 pub(crate) struct MutationVisitor<'a> {
-    pub(crate) target: &'a str,
-    pub(crate) is_mutated: bool,
+    target: &'a str,
+    is_mutated: bool,
 }
 
 impl<'a> MutationVisitor<'a> {
-    pub(crate) fn new(target: &'a str) -> Self {
+    fn new(target: &'a str) -> Self {
         Self {
             target,
             is_mutated: false,

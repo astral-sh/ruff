@@ -4,8 +4,8 @@ import sys
 import types
 from collections.abc import Callable, Iterator
 from opcode import *  # `dis` re-exports it as a part of public API
-from typing import IO, Any, Final, NamedTuple
-from typing_extensions import Self, TypeAlias, disjoint_base
+from typing import IO, Any, Final, NamedTuple, TypeAlias, overload
+from typing_extensions import Self, deprecated, disjoint_base
 
 __all__ = [
     "code_info",
@@ -128,6 +128,7 @@ if sys.version_info >= (3, 12):
                 *mark_as_current* inserts a '-->' marker arrow as part of the line
                 *offset_width* sets the width of the instruction offset field
                 """
+
         if sys.version_info >= (3, 13):
             @property
             def oparg(self) -> int:
@@ -165,6 +166,7 @@ if sys.version_info >= (3, 12):
             @property
             def is_jump_target(self) -> bool:
                 """True if other code jumps to here, otherwise False"""
+
         if sys.version_info >= (3, 14):
             @staticmethod
             def make(
@@ -432,10 +434,9 @@ else:
         """Disassemble a traceback (default: last traceback)."""
 
 if sys.version_info >= (3, 13):
-    # 3.13 made `show_cache` `None` by default
-    def get_instructions(
-        x: _HaveCodeType, *, first_line: int | None = None, show_caches: bool | None = None, adaptive: bool = False
-    ) -> Iterator[Instruction]:
+    # 3.13 made `show_caches` `None` by default and has no effect
+    @overload
+    def get_instructions(x: _HaveCodeType, *, first_line: int | None = None, adaptive: bool = False) -> Iterator[Instruction]:
         """Iterator for the opcodes in methods, functions or code
 
         Generates a series of Instruction named tuples giving the details of
@@ -446,6 +447,14 @@ if sys.version_info >= (3, 13):
         Otherwise, the source line information (if any) is taken directly from
         the disassembled code object.
         """
+    @overload
+    @deprecated(
+        "The `show_caches` parameter is deprecated since Python 3.13. "
+        "The iterator generates the `Instruction` instances with the `cache_info` field populated."
+    )
+    def get_instructions(
+        x: _HaveCodeType, *, first_line: int | None = None, show_caches: bool | None = None, adaptive: bool = False
+    ) -> Iterator[Instruction]: ...
 
 elif sys.version_info >= (3, 11):
     def get_instructions(

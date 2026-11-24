@@ -76,8 +76,27 @@ reveal_type(x)  # revealed: Unknown
 `module.py`:
 
 ```py
-# error: [unresolved-import]
+# error: [missing-module-member]
 from module import x
+```
+
+### Self-referential `from` import in a nested scope
+
+A `from <self> import <name>` inside a function body should resolve the name from the module's
+global scope without triggering a cycle.
+
+See: <https://github.com/astral-sh/ty/issues/2596>
+
+`main.py`:
+
+```py
+def foo() -> int:
+    return 0
+
+def bar() -> int:
+    from main import foo
+
+    return foo()
 ```
 
 ### Normal self-referential import
@@ -105,4 +124,29 @@ x: int = 1
 from module import x
 
 reveal_type(x)  # revealed: int
+```
+
+### Attribute assignment through a circular re-export
+
+A class imported through a circular re-export is the same class as the original definition. Its
+instances can be assigned to attributes annotated with that class, including optional attributes.
+
+`models.py`:
+
+```py
+class Item: ...
+
+from reexport import Item
+
+class Container:
+    item: Item | None
+
+def set_item(container: Container):
+    container.item = Item()
+```
+
+`reexport.py`:
+
+```py
+from models import Item
 ```

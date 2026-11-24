@@ -10,6 +10,7 @@ use std::ops::BitOr;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for classes that implement `__eq__` but not `__hash__`.
@@ -64,7 +65,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `object.__hash__`](https://docs.python.org/3/reference/datamodel.html#object.__hash__)
 /// - [Python glossary: hashable](https://docs.python.org/3/glossary.html#term-hashable)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Pedantic)]
 pub(crate) struct EqWithoutHash;
 
 impl Violation for EqWithoutHash {
@@ -101,7 +102,7 @@ impl EqHash {
     fn from_class(class: &StmtClassDef) -> Self {
         let (mut has_eq, mut has_hash) = (HasMethod::No, HasMethod::No);
 
-        any_member_declaration(class, &mut |declaration| {
+        any_member_declaration(class, |declaration| {
             let id = match declaration.kind() {
                 ClassMemberKind::Assign(StmtAssign { targets, .. }) => {
                     let [Expr::Name(ExprName { id, .. })] = &targets[..] else {

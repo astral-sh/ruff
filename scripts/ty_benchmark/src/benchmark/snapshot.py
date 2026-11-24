@@ -4,10 +4,13 @@ import difflib
 import logging
 import re
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Mapping, NamedTuple
+from typing import NamedTuple
 
 from benchmark import Command
+
+logger = logging.getLogger(__name__)
 
 
 def normalize_output(output: str, cwd: Path) -> str:
@@ -65,11 +68,10 @@ class SnapshotRunner(NamedTuple):
             snapshot_file = self.snapshot_dir / f"{self.name}_{command.name}.txt"
 
             # Run the prepare command if provided.
-            if command.prepare:
-                logging.info(f"Running prepare: {command.prepare}")
+            if command.prepare is not None:
+                logger.info(f"Running prepare: {command.prepare}")
                 subprocess.run(
                     command.prepare,
-                    shell=True,
                     cwd=cwd,
                     env=env,
                     capture_output=True,
@@ -77,14 +79,18 @@ class SnapshotRunner(NamedTuple):
                 )
 
             # Run the actual command and capture output.
-            logging.info(f"Running {command.command}")
+            logger.info(f"Running {command.command}")
             result = subprocess.run(
                 command.command,
                 cwd=cwd,
                 env=env,
                 capture_output=True,
                 text=True,
+                check=False,
             )
+
+            if result.returncode not in (0, 1):
+                result.check_returncode()
 
             # Get the actual output and combine stdout and stderr for the snapshot.
             actual_output = normalize_output(result.stdout + result.stderr, cwd)

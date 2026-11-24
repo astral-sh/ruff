@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for function definitions that use a loop variable.
@@ -42,7 +43,7 @@ use crate::checkers::ast::Checker;
 /// - [The Hitchhiker's Guide to Python: Late Binding Closures](https://docs.python-guide.org/writing/gotchas/#late-binding-closures)
 /// - [Python documentation: `functools.partial`](https://docs.python.org/3/library/functools.html#functools.partial)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.139")]
+#[violation_metadata(stable_since = "v0.0.139", category = Category::Suspicious)]
 pub(crate) struct FunctionUsesLoopVariable {
     name: String,
 }
@@ -109,15 +110,13 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
 
                 return;
             }
+            // Mark `return lambda: x` as safe.
             Stmt::Return(ast::StmtReturn {
                 value: Some(value),
                 range: _,
                 node_index: _,
-            }) => {
-                // Mark `return lambda: x` as safe.
-                if value.is_lambda_expr() {
-                    self.safe_functions.push(value);
-                }
+            }) if value.is_lambda_expr() => {
+                self.safe_functions.push(value);
             }
             _ => {}
         }
@@ -129,9 +128,15 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
             Expr::Call(ast::ExprCall {
                 func,
                 arguments,
-                range: _,
+                range_start: _,
                 node_index: _,
             }) => {
+                // Mark immediately-invoked lambdas as safe — the closure
+                // is consumed right away, so late-binding is not a concern.
+                if func.is_lambda_expr() {
+                    self.safe_functions.push(func);
+                }
+
                 match func.as_ref() {
                     Expr::Name(ast::ExprName { id, .. }) => {
                         if matches!(id.as_str(), "filter" | "reduce" | "map") {
@@ -142,14 +147,12 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                             }
                         }
                     }
-                    Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
-                        if attr == "reduce" {
-                            if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
-                                if id == "functools" {
-                                    for arg in &*arguments.args {
-                                        if arg.is_lambda_expr() {
-                                            self.safe_functions.push(arg);
-                                        }
+                    Expr::Attribute(ast::ExprAttribute { value, attr, .. }) if attr == "reduce" => {
+                        if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
+                            if id == "functools" {
+                                for arg in &*arguments.args {
+                                    if arg.is_lambda_expr() {
+                                        self.safe_functions.push(arg);
                                     }
                                 }
                             }
@@ -171,31 +174,29 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 body,
                 range: _,
                 node_index: _,
-            }) => {
-                if !self.safe_functions.contains(&expr) {
-                    // Collect all loaded variable names.
-                    let mut visitor = LoadedNamesVisitor::default();
-                    visitor.visit_expr(body);
+            }) if !self.safe_functions.contains(&expr) => {
+                // Collect all loaded variable names.
+                let mut visitor = LoadedNamesVisitor::default();
+                visitor.visit_expr(body);
 
-                    // Treat any non-arguments as "suspicious".
-                    self.names
-                        .extend(visitor.loaded.into_iter().filter(|loaded| {
-                            if visitor.stored.iter().any(|stored| stored.id == loaded.id) {
-                                return false;
-                            }
+                // Treat any non-arguments as "suspicious".
+                self.names
+                    .extend(visitor.loaded.into_iter().filter(|loaded| {
+                        if visitor.stored.iter().any(|stored| stored.id == loaded.id) {
+                            return false;
+                        }
 
-                            if parameters
-                                .as_ref()
-                                .is_some_and(|parameters| parameters.includes(&loaded.id))
-                            {
-                                return false;
-                            }
+                        if parameters
+                            .as_ref()
+                            .is_some_and(|parameters| parameters.includes(&loaded.id))
+                        {
+                            return false;
+                        }
 
-                            true
-                        }));
+                        true
+                    }));
 
-                    return;
-                }
+                return;
             }
             _ => {}
         }

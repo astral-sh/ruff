@@ -8,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::rules::blocking_open_call::is_open_call_from_pathlib;
+use crate::rules::flake8_use_pathlib::helpers::is_file_descriptor;
 use crate::{Applicability, Edit, Fix};
 
 /// Format a code snippet to call `name.method()`.
@@ -31,12 +32,12 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
-            args: Box::from([]),
-            keywords: Box::from([]),
+            args: [].into(),
+            keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // And finally, turn it into a statement.
@@ -65,9 +66,8 @@ pub(super) fn replace_with_identity_check(
     };
 
     let new_expr = Expr::Compare(ast::ExprCompare {
-        left: left.clone().into(),
         ops: [op].into(),
-        comparators: [ast::ExprNoneLiteral::default().into()].into(),
+        operands: [left.clone(), ast::ExprNoneLiteral::default().into()].into(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });
@@ -90,7 +90,7 @@ pub(super) fn replace_with_identity_check(
     Fix::applicable_edit(edit, applicability)
 }
 
-// Helpers for read-whole-file and write-whole-file
+// Helpers for `manual-path-read` and `manual-path-write`
 #[derive(Debug, Copy, Clone)]
 pub(super) enum OpenMode {
     /// "r"
@@ -217,23 +217,29 @@ fn resolve_file_open<'a>(
     if matches!(mode, OpenMode::ReadBytes | OpenMode::WriteBytes) && !keywords.is_empty() {
         return None;
     }
+
     let var = item.optional_vars.as_deref()?.as_name_expr()?;
     let scope = semantic.current_scope();
-
     let binding = scope.get_all(var.id.as_str()).find_map(|id| {
-        let b = semantic.binding(id);
-        (b.range() == var.range()).then_some(b)
+        let binding = semantic.binding(id);
+        (binding.range() == var.range()).then_some(binding)
     })?;
-    let references: Vec<&ResolvedReference> = binding
-        .references
-        .iter()
-        .map(|id| semantic.reference(*id))
-        .filter(|reference| with.range().contains_range(reference.range()))
-        .collect();
+    let mut binding_references = binding
+        .references()
+        .map(|id| semantic.reference(id))
+        // Reassignments in the same scope can carry forward older references. Ignore anything
+        // that appears before this `with` statement and only consider references from this point.
+        .filter(|reference| {
+            reference.scope_id() == binding.scope && reference.start() >= with.start()
+        });
 
-    let [reference] = references.as_slice() else {
+    let reference = binding_references.next()?;
+    if binding_references.next().is_some() {
         return None;
-    };
+    }
+    if !with.range().contains_range(reference.range()) {
+        return None;
+    }
 
     Some(FileOpen {
         item,
@@ -275,10 +281,17 @@ fn find_file_open<'a>(
     // Match positional arguments, get filename and mode.
     let (filename, pos_mode) = match_open_args(args)?;
 
+    // `open` accepts a file descriptor, but `Path` does not, so a `pathlib` replacement
+    // would fail at runtime. `PTH123` skips these for the same reason.
+    if is_file_descriptor(filename, semantic) {
+        return None;
+    }
+
     // Match keyword arguments, get keyword arguments to forward and possibly mode.
     let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
 
     let mode = kw_mode.unwrap_or(pos_mode);
+
     resolve_file_open(
         item,
         with,
@@ -307,9 +320,11 @@ fn find_path_open<'a>(
     {
         return None;
     }
+
     if !is_open_call_from_pathlib(func, semantic) {
         return None;
     }
+
     let attr = func.as_attribute_expr()?;
     let mode = if args.is_empty() {
         OpenMode::ReadText
@@ -319,6 +334,7 @@ fn find_path_open<'a>(
 
     let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
     let mode = kw_mode.unwrap_or(mode);
+
     resolve_file_open(
         item,
         with,
@@ -356,10 +372,12 @@ fn match_open_keywords(
             "encoding" | "errors" => result.push(keyword),
             "newline" => {
                 if read_mode {
-                    // newline is only valid for write_text
-                    return None;
+                    if target_version < PythonVersion::PY313 {
+                        // `pathlib.Path.read_text` doesn't support `newline` until Python 3.13.
+                        return None;
+                    }
                 } else if target_version < PythonVersion::PY310 {
-                    // `pathlib` doesn't support `newline` until Python 3.10.
+                    // `pathlib.Path.write_text` doesn't support `newline` until Python 3.10.
                     return None;
                 }
 
@@ -402,6 +420,8 @@ fn match_open_mode(mode: &Expr) -> Option<OpenMode> {
 /// A helper function that extracts the `iter` from a [`ast::StmtFor`] node and
 /// adds parentheses if needed.
 ///
+/// Also returns the original source range, including any existing parentheses.
+///
 /// These cases are okay and will not be modified:
 ///
 /// - `for x in z: ...`       ->  `"z"`
@@ -413,11 +433,11 @@ fn match_open_mode(mode: &Expr) -> Option<OpenMode> {
 /// - `for x in y, z: ...`                   ->  `"(y, z)"`
 /// - `for x in lambda: 0: ...`              ->  `"(lambda: 0)"`
 /// - `for x in (1,) if True else (2,): ...` ->  `"((1,) if True else (2,))"`
-pub(super) fn parenthesize_loop_iter_if_necessary<'a>(
+pub(crate) fn parenthesize_loop_iter_if_necessary<'a>(
     for_stmt: &'a ast::StmtFor,
     checker: &'a Checker,
     location: IterLocation,
-) -> Cow<'a, str> {
+) -> (Cow<'a, str>, TextRange) {
     let locator = checker.locator();
     let iter = for_stmt.iter.as_ref();
 
@@ -425,22 +445,24 @@ pub(super) fn parenthesize_loop_iter_if_necessary<'a>(
         parenthesized_range(iter.into(), for_stmt.into(), checker.tokens());
 
     if let Some(range) = original_parenthesized_range {
-        return Cow::Borrowed(locator.slice(range));
+        return (Cow::Borrowed(locator.slice(range)), range);
     }
 
     let iter_in_source = locator.slice(iter);
 
-    match iter {
+    let contents = match iter {
         Expr::Tuple(tuple) if !tuple.parenthesized => Cow::Owned(format!("({iter_in_source})")),
         Expr::Lambda(_) | Expr::If(_) if matches!(location, IterLocation::Comprehension) => {
             Cow::Owned(format!("({iter_in_source})"))
         }
         _ => Cow::Borrowed(iter_in_source),
-    }
+    };
+
+    (contents, iter.range())
 }
 
 #[derive(Copy, Clone)]
-pub(super) enum IterLocation {
+pub(crate) enum IterLocation {
     Call,
     Comprehension,
 }

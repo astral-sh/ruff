@@ -14,17 +14,12 @@ and called just like any other dunder method.
 
 `type.__call__` does other things too, but this is not yet handled by us.
 
-Since every class has `object` in it's MRO, the default implementations are `object.__new__` and
+Since every class has `object` in its MRO, the default implementations are `object.__new__` and
 `object.__init__`. They have some special behavior, namely:
 
 - If neither `__new__` nor `__init__` are defined anywhere in the MRO of class (except for
     `object`), no arguments are accepted and `TypeError` is raised if any are passed.
 - If `__new__` is defined but `__init__` is not, `object.__init__` will allow arbitrary arguments!
-
-As of today there are a number of behaviors that we do not support:
-
-- `__new__` is assumed to return an instance of the class on which it is called
-- User defined `__call__` on metaclass is ignored
 
 ## Creating an instance of the `object` class itself
 
@@ -47,8 +42,21 @@ class Foo: ...
 
 reveal_type(Foo())  # revealed: Foo
 
-# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+# error: [too-many-positional-arguments] "Too many positional arguments to `object.__init__`: expected 1, got 2"
 reveal_type(Foo(1))  # revealed: Foo
+```
+
+## Class-based protocol constructors
+
+Constructing a class-based protocol through `type` must not count the implicit receiver in an arity
+diagnostic.
+
+```py
+from collections.abc import Hashable
+
+def construct(value: Hashable) -> None:
+    # error: [too-many-positional-arguments] "Too many positional arguments to `object.__init__`: expected 0, got 3"
+    type(value)(1970, 1, 1)
 ```
 
 ## `__new__` present on the class itself
@@ -60,10 +68,45 @@ class Foo:
 
 reveal_type(Foo(1))  # revealed: Foo
 
-# error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
+# error: [invalid-argument-type] "Argument to constructor `Foo.__new__` is incorrect: Expected `int`, found `Literal["x"]`"
+reveal_type(Foo("x"))  # revealed: Foo
+# error: [missing-argument] "No argument provided for required parameter `x` of constructor `Foo.__new__`"
 reveal_type(Foo())  # revealed: Foo
-# error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 2, got 3"
+# error: [too-many-positional-arguments] "Too many positional arguments to constructor `Foo.__new__`: expected 2, got 3"
 reveal_type(Foo(1, 2))  # revealed: Foo
+```
+
+When `__new__` is a lambda with an unknown return type, constructor calls still infer the class
+instance type:
+
+```py
+class LambdaNew:
+    __new__ = lambda cls: object.__new__(cls)
+
+reveal_type(LambdaNew())  # revealed: LambdaNew
+LambdaNew().missing_attribute  # error: [missing-attribute]
+```
+
+## `__new__` with an invalid decorator and unresolved return annotation
+
+Regression test for <https://github.com/astral-sh/ty/issues/3470>.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import TypeVar
+from typing_extensions import deprecated
+
+class C:
+    @deprecated  # error: [invalid-argument-type] "LiteralString"
+    def __new__() -> T:  # error: [invalid-implicit-return-in-function-with-stub-body] "TypeVar"
+        pass
+
+C()
+T = TypeVar
 ```
 
 ## `__new__` present on a superclass
@@ -82,10 +125,27 @@ class Foo(Base): ...
 
 reveal_type(Foo(1))  # revealed: Foo
 
-# error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
+# error: [missing-argument] "No argument provided for required parameter `x` of constructor `Base.__new__`"
 reveal_type(Foo())  # revealed: Foo
-# error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 2, got 3"
+# error: [too-many-positional-arguments] "Too many positional arguments to constructor `Base.__new__`: expected 2, got 3"
 reveal_type(Foo(1, 2))  # revealed: Foo
+```
+
+## `__new__` present but `__init__` missing
+
+`object.__init__` allows arbitrary arguments when a custom `__new__` exists. This should not trigger
+`__init__` argument errors.
+
+```py
+class Foo:
+    def __new__(cls, x: int):
+        return object.__new__(cls)
+
+reveal_type(Foo(1))  # revealed: Foo
+
+Foo(1)
+# error: [too-many-positional-arguments] "Too many positional arguments to constructor `Foo.__new__`: expected 2, got 3"
+Foo(1, 2)
 ```
 
 ## Conditional `__new__`
@@ -94,18 +154,21 @@ reveal_type(Foo(1, 2))  # revealed: Foo
 def _(flag: bool) -> None:
     class Foo:
         if flag:
-            def __new__(cls, x: int): ...
+            def __new__(cls, x: int):
+                return super().__new__(cls)
+
         else:
-            def __new__(cls, x: int, y: int = 1): ...
+            def __new__(cls, x: int, y: int = 1):
+                return super().__new__(cls)
 
     reveal_type(Foo(1))  # revealed: Foo
-    # error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `int`, found `Literal["1"]`"
-    # error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `int`, found `Literal["1"]`"
+    # error: [invalid-argument-type] "Argument to constructor `Foo.__new__` is incorrect: Expected `int`, found `Literal["1"]`"
+    # error: [invalid-argument-type] "Argument to constructor `Foo.__new__` is incorrect: Expected `int`, found `Literal["1"]`"
     reveal_type(Foo("1"))  # revealed: Foo
-    # error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
-    # error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
+    # error: [missing-argument] "No argument provided for required parameter `x` of constructor `Foo.__new__`"
+    # error: [missing-argument] "No argument provided for required parameter `x` of constructor `Foo.__new__`"
     reveal_type(Foo())  # revealed: Foo
-    # error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 2, got 3"
+    # error: [too-many-positional-arguments] "Too many positional arguments to constructor `Foo.__new__`: expected 2, got 3"
     reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
@@ -126,8 +189,468 @@ class Foo:
     __new__: Descriptor = Descriptor()
 
 reveal_type(Foo(1))  # revealed: Foo
-# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
+# error: [missing-argument] "No argument provided for required parameter `x` of bound method `SomeCallable.__call__`"
 reveal_type(Foo())  # revealed: Foo
+```
+
+## A class object in place of `__new__`
+
+Regression test for <https://github.com/astral-sh/ty/issues/3491>.
+
+```py
+class C:
+    class __new__(a):  # error: [unresolved-reference]
+        pass
+
+C()
+```
+
+We do not fully model the constructor chain when the callable used as `__new__` is itself a class
+object. These cases document the runtime behavior and the approximation we make today.
+
+If the assigned class returns an outer-class instance that is not also an instance of the assigned
+class, the assigned class's `__init__` is skipped. Here, `D()` calls `Factory.__new__(Factory, D)`,
+which returns a `D`. Python skips `Factory.__init__`, then continues the outer call with
+`D.__init__`. This is what we currently model.
+
+```py
+class Factory:
+    def __new__(cls, outer_cls: type["D"]) -> "D":
+        return object.__new__(D)
+
+    def __init__(self, outer_cls: int) -> None:
+        pass
+
+class D:
+    __new__ = Factory
+
+    def __init__(self, value: int) -> None:
+        pass
+
+# error: [missing-argument] "No argument provided for required parameter `value` of `D.__init__`"
+D()
+```
+
+If the returned outer-class instance is also an instance of the assigned class, the assigned class
+call does continue into `__init__`. Here, `E()` calls `SubclassFactory.__new__(SubclassFactory, E)`,
+which returns an `E`. Since `E` is a `SubclassFactory` subclass and overrides `__init__`, the inner
+`SubclassFactory(E)` call dispatches to `E.__init__(..., E)`. The outer `E()` call then dispatches
+to `E.__init__` again with the outer call arguments. We currently only model that outer call.
+
+```py
+class SubclassFactory:
+    def __new__(cls, outer_cls: type["E"]) -> "E":
+        return object.__new__(E)
+
+    def __init__(self, outer_cls: int) -> None:
+        pass
+
+class E(SubclassFactory):
+    __new__ = SubclassFactory
+
+    def __init__(self, value: int) -> None:
+        pass
+
+# TODO should also be - error: [invalid-argument-type] "Argument to `E.__init__` is incorrect: Expected `int`, found `<class 'E'>`"
+# error: [missing-argument] "No argument provided for required parameter `value` of `E.__init__`"
+E()
+```
+
+If the assigned class returns an instance of itself instead of an outer-class instance, its own
+`__init__` is called and the outer class's `__init__` is skipped. Here, `SelfFactory.__new__`
+returns a `SelfFactory`, so `SelfFactory.__init__` runs inside `ReturnsFactory()` but
+`ReturnsFactory.__init__` does not. We currently do not model that nested `__init__` call.
+
+```py
+class SelfFactory:
+    def __new__(cls, outer_cls: type["ReturnsFactory"]) -> "SelfFactory":
+        return object.__new__(SelfFactory)
+
+    def __init__(self, outer_cls: int) -> None:
+        pass
+
+class ReturnsFactory:
+    __new__ = SelfFactory
+
+    def __init__(self, value: int) -> None:
+        pass
+
+# TODO should be - error: [invalid-argument-type] "Argument to `SelfFactory.__init__` is incorrect: Expected `int`, found `<class 'ReturnsFactory'>`"
+ReturnsFactory()
+```
+
+## Recursive constructor signatures
+
+When a constructor refers back to the same receiver type without reaching a callable signature, we
+fall back to an unknown signature with the nominal instance return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+### A decorator returning the enclosing class
+
+A decorator can replace `__new__` with the type of its implicit `cls` parameter, making the
+constructor refer back to itself. Regression test for <https://github.com/astral-sh/ty/issues/4347>.
+
+```py
+from collections.abc import Callable
+
+def decorate[T](callback: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+class C:
+    @decorate
+    def __new__(cls):
+        pass
+
+reveal_type(C.__new__)  # revealed: type[C]
+reveal_type(C())  # revealed: C
+```
+
+### Mutually recursive class objects
+
+The same fallback applies when two classes use each other as their `__new__` method:
+
+```py
+class A:
+    __new__: type["B"]
+
+class B:
+    __new__: type[A]
+
+reveal_type(A())  # revealed: A
+```
+
+### Recursive generic constructors
+
+A constructor can also return to the same generic class with the same specialization:
+
+```py
+class C[T]:
+    __new__: type["C[T]"]
+
+# TODO: Default unsolved class type variables in gradual constructor signatures to `Unknown`.
+reveal_type(C())  # revealed: C[T@C]
+reveal_type(C[int]())  # revealed: C[int]
+```
+
+### Shared constructors in union branches
+
+A constructor that occurs in separate union branches is not recursive. Both branches reach the same
+finite signature:
+
+```py
+class End:
+    def __new__(cls, *args: object) -> int:
+        return 1
+
+class Left:
+    __new__ = End
+
+class Right:
+    __new__ = End
+
+class C:
+    __new__: type[Left] | type[Right]
+
+reveal_type(C())  # revealed: int
+```
+
+### Finite generic constructor chains
+
+Returning to the same generic class is safe when subsequent constructors reach a callable signature.
+Here, each step consumes a nested specialization until it reaches `End.__new__`:
+
+```py
+class End[T]:
+    def __new__(cls, *args: object) -> int:
+        return 1
+
+class C[T]:
+    __new__: type[T]
+
+reveal_type(C[C[End[int]]]())  # revealed: int
+
+type Inner = C[End[int]]
+
+reveal_type(C[Inner]())  # revealed: int
+```
+
+A finite chain can even grow its arguments. `Factory` returns to `C` with a larger argument, but
+`End` does not expand the nested `Factory` type:
+
+```py
+class Factory[T]:
+    __new__: type[C[End["Factory[T]"]]]
+
+reveal_type(C[Factory[int]]())  # revealed: int
+```
+
+### Descriptor-sensitive constructor receivers
+
+An exact class object and a value of `type[C]` can select different descriptor overloads. This
+constructor returns to `C` with a different receiver type before reaching a finite signature:
+
+```py
+from collections.abc import Callable
+from typing import overload
+from ty_extensions._internal import TypeOf
+
+class Descriptor:
+    @overload
+    def __get__(self, obj: None, owner: "TypeOf[C]") -> "type[C]": ...
+    @overload
+    def __get__(self, obj: None, owner: "type[C]") -> Callable[..., int]: ...
+    def __get__(self, obj, owner):
+        raise NotImplementedError
+
+class C:
+    __new__: Descriptor
+
+reveal_type(C())  # revealed: int
+```
+
+### Argument checks after recursive `__new__`
+
+The recursive `__new__` fallback accepts arbitrary arguments, but an ordinary `__init__` still
+validates them against the class's specialization:
+
+```py
+class C[T]:
+    __new__: type["C[T]"]
+
+    def __init__(self, x: T):
+        pass
+
+reveal_type(C[int](1))  # revealed: C[int]
+# error: [invalid-argument-type]
+C[int]("wrong")
+```
+
+### A recursive class object in place of `__init__`
+
+Class-valued `__init__` methods can also lead back to the constructor being expanded:
+
+```py
+class C:
+    __init__: type["C"]
+
+reveal_type(C())  # revealed: C
+```
+
+The fallback does not override a known non-instance return from `__new__`, which bypasses
+`__init__`:
+
+```py
+class ReturnsInt:
+    def __new__(cls) -> int:
+        return 1
+
+    __init__: type["ReturnsInt"]
+
+reveal_type(ReturnsInt())  # revealed: int
+```
+
+### A recursive class object in place of metaclass `__call__`
+
+A metaclass's `__call__` can refer back to the class being constructed:
+
+```py
+class Meta(type):
+    __call__: type["C"]
+
+class C(metaclass=Meta): ...
+
+reveal_type(C())  # revealed: C
+```
+
+### A cycle through a callable instance
+
+Constructor expansion can pass through an instance's `__call__` before returning to the original
+class:
+
+```py
+class C:
+    __new__: "Factory"
+
+class Factory:
+    __call__: type[C]
+
+reveal_type(C())  # revealed: C
+```
+
+### A metaclass bypassing a recursive `__new__`
+
+A metaclass `__call__` that returns an unrelated type bypasses `__new__`. A recursive signature in
+the unused `__new__` does not prevent us from inferring the metaclass method's return type:
+
+```py
+class Meta(type):
+    def __call__(cls) -> int:
+        return 1
+
+class C(metaclass=Meta):
+    __new__: type["C"]
+
+reveal_type(C())  # revealed: int
+```
+
+## `__new__` is implicitly a static method, but explicitly marking it as one is harmless
+
+```py
+class Foo:
+    @staticmethod
+    def __new__(cls, x: int):
+        return object.__new__(cls)
+
+reveal_type(Foo(1))  # revealed: Foo
+```
+
+## Implicit `__new__` receivers
+
+An unannotated `cls` parameter on `__new__` is inferred as `type[Self]`. Constructor calls must be
+accepted when a generic callback determines the class's type argument. Here, the correlated callback
+overloads, covariant `frozenset`, and fully dynamic `values` exercise a path-merged specialization.
+Reapplying that specialization to the synthetic `cls` would introduce an extra `frozenset` layer and
+incorrectly reject both ordinary and signature-preserving `Callable` constructors.
+
+```pyi
+from collections.abc import Callable
+from typing import Any, Generic, ParamSpec, Protocol, TypeVar, overload
+from typing_extensions import Self
+
+P = ParamSpec("P")
+R = TypeVar("R")
+R_co = TypeVar("R_co", covariant=True)
+T = TypeVar("T")
+
+@overload
+def callback(value: frozenset[T]) -> T: ...
+@overload
+def callback(value: T) -> T: ...
+
+class Mapper(Generic[R]):
+    def __new__(cls, callback: Callable[[T], R], values: list[T], /) -> Self: ...
+
+values: Any
+
+# TODO: Preserve correlated overload solutions when inferring the callback's return type.
+reveal_type(Mapper(callback, values))  # revealed: Mapper[Unknown]
+
+def wrap(function: Callable[P, R]) -> Callable[P, R]: ...
+
+class Wrapped(Generic[R]):
+    @wrap
+    def __new__(cls, callback: Callable[[T], R], values: list[T]) -> Self: ...
+
+# TODO: Preserve the callback's correlated overload solutions through the decorator.
+reveal_type(Wrapped(callback, values))  # revealed: Wrapped[Unknown]
+```
+
+A decorator can preserve `cls` explicitly with `Concatenate`, re-expressing the receiver with its
+own type variable. Constraint inference checks the synthetic receiver; the later assignability pass
+must not reject it merely because that decorator-scoped type variable remains unsolved:
+
+```pyi
+from typing_extensions import Concatenate
+
+def wrap_cls(function: Callable[Concatenate[type[T], P], R]) -> Callable[Concatenate[type[T], P], R]: ...
+
+class WrappedCls:
+    @wrap_cls
+    def __new__(cls) -> Self: ...
+
+reveal_type(WrappedCls())  # revealed: WrappedCls
+```
+
+A decorator can also return a callback protocol instead of `Callable`. Its inferred `type[Self]`
+receiver must likewise not be rejected by the later assignability pass:
+
+```pyi
+class CallableObject(Protocol[P, R_co]):
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R_co: ...
+
+def wrap_object(function: Callable[P, R_co]) -> CallableObject[P, R_co]: ...
+
+class WrappedObject:
+    @wrap_object
+    def __new__(cls) -> Self: ...
+
+reveal_type(WrappedObject())  # revealed: WrappedObject
+```
+
+The explicit `cls` type in a signature-preserving decorator can also be expressed with a generic
+type alias. The alias must be resolved when identifying the constructor receiver, or the later
+assignability pass rejects the synthetic argument against the decorator's unsolved receiver type:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+type Receiver[X] = type[X]
+
+def preserve[U, **P, R](
+    function: Callable[Concatenate[Receiver[U], P], R],
+) -> Callable[Concatenate[Receiver[U], P], R]: ...
+
+class Simple:
+    @preserve
+    def __new__(cls) -> Self: ...
+
+reveal_type(Simple())  # revealed: Simple
+```
+
+## `__new__` defined as a classmethod
+
+Marking it as a classmethod, on the other hand, breaks at runtime.
+
+```py
+from typing_extensions import Self
+
+class Foo:
+    @classmethod
+    def __new__(cls, x: int):
+        return object.__new__(cls)
+
+# error: [invalid-argument-type] "Argument to bound method `Foo.__new__` is incorrect: Expected `int`, found `<class 'Foo'>`"
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `Foo.__new__`: expected 1, got 2"
+Foo(1)
+
+class Bar:
+    @classmethod
+    def __new__(cls) -> Self:
+        raise NotImplementedError
+
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `Bar.__new__`: expected 0, got 1"
+reveal_type(Bar())  # revealed: Bar
+```
+
+## `__new__` borrowed from another class
+
+A borrowed `__new__` method retains the upper bound on its `Self` receiver. The class being
+constructed must be a subclass of the class that defined the method.
+
+```py
+from typing_extensions import Self
+
+class A:
+    value: int = 1
+
+    def __new__(cls: type[Self]) -> int:
+        return cls.value
+
+class B:
+    __new__ = A.__new__
+
+class C(A):
+    __new__ = A.__new__
+
+B()  # error: [invalid-argument-type] "Argument type `B` does not satisfy upper bound `A` of type variable `Self`"
+reveal_type(C())  # revealed: int
 ```
 
 ## A callable instance in place of `__new__`
@@ -143,7 +666,7 @@ class Foo:
     __new__ = Callable()
 
 reveal_type(Foo(1))  # revealed: Foo
-# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
+# error: [missing-argument] "No argument provided for required parameter `x` of bound method `Callable.__call__`"
 reveal_type(Foo())  # revealed: Foo
 ```
 
@@ -178,11 +701,11 @@ def _(flag: bool) -> None:
     class Foo:
         __new__ = Callable()
 
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
+    # error: [not-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
     reveal_type(Foo(1))  # revealed: Foo
     # TODO should be - error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
     # but we currently infer the signature of `__call__` as unknown, so it accepts any arguments
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
+    # error: [not-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
     reveal_type(Foo())  # revealed: Foo
 ```
 
@@ -196,10 +719,1397 @@ class Foo:
 
 reveal_type(Foo(1))  # revealed: Foo
 
-# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
+# error: [missing-argument] "No argument provided for required parameter `x` of `Foo.__init__`"
 reveal_type(Foo())  # revealed: Foo
-# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 2, got 3"
+# error: [too-many-positional-arguments] "Too many positional arguments to `Foo.__init__`: expected 2, got 3"
 reveal_type(Foo(1, 2))  # revealed: Foo
+```
+
+## `__new__` return type
+
+Python's `__new__` method can return any type, not just an instance of the class. When `__new__`
+returns a type that is not a subtype of the class instance type, we use the returned type directly,
+without checking `__init__`.
+
+### `__new__` returning a different type
+
+```py
+class ReturnsInt:
+    def __new__(cls) -> int:
+        return 42
+
+reveal_type(ReturnsInt())  # revealed: int
+
+x: int = ReturnsInt()  # OK
+y: ReturnsInt = ReturnsInt()  # error: [invalid-assignment]
+```
+
+In this case, we don't validate `__init__`:
+
+```py
+class ReturnsIntWithInit:
+    def __new__(cls) -> int:
+        return 42
+
+    def __init__(self, x: str) -> None: ...
+
+# No error from missing argument to `__init__`:
+reveal_type(ReturnsIntWithInit())  # revealed: int
+```
+
+### `__new__` returning a union type
+
+```py
+class MaybeInt:
+    def __new__(cls, value: str) -> "int | MaybeInt":
+        try:
+            return int(value)
+        except ValueError:
+            return object.__new__(cls)
+
+reveal_type(MaybeInt("42"))  # revealed: int | MaybeInt
+
+a: int | MaybeInt = MaybeInt("42")  # OK
+b: int = MaybeInt("42")  # error: [invalid-assignment]
+```
+
+### `__new__` returning an intersection type
+
+```py
+from __future__ import annotations
+from ty_extensions import Intersection
+
+class Mixin:
+    pass
+
+class A:
+    def __new__(cls) -> Intersection[A, Mixin]:
+        raise NotImplementedError()
+
+    def __init__(self, x: int) -> None: ...
+
+# error: [missing-argument]
+reveal_type(A())  # revealed: A & Mixin
+```
+
+### `__new__` returning the class type
+
+When `__new__` returns the type of the instance being constructed, we use that type:
+
+```py
+class Normal:
+    def __new__(cls) -> "Normal":
+        return object.__new__(cls)
+
+reveal_type(Normal())  # revealed: Normal
+```
+
+And we do validate `__init__`:
+
+```py
+class NormalWithInit:
+    def __new__(cls) -> "NormalWithInit":
+        return object.__new__(cls)
+
+    def __init__(self, x: int) -> None: ...
+
+# error: [missing-argument]
+reveal_type(NormalWithInit())  # revealed: NormalWithInit
+```
+
+### `__new__` with no return type annotation
+
+When `__new__` has no return type annotation, we fall back to the instance type.
+
+```py
+class NoAnnotation:
+    def __new__(cls):
+        return object.__new__(cls)
+
+reveal_type(NoAnnotation())  # revealed: NoAnnotation
+```
+
+### `__new__` returning `Any`
+
+Per the spec, "an explicit return type of `Any` should be treated as a type that is not an instance
+of the class being constructed." This means `__init__` is not called and the return type is `Any`.
+
+```py
+from typing import Any
+
+class ReturnsAny:
+    def __new__(cls) -> Any:
+        return 42
+
+    def __init__(self, x: int) -> None:
+        pass
+
+# __init__ is skipped because `-> Any` is treated as non-instance per spec
+reveal_type(ReturnsAny())  # revealed: Any
+```
+
+### `__new__` returning `Never`
+
+When `__new__` returns `Never`, the call is terminal and `__init__` is skipped.
+
+```py
+from typing_extensions import Never
+
+class NewNeverReturns:
+    def __new__(cls) -> Never:
+        raise NotImplementedError
+
+    def __init__(self, x: int) -> None:
+        pass
+
+# `__init__` is skipped because `__new__` never returns.
+reveal_type(NewNeverReturns())  # revealed: Never
+```
+
+### `__new__` returning a union containing `Any`
+
+When `__new__` returns a union containing `Any`, since we don't consider `Any` a subtype of the
+instance type, `__init__` is skipped.
+
+```py
+from typing import Any
+
+class MaybeAny:
+    def __new__(cls, value: int) -> "MaybeAny | Any":
+        if value > 0:
+            return object.__new__(cls)
+        return None
+
+    def __init__(self) -> None:
+        pass
+
+reveal_type(MaybeAny(1))  # revealed: MaybeAny | Any
+```
+
+### `__new__` returning a non-self typevar
+
+When `__new__` returns a type variable that is not `Self`, we should specialize it before
+categorizing the return type as instance or non-instance.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def __new__(cls, x: T) -> T:
+        return x
+
+    def __init__(self) -> None: ...
+
+# `Literal[1]` is not an instance of `C`, so `__init__` is skipped.
+reveal_type(C(1))  # revealed: Literal[1]
+
+def _(c: C[str]):
+    # `C[str]` is an instance of `C`, so `__init__` is checked and fails.
+    # error: [too-many-positional-arguments]
+    reveal_type(C(c))  # revealed: C[str]
+```
+
+### Self-like `__new__` typevars should still provide `__init__` type context
+
+When `__new__` returns the constructed type via a `cls: type[T] -> T` annotation, we should still
+use `__init__` to provide argument type context for constructor arguments.
+
+#### `Any`-typed `__new__` parameter should not block `__init__` type context
+
+```py
+from __future__ import annotations
+from typing import Any, Callable, TypeVar
+
+T = TypeVar("T", bound="SpanData")
+
+class SpanData:
+    def __new__(
+        cls: type[T],
+        name: str,
+        on_finish: Any | None = None,
+    ) -> T:
+        return object.__new__(cls)
+
+class Span(SpanData):
+    def __init__(self, name: str, on_finish: list[Callable[[Span], None]] | None = None) -> None:
+        pass
+
+class Tracer:
+    def _on_span_finish(self, span: Span) -> None:
+        pass
+
+    def start(self) -> None:
+        Span("x", on_finish=[self._on_span_finish])
+```
+
+#### `object`-typed `__new__` parameter should not block `__init__` type context
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T", bound="SpanData")
+
+class SpanData:
+    def __new__(
+        cls: type[T],
+        name: str,
+        on_finish: object | None = None,
+    ) -> T:
+        return object.__new__(cls)
+
+class Span(SpanData):
+    def __init__(self, name: str, on_finish: list[Callable[["Span"], None]] | None = None) -> None:
+        pass
+
+class Tracer:
+    def _on_span_finish(self, span: "Span") -> None:
+        pass
+
+    def start(self) -> None:
+        Span("x", on_finish=[self._on_span_finish])
+```
+
+#### `cls: type[T] -> T` should still allow literal promotion for invariant class type parameters
+
+```py
+from typing import Generic, TypeVar
+
+S = TypeVar("S")
+T = TypeVar("T", bound="Box")  # error: [missing-type-argument]
+
+class Box(Generic[S]):
+    def __new__(cls: type[T], x: S) -> T:
+        return super().__new__(cls)
+
+reveal_type(Box(42))  # revealed: Box[int]
+```
+
+#### `typing.Self` return should still provide `__init__` type context
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+from typing import Callable, Self, Any
+
+class SpanData:
+    def __new__(
+        cls,
+        name: str,
+        on_finish: Any | None = None,
+    ) -> Self:
+        return object.__new__(cls)
+
+class Span(SpanData):
+    def __init__(self, name: str, on_finish: list[Callable[[Span], None]] | None = None) -> None:
+        pass
+
+class Tracer:
+    def _on_span_finish(self, span: Span) -> None:
+        pass
+
+    def start(self) -> None:
+        Span("x", on_finish=[self._on_span_finish])
+```
+
+### `__new__` returning a specific class affects subclasses
+
+When `__new__` returns a specific class (e.g., `-> Foo`), this is an instance type for `Foo` itself,
+so `__init__` is checked. But for a subclass `Bar(Foo)`, the return type `Foo` is NOT an instance of
+`Bar`, so the `__new__` return type is used directly and `Bar.__init__` is skipped.
+
+```py
+class Foo:
+    def __new__(cls, x: int = 0) -> "Foo":
+        return object.__new__(cls)
+
+    def __init__(self, x: int) -> None:
+        pass
+
+class Bar(Foo):
+    def __init__(self, y: str) -> None:
+        pass
+
+# For Foo: return type `Foo` IS an instance of `Foo`, so `__init__` is checked.
+Foo()  # error: [missing-argument]
+reveal_type(Foo(1))  # revealed: Foo
+
+# For Bar: return type `Foo` is NOT an instance of `Bar`, so `__init__` is
+# skipped and `Foo` is used directly.
+reveal_type(Bar())  # revealed: Foo
+reveal_type(Bar(1))  # revealed: Foo
+```
+
+### `__new__` can remap an explicit generic specialization
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Class8(Generic[T]):
+    def __new__(cls, *args, **kwargs) -> "Class8[list[T]]":
+        raise NotImplementedError
+
+reveal_type(Class8[int]())  # revealed: Class8[list[int]]
+reveal_type(Class8[str]())  # revealed: Class8[list[str]]
+```
+
+### `__new__` returning `Self` preserves explicit specialization
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class Class9(Generic[T]):
+    def __new__(cls, x: T) -> Self:
+        return super().__new__(cls)
+
+reveal_type(Class9[int](1))  # revealed: Class9[int]
+```
+
+### `__new__` can fix generic specialization and still validate `__init__`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C[T]:
+    def __new__(cls) -> "C[int]":
+        raise NotImplementedError()
+
+    def __init__(self, x: int) -> None:
+        pass
+
+# error: [missing-argument]
+reveal_type(C())  # revealed: C[int]
+# error: [missing-argument]
+reveal_type(C[str]())  # revealed: C[int]
+# error: [missing-argument]
+reveal_type(C[int]())  # revealed: C[int]
+```
+
+### `__new__` with method-level type variables mapping to class specialization
+
+When `__new__` has its own type parameters that map to the class's type parameter through the return
+type, we should correctly infer the class specialization.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C[T]:
+    x: T
+
+    def __new__[S](cls, x: S) -> "C[tuple[S, S]]":
+        raise NotImplementedError()
+
+reveal_type(C(1))  # revealed: C[tuple[int, int]]
+reveal_type(C("hello"))  # revealed: C[tuple[str, str]]
+```
+
+### `__new__` with arbitrary generic return types
+
+When `__new__` has method-level type variables in the return type that don't map to the class's type
+parameters, the resolved return type should be used directly.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C:
+    def __new__[S](cls, x: S) -> S:
+        return x
+
+reveal_type(C("foo"))  # revealed: Literal["foo"]
+reveal_type(C(1))  # revealed: Literal[1]
+```
+
+### `__new__` returning non-instance generic containers
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C:
+    def __new__[S](cls, x: S) -> list[S]:
+        return [x]
+
+reveal_type(C("foo"))  # revealed: list[str]
+reveal_type(C(1))  # revealed: list[int]
+```
+
+### Failed `__new__` call with unambiguous non-instance return type
+
+```py
+class C:
+    def __new__(cls, x: int) -> str:
+        return str(x)
+
+# error: [invalid-argument-type]
+reveal_type(C("foo"))  # revealed: str
+```
+
+### Overloaded `__new__` with generic return types
+
+Overloaded `__new__` methods should correctly resolve to the matching overload and infer the class
+specialization from the overload's return type.
+
+```py
+from typing import Generic, Iterable, TypeVar, overload
+
+T = TypeVar("T")
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
+
+class MyZip(Generic[T]):
+    @overload
+    def __new__(cls) -> "MyZip[object]": ...
+    @overload
+    def __new__(cls, iter1: Iterable[T1], iter2: Iterable[T2]) -> "MyZip[tuple[T1, T2]]": ...
+    def __new__(cls, *args, **kwargs) -> "MyZip[object]":
+        raise NotImplementedError
+
+def check(a: tuple[int, ...], b: tuple[str, ...]) -> None:
+    reveal_type(MyZip(a, b))  # revealed: MyZip[tuple[int, str]]
+    reveal_type(MyZip())  # revealed: MyZip[object]
+```
+
+### Mixed `__new__` overloads
+
+If some `__new__` overloads are instance-returning and some are not, the return type (and `__init__`
+validation) are resolved correctly for each call site:
+
+```py
+from __future__ import annotations
+from typing import Any, Literal, overload
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+class Test:
+    @overload
+    def __new__(cls, x: A) -> A: ...
+    @overload
+    def __new__(cls, x: str) -> Test: ...
+    def __new__(cls, x: A | str) -> A | Test:
+        raise NotImplementedError()
+
+    def __init__(self, x: Literal["ok"]) -> None:
+        pass
+
+# `A` matches the first `__new__` overload, which returns `A`, bypassing `__init__` since `A` is
+# not a subtype of `Test`.
+reveal_type(Test(A()))  # revealed: A
+
+# `str` returns `Test` from `__new__`, but `__init__` rejects `Literal["bad"]`.
+# error: [invalid-argument-type]
+reveal_type(Test("bad"))  # revealed: Test
+
+# `Literal["ok"]` returns `Test` from `__new__`, and is accepted by `__init__`.
+reveal_type(Test("ok"))  # revealed: Test
+```
+
+The same mechanism should also hold for a `Self`-returning overload:
+
+```py
+from typing import overload
+from typing_extensions import Self
+
+class SimpleMixed:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> Self: ...
+    def __new__(cls, x: int | str) -> object: ...
+    def __init__(self, x: str) -> None: ...
+
+reveal_type(SimpleMixed(1))  # revealed: int
+reveal_type(SimpleMixed("foo"))  # revealed: SimpleMixed
+```
+
+### Overlapping generic `__new__` overloads preserve first-match selection
+
+A synthetic constructor receiver can still contain inferable class type variables, even though each
+overload specializes `cls` differently. Step 5 of the overload evaluation algorithm must preserve
+the overload's inferable variables when checking whether the argument types are covered; otherwise a
+concrete constructor call appears ambiguous. In particular, both overloads below accept `list[int]`,
+but the first one must win. The non-instance return case verifies that this is not specific to
+`Self` or to returning the constructed class.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Self, overload
+
+class MixedSelf[T]:
+    @overload
+    def __new__(cls, value: list[T]) -> Self: ...
+    @overload
+    def __new__(cls, value: T) -> T: ...
+    def __new__(cls, value: object) -> object:
+        return object.__new__(cls)
+
+reveal_type(MixedSelf([1]))  # revealed: MixedSelf[int]
+reveal_type(MixedSelf(1))  # revealed: Literal[1]
+
+class DistinctNonInstanceReturns[T]:
+    @overload
+    def __new__(cls, value: list[T]) -> str: ...
+    @overload
+    def __new__(cls, value: T) -> T: ...
+    def __new__(cls, value: object) -> object:
+        return object.__new__(cls)
+
+reveal_type(DistinctNonInstanceReturns([1]))  # revealed: str
+```
+
+### A gradual constructor receiver participates in overload filtering
+
+The synthetic `cls` argument must participate in overload filtering because it can be the only
+gradual argument. A concrete class specialization selects its matching receiver overload, but an
+`Any` specialization can match receivers with different return types and must remain ambiguous.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Any, overload
+
+class Foo[T]:
+    @overload
+    def __new__(cls: type[Foo[int]]) -> int: ...
+    @overload
+    def __new__(cls: type[Foo[str]]) -> str: ...
+    def __new__(cls) -> object: ...
+
+reveal_type(Foo[int]())  # revealed: int
+reveal_type(Foo[str]())  # revealed: str
+reveal_type(Foo[Any]())  # revealed: Unknown
+```
+
+### Multiple matching `__new__` overloads
+
+If overload resolution for `__new__` falls back to `Unknown` because the argument is `Any` or
+`Unknown`, we should still validate downstream constructors:
+
+```py
+from typing import Any, overload
+from typing_extensions import Self
+from missing import Unknown  # type: ignore
+
+class AmbiguousMixed:
+    @overload
+    def __new__(cls, x: int) -> Self: ...
+    @overload
+    def __new__(cls, x: str) -> str: ...
+    def __new__(cls, x: int | str) -> Self | str:
+        raise NotImplementedError
+
+    def __init__(self) -> None: ...
+
+def _(a: Any, u: Unknown):
+    # error: [too-many-positional-arguments]
+    reveal_type(AmbiguousMixed(a))  # revealed: Unknown
+
+    # error: [too-many-positional-arguments]
+    reveal_type(AmbiguousMixed(u))  # revealed: Unknown
+```
+
+### Mixed `__new__` overloads should not become declaration-order dependent
+
+Reversing the declaration order of the same mixed overload set should not change the result when
+overload resolution falls back to `Unknown`.
+
+```py
+from typing import Any, overload
+from typing_extensions import Self
+from missing import Unknown  # type: ignore
+
+class ReverseAmbiguousMixed:
+    @overload
+    def __new__(cls, x: str) -> str: ...
+    @overload
+    def __new__(cls, x: int) -> Self: ...
+    def __new__(cls, x: int | str) -> object:
+        raise NotImplementedError
+
+    def __init__(self) -> None: ...
+
+def _(a: Any, u: Unknown):
+    # error: [too-many-positional-arguments]
+    reveal_type(ReverseAmbiguousMixed(a))  # revealed: Unknown
+
+    # error: [too-many-positional-arguments]
+    reveal_type(ReverseAmbiguousMixed(u))  # revealed: Unknown
+```
+
+### Overloaded non-instance `__new__` should preserve matched return type
+
+When all `__new__` overloads return non-instance types, constructor return typing should still use
+the matched overload's return type at each call site.
+
+```py
+from typing import overload
+
+class F:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> str: ...
+    def __new__(cls, x: int | str) -> object: ...
+
+reveal_type(F(1))  # revealed: int
+reveal_type(F("foo"))  # revealed: str
+```
+
+### Invalid overloaded non-instance `__new__` should not invent an instance return
+
+If no overload matches, we should report `Unknown` rather than falling back to the class instance
+type.
+
+```py
+from typing import overload
+
+class OnlyNonInstance:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> str: ...
+    def __new__(cls, x: int | str) -> object:
+        raise NotImplementedError
+
+# error: [no-matching-overload]
+reveal_type(OnlyNonInstance(1.2))  # revealed: Unknown
+```
+
+### Mixed generic `__new__` overloads should still validate `__init__`
+
+For generic classes, if an instance-returning `__new__` overload matches, we still need to validate
+`__init__` even when another overload returns a non-instance type.
+
+```py
+from typing import Generic, TypeVar, overload
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class E(Generic[T]):
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: T) -> Self: ...
+    def __new__(cls, x: object) -> object: ...
+    def __init__(self, x: T, y: str) -> None: ...
+
+# The `T -> Self` overload is instance-returning, so `__init__` must also be checked.
+# error: [missing-argument]
+reveal_type(E("foo"))  # revealed: E[str]
+```
+
+### Mixed overloaded `__new__` should also normalize `cls: type[T] -> T` returns
+
+The same selected-overload path should treat self-like `TypeVar` returns as instance-returning.
+
+```py
+from __future__ import annotations
+from typing import Generic, TypeVar, overload
+
+S = TypeVar("S")
+T = TypeVar("T", bound="E")  # error: [missing-type-argument]
+
+class E(Generic[S]):
+    @overload
+    def __new__(cls, x: int, y: int) -> int: ...
+    @overload
+    def __new__(cls: type[T], x: S) -> T: ...
+    def __new__(cls, *args: object) -> object: ...
+    def __init__(self, x: S, y: str) -> None: ...
+
+# The `type[T] -> T` overload is instance-returning, so `__init__` must also be checked.
+# error: [missing-argument]
+reveal_type(E("foo"))  # revealed: E[str]
+reveal_type(E(1, 2))  # revealed: int
+```
+
+### Mixed overloaded `__new__` should preserve constructor literal promotion
+
+When mixed `__new__` overloads defer `__init__` validation, the inferred constructor specialization
+should still apply literal promotion from `__init__`.
+
+```py
+from typing import Generic, TypeVar, overload
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class E(Generic[T]):
+    @overload
+    def __new__(cls, tag: int, y: object) -> int: ...
+    @overload
+    def __new__(cls, tag: str, y: object) -> Self: ...
+    def __new__(cls, tag: int | str, y: object) -> object: ...
+    def __init__(self, tag: str, y: T) -> None: ...
+
+reveal_type(E("ok", 1))  # revealed: E[int]
+reveal_type(E(1, 1))  # revealed: int
+```
+
+### Union of mixed constructors should preserve deferred `__init__` checks
+
+```py
+from typing import overload
+from typing_extensions import Self
+
+class C:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> Self: ...
+    def __new__(cls, x: int | str) -> object: ...
+    def __init__(self, x: str, y: str) -> None: ...
+
+class D:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> Self: ...
+    def __new__(cls, x: int | str) -> object: ...
+    def __init__(self, x: str) -> None: ...
+
+def f(flag: bool) -> None:
+    ctor = C if flag else D
+
+    # `str -> Self` is selected on both constructor branches. `C.__init__` still
+    # requires `y`, so this should fail even after unioning constructor bindings.
+    # error: [missing-argument]
+    ctor("foo")
+```
+
+### Intersection of mixed constructors should discard failing deferred `__init__` checks
+
+```py
+from typing import overload
+
+from ty_extensions import Intersection
+from typing_extensions import Self
+
+class C:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> Self: ...
+    def __new__(cls, x: int | str) -> object: ...
+    def __init__(self, x: str, y: str) -> None: ...
+
+class D:
+    def __init__(self, x: str) -> None: ...
+
+def f(ctor: Intersection[type[C], type[D]]) -> None:
+    # `C.__new__` selects `str -> Self`, but `C.__init__` still rejects the call
+    # because `y` is missing. `D` accepts the call, so the intersection should
+    # succeed using only the `D` branch.
+    reveal_type(ctor("foo"))  # revealed: D
+```
+
+### Union of generic constructor types with `__new__` should preserve specialization
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class E(Generic[T]):
+    def __new__(cls, x: object):
+        return object.__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+class F(Generic[T]):
+    def __new__(cls, x: object):
+        return object.__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+def f(flag: bool) -> None:
+    ctor: type[E[int]] | type[F[int]]
+    if flag:
+        ctor = E
+    else:
+        ctor = F
+
+    reveal_type(ctor(1))  # revealed: E[int] | F[int]
+```
+
+### Intersection of generic constructor types with `__new__` should preserve specialization
+
+```py
+from typing import Generic, TypeVar
+
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+
+class E(Generic[T]):
+    def __new__(cls, x: object):
+        return object.__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+class F(Generic[T]):
+    def __new__(cls, x: object):
+        return object.__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+def f(ctor: Intersection[type[E[int]], type[F[int]]]) -> None:
+    reveal_type(ctor(1))  # revealed: E[int] & F[int]
+```
+
+### `__new__` returning a strict subclass preserves that return type
+
+```py
+class C:
+    def __new__(cls) -> "D":
+        return object.__new__(D)
+
+class D(C): ...
+
+# Preserve explicit strict-subclass constructor returns.
+reveal_type(C())  # revealed: D
+```
+
+### Generic `__new__` returning a strict subclass preserves that return type
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C[T]:
+    def __new__(cls, x: T) -> "D":
+        raise NotImplementedError
+
+    def __init__(self, x: object) -> None: ...
+
+    x: T
+
+class D(C[int]): ...
+
+reveal_type(C("foo"))  # revealed: D
+```
+
+### Generic `__new__` subtype return should inherit specialization from `__init__`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C[T]:
+    def __new__(cls, x: object) -> "D[T]":
+        raise NotImplementedError
+
+    def __init__(self, x: T) -> None: ...
+
+    x: T
+
+class D[T](C[T]): ...
+
+reveal_type(C("foo"))  # revealed: D[str]
+```
+
+### Mixed overloaded `__new__` preserving strict-subclass return
+
+```py
+from typing import overload
+
+class Base:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> "Child": ...
+    def __new__(cls, x: int | str) -> object: ...
+    def __init__(self, x: str) -> None: ...
+
+class Child(Base): ...
+
+reveal_type(Base(1))  # revealed: int
+reveal_type(Base("foo"))  # revealed: Child
+```
+
+## Generic constructor inference
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __init__(self, x: T) -> None: ...
+
+reveal_type(Box(1))  # revealed: Box[int]
+```
+
+## Reconstructing a generic receiver through a union parameter
+
+A mapping matches the constructor's mapping protocol; its keys do not also have to be key-value
+pairs. Reconstructing the receiver preserves `Self` and the enclosing key type.
+
+```py
+from collections.abc import Iterable, Mapping
+from typing import Generic, Protocol, TypeVar
+from typing_extensions import Self
+
+K = TypeVar("K")
+
+class Maplike(Protocol[K]):
+    def keys(self) -> Iterable[K]: ...
+    def __getitem__(self, key: K, /) -> int: ...
+
+class Container(Generic[K]):
+    def __init__(self, value: Maplike[K] | Iterable[tuple[K, int]]) -> None: ...
+    def copy(self, other: Mapping[K, int]) -> Self:
+        result = self.__class__(other)
+        reveal_type(result)  # revealed: Self@copy
+        return result
+```
+
+## Generic constructor inference from overloaded `__init__` self types
+
+```py
+from __future__ import annotations
+
+from typing import Generic, TypeVar, overload
+
+T = TypeVar("T")
+CT = TypeVar("CT")
+
+class ClassSelector(Generic[T]):
+    @overload
+    def __init__(
+        self: ClassSelector[CT],
+        *,
+        default: CT,
+        class_: type[CT],
+    ) -> None: ...
+    @overload
+    def __init__(
+        self: ClassSelector[CT | None],
+        *,
+        default: None = None,
+        class_: type[CT],
+    ) -> None: ...
+    def __init__(self, *, default=None, class_=None): ...
+
+class MyClass:
+    pass
+
+a = ClassSelector(default=MyClass(), class_=MyClass)
+reveal_type(a)  # revealed: ClassSelector[MyClass]
+
+b = ClassSelector(class_=MyClass)
+reveal_type(b)  # revealed: ClassSelector[MyClass | None]
+
+# Explicit constructor specializations still reject incompatible inferred `self` types.
+ClassSelector[int](class_=MyClass)  # error: [invalid-argument-type]
+
+class RequiredClassSelector(Generic[T]):
+    def __init__(self: RequiredClassSelector[CT | None], *, class_: type[CT]) -> None: ...
+
+reveal_type(RequiredClassSelector(class_=MyClass))  # revealed: RequiredClassSelector[MyClass | None]
+```
+
+## Inferring type arguments from a union `self` annotation
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Never
+
+class Covariant[T]:
+    def __init__(self: Covariant[int | str]) -> None: ...
+
+    # Make it covariant in `T`:
+    def get(self) -> T:
+        raise NotImplementedError
+
+reveal_type(Covariant())  # revealed: Covariant[int | str]
+reveal_type(Covariant[int]())  # revealed: Covariant[int]
+reveal_type(Covariant[str]())  # revealed: Covariant[str]
+reveal_type(Covariant[Never]())  # revealed: Covariant[Never]
+
+Covariant[object]()  # error: [invalid-argument-type]
+
+class Contravariant[T]:
+    def __init__(self: Contravariant[int | str]) -> None: ...
+
+    # Make it contravariant in `T`:
+    def push(self, value: T) -> None: ...
+
+reveal_type(Contravariant())  # revealed: Contravariant[int | str]
+reveal_type(Contravariant[object]())  # revealed: Contravariant[object]
+
+Contravariant[int]()  # error: [invalid-argument-type]
+Contravariant[str]()  # error: [invalid-argument-type]
+
+class Invariant[T]:
+    def __init__(self: Invariant[int | str]) -> None: ...
+
+    # Make it invariant in `T`:
+    def get(self) -> T:
+        raise NotImplementedError
+    def push(self, value: T) -> None: ...
+
+reveal_type(Invariant())  # revealed: Invariant[int | str]
+reveal_type(Invariant[int | str]())  # revealed: Invariant[int | str]
+
+Invariant[int]()  # error: [invalid-argument-type]
+Invariant[Never]()  # error: [invalid-argument-type]
+Invariant[object]()  # error: [invalid-argument-type]
+```
+
+## Constrained type variables in a union `self` annotation
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+class C[T: (str | None, int | None)]:
+    def __init__[U: (str, int)](self: C[U | None], value: U) -> None: ...
+    def get(self) -> T:
+        raise NotImplementedError
+
+reveal_type(C("a"))  # revealed: C[str | None]
+reveal_type(C(1))  # revealed: C[int | None]
+```
+
+## Variadic receiver annotations
+
+A variadic parameter can accept both the receiver and the explicit constructor arguments.
+
+```py
+class Plain:
+    def __init__(*args: *tuple[object, ...]) -> None: ...
+
+Plain()  # ok
+Plain(1, "a")  # ok
+```
+
+## Union `self` annotations with variadic constructor parameters
+
+The `object` argument selects the `Any` constraint, even when the constructor also infers a
+`ParamSpec` or `TypeVarTuple`.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+class WithParamSpec[T: (str | None, Any)]:
+    def __init__[**P](self: WithParamSpec[str | None], value: T, callback: Callable[P, None]) -> None: ...
+    def push(self, value: T) -> None: ...
+
+def callback() -> None: ...
+
+reveal_type(WithParamSpec(object(), callback))  # revealed: WithParamSpec[Any]
+
+class WithTypeVarTuple[T: (str | None, Any)]:
+    def __init__[*Ts](self: WithTypeVarTuple[str | None], value: T, rest: tuple[*Ts]) -> None: ...
+    def push(self, value: T) -> None: ...
+
+reveal_type(WithTypeVarTuple(object(), (1,)))  # revealed: WithTypeVarTuple[Any]
+```
+
+## `__init__` can remap constructor generic arguments via `self` annotation
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
+
+V1 = TypeVar("V1")
+V2 = TypeVar("V2")
+
+class Class6(Generic[T1, T2]):
+    def __init__(self: "Class6[V1, V2]", value1: V1, value2: V2) -> None: ...
+
+reveal_type(Class6(0, ""))  # revealed: Class6[int, str]
+reveal_type(Class6[int, str](0, ""))  # revealed: Class6[int, str]
+
+class Class7(Generic[T1, T2]):
+    def __init__(self: "Class7[V2, V1]", value1: V1, value2: V2) -> None: ...
+
+reveal_type(Class7(0, ""))  # revealed: Class7[str, int]
+reveal_type(Class7[str, int](0, ""))  # revealed: Class7[str, int]
+```
+
+The tuple's second element still needs specialization when its common element type is `object`.
+
+```py
+class Box(Generic[T1]):
+    def __init__(self: "Box[type[tuple[object, V1]]]", x: V1) -> None: ...
+
+reveal_type(Box(1))  # revealed: Box[type[tuple[object, Literal[1]]]]
+```
+
+## Constructor calls through `type[T]` with a bound TypeVar
+
+```py
+from typing import TypeVar
+
+class C:
+    def __new__(cls, x: int, y: str): ...
+
+T = TypeVar("T", bound=C)
+
+def f(cls: type[T]):
+    # error: [missing-argument] "No argument provided for required parameter `y` of constructor `C.__new__`"
+    cls(1)
+    # error: [invalid-argument-type] "Argument to constructor `C.__new__` is incorrect: Expected `str`, found `Literal[2]`"
+    cls(1, 2)
+    reveal_type(cls(1, "foo"))  # revealed: T@f
+```
+
+## Intersection constructors
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+### Narrowed bound type variables
+
+Narrowing a bounded class type with `issubclass` must use the subclass constructor while preserving
+both the original type variable and the narrowed subclass in the return type.
+
+```py
+class Base:
+    def __init__(self, value: str) -> None: ...
+
+class IntConstructor(Base):
+    def __init__(self, value: int) -> None: ...
+
+def valid[T: Base](cls: type[T]) -> T:
+    if issubclass(cls, IntConstructor):
+        reveal_type(cls)  # revealed: type[T@valid] & type[IntConstructor]
+        reveal_type(cls(1))  # revealed: T@valid & IntConstructor
+        return cls(1)
+    return cls("ok")
+```
+
+An argument accepted by the bound's constructor must still be rejected by the narrowed subclass.
+Arguments rejected by both constructors produce only the subclass constructor's diagnostic.
+
+```py
+def invalid_arguments[T: Base](cls: type[T]) -> None:
+    if issubclass(cls, IntConstructor):
+        # error: [invalid-argument-type] "Argument to `IntConstructor.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+        cls("wrong")
+        # error: [invalid-argument-type] "Argument to `IntConstructor.__init__` is incorrect: Expected `int`, found `None`"
+        cls(None)
+```
+
+### Narrowed constrained type variables
+
+Narrowing a constrained type variable selects the matching constructor without losing the original
+type variable in the return type.
+
+```py
+class StringConstructor:
+    def __init__(self, value: str) -> None: ...
+
+class IntConstructor:
+    def __init__(self, value: int) -> None: ...
+
+def construct[T: (StringConstructor, IntConstructor)](cls: type[T]) -> None:
+    if issubclass(cls, IntConstructor):
+        reveal_type(cls)  # revealed: type[T@construct] & type[IntConstructor]
+        reveal_type(cls(1))  # revealed: T@construct & IntConstructor
+        # error: [invalid-argument-type] "Argument to `IntConstructor.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+        cls("wrong")
+```
+
+### Narrowed unbounded type variables
+
+The narrowed subclass constructor also determines which arguments are valid when the original type
+variable has no upper bound.
+
+```py
+class IntConstructor:
+    def __init__(self, value: int) -> None: ...
+
+def construct[T](cls: type[T]) -> None:
+    if issubclass(cls, IntConstructor):
+        reveal_type(cls)  # revealed: type[T@construct] & type[IntConstructor]
+        reveal_type(cls(1))  # revealed: T@construct & IntConstructor
+        # error: [invalid-argument-type] "Argument to `IntConstructor.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+        cls("wrong")
+```
+
+### Specialized generic constructors
+
+A generic constructor provider must retain its explicit specialization when validating arguments and
+preserve the original type variable in its return type.
+
+```py
+from ty_extensions import Intersection
+
+class Box[S]:
+    def __init__(self, value: S) -> None: ...
+
+def construct[T](cls: Intersection[type[T], type[Box[int]]]) -> None:
+    reveal_type(cls(1))  # revealed: T@construct & Box[int]
+    # error: [invalid-argument-type] "Argument to `Box.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+    cls("wrong")
+```
+
+### Built-in constructor behavior
+
+Narrowing to a final built-in class must retain its specialized constructor behavior and the
+original type variable.
+
+```py
+def construct[T](cls: type[T]) -> None:
+    if issubclass(cls, bool):
+        reveal_type(cls)  # revealed: type[T@construct] & <class 'bool'>
+        reveal_type(cls(1))  # revealed: T@construct & Literal[True]
+```
+
+### `Self` constructor returns
+
+An explicit `Self` return still represents the constructed instance, so narrowing must preserve the
+original type variable and validate the subclass initializer.
+
+```py
+from typing import Self
+
+class Base:
+    def __init__(self, value: str) -> None: ...
+
+class NewChild(Base):
+    def __new__(cls, value: object) -> Self:
+        return object.__new__(cls)
+
+    def __init__(self, value: int) -> None: ...
+
+def construct[T: Base](cls: type[T]) -> None:
+    if issubclass(cls, NewChild):
+        reveal_type(cls(1))  # revealed: T@construct & NewChild
+        # error: [invalid-argument-type] "Argument to `NewChild.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+        cls("wrong")
+```
+
+### Non-instance `__new__` returns
+
+A constructor explicitly returning a non-instance type must retain that return type instead of
+intersecting it with the original type variable.
+
+```py
+class Base:
+    def __init__(self, value: str) -> None: ...
+
+class ReturnsString(Base):
+    def __new__(cls, value: int) -> str:
+        return str(value)
+
+def construct[T: Base](cls: type[T]) -> None:
+    if issubclass(cls, ReturnsString):
+        reveal_type(cls(1))  # revealed: str
+```
+
+### Non-instance metaclass `__call__` returns
+
+A custom metaclass's explicit non-instance return similarly takes precedence over the original type
+variable.
+
+```py
+class StringFactory(type):
+    def __call__(cls, value: int) -> str:
+        return str(value)
+
+class Base:
+    def __init__(self, value: str) -> None: ...
+
+class Factory(Base, metaclass=StringFactory): ...
+
+def construct[T: Base](cls: type[T]) -> None:
+    if issubclass(cls, Factory):
+        reveal_type(cls(1))  # revealed: str
+```
+
+### Independent metaclass callables
+
+An intersection of a class-object type and a metaclass instance retains both independent callables.
+Arguments accepted by only one callable use that callable's return type.
+
+```py
+from ty_extensions import Intersection
+
+class StringBase:
+    def __init__(self, value: str) -> None: ...
+
+class IntMeta(type):
+    def __call__(cls, value: int) -> str:
+        return str(value)
+
+def construct(cls: Intersection[type[StringBase], IntMeta]) -> None:
+    reveal_type(cls(1))  # revealed: str
+    reveal_type(cls("ok"))  # revealed: StringBase
+```
+
+## Union of constructors
+
+```py
+class A:
+    def __init__(self, x: int) -> None:
+        self.x = x
+
+class B:
+    def __init__(self, x: int) -> None:
+        self.x = x
+
+def f(flag: bool):
+    cls = A if flag else B
+    reveal_type(cls(1))  # revealed: A | B
 ```
 
 ## `__init__` present on a superclass
@@ -215,9 +2125,9 @@ class Foo(Base): ...
 
 reveal_type(Foo(1))  # revealed: Foo
 
-# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
+# error: [missing-argument] "No argument provided for required parameter `x` of `Base.__init__`"
 reveal_type(Foo())  # revealed: Foo
-# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 2, got 3"
+# error: [too-many-positional-arguments] "Too many positional arguments to `Base.__init__`: expected 2, got 3"
 reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
@@ -228,17 +2138,18 @@ def _(flag: bool) -> None:
     class Foo:
         if flag:
             def __init__(self, x: int): ...
+
         else:
             def __init__(self, x: int, y: int = 1): ...
 
     reveal_type(Foo(1))  # revealed: Foo
-    # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `int`, found `Literal["1"]`"
-    # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `int`, found `Literal["1"]`"
+    # error: [invalid-argument-type] "Argument to `Foo.__init__` is incorrect: Expected `int`, found `Literal["1"]`"
+    # error: [invalid-argument-type] "Argument to `Foo.__init__` is incorrect: Expected `int`, found `Literal["1"]`"
     reveal_type(Foo("1"))  # revealed: Foo
-    # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
-    # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
+    # error: [missing-argument] "No argument provided for required parameter `x` of `Foo.__init__`"
+    # error: [missing-argument] "No argument provided for required parameter `x` of `Foo.__init__`"
     reveal_type(Foo())  # revealed: Foo
-    # error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 2, got 3"
+    # error: [too-many-positional-arguments] "Too many positional arguments to `Foo.__init__`: expected 2, got 3"
     reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
@@ -261,7 +2172,7 @@ class Foo:
     __init__: Descriptor = Descriptor()
 
 reveal_type(Foo(1))  # revealed: Foo
-# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
+# error: [missing-argument] "No argument provided for required parameter `x` of bound method `SomeCallable.__call__`"
 reveal_type(Foo())  # revealed: Foo
 ```
 
@@ -278,8 +2189,36 @@ class Foo:
     __init__ = Callable()
 
 reveal_type(Foo(1))  # revealed: Foo
-# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
+# error: [missing-argument] "No argument provided for required parameter `x` of bound method `Callable.__call__`"
 reveal_type(Foo())  # revealed: Foo
+```
+
+An explicit `Self` annotation on the callable's receiver refers to the callable instance, not the
+class being constructed:
+
+```py
+from typing_extensions import Self
+
+class SelfCallable:
+    def __call__(self: Self, x: int) -> None: ...
+
+class WithSelfCallable:
+    __init__ = SelfCallable()
+
+reveal_type(WithSelfCallable(1))  # revealed: WithSelfCallable
+```
+
+For a classmethod `__call__`, the `cls: type[Self]` receiver refers to the callable's class:
+
+```py
+class ClassmethodCallable:
+    @classmethod
+    def __call__(cls: type[Self], x: int) -> None: ...
+
+class WithClassmethodCallable:
+    __init__ = ClassmethodCallable()
+
+reveal_type(WithClassmethodCallable(1))  # revealed: WithClassmethodCallable
 ```
 
 ### Possibly Unbound
@@ -294,43 +2233,20 @@ def _(flag: bool) -> None:
     class Foo:
         __init__ = Callable()
 
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
+    # error: [not-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
     reveal_type(Foo(1))  # revealed: Foo
     # TODO should be - error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
     # but we currently infer the signature of `__call__` as unknown, so it accepts any arguments
-    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
+    # error: [not-callable] "Object of type `Callable` is not callable (possibly missing `__call__` method)"
     reveal_type(Foo())  # revealed: Foo
 ```
 
 ## `__new__` and `__init__` both present
 
-### Identical signatures
-
-A common case is to have `__new__` and `__init__` with identical signatures (except for the first
-argument). We report errors for both `__new__` and `__init__` if the arguments are incorrect.
-
-At runtime `__new__` is called first and will fail without executing `__init__` if the arguments are
-incorrect. However, we decided that it is better to report errors for both methods, since after
-fixing the `__new__` method, the user may forget to fix the `__init__` method.
-
-```py
-class Foo:
-    def __new__(cls, x: int) -> "Foo":
-        return object.__new__(cls)
-
-    def __init__(self, x: int): ...
-
-# error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
-# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
-reveal_type(Foo())  # revealed: Foo
-
-reveal_type(Foo(1))  # revealed: Foo
-```
-
 ### Compatible signatures
 
 But they can also be compatible, but not identical. We should correctly report errors only for the
-mthod that would fail.
+method that would fail.
 
 ```py
 class Foo:
@@ -340,12 +2256,29 @@ class Foo:
     def __init__(self, x: int) -> None:
         self.x = x
 
-# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
+# error: [missing-argument] "No argument provided for required parameter `x` of `Foo.__init__`"
 reveal_type(Foo())  # revealed: Foo
 reveal_type(Foo(1))  # revealed: Foo
 
-# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 2, got 3"
+# error: [too-many-positional-arguments] "Too many positional arguments to `Foo.__init__`: expected 2, got 3"
 reveal_type(Foo(1, 2))  # revealed: Foo
+```
+
+### Conflicting parameter types
+
+```py
+class Foo:
+    def __new__(cls, x: int):
+        return object.__new__(cls)
+
+    def __init__(self, x: str) -> None:
+        self.x = x
+
+# error: [invalid-argument-type] "Argument to `Foo.__init__` is incorrect: Expected `str`, found `Literal[1]`"
+Foo(1)
+
+# error: [invalid-argument-type] "Argument to constructor `Foo.__new__` is incorrect: Expected `int`, found `Literal["x"]`"
+Foo("x")
 ```
 
 ### Incompatible signatures
@@ -360,10 +2293,10 @@ class Foo:
     def __init__(self, x):
         self.x = 42
 
-# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
+# error: [missing-argument] "No argument provided for required parameter `x` of `Foo.__init__`"
 reveal_type(Foo())  # revealed: Foo
 
-# error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 1, got 2"
+# error: [too-many-positional-arguments] "Too many positional arguments to constructor `Foo.__new__`: expected 1, got 2"
 reveal_type(Foo(42))  # revealed: Foo
 
 class Foo2:
@@ -373,10 +2306,10 @@ class Foo2:
     def __init__(self):
         pass
 
-# error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
+# error: [missing-argument] "No argument provided for required parameter `x` of constructor `Foo2.__new__`"
 reveal_type(Foo2())  # revealed: Foo2
 
-# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+# error: [too-many-positional-arguments] "Too many positional arguments to `Foo2.__init__`: expected 1, got 2"
 reveal_type(Foo2(42))  # revealed: Foo2
 
 class Foo3(metaclass=abc.ABCMeta):
@@ -386,10 +2319,10 @@ class Foo3(metaclass=abc.ABCMeta):
     def __init__(self, x):
         self.x = 42
 
-# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
+# error: [missing-argument] "No argument provided for required parameter `x` of `Foo3.__init__`"
 reveal_type(Foo3())  # revealed: Foo3
 
-# error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 1, got 2"
+# error: [too-many-positional-arguments] "Too many positional arguments to constructor `Foo3.__new__`: expected 1, got 2"
 reveal_type(Foo3(42))  # revealed: Foo3
 
 class Foo4(metaclass=abc.ABCMeta):
@@ -399,10 +2332,10 @@ class Foo4(metaclass=abc.ABCMeta):
     def __init__(self):
         pass
 
-# error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
+# error: [missing-argument] "No argument provided for required parameter `x` of constructor `Foo4.__new__`"
 reveal_type(Foo4())  # revealed: Foo4
 
-# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+# error: [too-many-positional-arguments] "Too many positional arguments to `Foo4.__init__`: expected 1, got 2"
 reveal_type(Foo4(42))  # revealed: Foo4
 ```
 
@@ -429,4 +2362,32 @@ reveal_type(C())  # revealed: C
 
 # Meta.__lt__ is implicitly called here:
 reveal_type(C < C)  # revealed: Literal[True]
+```
+
+## Covariant constructors retain outer type variables from arguments
+
+A holder argument supplies its outer type variable to a covariant constructor, even without an
+expected return type. The constructor's bound and default must not replace that outer variable. Both
+the standalone expression and the return expression infer `RelatedBox[T]`.
+
+```py
+from __future__ import annotations
+
+from typing import Generic
+from typing_extensions import TypeVar
+
+class Client: ...
+
+T = TypeVar("T", bound=Client, default=Client, covariant=True)
+
+class Holder(Generic[T]):
+    def related(self) -> RelatedBox[T]:
+        # revealed: RelatedBox[T@Holder]
+        reveal_type(RelatedBox(self))
+        # revealed: RelatedBox[T@Holder]
+        return reveal_type(RelatedBox(self))
+
+class RelatedBox(Generic[T]):
+    def __init__(self, holder: Holder[T]) -> None:
+        self.holder = holder
 ```

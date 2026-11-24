@@ -25,7 +25,6 @@ http://wwwsearch.sf.net/):
 
 """
 
-import sys
 from _typeshed import StrPath
 from collections.abc import Iterator, Sequence
 from http.client import HTTPResponse
@@ -176,9 +175,6 @@ class MozillaCookieJar(FileCookieJar):
 
     """
 
-    if sys.version_info < (3, 10):
-        header: ClassVar[str]  # undocumented
-
 class LWPCookieJar(FileCookieJar):
     """
     The LWPCookieJar saves a sequence of "Set-Cookie3" lines.
@@ -325,7 +321,7 @@ class Cookie:
     domain_initial_dot: bool
     def __init__(
         self,
-        version: int | None,
+        version: int | str | None,
         name: str,
         value: str | None,  # undocumented
         port: str | None,
@@ -336,7 +332,7 @@ class Cookie:
         path: str,
         path_specified: bool,
         secure: bool,
-        expires: int | None,
+        expires: float | str | None,
         discard: bool,
         comment: str | None,
         comment_url: str | None,
@@ -344,9 +340,11 @@ class Cookie:
         rfc2109: bool = False,
     ) -> None: ...
     def has_nonstandard_attr(self, name: str) -> bool: ...
+
     @overload
     def get_nonstandard_attr(self, name: str) -> str | None: ...
     @overload
     def get_nonstandard_attr(self, name: str, default: _T) -> str | _T: ...
+
     def set_nonstandard_attr(self, name: str, value: str) -> None: ...
     def is_expired(self, now: int | None = None) -> bool: ...

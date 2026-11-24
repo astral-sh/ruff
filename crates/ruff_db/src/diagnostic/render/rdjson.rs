@@ -5,28 +5,34 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_source_file::{LineColumn, SourceCode};
 use ruff_text_size::Ranged;
 
-use crate::diagnostic::{ConciseMessage, Diagnostic};
+use crate::diagnostic::{ConciseMessage, Diagnostic, DisplayDiagnosticConfig};
 
-use super::FileResolver;
+use super::{FileResolver, Renderer};
 
+/// Print diagnostics in the JSON format expected by [reviewdog].
+///
+/// [reviewdog]: https://github.com/reviewdog/reviewdog
 pub struct RdjsonRenderer<'a> {
     resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> RdjsonRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver) -> Self {
-        Self { resolver }
+    pub fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+        Self { resolver, config }
     }
+}
 
-    pub(super) fn render(
-        &self,
-        f: &mut std::fmt::Formatter,
-        diagnostics: &[Diagnostic],
-    ) -> std::fmt::Result {
+impl Renderer for RdjsonRenderer<'_> {
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         write!(
             f,
             "{:#}",
-            serde_json::json!(RdjsonDiagnostics::new(diagnostics, self.resolver))
+            serde_json::json!(RdjsonDiagnostics::new(
+                diagnostics,
+                self.resolver,
+                self.config
+            ))
         )
     }
 }
@@ -34,6 +40,7 @@ impl<'a> RdjsonRenderer<'a> {
 struct ExpandedDiagnostics<'a> {
     resolver: &'a dyn FileResolver,
     diagnostics: &'a [Diagnostic],
+    config: &'a DisplayDiagnosticConfig,
 }
 
 impl Serialize for ExpandedDiagnostics<'_> {
@@ -44,7 +51,7 @@ impl Serialize for ExpandedDiagnostics<'_> {
         let mut s = serializer.serialize_seq(Some(self.diagnostics.len()))?;
 
         for diagnostic in self.diagnostics {
-            let value = diagnostic_to_rdjson(diagnostic, self.resolver);
+            let value = diagnostic_to_rdjson(diagnostic, self.resolver, self.config);
             s.serialize_element(&value)?;
         }
 
@@ -55,6 +62,7 @@ impl Serialize for ExpandedDiagnostics<'_> {
 fn diagnostic_to_rdjson<'a>(
     diagnostic: &'a Diagnostic,
     resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
 ) -> RdjsonDiagnostic<'a> {
     let span = diagnostic.primary_span_ref();
     let source_file = span.map(|span| {
@@ -73,15 +81,17 @@ fn diagnostic_to_rdjson<'a>(
         RdjsonLocation { path, range }
     });
 
-    let edits = diagnostic.fix().map(Fix::edits).unwrap_or_default();
+    let edits = diagnostic.fix().map_or_default(Fix::edits);
 
     RdjsonDiagnostic {
         message: diagnostic.concise_message(),
         location,
         code: RdjsonCode {
-            value: diagnostic
-                .secondary_code()
-                .map_or_else(|| diagnostic.name(), |code| code.as_str()),
+            value: if config.preview && !config.prefer_rule_codes {
+                diagnostic.id().as_str()
+            } else {
+                diagnostic.secondary_code_or_id()
+            },
             url: diagnostic.documentation_url(),
         },
         suggestions: rdjson_suggestions(
@@ -129,7 +139,11 @@ struct RdjsonDiagnostics<'a> {
 }
 
 impl<'a> RdjsonDiagnostics<'a> {
-    fn new(diagnostics: &'a [Diagnostic], resolver: &'a dyn FileResolver) -> Self {
+    fn new(
+        diagnostics: &'a [Diagnostic],
+        resolver: &'a dyn FileResolver,
+        config: &'a DisplayDiagnosticConfig,
+    ) -> Self {
         Self {
             source: RdjsonSource {
                 name: "ruff",
@@ -139,6 +153,7 @@ impl<'a> RdjsonDiagnostics<'a> {
             diagnostics: ExpandedDiagnostics {
                 diagnostics,
                 resolver,
+                config,
             },
         }
     }
@@ -194,9 +209,8 @@ struct RdjsonSuggestion<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::diagnostic::{
-        DiagnosticFormat,
-        render::tests::{TestEnvironment, create_diagnostics, create_syntax_error_diagnostics},
+    use crate::diagnostic::render::tests::{
+        DiagnosticFormat, TestEnvironment, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     #[test]

@@ -3,13 +3,13 @@
 use std::num::NonZeroUsize;
 
 use anyhow::Context as _;
-pub use edit::{DocumentKey, NotebookDocument, PositionEncoding, TextDocument};
+use edit::DocumentKey;
+pub use logging::{LogLevel, init_logging};
 use lsp_types::CodeActionKind;
-pub use server::{ConnectionSender, MainLoopSender, Server};
-pub use session::{Client, ClientOptions, DocumentQuery, DocumentSnapshot, GlobalOptions, Session};
-pub use workspace::{Workspace, Workspaces};
+pub use server::{ConnectionInitializer, Server};
+use session::{ClientOptions, Session};
 
-use crate::server::ConnectionInitializer;
+pub use edit::{PositionEncoding, TextDocument};
 
 mod edit;
 mod fix;
@@ -21,26 +21,33 @@ mod server;
 mod session;
 mod workspace;
 
-pub(crate) const SERVER_NAME: &str = "ruff";
+const SERVER_NAME: &str = "ruff";
 pub(crate) const DIAGNOSTIC_NAME: &str = "Ruff";
 
-pub(crate) const SOURCE_FIX_ALL_RUFF: CodeActionKind = CodeActionKind::new("source.fixAll.ruff");
-pub(crate) const SOURCE_ORGANIZE_IMPORTS_RUFF: CodeActionKind =
+const SOURCE_FIX_ALL_RUFF: CodeActionKind = CodeActionKind::new("source.fixAll.ruff");
+const SOURCE_ORGANIZE_IMPORTS_RUFF: CodeActionKind =
     CodeActionKind::new("source.organizeImports.ruff");
-pub(crate) const NOTEBOOK_SOURCE_FIX_ALL_RUFF: CodeActionKind =
+const NOTEBOOK_SOURCE_FIX_ALL_RUFF: CodeActionKind =
     CodeActionKind::new("notebook.source.fixAll.ruff");
-pub(crate) const NOTEBOOK_SOURCE_ORGANIZE_IMPORTS_RUFF: CodeActionKind =
+const NOTEBOOK_SOURCE_ORGANIZE_IMPORTS_RUFF: CodeActionKind =
     CodeActionKind::new("notebook.source.organizeImports.ruff");
 
 /// A common result type used in most cases where a
 /// result type is needed.
 pub(crate) type Result<T> = anyhow::Result<T>;
 
-pub(crate) fn version() -> &'static str {
+/// Whether the server may execute code from the workspace.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum WorkspaceTrust {
+    Trusted,
+    Untrusted,
+}
+
+fn version() -> &'static str {
     ruff_linter::VERSION
 }
 
-pub fn run(preview: Option<bool>) -> Result<()> {
+pub fn run(preview: Option<bool>, workspace_trust: WorkspaceTrust) -> Result<()> {
     let four = NonZeroUsize::new(4).unwrap();
 
     // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
@@ -50,7 +57,7 @@ pub fn run(preview: Option<bool>) -> Result<()> {
 
     let (connection, io_threads) = ConnectionInitializer::stdio();
 
-    let server_result = Server::new(worker_threads, connection, preview)
+    let server_result = Server::new(worker_threads, connection, preview, workspace_trust, false)
         .context("Failed to start server")?
         .run();
 

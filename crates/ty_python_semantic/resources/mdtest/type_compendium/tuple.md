@@ -55,7 +55,7 @@ def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never], bb: LiskovUncom
 
 reveal_type(tuple((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 
-reveal_type(tuple([1]))  # revealed: tuple[Unknown | int, ...]
+reveal_type(tuple([1]))  # revealed: tuple[int, ...]
 
 x1: tuple[int, ...] = tuple([1])
 reveal_type(x1)  # revealed: tuple[int, ...]
@@ -77,6 +77,18 @@ def g(x: tuple[int, str] | tuple[bytes, bool], y: tuple[int, str] | tuple[bytes,
     reveal_type(tuple(y))  # revealed: tuple[int, str] | tuple[bytes, bool, bytes]
 ```
 
+When `map` calls `tuple` on each row, the result contains tuples even if the assignment target
+allows any sequence.
+
+```py
+from collections.abc import Sequence
+
+def freeze_rows(rows: Sequence[Sequence[int]]) -> tuple[tuple[int, ...], ...]:
+    rows = tuple(map(tuple, rows))
+    reveal_type(rows)  # revealed: tuple[tuple[int, ...], ...]
+    return rows
+```
+
 ## Instantiating tuple subclasses
 
 Tuple subclasses inherit the special-cased constructors from their tuple superclasses:
@@ -87,18 +99,18 @@ python-version = "3.11"
 ```
 
 ```py
-from typing_extensions import Iterable, Never
+from typing_extensions import Any, Iterable, Never
 
-class UnspecializedTupleSubclass(tuple): ...
+class VariadicAnyTupleSubclass(tuple[Any, ...]): ...
 class EmptyTupleSubclass(tuple[()]): ...
 class SingleElementTupleSubclass(tuple[int]): ...
 class VariadicTupleSubclass(tuple[int, ...]): ...
 class MixedTupleSubclass(tuple[int, *tuple[str, ...]]): ...
 
-reveal_type(UnspecializedTupleSubclass())  # revealed: UnspecializedTupleSubclass
-reveal_type(UnspecializedTupleSubclass(()))  # revealed: UnspecializedTupleSubclass
-reveal_type(UnspecializedTupleSubclass((1, 2, "foo")))  # revealed: UnspecializedTupleSubclass
-reveal_type(UnspecializedTupleSubclass([1, 2, "foo", b"bar"]))  # revealed: UnspecializedTupleSubclass
+reveal_type(VariadicAnyTupleSubclass())  # revealed: VariadicAnyTupleSubclass
+reveal_type(VariadicAnyTupleSubclass(()))  # revealed: VariadicAnyTupleSubclass
+reveal_type(VariadicAnyTupleSubclass((1, 2, "foo")))  # revealed: VariadicAnyTupleSubclass
+reveal_type(VariadicAnyTupleSubclass([1, 2, "foo", b"bar"]))  # revealed: VariadicAnyTupleSubclass
 
 reveal_type(EmptyTupleSubclass())  # revealed: EmptyTupleSubclass
 reveal_type(EmptyTupleSubclass(()))  # revealed: EmptyTupleSubclass
@@ -162,7 +174,8 @@ The type `tuple[S1, S2]` is a subtype of `tuple[T1, T2]` if and only if `S1` is 
 and `S2` is a subtype of `T2`, and similar for other lengths of tuples:
 
 ```py
-from ty_extensions import static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 class T1: ...
 class S1(T1): ...
@@ -192,7 +205,8 @@ CPython at the time of writing).
 The empty tuple can also be subclassed (further clarifying that it is not a singleton type):
 
 ```py
-from ty_extensions import static_assert, is_singleton, is_subtype_of, is_equivalent_to, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_singleton, is_subtype_of, is_equivalent_to, is_assignable_to
 
 static_assert(not is_singleton(tuple[()]))
 
@@ -210,7 +224,8 @@ For the same reason as above (two instances of a tuple with the same elements mi
 object), non-empty tuples are also not singleton types — even if all their elements are singletons:
 
 ```py
-from ty_extensions import static_assert, is_singleton
+from ty_extensions import static_assert
+from ty_extensions._internal import is_singleton
 
 static_assert(is_singleton(None))
 
@@ -224,16 +239,26 @@ static_assert(not is_singleton(tuple[None]))
 python-version = "3.11"
 ```
 
-The `Never` type contains no inhabitants, so a tuple type that contains `Never` as a mandatory
-element also contains no inhabitants.
+The `Never` type contains no inhabitants, but a tuple annotation can also describe user-defined
+subclasses. A tuple type containing `Never` as a mandatory element therefore retains its shape
+instead of simplifying to `Never`.
 
 ```py
 from typing import Never
-from ty_extensions import static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
-static_assert(is_equivalent_to(tuple[Never], Never))
-static_assert(is_equivalent_to(tuple[int, Never], Never))
-static_assert(is_equivalent_to(tuple[Never, *tuple[int, ...]], Never))
+static_assert(not is_equivalent_to(tuple[Never], Never))
+static_assert(not is_equivalent_to(tuple[int, Never], Never))
+static_assert(not is_equivalent_to(tuple[Never, *tuple[int, ...]], Never))
+```
+
+Tuple expressions also preserve their element types when an element has type `Never`.
+
+```py
+def tuple_from_never(value: Never) -> None:
+    reveal_type((value,))  # revealed: tuple[Never]
+    reveal_type((1, value))  # revealed: tuple[Literal[1], Never]
 ```
 
 If the variable-length portion of a tuple is `Never`, then that portion of the tuple must always be
@@ -241,7 +266,8 @@ empty. This means that the tuple is not actually variable-length!
 
 ```py
 from typing import Never
-from ty_extensions import static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(tuple[Never, ...], tuple[()]))
 static_assert(is_equivalent_to(tuple[int, *tuple[Never, ...]], tuple[int]))
@@ -302,7 +328,8 @@ The tuple types are equivalent regardless of whether the required elements appea
 suffix.
 
 ```py
-from ty_extensions import static_assert, is_subtype_of, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of, is_equivalent_to
 
 static_assert(is_equivalent_to(tuple[int, *tuple[int, ...]], tuple[*tuple[int, ...], int]))
 
@@ -313,7 +340,8 @@ static_assert(is_equivalent_to(tuple[int, int, *tuple[int, ...]], tuple[int, *tu
 This is true when the prefix/suffix and variable-length types are equivalent, not just identical.
 
 ```py
-from ty_extensions import static_assert, is_subtype_of, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of, is_equivalent_to
 
 static_assert(is_equivalent_to(tuple[int | str, *tuple[str | int, ...]], tuple[*tuple[str | int, ...], int | str]))
 
@@ -337,7 +365,8 @@ Two tuples with incompatible minimum lengths are always disjoint, regardless of 
 of the other.)
 
 ```py
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 static_assert(is_disjoint_from(tuple[()], tuple[int]))
 static_assert(not is_disjoint_from(tuple[()], tuple[int, ...]))
@@ -388,8 +417,8 @@ static_assert(not is_disjoint_from(tuple[F1, ...], tuple[F2, ...]))
 static_assert(not is_disjoint_from(tuple[N1, ...], tuple[N2, ...]))
 ```
 
-We currently model tuple types to _not_ be disjoint from arbitrary instance types, because we allow
-for the possibility of `tuple` to be subclassed
+We model tuple types to _not_ be disjoint from arbitrary instance types, because we allow for the
+possibility of `tuple` to be subclassed.
 
 ```py
 class C: ...
@@ -399,17 +428,14 @@ static_assert(not is_disjoint_from(tuple[int, str], C))
 class CommonSubtype(tuple[int, str], C): ...
 ```
 
-Note: This is inconsistent with the fact that we model heterogeneous tuples to be disjoint from
-other heterogeneous tuples above:
+However, we model heterogeneous tuples to be disjoint from other heterogeneous tuples. To reconcile
+these two things, we explicitly ban two differently specialized heterogeneous tuples from coexisting
+in the same MRO:
 
 ```py
 class I1(tuple[F1, F2]): ...
 class I2(tuple[F2, F1]): ...
-
-# TODO
-# This is a subtype of both `tuple[F1, F2]` and `tuple[F2, F1]`, so those two heterogeneous tuples
-# should not be disjoint from each other (see conflicting test above).
-class CommonSubtypeOfTuples(I1, I2): ...
+class CommonSubtypeOfTuples(I1, I2): ...  # error: [invalid-generic-class]
 ```
 
 ## Truthiness
@@ -423,7 +449,8 @@ The truthiness of the empty tuple is `False`.
 
 ```py
 from typing_extensions import assert_type, Literal
-from ty_extensions import static_assert, is_assignable_to, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysFalsy
+from ty_extensions._internal import is_assignable_to
 
 assert_type(bool(()), Literal[False])
 
@@ -436,7 +463,8 @@ its content.
 
 ```py
 from typing_extensions import assert_type, Any, Literal
-from ty_extensions import static_assert, is_assignable_to, AlwaysTruthy
+from ty_extensions import static_assert, AlwaysTruthy
+from ty_extensions._internal import is_assignable_to
 
 assert_type(bool((False,)), Literal[True])
 assert_type(bool((False, False)), Literal[True])
@@ -454,7 +482,8 @@ non-empty tuples.
 
 ```py
 from typing_extensions import Any, Literal
-from ty_extensions import static_assert, is_assignable_to, AlwaysFalsy, AlwaysTruthy
+from ty_extensions import static_assert, AlwaysFalsy, AlwaysTruthy
+from ty_extensions._internal import is_assignable_to
 
 static_assert(not is_assignable_to(tuple[Any, ...], AlwaysFalsy))
 static_assert(not is_assignable_to(tuple[Any, ...], AlwaysTruthy))
@@ -498,11 +527,12 @@ An unspecialized tuple is equivalent to `tuple[Any, ...]` and `tuple[Unknown, ..
 
 ```py
 from typing_extensions import Any, assert_type
-from ty_extensions import Unknown, is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to
 
 static_assert(is_equivalent_to(tuple[Any, ...], tuple[Unknown, ...]))
 
-def f(x: tuple, y: tuple[Unknown, ...]):
+def f(x: tuple, y: tuple[Unknown, ...]):  # error: [missing-type-argument]
     reveal_type(x)  # revealed: tuple[Unknown, ...]
     assert_type(x, tuple[Any, ...])
     assert_type(x, tuple[Unknown, ...])
@@ -558,10 +588,165 @@ reveal_type((42, *[], 56, *[]))  # revealed: tuple[Literal[42], Literal[56]]
 tup: Sequence[str] = (*{"foo": 42, "bar": 56},)
 
 # TODO: `tuple[str, str]` would be better, given the type annotation
-reveal_type(tup)  # revealed: tuple[Unknown | str, Unknown | str]
+reveal_type(tup)  # revealed: tuple[str, str]
 
 def f(x: list[int]):
     reveal_type((42, 56, *x, 97))  # revealed: tuple[Literal[42], Literal[56], *tuple[int, ...], Literal[97]]
+```
+
+## Tuples constructed from list literals
+
+Expanding a list literal into a tuple preserves the type and position of each element. Unpacking the
+resulting tuple therefore gives the same types as unpacking the literal directly.
+
+```py
+source = (*[1, "two"],)
+reveal_type(source)  # revealed: tuple[Literal[1], Literal["two"]]
+
+first, second = source
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(second)  # revealed: Literal["two"]
+```
+
+Literal expansions can be nested, including through assignment expressions. Each assignment still
+binds the type of its own container.
+
+```py
+source = (0, *[1, *(pair := ("two", *[False]))])
+reveal_type(source)  # revealed: tuple[Literal[0], Literal[1], Literal["two"], Literal[False]]
+reveal_type(pair)  # revealed: tuple[Literal["two"], Literal[False]]
+
+source = (*[(first := 1), first], (last := "two"), last)
+reveal_type(source)  # revealed: tuple[Literal[1], Literal[1], Literal["two"], Literal["two"]]
+```
+
+An invalid expansion reports its iteration error once, while the surrounding literal elements retain
+their positions.
+
+```py
+# error: [not-iterable] "Object of type `Literal[2]` is not iterable"
+source = (*[1, *2, "two"],)
+reveal_type(source)  # revealed: tuple[Literal[1], *tuple[Unknown, ...], Literal["two"]]
+```
+
+## Literal expansions containing variable-length tuples
+
+A list literal can contain an expansion whose length is unknown. Converting that literal to a tuple
+preserves the fixed elements on either side of the expansion, including when the variable portion is
+a symbolic `TypeVarTuple`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def homogeneous(values: tuple[float, ...]):
+    source = (*[1, *values, "two"],)
+    reveal_type(source)  # revealed: tuple[Literal[1], *tuple[float, ...], Literal["two"]]
+
+def symbolic[*Ts](values: tuple[*Ts]):
+    source = (*[1, *values, "two"],)
+    reveal_type(source)  # revealed: tuple[Literal[1], *Ts@symbolic, Literal["two"]]
+```
+
+## `Literal` promotion for large unannotated tuples
+
+We infer `Literal` types for a tuple's elements only if it has \<=64 elements. For larger tuples, if
+they are unannotated, we promote `Literal` types inside the tuple.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Final, Literal
+
+# fmt: off
+
+has_64_elements = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64)
+
+reveal_type(len(has_64_elements))  # revealed: Literal[64]
+
+# revealed: tuple[Literal[1], Literal[2], Literal[3], Literal[4], Literal[5], Literal[6], Literal[7], Literal[8], Literal[9], Literal[10], Literal[11], Literal[12], Literal[13], Literal[14], Literal[15], Literal[16], Literal[17], Literal[18], Literal[19], Literal[20], Literal[21], Literal[22], Literal[23], Literal[24], Literal[25], Literal[26], Literal[27], Literal[28], Literal[29], Literal[30], Literal[31], Literal[32], Literal[33], Literal[34], Literal[35], Literal[36], Literal[37], Literal[38], Literal[39], Literal[40], Literal[41], Literal[42], Literal[43], Literal[44], Literal[45], Literal[46], Literal[47], Literal[48], Literal[49], Literal[50], Literal[51], Literal[52], Literal[53], Literal[54], Literal[55], Literal[56], Literal[57], Literal[58], Literal[59], Literal[60], Literal[61], Literal[62], Literal[63], Literal[64]]
+reveal_type(has_64_elements)
+
+annotated_tuple_with_64: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64)
+
+reveal_type(len(annotated_tuple_with_64))  # revealed: Literal[64]
+
+# revealed: tuple[Literal[1], Literal[2], Literal[3], Literal[4], Literal[5], Literal[6], Literal[7], Literal[8], Literal[9], Literal[10], Literal[11], Literal[12], Literal[13], Literal[14], Literal[15], Literal[16], Literal[17], Literal[18], Literal[19], Literal[20], Literal[21], Literal[22], Literal[23], Literal[24], Literal[25], Literal[26], Literal[27], Literal[28], Literal[29], Literal[30], Literal[31], Literal[32], Literal[33], Literal[34], Literal[35], Literal[36], Literal[37], Literal[38], Literal[39], Literal[40], Literal[41], Literal[42], Literal[43], Literal[44], Literal[45], Literal[46], Literal[47], Literal[48], Literal[49], Literal[50], Literal[51], Literal[52], Literal[53], Literal[54], Literal[55], Literal[56], Literal[57], Literal[58], Literal[59], Literal[60], Literal[61], Literal[62], Literal[63], Literal[64]]
+reveal_type(annotated_tuple_with_64)
+
+has_65_elements = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65)
+
+reveal_type(len(has_65_elements))  # revealed: Literal[65]
+
+# revealed: tuple[int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int]
+reveal_type(has_65_elements)
+
+final_tuple_with_65: Final = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65)
+
+reveal_type(len(final_tuple_with_65))  # revealed: Literal[65]
+
+# revealed: tuple[int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int]
+reveal_type(final_tuple_with_65)
+
+# fmt: on
+```
+
+Literal promotion can always be avoided by providing explicit type annotations:
+
+```py
+# fmt: off
+
+annotated_tuple_with_65: tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[64], Literal[65]] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65)
+
+reveal_type(len(annotated_tuple_with_65))  # revealed: Literal[65]
+
+# revealed: tuple[Literal[1], Literal[2], int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, Literal[64], Literal[65]]
+reveal_type(annotated_tuple_with_65)
+
+# fmt: on
+```
+
+The limit counts elements introduced by list and tuple literal expansions, including elements from
+several smaller literals. A 64-element expansion retains its literals; adding one more element
+widens the whole tuple. Empty expansions do not consume this budget.
+
+```py
+# fmt: off
+expanded_64 = (*[], *[
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+    20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+    30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+    40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+    50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
+    60, 61, 62, 63,
+], *())
+expanded_65 = (*[
+    0, (1,), 2, 3, 4, 5, 6, 7, 8, 9,
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+    20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+], *(
+    30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+    40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+    50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
+    60, 61, 62, 63,
+), 64)
+# fmt: on
+reveal_type(expanded_64[0])  # revealed: Literal[0]
+reveal_type(expanded_64[-1])  # revealed: Literal[63]
+reveal_type(expanded_65[0])  # revealed: int
+reveal_type(expanded_65[-1])  # revealed: int
+```
+
+Widening also applies inside the nested tuple in `expanded_65`.
+
+```py
+reveal_type(expanded_65[1])  # revealed: tuple[int]
 ```
 
 [not a singleton type]: https://discuss.python.org/t/should-we-specify-in-the-language-reference-that-the-empty-tuple-is-a-singleton/67957

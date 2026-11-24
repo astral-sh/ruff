@@ -5,11 +5,12 @@ use std::ops::Deref;
 use compact_str::{CompactString, ToCompactString};
 
 use ruff_db::files::File;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::db::Db;
 use crate::resolve::file_to_module;
+use crate::{ResolverEnvironment, ResolverFile};
 
 /// A module name, e.g. `foo.bar`.
 ///
@@ -78,7 +79,6 @@ impl ModuleName {
     ///
     /// assert_eq!(ModuleName::new_static("foo.bar.baz").unwrap().components().collect::<Vec<_>>(), vec!["foo", "bar", "baz"]);
     /// ```
-    #[must_use]
     pub fn components(&self) -> impl DoubleEndedIterator<Item = &str> {
         self.0.split('.')
     }
@@ -98,6 +98,24 @@ impl ModuleName {
         // one component in the module name.
         self.components()
             .next()
+            .expect("at least one module component")
+    }
+
+    /// Returns the last component in this module name.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// assert_eq!(ModuleName::new_static("foo.bar.baz").unwrap().last_component(), "baz");
+    /// ```
+    #[must_use]
+    pub fn last_component(&self) -> &str {
+        // OK because `Self::is_valid_name` guarantees that there is at least
+        // one component in the module name.
+        self.components()
+            .next_back()
             .expect("at least one module component")
     }
 
@@ -235,23 +253,23 @@ impl ModuleName {
         if !is_identifier(first_part) {
             return None;
         }
-        let name = if let Some(second_part) = components.next() {
-            if !is_identifier(second_part) {
+        let mut name = CompactString::from(first_part);
+        for part in components {
+            if !is_identifier(part) {
                 return None;
             }
-            let mut name = format!("{first_part}.{second_part}");
-            for part in components {
-                if !is_identifier(part) {
-                    return None;
-                }
-                name.push('.');
-                name.push_str(part);
-            }
-            CompactString::from(&name)
-        } else {
-            CompactString::from(first_part)
-        };
+            name.push('.');
+            name.push_str(part);
+        }
         Some(Self(name))
+    }
+
+    /// Returns a new module name with the components of `other` appended to `self`.
+    #[must_use]
+    pub fn join(&self, other: &ModuleName) -> Self {
+        let mut name = self.clone();
+        name.extend(other);
+        name
     }
 
     /// Extend `self` with the components of `other`
@@ -295,19 +313,19 @@ impl ModuleName {
     /// Extracts a module name from the AST of a `from <module> import ...`
     /// statement.
     ///
-    /// `importing_file` must be the [`File`] that contains the import
-    /// statement.
+    /// `importing_file` must be the file that contains the import statement.
     ///
     /// This handles relative import statements.
     pub fn from_import_statement<'db>(
         db: &'db dyn Db,
-        importing_file: File,
-        node: &'db ast::StmtImportFrom,
+        importing_file: ImportingFile<'db>,
+        node: &ast::StmtImportFrom,
     ) -> Result<Self, ModuleNameResolutionError> {
         let ast::StmtImportFrom {
             module,
             level,
             names: _,
+            is_lazy: _,
             range: _,
             node_index: _,
         } = node;
@@ -315,14 +333,14 @@ impl ModuleName {
     }
 
     /// Computes the absolute module name from the LHS components of `from LHS import RHS`
-    pub fn from_identifier_parts(
-        db: &dyn Db,
-        importing_file: File,
+    pub fn from_identifier_parts<'db>(
+        db: &'db dyn Db,
+        importing_file: ImportingFile<'db>,
         module: Option<&str>,
         level: u32,
     ) -> Result<Self, ModuleNameResolutionError> {
         if let Some(level) = NonZeroU32::new(level) {
-            relative_module_name(db, importing_file, module, level)
+            relative_module_name(db, importing_file.resolver_file(db), module, level)
         } else {
             module
                 .and_then(Self::new)
@@ -333,11 +351,100 @@ impl ModuleName {
     /// Computes the absolute module name for the package this file belongs to.
     ///
     /// i.e. this resolves `.`
-    pub fn package_for_file(
-        db: &dyn Db,
-        importing_file: File,
+    pub fn package_for_file<'db>(
+        db: &'db dyn Db,
+        importing_file: ImportingFile<'db>,
     ) -> Result<Self, ModuleNameResolutionError> {
         Self::from_identifier_parts(db, importing_file, None, 1)
+    }
+
+    /// Returns `true` if the module name given appears to be a test module.
+    ///
+    /// This routine is meant to codify a Python ecosystem convention. That is,
+    /// a module is considered a test module if any of the following are true:
+    ///
+    /// * Any non-root component is `test` or `tests`
+    ///   (e.g., `numpy.tests.test_core`).
+    /// * The final component is `conftest` (pytest configuration).
+    ///
+    /// Note that top-level "testing" modules like `pandas.testing` are
+    /// intentionally not filtered, as they provide utilities meant for external
+    /// use.
+    ///
+    /// # Usage
+    ///
+    /// Callers should be mindful when using this routine to filter items
+    /// presented to end users. For example, auto-import uses this to filter
+    /// completions offered, but only for completions outside of the end
+    /// user's first party code. That is, end users still expect to see
+    /// suggestions from their own test modules, but not for test modules in
+    /// their dependencies.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// // Some positive examples.
+    /// let module_name = ModuleName::new_static("numpy.tests").unwrap();
+    /// assert!(module_name.is_test_module());
+    /// let module_name = ModuleName::new_static("requests.test").unwrap();
+    /// assert!(module_name.is_test_module());
+    /// let module_name = ModuleName::new_static("conftest").unwrap();
+    /// assert!(module_name.is_test_module());
+    /// let module_name = ModuleName::new_static("foo.bar.conftest").unwrap();
+    /// assert!(module_name.is_test_module());
+    ///
+    /// // Some negative examples.
+    /// let module_name = ModuleName::new_static("foo.testing").unwrap();
+    /// assert!(!module_name.is_test_module());
+    /// let module_name = ModuleName::new_static("tests").unwrap();
+    /// assert!(!module_name.is_test_module());
+    /// let module_name = ModuleName::new_static("test").unwrap();
+    /// assert!(!module_name.is_test_module());
+    /// let module_name = ModuleName::new_static("pytest").unwrap();
+    /// assert!(!module_name.is_test_module());
+    /// let module_name = ModuleName::new_static("unittest").unwrap();
+    /// assert!(!module_name.is_test_module());
+    /// ```
+    pub fn is_test_module(&self) -> bool {
+        if self.last_component() == "conftest" {
+            return true;
+        }
+        self.components()
+            .skip(1)
+            .any(|c| c == "test" || c == "tests")
+    }
+
+    /// Returns `true` if the module name is considered private.
+    ///
+    /// This routine is meant to codify a Python ecosystem convention. That is,
+    /// a module is considered private if itself or any of its parent modules
+    /// starts with a `_`.
+    ///
+    /// # Usage
+    ///
+    /// Callers should be mindful when using this routine to filter items
+    /// presented to end users. For example, auto-import uses this to filter
+    /// completions offered, but only for completions outside of the end user's
+    /// first party code. That is, end users still expect to see suggestions
+    /// from their private modules, but not for private modules in their
+    /// dependencies.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// let module_name = ModuleName::new_static("_foo").unwrap();
+    /// assert!(module_name.is_private());
+    /// let module_name = ModuleName::new_static("foo._bar").unwrap();
+    /// assert!(module_name.is_private());
+    /// let module_name = ModuleName::new_static("foo._bar.quux").unwrap();
+    /// assert!(module_name.is_private());
+    /// ```
+    pub fn is_private(&self) -> bool {
+        self.components().any(|c| c.starts_with('_'))
     }
 }
 
@@ -368,6 +475,67 @@ impl std::fmt::Display for ModuleName {
     }
 }
 
+/// The file from which an import is resolved.
+///
+/// Most absolute imports only need the resolver environment. Creating a [`ResolverFile`] for each
+/// such import would unnecessarily intern the file and environment together, even though that
+/// combined identity is never used:
+///
+/// ```text
+/// resolve_module(ImportingFile::File(shared.py, environment), "dependency")
+///     -> resolve using environment; no ResolverFile needed
+/// ```
+///
+/// Relative imports, on the other hand, need the importing file's module identity and therefore
+/// require a [`ResolverFile`]:
+///
+/// ```text
+/// from .dependency import value
+///     -> importing_file.resolver_file(db)
+///     -> ResolverFile(shared.py, environment)
+/// ```
+///
+/// [`ImportingFile::File`] defers interning until such a code path actually calls
+/// [`ImportingFile::resolver_file`]. Callers that already have an interned resolver file can pass
+/// [`ImportingFile::ResolverFile`] to reuse it directly.
+#[derive(Clone, Copy)]
+pub enum ImportingFile<'db> {
+    /// An already-interned resolver key that can be reused without materialization.
+    ResolverFile(ResolverFile<'db>),
+    /// An importing file and resolver environment whose combined key is materialized lazily.
+    File(File, ResolverEnvironment<'db>),
+}
+
+impl<'db> ImportingFile<'db> {
+    pub fn file(self, db: &dyn Db) -> File {
+        match self {
+            Self::ResolverFile(file) => file.file(db),
+            Self::File(file, _) => file,
+        }
+    }
+
+    pub(crate) fn resolver_environment(self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
+        match self {
+            Self::ResolverFile(file) => file.environment(db),
+            Self::File(_, resolver_environment) => resolver_environment,
+        }
+    }
+
+    pub fn python_version(self, db: &'db dyn Db) -> PythonVersion {
+        self.resolver_environment(db).python_version(db)
+    }
+
+    /// Returns the existing resolver key or materializes one when required.
+    pub fn resolver_file(self, db: &'db dyn Db) -> ResolverFile<'db> {
+        match self {
+            Self::ResolverFile(file) => file,
+            Self::File(file, resolver_environment) => {
+                ResolverFile::new(db, file, resolver_environment)
+            }
+        }
+    }
+}
+
 /// Given a `from .foo import bar` relative import, resolve the relative module
 /// we're importing `bar` from into an absolute [`ModuleName`]
 /// using the name of the module we're currently analyzing.
@@ -378,9 +546,9 @@ impl std::fmt::Display for ModuleName {
 /// - `tail` is the relative module name stripped of all leading dots:
 ///   - `from .foo import bar` => `tail == "foo"`
 ///   - `from ..foo.bar import baz` => `tail == "foo.bar"`
-fn relative_module_name(
-    db: &dyn Db,
-    importing_file: File,
+fn relative_module_name<'db>(
+    db: &'db dyn Db,
+    importing_file: ResolverFile<'db>,
     tail: Option<&str>,
     level: NonZeroU32,
 ) -> Result<ModuleName, ModuleNameResolutionError> {

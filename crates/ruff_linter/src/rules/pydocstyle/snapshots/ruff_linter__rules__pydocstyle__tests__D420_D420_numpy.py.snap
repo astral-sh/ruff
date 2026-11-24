@@ -1,0 +1,79 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D420 Section "Returns" appears after section "Notes" but should be before it
+  --> D420_numpy.py:78:5
+   |
+76 |     Some notes.
+77 |
+78 |     Returns
+   |     ^^^^^^^
+79 |     -------
+80 |     int
+   |
+
+D420 Section "Returns" appears after section "Examples" but should be before it
+  --> D420_numpy.py:91:5
+   |
+89 |     >>> func()
+90 |
+91 |     Returns
+   |     ^^^^^^^
+92 |     -------
+93 |     int
+   |
+
+D420 Section "Notes" appears after section "Examples" but should be before it
+  --> D420_numpy.py:95:5
+   |
+93 |     int
+94 |
+95 |     Notes
+   |     ^^^^^
+96 |     -----
+97 |     Some notes.
+   |
+
+D420 Section "Warns" appears after section "Notes" but should be before it
+   --> D420_numpy.py:117:5
+    |
+115 |     Some notes.
+116 |
+117 |     Warns
+    |     ^^^^^
+118 |     -----
+119 |     UserWarning
+    |
+
+D420 Section "Parameters" appears after section "Other Params" but should be before it
+   --> D420_numpy.py:131:5
+    |
+129 |         Description.
+130 |
+131 |     Parameters
+    |     ^^^^^^^^^^
+132 |     ----------
+133 |     x : int
+    |
+
+D420 Section "Attributes" appears after section "Methods" but should be before it
+   --> D420_numpy.py:177:5
+    |
+175 |     do_something
+176 |
+177 |     Attributes
+    |     ^^^^^^^^^^
+178 |     ----------
+179 |     x : int
+    |
+
+D420 Section "Returns" appears after section "Notes" but should be before it
+   --> D420_numpy.py:222:5
+    |
+220 |     Some notes.
+221 |
+222 |     Returns
+    |     ^^^^^^^
+223 |     -------
+224 |     int
+    |

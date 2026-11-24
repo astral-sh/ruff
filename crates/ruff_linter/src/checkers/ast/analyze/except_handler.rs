@@ -27,8 +27,8 @@ pub(crate) fn except_handler(except_handler: &ExceptHandler, checker: &Checker) 
                     body,
                 );
             }
-            if checker.is_rule_enabled(Rule::BlindExcept) {
-                flake8_blind_except::rules::blind_except(
+            if checker.is_rule_enabled(Rule::CatchExceptionOrBaseException) {
+                flake8_blind_except::rules::catch_exception_or_base_exception(
                     checker,
                     type_.as_deref(),
                     name.as_deref(),

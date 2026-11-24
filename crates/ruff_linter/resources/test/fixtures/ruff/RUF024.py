@@ -32,3 +32,8 @@ bar.fromkeys(pierogi_fillings, [])
 def bad_dict() -> None:
     dict = MysteryBox()
     dict.fromkeys(pierogi_fillings, [])
+
+
+key = "xy"
+key_0 = "z"
+dict.fromkeys("ABC", list(key))

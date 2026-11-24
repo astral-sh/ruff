@@ -5,7 +5,7 @@
 `lambda` expressions can be defined without any parameters.
 
 ```py
-reveal_type(lambda: 1)  # revealed: () -> Unknown
+reveal_type(lambda: 1)  # revealed: () -> Literal[1]
 
 # error: [unresolved-reference]
 reveal_type(lambda: a)  # revealed: () -> Unknown
@@ -24,7 +24,7 @@ reveal_type(lambda a, b: a + b)  # revealed: (a, b) -> Unknown
 But, it can have default values:
 
 ```py
-reveal_type(lambda a=1: a)  # revealed: (a=1) -> Unknown
+reveal_type(lambda a=1: a)  # revealed: (a=1) -> Unknown | Literal[1]
 reveal_type(lambda a, b=2: a)  # revealed: (a, b=2) -> Unknown
 ```
 
@@ -37,25 +37,25 @@ reveal_type(lambda a, b, /, c: c)  # revealed: (a, b, /, c) -> Unknown
 And, keyword-only parameters:
 
 ```py
-reveal_type(lambda a, *, b=2, c: b)  # revealed: (a, *, b=2, c) -> Unknown
+reveal_type(lambda a, *, b=2, c: b)  # revealed: (a, *, b=2, c) -> Unknown | Literal[2]
 ```
 
 And, variadic parameter:
 
 ```py
-reveal_type(lambda *args: args)  # revealed: (*args) -> Unknown
+reveal_type(lambda *args: args)  # revealed: (*args) -> tuple[Unknown, ...]
 ```
 
-And, keyword-varidic parameter:
+And, keyword-variadic parameter:
 
 ```py
-reveal_type(lambda **kwargs: kwargs)  # revealed: (**kwargs) -> Unknown
+reveal_type(lambda **kwargs: kwargs)  # revealed: (**kwargs) -> dict[str, Unknown]
 ```
 
 Mixing all of them together:
 
 ```py
-# revealed: (a, b, /, c=True, *args, *, d="default", e=5, **kwargs) -> Unknown
+# revealed: (a, b, /, c=True, *args, d="default", e=5, **kwargs) -> None
 reveal_type(lambda a, b, /, c=True, *args, d="default", e=5, **kwargs: None)
 ```
 
@@ -94,7 +94,45 @@ Here, a `lambda` expression is used as the default value for a parameter in anot
 expression.
 
 ```py
-reveal_type(lambda a=lambda x, y: 0: 2)  # revealed: (a=...) -> Unknown
+reveal_type(lambda a=lambda x, y: 0: 2)  # revealed: (a=...) -> Literal[2]
+```
+
+## Defaults in string annotations
+
+`Annotated` metadata can contain lambdas. Names in their default values must still be resolved in
+the enclosing string annotation, whose expressions are not part of the module's semantic index.
+
+```py
+from typing_extensions import Annotated
+
+def f(value: "Annotated[int, lambda default=int: None]"):
+    reveal_type(value)  # revealed: int
+
+# error: [unresolved-reference]
+def invalid(value: "Annotated[int, lambda default=missing: None]"): ...
+```
+
+Nested lambdas must retain the same context. Dynamic classes created in a default value also need
+the original string annotation as their source anchor.
+
+```py
+def nested(value: "Annotated[int, lambda outer=(lambda inner=int: None): None]"):
+    reveal_type(value)  # revealed: int
+
+def dynamic(value: "Annotated[int, lambda default=type('C', (), {}): None]"):
+    reveal_type(value)  # revealed: int
+```
+
+## Defaults in stub string annotations
+
+Stub files must preserve the string-annotation context too, including for positional-only and
+keyword-only defaults.
+
+```pyi
+from typing_extensions import Annotated
+
+value: "Annotated[int, lambda positional=int, /, normal=str, *, keyword=bytes: None]"
+reveal_type(value)  # revealed: int
 ```
 
 ## Assignment
@@ -114,6 +152,9 @@ a4: Callable[[int, int], None] = lambda *args: None
 a5: Callable[[], None] = lambda x: None
 # error: [invalid-assignment]
 a6: Callable[[int], None] = lambda: None
+
+# error: [invalid-assignment]
+a7: Callable[[], str] = lambda: 1
 ```
 
 ## Function-like behavior of lambdas

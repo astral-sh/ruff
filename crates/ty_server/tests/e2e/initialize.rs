@@ -1,11 +1,92 @@
 use anyhow::Result;
-use lsp_types::notification::ShowMessage;
-use lsp_types::{Position, request::RegisterCapability};
+use lsp_types::{
+    Code, HoverParams, HoverRequest, Position, PublishDiagnosticsNotification, RegistrationRequest,
+    ShowMessageNotification, TextDocumentIdentifier, TextDocumentPositionParams,
+    WorkDoneProgressParams,
+};
 use ruff_db::system::SystemPath;
-use serde_json::Value;
+use serde_json::{Value, json};
 use ty_server::{ClientOptions, DiagnosticMode};
 
 use crate::TestServerBuilder;
+
+#[test]
+#[should_panic(expected = "Invalid initialization options: Invalid `untrustedWorkspace` setting")]
+fn malformed_trust_rejects_initialization() {
+    TestServerBuilder::new()
+        .expect("Failed to create test server builder")
+        .with_raw_initialization_options(json!({
+            "untrustedWorkspace": "true",
+            "logLevel": "invalid",
+        }))
+        .build();
+}
+
+#[test]
+fn malformed_initialization_options_preserve_workspace_trust() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let script = SystemPath::new("src/script.py");
+    let source = "# /// script\n# dependencies = []\n# ///\nmissing\n";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(script, source)?
+        .with_raw_initialization_options(json!({
+            "untrustedWorkspace": true,
+            "diagnosticMode": "invalid",
+        }))
+        .with_env_var("TY_UV", "true")
+        .with_env_var("UV", "missing-ty-script-uv-executable")
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(script, source, 1);
+
+    let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+    assert_eq!(diagnostics.uri, server.file_uri(script));
+    assert_eq!(
+        diagnostics
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.code.as_ref())
+            .collect::<Vec<_>>(),
+        [Some(&Code::String("unresolved-reference".to_string()))],
+    );
+    Ok(())
+}
+
+#[test]
+fn editor_project_manager_overrides_legacy_use_uv() -> Result<()> {
+    let server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file("src/pyproject.toml", "")?
+        .with_raw_initialization_options(json!({
+            "experimental": {"useUv": "on"},
+            "configuration": {"project-manager": {"project": "none"}}
+        }))
+        .with_env_var("UV", "missing-ty-project-uv")
+        .build()
+        .wait_until_workspaces_are_initialized();
+    server.assert_no_pending_messages();
+    Ok(())
+}
+
+#[test]
+fn untrusted_workspace_overrides_editor_project_manager() -> Result<()> {
+    let server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file("src/pyproject.toml", "")?
+        .with_raw_initialization_options(json!({
+            "untrustedWorkspace": true,
+            "configuration": {"project-manager": {"project": "uv"}}
+        }))
+        .with_env_var("UV", "missing-ty-project-uv")
+        .build()
+        .wait_until_workspaces_are_initialized();
+    server.assert_no_pending_messages();
+    Ok(())
+}
 
 #[test]
 fn empty_workspace_folders() -> Result<()> {
@@ -35,6 +116,43 @@ fn single_workspace_folder() -> Result<()> {
     Ok(())
 }
 
+/// Requests received before workspace configuration must complete once initialization finishes.
+#[test]
+fn deferred_request_burst_does_not_block_responses() -> Result<()> {
+    const REQUEST_COUNT: usize = 64;
+
+    let workspace_root = SystemPath::new("src");
+    let file = SystemPath::new("src/main.py");
+    let source = "x = 1\n";
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(file, source)?
+        .build();
+
+    // Hold the configuration response until the entire burst is queued, so every request
+    // must pass through the deferred-message queue.
+    server.open_text_document(file, source, 1);
+    let uri = server.file_uri(file);
+    let mut request_ids = Vec::with_capacity(REQUEST_COUNT);
+    for _ in 0..REQUEST_COUNT {
+        request_ids.push(server.send_request::<HoverRequest>(HoverParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                position: Position::new(0, 0),
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        }));
+    }
+    let mut server = server.wait_until_workspaces_are_initialized();
+
+    for id in request_ids {
+        assert!(server.await_response::<HoverRequest>(&id).is_some());
+    }
+    assert!(server.hover_request(file, Position::new(0, 0)).is_some());
+
+    Ok(())
+}
+
 /// Tests that the server sends a registration request for diagnostics if workspace diagnostics
 /// are enabled via initialization options and dynamic registration is enabled, even if the
 /// workspace configuration is not supported by the client.
@@ -43,7 +161,7 @@ fn workspace_diagnostic_registration_without_configuration() -> Result<()> {
     let workspace_root = SystemPath::new("foo");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_workspace(workspace_root, None)?
         .enable_workspace_configuration(false)
@@ -53,7 +171,7 @@ fn workspace_diagnostic_registration_without_configuration() -> Result<()> {
     // No need to wait for workspaces to initialize as the client does not support workspace
     // configuration.
 
-    let (_, params) = server.await_request::<RegisterCapability>();
+    let (_, params) = server.await_request::<RegistrationRequest>();
     let [registration] = params.registrations.as_slice() else {
         panic!(
             "Expected a single registration, got: {:#?}",
@@ -86,7 +204,7 @@ fn open_files_diagnostic_registration_without_configuration() -> Result<()> {
     let workspace_root = SystemPath::new("foo");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly),
         )
         .with_workspace(workspace_root, None)?
         .enable_workspace_configuration(false)
@@ -96,7 +214,7 @@ fn open_files_diagnostic_registration_without_configuration() -> Result<()> {
     // No need to wait for workspaces to initialize as the client does not support workspace
     // configuration.
 
-    let (_, params) = server.await_request::<RegisterCapability>();
+    let (_, params) = server.await_request::<RegistrationRequest>();
     let [registration] = params.registrations.as_slice() else {
         panic!(
             "Expected a single registration, got: {:#?}",
@@ -128,14 +246,14 @@ fn workspace_diagnostic_registration_via_initialization() -> Result<()> {
     let workspace_root = SystemPath::new("foo");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_workspace(workspace_root, None)?
         .enable_diagnostic_dynamic_registration(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let (_, params) = server.await_request::<RegisterCapability>();
+    let (_, params) = server.await_request::<RegistrationRequest>();
     let [registration] = params.registrations.as_slice() else {
         panic!(
             "Expected a single registration, got: {:#?}",
@@ -167,14 +285,14 @@ fn open_files_diagnostic_registration_via_initialization() -> Result<()> {
     let workspace_root = SystemPath::new("foo");
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly),
         )
         .with_workspace(workspace_root, None)?
         .enable_diagnostic_dynamic_registration(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let (_, params) = server.await_request::<RegisterCapability>();
+    let (_, params) = server.await_request::<RegistrationRequest>();
     let [registration] = params.registrations.as_slice() else {
         panic!(
             "Expected a single registration, got: {:#?}",
@@ -213,7 +331,7 @@ fn workspace_diagnostic_registration() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let (_, params) = server.await_request::<RegisterCapability>();
+    let (_, params) = server.await_request::<RegistrationRequest>();
     let [registration] = params.registrations.as_slice() else {
         panic!(
             "Expected a single registration, got: {:#?}",
@@ -252,7 +370,7 @@ fn open_files_diagnostic_registration() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let (_, params) = server.await_request::<RegisterCapability>();
+    let (_, params) = server.await_request::<RegistrationRequest>();
     let [registration] = params.registrations.as_slice() else {
         panic!(
             "Expected a single registration, got: {:#?}",
@@ -288,9 +406,8 @@ def foo() -> str:
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default().with_disable_language_services(true))
+        .with_initialization_options(&ClientOptions::default().with_disable_language_services(true))
         .with_workspace(workspace_root, None)?
-        .enable_pull_diagnostics(true)
         .with_file(foo, foo_content)?
         .build()
         .wait_until_workspaces_are_initialized();
@@ -322,7 +439,6 @@ def foo() -> str:
             workspace_root,
             Some(ClientOptions::default().with_disable_language_services(true)),
         )?
-        .enable_pull_diagnostics(true)
         .with_file(foo, foo_content)?
         .build()
         .wait_until_workspaces_are_initialized();
@@ -362,7 +478,6 @@ def bar() -> str:
             Some(ClientOptions::default().with_disable_language_services(true)),
         )?
         .with_workspace(workspace_b, None)?
-        .enable_pull_diagnostics(true)
         .with_file(foo, foo_content)?
         .with_file(bar, bar_content)?
         .build()
@@ -393,17 +508,17 @@ fn unknown_initialization_options() -> Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_initialization_options(
-            ClientOptions::default().with_unknown([("bar".to_string(), Value::Null)].into()),
+            &ClientOptions::default().with_unknown([("bar".to_string(), Value::Null)].into()),
         )
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let show_message_params = server.await_notification::<ShowMessage>();
+    let show_message_params = server.await_notification::<ShowMessageNotification>();
 
     insta::assert_json_snapshot!(show_message_params, @r#"
     {
       "type": 2,
-      "message": "Received unknown options during initialization: {\n  /"bar/": null\n}"
+      "message": "Received unknown options during initialization: {\n  \"bar\": null\n}"
     }
     "#);
 
@@ -423,12 +538,12 @@ fn unknown_options_in_workspace_configuration() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let show_message_params = server.await_notification::<ShowMessage>();
+    let show_message_params = server.await_notification::<ShowMessageNotification>();
 
     insta::assert_json_snapshot!(show_message_params, @r#"
     {
       "type": 2,
-      "message": "Received unknown options for workspace `file://<temp_dir>/foo`: {\n  /"bar/": null\n}"
+      "message": "Received unknown options for workspace `file://<temp_dir>/foo`: {\n  \"bar\": null\n}"
     }
     "#);
 
@@ -448,13 +563,13 @@ fn register_multiple_capabilities() -> Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .enable_diagnostic_dynamic_registration(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let (_, params) = server.await_request::<RegisterCapability>();
+    let (_, params) = server.await_request::<RegistrationRequest>();
     let registrations = params.registrations;
 
     insta::assert_json_snapshot!(registrations, @r#"
@@ -490,12 +605,9 @@ fn missing_virtual_env_does_not_panic() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let _show_message_params = server.await_notification::<ShowMessage>();
+    let show_message_params = server.await_notification::<ShowMessageNotification>();
 
-    // Something accursed in the escaping pipeline produces `\/` in windows paths
-    // and I can't for the life of me get insta to escape it properly, so I just
-    // need to move on with my life and not debug this right now, but ideally we
-    // would snapshot the message here.
+    insta::assert_snapshot!(show_message_params.message, @"Failed to load project for workspace file://<temp_dir>/project. Please refer to the logs for more details.");
 
     Ok(())
 }

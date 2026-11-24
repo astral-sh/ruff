@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Expr, StmtFunctionDef};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for function definitions with default arguments set to insecure SSL
@@ -35,7 +36,7 @@ use crate::checkers::ast::Checker;
 /// def func(version=ssl.PROTOCOL_TLSv1_2): ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Security)]
 pub(crate) struct SslWithBadDefaults {
     protocol: String,
 }
@@ -56,25 +57,23 @@ pub(crate) fn ssl_with_bad_defaults(checker: &Checker, function_def: &StmtFuncti
         .filter_map(|param| param.default.as_deref())
     {
         match default {
-            Expr::Name(ast::ExprName { id, range, .. }) => {
-                if is_insecure_protocol(id.as_str()) {
-                    checker.report_diagnostic(
-                        SslWithBadDefaults {
-                            protocol: id.to_string(),
-                        },
-                        *range,
-                    );
-                }
+            Expr::Name(ast::ExprName { id, range, .. }) if is_insecure_protocol(id.as_str()) => {
+                checker.report_diagnostic(
+                    SslWithBadDefaults {
+                        protocol: id.to_string(),
+                    },
+                    *range,
+                );
             }
-            Expr::Attribute(ast::ExprAttribute { attr, range, .. }) => {
-                if is_insecure_protocol(attr.as_str()) {
-                    checker.report_diagnostic(
-                        SslWithBadDefaults {
-                            protocol: attr.to_string(),
-                        },
-                        *range,
-                    );
-                }
+            Expr::Attribute(ast::ExprAttribute { attr, range, .. })
+                if is_insecure_protocol(attr.as_str()) =>
+            {
+                checker.report_diagnostic(
+                    SslWithBadDefaults {
+                        protocol: attr.to_string(),
+                    },
+                    *range,
+                );
             }
             _ => {}
         }

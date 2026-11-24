@@ -18,23 +18,21 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     )?;
 
     // Assert that there's an `unresolved-reference` diagnostic (error).
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:7:1
       |
-    5 |     x = a
-    6 |
     7 | prin(x)  # unresolved-reference
       | ^^^^
-      |
     info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
+    INFO Indexed 1 file(s) in 0.000s
     ");
 
     case.write_file(
@@ -46,23 +44,21 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @"
-    success: true
-    exit_code: 0
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
       |
     2 | y = 4 / 0
       |     ^^^^^
-    3 |
-    4 | for a in range(0, int(y)):
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     Found 1 diagnostic
 
     ----- stderr -----
+    INFO Indexed 1 file(s) in 0.000s
     ");
 
     Ok(())
@@ -86,82 +82,77 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     )?;
 
     // Assert that there's an `unresolved-reference` diagnostic (error)
-    // and an unresolved-import (error) diagnostic by default.
-    assert_cmd_snapshot!(case.command(), @"
+    // and an import-not-found (error) diagnostic by default.
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `does_not_exit`
+    error[import-not-found]: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
       |        ^^^^^^^^^^^^^
-    3 |
-    4 | y = 4 / 0
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
+    info: rule `import-not-found` is enabled by default
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:9:1
       |
-    7 |     x = a
-    8 |
     9 | prin(x)  # unresolved-reference
       | ^^^^
-      |
     info: rule `unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
+    INFO Indexed 1 file(s) in 0.000s
     ");
 
     assert_cmd_snapshot!(
         case
             .command()
+            .arg("--verbose")
             .arg("--ignore")
             .arg("unresolved-reference")
             .arg("--warn")
             .arg("division-by-zero")
+            .arg("--ignore")
+            .arg("unresolved-import")
+            .arg("--error")
+            .arg("import-not-found")
             .arg("--warn")
             .arg("unresolved-import"),
         @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
-    warning[unresolved-import]: Cannot resolve imported module `does_not_exit`
+    warning[renamed-rule]: Rule `unresolved-import` has been renamed to `import-not-found`
+
+    warning[import-not-found]: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
       |        ^^^^^^^^^^^^^
-    3 |
-    4 | y = 4 / 0
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` was selected on the command line
+    info: rule `import-not-found` was selected on the command line
 
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:4:5
       |
-    2 | import does_not_exit
-    3 |
     4 | y = 4 / 0
       |     ^^^^^
-    5 |
-    6 | for a in range(0, int(y)):
-      |
     info: rule `division-by-zero` was selected on the command line
 
-    Found 2 diagnostics
+    Found 3 diagnostics
 
     ----- stderr -----
+    INFO Indexed 1 file(s) in 0.000s
     "
     );
 
@@ -185,28 +176,27 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     )?;
 
     // Assert that there's a `unresolved-reference` diagnostic (error) by default.
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
     error[unresolved-reference]: Name `prin` used when not defined
      --> test.py:7:1
       |
-    5 |     x = a
-    6 |
     7 | prin(x)  # unresolved-reference
       | ^^^^
-      |
     info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
+    INFO Indexed 1 file(s) in 0.000s
     ");
 
     assert_cmd_snapshot!(
         case
             .command()
+            .arg("--verbose")
             .arg("--warn")
             .arg("unresolved-reference")
             .arg("--warn")
@@ -214,25 +204,177 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
             .arg("--ignore")
             .arg("unresolved-reference"),
         @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
       |
     2 | y = 4 / 0
       |     ^^^^^
-    3 |
-    4 | for a in range(0, int(y)):
-      |
     info: rule `division-by-zero` was selected on the command line
 
     Found 1 diagnostic
 
     ----- stderr -----
+    INFO Indexed 1 file(s) in 0.000s
     "
     );
 
+    Ok(())
+}
+
+/// The canonical name wins over an alias with a conflicting level in the same table.
+#[test]
+fn configuration_conflicting_rule_alias_levels() {
+    let case = CliTest::with_files([
+        ("test.py", "import missing"),
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            unresolved-import = "error"
+            import-not-found = "ignore"
+            "#,
+        ),
+    ])
+    .unwrap();
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[renamed-rule]: Rule `unresolved-import` has been renamed to `import-not-found`
+     --> ty.toml:3:1
+      |
+    3 | unresolved-import = "error"
+      | ^^^^^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    // An alias on the command line overrides the current name in ty.toml.
+    assert_cmd_snapshot!(
+        case.command().args(["--warn", "unresolved-import", "--output-format", "concise"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[renamed-rule] Rule `unresolved-import` has been renamed to `import-not-found`
+    test.py:1:8: warning[import-not-found] Cannot resolve imported module `missing`
+    ty.toml:3:1: warning[renamed-rule] Rule `unresolved-import` has been renamed to `import-not-found`
+    Found 3 diagnostics
+
+    ----- stderr -----
+    "
+    );
+}
+
+/// A rule's name and its alias can select the same level, and a separate override can change it.
+#[test]
+fn configuration_rule_alias_levels_with_override() {
+    let case = CliTest::with_files([
+        ("test.py", "import missing"),
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            unresolved-import = "error"
+            import-not-found = "error"
+
+            [[overrides]]
+            include = ["test.py"]
+            [overrides.rules]
+            unresolved-import = "ignore"
+            "#,
+        ),
+    ])
+    .unwrap();
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[renamed-rule]: Rule `unresolved-import` has been renamed to `import-not-found`
+     --> ty.toml:3:1
+      |
+    3 | unresolved-import = "error"
+      | ^^^^^^^^^^^^^^^^^
+
+    warning[renamed-rule]: Rule `unresolved-import` has been renamed to `import-not-found`
+     --> ty.toml:9:1
+      |
+    9 | unresolved-import = "ignore"
+      | ^^^^^^^^^^^^^^^^^
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
+}
+
+#[test]
+fn discover_pyproject_with_conflicting_rule_alias_levels() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("test.py", "import missing"),
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            import-not-found = "warn"
+            unresolved-import = "ignore"
+
+            [tool.ty.terminal]
+            error-on-warning = false
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().args(["--output-format", "concise"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    pyproject.toml:4:1: warning[renamed-rule] Rule `unresolved-import` has been renamed to `import-not-found`
+    test.py:1:8: warning[import-not-found] Cannot resolve imported module `missing`
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn shadowed_pyproject_rule_alias_conflict() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("test.py", "import missing"),
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            import-not-found = "ignore"
+            "#,
+        ),
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            unresolved-import = "warn"
+            import-not-found = "error"
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN Ignoring the `tool.ty` section in `<temp_dir>/pyproject.toml` because `<temp_dir>/ty.toml` takes precedence.
+    ");
     Ok(())
 }
 
@@ -245,28 +387,90 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
             r#"
             [tool.ty.rules]
             division-by-zer = "warn" # incorrect rule name
+
+            [[tool.ty.overrides]]
+            include = ["test.py"]
+            [tool.ty.overrides.rules]
+            division-by-zero = "error"
             "#,
         ),
         ("test.py", "print(10)"),
     ])?;
 
+    // ty warns once about `division-by-zer`, even though the override inherits it.
     assert_cmd_snapshot!(case.command(), @r#"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
      --> pyproject.toml:3:1
       |
-    2 | [tool.ty.rules]
     3 | division-by-zer = "warn" # incorrect rule name
       | ^^^^^^^^^^^^^^^
-      |
 
     Found 1 diagnostic
 
     ----- stderr -----
     "#);
 
+    // The same typo written on the command line has its own diagnostic.
+    assert_cmd_snapshot!(
+        case.command().args(["--warn", "division-by-zer", "--output-format", "concise"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unknown-rule] Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
+    pyproject.toml:3:1: warning[unknown-rule] Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn removed_rule_in_configuration_and_ignore_comment() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            invalid-type-guard-call = "ignore"
+            "#,
+        ),
+        (
+            "test.py",
+            "
+            x = 1  # ty: ignore[invalid-type-guard-call]
+            ",
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unknown-rule-in-ignore-comment]: Rule `invalid-type-guard-call` has been removed
+     --> test.py:2:21
+      |
+    2 | x = 1  # ty: ignore[invalid-type-guard-call]
+      |                     ^^^^^^^^^^^^^^^^^^^^^^^
+    info: Type guard calls without a narrowing target are valid and have no narrowing effect.
+
+    warning[unknown-rule]: Rule `invalid-type-guard-call` has been removed
+     --> ty.toml:3:1
+      |
+    3 | invalid-type-guard-call = "ignore"
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: Type guard calls without a narrowing target are valid and have no narrowing effect.
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
     Ok(())
 }
 
@@ -276,8 +480,8 @@ fn cli_unknown_rules() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", "print(10)")?;
 
     assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
 
@@ -326,7 +530,7 @@ fn overrides_basic() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -335,19 +539,13 @@ fn overrides_basic() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0  # division-by-zero: error (global)
       |     ^^^^^
-    3 | x = 1
-    4 | prin(x)    # unresolved-reference: error (global)
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> main.py:4:1
       |
-    2 | y = 4 / 0  # division-by-zero: error (global)
-    3 | x = 1
     4 | prin(x)    # unresolved-reference: error (global)
       | ^^^^
-      |
     info: rule `unresolved-reference` was selected in the configuration file
 
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
@@ -355,14 +553,12 @@ fn overrides_basic() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0  # division-by-zero: warn (override)
       |     ^^^^^
-    3 | x = 1
-    4 | prin(x)    # unresolved-reference: ignore (override)
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     Found 3 diagnostics
 
     ----- stderr -----
+    INFO Indexed 2 file(s) in 0.000s
     ");
 
     Ok(())
@@ -405,22 +601,70 @@ fn overrides_precedence() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @"
-    success: true
-    exit_code: 0
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> tests/test_main.py:2:5
       |
     2 | y = 4 / 0  # division-by-zero: warn (first override)
       |     ^^^^^
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     Found 1 diagnostic
 
     ----- stderr -----
+    INFO Indexed 2 file(s) in 0.000s
     ");
+
+    Ok(())
+}
+
+/// Multiple matching overrides inherit global options from higher-precedence layers.
+#[test]
+fn multiple_overrides_inherit_cli_rules() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [[tool.ty.overrides]]
+            include = ["test.py"]
+            [tool.ty.overrides.rules]
+            division-by-zero = "warn"
+
+            [[tool.ty.overrides]]
+            include = ["test.py"]
+            [tool.ty.overrides.rules]
+            possibly-unresolved-reference = "ignore"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            y = 4 / 0
+            prin(y)
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(
+        case.command().args(["--ignore", "unresolved-reference"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> test.py:2:5
+      |
+    2 | y = 4 / 0
+      |     ^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "
+    );
 
     Ok(())
 }
@@ -456,7 +700,7 @@ fn overrides_exclude() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -465,7 +709,6 @@ fn overrides_exclude() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0  # division-by-zero: error (override excluded)
       |     ^^^^^
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
@@ -473,12 +716,12 @@ fn overrides_exclude() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0  # division-by-zero: warn (override applies)
       |     ^^^^^
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     Found 2 diagnostics
 
     ----- stderr -----
+    INFO Indexed 2 file(s) in 0.000s
     ");
 
     Ok(())
@@ -519,7 +762,7 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -528,31 +771,26 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0  # division-by-zero: warn (global)
       |     ^^^^^
-    3 | prin(y)    # unresolved-reference: error (global)
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> main.py:3:1
       |
-    2 | y = 4 / 0  # division-by-zero: warn (global)
     3 | prin(y)    # unresolved-reference: error (global)
       | ^^^^
-      |
     info: rule `unresolved-reference` was selected in the configuration file
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> tests/test_main.py:3:1
       |
-    2 | y = 4 / 0  # division-by-zero: ignore (overridden)
     3 | prin(y)    # unresolved-reference: error (inherited from global)
       | ^^^^
-      |
     info: rule `unresolved-reference` was selected in the configuration file
 
     Found 3 diagnostics
 
     ----- stderr -----
+    INFO Indexed 2 file(s) in 0.000s
     ");
 
     Ok(())
@@ -589,7 +827,7 @@ fn overrides_invalid_include_glob() -> anyhow::Result<()> {
 
     ----- stderr -----
     ty failed
-      Cause: error[invalid-glob]: Invalid include pattern
+      Cause: error[invalid-glob]: Invalid pattern
      --> pyproject.toml:6:12
       |
     5 | [[tool.ty.overrides]]
@@ -635,7 +873,7 @@ fn overrides_invalid_exclude_glob() -> anyhow::Result<()> {
 
     ----- stderr -----
     ty failed
-      Cause: error[invalid-glob]: Invalid exclude pattern
+      Cause: error[invalid-glob]: Invalid pattern
      --> pyproject.toml:7:12
       |
     5 | [[tool.ty.overrides]]
@@ -674,20 +912,15 @@ fn overrides_missing_include_exclude() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
-    success: true
-    exit_code: 0
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[unnecessary-overrides-section]: Unnecessary `overrides` section
      --> pyproject.toml:5:1
       |
-    3 | division-by-zero = "error"
-    4 |
     5 | [[tool.ty.overrides]]
       | ^^^^^^^^^^^^^^^^^^^^^ This overrides section applies to all files
-    6 | # Missing both include and exclude - should warn
-    7 | [tool.ty.overrides.rules]
-      |
     info: It has no `include` or `exclude` option restricting the files
     info: Restrict the files by adding a pattern to `include` or `exclude`...
     info: or remove the `[[overrides]]` section and merge the configuration into the root `[rules]` table if the configuration should apply to all files
@@ -697,13 +930,13 @@ fn overrides_missing_include_exclude() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0
       |     ^^^^^
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     Found 2 diagnostics
 
     ----- stderr -----
-    "#);
+    INFO Indexed 1 file(s) in 0.000s
+    ");
 
     Ok(())
 }
@@ -732,19 +965,15 @@ fn overrides_empty_include() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
     warning[empty-include]: Empty include matches no files
      --> pyproject.toml:6:11
       |
-    5 | [[tool.ty.overrides]]
     6 | include = []  # Empty include - won't match any files
       |           ^^ This `include` list is empty
-    7 | [tool.ty.overrides.rules]
-    8 | division-by-zero = "warn"
-      |
     info: Remove the `include` option to match all files or add a pattern to match specific files
 
     error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
@@ -752,13 +981,13 @@ fn overrides_empty_include() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0
       |     ^^^^^
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     Found 2 diagnostics
 
     ----- stderr -----
-    "#);
+    INFO Indexed 1 file(s) in 0.000s
+    ");
 
     Ok(())
 }
@@ -786,20 +1015,15 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
     success: false
     exit_code: 1
     ----- stdout -----
     warning[useless-overrides-section]: Useless `overrides` section
      --> pyproject.toml:5:1
       |
-    3 | division-by-zero = "error"
-    4 |
     5 | [[tool.ty.overrides]]
       | ^^^^^^^^^^^^^^^^^^^^^ This overrides section overrides no settings
-    6 | include = ["*.py"]  # Has patterns but no rule overrides
-    7 | # Missing [tool.ty.overrides.rules] section entirely
-      |
     info: It has no `rules` or `analysis` table
     info: Add a `[overrides.rules]` or `[overrides.analysis]` table...
     info: or remove the `[[overrides]]` section if there's nothing to override
@@ -809,13 +1033,13 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0
       |     ^^^^^
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     Found 2 diagnostics
 
     ----- stderr -----
-    "#);
+    INFO Indexed 1 file(s) in 0.000s
+    ");
 
     Ok(())
 }
@@ -852,7 +1076,7 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -861,30 +1085,423 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0
       |     ^^^^^
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
       --> pyproject.toml:10:1
        |
-     8 | [tool.ty.overrides.rules]
-     9 | division-by-zero = "warn"
     10 | division-by-zer = "error"  # incorrect rule name
        | ^^^^^^^^^^^^^^^
-       |
 
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> tests/test_main.py:2:5
       |
     2 | y = 4 / 0
       |     ^^^^^
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     Found 3 diagnostics
 
     ----- stderr -----
+    INFO Indexed 2 file(s) in 0.000s
     "#);
+
+    Ok(())
+}
+
+/// The "all" keyword can be used to set all rules to a specific severity
+#[test]
+fn cli_all_rules_ignore() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        import does_not_exit
+
+        y = 4 / 0
+
+        prin(y)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --ignore all should disable all rules
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--ignore")
+            .arg("all"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// The "all" keyword works with --warn to set all rules to warn severity
+#[test]
+fn cli_all_rules_warn() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        prin(x)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --warn all should make all rules warnings (not errors)
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--verbose")
+            .arg("--warn")
+            .arg("all"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unresolved-reference]: Name `prin` used when not defined
+     --> test.py:2:1
+      |
+    2 | prin(x)  # unresolved-reference
+      | ^^^^
+    info: rule `unresolved-reference` was selected on the command line
+
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:2:6
+      |
+    2 | prin(x)  # unresolved-reference
+      |      ^
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    INFO Indexed 1 file(s) in 0.000s
+    "
+    );
+
+    Ok(())
+}
+
+/// The "all" keyword can be overridden by subsequent specific rule settings
+#[test]
+fn cli_all_rules_precedence() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        import does_not_exit
+
+        y = 4 / 0
+
+        prin(y)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --ignore all followed by --error for a specific rule should
+    // disable all rules except the one specified
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--verbose")
+            .arg("--ignore")
+            .arg("all")
+            .arg("--error")
+            .arg("unresolved-reference"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> test.py:6:1
+      |
+    6 | prin(y)  # unresolved-reference
+      | ^^^^
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    INFO Indexed 1 file(s) in 0.000s
+    "
+    );
+
+    Ok(())
+}
+
+/// A specific rule can be set first and then overridden by "all"
+#[test]
+fn cli_specific_then_all() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        prin(x)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --error for a specific rule followed by --ignore all should
+    // ignore all rules (including the previously set one)
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--error")
+            .arg("unresolved-reference")
+            .arg("--ignore")
+            .arg("all"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// The "all" keyword works in configuration files
+#[test]
+fn configuration_all_rules() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            all = "ignore"
+            unresolved-reference = "error"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            import does_not_exit
+
+            y = 4 / 0
+
+            prin(y)  # unresolved-reference
+            "#,
+        ),
+    ])?;
+
+    // The "all" rule should be processed first, ignoring all rules,
+    // then unresolved-reference should be enabled as error
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> test.py:6:1
+      |
+    6 | prin(y)  # unresolved-reference
+      | ^^^^
+    info: rule `unresolved-reference` was selected in the configuration file
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    INFO Indexed 1 file(s) in 0.000s
+    ");
+
+    Ok(())
+}
+
+/// In TOML, key order in a table is not semantically meaningful, so specific rules should
+/// still override `all` even if they sort lexicographically before `all`.
+#[test]
+fn configuration_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            all = "warn"
+            abstract-method-in-final-class = "error"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            from typing import final
+            from abc import ABC, abstractmethod
+
+            class Base(ABC):
+                @abstractmethod
+                def foo(self) -> int:
+                    raise NotImplementedError
+
+            @final
+            class Derived(Base):
+                pass
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[abstract-method-in-final-class]: Final class `Derived` has unimplemented abstract methods
+      --> test.py:11:7
+       |
+     6 | /     @abstractmethod
+     7 | |     def foo(self) -> int:
+       | |________________________- `foo` declared as abstract on superclass `Base`
+     8 |           raise NotImplementedError
+     9 |
+    10 |   @final
+       |   ------
+    11 |   class Derived(Base):
+       |         ^^^^^^^ `foo` is unimplemented
+    info: rule `abstract-method-in-final-class` was selected in the configuration file
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    INFO Indexed 1 file(s) in 0.000s
+    ");
+
+    Ok(())
+}
+
+/// Same TOML key ordering issue, but within an override's `[rules]` table.
+/// `abstract-method-in-final-class` sorts before `all` lexicographically, but
+/// the specific rule should still take precedence over `all`.
+#[test]
+fn overrides_all_rules_with_rule_sorting_before_all() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [[tool.ty.overrides]]
+            include = ["src/**"]
+
+            [tool.ty.overrides.rules]
+            all = "warn"
+            abstract-method-in-final-class = "error"
+            "#,
+        ),
+        (
+            "src/test.py",
+            r#"
+            from typing import final
+            from abc import ABC, abstractmethod
+
+            class Base(ABC):
+                @abstractmethod
+                def foo(self) -> int:
+                    raise NotImplementedError
+
+            @final
+            class Derived(Base):
+                pass
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[abstract-method-in-final-class]: Final class `Derived` has unimplemented abstract methods
+      --> src/test.py:11:7
+       |
+     6 | /     @abstractmethod
+     7 | |     def foo(self) -> int:
+       | |________________________- `foo` declared as abstract on superclass `Base`
+     8 |           raise NotImplementedError
+     9 |
+    10 |   @final
+       |   ------
+    11 |   class Derived(Base):
+       |         ^^^^^^^ `foo` is unimplemented
+    info: rule `abstract-method-in-final-class` was selected in the configuration file
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    INFO Indexed 1 file(s) in 0.000s
+    ");
+
+    Ok(())
+}
+
+/// Tests the `all` selector in an `overrides` section
+#[test]
+fn all_overrides() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            all = "error"
+
+            [[tool.ty.overrides]]
+            include = ["tests/**"]
+
+            [tool.ty.overrides.rules]
+            unresolved-reference = "warn"
+            "#,
+        ),
+        (
+            "main.py",
+            r#"
+            y = 4 / 0  # division-by-zero: error (global)
+            x = 1
+            prin(x)    # unresolved-reference: error (global)
+            "#,
+        ),
+        (
+            "tests/test_main.py",
+            r#"
+            y = 4 / 0  # division-by-zero: error (global)
+            x = 1
+            prin(x)    # unresolved-reference: warn (override)
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().arg("--verbose"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> main.py:2:5
+      |
+    2 | y = 4 / 0  # division-by-zero: error (global)
+      |     ^^^^^
+    info: rule `division-by-zero` was selected in the configuration file
+
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> main.py:4:1
+      |
+    4 | prin(x)    # unresolved-reference: error (global)
+      | ^^^^
+    info: rule `unresolved-reference` was selected in the configuration file
+
+    error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+     --> tests/test_main.py:2:5
+      |
+    2 | y = 4 / 0  # division-by-zero: error (global)
+      |     ^^^^^
+    info: rule `division-by-zero` was selected in the configuration file
+
+    warning[unresolved-reference]: Name `prin` used when not defined
+     --> tests/test_main.py:4:1
+      |
+    4 | prin(x)    # unresolved-reference: warn (override)
+      | ^^^^
+    info: rule `unresolved-reference` was selected in the configuration file
+
+    Found 4 diagnostics
+
+    ----- stderr -----
+    INFO Indexed 2 file(s) in 0.000s
+    ");
 
     Ok(())
 }

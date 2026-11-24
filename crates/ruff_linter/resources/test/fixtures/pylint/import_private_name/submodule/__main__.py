@@ -44,3 +44,16 @@ class Class:
 
     def __init__(self, arg: vv) -> "zz":
         pass
+
+
+def generic[T: _nn](arg: T) -> T:
+    return arg
+
+from foo.    _bar import baz
+
+# PLC2701 exceptions: `os._exit` is considered public despite leading underscore.
+from os import _exit
+from os import _exit as process_exit
+from another_module import _exit as another_exit
+from os import _private_member
+from os import _exit as os_exit, _other_private_member

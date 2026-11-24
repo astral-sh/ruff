@@ -4,8 +4,8 @@ import _typeshed
 import sys
 from _typeshed import SupportsWrite
 from collections.abc import Callable
-from typing import Any, Literal, TypeVar
-from typing_extensions import Concatenate, ParamSpec, deprecated
+from typing import Any, Concatenate, Literal, ParamSpec, TypeVar
+from typing_extensions import deprecated
 
 _T = TypeVar("_T")
 _R_co = TypeVar("_R_co", covariant=True)
@@ -37,10 +37,10 @@ class ABCMeta(type):
             mcls: type[_typeshed.Self], name: str, bases: tuple[type, ...], namespace: dict[str, Any], **kwargs: Any
         ) -> _typeshed.Self: ...
 
-    def __instancecheck__(cls: ABCMeta, instance: Any) -> bool:
+    def __instancecheck__(cls: ABCMeta, instance: Any, /) -> bool:
         """Override for isinstance(instance, cls)."""
 
-    def __subclasscheck__(cls: ABCMeta, subclass: type) -> bool:
+    def __subclasscheck__(cls: ABCMeta, subclass: type, /) -> bool:
         """Override for issubclass(subclass, cls)."""
 
     def _dump_registry(cls: ABCMeta, file: SupportsWrite[str] | None = None) -> None:
@@ -130,25 +130,24 @@ class ABC(metaclass=ABCMeta):
 def get_cache_token() -> object:
     """Returns the current ABC cache token.
 
-    The token is an opaque object (supporting equality testing) identifying the
-    current version of the ABC cache for virtual subclasses. The token changes
-    with every call to register() on any ABC.
+    The token is an opaque object (supporting equality testing) identifying
+    the current version of the ABC cache for virtual subclasses.  The token
+    changes with every call to register() on any ABC.
     """
 
-if sys.version_info >= (3, 10):
-    def update_abstractmethods(cls: type[_T]) -> type[_T]:
-        """Recalculate the set of abstract methods of an abstract class.
+def update_abstractmethods(cls: type[_T]) -> type[_T]:
+    """Recalculate the set of abstract methods of an abstract class.
 
-        If a class has had one of its abstract methods implemented after the
-        class was created, the method will not be considered implemented until
-        this function is called. Alternatively, if a new abstract method has been
-        added to the class, it will only be considered an abstract method of the
-        class after this function is called.
+    If a class has had one of its abstract methods implemented after the
+    class was created, the method will not be considered implemented until
+    this function is called. Alternatively, if a new abstract method has been
+    added to the class, it will only be considered an abstract method of the
+    class after this function is called.
 
-        This function should be called before any use is made of the class,
-        usually in class decorators that add methods to the subject class.
+    This function should be called before any use is made of the class,
+    usually in class decorators that add methods to the subject class.
 
-        Returns cls, to allow usage as a class decorator.
+    Returns cls, to allow usage as a class decorator.
 
-        If cls is not an instance of ABCMeta, does nothing.
-        """
+    If cls is not an instance of ABCMeta, does nothing.
+    """

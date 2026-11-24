@@ -1,3 +1,14 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+#
+# [tool.uv]
+# no-build = true
+# exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
+# ///
+
 """Transform the README.md to support a specific deployment target.
 
 By default, we assume that our README.md will be rendered on GitHub. However, different

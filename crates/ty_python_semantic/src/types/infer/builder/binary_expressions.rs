@@ -1,0 +1,1278 @@
+use crate::{Db, Program, ProgramEnvironment};
+use compact_str::CompactString;
+use ruff_python_ast::{self as ast, AnyNodeRef};
+
+use super::TypeInferenceBuilder;
+use crate::types::call::CallArguments;
+use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::cyclic::CycleDetector;
+use crate::types::diagnostic::{
+    DIVISION_BY_ZERO, report_unsupported_augmented_assignment, report_unsupported_binary_operation,
+};
+use crate::types::function::OverloadLiteral;
+use crate::types::set_theoretic::RecursivelyDefined;
+use crate::types::tuple::{TupleSpecBuilder, TupleType};
+use crate::types::typevar::TypeVarConstraints;
+use crate::types::{
+    DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
+    MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
+    UnionType, UnionTypeInstance,
+};
+
+enum BinaryExpressionOperandTypes<'db> {
+    Inferred(Type<'db>, Type<'db>),
+    TypedDictResult(Type<'db>),
+}
+
+type BinaryExpressionVisitor<'db> =
+    CycleDetector<'db, ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
+
+fn is_union_type_operand(ty: Type<'_>) -> bool {
+    matches!(
+        ty,
+        Type::ClassLiteral(_)
+            | Type::SubclassOf(_)
+            | Type::GenericAlias(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(
+                KnownInstanceType::UnionType(_)
+                    | KnownInstanceType::Literal(_)
+                    | KnownInstanceType::Annotated(_)
+                    | KnownInstanceType::TypeGenericAlias(_)
+                    | KnownInstanceType::Callable(_)
+                    | KnownInstanceType::TypeVar(_)
+                    | KnownInstanceType::TypeAliasType(_)
+                    | KnownInstanceType::NewType(_)
+                    | KnownInstanceType::Sentinel(_)
+            )
+    )
+}
+
+/// Whether `class` might define or inherit the in-place method for `op`.
+///
+/// Literals of the same class share this lookup. If the method exists, we still bind
+/// it to each literal separately.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+pub(super) fn has_in_place_operator<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    class: KnownClass,
+    op: ast::Operator,
+) -> bool {
+    let env = &ProgramEnvironment::from_program(program);
+    class
+        .to_class_literal(db, env)
+        .find_name_in_mro_with_policy(
+            db,
+            env,
+            op.in_place_dunder(),
+            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+        )
+        .is_none_or(|member| !member.is_undefined())
+}
+
+/// Repeated conditional concatenation can double the number of tuple alternatives at each step.
+const MAX_TUPLE_ADDITION_ALTERNATIVES: usize = 32;
+/// Repeated doubling (`x = x + x`) can grow a single tuple without introducing any union.
+const MAX_TUPLE_ADDITION_ELEMENTS: usize = 4096;
+
+/// State shared across the alternatives of one binary or augmented operation.
+#[derive(Default)]
+pub(super) struct BinaryInferenceState<'db> {
+    emitted_division_by_zero_diagnostic: bool,
+    pub(super) deprecated_functions: Vec<OverloadLiteral<'db>>,
+    used_tuple_addition: bool,
+}
+
+impl<'db> BinaryInferenceState<'db> {
+    fn tuple_alternative_count(db: &'db dyn Db, ty: Type<'db>) -> usize {
+        match ty {
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .map(|ty| Self::tuple_alternative_count(db, *ty))
+                .sum(),
+            // Adding an alias can expose more tuples, so check the expanded result.
+            Type::TypeAlias(_) => MAX_TUPLE_ADDITION_ALTERNATIVES,
+            _ => usize::from(ty.exact_tuple_instance_spec(db).is_some()),
+        }
+    }
+
+    /// Limit intermediate unions as well as the final result: waiting until all operands
+    /// have been expanded can first construct an exponentially large union of tuples.
+    pub(super) fn try_map_union<E>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        union: UnionType<'db>,
+        mut transform: impl FnMut(Type<'db>, &mut Self) -> Result<Type<'db>, E>,
+    ) -> Result<Type<'db>, E> {
+        let mut result = UnionBuilder::new(db, env);
+        let mut tuple_alternatives = 0;
+        for element in union.elements(db) {
+            let mapped = transform(*element, self)?;
+            tuple_alternatives += Self::tuple_alternative_count(db, mapped);
+            result.add_in_place(mapped);
+            // This count can include redundant alternatives. Rebuild only when widening
+            // might be needed, so unrelated custom-operator results accumulate normally.
+            if self.used_tuple_addition && tuple_alternatives >= MAX_TUPLE_ADDITION_ALTERNATIVES {
+                let limited = self.limit_tuple_addition_result(db, env, result.build());
+                tuple_alternatives = Self::tuple_alternative_count(db, limited);
+                result = UnionBuilder::new(db, env).add(limited);
+            }
+        }
+        Ok(result
+            .or_recursively_defined(union.recursively_defined(db))
+            .build())
+    }
+
+    /// Bound tuple alternatives produced by addition while preserving other operator results.
+    fn limit_tuple_addition_result(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        if !self.used_tuple_addition {
+            return ty;
+        }
+        let Some(union) = ty.as_union() else {
+            return ty;
+        };
+        if union.elements(db).len() < MAX_TUPLE_ADDITION_ALTERNATIVES
+            || union
+                .elements(db)
+                .iter()
+                .filter(|ty| ty.exact_tuple_instance_spec(db).is_some())
+                .count()
+                < MAX_TUPLE_ADDITION_ALTERNATIVES
+        {
+            return ty;
+        }
+
+        let mut elements = UnionBuilder::new(db, env).unpack_aliases(false);
+        let mut result = UnionBuilder::new(db, env)
+            .unpack_aliases(false)
+            .or_recursively_defined(union.recursively_defined(db));
+        for alternative in union.elements(db) {
+            if let Some(tuple) = alternative.exact_tuple_instance_spec(db) {
+                for element in tuple.iter_element_types(db) {
+                    elements.add_in_place(element);
+                }
+            } else {
+                result.add_in_place(*alternative);
+            }
+        }
+        let elements = elements.build();
+        // A fixed tuple containing Never can be inhabited by a subclass. Widening must not
+        // turn a nonempty tuple into `tuple[()]`, as `tuple[Never, ...]` would do.
+        let elements = if elements.is_never() {
+            Type::object()
+        } else {
+            elements
+        };
+        result
+            .add(Type::homogeneous_tuple(db, env, elements))
+            .build()
+    }
+}
+
+impl<'db> TypeInferenceBuilder<'db, '_> {
+    pub(super) fn infer_binary_expression(
+        &mut self,
+        binary: &ast::ExprBinOp,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        if tcx.is_typealias() {
+            return self.infer_pep_604_union_type_alias(binary, tcx);
+        }
+
+        let ast::ExprBinOp {
+            left,
+            op,
+            right,
+            range: _,
+            node_index: _,
+        } = binary;
+
+        let (left_ty, right_ty) =
+            match self.infer_binary_expression_operand_types(left, *op, right, tcx) {
+                BinaryExpressionOperandTypes::TypedDictResult(ty) => return ty,
+                BinaryExpressionOperandTypes::Inferred(left_ty, right_ty) => (left_ty, right_ty),
+            };
+
+        self.infer_binary_expression_from_types(binary, left_ty, right_ty)
+    }
+
+    /// Evaluate a binary operator whose operands have already been inferred in their type contexts.
+    pub(super) fn infer_binary_expression_from_types(
+        &mut self,
+        binary: &ast::ExprBinOp,
+        left_ty: Type<'db>,
+        right_ty: Type<'db>,
+    ) -> Type<'db> {
+        let op = binary.op;
+        let mut state = BinaryInferenceState::default();
+        let return_type =
+            self.infer_binary_expression_type(binary.into(), left_ty, right_ty, op, &mut state);
+        self.report_deprecated_functions(binary, state.deprecated_functions);
+        return_type.unwrap_or_else(|| {
+            report_unsupported_binary_operation(&self.context, binary, left_ty, right_ty, op);
+            Type::unknown()
+        })
+    }
+
+    fn infer_pep_604_union_type_alias(
+        &mut self,
+        node: &ast::ExprBinOp,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        let db = self.db();
+        let ast::ExprBinOp {
+            left,
+            op,
+            right,
+            range: _,
+            node_index: _,
+        } = node;
+
+        if *op != ast::Operator::BitOr {
+            // TODO diagnostic?
+            return Type::unknown();
+        }
+
+        let left_ty = self.infer_expression(left, tcx);
+        let right_ty = self.infer_expression(right, tcx);
+
+        // TODO this is overly aggressive; if the operands' `__or__` does not actually return a
+        // `UnionType` at runtime, we should ideally not infer one here. But this is unlikely to be
+        // a problem in practice: it would require someone having an explicitly annotated
+        // `TypeAlias`, which uses `X | Y` syntax, where the returned type is not actually a union.
+        // And attempting to enforce this more tightly showed a lot of potential false positives in
+        // the ecosystem.
+        UnionTypeInstance::from_value_expression_types(
+            db,
+            [left_ty, right_ty],
+            self.scope(),
+            self.typevar_binding_context,
+            self.inference_flags(),
+        )
+    }
+
+    /// Returns a `TypedDict` result when a PEP 584 special case succeeds, otherwise the inferred
+    /// operand types for ordinary binary inference.
+    fn infer_binary_expression_operand_types(
+        &mut self,
+        left: &ast::Expr,
+        op: ast::Operator,
+        right: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> BinaryExpressionOperandTypes<'db> {
+        let db = self.db();
+        // As a special case, pass `tcx` to binary operands that are collection literals/displays.
+        // Note that it's not correct to pass it to all binary operands, for example:
+        // ```
+        // x: list[str] = ["x"] * 3
+        // ```
+        // It doesn't make sense to pass the list type context to the `3` expression. It wouldn't
+        // have any effect in this case, but it could in more complicated cases.
+        // TODO: When we support passing `tcx` through generic method calls, we can remove this
+        // special case and handle the relevant dunder method instead.
+        let operand_tcx = |expr: &ast::Expr| -> TypeContext<'db> {
+            match expr {
+                ast::Expr::List(_)
+                | ast::Expr::Tuple(_)
+                | ast::Expr::Set(_)
+                | ast::Expr::Dict(_)
+                | ast::Expr::ListComp(_)
+                | ast::Expr::SetComp(_)
+                | ast::Expr::DictComp(_) => tcx,
+                // Also pass `tcx` to nested binary expressions.
+                ast::Expr::BinOp(_) => tcx,
+                _ => TypeContext::default(),
+            }
+        };
+
+        // When a dict literal is `|`'d with a TypedDict, infer the non-literal side first
+        // so we can use bidirectional inference on the literal before calling the synthesized
+        // `__or__`/`__ror__` method on the TypedDict side.
+        if op == ast::Operator::BitOr && matches!(left, ast::Expr::Dict(_)) {
+            let right_ty = self.infer_expression(right, operand_tcx(right));
+            if let Type::TypedDict(typed_dict) = right_ty
+                && let Some(ty) = self.try_typed_dict_pep_584_dunder(
+                    left,
+                    typed_dict.to_partial(db),
+                    typed_dict,
+                    "__ror__",
+                )
+            {
+                return BinaryExpressionOperandTypes::TypedDictResult(ty);
+            }
+
+            // If the TypedDict update path rejects the literal, fall back to ordinary inference
+            // even though that means re-inferring the literal without TypedDict context.
+            return BinaryExpressionOperandTypes::Inferred(
+                self.infer_expression(left, operand_tcx(left)),
+                right_ty,
+            );
+        }
+
+        let left_ty = self.infer_expression(left, operand_tcx(left));
+        if op == ast::Operator::BitOr
+            && let Type::TypedDict(typed_dict) = left_ty
+            && matches!(right, ast::Expr::Dict(_))
+            && let Some(ty) = self.try_typed_dict_pep_584_dunder(
+                right,
+                typed_dict.to_partial(db),
+                typed_dict,
+                "__or__",
+            )
+        {
+            return BinaryExpressionOperandTypes::TypedDictResult(ty);
+        }
+
+        BinaryExpressionOperandTypes::Inferred(
+            left_ty,
+            self.infer_expression(right, operand_tcx(right)),
+        )
+    }
+
+    fn try_typed_dict_pep_584_dunder(
+        &mut self,
+        update: &ast::Expr,
+        update_context_typed_dict: TypedDictType<'db>,
+        result_typed_dict: TypedDictType<'db>,
+        dunder_name: &str,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let update_ty = self.speculate_without_diagnostics().infer_expression(
+            update,
+            TypeContext::preference(Some(Type::TypedDict(update_context_typed_dict))),
+        );
+        let env = self.program_environment();
+
+        Type::TypedDict(result_typed_dict)
+            .try_call_dunder(
+                db,
+                env,
+                dunder_name,
+                CallArguments::positional([update_ty]),
+                TypeContext::default(),
+            )
+            .ok()
+            .map(|bindings| bindings.return_type(db, env))
+    }
+
+    /// Handle `TypedDict |= value` before the normal `__ior__` path runs.
+    ///
+    /// The normal path's bidirectional inference would report missing or unknown constructor keys
+    /// when the RHS doesn't exactly match the `TypedDict` schema. We probe here to decide the
+    /// outcome without those side effects.
+    ///
+    /// Returns `Some` after handling either a compatible or incompatible operand.
+    pub(super) fn try_infer_typed_dict_pep_584_augmented_assignment(
+        &mut self,
+        assignment: &ast::StmtAugAssign,
+        target_type: Type<'db>,
+        value_expr: &ast::Expr,
+        infer_value_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        if assignment.op != ast::Operator::BitOr {
+            return None;
+        }
+
+        let Type::TypedDict(typed_dict) = target_type else {
+            return None;
+        };
+
+        let typed_dict_ty = Type::TypedDict(typed_dict);
+
+        // Prefer the full TypedDict as context when possible so exact-shape literals preserve the
+        // named type in bidirectional inference.
+        if self
+            .try_typed_dict_pep_584_dunder(value_expr, typed_dict, typed_dict, "__ior__")
+            .is_some()
+        {
+            infer_value_ty(self, TypeContext::preference(Some(typed_dict_ty)));
+            return Some(typed_dict_ty);
+        }
+
+        // Subset updates use the mutation-safe patch as context.
+        let update_patch = typed_dict.to_update_patch(db);
+        if self
+            .try_typed_dict_pep_584_dunder(value_expr, update_patch, typed_dict, "__ior__")
+            .is_some()
+        {
+            infer_value_ty(
+                self,
+                TypeContext::preference(Some(Type::TypedDict(update_patch))),
+            );
+            return Some(typed_dict_ty);
+        }
+
+        // The probe failed. Infer the RHS without TypedDict context so we report only the operator
+        // failure, not spurious typed-dict diagnostics.
+        let value_ty = infer_value_ty(self, TypeContext::default());
+        report_unsupported_augmented_assignment(&self.context, assignment, target_type, value_ty);
+        Some(target_type)
+    }
+
+    /// Maps an operation over each constraint of a constrained `TypeVar`.
+    ///
+    /// Returns the original `TypeVar` if each result is equivalent to its input constraint;
+    /// otherwise returns the union of all results.
+    pub(super) fn map_constrained_typevar_constraints(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar: Type<'db>,
+        constraints: TypeVarConstraints<'db>,
+        mut op: impl FnMut(Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        let mut builder = UnionBuilder::new(db, env);
+        let mut any_different = false;
+
+        for constraint in constraints.elements(db) {
+            let result = op(*constraint)?;
+            if !result.is_equivalent_to(db, env, *constraint) {
+                any_different = true;
+            }
+            builder = builder.add(result);
+        }
+
+        Some(if any_different {
+            builder.build()
+        } else {
+            typevar
+        })
+    }
+
+    /// Collect deprecations from the selected operator methods while reusing cached resolution.
+    fn infer_binary_dunder(
+        &self,
+        state: &mut BinaryInferenceState<'db>,
+        left_ty: Type<'db>,
+        op: ast::Operator,
+        right_ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let result = Type::try_call_bin_op_result(
+            self.db(),
+            self.program_environment(),
+            left_ty,
+            op,
+            right_ty,
+        )?;
+        state
+            .deprecated_functions
+            .extend(&result.deprecated_functions);
+        Some(result.return_type)
+    }
+
+    /// Infer the result type and collect deprecated methods for the enclosing operation.
+    /// The caller reports them together after expanding union operands and in-place fallbacks.
+    pub(super) fn infer_binary_expression_type(
+        &mut self,
+        node: AnyNodeRef<'_>,
+        left_ty: Type<'db>,
+        right_ty: Type<'db>,
+        op: ast::Operator,
+        state: &mut BinaryInferenceState<'db>,
+    ) -> Option<Type<'db>> {
+        let result = self.infer_binary_expression_type_impl(
+            node,
+            left_ty,
+            right_ty,
+            op,
+            &BinaryExpressionVisitor::new(Some(Type::Never)),
+            state,
+        )?;
+        Some(state.limit_tuple_addition_result(self.db(), self.program_environment(), result))
+    }
+
+    fn infer_binary_expression_type_impl(
+        &mut self,
+        node: AnyNodeRef<'_>,
+        left_ty: Type<'db>,
+        right_ty: Type<'db>,
+        op: ast::Operator,
+        visitor: &BinaryExpressionVisitor<'db>,
+        state: &mut BinaryInferenceState<'db>,
+    ) -> Option<Type<'db>> {
+        let env = self.program_environment();
+        let db = self.db();
+
+        // Check for division by zero; this doesn't change the inferred type for the expression, but
+        // may emit a diagnostic
+        if !state.emitted_division_by_zero_diagnostic
+            && matches!(
+                op,
+                ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod
+            )
+            && right_ty.as_literal_value().is_some_and(|literal| {
+                literal.as_bool() == Some(false) || literal.as_int() == Some(0)
+            })
+        {
+            state.emitted_division_by_zero_diagnostic =
+                self.check_division_by_zero(node, op, left_ty);
+        }
+
+        match (left_ty, right_ty, op) {
+            (Type::RecursiveVar(_), _, _) | (_, Type::RecursiveVar(_), _) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
+            (Type::Union(lhs_union), rhs, _) => state
+                .try_map_union(db, env, lhs_union, |lhs_element, state| {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        lhs_element,
+                        rhs,
+                        op,
+                        visitor,
+                        state,
+                    )
+                    .ok_or(())
+                })
+                .ok(),
+            (lhs, Type::Union(rhs_union), _) => state
+                .try_map_union(db, env, rhs_union, |rhs_element, state| {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        lhs,
+                        rhs_element,
+                        op,
+                        visitor,
+                        state,
+                    )
+                    .ok_or(())
+                })
+                .ok(),
+
+            (Type::Recursive(recursive), rhs, _) => {
+                visitor.visit(db, (left_ty, op, right_ty), || {
+                    let unfolded = recursive.unfold(db, env).into_unfolded()?;
+                    self.infer_binary_expression_type_impl(node, unfolded, rhs, op, visitor, state)
+                })
+            }
+
+            (lhs, Type::Recursive(recursive), _) => {
+                visitor.visit(db, (left_ty, op, right_ty), || {
+                    let unfolded = recursive.unfold(db, env).into_unfolded()?;
+                    self.infer_binary_expression_type_impl(node, lhs, unfolded, op, visitor, state)
+                })
+            }
+
+            (Type::TypeAlias(alias), rhs, _) => visitor.visit(db, (left_ty, op, right_ty), || {
+                self.infer_binary_expression_type_impl(
+                    node,
+                    alias.value_type(db),
+                    rhs,
+                    op,
+                    visitor,
+                    state,
+                )
+            }),
+
+            (lhs, Type::TypeAlias(alias), _) => visitor.visit(db, (left_ty, op, right_ty), || {
+                self.infer_binary_expression_type_impl(
+                    node,
+                    lhs,
+                    alias.value_type(db),
+                    op,
+                    visitor,
+                    state,
+                )
+            }),
+
+            (Type::TypedDict(left_typed_dict), rhs, ast::Operator::BitOr)
+                if rhs.is_assignable_to(db, env, Type::TypedDict(left_typed_dict)) =>
+            {
+                Some(Type::TypedDict(left_typed_dict))
+            }
+
+            (lhs, Type::TypedDict(right_typed_dict), ast::Operator::BitOr)
+                if lhs.is_assignable_to(db, env, Type::TypedDict(right_typed_dict)) =>
+            {
+                Some(Type::TypedDict(right_typed_dict))
+            }
+
+            // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
+            // the result would then become Any or Unknown, respectively).
+            (div @ Type::Divergent(_), _, _) | (_, div @ Type::Divergent(_), _) => Some(div),
+
+            (unknown @ Type::Dynamic(DynamicType::AmbiguousOverload), _, _)
+            | (_, unknown @ Type::Dynamic(DynamicType::AmbiguousOverload), _) => Some(unknown),
+
+            (any @ Type::Dynamic(DynamicType::Any), _, _)
+            | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
+
+            (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
+            | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
+
+            (unknown @ Type::Dynamic(DynamicType::InvalidConcatenateUnknown), _, _)
+            | (_, unknown @ Type::Dynamic(DynamicType::InvalidConcatenateUnknown), _) => {
+                Some(unknown)
+            }
+
+            (unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _, _)
+            | (_, unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _) => Some(unknown),
+
+            (
+                placeholder @ Type::Dynamic(
+                    DynamicType::UnspecializedTypeVar | DynamicType::UnknownLambdaParameter,
+                ),
+                _,
+                _,
+            )
+            | (
+                _,
+                placeholder @ Type::Dynamic(
+                    DynamicType::UnspecializedTypeVar | DynamicType::UnknownLambdaParameter,
+                ),
+                _,
+            ) => Some(placeholder),
+
+            // When both operands are the same constrained TypeVar (e.g., `T: (int, str)`),
+            // we check if the operation is valid for each constraint paired with itself.
+            // This is different from treating it as a union, where we'd check all combinations.
+            // For example, `T + T` where `T: (int, str)` should check `int + int` and `str + str`,
+            // not `int + str` which would fail.
+            //
+            // If each constraint's operation returns the same type as the constraint (e.g.,
+            // `int + int -> int`), we return the TypeVar to preserve the generic relationship.
+            // Otherwise, we return the union of the return types.
+            //
+            // TODO: We expect to replace this with more general support for handling constrained TypeVars
+            // in arbitrary method/function calls.
+            (Type::TypeVar(left_tvar), Type::TypeVar(right_tvar), _)
+                if left_tvar.identity(db) == right_tvar.identity(db) =>
+            {
+                match left_tvar.typevar(db).bound_or_constraints(db, env) {
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        Self::map_constrained_typevar_constraints(
+                            db,
+                            env,
+                            left_ty,
+                            constraints,
+                            |constraint| {
+                                self.infer_binary_expression_type(
+                                    node, constraint, constraint, op, state,
+                                )
+                            },
+                        )
+                    }
+                    // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
+                    _ => self.infer_binary_dunder(state, left_ty, op, right_ty),
+                }
+            }
+
+            // When the left operand is a constrained TypeVar (e.g., `T: (int, float)`) and the
+            // right operand is not a TypeVar, we check if each constraint supports the operation
+            // with the right operand. For example, `T * 2` where `T: (int, float)` should check
+            // `int * 2` and `float * 2`, both of which work.
+            //
+            // TODO: We expect to replace this with more general support once we migrate to the new
+            // solver.
+            (Type::TypeVar(left_tvar), rhs, _) if !rhs.is_type_var() => {
+                match left_tvar.typevar(db).bound_or_constraints(db, env) {
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        Self::map_constrained_typevar_constraints(
+                            db,
+                            env,
+                            left_ty,
+                            constraints,
+                            |constraint| {
+                                self.infer_binary_expression_type_impl(
+                                    node, constraint, rhs, op, visitor, state,
+                                )
+                            },
+                        )
+                    }
+                    // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
+                    _ => self.infer_binary_dunder(state, left_ty, op, right_ty),
+                }
+            }
+
+            // When the right operand is a constrained TypeVar and the left operand is not a TypeVar,
+            // we check if each constraint supports the operation with the left operand.
+            (lhs, Type::TypeVar(right_tvar), _) if !lhs.is_type_var() => {
+                match right_tvar.typevar(db).bound_or_constraints(db, env) {
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        Self::map_constrained_typevar_constraints(
+                            db,
+                            env,
+                            right_ty,
+                            constraints,
+                            |constraint| {
+                                self.infer_binary_expression_type_impl(
+                                    node, lhs, constraint, op, visitor, state,
+                                )
+                            },
+                        )
+                    }
+                    // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
+                    _ => self.infer_binary_dunder(state, left_ty, op, right_ty),
+                }
+            }
+
+            // `try_call_bin_op` works for almost all `NewType`s, but not for `NewType`s of `float`
+            // and `complex`, where the concrete base type is a union. In that case it turns out
+            // the `self` types of the dunder methods in typeshed don't match, because they don't
+            // get the same `int | float` and `int | float | complex` special treatment that the
+            // positional arguments get. In those cases we need to explicitly delegate to the base
+            // type, so that it hits the `Type::Union` branches above.
+            (Type::NewTypeInstance(newtype), rhs, _) => self
+                .infer_binary_dunder(state, left_ty, op, right_ty)
+                .or_else(|| {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        newtype.concrete_base_type(db),
+                        rhs,
+                        op,
+                        visitor,
+                        state,
+                    )
+                }),
+            (lhs, Type::NewTypeInstance(newtype), _) => self
+                .infer_binary_dunder(state, left_ty, op, right_ty)
+                .or_else(|| {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        lhs,
+                        newtype.concrete_base_type(db),
+                        op,
+                        visitor,
+                        state,
+                    )
+                }),
+
+            (todo @ Type::Dynamic(DynamicType::Todo(_)), _, _)
+            | (_, todo @ Type::Dynamic(DynamicType::Todo(_)), _) => Some(todo),
+
+            (left, right, ast::Operator::Add)
+                if let Some(left_tuple) = left.exact_tuple_instance_spec(db)
+                    && let Some(right_tuple) = right.exact_tuple_instance_spec(db) =>
+            {
+                state.used_tuple_addition = true;
+                // As with tuple slicing and iteration, assume that values typed as `tuple`
+                // have the usual behavior even though they could be subclass instances.
+                // Explicitly known subclasses still use their operator methods below.
+                if left_tuple
+                    .len()
+                    .minimum()
+                    .saturating_add(right_tuple.len().minimum())
+                    > MAX_TUPLE_ADDITION_ELEMENTS
+                {
+                    let elements = UnionType::from_elements_leave_aliases(
+                        db,
+                        env,
+                        left_tuple
+                            .iter_element_types(db)
+                            .chain(right_tuple.iter_element_types(db)),
+                    );
+                    let elements = if elements.is_never() {
+                        Type::object()
+                    } else {
+                        elements
+                    };
+                    return Some(Type::homogeneous_tuple(db, env, elements));
+                }
+                let tuple = TupleSpecBuilder::from(left_tuple.as_ref())
+                    .concat(db, env, right_tuple.as_ref())
+                    .build();
+                Some(Type::tuple(TupleType::new(db, env, &tuple)))
+            }
+
+            (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
+
+            (Type::LiteralValue(left), Type::LiteralValue(right), _) => {
+                let recursively_defined = if left.recursively_defined().is_yes()
+                    || right.recursively_defined().is_yes()
+                {
+                    RecursivelyDefined::Yes
+                } else {
+                    RecursivelyDefined::No
+                };
+                let result = match (left.kind(), right.kind(), op) {
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::Add,
+                    ) => Some(
+                        n.as_i64()
+                            .checked_add(m.as_i64())
+                            .map(Type::int_literal)
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(db, env)),
+                    ),
+
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::Sub,
+                    ) => Some(
+                        n.as_i64()
+                            .checked_sub(m.as_i64())
+                            .map(Type::int_literal)
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(db, env)),
+                    ),
+
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::Mult,
+                    ) => Some(
+                        n.as_i64()
+                            .checked_mul(m.as_i64())
+                            .map(Type::int_literal)
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(db, env)),
+                    ),
+
+                    (
+                        LiteralValueTypeKind::Int(_),
+                        LiteralValueTypeKind::Int(_),
+                        ast::Operator::Div,
+                    ) => Some(KnownClass::Float.to_instance(db, env)),
+
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::FloorDiv,
+                    ) => Some({
+                        let mut q = n.as_i64().checked_div(m.as_i64());
+                        let r = n.as_i64().checked_rem(m.as_i64());
+                        // Division works differently in Python than in Rust. If the result is negative and
+                        // there is a remainder, the division rounds down (instead of towards zero):
+                        if n.as_i64().is_negative() != m.as_i64().is_negative()
+                            && r.unwrap_or(0) != 0
+                        {
+                            q = q.map(|q| q - 1);
+                        }
+                        q.map(Type::int_literal)
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(db, env))
+                    }),
+
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::Mod,
+                    ) => Some({
+                        let mut r = n.as_i64().checked_rem(m.as_i64());
+                        // Division works differently in Python than in Rust. If the result is negative and
+                        // there is a remainder, the division rounds down (instead of towards zero). Adjust
+                        // the remainder to compensate so that q * m + r == n:
+                        if n.as_i64().is_negative() != m.as_i64().is_negative()
+                            && r.unwrap_or(0) != 0
+                        {
+                            r = r.map(|x| x + m.as_i64());
+                        }
+                        r.map(Type::int_literal)
+                            .unwrap_or_else(|| KnownClass::Int.to_instance(db, env))
+                    }),
+
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::Pow,
+                    ) => Some({
+                        if m.as_i64() < 0 {
+                            KnownClass::Float.to_instance(db, env)
+                        } else {
+                            u32::try_from(m.as_i64())
+                                .ok()
+                                .and_then(|m| n.as_i64().checked_pow(m))
+                                .map(Type::int_literal)
+                                .unwrap_or_else(|| KnownClass::Int.to_instance(db, env))
+                        }
+                    }),
+
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::BitOr,
+                    ) => Some(Type::int_literal(n.as_i64() | m.as_i64())),
+
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::BitAnd,
+                    ) => Some(Type::int_literal(n.as_i64() & m.as_i64())),
+
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::BitXor,
+                    ) => Some(Type::int_literal(n.as_i64() ^ m.as_i64())),
+
+                    (
+                        LiteralValueTypeKind::Bytes(lhs),
+                        LiteralValueTypeKind::Bytes(rhs),
+                        ast::Operator::Add,
+                    ) => {
+                        let lhs = lhs.value(db);
+                        let rhs = rhs.value(db);
+                        let new_length = lhs.len().saturating_add(rhs.len());
+                        let ty = if new_length <= Self::MAX_STRING_LITERAL_SIZE {
+                            Type::bytes_literal(db, &[lhs, rhs].concat())
+                        } else {
+                            KnownClass::Bytes.to_instance(db, env)
+                        };
+                        Some(ty)
+                    }
+
+                    (
+                        LiteralValueTypeKind::String(lhs),
+                        LiteralValueTypeKind::String(rhs),
+                        ast::Operator::Add,
+                    ) => {
+                        let lhs_value = lhs.value(db);
+                        let rhs_value = rhs.value(db);
+                        let new_length = lhs_value.len() + rhs_value.len();
+                        let ty = if new_length <= Self::MAX_STRING_LITERAL_SIZE {
+                            let mut value = CompactString::with_capacity(new_length);
+                            value.push_str(lhs_value);
+                            value.push_str(rhs_value);
+                            Type::string_literal(db, value)
+                        } else {
+                            Type::literal_string()
+                        };
+                        Some(ty)
+                    }
+
+                    (
+                        LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString,
+                        LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString,
+                        ast::Operator::Add,
+                    ) => Some(Type::literal_string()),
+
+                    (
+                        LiteralValueTypeKind::String(s),
+                        LiteralValueTypeKind::Int(n),
+                        ast::Operator::Mult,
+                    )
+                    | (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::String(s),
+                        ast::Operator::Mult,
+                    ) => {
+                        let ty = if n.as_i64() < 1 {
+                            Type::string_literal(db, "")
+                        } else if let Ok(n) = usize::try_from(n.as_i64())
+                            && let value = s.value(db)
+                            && n.checked_mul(value.len()).is_some_and(|new_length| {
+                                new_length <= Self::MAX_STRING_LITERAL_SIZE
+                            })
+                        {
+                            let new_literal = value.repeat(n);
+                            Type::string_literal(db, &*new_literal)
+                        } else {
+                            Type::literal_string()
+                        };
+                        Some(ty)
+                    }
+
+                    (
+                        LiteralValueTypeKind::LiteralString,
+                        LiteralValueTypeKind::Int(n),
+                        ast::Operator::Mult,
+                    )
+                    | (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::LiteralString,
+                        ast::Operator::Mult,
+                    ) => {
+                        let ty = if n.as_i64() < 1 {
+                            Type::string_literal(db, "")
+                        } else {
+                            Type::literal_string()
+                        };
+                        Some(ty)
+                    }
+
+                    (
+                        LiteralValueTypeKind::Bool(b1),
+                        LiteralValueTypeKind::Bool(b2),
+                        ast::Operator::BitOr,
+                    ) => Some(Type::bool_literal(b1 | b2)),
+
+                    (
+                        LiteralValueTypeKind::Bool(b1),
+                        LiteralValueTypeKind::Bool(b2),
+                        ast::Operator::BitAnd,
+                    ) => Some(Type::bool_literal(b1 & b2)),
+
+                    (
+                        LiteralValueTypeKind::Bool(b1),
+                        LiteralValueTypeKind::Bool(b2),
+                        ast::Operator::BitXor,
+                    ) => Some(Type::bool_literal(b1 ^ b2)),
+
+                    (
+                        LiteralValueTypeKind::Bool(b1),
+                        LiteralValueTypeKind::Bool(_) | LiteralValueTypeKind::Int(_),
+                        op,
+                    ) => self.infer_binary_expression_type(
+                        node,
+                        Type::int_literal(i64::from(b1)),
+                        right_ty,
+                        op,
+                        state,
+                    ),
+
+                    (LiteralValueTypeKind::Int(_), LiteralValueTypeKind::Bool(b2), op) => self
+                        .infer_binary_expression_type(
+                            node,
+                            left_ty,
+                            Type::int_literal(i64::from(b2)),
+                            op,
+                            state,
+                        ),
+
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::LShift,
+                    ) if n.as_i64() == 0 && m.as_i64() >= 0 => Some(Type::int_literal(0)),
+
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::LShift,
+                    ) => {
+                        let n = n.as_i64();
+
+                        // An additional overflow check beyond `checked_shl` is necessary
+                        // here, because `checked_shl` only rejects shift amounts >= 64;
+                        // it does not detect when significant bits are shifted into (or
+                        // past) the sign bit. For example, `1i64.checked_shl(63)` returns
+                        // `Some(i64::MIN)`, but Python's `1 << 63` is a large positive int.
+                        //
+                        // We compute the "headroom": the number of redundant sign-extension
+                        // bits minus one (for the sign bit itself). A shift is safe iff
+                        // `m <= headroom`.
+                        let headroom = if n >= 0 {
+                            n.leading_zeros().saturating_sub(1)
+                        } else {
+                            n.leading_ones().saturating_sub(1)
+                        };
+                        Some(
+                            u32::try_from(m.as_i64())
+                                .ok()
+                                .filter(|&m| m <= headroom)
+                                .and_then(|m| n.checked_shl(m))
+                                .map(Type::int_literal)
+                                .unwrap_or_else(|| KnownClass::Int.to_instance(db, env)),
+                        )
+                    }
+
+                    (
+                        LiteralValueTypeKind::Int(n),
+                        LiteralValueTypeKind::Int(m),
+                        ast::Operator::RShift,
+                    ) => {
+                        let n = n.as_i64();
+                        let result = match u32::try_from(m.as_i64()) {
+                            Ok(m) => Type::int_literal(n >> m.clamp(0, 63)),
+                            Err(_) if m.as_i64() > 0 => {
+                                Type::int_literal(if n >= 0 { 0 } else { -1 })
+                            }
+                            Err(_) => KnownClass::Int.to_instance(db, env),
+                        };
+                        Some(result)
+                    }
+
+                    _ => self.infer_binary_dunder(state, left_ty, op, right_ty),
+                };
+
+                result.map(|result| match result {
+                    Type::LiteralValue(literal) => {
+                        Type::LiteralValue(literal.with_recursively_defined(recursively_defined))
+                    }
+                    _ => result,
+                })
+            }
+
+            (
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
+                ast::Operator::BitAnd,
+            ) => {
+                let constraints = ConstraintSetBuilder::new();
+                let result = constraints.into_owned(|constraints| {
+                    let left = constraints.load(db, env, left.constraints(db));
+                    let right = constraints.load(db, env, right.constraints(db));
+                    left.and(db, constraints, || right)
+                });
+                Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    InternedConstraintSet::new(db, result),
+                )))
+            }
+
+            (
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
+                ast::Operator::BitOr,
+            ) => {
+                let constraints = ConstraintSetBuilder::new();
+                let result = constraints.into_owned(|constraints| {
+                    let left = constraints.load(db, env, left.constraints(db));
+                    let right = constraints.load(db, env, right.constraints(db));
+                    left.or(db, constraints, || right)
+                });
+                Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
+                    InternedConstraintSet::new(db, result),
+                )))
+            }
+
+            // PEP 604-style union types using the `|` operator.
+            (left, right, ast::Operator::BitOr)
+                if (is_union_type_operand(left)
+                    && (is_union_type_operand(right) || right.is_none(db)))
+                    || (left.is_none(db) && is_union_type_operand(right)) =>
+            {
+                Some(UnionTypeInstance::from_value_expression_types(
+                    db,
+                    [left_ty, right_ty],
+                    self.scope(),
+                    self.typevar_binding_context,
+                    self.inference_flags(),
+                ))
+            }
+
+            // We avoid calling `type.__(r)or__`, as typeshed annotates these methods as
+            // accepting `Any` (since typeforms are inexpressable in the type system currently).
+            // This means that many common errors would not be caught if we fell back to typeshed's stubs here.
+            //
+            // Note that if a class had a custom metaclass that overrode `__(r)or__`, we would also ignore
+            // that custom method as we'd take one of the earlier branches.
+            // This seems like it's probably rare enough that it's acceptable, however.
+            (
+                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..),
+                _,
+                ast::Operator::BitOr,
+            )
+            | (
+                _,
+                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..),
+                ast::Operator::BitOr,
+            ) => Type::try_call_bin_op_with_policy(
+                db,
+                env,
+                left_ty,
+                ast::Operator::BitOr,
+                right_ty,
+                MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .ok()
+            .map(|binding| {
+                state.deprecated_functions.extend(
+                    binding
+                        .deprecated_functions(db)
+                        .map(|(_, function)| function),
+                );
+                binding.return_type(db, env)
+            }),
+
+            // We've handled all of the special cases that we support for literals, so we need to
+            // fall back on looking for dunder methods on one of the operand types.
+            (
+                Type::FunctionLiteral(_)
+                | Type::Callable(..)
+                | Type::BoundMethod(_)
+                | Type::WrapperDescriptor(_)
+                | Type::KnownBoundMethod(_)
+                | Type::DataclassDecorator(_)
+                | Type::DataclassTransformer(_)
+                | Type::ModuleLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::SubclassOf(_)
+                | Type::NominalInstance(_)
+                | Type::ProtocolInstance(_)
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(_)
+                | Type::PropertyInstance(_)
+                | Type::SlotDescriptor(_)
+                | Type::Intersection(_)
+                | Type::EnumComplement(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy
+                | Type::LiteralValue(_)
+                | Type::BoundSuper(_)
+                | Type::TypeVar(_)
+                | Type::TypeIs(_)
+                | Type::TypeGuard(_)
+                | Type::TypeForm(_)
+                | Type::TypedDict(_),
+                Type::FunctionLiteral(_)
+                | Type::Callable(..)
+                | Type::BoundMethod(_)
+                | Type::WrapperDescriptor(_)
+                | Type::KnownBoundMethod(_)
+                | Type::DataclassDecorator(_)
+                | Type::DataclassTransformer(_)
+                | Type::ModuleLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::SubclassOf(_)
+                | Type::NominalInstance(_)
+                | Type::ProtocolInstance(_)
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(_)
+                | Type::PropertyInstance(_)
+                | Type::SlotDescriptor(_)
+                | Type::Intersection(_)
+                | Type::EnumComplement(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy
+                | Type::LiteralValue(_)
+                | Type::BoundSuper(_)
+                | Type::TypeVar(_)
+                | Type::TypeIs(_)
+                | Type::TypeGuard(_)
+                | Type::TypeForm(_)
+                | Type::TypedDict(_),
+                op,
+            ) => self.infer_binary_dunder(state, left_ty, op, right_ty),
+        }
+    }
+
+    /// Raise a diagnostic if the given type cannot be divided by zero.
+    ///
+    /// Expects the resolved type of the left side of the binary expression.
+    fn check_division_by_zero(
+        &mut self,
+        node: AnyNodeRef<'_>,
+        op: ast::Operator,
+        left: Type<'db>,
+    ) -> bool {
+        let db = self.db();
+        match left {
+            Type::LiteralValue(literal)
+                if matches!(
+                    literal.kind(),
+                    LiteralValueTypeKind::Bool(_) | LiteralValueTypeKind::Int(_)
+                ) => {}
+            Type::NominalInstance(instance)
+                if matches!(
+                    instance.known_class(db),
+                    Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
+                ) => {}
+            _ => return false,
+        }
+
+        let (op, by_zero) = match op {
+            ast::Operator::Div => ("divide", "by zero"),
+            ast::Operator::FloorDiv => ("floor divide", "by zero"),
+            ast::Operator::Mod => ("reduce", "modulo zero"),
+            _ => return false,
+        };
+
+        if let Some(builder) = self.context.report_lint(&DIVISION_BY_ZERO, node) {
+            builder.into_diagnostic(format_args!(
+                "Cannot {op} object of type `{}` {by_zero}",
+                left.display(db, self.program_environment())
+            ));
+        }
+
+        true
+    }
+}

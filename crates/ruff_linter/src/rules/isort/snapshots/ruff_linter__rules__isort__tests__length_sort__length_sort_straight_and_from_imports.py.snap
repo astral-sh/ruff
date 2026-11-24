@@ -11,8 +11,8 @@ I001 [*] Import block is un-sorted or un-formatted
 5 | | from mediuuuum import c
 6 | | from short import b
   | |___________________^
-  |
 help: Organize imports
+  |
 1 + import short
 2 | import mediuuuuuum
   - import short
@@ -22,3 +22,4 @@ help: Organize imports
 5 | from mediuuuum import c
   - from short import b
 6 + from looooooooooooooong import a
+  |

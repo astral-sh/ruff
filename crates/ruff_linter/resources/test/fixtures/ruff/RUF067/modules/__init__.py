@@ -1,4 +1,4 @@
-"""This is the module docstring."""
+"""This is the module docstring."""  # ok in both modes
 
 # convenience imports:
 import os
@@ -10,7 +10,7 @@ __all__: list[str] = __all__
 __all__ = __all__ = __all__
 
 MY_CONSTANT = 5
-"""This is an important constant."""
+"""This is an important constant."""  # ok in both modes
 
 os.environ["FOO"] = 1
 
@@ -40,12 +40,20 @@ def __dir__():  # ok
     return ["foo"]
 
 import pkgutil
+"""Not a docstring: only module and attribute docstrings are exempt."""  # RUF067 in both modes
 
 __path__ = pkgutil.extend_path(__path__, __name__)  # ok
 __path__ = unknown.extend_path(__path__, __name__)  # also ok
 
-# non-`extend_path` assignments are not allowed
-__path__ = 5  # RUF067
+# any dunder-named assignment is allowed in non-strict mode
+__path__ = 5  # ok
+__submodules__ = []  # ok (e.g. mkinit)
+__protected__ = []  # ok
+__custom__: list[str] = []  # ok
+__submodules__ += ["extra"]  # ok
+
+foo = __submodules__ = []  # RUF067: not every target is a dunder
+__all__[0] = __version__ = "1"  # RUF067: subscript target is not a simple name
 
 # also allow `__author__`
 __author__ = "The Author"  # ok

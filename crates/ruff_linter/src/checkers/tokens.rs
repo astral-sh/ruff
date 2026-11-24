@@ -4,7 +4,7 @@ use std::path::Path;
 
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
-use ruff_python_ast::token::Tokens;
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 
@@ -33,12 +33,12 @@ pub(crate) fn check_tokens(
     let comment_ranges = indexer.comment_ranges();
 
     if context.any_rule_enabled(&[
-        Rule::BlankLineBetweenMethods,
-        Rule::BlankLinesTopLevel,
+        Rule::MissingBlankLineBeforeMethod,
+        Rule::MissingBlankLinesBeforeTopLevelDefinition,
         Rule::TooManyBlankLines,
         Rule::BlankLineAfterDecorator,
-        Rule::BlankLinesAfterFunctionOrClass,
-        Rule::BlankLinesBeforeNestedDefinition,
+        Rule::MissingBlankLinesAfterTopLevelDefinition,
+        Rule::MissingBlankLineBeforeNestedDefinition,
     ]) {
         BlankLinesChecker::new(locator, stylist, source_type, cell_offsets, context)
             .check_lines(tokens);
@@ -71,14 +71,56 @@ pub(crate) fn check_tokens(
     }
 
     if context.any_rule_enabled(&[
-        Rule::InvalidCharacterBackspace,
-        Rule::InvalidCharacterSub,
-        Rule::InvalidCharacterEsc,
-        Rule::InvalidCharacterNul,
-        Rule::InvalidCharacterZeroWidthSpace,
-    ]) {
+        Rule::UnescapedBackspaceCharacter,
+        Rule::UnescapedSubstituteCharacter,
+        Rule::UnescapedEscapeCharacter,
+        Rule::UnescapedNullCharacter,
+        Rule::UnescapedZeroWidthSpaceCharacter,
+    ]) && pylint::rules::contains_unescaped_string_character(locator.contents())
+    {
+        let mut interpolated_string_depths: Vec<u32> = Vec::new();
+        let target_version = context
+            .settings()
+            .resolve_target_version(path)
+            .linter_version();
+
         for token in tokens {
-            pylint::rules::invalid_string_characters(context, token, locator);
+            match token.kind() {
+                TokenKind::FStringStart | TokenKind::TStringStart => {
+                    interpolated_string_depths.push(0);
+                }
+                TokenKind::FStringEnd | TokenKind::TStringEnd => {
+                    interpolated_string_depths.pop();
+                }
+                TokenKind::Lbrace => {
+                    if let Some(depth) = interpolated_string_depths.last_mut() {
+                        *depth += 1;
+                    }
+                }
+                TokenKind::Rbrace => {
+                    if let Some(depth) = interpolated_string_depths.last_mut() {
+                        *depth = depth.saturating_sub(1);
+                    }
+                }
+                _ => {}
+            }
+
+            let inside_interpolation = match token.kind() {
+                // Middle tokens are literal text or format specs for the current f/t-string, where
+                // backslash escapes are valid. They can still be inside an outer interpolation.
+                TokenKind::FStringMiddle | TokenKind::TStringMiddle => interpolated_string_depths
+                    .split_last()
+                    .is_some_and(|(_, outer_depths)| outer_depths.iter().any(|depth| *depth > 0)),
+                _ => interpolated_string_depths.iter().any(|depth| *depth > 0),
+            };
+
+            pylint::rules::unescaped_string_characters(
+                context,
+                token,
+                locator,
+                target_version,
+                inside_interpolation,
+            );
         }
     }
 
@@ -107,7 +149,7 @@ pub(crate) fn check_tokens(
     if context.any_rule_enabled(&[
         Rule::MissingTrailingComma,
         Rule::TrailingCommaOnBareTuple,
-        Rule::ProhibitedTrailingComma,
+        Rule::UnnecessaryTrailingComma,
     ]) {
         flake8_commas::rules::trailing_commas(context, tokens, locator, indexer);
     }
@@ -116,13 +158,13 @@ pub(crate) fn check_tokens(
         pyupgrade::rules::extraneous_parentheses(context, tokens, locator);
     }
 
-    if source_type.is_stub() && context.is_rule_enabled(Rule::TypeCommentInStub) {
-        flake8_pyi::rules::type_comment_in_stub(context, locator, comment_ranges);
+    if context.is_rule_enabled(Rule::LegacyTypeComment) {
+        flake8_pyi::rules::legacy_type_comment(context, locator, comment_ranges, source_type);
     }
 
     if context.any_rule_enabled(&[
-        Rule::ShebangNotExecutable,
-        Rule::ShebangMissingExecutableFile,
+        Rule::NonExecutableFileWithShebang,
+        Rule::ExecutableFileWithoutShebang,
         Rule::ShebangLeadingWhitespace,
         Rule::ShebangNotFirstLine,
         Rule::ShebangMissingPython,

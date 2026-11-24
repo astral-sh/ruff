@@ -12,14 +12,14 @@ Q002 [*] Single quote docstring found but double quotes preferred
 5 |   '''
   |
 help: Replace single quotes docstring with double quotes
+  |
   - '''
 1 + """
 2 | Single quotes multiline module docstring
   - '''
 3 + """
-4 | 
-5 | '''
-6 | this is not a docstring
+4 |
+  |
 
 Q002 [*] Single quote docstring found but double quotes preferred
   --> docstring_singles.py:14:5
@@ -34,17 +34,15 @@ Q002 [*] Single quote docstring found but double quotes preferred
 18 |       '''
    |
 help: Replace single quotes docstring with double quotes
-11 | class Cls(MakeKlass('''
-12 |     class params \t not a docstring
+   |
 13 | ''')):
    -     '''
 14 +     """
 15 |     Single quotes multiline class docstring
    -     '''
 16 +     """
-17 | 
-18 |     '''
-19 |     this is not a docstring
+17 |
+   |
 
 Q002 [*] Single quote docstring found but double quotes preferred
   --> docstring_singles.py:26:9
@@ -59,14 +57,12 @@ Q002 [*] Single quote docstring found but double quotes preferred
 30 |           some_expression = 'hello world'
    |
 help: Replace single quotes docstring with double quotes
-23 |     def f(self, bar='''
-24 |         definitely not a docstring''',
+   |
 25 |         val=l[Cls():3]):
    -         '''
 26 +         """
 27 |         Single quotes multiline function docstring
    -         '''
 28 +         """
-29 | 
-30 |         some_expression = 'hello world'
-31 |
+29 |
+   |

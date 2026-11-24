@@ -1,1 +1,1 @@
-def __getattr__(name: str): ...  # incomplete module
+def __getattr__(name: str, /): ...  # incomplete module

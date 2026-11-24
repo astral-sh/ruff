@@ -1,1 +1,1 @@
-Success: no issues found in 340 source files
+Success: no issues found in 336 source files

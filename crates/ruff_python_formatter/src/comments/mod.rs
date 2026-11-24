@@ -97,7 +97,7 @@ pub(crate) use format::{
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_trivia::{CommentLinePosition, CommentRanges, SuppressionKind};
+use ruff_python_trivia::{CommentLinePosition, SuppressionKind, TriviaRanges};
 use ruff_text_size::{Ranged, TextRange};
 pub(crate) use visitor::collect_comments;
 
@@ -162,7 +162,7 @@ impl SourceComment {
     }
 
     /// Returns a nice debug representation that prints the source code for every comment (and not just the range).
-    pub(crate) fn debug<'a>(&'a self, source_code: SourceCode<'a>) -> DebugComment<'a> {
+    fn debug<'a>(&'a self, source_code: SourceCode<'a>) -> DebugComment<'a> {
         DebugComment::new(self, source_code)
     }
 
@@ -219,53 +219,60 @@ pub(crate) struct Comments<'a> {
 }
 
 impl<'a> Comments<'a> {
-    fn new(comments: CommentsMap<'a>, comment_ranges: &'a CommentRanges) -> Self {
+    fn new(comments: CommentsMap<'a>) -> Self {
         Self {
             data: Rc::new(CommentsData {
+                bloom_filter: CommentNodeFilter::from_map(&comments),
                 comments,
-                comment_ranges,
             }),
         }
     }
 
-    /// Effectively a [`Default`] implementation that works around the lifetimes for tests
+    /// Creates an empty comment map for tests.
     #[cfg(test)]
-    pub(crate) fn from_ranges(comment_ranges: &'a CommentRanges) -> Self {
-        Self {
-            data: Rc::new(CommentsData {
-                comments: CommentsMap::default(),
-                comment_ranges,
-            }),
-        }
-    }
-
-    pub(crate) fn ranges(&self) -> &'a CommentRanges {
-        self.data.comment_ranges
+    pub(crate) fn empty() -> Self {
+        Self::new(CommentsMap::default())
     }
 
     /// Extracts the comments from the AST.
     pub(crate) fn from_ast(
         root: impl Into<AnyNodeRef<'a>>,
         source_code: SourceCode<'a>,
-        comment_ranges: &'a CommentRanges,
+        trivia: &'a TriviaRanges,
     ) -> Self {
         fn collect_comments<'a>(
             root: AnyNodeRef<'a>,
             source_code: SourceCode<'a>,
-            comment_ranges: &'a CommentRanges,
+            trivia: &'a TriviaRanges,
         ) -> Comments<'a> {
-            let map = if comment_ranges.is_empty() {
+            let map = if trivia.comments().is_empty() {
                 CommentsMap::new()
             } else {
-                let mut builder = CommentsMapBuilder::new(source_code.as_str(), comment_ranges);
-                CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
+                let mut builder = CommentsMapBuilder::new(source_code.as_str(), trivia);
+                CommentsVisitor::new(source_code, trivia.comments(), &mut builder).visit(root);
                 builder.finish()
             };
 
-            Comments::new(map, comment_ranges)
+            Comments::new(map)
         }
 
-        collect_comments(root.into(), source_code, comment_ranges)
+        collect_comments(root.into(), source_code, trivia)
+    }
+
+    /// Returns whether this node might have leading, dangling, or trailing comments.
+    ///
+    /// A false result guarantees that the node has none. A true result can also
+    /// mean another node with comments set the same bit in the filter.
+    #[inline]
+    pub(crate) fn may_have_comment(&self, node: impl Into<AnyNodeRef<'a>>) -> bool {
+        self.data.bloom_filter.might_contain(node.into())
+    }
+
+    #[inline]
+    fn possible_key(&self, node: impl Into<AnyNodeRef<'a>>) -> Option<NodeRefEqualityKey<'a>> {
+        let node = node.into();
+        self.may_have_comment(node)
+            .then(|| NodeRefEqualityKey::from_ref(node))
     }
 
     /// Returns `true` if the given `node` has any comments.
@@ -274,9 +281,8 @@ impl<'a> Comments<'a> {
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        self.data
-            .comments
-            .has(&NodeRefEqualityKey::from_ref(node.into()))
+        self.possible_key(node)
+            .is_some_and(|key| self.data.comments.has(&key))
     }
 
     /// Returns `true` if the given `node` has any [leading comments](self#leading-comments).
@@ -294,9 +300,8 @@ impl<'a> Comments<'a> {
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        self.data
-            .comments
-            .leading(&NodeRefEqualityKey::from_ref(node.into()))
+        self.possible_key(node)
+            .map_or(&[], |key| self.data.comments.leading(&key))
     }
 
     /// Returns `true` if node has any [dangling comments](self#dangling-comments).
@@ -312,9 +317,8 @@ impl<'a> Comments<'a> {
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        self.data
-            .comments
-            .dangling(&NodeRefEqualityKey::from_ref(node.into()))
+        self.possible_key(node)
+            .map_or(&[], |key| self.data.comments.dangling(&key))
     }
 
     /// Returns the `node`'s [trailing comments](self#trailing-comments).
@@ -323,9 +327,8 @@ impl<'a> Comments<'a> {
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        self.data
-            .comments
-            .trailing(&NodeRefEqualityKey::from_ref(node.into()))
+        self.possible_key(node)
+            .map_or(&[], |key| self.data.comments.trailing(&key))
     }
 
     /// Returns `true` if the given `node` has any [trailing comments](self#trailing-comments).
@@ -365,9 +368,10 @@ impl<'a> Comments<'a> {
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        self.data
-            .comments
-            .leading_dangling_trailing(&NodeRefEqualityKey::from_ref(node.into()))
+        self.possible_key(node)
+            .map_or(LeadingDanglingTrailing::EMPTY, |key| {
+                self.data.comments.leading_dangling_trailing(&key)
+            })
     }
 
     #[inline(always)]
@@ -495,10 +499,36 @@ impl LeadingDanglingTrailingComments<'_> {
 
 #[derive(Debug)]
 struct CommentsData<'a> {
+    bloom_filter: CommentNodeFilter,
     comments: CommentsMap<'a>,
+}
 
-    /// We need those for backwards lexing
-    comment_ranges: &'a CommentRanges,
+/// A single-hash Bloom filter over the addresses of nodes with comments.
+/// Different nodes can set the same bit, so a hit still needs an exact lookup.
+#[derive(Debug, Default)]
+struct CommentNodeFilter([u64; 32]);
+
+impl CommentNodeFilter {
+    fn from_map(map: &CommentsMap<'_>) -> Self {
+        let mut filter = Self::default();
+        for key in map.keys() {
+            let (word, bit) = filter.position(key.node());
+            filter.0[word] |= bit;
+        }
+        filter
+    }
+
+    #[inline]
+    fn might_contain(&self, node: AnyNodeRef<'_>) -> bool {
+        let (word, bit) = self.position(node);
+        self.0[word] & bit != 0
+    }
+
+    fn position(&self, node: AnyNodeRef<'_>) -> (usize, u64) {
+        // Drop the low bits because AST node addresses are typically aligned.
+        let index = node.as_ptr().as_ptr().addr() >> 3;
+        ((index / 64) % self.0.len(), 1 << (index % 64))
+    }
 }
 
 pub(crate) fn has_skip_comment(trailing_comments: &[SourceComment], source: &str) -> bool {
@@ -513,18 +543,20 @@ pub(crate) fn has_skip_comment(trailing_comments: &[SourceComment], source: &str
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use insta::assert_debug_snapshot;
 
     use ruff_formatter::SourceCode;
     use ruff_python_ast::{Mod, PySourceType};
     use ruff_python_parser::{ParseOptions, Parsed, parse};
-    use ruff_python_trivia::CommentRanges;
+    use ruff_python_trivia::TriviaRanges;
 
-    use crate::comments::Comments;
+    use crate::comments::{CommentNodeFilter, Comments, CommentsData, CommentsMap};
 
     struct CommentsTestCase<'a> {
         parsed: Parsed<Mod>,
-        comment_ranges: CommentRanges,
+        trivia: TriviaRanges,
         source_code: SourceCode<'a>,
     }
 
@@ -534,18 +566,44 @@ mod tests {
             let source_type = PySourceType::Python;
             let parsed = parse(source, ParseOptions::from(source_type))
                 .expect("Expect source to be valid Python");
-            let comment_ranges = CommentRanges::from(parsed.tokens());
+            let trivia = TriviaRanges::from(parsed.tokens());
 
             CommentsTestCase {
                 parsed,
-                comment_ranges,
+                trivia,
                 source_code,
             }
         }
 
         fn to_comments(&self) -> Comments<'_> {
-            Comments::from_ast(self.parsed.syntax(), self.source_code, &self.comment_ranges)
+            Comments::from_ast(self.parsed.syntax(), self.source_code, &self.trivia)
         }
+    }
+
+    #[test]
+    fn bloom_filter_false_positive() {
+        let test_case = CommentsTestCase::from_code("pass");
+        let node = test_case.parsed.syntax();
+
+        // Force a collision independently of where the allocator put the node.
+        let mut bloom_filter = CommentNodeFilter::default();
+        bloom_filter.0.fill(u64::MAX);
+        let comments = Comments {
+            data: Rc::new(CommentsData {
+                bloom_filter,
+                comments: CommentsMap::new(),
+            }),
+        };
+
+        assert!(comments.may_have_comment(node));
+        assert!(!comments.has(node));
+        assert!(
+            comments
+                .leading_dangling_trailing(node)
+                .into_iter()
+                .next()
+                .is_none()
+        );
     }
 
     #[test]

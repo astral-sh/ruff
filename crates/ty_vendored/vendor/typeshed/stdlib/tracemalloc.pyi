@@ -1,8 +1,7 @@
 import sys
 from _tracemalloc import *
 from collections.abc import Sequence
-from typing import Any, SupportsIndex, overload
-from typing_extensions import TypeAlias
+from typing import Any, SupportsIndex, TypeAlias, overload
 
 def get_object_traceback(obj: object) -> Traceback | None:
     """
@@ -96,6 +95,7 @@ class Frame:
 
         def __le__(self, other: Frame) -> bool:
             """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b)."""
+
     else:
         def __gt__(self, other: Frame, NotImplemented: Any = ...) -> bool:
             """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b)."""
@@ -135,10 +135,12 @@ class Traceback(Sequence[Frame]):
     def total_nframe(self) -> int | None: ...
     def __init__(self, frames: Sequence[_FrameTuple], total_nframe: int | None = None) -> None: ...
     def format(self, limit: int | None = None, most_recent_first: bool = False) -> list[str]: ...
+
     @overload
     def __getitem__(self, index: SupportsIndex) -> Frame: ...
     @overload
-    def __getitem__(self, index: slice) -> Sequence[Frame]: ...
+    def __getitem__(self, index: slice[SupportsIndex | None]) -> Sequence[Frame]: ...
+
     def __contains__(self, frame: Frame) -> bool: ...  # type: ignore[override]
     def __len__(self) -> int: ...
     def __eq__(self, other: object) -> bool: ...
@@ -153,6 +155,7 @@ class Traceback(Sequence[Frame]):
 
         def __le__(self, other: Traceback) -> bool:
             """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b)."""
+
     else:
         def __gt__(self, other: Traceback, NotImplemented: Any = ...) -> bool:
             """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b)."""
@@ -199,5 +202,6 @@ class Snapshot:
         Group statistics by key_type. Return a sorted list of Statistic
         instances.
         """
+
     traceback_limit: int
     traces: Sequence[Trace]

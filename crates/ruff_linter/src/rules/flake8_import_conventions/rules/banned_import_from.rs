@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{Violation, checkers::ast::Checker};
 
 /// ## What it does
@@ -33,7 +34,7 @@ use crate::{Violation, checkers::ast::Checker};
 /// ## Options
 /// - `lint.flake8-import-conventions.banned-from`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.263")]
+#[violation_metadata(stable_since = "v0.0.263", category = Category::Pedantic)]
 pub(crate) struct BannedImportFrom {
     name: String,
 }

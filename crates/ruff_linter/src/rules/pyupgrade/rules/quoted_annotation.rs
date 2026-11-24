@@ -6,6 +6,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -87,7 +88,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [TC008]: https://docs.astral.sh/ruff/rules/quoted-type-alias/
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.242")]
+#[violation_metadata(stable_since = "v0.0.242", category = Category::Correctness)]
 pub(crate) struct QuotedAnnotation;
 
 impl AlwaysFixableViolation for QuotedAnnotation {
@@ -115,9 +116,8 @@ pub(crate) fn quoted_annotation(checker: &Checker, annotation: &str, range: Text
 
     let last_token_is_comment = checker
         .tokens()
-        // The actual last token will always be a logical newline,
-        // so we check the second to last
-        .get(checker.tokens().len().saturating_sub(2))
+        .iter()
+        .rfind(|tok| !tok.kind().is_any_newline())
         .is_some_and(|tok| tok.kind() == TokenKind::Comment);
 
     let new_content = match (spans_multiple_lines, last_token_is_comment) {

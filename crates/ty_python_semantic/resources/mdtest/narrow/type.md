@@ -53,6 +53,37 @@ def _(x: A | B, y: A | C):
         reveal_type(y)  # revealed: A | C
 ```
 
+## `type(x) is C` in chained comparisons
+
+```py
+from typing import Literal
+
+class A: ...
+class B: ...
+
+def _(x: A | B, y: Literal[1, 2]):
+    if type(x) is A is not None:
+        reveal_type(x)  # revealed: A
+
+    if y is 1 is not type(x):
+        reveal_type(y)  # revealed: Literal[1]
+```
+
+## `type(x) is type(self)`
+
+```py
+class Pattern: ...
+
+class InstanceOf(Pattern):
+    def matches(self, other: Pattern) -> bool:
+        if type(other) is type(self):
+            reveal_type(other)  # revealed: InstanceOf
+            return True
+
+        reveal_type(other)  # revealed: Pattern
+        return False
+```
+
 ## `type(x) is not C`
 
 ```py
@@ -83,6 +114,39 @@ def _(x: A | B, y: A | C):
         reveal_type(y)  # revealed: A | C
     else:
         reveal_type(y)  # revealed: A
+```
+
+## `x.__class__ is C`
+
+```py
+from typing import final
+
+class A: ...
+class B: ...
+
+@final
+class C: ...
+
+def _(x: A | B, y: A | C):
+    if x.__class__ is A:
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: A | B
+
+    if C is y.__class__:
+        reveal_type(y)  # revealed: C
+    else:
+        reveal_type(y)  # revealed: A
+
+    if x.__class__ is not A:
+        reveal_type(x)  # revealed: A | B
+    else:
+        reveal_type(x)  # revealed: A
+
+    if y.__class__ is not C:
+        reveal_type(y)  # revealed: A
+    else:
+        reveal_type(y)  # revealed: C
 ```
 
 ## The top materialization is used for generic classes
@@ -148,7 +212,7 @@ def f(x: A[int] | B):
         reveal_type(x)  # revealed: A[int] | B
 
     if type(x) is A:
-        reveal_type(x)  # revealed: A[int]
+        reveal_type(x)  # revealed: A[int] | (B & A[object])
     else:
         reveal_type(x)  # revealed: A[int] | B
 
@@ -166,7 +230,7 @@ def f(x: A[int] | B):
     if type(x) is not A:
         reveal_type(x)  # revealed: A[int] | B
     else:
-        reveal_type(x)  # revealed: A[int]
+        reveal_type(x)  # revealed: A[int] | (B & A[object])
 
     if type(x) is not B:
         reveal_type(x)  # revealed: A[int] | B
@@ -176,11 +240,45 @@ def f(x: A[int] | B):
 
 ## `type(x) == C`, `type(x) != C`
 
-No narrowing can occur for equality comparisons, since there might be a custom `__eq__`
-implementation on the metaclass.
+Classes with ordinary metaclasses compare by identity. A successful comparison with `Child` narrows
+the instance to `Child`. A failed comparison still allows instances of its subclasses.
 
-TODO: Narrowing might be possible in some cases where the classes themselves are `@final` or their
-metaclass is `@final`.
+```py
+class Base: ...
+class Child(Base): ...
+
+def _(x: Base):
+    if type(x) == Child:
+        reveal_type(x)  # revealed: Child
+    else:
+        reveal_type(x)  # revealed: Base
+
+    if Child != x.__class__:
+        reveal_type(x)  # revealed: Base
+    else:
+        reveal_type(x)  # revealed: Child
+```
+
+If the comparison reassigns the variable after reading its type, the branch sees the new value.
+
+```py
+def rebind(x: object):
+    if type(x) == (x := Child):
+        reveal_type(x)  # revealed: <class 'Child'>
+```
+
+A failed comparison with a final class excludes its instances.
+
+```py
+def _(y: object):
+    if type(y) == bool:
+        reveal_type(y)  # revealed: bool
+    else:
+        reveal_type(y)  # revealed: ~bool
+```
+
+A metaclass can make distinct classes compare equal. Instances whose classes use that metaclass
+remain possible on either branch.
 
 ```py
 class IsEqualToEverything(type):
@@ -190,26 +288,54 @@ class IsEqualToEverything(type):
 class A(metaclass=IsEqualToEverything): ...
 class B(metaclass=IsEqualToEverything): ...
 
-def _(x: A | B, y: object):
+def _(x: A | B):
     if type(x) == A:
         reveal_type(x)  # revealed: A | B
 
     if type(x) != A:
         reveal_type(x)  # revealed: A | B
 
-    if type(y) == bool:
-        reveal_type(y)  # revealed: object
-    else:
-        reveal_type(y)  # revealed: object
+def _(x: Base | A):
+    if type(x) == Child:
+        reveal_type(x)  # revealed: Child | A
+```
+
+Comparing with an unspecialized generic class preserves the instance's type arguments.
+
+```py
+def _(x: list[int] | None):
+    if type(x) == list:
+        reveal_type(x)  # revealed: list[int]
+```
+
+## Class equality with strict equality semantics
+
+A subclass of `Base` may use a different metaclass from `Base`. Strict equality semantics account
+for an equality override on that metaclass.
+
+```toml
+[analysis]
+strict-equality-semantics = true
+```
+
+```py
+class Base: ...
+class Child(Base): ...
+
+def _(x: Base):
+    if type(x) == Child:
+        reveal_type(x)  # revealed: Base
 ```
 
 ## No narrowing for custom `type` callable
 
 ```py
+from builtins import type as builtin_type
+
 class A: ...
 class B: ...
 
-def type(x):
+def type(x) -> builtin_type:
     return int
 
 def _(x: A | B):
@@ -315,6 +441,7 @@ def _(x: Base):
 def _(x: object):
     if (y := type(x)) is bool:
         reveal_type(y)  # revealed: <class 'bool'>
+        reveal_type(x)  # revealed: bool
     if (type(y := x)) is bool:
         reveal_type(y)  # revealed: bool
 ```

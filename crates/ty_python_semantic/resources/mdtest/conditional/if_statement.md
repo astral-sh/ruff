@@ -133,11 +133,12 @@ reveal_type(x)  # revealed: Literal[2, 3, 4]
 ## constraints apply to later test expressions
 
 ```py
+from typing import Literal
+
 def check(x) -> bool:
     return bool(x)
 
-def _(flag: bool):
-    x = 1 if flag else None
+def _(x: Literal[1] | None):
     y = 0
 
     if x is None:
@@ -156,8 +157,8 @@ class NotBoolable:
 
 # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `NotBoolable`"
 if NotBoolable():
-    ...
+    pass
 # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `NotBoolable`"
 elif NotBoolable():
-    ...
+    pass
 ```

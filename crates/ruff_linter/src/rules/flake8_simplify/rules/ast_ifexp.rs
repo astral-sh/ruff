@@ -7,6 +7,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parenthesized_range;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -37,7 +38,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.214")]
+#[violation_metadata(stable_since = "v0.0.214", category = Category::Complexity)]
 pub(crate) struct IfExprWithTrueFalse {
     is_compare: bool,
 }
@@ -86,7 +87,7 @@ impl Violation for IfExprWithTrueFalse {
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.214")]
+#[violation_metadata(stable_since = "v0.0.214", category = Category::Complexity)]
 pub(crate) struct IfExprWithFalseTrue;
 
 impl AlwaysFixableViolation for IfExprWithFalseTrue {
@@ -101,11 +102,12 @@ impl AlwaysFixableViolation for IfExprWithFalseTrue {
 }
 
 /// ## What it does
-/// Checks for `if` expressions that check against a negated condition.
+/// Checks for `if` expressions that negate a variable in the condition and
+/// return that same variable in the `else` branch.
 ///
 /// ## Why is this bad?
-/// `if` expressions that check against a negated condition are more difficult
-/// to read than `if` expressions that check against the condition directly.
+/// In these expressions, testing the variable directly and swapping the arms
+/// makes the expression easier to read.
 ///
 /// ## Example
 /// ```python
@@ -120,16 +122,16 @@ impl AlwaysFixableViolation for IfExprWithFalseTrue {
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.214")]
-pub(crate) struct IfExprWithTwistedArms {
+#[violation_metadata(stable_since = "v0.0.214", category = Category::Pedantic)]
+pub(crate) struct IfExprWithNegatedElseAsCondition {
     expr_body: String,
     expr_else: String,
 }
 
-impl AlwaysFixableViolation for IfExprWithTwistedArms {
+impl AlwaysFixableViolation for IfExprWithNegatedElseAsCondition {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfExprWithTwistedArms {
+        let IfExprWithNegatedElseAsCondition {
             expr_body,
             expr_else,
         } = self;
@@ -140,7 +142,7 @@ impl AlwaysFixableViolation for IfExprWithTwistedArms {
     }
 
     fn fix_title(&self) -> String {
-        let IfExprWithTwistedArms {
+        let IfExprWithNegatedElseAsCondition {
             expr_body,
             expr_else,
         } = self;
@@ -191,12 +193,12 @@ pub(crate) fn if_expr_with_true_false(
                         .into(),
                     ),
                     arguments: Arguments {
-                        args: Box::from([test.clone()]),
-                        keywords: Box::from([]),
+                        args: [test.clone()].into(),
+                        keywords: std::iter::empty().collect(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },
-                    range: TextRange::default(),
+                    range_start: ruff_text_size::TextSize::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 }
                 .into(),
@@ -234,7 +236,7 @@ pub(crate) fn if_expr_with_false_true(
 }
 
 /// SIM212
-pub(crate) fn twisted_arms_in_ifexpr(
+pub(crate) fn if_expr_with_negated_else_as_condition(
     checker: &Checker,
     expr: &Expr,
     test: &Expr,
@@ -266,7 +268,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
     }
 
     let mut diagnostic = checker.report_diagnostic(
-        IfExprWithTwistedArms {
+        IfExprWithNegatedElseAsCondition {
             expr_body: checker.generator().expr(body),
             expr_else: checker.generator().expr(orelse),
         },

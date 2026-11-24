@@ -21,9 +21,9 @@ if sys.version_info >= (3, 13):
         anchor: Anchor, *path_names: Unpack[tuple[StrPath]], encoding: str | None = "utf-8", errors: str | None = "strict"
     ) -> TextIOWrapper:
         """Open for text reading the *resource* within *package*."""
-
     @overload
     def open_text(anchor: Anchor, *path_names: StrPath, encoding: str | None, errors: str | None = "strict") -> TextIOWrapper: ...
+
     def read_binary(anchor: Anchor, *path_names: StrPath) -> bytes:
         """Read and return contents of *resource* within *package* as bytes."""
 
@@ -32,9 +32,9 @@ if sys.version_info >= (3, 13):
         anchor: Anchor, *path_names: Unpack[tuple[StrPath]], encoding: str | None = "utf-8", errors: str | None = "strict"
     ) -> str:
         """Read and return contents of *resource* within *package* as str."""
-
     @overload
     def read_text(anchor: Anchor, *path_names: StrPath, encoding: str | None, errors: str | None = "strict") -> str: ...
+
     def path(anchor: Anchor, *path_names: StrPath) -> AbstractContextManager[Path, Literal[False]]:
         """Return the path to the *resource* as an actual file system path."""
 

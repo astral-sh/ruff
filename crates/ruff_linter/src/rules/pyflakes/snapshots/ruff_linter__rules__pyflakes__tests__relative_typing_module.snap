@@ -7,4 +7,3 @@ F821 Undefined name `foo`
 25 |     # F821
 26 |     x: Literal["foo"]
    |                 ^^^
-   |

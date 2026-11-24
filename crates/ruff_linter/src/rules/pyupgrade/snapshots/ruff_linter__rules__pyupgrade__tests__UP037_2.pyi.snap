@@ -8,16 +8,14 @@ UP037 [*] Remove quotes from type annotation
 2 |
 3 | def f(a: Foo['SingleLine  # Comment']): ...
   |              ^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove quotes
-1 | # https://github.com/astral-sh/ruff/issues/7102
-2 | 
+  |
+2 |
   - def f(a: Foo['SingleLine  # Comment']): ...
 3 + def f(a: Foo[(SingleLine  # Comment
 4 + )]): ...
-5 | 
-6 | 
-7 | def f(a: Foo['''Bar[
+5 |
+  |
 
 UP037 [*] Remove quotes from type annotation
  --> UP037_2.pyi:6:14
@@ -27,19 +25,16 @@ UP037 [*] Remove quotes from type annotation
 7 | |     Multi |
 8 | |     Line]''']): ...
   | |____________^
-  |
 help: Remove quotes
-3  | def f(a: Foo['SingleLine  # Comment']): ...
-4  | 
-5  | 
-   - def f(a: Foo['''Bar[
-6  + def f(a: Foo[Bar[
-7  |     Multi |
-   -     Line]''']): ...
-8  +     Line]]): ...
-9  | 
-10 | 
-11 | def f(a: Foo['''Bar[
+  |
+5 |
+  - def f(a: Foo['''Bar[
+6 + def f(a: Foo[Bar[
+7 |     Multi |
+  -     Line]''']): ...
+8 +     Line]]): ...
+9 |
+  |
 
 UP037 [*] Remove quotes from type annotation
   --> UP037_2.pyi:11:14
@@ -50,20 +45,17 @@ UP037 [*] Remove quotes from type annotation
 13 | |     Line  # Comment
 14 | | ]''']): ...
    | |____^
-   |
 help: Remove quotes
-8  |     Line]''']): ...
-9  | 
-10 | 
+   |
+10 |
    - def f(a: Foo['''Bar[
 11 + def f(a: Foo[Bar[
 12 |     Multi |
 13 |     Line  # Comment
    - ]''']): ...
 14 + ]]): ...
-15 | 
-16 | 
-17 | def f(a: Foo['''Bar[
+15 |
+   |
 
 UP037 [*] Remove quotes from type annotation
   --> UP037_2.pyi:17:14
@@ -73,20 +65,17 @@ UP037 [*] Remove quotes from type annotation
 18 | |     Multi |
 19 | |     Line]  # Comment''']): ...
    | |_______________________^
-   |
 help: Remove quotes
-14 | ]''']): ...
-15 | 
-16 | 
+   |
+16 |
    - def f(a: Foo['''Bar[
 17 + def f(a: Foo[(Bar[
 18 |     Multi |
    -     Line]  # Comment''']): ...
 19 +     Line]  # Comment
 20 + )]): ...
-21 | 
-22 | 
-23 | def f(a: Foo['''
+21 |
+   |
 
 UP037 [*] Remove quotes from type annotation
   --> UP037_2.pyi:22:14
@@ -97,11 +86,9 @@ UP037 [*] Remove quotes from type annotation
 24 | |     Multi |
 25 | |     Line]  # Comment''']): ...
    | |_______________________^
-   |
 help: Remove quotes
-19 |     Line]  # Comment''']): ...
-20 | 
-21 | 
+   |
+21 |
    - def f(a: Foo['''
 22 + def f(a: Foo[(
 23 | Bar[
@@ -109,9 +96,8 @@ help: Remove quotes
    -     Line]  # Comment''']): ...
 25 +     Line]  # Comment
 26 + )]): ...
-27 | 
-28 | 
-29 | def f(a: '''list[int]
+27 |
+   |
 
 UP037 [*] Remove quotes from type annotation
   --> UP037_2.pyi:28:10
@@ -120,18 +106,15 @@ UP037 [*] Remove quotes from type annotation
    |  __________^
 29 | |     ''' = []): ...
    | |_______^
-   |
 help: Remove quotes
-25 |     Line]  # Comment''']): ...
-26 | 
-27 | 
+   |
+27 |
    - def f(a: '''list[int]
    - 	''' = []): ...
 28 + def f(a: list[int]
 29 + 	 = []): ...
-30 | 
-31 | 
-32 | a: '''\\
+30 |
+   |
 
 UP037 [*] Remove quotes from type annotation
   --> UP037_2.pyi:32:4
@@ -140,18 +123,15 @@ UP037 [*] Remove quotes from type annotation
    |  ____^
 33 | | list[int]''' = [42]
    | |____________^
-   |
 help: Remove quotes
-29 | 	''' = []): ...
-30 | 
-31 | 
+   |
+31 |
    - a: '''\\
    - list[int]''' = [42]
 32 + a: (\
 33 + list[int]) = [42]
-34 | 
-35 | 
-36 | def f(a: '''
+34 |
+   |
 
 UP037 [*] Remove quotes from type annotation
   --> UP037_2.pyi:36:10
@@ -161,19 +141,16 @@ UP037 [*] Remove quotes from type annotation
 37 | |     list[int]
 38 | |     ''' = []): ...
    | |_______^
-   |
 help: Remove quotes
-33 | list[int]''' = [42]
-34 | 
-35 | 
+   |
+35 |
    - def f(a: '''
 36 + def f(a: 
 37 | 	list[int]
    - 	''' = []): ...
 38 + 	 = []): ...
-39 | 
-40 | 
-41 | def f(a: Foo['''
+39 |
+   |
 
 UP037 [*] Remove quotes from type annotation
   --> UP037_2.pyi:41:14
@@ -186,11 +163,9 @@ UP037 [*] Remove quotes from type annotation
 45 | |     Line
 46 | |     ]  # Comment''']): ...
    | |___________________^
-   |
 help: Remove quotes
-38 | 	''' = []): ...
-39 | 
-40 | 
+   |
+40 |
    - def f(a: Foo['''
 41 + def f(a: Foo[(
 42 |     Bar
@@ -200,9 +175,8 @@ help: Remove quotes
    -     ]  # Comment''']): ...
 46 +     ]  # Comment
 47 + )]): ...
-48 | 
-49 | 
-50 | a: '''list
+48 |
+   |
 
 UP037 [*] Remove quotes from type annotation
   --> UP037_2.pyi:49:4
@@ -211,12 +185,11 @@ UP037 [*] Remove quotes from type annotation
    |  ____^
 50 | | [int]''' = [42]
    | |________^
-   |
 help: Remove quotes
-46 |     ]  # Comment''']): ...
-47 | 
-48 | 
+   |
+48 |
    - a: '''list
    - [int]''' = [42]
 49 + a: (list
 50 + [int]) = [42]
+   |

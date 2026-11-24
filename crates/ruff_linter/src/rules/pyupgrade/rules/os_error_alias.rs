@@ -2,11 +2,13 @@ use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::{Name, UnqualifiedName};
+use ruff_python_ast::name::{Name, QualifiedName, UnqualifiedName};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
+use crate::preview::is_up024_precise_highlighting_enabled;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -35,7 +37,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `OSError`](https://docs.python.org/3/library/exceptions.html#OSError)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.206")]
+#[violation_metadata(stable_since = "v0.0.206", category = Category::Suspicious)]
 pub(crate) struct OSErrorAlias {
     name: Option<String>,
 }
@@ -59,15 +61,17 @@ impl AlwaysFixableViolation for OSErrorAlias {
 fn is_alias(expr: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                [
-                    "" | "builtins",
-                    "EnvironmentError" | "IOError" | "WindowsError"
-                ] | ["mmap" | "resource" | "select" | "socket" | "os", "error"]
-            )
-        })
+        .is_some_and(|name| is_os_error_alias(&name))
+}
+
+fn is_os_error_alias(qualified_name: &QualifiedName) -> bool {
+    matches!(
+        qualified_name.segments(),
+        [
+            "" | "builtins",
+            "EnvironmentError" | "IOError" | "WindowsError"
+        ] | ["mmap" | "resource" | "select" | "socket" | "os", "error"]
+    )
 }
 
 /// Create a [`Diagnostic`] for a single target, like an [`Expr::Name`].
@@ -93,7 +97,20 @@ fn atom_diagnostic(checker: &Checker, target: &Expr) {
 
 /// Create a [`Diagnostic`] for a tuple of expressions.
 fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
-    let mut diagnostic = checker.report_diagnostic(OSErrorAlias { name: None }, tuple.range());
+    let Some(first_alias) = aliases.first() else {
+        return;
+    };
+    let diagnostic_range = if is_up024_precise_highlighting_enabled(checker.settings()) {
+        first_alias.range()
+    } else {
+        tuple.range()
+    };
+    let mut diagnostic = checker.report_diagnostic(OSErrorAlias { name: None }, diagnostic_range);
+    if is_up024_precise_highlighting_enabled(checker.settings()) {
+        for alias in aliases.iter().skip(1) {
+            diagnostic.secondary_annotation_without_message(alias.range());
+        }
+    }
     let semantic = checker.semantic();
     if semantic.has_builtin_binding("OSError") {
         // Filter out any `OSErrors` aliases.
@@ -150,10 +167,8 @@ pub(crate) fn os_error_alias_handlers(checker: &Checker, handlers: &[ExceptHandl
             continue;
         };
         match expr.as_ref() {
-            Expr::Name(_) | Expr::Attribute(_) => {
-                if is_alias(expr, checker.semantic()) {
-                    atom_diagnostic(checker, expr);
-                }
+            Expr::Name(_) | Expr::Attribute(_) if is_alias(expr, checker.semantic()) => {
+                atom_diagnostic(checker, expr);
             }
             Expr::Tuple(tuple) => {
                 // List of aliases to replace with `OSError`.
@@ -173,8 +188,8 @@ pub(crate) fn os_error_alias_handlers(checker: &Checker, handlers: &[ExceptHandl
 }
 
 /// UP024
-pub(crate) fn os_error_alias_call(checker: &Checker, func: &Expr) {
-    if is_alias(func, checker.semantic()) {
+pub(crate) fn os_error_alias_call(checker: &Checker, func: &Expr, qualified_name: &QualifiedName) {
+    if is_os_error_alias(qualified_name) {
         atom_diagnostic(checker, func);
     }
 }

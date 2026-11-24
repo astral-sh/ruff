@@ -27,7 +27,7 @@ class Person:
 We can see in the signature of `__init__` that `db` is included as an argument:
 
 ```py
-reveal_type(Person.__init__)  # revealed: (self: Person, db: Database, name: str, age: int) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, /, db: Database, name: str, age: int) -> None
 ```
 
 However, when we create an instance of this dataclass, the `db` attribute is not accessible:
@@ -36,13 +36,13 @@ However, when we create an instance of this dataclass, the `db` attribute is not
 db = Database()
 alice = Person(db, "Alice", 30)
 
-alice.db  # error: [unresolved-attribute]
+alice.db  # error: [missing-attribute]
 ```
 
 The `db` attribute is also not accessible on the class itself:
 
 ```py
-Person.db  # error: [unresolved-attribute]
+Person.db  # error: [missing-attribute]
 ```
 
 Other fields can still be accessed normally:
@@ -67,7 +67,7 @@ class Person:
 
     metadata: InitVar[str] = "default"
 
-reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int, metadata: str = "default") -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, /, name: str, age: int, metadata: str = "default") -> None
 
 alice = Person("Alice", 30)
 bob = Person("Bob", 25, "custom metadata")
@@ -75,6 +75,45 @@ bob = Person("Bob", 25, "custom metadata")
 reveal_type(bob.metadata)  # revealed: str
 
 reveal_type(Person.metadata)  # revealed: str
+```
+
+Field synthesis still follows declaration order even when an `InitVar` field name shadows a type
+name referenced by an earlier annotation:
+
+```py
+from dataclasses import InitVar, dataclass
+from ty_extensions import Top
+
+@dataclass
+class C:
+    a: Top[int]
+    int: InitVar[int] = 0
+
+reveal_type(C.__init__)  # revealed: (self: C, /, a: int, int: int = 0) -> None
+C()  # error: [missing-argument] "No argument provided for required parameter `a`"
+```
+
+## Deferred annotations
+
+With deferred annotations, the default value of `int` shadows the built-in type in both annotations.
+Field synthesis still reports the missing argument even though the annotations are invalid.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from dataclasses import InitVar, dataclass
+from ty_extensions import Top
+
+@dataclass
+class C:
+    a: Top[int]  # error: [invalid-type-form]
+    int: InitVar[int] = 0  # error: [invalid-type-form]
+
+def fn():
+    C()  # error: [missing-argument] "No argument provided for required parameter `a`"
 ```
 
 ## Overwritten `InitVar`
@@ -109,7 +148,7 @@ from dataclasses import InitVar, dataclass
 
 @dataclass
 class Wrong:
-    x: InitVar[int, str]  # error: [invalid-type-form] "Type qualifier `InitVar` expected exactly 1 argument, got 2"
+    x: InitVar[int, str]  # error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` expected exactly 1 argument, got 2"
 ```
 
 A trailing comma in a subscript creates a single-element tuple. We need to handle this gracefully
@@ -124,10 +163,10 @@ class AlsoWrong:
     # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression: Did you mean `tuple[()]`?"
     x: InitVar[(),]
 
-# revealed: (self: AlsoWrong, x: Unknown) -> None
+# revealed: (self: AlsoWrong, /, x: Unknown) -> None
 reveal_type(AlsoWrong.__init__)
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(AlsoWrong(42).x)  # revealed: Unknown
 ```
 
@@ -144,25 +183,56 @@ class AlsoWrong:
 `InitVar` annotations are not allowed outside of dataclass attribute annotations:
 
 ```py
+from typing import TypedDict
 from dataclasses import InitVar, dataclass
 
-# error: [invalid-type-form] "`InitVar` annotations are only allowed in class-body scopes"
+# error: [invalid-type-form] "`InitVar` is only allowed in dataclass fields"
 x: InitVar[int] = 1
 
-def f(x: InitVar[int]) -> None:  # error: [invalid-type-form] "`InitVar` is not allowed in function parameter annotations"
+# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in parameter annotations"
+def f(x: InitVar[int]) -> None:
     pass
 
-def g() -> InitVar[int]:  # error: [invalid-type-form] "`InitVar` is not allowed in function return type annotations"
+# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in return type annotations"
+def g() -> InitVar[int]:
     return 1
 
 class C:
-    # TODO: this would ideally be an error
+    # error: [invalid-type-form] "`InitVar` is only allowed in dataclass fields"
+    x: InitVar[int]
+
+class D(TypedDict):
+    # error: [invalid-type-form] "`InitVar` is not allowed in TypedDict fields"
     x: InitVar[int]
 
 @dataclass
 class D:
     def __init__(self) -> None:
         self.x: InitVar[int] = 1  # error: [invalid-type-form] "`InitVar` annotations are not allowed for non-name targets"
+```
+
+### Use as a class
+
+`InitVar` is a class at runtime. We do not recognise it as such, but we try to avoid emitting errors
+on runtime uses of the symbol.
+
+```py
+from dataclasses import InitVar
+
+x: type = InitVar
+
+reveal_type(InitVar[int])  # revealed: Any
+reveal_type(InitVar(int))  # revealed: Any
+reveal_type(InitVar(type=int))  # revealed: Any
+
+# error: [missing-argument] "No argument provided for required parameter `type`"
+reveal_type(InitVar())  # revealed: Any
+# error: [unknown-argument] "Argument `wut` does not match any known parameter"
+reveal_type(InitVar(str, wut=56))  # revealed: Any
+
+def test(x: object):
+    if isinstance(x, InitVar):
+        reveal_type(x)  # revealed: Any
 ```
 
 [type annotation grammar]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions

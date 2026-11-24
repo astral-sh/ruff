@@ -48,8 +48,8 @@ from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime
 from io import BytesIO
 from types import TracebackType
-from typing import Any, ClassVar, Final, Literal, Protocol, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import Any, ClassVar, Final, Literal, Protocol, TypeAlias, overload, type_check_only
+from typing_extensions import Self
 
 @type_check_only
 class _SupportsTimeTuple(Protocol):
@@ -63,7 +63,6 @@ _Marshallable: TypeAlias = (
     | str
     | bytes
     | bytearray
-    | None
     | tuple[_Marshallable, ...]
     # Ideally we'd use _Marshallable for list and dict, but invariance makes that impractical
     | list[Any]
@@ -71,6 +70,7 @@ _Marshallable: TypeAlias = (
     | datetime
     | DateTime
     | Binary
+    | None
 )
 _XMLDate: TypeAlias = int | datetime | tuple[int, ...] | time.struct_time
 _HostType: TypeAlias = tuple[str, dict[str, str]] | str
@@ -448,16 +448,17 @@ class ServerProxy:
         context: Any | None = None,
     ) -> None: ...
     def __getattr__(self, name: str) -> _Method: ...
+
     @overload
     def __call__(self, attr: Literal["close"]) -> Callable[[], None]:
         """A workaround to get special attributes on the ServerProxy
         without interfering with the magic __getattr__
         """
-
     @overload
     def __call__(self, attr: Literal["transport"]) -> Transport: ...
     @overload
     def __call__(self, attr: str) -> Callable[[], None] | Transport: ...
+
     def __enter__(self) -> Self: ...
     def __exit__(
         self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None

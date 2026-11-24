@@ -259,4 +259,3 @@ Module(
 3 | call(x = *y)
 4 | call(x = (*y))
   |           ^^ Syntax Error: Starred expression cannot be used here
-  |

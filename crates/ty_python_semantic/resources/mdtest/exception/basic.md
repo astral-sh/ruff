@@ -16,7 +16,7 @@ except re.error as f:
 ## Unknown type in except handler does not cause spurious diagnostic
 
 ```py
-from nonexistent_module import foo  # error: [unresolved-import]
+from nonexistent_module import foo  # error: [import-not-found]
 
 try:
     help()
@@ -47,6 +47,7 @@ def foo(
     z: tuple[type[BaseException], ...],
     zz: tuple[type[TypeError | RuntimeError], ...],
     zzz: type[BaseException] | tuple[type[BaseException], ...],
+    v: type[ValueError] | tuple[type[ValueError], ...],
 ):
     try:
         help()
@@ -60,20 +61,141 @@ def foo(
         reveal_type(h)  # revealed: TypeError | RuntimeError
     except zzz as i:
         reveal_type(i)  # revealed: BaseException
+    except v as j:
+        reveal_type(j)  # revealed: ValueError
+```
+
+## Previously narrowed tuple of exception classes
+
+Checking that the tuple is nonempty preserves the type of the caught exception.
+
+```py
+def catch(classes: tuple[type[ValueError], ...]):
+    assert classes
+    try:
+        help()
+    except classes as exc:
+        reveal_type(exc)  # revealed: ValueError
+```
+
+## Previously narrowed union of exception tuples
+
+The caught exception can come from any tuple in the union.
+
+```py
+def catch(classes: tuple[type[ValueError], ...] | tuple[type[RuntimeError], ...]):
+    assert classes
+    try:
+        help()
+    except classes as exc:
+        reveal_type(exc)  # revealed: ValueError | RuntimeError
+```
+
+## Aliases for exception classes and tuples
+
+The caught type comes from the exception classes and tuple elements described by the alias.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import AlwaysFalsy, Intersection, Not
+
+type Errors = tuple[type[ValueError], ...]
+type NonemptyErrors = Intersection[tuple[type[ValueError], ...], Not[AlwaysFalsy]]
+type MixedErrors = type[ValueError] | tuple[type[RuntimeError], ...]
+
+def catch(classes: NonemptyErrors, plain: Errors, mixed: MixedErrors):
+    try:
+        help()
+    except classes as exc:
+        reveal_type(exc)  # revealed: ValueError
+
+    try:
+        help()
+    except plain as exc:
+        reveal_type(exc)  # revealed: ValueError
+
+    try:
+        help()
+    except mixed as exc:
+        reveal_type(exc)  # revealed: ValueError | RuntimeError
+```
+
+## Negated dynamic type aliases
+
+A negated alias of `Any` behaves like `Any` in both single and tuple exception handlers.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import Not
+
+type Dynamic = Any
+
+def catch_negated_alias(exc: Not[Dynamic]) -> None:
+    try:
+        raise ValueError
+    except exc as single:
+        reveal_type(single)  # revealed: Any
+
+    try:
+        raise ValueError
+    except (exc,) as tuple_element:
+        reveal_type(tuple_element)  # revealed: Any
+```
+
+## Exception-class expressions
+
+Exception-class expressions can produce intersections, gradual refinements, or unions. Positive
+class-object constraints project into the caught instance type; unmappable positive constraints and
+exact-class negatives do not exclude valid subclass instances.
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+
+class FirstError(Exception): ...
+class SecondError(Exception): ...
+
+def catch_intersection(exc: Intersection[type[FirstError], type[SecondError]]) -> None:
+    try:
+        help()
+    except exc as caught:
+        reveal_type(caught)  # revealed: FirstError & SecondError
+
+def catch_proper_subclass(exc: Any) -> None:
+    if exc != ValueError and issubclass(exc, ValueError):
+        reveal_type(exc)  # revealed: Any & type[ValueError] & ~<class 'ValueError'>
+        try:
+            help()
+        except exc as caught:
+            reveal_type(caught)  # revealed: Any & ValueError
+
+try:
+    help()
+except ZeroDivisionError and ValueError as caught:
+    reveal_type(caught)  # revealed: ZeroDivisionError | ValueError
 ```
 
 We do not emit an `invalid-exception-caught` if a class is caught that has `Any` or `Unknown` in its
 MRO, as the dynamic element in the MRO could materialize to some subclass of `BaseException`:
 
 ```py
-from compat import BASE_EXCEPTION_CLASS  # error: [unresolved-import] "Cannot resolve imported module `compat`"
+from compat import BASE_EXCEPTION_CLASS  # error: [import-not-found] "Cannot resolve imported module `compat`"
 
 class Error(BASE_EXCEPTION_CLASS): ...
 
 try:
-    ...
+    pass
 except Error as err:
-    ...
+    pass
 ```
 
 ## Exception with no captured type
@@ -93,7 +215,9 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Callable
+from typing import Callable, TypeVar
+
+E = TypeVar("E", bound=Exception)
 
 def silence[T: type[BaseException]](
     func: Callable[[], None],
@@ -104,16 +228,27 @@ def silence[T: type[BaseException]](
     except exception_type as e:
         reveal_type(e)  # revealed: T'instance@silence
 
-def silence2[
-    T: (
-        type[ValueError],
-        type[TypeError],
-    )
-](func: Callable[[], None], exception_type: T,):
+def silence2[T: (type[ValueError], type[TypeError])](func: Callable[[], None], exception_type: T):
     try:
         func()
     except exception_type as e:
         reveal_type(e)  # revealed: T'instance@silence2
+
+def silence3(func: Callable[[], None], exception_types: type[E] | tuple[type[E], ...]):
+    try:
+        func()
+    except exception_types as e:
+        reveal_type(e)  # revealed: E@silence3
+
+def silence4[T: type[BaseException] | tuple[type[BaseException], ...]](
+    func: Callable[[], None],
+    exception_types: T,
+):
+    try:
+        func()
+    except exception_types as e:
+        # TODO: Should reveal something more like `T'instance@silence4`.
+        reveal_type(e)  # revealed: BaseException
 ```
 
 ## Invalid exception handlers
@@ -122,13 +257,13 @@ def silence2[
 
 ```py
 try:
-    pass
+    raise Exception
 # error: [invalid-exception-caught]
 except 3 as e:
     reveal_type(e)  # revealed: Unknown
 
 try:
-    pass
+    raise Exception
 # error: [invalid-exception-caught]
 except (ValueError, OSError, "foo", b"bar") as e:
     reveal_type(e)  # revealed: ValueError | OSError | Unknown
@@ -163,22 +298,22 @@ except int:
 try:
     raise AttributeError()  # fine
 except:
-    ...
+    pass
 
 try:
     raise FloatingPointError  # fine
 except:
-    ...
+    pass
 
 try:
     raise 1  # error: [invalid-raise]
 except:
-    ...
+    pass
 
 try:
     raise int  # error: [invalid-raise]
 except:
-    ...
+    pass
 
 def _(e: Exception | type[Exception]):
     raise e  # fine
@@ -194,31 +329,31 @@ def _():
     try:
         raise EOFError() from GeneratorExit  # fine
     except:
-        ...
+        pass
 
 def _():
     try:
         raise StopIteration from MemoryError()  # fine
     except:
-        ...
+        pass
 
 def _():
     try:
         raise BufferError() from None  # fine
     except:
-        ...
+        pass
 
 def _():
     try:
         raise ZeroDivisionError from False  # error: [invalid-raise]
     except:
-        ...
+        pass
 
 def _():
     try:
         raise SystemExit from bool()  # error: [invalid-raise]
     except:
-        ...
+        pass
 
 def _():
     try:

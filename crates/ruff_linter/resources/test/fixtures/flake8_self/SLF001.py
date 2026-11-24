@@ -78,6 +78,10 @@ import os
 
 os._exit()
 
+import os as operating_system
+
+operating_system._exit(1)
+
 
 from enum import Enum
 

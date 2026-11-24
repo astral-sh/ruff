@@ -144,3 +144,24 @@ def not_ok1_with_mixed_indented_comments():
             pass
         else:
             pass  # final pass comment
+
+
+def not_ok1_with_else_line_comment(a, b):
+    if a:
+        return 1
+    else:  # explain the fallback
+        if b:
+            return 2
+        else:
+            return 3
+
+
+def not_ok1_with_else_line_and_inner_comments():
+    if 1:
+        pass
+    else:  # else line comment
+        # inner comment
+        if 2:
+            pass
+        else:
+            pass  # final pass comment

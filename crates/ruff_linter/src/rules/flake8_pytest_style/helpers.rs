@@ -1,12 +1,13 @@
 use std::fmt;
 
-use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall, Keyword, Stmt, StmtFunctionDef};
+use ruff_python_ast::helpers::{is_const_true, map_callable};
+use ruff_python_ast::{self as ast, Decorator, Expr, Keyword, Stmt, StmtFunctionDef};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_python_trivia::PythonWhitespace;
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_pytest_asyncio_enabled;
 
 pub(super) fn get_mark_decorators<'a>(
     decorators: &'a [Decorator],
@@ -22,32 +23,50 @@ pub(super) fn get_mark_decorators<'a>(
     })
 }
 
-pub(super) fn is_pytest_fail(call: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(call)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "fail"]))
-}
-
-pub(super) fn is_pytest_fixture(decorator: &Decorator, semantic: &SemanticModel) -> bool {
-    semantic
+pub(crate) fn is_pytest_fixture(decorator: &Decorator, checker: &Checker) -> bool {
+    checker
+        .semantic()
         .resolve_qualified_name(map_callable(&decorator.expression))
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "fixture"]))
+        .is_some_and(|qualified_name| {
+            matches!(qualified_name.segments(), ["pytest", "fixture"])
+                || matches!(
+                    qualified_name.segments(),
+                    ["pytest_asyncio", "fixture"]
+                        if is_pytest_asyncio_enabled(checker.settings())
+                )
+        })
 }
 
 pub(super) fn is_pytest_yield_fixture(decorator: &Decorator, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(map_callable(&decorator.expression))
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["pytest", "yield_fixture"])
-        })
+    semantic.matches_qualified_name(
+        map_callable(&decorator.expression),
+        &["pytest", "yield_fixture"],
+    )
 }
 
-pub(super) fn is_pytest_parametrize(call: &ExprCall, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["pytest", "mark", "parametrize"])
-        })
+/// Returns `true` if the decorator is `@pytest.hookimpl(wrapper=True)` or
+/// `@pytest.hookimpl(hookwrapper=True)`.
+///
+/// These hook wrappers intentionally use `return` in generator functions as part of the
+/// pytest hook wrapper protocol.
+///
+/// See: <https://docs.pytest.org/en/stable/how-to/writing_hook_functions.html#hook-wrappers-executing-around-other-hooks>
+pub(crate) fn is_pytest_hookimpl_wrapper(decorator: &Decorator, semantic: &SemanticModel) -> bool {
+    let Expr::Call(call) = &decorator.expression else {
+        return false;
+    };
+
+    // Check if it's pytest.hookimpl
+    let is_hookimpl = semantic.matches_qualified_name(&call.func, &["pytest", "hookimpl"]);
+
+    if !is_hookimpl {
+        return false;
+    }
+
+    let wrapper = call.arguments.find_argument_value("wrapper", 6);
+    let hookwrapper = call.arguments.find_argument_value("hookwrapper", 1);
+
+    wrapper.or(hookwrapper).is_some_and(is_const_true)
 }
 
 /// Whether the currently checked `func` is likely to be a Pytest test.
@@ -105,8 +124,8 @@ pub(super) fn is_empty_or_null_string(expr: &Expr) -> bool {
         Expr::NoneLiteral(_) => true,
         Expr::FString(ast::ExprFString { value, .. }) => {
             value.iter().all(|f_string_part| match f_string_part {
-                ast::FStringPart::Literal(literal) => literal.is_empty(),
-                ast::FStringPart::FString(f_string) => f_string
+                ast::FStringPartRef::Literal(literal) => literal.is_empty(),
+                ast::FStringPartRef::FString(f_string) => f_string
                     .elements
                     .iter()
                     .all(is_empty_or_null_interpolated_string_element),

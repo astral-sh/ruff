@@ -17,9 +17,6 @@ use crate::comments::{
 use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
 use crate::other::string_literal::StringLiteralKind;
 use crate::prelude::*;
-use crate::preview::{
-    is_allow_newline_after_block_open_enabled, is_blank_line_before_decorated_class_in_stub_enabled,
-};
 use crate::statement::trailing_semicolon;
 use crate::verbatim::{
     write_skipped_statements, write_suppressed_statements_starting_with_leading_comment,
@@ -189,12 +186,11 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 false,
             )
         } else {
-            // Allow an empty line after a function header in preview, if the function has no
+            // Allow an empty line after a function header
+            // if the function has no
             // docstring and no initial comment.
-            let allow_newline_after_block_open =
-                is_allow_newline_after_block_open_enabled(f.context())
-                    && matches!(self.kind, SuiteKind::Function)
-                    && matches!(first, SuiteChildStatement::Other(_));
+            let allow_newline_after_block_open = matches!(self.kind, SuiteKind::Function)
+                && matches!(first, SuiteChildStatement::Other(_));
 
             let start = comments
                 .leading(first)
@@ -530,34 +526,33 @@ fn trailing_function_or_class_def<'a>(
         preceding.map(AnyNodeRef::from),
         AnyNodeRef::last_child_in_body,
     )
-    .take_while(|last_child|
-        // If there is a comment between preceding and following the empty lines were
-        // inserted before the comment by preceding and there are no extra empty lines
-        // after the comment.
-        // ```python
-        // class Test:
-        //     def a(self):
-        //         pass
-        //         # trailing comment
-        //
-        //
-        // # two lines before, one line after
-        //
-        // c = 30
-        // ````
-        // This also includes nested class/function definitions, so we stop recursing
-        // once we see a node with a trailing own line comment:
-        // ```python
-        // def f():
-        //     if True:
-        //
-        //         def double(s):
-        //             return s + s
-        //
-        //         # nested trailing own line comment
-        //     print("below function with trailing own line comment")
-        // ```
-        !comments.has_trailing_own_line(*last_child))
+    // If there is a comment between preceding and following the empty lines were
+    // inserted before the comment by preceding and there are no extra empty lines
+    // after the comment.
+    // ```python
+    // class Test:
+    //     def a(self):
+    //         pass
+    //         # trailing comment
+    //
+    //
+    // # two lines before, one line after
+    //
+    // c = 30
+    // ````
+    // This also includes nested class/function definitions, so we stop recursing
+    // once we see a node with a trailing own line comment:
+    // ```python
+    // def f():
+    //     if True:
+    //
+    //         def double(s):
+    //             return s + s
+    //
+    //         # nested trailing own line comment
+    //     print("below function with trailing own line comment")
+    // ```
+    .take_while(|last_child| !comments.has_trailing_own_line(*last_child))
     .find(|last_child| {
         matches!(
             last_child,
@@ -730,26 +725,6 @@ fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyForm
                 && class.decorator_list.is_empty()
         });
 
-    // Black for some reasons accepts decorators in place of empty lines
-    // ```python
-    // def _count1(): ...
-    // @final
-    // class LockType1: ...
-    //
-    // def _count2(): ...
-    //
-    // class LockType2: ...
-    // ```
-    //
-    // However, this behavior is incorrect and should not be replicated in preview mode.
-    // See: https://github.com/astral-sh/ruff/issues/18865
-    let class_decorator_instead_of_empty_line =
-        !is_blank_line_before_decorated_class_in_stub_enabled(f.context())
-            && preceding.is_function_def_stmt()
-            && following
-                .as_class_def_stmt()
-                .is_some_and(|class| !class.decorator_list.is_empty());
-
     // A function definition following a stub function definition
     // ```python
     // def test(): ...
@@ -760,13 +735,11 @@ fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyForm
         .is_some_and(|function| contains_only_an_ellipsis(&function.body, f.context().comments()))
         && following.is_function_def_stmt();
 
-    class_sequences_with_ellipsis_only
-        || class_decorator_instead_of_empty_line
-        || function_with_ellipsis
+    class_sequences_with_ellipsis_only || function_with_ellipsis
 }
 
 /// Returns `true` if a function or class body contains only an ellipsis with no comments.
-pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> bool {
+fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> bool {
     as_only_an_ellipsis(body, comments).is_some()
 }
 
@@ -1011,7 +984,7 @@ fn new_logical_line_between_statements(source: &str, between_statement_range: Te
 mod tests {
     use ruff_formatter::format;
     use ruff_python_parser::parse_module;
-    use ruff_python_trivia::CommentRanges;
+    use ruff_python_trivia::TriviaRanges;
 
     use crate::PyFormatOptions;
     use crate::comments::Comments;
@@ -1041,12 +1014,13 @@ def trailing_func():
 ";
 
         let parsed = parse_module(source).unwrap();
-        let comment_ranges = CommentRanges::from(parsed.tokens());
+        let trivia = TriviaRanges::from(parsed.tokens());
 
         let context = PyFormatContext::new(
             PyFormatOptions::default(),
             source,
-            Comments::from_ranges(&comment_ranges),
+            Comments::empty(),
+            &trivia,
             parsed.tokens(),
         );
 

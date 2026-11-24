@@ -1,0 +1,121 @@
+---
+source: crates/ruff_server/tests/e2e/notebook.rs
+expression: "final_diagnostics.expect(\"at least one notebook change\")"
+---
+{
+  "notebook-cell:///Users/test/notebooks/tensorflow_test_notebook.ipynb.ipynb?cell=0": [],
+  "notebook-cell:///Users/test/notebooks/tensorflow_test_notebook.ipynb.ipynb?cell=1": [],
+  "notebook-cell:///Users/test/notebooks/tensorflow_test_notebook.ipynb.ipynb?cell=2": [
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 0
+        },
+        "end": {
+          "line": 2,
+          "character": 31
+        }
+      },
+      "severity": 2,
+      "code": "I001",
+      "codeDescription": {
+        "href": "https://docs.astral.sh/ruff/rules/unsorted-imports"
+      },
+      "source": "Ruff",
+      "message": "Import block is un-sorted or un-formatted\n\nhelp: Organize imports",
+      "tags": [],
+      "data": {
+        "code": "I001",
+        "edits": [
+          {
+            "newText": "import matplotlib.pyplot as plt\nimport tensorflow as tf\nimport tensorflow_hub as hub\n\n",
+            "range": {
+              "end": {
+                "character": 0,
+                "line": 3
+              },
+              "start": {
+                "character": 0,
+                "line": 0
+              }
+            }
+          }
+        ],
+        "is_preferred": true,
+        "noqa_edit": {
+          "newText": "  # noqa: I001\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 1
+            },
+            "start": {
+              "character": 23,
+              "line": 0
+            }
+          }
+        },
+        "title": "Organize imports"
+      }
+    }
+  ],
+  "notebook-cell:///Users/test/notebooks/tensorflow_test_notebook.ipynb.ipynb?cell=3": [],
+  "notebook-cell:///Users/test/notebooks/tensorflow_test_notebook.ipynb.ipynb?cell=4": [],
+  "notebook-cell:///Users/test/notebooks/tensorflow_test_notebook.ipynb.ipynb?cell=5": [],
+  "notebook-cell:///Users/test/notebooks/tensorflow_test_notebook.ipynb.ipynb?cell=6": [
+    {
+      "range": {
+        "start": {
+          "line": 7,
+          "character": 10
+        },
+        "end": {
+          "line": 7,
+          "character": 24
+        }
+      },
+      "severity": 2,
+      "code": "F541",
+      "codeDescription": {
+        "href": "https://docs.astral.sh/ruff/rules/f-string-missing-placeholders"
+      },
+      "source": "Ruff",
+      "message": "f-string without any placeholders\n\nhelp: Remove extraneous `f` prefix",
+      "tags": [],
+      "data": {
+        "code": "F541",
+        "edits": [
+          {
+            "newText": "'ESRGAN (x4)'",
+            "range": {
+              "end": {
+                "character": 24,
+                "line": 7
+              },
+              "start": {
+                "character": 10,
+                "line": 7
+              }
+            }
+          }
+        ],
+        "is_preferred": true,
+        "noqa_edit": {
+          "newText": "  # noqa: F541\n",
+          "range": {
+            "end": {
+              "character": 0,
+              "line": 8
+            },
+            "start": {
+              "character": 25,
+              "line": 7
+            }
+          }
+        },
+        "title": "Remove extraneous `f` prefix"
+      }
+    }
+  ]
+}

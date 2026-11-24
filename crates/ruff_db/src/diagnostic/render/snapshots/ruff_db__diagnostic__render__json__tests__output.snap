@@ -33,7 +33,9 @@ expression: env.render_diagnostics(&diagnostics)
       "row": 1
     },
     "message": "`os` imported but unused",
+    "name": "unused-import",
     "noqa_row": 1,
+    "severity": "error",
     "url": "https://docs.astral.sh/ruff/rules/unused-import"
   },
   {
@@ -66,7 +68,9 @@ expression: env.render_diagnostics(&diagnostics)
       "row": 6
     },
     "message": "Local variable `x` is assigned to but never used",
+    "name": "unused-variable",
     "noqa_row": 6,
+    "severity": "error",
     "url": "https://docs.astral.sh/ruff/rules/unused-variable"
   },
   {
@@ -83,7 +87,28 @@ expression: env.render_diagnostics(&diagnostics)
       "row": 1
     },
     "message": "Undefined name `a`",
+    "name": "undefined-name",
     "noqa_row": 1,
+    "severity": "error",
+    "url": "https://docs.astral.sh/ruff/rules/undefined-name"
+  },
+  {
+    "cell": null,
+    "code": "F821",
+    "end_location": {
+      "column": 26,
+      "row": 12
+    },
+    "filename": "/fib.py",
+    "fix": null,
+    "location": {
+      "column": 16,
+      "row": 12
+    },
+    "message": "Undefined name `fibonaccii`",
+    "name": "undefined-name",
+    "noqa_row": 1,
+    "severity": "error",
     "url": "https://docs.astral.sh/ruff/rules/undefined-name"
   }
 ]

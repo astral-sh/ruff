@@ -2,9 +2,9 @@ use anyhow::{Context, Ok, Result};
 
 use ruff_python_ast as ast;
 use ruff_python_ast::Expr;
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::Binding;
-use ruff_python_trivia::{BackwardsTokenizer, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
 use crate::Edit;
@@ -73,13 +73,18 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
     // If we're removing _all_ arguments, we can remove the entire call.
     //
     // For example, `"Hello".format(", world!")` -> `"Hello"`, as opposed to `"Hello".format()`.
-    if unused_arguments.len() == call.arguments.len() {
-        if let Expr::Attribute(attribute) = &*call.func {
-            return Ok(Edit::range_replacement(
-                locator.slice(&*attribute.value).to_string(),
-                call.range(),
-            ));
-        }
+    //
+    // However, if the `format` call has other effects, like escaping `{{` to `{` or would raise a
+    // `KeyError` for a missing field name, we preserve the empty call to avoid changing behavior.
+    if unused_arguments.len() == call.arguments.len()
+        && let Expr::Attribute(attribute) = &*call.func
+        && let Expr::StringLiteral(string_expr) = &*attribute.value
+        && !string_expr.value.to_str().contains(['{', '}'])
+    {
+        return Ok(Edit::range_replacement(
+            locator.slice(string_expr).to_string(),
+            call.range(),
+        ));
     }
 
     let source_code = locator.slice(call);
@@ -94,12 +99,7 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
             !is_unused
         });
 
-        // If there are no arguments left, remove the parentheses.
-        if call.args.is_empty() {
-            Ok((*call.func).clone())
-        } else {
-            Ok(expression)
-        }
+        Ok(expression)
     })
     .map(|output| Edit::range_replacement(output, call.range()))
 }
@@ -107,37 +107,39 @@ pub(crate) fn remove_unused_positional_arguments_from_format_call(
 /// Generate a [`Edit`] to remove the binding from an exception handler.
 pub(crate) fn remove_exception_handler_assignment(
     bound_exception: &Binding,
-    locator: &Locator,
+    tokens: &Tokens,
 ) -> Result<Edit> {
-    // Find the position just after the exception name. This is a late pass so we only have the
-    // binding and can't look its parent in the AST up anymore.
+    // Find the end of the exception type. This is a late pass, so we only have the binding
+    // and can't look up its parent in the AST anymore.
     // ```
     // except ZeroDivisionError as err:
     //                             ^^^ This is the bound_exception range
-    //                         ^^^^ lex this range
+    //                         ^^^^ tokens in this range
     //                         ^ preceding_end (we want to remove from here)
     // ```
     // There can't be any comments in that range.
-    let mut tokenizer =
-        BackwardsTokenizer::up_to(bound_exception.start(), locator.contents(), &[]).skip_trivia();
-
-    // Eat the `as` token.
-    let preceding = tokenizer
-        .next()
+    let (before, after) = tokens.split_at(bound_exception.start());
+    // Whitespace and explicit line continuations do not produce parser tokens.
+    let (as_token, before) = before
+        .split_last()
         .context("expected the exception name to be preceded by `as`")?;
-    debug_assert!(matches!(preceding.kind, SimpleTokenKind::As));
+    debug_assert_eq!(as_token.kind(), TokenKind::As);
 
-    // Lex to the end of the preceding token, which should be the exception value.
-    let preceding = tokenizer
-        .next()
+    // Find the end of the preceding token, which should be the exception value.
+    let preceding = before
+        .last()
         .context("expected the exception name to be preceded by a token")?;
 
-    // Lex forwards, to the `:` token.
-    let following = SimpleTokenizer::starts_at(bound_exception.end(), locator.contents())
-        .skip_trivia()
-        .next()
+    debug_assert!(
+        after
+            .first()
+            .is_some_and(|token| token.range() == bound_exception.range())
+    );
+    // Skip the bound name and find the `:` token.
+    let following = after
+        .get(1)
         .context("expected the exception name to be followed by a colon")?;
-    debug_assert!(matches!(following.kind, SimpleTokenKind::Colon));
+    debug_assert_eq!(following.kind(), TokenKind::Colon);
 
     Ok(Edit::deletion(preceding.end(), following.start()))
 }

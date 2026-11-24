@@ -12,6 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::line_width::LineWidthBuilder;
 use crate::package::PackageRoot;
 use crate::rules::isort::block::Block;
@@ -22,6 +23,23 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## What it does
 /// De-duplicates, groups, and sorts imports based on the provided `isort` settings.
 ///
+/// By default, imports are categorized into the following sections in order:
+/// 1. `future` (`__future__`)
+/// 2. `standard-library` (e.g., `sys`, `os`, `json`)
+/// 3. `third-party` (e.g., `numpy`, `pandas`)
+/// 4. `first-party` (modules within the current project or package)
+/// 5. `local-folder` (relative imports starting with `.`, e.g., `from . import utils`)
+///
+/// With the default settings, each section is separated by a blank line. Within a section, Ruff
+/// generally places `import` statements before `from` imports and sorts each group by module name.
+///
+/// Ruff defaults to two blank lines between a top-level import block and a function or class
+/// definition, and one blank line before other top-level statements. In stub files (`.pyi`), the
+/// default is one blank line in either case.
+///
+/// See the FAQ for more information on how Ruff [determines which imports are first-party][1] and
+/// for how Ruff [compares to isort][2] more broadly.
+///
 /// ## Why is this bad?
 /// Consistency is good. Use a common convention for imports to make your code
 /// more readable and idiomatic.
@@ -30,16 +48,35 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```python
 /// import pandas
 /// import numpy as np
+/// import sys
+///
+///
+/// def main(): ...
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import sys
+///
 /// import numpy as np
 /// import pandas
+///
+///
+/// def main(): ...
 /// ```
 ///
+/// ## Options
+/// See the [`isort` settings](https://docs.astral.sh/ruff/settings/#lintisort) for all available
+/// configuration options.
+///
+/// ## References
+/// - [PEP 8: Imports](https://peps.python.org/pep-0008/#imports)
+/// - [isort documentation](https://isort.readthedocs.io/en/latest/)
+///
+/// [1]: https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc
+/// [2]: https://docs.astral.sh/ruff/faq/#how-does-ruffs-import-sorting-compare-to-isort
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.110")]
+#[violation_metadata(stable_since = "v0.0.110", category = Category::Style)]
 pub(crate) struct UnsortedImports;
 
 impl Violation for UnsortedImports {
@@ -110,8 +147,42 @@ pub(crate) fn organize_imports(
     }
 
     // Extract comments. Take care to grab any inline comments from the last line.
+    // Also extend the start backward to include any import heading comments above
+    // the first import, so they're collected and can be stripped/re-added correctly.
+    let import_headings = &settings.isort.import_headings;
+    let (comment_start, fix_start) = if import_headings.is_empty() {
+        // Preserve original behavior: comments from import start, fix range from line start.
+        (range.start(), locator.line_start(range.start()))
+    } else {
+        // Heading comments are already formatted as "# {heading}" in settings.
+        // Walk backward through comment ranges to find adjacent heading comments above the first import.
+        let comment_ranges: &[TextRange] = indexer.comment_ranges();
+        let import_line_start = locator.line_start(range.start());
+        let partition =
+            comment_ranges.partition_point(|comment| comment.start() < import_line_start);
+
+        let mut earliest = import_line_start;
+        for comment_range in comment_ranges[..partition].iter().rev() {
+            // The comment's line must end right where 'earliest' starts (adjacent).
+            if locator.full_line_end(comment_range.end()) != earliest {
+                break;
+            }
+
+            let comment_text = locator.slice(*comment_range);
+            if import_headings
+                .values()
+                .any(|header| comment_text == header.as_str())
+            {
+                earliest = locator.line_start(comment_range.start());
+            } else {
+                break;
+            }
+        }
+        (earliest, earliest)
+    };
+
     let comments = comments::collect_comments(
-        TextRange::new(range.start(), locator.full_line_end(range.end())),
+        TextRange::new(comment_start, locator.full_line_end(range.end())),
         locator,
         indexer.comment_ranges(),
     );
@@ -139,7 +210,7 @@ pub(crate) fn organize_imports(
     );
 
     // Expand the span the entire range, including leading and trailing space.
-    let fix_range = TextRange::new(locator.line_start(range.start()), trailing_line_end);
+    let fix_range = TextRange::new(fix_start, trailing_line_end);
     let actual = locator.slice(fix_range);
     if matches_ignoring_indentation(actual, &expected) {
         return;

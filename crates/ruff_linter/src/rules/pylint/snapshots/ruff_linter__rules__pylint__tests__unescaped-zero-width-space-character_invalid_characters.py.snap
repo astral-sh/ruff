@@ -1,0 +1,186 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
+  --> invalid_characters.py:44:13
+   |
+42 | nul_ok = f'\0'
+43 |
+44 | zwsp = 'zero​width'
+   |             ^
+45 | zwsp = f'zero​width'
+   |
+help: Replace with escape sequence
+   |
+43 |
+   - zwsp = 'zero​width'
+44 + zwsp = 'zero\u200bwidth'
+45 | zwsp = f'zero​width'
+   |
+
+PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
+  --> invalid_characters.py:45:14
+   |
+44 | zwsp = 'zero​width'
+45 | zwsp = f'zero​width'
+   |              ^
+46 |
+47 | zwsp_ok = '\u200b'
+   |
+help: Replace with escape sequence
+   |
+44 | zwsp = 'zero​width'
+   - zwsp = f'zero​width'
+45 + zwsp = f'zero\u200bwidth'
+46 |
+   |
+
+PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
+  --> invalid_characters.py:50:36
+   |
+48 | zwsp_ok = f'\u200b'
+49 |
+50 | zwsp_after_multibyte_character = "ಫ​"
+   |                                    ^
+51 | zwsp_after_multibyte_character = f"ಫ​"
+52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   |
+help: Replace with escape sequence
+   |
+49 |
+   - zwsp_after_multibyte_character = "ಫ​"
+50 + zwsp_after_multibyte_character = "ಫ\u200b"
+51 | zwsp_after_multibyte_character = f"ಫ​"
+   |
+
+PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
+  --> invalid_characters.py:51:37
+   |
+50 | zwsp_after_multibyte_character = "ಫ​"
+51 | zwsp_after_multibyte_character = f"ಫ​"
+   |                                     ^
+52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   |
+help: Replace with escape sequence
+   |
+50 | zwsp_after_multibyte_character = "ಫ​"
+   - zwsp_after_multibyte_character = f"ಫ​"
+51 + zwsp_after_multibyte_character = f"ಫ\u200b"
+52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   |
+
+PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
+  --> invalid_characters.py:52:60
+   |
+50 | zwsp_after_multibyte_character = "ಫ​"
+51 | zwsp_after_multibyte_character = f"ಫ​"
+52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   |                                                       ^
+53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   |
+help: Replace with escape sequence
+   |
+51 | zwsp_after_multibyte_character = f"ಫ​"
+   - zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+52 + zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ \u200b​"
+53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   |
+
+PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
+  --> invalid_characters.py:52:61
+   |
+50 | zwsp_after_multibyte_character = "ಫ​"
+51 | zwsp_after_multibyte_character = f"ಫ​"
+52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   |                                                       ^
+53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   |
+help: Replace with escape sequence
+   |
+51 | zwsp_after_multibyte_character = f"ಫ​"
+   - zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+52 + zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​\u200b"
+53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   |
+
+PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
+  --> invalid_characters.py:53:61
+   |
+51 | zwsp_after_multibyte_character = f"ಫ​"
+52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   |                                                        ^
+54 |
+55 | nested_fstrings = f'␈{f'␚{f'␛'}'}'
+   |
+help: Replace with escape sequence
+   |
+52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   - zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+53 + zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ \u200b​"
+54 |
+   |
+
+PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
+  --> invalid_characters.py:53:62
+   |
+51 | zwsp_after_multibyte_character = f"ಫ​"
+52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   |                                                        ^
+54 |
+55 | nested_fstrings = f'␈{f'␚{f'␛'}'}'
+   |
+help: Replace with escape sequence
+   |
+52 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   - zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+53 + zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​\u200b"
+54 |
+   |
+
+PLE2515 Invalid unescaped character zero-width-space, use "\u200B" instead
+  --> invalid_characters.py:64:15
+   |
+63 | # https://github.com/astral-sh/ruff/issues/13294
+64 | print(r"""␈␚␛␀​
+   |               ^
+65 | """)
+66 | print(fr"""␈␚␛␀​
+   |
+help: Replace with escape sequence
+
+PLE2515 Invalid unescaped character zero-width-space, use "\u200B" instead
+  --> invalid_characters.py:66:16
+   |
+64 | print(r"""␈␚␛␀​
+65 | """)
+66 | print(fr"""␈␚␛␀​
+   |                ^
+67 | """)
+68 | print(Rf"""␈␚␛␀​
+   |
+help: Replace with escape sequence
+
+PLE2515 Invalid unescaped character zero-width-space, use "\u200B" instead
+  --> invalid_characters.py:68:16
+   |
+66 | print(fr"""␈␚␛␀​
+67 | """)
+68 | print(Rf"""␈␚␛␀​
+   |                ^
+69 | """)
+   |
+help: Replace with escape sequence
+
+PLE2515 Invalid unescaped character zero-width-space, use "\u200B" instead
+  --> invalid_characters.py:75:10
+   |
+73 | sub = "\␚"
+74 | esc = "\␛"
+75 | zwsp = "\​"
+   |          ^
+76 | nul = "\␀"
+   |
+help: Replace with escape sequence

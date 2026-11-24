@@ -3,13 +3,14 @@
     reason = "Prefer System trait methods over std methods"
 )]
 
-use crate::files::Files;
+use crate::files::{File, Files};
 use crate::system::System;
 use crate::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHasher;
 use std::hash::BuildHasherDefault;
 use std::num::NonZeroUsize;
+use std::sync::OnceLock;
 use ty_static::EnvVars;
 
 pub mod cancellation;
@@ -25,6 +26,22 @@ pub mod system;
 pub mod testing;
 pub mod vendored;
 
+/// A file paired with the Python version used to parse its contents.
+///
+/// This is the key for [`parsed::parsed_module`]. Including the Python version allows the same
+/// file to be parsed for different versions within a single Salsa revision without sharing an
+/// incompatible AST or syntax diagnostics.
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+pub struct PythonFile<'db> {
+    #[returns(copy)]
+    pub file: File,
+    #[returns(copy)]
+    pub python_version: PythonVersion,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for PythonFile<'_> {}
+
 #[cfg(not(target_arch = "wasm32"))]
 pub use std::time::{Instant, SystemTime, SystemTimeError};
 
@@ -32,9 +49,7 @@ pub use std::time::{Instant, SystemTime, SystemTimeError};
 pub use web_time::{Instant, SystemTime, SystemTimeError};
 
 pub type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
-pub type FxDashSet<K> = dashmap::DashSet<K, BuildHasherDefault<FxHasher>>;
-
-static VERSION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+static VERSION: OnceLock<String> = OnceLock::new();
 
 /// Returns the version of the executing program if set.
 pub fn program_version() -> Option<&'static str> {
@@ -49,40 +64,51 @@ pub fn set_program_version(version: String) -> Result<(), String> {
     VERSION.set(version)
 }
 
+/// Disables LRU bookkeeping for all queries defined by this crate.
+///
+/// This is useful for short-lived database users that don't need to evict query results across
+/// revisions.
+pub fn disable_lru(db: &mut dyn Db) {
+    parsed::disable_lru(db);
+}
+
 /// Most basic database that gives access to files, the host system, source code, and parsed AST.
 #[salsa::db]
 pub trait Db: salsa::Database {
     fn vendored(&self) -> &VendoredFileSystem;
     fn system(&self) -> &dyn System;
     fn files(&self) -> &Files;
-    fn python_version(&self) -> PythonVersion;
 }
 
-/// Returns the maximum number of tasks that ty is allowed
-/// to process in parallel.
+static MAX_PARALLELISM: OnceLock<NonZeroUsize> = OnceLock::new();
+
+/// Sets the maximum number of tasks to process in parallel.
 ///
-/// Returns [`std::thread::available_parallelism`], unless the environment
-/// variable `TY_MAX_PARALLELISM` or `RAYON_NUM_THREADS` is set. `TY_MAX_PARALLELISM` takes
-/// precedence over `RAYON_NUM_THREADS`.
+/// Returns the supplied limit if [`max_parallelism`] has already been read or set.
+pub fn set_max_parallelism(limit: NonZeroUsize) -> Result<(), NonZeroUsize> {
+    MAX_PARALLELISM.set(limit)
+}
+
+/// Returns the maximum number of tasks to process in parallel.
 ///
-/// Falls back to `1` if `available_parallelism` is not available.
+/// Unless [`set_max_parallelism`] was called at startup, the first call uses a positive
+/// `RAYON_NUM_THREADS` value or [`std::thread::available_parallelism`].
+/// Falls back to `1` if `available_parallelism` is unavailable.
 ///
-/// Setting `TY_MAX_PARALLELISM` to `2` only restricts the number of threads that ty spawns
-/// to process work in parallel. For example, to index a directory or checking the files of a project.
-/// ty can still spawn more threads for other tasks, e.g. to wait for a Ctrl+C signal or
-/// watching the files for changes.
+/// A limit of `2` restricts how many threads can index a directory or check the files
+/// of a project in parallel. The process can still spawn threads for other tasks,
+/// such as waiting for a Ctrl+C signal or watching files for changes.
 #[expect(
     clippy::disallowed_methods,
     reason = "We don't have access to System here, but this is also only used by the CLI and the server which always run on a real system."
 )]
 pub fn max_parallelism() -> NonZeroUsize {
-    std::env::var(EnvVars::TY_MAX_PARALLELISM)
-        .or_else(|_| std::env::var(EnvVars::RAYON_NUM_THREADS))
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or_else(|| {
-            std::thread::available_parallelism().unwrap_or_else(|_| NonZeroUsize::new(1).unwrap())
-        })
+    *MAX_PARALLELISM.get_or_init(|| {
+        std::env::var(EnvVars::RAYON_NUM_THREADS)
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or_else(|| std::thread::available_parallelism().unwrap_or(NonZeroUsize::MIN))
+    })
 }
 
 // Use a reasonably large stack size to avoid running into stack overflows too easily. The
@@ -173,10 +199,6 @@ mod tests {
 
         fn files(&self) -> &Files {
             &self.files
-        }
-
-        fn python_version(&self) -> ruff_python_ast::PythonVersion {
-            ruff_python_ast::PythonVersion::latest_ty()
         }
     }
 

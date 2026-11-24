@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of named expressions (e.g., `a := 42`) that can be
@@ -25,7 +26,7 @@ use crate::checkers::ast::Checker;
 /// a = 42
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.270")]
+#[violation_metadata(stable_since = "v0.0.270", category = Category::Complexity)]
 pub(crate) struct NamedExprWithoutContext;
 
 impl Violation for NamedExprWithoutContext {

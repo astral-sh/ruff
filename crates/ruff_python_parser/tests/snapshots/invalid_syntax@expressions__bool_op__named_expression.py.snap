@@ -117,4 +117,3 @@ Module(
 1 | x and a := b
 2 | x or a := b
   |        ^^ Syntax Error: Expected a statement
-  |

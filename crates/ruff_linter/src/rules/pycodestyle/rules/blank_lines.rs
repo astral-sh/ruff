@@ -19,6 +19,7 @@ use ruff_text_size::TextSize;
 
 use crate::checkers::ast::{DiagnosticGuard, LintContext};
 use crate::checkers::logical_lines::expand_indent;
+use crate::codes::Category;
 use crate::line_width::IndentWidth;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
 use crate::{AlwaysFixableViolation, Edit, Fix, Locator, Violation};
@@ -62,10 +63,10 @@ const BLANK_LINES_NESTED_LEVEL: u32 = 1;
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E301.html)
 /// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.2.2")]
-pub(crate) struct BlankLineBetweenMethods;
+#[violation_metadata(preview_since = "v0.2.2", category = Category::Formatting)]
+pub(crate) struct MissingBlankLineBeforeMethod;
 
-impl AlwaysFixableViolation for BlankLineBetweenMethods {
+impl AlwaysFixableViolation for MissingBlankLineBeforeMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Expected {BLANK_LINES_NESTED_LEVEL:?} blank line, found 0")
@@ -116,16 +117,16 @@ impl AlwaysFixableViolation for BlankLineBetweenMethods {
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E302.html)
 /// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.2.2")]
-pub(crate) struct BlankLinesTopLevel {
+#[violation_metadata(preview_since = "v0.2.2", category = Category::Formatting)]
+pub(crate) struct MissingBlankLinesBeforeTopLevelDefinition {
     actual_blank_lines: u32,
     expected_blank_lines: u32,
 }
 
-impl AlwaysFixableViolation for BlankLinesTopLevel {
+impl AlwaysFixableViolation for MissingBlankLinesBeforeTopLevelDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLinesTopLevel {
+        let MissingBlankLinesBeforeTopLevelDefinition {
             actual_blank_lines,
             expected_blank_lines,
         } = self;
@@ -184,7 +185,7 @@ impl AlwaysFixableViolation for BlankLinesTopLevel {
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E303.html)
 /// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.2.2")]
+#[violation_metadata(preview_since = "v0.2.2", category = Category::Formatting)]
 pub(crate) struct TooManyBlankLines {
     actual_blank_lines: u32,
 }
@@ -231,7 +232,7 @@ impl AlwaysFixableViolation for TooManyBlankLines {
 /// - [PEP 8: Blank Lines](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E304.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.2.2")]
+#[violation_metadata(preview_since = "v0.2.2", category = Category::Formatting)]
 pub(crate) struct BlankLineAfterDecorator {
     actual_blank_lines: u32,
 }
@@ -283,15 +284,15 @@ impl AlwaysFixableViolation for BlankLineAfterDecorator {
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E305.html)
 /// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.2.2")]
-pub(crate) struct BlankLinesAfterFunctionOrClass {
+#[violation_metadata(preview_since = "v0.2.2", category = Category::Formatting)]
+pub(crate) struct MissingBlankLinesAfterTopLevelDefinition {
     actual_blank_lines: u32,
 }
 
-impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
+impl AlwaysFixableViolation for MissingBlankLinesAfterTopLevelDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLinesAfterFunctionOrClass {
+        let MissingBlankLinesAfterTopLevelDefinition {
             actual_blank_lines: blank_lines,
         } = self;
         format!("Expected 2 blank lines after class or function definition, found ({blank_lines})")
@@ -338,10 +339,10 @@ impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E306.html)
 /// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.2.2")]
-pub(crate) struct BlankLinesBeforeNestedDefinition;
+#[violation_metadata(preview_since = "v0.2.2", category = Category::Formatting)]
+pub(crate) struct MissingBlankLineBeforeNestedDefinition;
 
-impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
+impl AlwaysFixableViolation for MissingBlankLineBeforeNestedDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Expected 1 blank line before a nested definition, found 0".to_string()
@@ -856,7 +857,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
         {
             // E301
             if let Some(mut diagnostic) =
-                self.report_diagnostic(BlankLineBetweenMethods, line.first_token_range)
+                self.report_diagnostic(MissingBlankLineBeforeMethod, line.first_token_range)
             {
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                     self.stylist.line_ending().to_string(),
@@ -912,7 +913,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
         {
             // E302
             if let Some(mut diagnostic) = self.report_diagnostic(
-                BlankLinesTopLevel {
+                MissingBlankLinesBeforeTopLevelDefinition {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                     expected_blank_lines: expected_blank_lines_before_definition,
                 },
@@ -1029,7 +1030,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
         {
             // E305
             if let Some(mut diagnostic) = self.report_diagnostic(
-                BlankLinesAfterFunctionOrClass {
+                MissingBlankLinesAfterTopLevelDefinition {
                     actual_blank_lines: line.preceding_blank_lines.count(),
                 },
                 line.first_token_range,
@@ -1069,9 +1070,10 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             && !self.source_type.is_stub()
         {
             // E306
-            if let Some(mut diagnostic) =
-                self.report_diagnostic(BlankLinesBeforeNestedDefinition, line.first_token_range)
-            {
+            if let Some(mut diagnostic) = self.report_diagnostic(
+                MissingBlankLineBeforeNestedDefinition,
+                line.first_token_range,
+            ) {
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                     self.stylist.line_ending().to_string(),
                     self.locator.line_start(line.first_token_range.start()),

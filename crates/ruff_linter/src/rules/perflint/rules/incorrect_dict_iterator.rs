@@ -6,6 +6,7 @@ use ruff_python_ast::{Arguments, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -27,13 +28,19 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Example
 /// ```python
 /// obj = {"a": 1, "b": 2}
-/// for key, value in obj.items():
+/// for key, _value in obj.items():
+///     print(key)
+///
+/// for _key, value in obj.items():
 ///     print(value)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// obj = {"a": 1, "b": 2}
+/// for key in obj.keys():
+///     print(key)
+///
 /// for value in obj.values():
 ///     print(value)
 /// ```
@@ -44,7 +51,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// (e.g., if it is missing a `.keys()` or `.values()` method, or if those
 /// methods behave differently than they do on standard mapping types).
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.273")]
+#[violation_metadata(stable_since = "v0.0.273", category = Category::Complexity)]
 pub(crate) struct IncorrectDictIterator {
     subset: DictSubset,
 }
@@ -62,9 +69,21 @@ impl AlwaysFixableViolation for IncorrectDictIterator {
     }
 }
 
-/// PERF102
+/// PERF102 for `for` loops.
 pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor) {
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = stmt_for.target.as_ref() else {
+    check_dict_items_usage(checker, stmt_for.target.as_ref(), stmt_for.iter.as_ref());
+}
+
+/// PERF102 for comprehensions and generators.
+pub(crate) fn incorrect_dict_iterator_comprehension(
+    checker: &Checker,
+    comprehension: &ast::Comprehension,
+) {
+    check_dict_items_usage(checker, &comprehension.target, &comprehension.iter);
+}
+
+fn check_dict_items_usage(checker: &Checker, target: &Expr, iter: &Expr) {
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
         return;
     };
     let [key, value] = elts.as_slice() else {
@@ -74,7 +93,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
         func,
         arguments: Arguments { args, .. },
         ..
-    }) = stmt_for.iter.as_ref()
+    }) = iter
     else {
         return;
     };
@@ -110,10 +129,10 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
             let replace_target = Edit::range_replacement(
                 pad(
                     checker.locator().slice(value).to_string(),
-                    stmt_for.target.range(),
+                    target.range(),
                     checker.locator(),
                 ),
-                stmt_for.target.range(),
+                target.range(),
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
         }
@@ -129,10 +148,10 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
             let replace_target = Edit::range_replacement(
                 pad(
                     checker.locator().slice(key).to_string(),
-                    stmt_for.target.range(),
+                    target.range(),
                     checker.locator(),
                 ),
-                stmt_for.target.range(),
+                target.range(),
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
         }

@@ -49,4 +49,3 @@ Module(
 1 | # parse_options: { "target-version": "3.7" }
 2 | (x := 1)
   |  ^^^^^^ Syntax Error: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
-  |

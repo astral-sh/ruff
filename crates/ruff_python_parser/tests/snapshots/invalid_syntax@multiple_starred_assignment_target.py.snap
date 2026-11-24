@@ -509,7 +509,6 @@ Module(
 4 | [*a, *b, c] = (1, 2, 3)
 5 | (*a, *b, (*c, *d)) = (1, 2)
   | ^^^^^^^^^^^^^^^^^^ Syntax Error: Two starred expressions in assignment
-  |
 
 
   |
@@ -517,4 +516,3 @@ Module(
 4 | [*a, *b, c] = (1, 2, 3)
 5 | (*a, *b, (*c, *d)) = (1, 2)
   |          ^^^^^^^^ Syntax Error: Two starred expressions in assignment
-  |

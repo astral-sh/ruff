@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for the use of `locals()` in `render` functions.
@@ -34,7 +35,7 @@ use crate::checkers::ast::Checker;
 ///     return render(request, "app/index.html", context)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.253")]
+#[violation_metadata(stable_since = "v0.0.253", category = Category::Security)]
 pub(crate) struct DjangoLocalsInRenderFunction;
 
 impl Violation for DjangoLocalsInRenderFunction {
@@ -52,10 +53,7 @@ pub(crate) fn locals_in_render_function(checker: &Checker, call: &ast::ExprCall)
 
     if !checker
         .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["django", "shortcuts", "render"])
-        })
+        .matches_qualified_name(&call.func, &["django", "shortcuts", "render"])
     {
         return;
     }

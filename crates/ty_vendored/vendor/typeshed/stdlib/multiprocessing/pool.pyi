@@ -1,5 +1,5 @@
 from collections.abc import Callable, Iterable, Mapping
-from multiprocessing.context import DefaultContext, Process
+from multiprocessing.context import DefaultContext, Process as _Process
 from types import GenericAlias, TracebackType
 from typing import Any, Final, Generic, TypeVar
 from typing_extensions import Self
@@ -20,7 +20,8 @@ class ApplyResult(Generic[_T]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 # alias created during issue #17805
@@ -58,7 +59,7 @@ class Pool:
         context: Any | None = None,
     ) -> None: ...
     @staticmethod
-    def Process(ctx: DefaultContext, *args: Any, **kwds: Any) -> Process: ...
+    def Process(ctx: DefaultContext, *args: Any, **kwds: Any) -> _Process: ...
     def apply(self, func: Callable[..., _T], args: Iterable[Any] = (), kwds: Mapping[str, Any] = {}) -> _T:
         """
         Equivalent of `func(*args, **kwds)`.

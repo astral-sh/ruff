@@ -12,8 +12,12 @@ use crate::files::{File, FilePath};
 use crate::system::System;
 
 /// Reads the source text of a python text file (must be valid UTF8) or notebook.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(clone), heap_size=ruff_memory_usage::heap_size)]
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
+    read_source_text(db, file)
+}
+
+pub(crate) fn read_source_text(db: &dyn Db, file: File) -> SourceText {
     let path = file.path(db);
     let _span = tracing::trace_span!("source_text", file = %path).entered();
     let mut read_error = None;
@@ -22,7 +26,7 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
         return source.clone();
     }
 
-    let kind = if is_notebook(db.system(), path) {
+    let kind = if is_notebook_path(db.system(), path) {
         file.read_to_notebook(db)
             .unwrap_or_else(|error| {
                 tracing::debug!("Failed to read notebook '{path}': {error}");
@@ -47,7 +51,19 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     }
 }
 
-fn is_notebook(system: &dyn System, path: &FilePath) -> bool {
+/// Returns whether a file is a notebook without reading its contents.
+pub fn is_notebook(db: &dyn Db, file: File) -> bool {
+    if let Some(source) = file.source_text_override(db) {
+        return source.is_notebook();
+    }
+
+    // The editor can change a file's source type without changing its path.
+    let _ = file.revision(db);
+
+    is_notebook_path(db.system(), file.path(db))
+}
+
+fn is_notebook_path(system: &dyn System, path: &FilePath) -> bool {
     let source_type = match path {
         FilePath::System(path) => system.source_type(path),
         FilePath::SystemVirtual(system_virtual) => system.virtual_path_source_type(system_virtual),
@@ -195,14 +211,14 @@ impl From<Notebook> for SourceTextKind {
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq, Clone, get_size2::GetSize)]
 pub enum SourceTextError {
-    #[error("Failed to read notebook: {0}`")]
+    #[error("Failed to read notebook: {0}")]
     FailedToReadNotebook(String),
     #[error("Failed to read file: {0}")]
     FailedToReadFile(String),
 }
 
 /// Computes the [`LineIndex`] for `file`.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(clone), heap_size=ruff_memory_usage::heap_size)]
 pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
     let _span = tracing::trace_span!("line_index", ?file).entered();
 

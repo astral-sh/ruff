@@ -8,4 +8,3 @@ PD007 `.ix` is deprecated; use more explicit `.loc` or `.iloc`
 3 | x = pd.DataFrame()
 4 | y = x.ix[[0, 2], "A"]
   |     ^^^^^^^^^^^^^^^^^
-  |

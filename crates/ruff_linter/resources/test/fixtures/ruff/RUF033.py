@@ -140,3 +140,12 @@ class D:
     def __post_init__(self, x: int = """
     """) -> None:
         self.x = x
+
+
+# https://github.com/astral-sh/ruff/issues/19628
+# No fix: annotation references a type variable scoped to `__post_init__`
+@dataclass
+class E:
+    def __post_init__[T: (str, bytes)](self, a: T | None = None, b: T | None = None) -> None:
+        self.a = str(a)
+        self.b = str(b)

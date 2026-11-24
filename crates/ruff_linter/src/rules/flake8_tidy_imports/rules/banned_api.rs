@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_tidy_imports::matchers::NameMatchPolicy;
 
 /// ## What it does
@@ -24,8 +25,9 @@ use crate::rules::flake8_tidy_imports::matchers::NameMatchPolicy;
 ///
 /// ## Options
 /// - `lint.flake8-tidy-imports.banned-api`
+/// - `lint.flake8-tidy-imports.extend-banned-api`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.201")]
+#[violation_metadata(stable_since = "v0.0.201", category = Category::Restriction)]
 pub(crate) struct BannedApi {
     name: String,
     message: String,
@@ -67,9 +69,12 @@ pub(crate) fn banned_attribute_access(checker: &Checker, expr: &Expr) {
             .semantic()
             .resolve_qualified_name(expr)
             .and_then(|qualified_name| {
-                banned_api.iter().find(|(banned_path, ..)| {
-                    qualified_name == QualifiedName::from_dotted_name(banned_path)
-                })
+                // Preserve the empty leading segment for attributes of implicit builtins.
+                banned_api
+                    .get_key_value(&qualified_name.segments().join("."))
+                    .filter(|(banned_path, ..)| {
+                        qualified_name == QualifiedName::from_dotted_name(banned_path)
+                    })
             })
     {
         checker.report_diagnostic(

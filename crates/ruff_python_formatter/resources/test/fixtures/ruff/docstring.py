@@ -40,7 +40,7 @@ def multiple_negatively_indented_docstring_lines():
     """
 
 
-def overindentend_docstring():
+def overindented_docstring():
     """a
             over-indented
     """

@@ -7,7 +7,10 @@ use crate::rules::pyflakes;
 
 /// Run lint rules over all [`UnresolvedReference`] entities in the [`SemanticModel`].
 pub(crate) fn unresolved_references(checker: &Checker) {
-    if !checker.any_rule_enabled(&[Rule::UndefinedLocalWithImportStarUsage, Rule::UndefinedName]) {
+    if !checker.any_rule_enabled(&[
+        Rule::PossiblyUndefinedNameWithStarImport,
+        Rule::UndefinedName,
+    ]) {
         return;
     }
 
@@ -15,7 +18,7 @@ pub(crate) fn unresolved_references(checker: &Checker) {
         if reference.is_wildcard_import() {
             // F405
             checker.report_diagnostic_if_enabled(
-                pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                pyflakes::rules::PossiblyUndefinedNameWithStarImport {
                     name: reference.name(checker.source()).to_string(),
                 },
                 reference.range(),
@@ -35,6 +38,18 @@ pub(crate) fn unresolved_references(checker: &Checker) {
                 // Allow __path__.
                 if checker.in_init_module() {
                     if reference.name(checker.source()) == "__path__" {
+                        continue;
+                    }
+                }
+
+                // Bare local annotations can be initialized through nested `nonlocal`
+                // rebindings. If such a rebinding exists, skip F821.
+                if let Some(annotation_binding_id) = reference.annotation_binding_id() {
+                    if checker
+                        .semantic
+                        .rebinding_scopes(annotation_binding_id)
+                        .is_some_and(|scopes| !scopes.is_empty())
+                    {
                         continue;
                     }
                 }

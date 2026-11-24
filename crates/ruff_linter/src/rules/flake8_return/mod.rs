@@ -4,6 +4,8 @@ mod helpers;
 pub(crate) mod rules;
 mod visitor;
 
+pub(crate) use visitor::has_conditional_body;
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
@@ -20,12 +22,12 @@ mod tests {
     #[test_case(Rule::ImplicitReturnValue, Path::new("RET502.py"))]
     #[test_case(Rule::ImplicitReturn, Path::new("RET503.py"))]
     #[test_case(Rule::UnnecessaryAssign, Path::new("RET504.py"))]
-    #[test_case(Rule::SuperfluousElseReturn, Path::new("RET505.py"))]
-    #[test_case(Rule::SuperfluousElseRaise, Path::new("RET506.py"))]
-    #[test_case(Rule::SuperfluousElseContinue, Path::new("RET507.py"))]
-    #[test_case(Rule::SuperfluousElseBreak, Path::new("RET508.py"))]
+    #[test_case(Rule::UnnecessaryElseAfterReturn, Path::new("RET505.py"))]
+    #[test_case(Rule::UnnecessaryElseAfterRaise, Path::new("RET506.py"))]
+    #[test_case(Rule::UnnecessaryElseAfterContinue, Path::new("RET507.py"))]
+    #[test_case(Rule::UnnecessaryElseAfterBreak, Path::new("RET508.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_return").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),

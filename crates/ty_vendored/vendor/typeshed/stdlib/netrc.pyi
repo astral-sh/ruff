@@ -2,7 +2,7 @@
 
 import sys
 from _typeshed import StrOrBytesPath
-from typing_extensions import TypeAlias
+from typing import TypeAlias
 
 __all__ = ["netrc", "NetrcParseError"]
 

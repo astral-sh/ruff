@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_django::helpers::is_model_form;
 
 /// ## What it does
@@ -38,7 +39,7 @@ use crate::rules::flake8_django::helpers::is_model_form;
 ///         fields = ["title", "content"]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.253")]
+#[violation_metadata(stable_since = "v0.0.253", category = Category::Security)]
 pub(crate) struct DjangoAllWithModelForm;
 
 impl Violation for DjangoAllWithModelForm {
@@ -77,17 +78,17 @@ pub(crate) fn all_with_model_form(checker: &Checker, class_def: &ast::StmtClassD
                     continue;
                 }
                 match value.as_ref() {
-                    Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                        if value == "__all__" {
-                            checker.report_diagnostic(DjangoAllWithModelForm, element.range());
-                            return;
-                        }
+                    Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
+                        if value == "__all__" =>
+                    {
+                        checker.report_diagnostic(DjangoAllWithModelForm, element.range());
+                        return;
                     }
-                    Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
-                        if value == "__all__".as_bytes() {
-                            checker.report_diagnostic(DjangoAllWithModelForm, element.range());
-                            return;
-                        }
+                    Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. })
+                        if value == "__all__".as_bytes() =>
+                    {
+                        checker.report_diagnostic(DjangoAllWithModelForm, element.range());
+                        return;
                     }
                     _ => (),
                 }

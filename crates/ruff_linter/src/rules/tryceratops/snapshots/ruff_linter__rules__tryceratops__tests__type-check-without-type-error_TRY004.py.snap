@@ -8,7 +8,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 11 |     else:
 12 |         raise Exception("...")  # should be typeerror
    |         ^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 TRY004 Prefer `TypeError` exception for invalid type
   --> TRY004.py:19:9
@@ -17,7 +16,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 18 |     else:
 19 |         raise Exception("...")  # should be typeerror
    |         ^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 TRY004 Prefer `TypeError` exception for invalid type
   --> TRY004.py:30:9
@@ -26,7 +24,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 29 |     else:
 30 |         raise Exception("...")  # should be typeerror
    |         ^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 TRY004 Prefer `TypeError` exception for invalid type
   --> TRY004.py:37:9
@@ -35,7 +32,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 36 |     else:
 37 |         raise Exception("...")  # should be typeerror
    |         ^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 TRY004 Prefer `TypeError` exception for invalid type
   --> TRY004.py:44:9
@@ -44,7 +40,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 43 |     else:
 44 |         raise ArithmeticError("...")  # should be typeerror
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 TRY004 Prefer `TypeError` exception for invalid type
   --> TRY004.py:51:9
@@ -53,7 +48,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 50 |     else:
 51 |         raise AssertionError("...")  # should be typeerror
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 TRY004 Prefer `TypeError` exception for invalid type
   --> TRY004.py:58:9
@@ -62,7 +56,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 57 |     else:
 58 |         raise AttributeError("...")  # should be typeerror
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 TRY004 Prefer `TypeError` exception for invalid type
   --> TRY004.py:65:9
@@ -71,7 +64,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 64 |     else:
 65 |         raise BufferError  # should be typeerror
    |         ^^^^^^^^^^^^^^^^^
-   |
 
 TRY004 Prefer `TypeError` exception for invalid type
   --> TRY004.py:72:9
@@ -80,7 +72,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 71 |     else:
 72 |         raise EOFError("...")  # should be typeerror
    |         ^^^^^^^^^^^^^^^^^^^^^
-   |
 
 TRY004 Prefer `TypeError` exception for invalid type
   --> TRY004.py:79:9
@@ -89,7 +80,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 78 |     else:
 79 |         raise ImportError("...")  # should be typeerror
    |         ^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 TRY004 Prefer `TypeError` exception for invalid type
   --> TRY004.py:86:9
@@ -98,7 +88,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 85 |     else:
 86 |         raise LookupError("...")  # should be typeerror
    |         ^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 TRY004 Prefer `TypeError` exception for invalid type
   --> TRY004.py:95:9
@@ -109,7 +98,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 96 | |             "..."
 97 | |         )
    | |_________^
-   |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:104:9
@@ -118,7 +106,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 103 |     else:
 104 |         raise NameError("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:111:9
@@ -127,7 +114,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 110 |     else:
 111 |         raise ReferenceError("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:118:9
@@ -136,7 +122,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 117 |     else:
 118 |         raise RuntimeError("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:125:9
@@ -145,7 +130,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 124 |     else:
 125 |         raise SyntaxError("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:132:9
@@ -154,7 +138,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 131 |     else:
 132 |         raise SystemError("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:139:9
@@ -163,7 +146,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 138 |     else:
 139 |         raise ValueError("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:146:9
@@ -172,7 +154,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 145 |     else:
 146 |         raise Exception("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:153:9
@@ -181,7 +162,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 152 |     else:
 153 |         raise Exception("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:160:9
@@ -190,7 +170,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 159 |     else:
 160 |         raise Exception("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:167:9
@@ -199,7 +178,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 166 |     else:
 167 |         raise Exception("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:174:9
@@ -208,7 +186,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 173 |     else:
 174 |         raise Exception("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:181:9
@@ -217,7 +194,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 180 |     else:
 181 |         raise Exception("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:188:9
@@ -226,7 +202,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 187 |     else:
 188 |         raise Exception("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:195:9
@@ -235,7 +210,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 194 |     else:
 195 |         raise Exception("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:202:9
@@ -244,7 +218,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 201 |     else:
 202 |         raise Exception("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:209:9
@@ -253,7 +226,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 208 |     else:
 209 |         raise Exception("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:216:9
@@ -262,7 +234,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 215 |     else:
 216 |         raise Exception("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:223:9
@@ -271,7 +242,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 222 |     else:
 223 |         raise Exception("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:230:9
@@ -280,7 +250,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 229 |     elif isinstance(arg2, int):
 230 |         raise Exception("...")  # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:239:9
@@ -289,7 +258,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 238 |     else:
 239 |         raise Exception("...")   # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:276:9
@@ -298,7 +266,6 @@ TRY004 Prefer `TypeError` exception for invalid type
 275 |     if isinstance(some_args, int):
 276 |         raise ValueError("...") # should be typeerror
     |         ^^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 TRY004 Prefer `TypeError` exception for invalid type
    --> TRY004.py:286:9
@@ -329,4 +296,3 @@ TRY004 Prefer `TypeError` exception for invalid type
 315 |     else:
 316 |         raise Exception(f"Unknown object type: {obj.__class__.__name__}")
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |

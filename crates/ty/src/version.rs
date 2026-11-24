@@ -1,15 +1,19 @@
 //! Code for representing ty's release version number.
+use serde::Serialize;
 use std::fmt;
 
 /// Information about the git repository where ty was built from.
+#[derive(Serialize)]
 pub(crate) struct CommitInfo {
     short_commit_hash: String,
+    commit_hash: String,
     commit_date: String,
-    commits_since_last_tag: u32,
     last_tag: Option<String>,
+    commits_since_last_tag: u32,
 }
 
 /// ty's version.
+#[derive(Serialize)]
 pub(crate) struct VersionInfo {
     /// ty's version, such as "0.5.1"
     version: String,
@@ -51,13 +55,14 @@ pub(crate) fn version() -> VersionInfo {
     }
 
     // Commit info is pulled from git and set by `build.rs`
-    let commit_info = option_env_str!("TY_COMMIT_SHORT_HASH").map(|short_commit_hash| CommitInfo {
-        short_commit_hash,
+    let commit_info = option_env_str!("TY_COMMIT_HASH").map(|commit_hash| CommitInfo {
+        short_commit_hash: option_env_str!("TY_COMMIT_SHORT_HASH").unwrap(),
+        commit_hash,
         commit_date: option_env_str!("TY_COMMIT_DATE").unwrap(),
+        last_tag: option_env_str!("TY_LAST_TAG"),
         commits_since_last_tag: option_env_str!("TY_LAST_TAG_DISTANCE")
             .as_deref()
             .map_or(0, |value| value.parse::<u32>().unwrap_or(0)),
-        last_tag: option_env_str!("TY_LAST_TAG"),
     });
 
     // The version is pulled from `dist-workspace.toml` and set by `build.rs`
@@ -83,7 +88,7 @@ pub(crate) fn version() -> VersionInfo {
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_snapshot;
+    use insta::{assert_json_snapshot, assert_snapshot};
 
     use super::{CommitInfo, VersionInfo};
 
@@ -102,9 +107,10 @@ mod tests {
             version: "0.0.0".to_string(),
             commit_info: Some(CommitInfo {
                 short_commit_hash: "53b0f5d92".to_string(),
+                commit_hash: "53b0f5d924110e5b26fbf09f6fd3a03d67b475b7".to_string(),
                 commit_date: "2023-10-19".to_string(),
-                commits_since_last_tag: 0,
                 last_tag: None,
+                commits_since_last_tag: 0,
             }),
         };
         assert_snapshot!(version, @"0.0.0 (53b0f5d92 2023-10-19)");
@@ -116,11 +122,27 @@ mod tests {
             version: "0.0.0".to_string(),
             commit_info: Some(CommitInfo {
                 short_commit_hash: "53b0f5d92".to_string(),
+                commit_hash: "53b0f5d924110e5b26fbf09f6fd3a03d67b475b7".to_string(),
                 commit_date: "2023-10-19".to_string(),
-                commits_since_last_tag: 24,
                 last_tag: None,
+                commits_since_last_tag: 24,
             }),
         };
         assert_snapshot!(version, @"0.0.0+24 (53b0f5d92 2023-10-19)");
+    }
+
+    #[test]
+    fn version_serializable() {
+        let version = VersionInfo {
+            version: "0.0.0".to_string(),
+            commit_info: Some(CommitInfo {
+                short_commit_hash: "53b0f5d92".to_string(),
+                commit_hash: "53b0f5d924110e5b26fbf09f6fd3a03d67b475b7".to_string(),
+                commit_date: "2023-10-19".to_string(),
+                last_tag: Some("v0.0.1".to_string()),
+                commits_since_last_tag: 0,
+            }),
+        };
+        assert_json_snapshot!(version);
     }
 }

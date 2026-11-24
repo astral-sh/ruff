@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `if` statements that use non-empty tuples as test conditions.
@@ -29,7 +30,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `if` statement](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.18")]
+#[violation_metadata(stable_since = "v0.0.18", category = Category::Correctness)]
 pub(crate) struct IfTuple;
 
 impl Violation for IfTuple {

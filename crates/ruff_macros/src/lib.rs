@@ -20,7 +20,7 @@ mod rule_namespace;
 mod rust_doc;
 mod violation_metadata;
 
-#[proc_macro_derive(OptionsMetadata, attributes(option, doc, option_group))]
+#[proc_macro_derive(OptionsMetadata, attributes(option, option_group))]
 pub fn derive_options_metadata(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 

@@ -2,15 +2,15 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::{Formatter, Write};
 
+use annotate_snippets::{AnnotationKind, Group, Level, Renderer, Snippet};
 use datatest_stable::Utf8Path;
 use itertools::Itertools;
-use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_python_ast::token::{Token, Tokens};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_module};
 use ruff_python_ast::{self as ast, AnyNodeRef, Mod, PythonVersion};
 use ruff_python_parser::semantic_errors::{
-    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
+    LazyImportContext, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
 };
 use ruff_python_parser::{Mode, ParseErrorType, ParseOptions, Parsed, parse_unchecked};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
@@ -47,10 +47,19 @@ datatest_stable::harness! {
     { test = inline_err, root="./resources/inline/err", pattern = r"\.pyi?$" }
 }
 
+fn snapshot_input_file_for_test(root: &str, test_name: &str) -> String {
+    format!(
+        "crates/ruff_python_parser/{}/{}",
+        root.trim_start_matches("./"),
+        test_name
+    )
+}
+
 /// Asserts that the parser generates no syntax errors for a valid program.
 /// Snapshots the AST.
 fn test_valid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
     let test_name = input_path.strip_prefix(root).unwrap_or(input_path).as_str();
+    let snapshot_input_file = snapshot_input_file_for_test(root, test_name);
     let options = extract_options(source).unwrap_or_else(|| {
         ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest_preview())
     });
@@ -60,7 +69,10 @@ fn test_valid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
         let line_index = LineIndex::from_source_text(source);
         let source_code = SourceCode::new(source, &line_index);
 
-        let mut message = "Expected no syntax errors for a valid program but the parser generated the following errors:\n".to_string();
+        let mut message = "\
+            Expected no syntax errors for a valid program \
+                but the parser generated the following errors:\n"
+            .to_string();
 
         for error in parsed.errors() {
             writeln!(
@@ -133,7 +145,7 @@ fn test_valid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
 
     insta::with_settings!({
         omit_expression => true,
-        input_file => input_path,
+        input_file => snapshot_input_file,
         prepend_module_to_snapshot => false,
         snapshot_suffix => test_name
     }, {
@@ -145,6 +157,7 @@ fn test_valid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
 /// Snapshots the AST and the error messages.
 fn test_invalid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
     let test_name = input_path.strip_prefix(root).unwrap_or(input_path).as_str();
+    let snapshot_input_file = snapshot_input_file_for_test(root, test_name);
 
     let options = extract_options(source).unwrap_or_else(|| {
         ParseOptions::from(Mode::Module).with_target_version(PythonVersion::PY314)
@@ -208,7 +221,8 @@ fn test_invalid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
 
     assert!(
         parsed.has_syntax_errors() || !semantic_syntax_errors.is_empty(),
-        "Expected parser to generate at least one syntax error for a program containing syntax errors."
+        "Expected parser to generate at least one syntax error \
+            for a program containing syntax errors."
     );
 
     if !semantic_syntax_errors.is_empty() {
@@ -230,7 +244,7 @@ fn test_invalid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
 
     insta::with_settings!({
         omit_expression => true,
-        input_file => input_path,
+        input_file => snapshot_input_file,
         prepend_module_to_snapshot => false,
         snapshot_suffix => test_name
     }, {
@@ -370,14 +384,14 @@ impl std::fmt::Display for CodeFrame<'_> {
         let label = format!("Syntax Error: {error}", error = self.error);
 
         let span = usize::from(annotation_range.start())..usize::from(annotation_range.end());
-        let annotation = Level::Error.span(span).label(&label);
+        let annotation = AnnotationKind::Primary.span(span).label(&label);
         let snippet = Snippet::source(source)
             .line_start(start_index.get())
             .annotation(annotation)
             .fold(false);
-        let message = Level::None.title("").snippet(snippet);
+        let message = Group::with_level(Level::ERROR).element(snippet);
         let renderer = Renderer::plain().cut_indicator("…");
-        let rendered = renderer.render(message);
+        let rendered = renderer.render(&[message]);
         writeln!(f, "{rendered}")
     }
 }
@@ -453,7 +467,13 @@ impl ValidateAstVisitor<'_> {
             // At this point, next_token.end() > node.start()
             assert!(
                 next.start() >= node.start(),
-                "The start of the node falls within a token.\nNode: {node:#?}\n\nToken: {next:#?}\n\nRoot: {root:#?}",
+                "\
+The start of the node falls within a token.
+Node: {node:#?}
+
+Token: {next:#?}
+
+Root: {root:#?}",
                 root = self.parents.first()
             );
         }
@@ -472,7 +492,13 @@ impl ValidateAstVisitor<'_> {
             // At this point, `next_token.end() > node.end()`
             assert!(
                 next.start() >= node.end(),
-                "The end of the node falls within a token.\nNode: {node:#?}\n\nToken: {next:#?}\n\nRoot: {root:#?}",
+                "\
+The end of the node falls within a token.
+Node: {node:#?}
+
+Token: {next:#?}
+
+Root: {root:#?}",
                 root = self.parents.first()
             );
         }
@@ -481,6 +507,18 @@ impl ValidateAstVisitor<'_> {
 
 impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
+        if let AnyNodeRef::ExprCompare(compare) = node {
+            assert!(
+                !compare.ops.is_empty(),
+                "Comparison without an operator: {compare:#?}"
+            );
+            assert_eq!(
+                compare.operands.len(),
+                compare.ops.len() + 1,
+                "Comparison operands and operators are unbalanced: {compare:#?}",
+            );
+        }
+
         assert!(
             node.end() <= self.source_length,
             "The range of the node exceeds the length of the source code. Node: {node:#?}",
@@ -490,7 +528,13 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
             assert_ne!(
                 previous.range().ordering(node.range()),
                 Ordering::Greater,
-                "The ranges of the nodes are not strictly increasing when traversing the AST in pre-order.\nPrevious node: {previous:#?}\n\nCurrent node: {node:#?}\n\nRoot: {root:#?}",
+                "\
+The ranges of the nodes are not strictly increasing when traversing the AST in pre-order.
+Previous node: {previous:#?}
+
+Current node: {node:#?}
+
+Root: {root:#?}",
                 root = self.parents.first()
             );
         }
@@ -498,7 +542,13 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
         if let Some(parent) = self.parents.last() {
             assert!(
                 parent.range().contains_range(node.range()),
-                "The range of the parent node does not fully enclose the range of the child node.\nParent node: {parent:#?}\n\nChild node: {node:#?}\n\nRoot: {root:#?}",
+                "\
+The range of the parent node does not fully enclose the range of the child node.
+Parent node: {parent:#?}
+
+Child node: {node:#?}
+
+Root: {root:#?}",
                 root = self.parents.first()
             );
         }
@@ -532,6 +582,7 @@ struct SemanticSyntaxCheckerVisitor<'a> {
     python_version: PythonVersion,
     source: &'a str,
     scopes: Vec<Scope>,
+    in_try: bool,
 }
 
 impl<'a> SemanticSyntaxCheckerVisitor<'a> {
@@ -542,6 +593,7 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
             python_version: PythonVersion::default(),
             source,
             scopes: vec![Scope::Module],
+            in_try: false,
         }
     }
 
@@ -565,6 +617,20 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
 impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     fn future_annotations_or_stub(&self) -> bool {
         false
+    }
+
+    fn lazy_import_context(&self) -> Option<LazyImportContext> {
+        match self.scopes.last() {
+            Some(Scope::Function { .. }) => return Some(LazyImportContext::Function),
+            Some(Scope::Class) => return Some(LazyImportContext::Class),
+            Some(Scope::Module | Scope::Comprehension { .. }) | None => {}
+        }
+
+        if self.in_try {
+            return Some(LazyImportContext::TryExceptBlocks);
+        }
+
+        None
     }
 
     fn python_version(&self) -> PythonVersion {
@@ -603,6 +669,17 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         for scope in &self.scopes {
             if let Scope::Comprehension { is_async: false } = scope {
                 return true;
+            }
+        }
+        false
+    }
+
+    fn in_class_body_comprehension(&self) -> bool {
+        for scope in self.scopes.iter().rev() {
+            match scope {
+                Scope::Comprehension { .. } => {}
+                Scope::Class => return true,
+                Scope::Module | Scope::Function { .. } => return false,
             }
         }
         false
@@ -672,6 +749,11 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 ast::visitor::walk_stmt(self, stmt);
                 self.scopes.pop().unwrap();
             }
+            ast::Stmt::Try(_) => {
+                let was_in_try = std::mem::replace(&mut self.in_try, true);
+                ast::visitor::walk_stmt(self, stmt);
+                self.in_try = was_in_try;
+            }
             _ => {
                 ast::visitor::walk_stmt(self, stmt);
             }
@@ -716,7 +798,9 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 self.scopes.push(Scope::Comprehension {
                     is_async: generators.iter().any(|generator| generator.is_async),
                 });
-                self.visit_expr(key);
+                if let Some(key) = key {
+                    self.visit_expr(key);
+                }
                 self.visit_expr(value);
                 self.scopes.pop().unwrap();
             }

@@ -34,11 +34,11 @@ class Parser(Generic[_MessageT]):
         backward compatibility.
 
         """
-
     @overload
     def __init__(self, _class: None = None, *, policy: Policy[_MessageT]) -> None: ...
     @overload
     def __init__(self, _class: Callable[[], _MessageT] | None, *, policy: Policy[_MessageT] = ...) -> None: ...
+
     def parse(self, fp: SupportsRead[str], headersonly: bool = False) -> _MessageT:
         """Create a message structure from the data in a file.
 
@@ -63,6 +63,7 @@ class HeaderParser(Parser[_MessageT]):
 
 class BytesParser(Generic[_MessageT]):
     parser: Parser[_MessageT]
+
     @overload
     def __init__(self: BytesParser[Message[str, str]], _class: None = None) -> None:
         """Parser of binary RFC 5322 and MIME email messages.
@@ -80,11 +81,11 @@ class BytesParser(Generic[_MessageT]):
         must be created.  This class must have a constructor that can take
         zero arguments.  Default is Message.Message.
         """
-
     @overload
     def __init__(self, _class: None = None, *, policy: Policy[_MessageT]) -> None: ...
     @overload
     def __init__(self, _class: Callable[[], _MessageT], *, policy: Policy[_MessageT] = ...) -> None: ...
+
     def parse(self, fp: _WrappedBuffer, headersonly: bool = False) -> _MessageT:
         """Create a message structure from the data in a binary file.
 

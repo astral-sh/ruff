@@ -6,15 +6,14 @@
 # It's reasonably clear here what they *meant* to write,
 # so we'll still infer the correct type:
 
-# error: [invalid-syntax] "Expected `in`, found name"
+# error: [invalid-syntax] "Expected `in`, found identifier"
 # revealed: int
 [reveal_type(a) for a range(3)]
 
 
 # Missing iteration variable
 
-# error: [invalid-syntax] "Expected an identifier, but found a keyword `in` that cannot be used here"
-# error: [invalid-syntax] "Expected `in`, found name"
+# error: [invalid-syntax] "Expected an identifier"
 # error: [unresolved-reference]
 # revealed: Unknown
 [reveal_type(b) for in range(3)]

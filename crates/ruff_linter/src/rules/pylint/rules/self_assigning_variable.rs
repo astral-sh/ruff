@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for self-assignment of variables.
@@ -24,7 +25,7 @@ use crate::checkers::ast::Checker;
 /// country = "Poland"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.281")]
+#[violation_metadata(stable_since = "v0.0.281", category = Category::Suspicious)]
 pub(crate) struct SelfAssigningVariable {
     name: String,
 }
@@ -45,11 +46,17 @@ pub(crate) fn self_assignment(checker: &Checker, assign: &ast::StmtAssign) {
         return;
     }
 
-    for (left, right) in assign
+    // For `x = value`, `array_combinations` would allocate a buffer just to yield one pair.
+    if let [target] = assign.targets.as_slice() {
+        visit_assignments(checker, target, assign.value.as_ref());
+        return;
+    }
+
+    for [left, right] in assign
         .targets
         .iter()
         .chain(std::iter::once(assign.value.as_ref()))
-        .tuple_combinations()
+        .array_combinations()
     {
         visit_assignments(checker, left, right);
     }

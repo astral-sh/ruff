@@ -1,0 +1,3534 @@
+//! Smart builders for union and intersection types.
+//!
+//! Invariants we maintain here:
+//!   * No single-element union types (should just be the contained type instead.)
+//!   * No single-positive-element intersection types. Single-negative-element are OK, we don't
+//!     have a standalone negation type so there's no other representation for this.
+//!   * The same type should never appear more than once in a union or intersection. (This should
+//!     be expanded to cover subtyping -- see below -- but for now we only implement it for type
+//!     identity.)
+//!   * Disjunctive normal form (DNF): the tree of unions and intersections can never be deeper
+//!     than a union-of-intersections. Unions cannot contain other unions (the inner union just
+//!     flattens into the outer one), intersections cannot contain other intersections (also
+//!     flattens), and intersections cannot contain unions (the intersection distributes over the
+//!     union, inverting it into a union-of-intersections).
+//!   * No type in a union can be a subtype of any other type in the union (just eliminate the
+//!     subtype from the union).
+//!   * No type in an intersection can be a supertype of any other type in the intersection (just
+//!     eliminate the supertype from the intersection).
+//!   * An intersection containing two non-overlapping types simplifies to [`Type::Never`].
+//!
+//! Relation-based intersection simplifications require a non-circular proof. During inference
+//! cycles, an intersection can retain redundant or contradictory elements instead.
+//!
+//! The implication of these invariants is that a [`UnionBuilder`] does not necessarily build a
+//! [`Type::Union`]. For example, if only one type is added to the [`UnionBuilder`], `build()` will
+//! just return that type directly. The same is true for [`IntersectionBuilder`]; for example, if a
+//! union type is added to the intersection, it will distribute and [`IntersectionBuilder::build`]
+//! may end up returning a [`Type::Union`] of intersections.
+//!
+//! ## Performance
+//!
+//! In practice, there are two kinds of unions found in the wild: relatively-small unions made up
+//! of normal user types (classes, etc), and large unions made up of literals, which can occur via
+//! large enums or from string/integer/bytes literals, which can grow due to literal arithmetic or
+//! operations on literal strings/bytes. For normal unions, it's most efficient to just store the
+//! member types in a vector, and do O(n^2) redundancy checks to maintain the union in simplified
+//! form. But literal unions can grow to a size where this becomes a performance problem. For this
+//! reason, we group literal types in `UnionBuilder`. For example, every string literal is a
+//! subtype of `str`, so checking one member suffices to remove the entire group. When a type can
+//! distinguish individual literals, we check each member of the group.
+
+use std::convert::Infallible;
+use std::hint::cold_path;
+use std::ops::ControlFlow;
+
+use super::RecursivelyDefined;
+use super::generic_gradual_intersections::{GenericIntersection, generic_gradual_intersection};
+use crate::types::enums::EnumComplement;
+use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
+use crate::types::visitor::any_over_type;
+use crate::types::{
+    BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownBoundMethodType,
+    KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
+    NegativeIntersectionElements, StringLiteralType, SubclassOfType, Type, TypePair,
+    TypeVarBoundOrConstraints, UnionType,
+};
+use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, ProgramEnvironment};
+use itertools::Itertools;
+use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
+
+/// The truthiness excluded by a single guard, e.g. `AlwaysFalsy` in `A & ~AlwaysFalsy`.
+/// Intersections that exclude both truthy and falsy values have no single guard.
+fn excluded_truthiness<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+    let Type::Intersection(intersection) = ty else {
+        return None;
+    };
+    let negative = intersection.negative(db);
+    match (
+        negative.contains(&Type::AlwaysTruthy),
+        negative.contains(&Type::AlwaysFalsy),
+    ) {
+        (true, false) => Some(Type::AlwaysTruthy),
+        (false, true) => Some(Type::AlwaysFalsy),
+        _ => None,
+    }
+}
+
+/// Try to merge a complementary guarded pair into an unguarded core.
+///
+/// e.g.
+/// - `(A & ~AlwaysTruthy, A & ~AlwaysFalsy)` -> `Some(A)`
+/// - `(A & ~AlwaysTruthy, B & ~AlwaysFalsy)` -> `Some(A | B)` if reconstruction is exact
+/// - `(A & ~AlwaysTruthy, C)` -> `None`
+///
+/// Safety rule:
+/// The candidate merge is accepted only if adding each original guard back reconstructs
+/// exactly the original operands (`left` and `right`).
+///
+/// TODO: This processing is specialized for `AlwaysTruthy/AlwaysFalsy`.
+/// It would be nice to generalize this in the future.
+/// Discussion: <https://github.com/astral-sh/ty/issues/224>
+fn merge_truthiness_guarded_pair<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    left: Type<'db>,
+    right: Type<'db>,
+) -> Option<Type<'db>> {
+    let left_excluded = excluded_truthiness(db, left)?;
+    let right_excluded = excluded_truthiness(db, right)?;
+    if left_excluded == right_excluded {
+        return None;
+    }
+
+    let left_core = remove_covered_exclusions(db, env, left, |ty| ty == left_excluded)?;
+    let right_core = remove_covered_exclusions(db, env, right, |ty| ty == right_excluded)?;
+    if left_core.is_equivalent_to(db, env, right_core) {
+        return Some(left_core);
+    }
+
+    let candidate = UnionType::from_elements(db, env, [left_core, right_core]);
+    let left_reconstructed =
+        IntersectionType::from_two_elements(db, env, candidate, left_excluded.negate(db, env));
+    let right_reconstructed =
+        IntersectionType::from_two_elements(db, env, candidate, right_excluded.negate(db, env));
+    if left_reconstructed == left && right_reconstructed == right {
+        Some(candidate)
+    } else {
+        None
+    }
+}
+
+/// Whether the first positive element of `target` requires a class that `source` cannot supply.
+///
+/// When all the positives are nominal, at least one source class must supply each
+/// target bound. Look at just one target bound to keep this check linear.
+fn has_unrelated_nominal_bound<'db>(
+    db: &'db dyn Db,
+    source: IntersectionType<'db>,
+    target: IntersectionType<'db>,
+) -> bool {
+    let Some(Type::NominalInstance(bound)) = target.iter_positive(db).next() else {
+        return false;
+    };
+    source.positive_elements_or_object(db).all(|ty| {
+        ty.as_nominal_instance()
+            .is_some_and(|instance| bound.has_unrelated_class(db, instance))
+    })
+}
+
+/// Fold `(T & ~A) | (T & ~B)` to `T` when `A` and `B` are disjoint.
+///
+/// The common part can itself contain exclusions. For example,
+/// `(Unknown & ~str & ~A) | (Unknown & ~str & ~B)` simplifies to `Unknown & ~str`.
+/// `A` and `B` can each be unions: all exclusions unique to one side must be disjoint
+/// from every exclusion unique to the other side.
+fn merge_disjoint_exclusions<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    left: Type<'db>,
+    right: Type<'db>,
+) -> Option<Type<'db>> {
+    let (Type::Intersection(left), Type::Intersection(right)) = (left, right) else {
+        return None;
+    };
+    let left_positive = left.positive(db);
+    let left_negative = left.negative(db);
+    let right_negative = right.negative(db);
+
+    if !left_positive.set_eq(right.positive(db)) {
+        return None;
+    }
+
+    let (common_negative, left_only): (SmallVec<[_; 2]>, SmallVec<[_; 2]>) = left_negative
+        .iter()
+        .copied()
+        .partition(|ty| right_negative.contains(ty));
+
+    // Leave trivially redundant operands to the usual union simplification, which preserves
+    // their order. This only checks exact containment, not redundancy through subtyping.
+    if left_only.is_empty() || common_negative.len() == right_negative.len() {
+        return None;
+    }
+
+    for right_exclusion in right_negative
+        .iter()
+        .filter(|ty| !left_negative.contains(ty))
+    {
+        for left_exclusion in &left_only {
+            if simplify_intersection_pair(
+                db,
+                env,
+                *left_exclusion,
+                *right_exclusion,
+                IntersectionPolarity::Positive,
+            ) != IntersectionSimplification::Disjoint
+            {
+                return None;
+            }
+        }
+    }
+
+    let mut common =
+        IntersectionBuilder::new(db, env).positive_elements(left_positive.iter().copied());
+    for negative in common_negative {
+        common.add_negative_in_place(negative);
+    }
+    Some(common.build())
+}
+
+/// Prove coverage without circular inference. Unlike intersection simplification, coverage
+/// only needs subtyping; checking disjointness after a failed subtype check adds unnecessary work.
+#[salsa::tracked(returns(copy), cycle_result=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
+fn exclusion_is_covered<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
+    let env = ProgramEnvironment::from_program(types.program(db));
+    types.first(db).is_subtype_of(db, &env, types.second(db))
+}
+
+/// Remove exclusions already covered by another union element: `A | (B & ~A) = A | B`.
+///
+/// The coverage predicate must account for every materialization of a gradual exclusion.
+fn remove_covered_exclusions<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    mut is_covered: impl FnMut(Type<'db>) -> bool,
+) -> Option<Type<'db>> {
+    let Type::Intersection(intersection) = ty else {
+        return None;
+    };
+    let negative = intersection.negative(db);
+    // Most pairs cover no exclusions. Avoid allocating a retained list for those pairs.
+    let first_covered = negative.iter().position(|excluded| is_covered(*excluded))?;
+    let retained = negative.iter().take(first_covered).copied().chain(
+        negative
+            .iter()
+            .skip(first_covered + 1)
+            .copied()
+            .filter(|excluded| !is_covered(*excluded)),
+    );
+
+    let mut widened = IntersectionBuilder::new(db, env)
+        .positive_elements(intersection.positive(db).iter().copied());
+    for negative in retained {
+        widened.add_negative_in_place(negative);
+    }
+    Some(widened.build())
+}
+
+/// Literal groups bypass pairwise union simplification. Match their exclusions in one pass so
+/// that restoring many excluded literals does not require comparing every pair of literals.
+fn normalize_covered_literal_exclusions<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    types: &mut [Type<'db>],
+    unpack_aliases: bool,
+) -> bool {
+    if !types.iter().any(|ty| {
+        matches!(ty, Type::Intersection(intersection) if !intersection.negative(db).is_empty())
+    }) {
+        return false;
+    }
+    let literals: FxHashSet<_> = types
+        .iter()
+        .filter_map(|ty| ty.as_literal_value_kind())
+        .collect();
+    if literals.is_empty() {
+        return false;
+    }
+
+    let mut changed = false;
+    for ty in types {
+        if !unpack_aliases && any_over_type(db, env, *ty, false, Type::is_alias_like) {
+            continue;
+        }
+        if let Some(widened) = remove_covered_exclusions(db, env, *ty, |excluded| {
+            excluded
+                .as_literal_value_kind()
+                .is_some_and(|literal| literals.contains(&literal))
+        }) {
+            *ty = widened;
+            changed = true;
+        }
+    }
+    changed
+}
+
+/// Return `true` if union simplification should preserve this pair because one element is
+/// `Hashable` and the other is a non-final nominal instance.
+///
+/// Hashability does not obey normal inheritance rules: subclasses of hashable classes can be
+/// unhashable. Keeping the non-final type allows downstream checks to consider it independently.
+fn should_preserve_hashable_union(
+    db: &dyn Db,
+    env: &ProgramEnvironment<'_>,
+    left: Type,
+    right: Type,
+) -> bool {
+    let is_hashable =
+        |ty| matches!(ty, Type::ProtocolInstance(protocol) if protocol.is_hashable(db));
+    let is_non_final_nominal_instance =
+        |ty| matches!(ty, Type::NominalInstance(instance) if !instance.class(db, env).is_final(db));
+
+    (is_hashable(left) && is_non_final_nominal_instance(right))
+        || (is_hashable(right) && is_non_final_nominal_instance(left))
+}
+
+/// Combine union elements that cover more of the same enum class.
+///
+/// Enum complements are intersections like `Color & ~Literal[Color.RED]`. When a union contains
+/// such a complement plus other complements or literals from the same enum, this rewrites the
+/// element list to a single complement with the shared exclusions removed.
+///
+/// ```python
+/// from enum import Enum
+///
+/// class Color(Enum):
+///     RED = 1
+///     BLUE = 2
+///
+/// # (Color excluding RED) | Literal[Color.RED] simplifies to Color.
+/// ```
+fn normalize_enum_complement_unions<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    types: &mut Vec<Type<'db>>,
+) -> bool {
+    for complement_index in 0..types.len() {
+        let Type::EnumComplement(complement) = types[complement_index] else {
+            continue;
+        };
+        let enum_class = complement.enum_class(db);
+        let enum_class_literal = complement.enum_class_literal(db);
+        let mut shared_excluded_names: FxHashSet<_> =
+            complement.excluded_names(db).iter().cloned().collect();
+
+        let mut remove_indices = Vec::new();
+        for (index, ty) in types.iter().enumerate() {
+            if index == complement_index {
+                continue;
+            }
+
+            if let Type::EnumComplement(other_complement) = *ty {
+                if other_complement.enum_class(db) == enum_class
+                    && other_complement.rest(db) == complement.rest(db)
+                {
+                    shared_excluded_names
+                        .retain(|name| other_complement.excluded_names(db).contains(name));
+                    remove_indices.push(index);
+                }
+                continue;
+            }
+
+            if !complement.rest(db).is_empty() {
+                continue;
+            }
+
+            let Some(enum_literal) = ty.as_enum_literal() else {
+                continue;
+            };
+            if enum_literal.enum_class(db) != enum_class {
+                continue;
+            }
+
+            let Some(canonical_name) = enum_class_literal.resolve_member(db, enum_literal.name(db))
+            else {
+                continue;
+            };
+            shared_excluded_names.remove(canonical_name);
+            remove_indices.push(index);
+        }
+
+        if !remove_indices.is_empty() {
+            let mut builder = IntersectionBuilder::new(db, env)
+                .add_positive(enum_class.to_non_generic_instance(db, env));
+            for rest in complement.rest(db) {
+                builder.add_positive_in_place(*rest);
+            }
+            for name in enum_class_literal
+                .member_names(db)
+                .filter(|name| shared_excluded_names.contains(*name))
+            {
+                builder.add_negative_in_place(Type::enum_literal(EnumLiteralType::new(
+                    db,
+                    enum_class_literal,
+                    name,
+                )));
+            }
+            types[complement_index] = builder.build();
+
+            remove_indices.sort_unstable();
+            for index in remove_indices.into_iter().rev() {
+                types.swap_remove(index);
+            }
+            return true;
+        }
+    }
+
+    false
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LiteralKind<'db> {
+    Int,
+    String,
+    Bytes,
+    Enum { enum_class: ClassLiteral<'db> },
+}
+
+impl<'db> Type<'db> {
+    /// Return `true` if this type can be a supertype of some literals of `kind` and not others.
+    fn splits_literals(self, db: &'db dyn Db, kind: LiteralKind) -> bool {
+        match (self, kind) {
+            // Note that as of 2026-01-04, `AlwaysFalsy` and `AlwaysTruthy` never split
+            // enum literals, but that could change in the future. `Literal[Foo.X]` could
+            // plausibly be understood by ty as a subtype of `AlwaysFalsy` in the following
+            // snippet, because `Foo` is an IntEnum that does not override `__bool__` and
+            // `Foo.X` has a falsy value whereas `Foo.Y` does not:
+            //
+            // ```py
+            // class Foo(enum.IntEnum):
+            //     X = 0
+            //     Y = 1
+            // ```
+            (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => true,
+            // A protocol can distinguish enum members by `name`, integers by `numerator`,
+            // and strings and bytes by `__len__`.
+            (Type::ProtocolInstance(_), _) => true,
+            // A recursive type or an alias nested in an intersection can hide a protocol
+            // or a literal of this kind.
+            (ty, _) if ty.is_alias_like() => true,
+            (Type::LiteralValue(literal), _) => match (literal.kind(), kind) {
+                (LiteralValueTypeKind::String(_), LiteralKind::String) => true,
+                (LiteralValueTypeKind::Bytes(_), LiteralKind::Bytes) => true,
+                (LiteralValueTypeKind::Int(_), LiteralKind::Int) => true,
+                (LiteralValueTypeKind::Enum(enum_literal), LiteralKind::Enum { enum_class }) => {
+                    enum_literal.enum_class(db) == enum_class
+                }
+                _ => false,
+            },
+            (Type::Intersection(intersection), _) => {
+                intersection
+                    .positive(db)
+                    .iter()
+                    .any(|ty| ty.splits_literals(db, kind))
+                    || intersection
+                        .negative(db)
+                        .iter()
+                        .any(|ty| ty.splits_literals(db, kind))
+            }
+            (Type::Union(union), _) => union
+                .elements(db)
+                .iter()
+                .any(|ty| ty.splits_literals(db, kind)),
+            (Type::EnumComplement(complement), LiteralKind::Enum { enum_class }) => {
+                complement.enum_class(db) == enum_class
+            }
+            _ => false,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum UnionElement<'db> {
+    Type(Type<'db>),
+    // A map from integer literals to their promotability.
+    //
+    // Note that an unpromotable literal takes higher precedence than the identical literal
+    // in its promotable form.
+    IntLiterals(FxOrderMap<i64, bool>),
+    StringLiterals(FxOrderMap<StringLiteralType<'db>, bool>),
+    BytesLiterals(FxOrderMap<BytesLiteralType<'db>, bool>),
+    EnumLiterals {
+        enum_class: ClassLiteral<'db>,
+        literals: FxOrderMap<EnumLiteralType<'db>, bool>,
+    },
+}
+
+impl<'db> UnionElement<'db> {
+    fn type_count(&self) -> usize {
+        match self {
+            UnionElement::Type(_) => 1,
+            UnionElement::IntLiterals(literals) => literals.len(),
+            UnionElement::StringLiterals(literals) => literals.len(),
+            UnionElement::BytesLiterals(literals) => literals.len(),
+            UnionElement::EnumLiterals { literals, .. } => literals.len(),
+        }
+    }
+
+    /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
+    fn try_reduce(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other_type: Type<'db>,
+        cycle_recovery: bool,
+        unpack_aliases: bool,
+    ) -> ReduceResult<'db> {
+        if let UnionElement::Type(existing) = self {
+            return ReduceResult::Type(*existing);
+        }
+
+        if cycle_recovery {
+            cold_path();
+
+            // A widened literal group must absorb matching literals from later iterations for
+            // recovery to converge. Preserve that exact fallback reduction without relation queries.
+            return match self {
+                UnionElement::IntLiterals(_) => {
+                    ReduceResult::KeepIf(!other_type.is_instance_of(db, KnownClass::Int))
+                }
+                UnionElement::StringLiterals(_) => {
+                    ReduceResult::KeepIf(!other_type.is_instance_of(db, KnownClass::Str))
+                }
+                UnionElement::BytesLiterals(_) => {
+                    ReduceResult::KeepIf(!other_type.is_instance_of(db, KnownClass::Bytes))
+                }
+                UnionElement::EnumLiterals { enum_class, .. } => ReduceResult::KeepIf(
+                    other_type
+                        .as_nominal_instance()
+                        .is_none_or(|instance| instance.class_literal(db, env) != *enum_class),
+                ),
+                UnionElement::Type(_) => unreachable!("ordinary types are handled before recovery"),
+            };
+        }
+
+        // Keep preserved aliases alongside literal groups until we expand the union.
+        // Even negating a single alias can be costly if it stands for thousands of literals.
+        if !unpack_aliases && other_type.is_alias_like() {
+            return ReduceResult::KeepIf(true);
+        }
+
+        match self {
+            UnionElement::IntLiterals(literals) => {
+                Self::reduce_literals(db, env, other_type, LiteralKind::Int, literals)
+            }
+            UnionElement::StringLiterals(literals) => {
+                Self::reduce_literals(db, env, other_type, LiteralKind::String, literals)
+            }
+            UnionElement::BytesLiterals(literals) => {
+                Self::reduce_literals(db, env, other_type, LiteralKind::Bytes, literals)
+            }
+            UnionElement::EnumLiterals {
+                enum_class,
+                literals,
+            } => Self::reduce_literals(
+                db,
+                env,
+                other_type,
+                LiteralKind::Enum {
+                    enum_class: *enum_class,
+                },
+                literals,
+            ),
+            UnionElement::Type(_) => unreachable!("ordinary types are handled before reduction"),
+        }
+    }
+
+    /// Decide which literals to keep if we add `other_type`, without modifying the group.
+    fn reduce_literals<L: Copy + Into<LiteralValueTypeKind<'db>>>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other_type: Type<'db>,
+        kind: LiteralKind<'db>,
+        literals: &FxOrderMap<L, bool>,
+    ) -> ReduceResult<'db> {
+        let mut types = literals
+            .iter()
+            .map(|(&literal, &promotable)| Type::from(LiteralValueType::new(literal, promotable)));
+        if !other_type.splits_literals(db, kind) {
+            let ty = types.next().expect("literal groups are nonempty");
+            return ReduceResult::KeepIf(!ty.is_redundant_with(db, env, other_type));
+        }
+
+        let mut keep = SmallVec::new();
+        let mut other_type_negated_cache = None;
+        let mut collapse = false;
+        for ty in types {
+            // Even if an earlier literal would collapse the union, a later one can
+            // make the incoming type redundant and leave the whole group unchanged.
+            if other_type.is_redundant_with(db, env, ty) {
+                return ReduceResult::Ignore;
+            }
+            if collapse
+                || other_type.negation_is_subtype_of_cached(
+                    db,
+                    env,
+                    ty,
+                    &mut other_type_negated_cache,
+                )
+            {
+                collapse = true;
+                continue;
+            }
+            keep.push(!ty.is_redundant_with(db, env, other_type));
+        }
+        if collapse {
+            ReduceResult::CollapseToObject
+        } else if !keep.contains(&false) {
+            ReduceResult::KeepIf(true)
+        } else if !keep.contains(&true) {
+            ReduceResult::KeepIf(false)
+        } else {
+            ReduceResult::RetainLiterals(keep)
+        }
+    }
+
+    /// Apply the decisions from `reduce_literals` in the group's original iteration order.
+    fn retain_literals(&mut self, keep: &[bool]) {
+        debug_assert_eq!(self.type_count(), keep.len());
+        let mut keep = keep.iter();
+        let mut retain_next = || *keep.next().expect("one decision per literal");
+        match self {
+            UnionElement::IntLiterals(literals) => literals.retain(|_, _| retain_next()),
+            UnionElement::StringLiterals(literals) => literals.retain(|_, _| retain_next()),
+            UnionElement::BytesLiterals(literals) => literals.retain(|_, _| retain_next()),
+            UnionElement::EnumLiterals { literals, .. } => literals.retain(|_, _| retain_next()),
+            UnionElement::Type(_) => unreachable!("only literal groups can be partially reduced"),
+        }
+    }
+}
+
+enum ReduceResult<'db> {
+    /// Reduction of this `UnionElement` is complete; keep it in the union if the nested
+    /// boolean is true, eliminate it from the union if false.
+    KeepIf(bool),
+    /// Retain a nonempty subset of the literal group if the new element is added.
+    RetainLiterals(SmallVec<[bool; 8]>),
+    /// Collapse this entire union to `object`.
+    CollapseToObject,
+    /// The new element is a subtype of an existing part of the `UnionElement`, ignore it.
+    Ignore,
+    /// The given `Type` can stand-in for the entire `UnionElement` for further union
+    /// simplification checks.
+    Type(Type<'db>),
+}
+
+/// Removals to apply if the incoming type is added to the union or merged with an
+/// existing member. If a later comparison makes the incoming type redundant, we
+/// discard these decisions and leave the union intact.
+#[derive(Default)]
+struct UnionReductions {
+    to_remove: SmallVec<[usize; 2]>,
+    literal_filters: Vec<(usize, SmallVec<[bool; 8]>)>,
+}
+
+impl UnionReductions {
+    /// Apply all removals before restarting a merge, or insert `replacement` in
+    /// the first vacated slot when no further comparisons are needed.
+    fn apply<'db>(self, elements: &mut Vec<UnionElement<'db>>, replacement: Option<Type<'db>>) {
+        // Filter groups before any swap can move them. A merge may restore a literal
+        // that would otherwise complete an enum or push a group over its widening limit.
+        for (index, keep) in self.literal_filters {
+            elements[index].retain_literals(&keep);
+        }
+        let mut to_remove = self.to_remove.into_iter();
+        if let Some(ty) = replacement {
+            if let Some(first) = to_remove.next() {
+                elements[first] = UnionElement::Type(ty);
+            } else {
+                elements.push(UnionElement::Type(ty));
+            }
+        }
+        // Descending indices remain valid after each swap.
+        for index in to_remove.rev() {
+            elements.swap_remove(index);
+        }
+    }
+}
+
+/// If the value ​​is defined recursively, widening is performed from fewer literal elements,
+/// resulting in faster convergence of the fixed-point iteration.
+const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
+/// If the value ​​is defined non-recursively, the fixed-point iteration will converge in one go,
+/// so in principle we can have as many literal elements as we want.
+/// We set a large limit for union and enum literals.
+/// Huge enums and string literal sets are not uncommon (especially in generated code), and it's annoying
+/// if reachability analysis etc. fails when analysing these enums.
+const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
+#[derive(Clone)]
+pub(crate) struct UnionBuilder<'db> {
+    elements: Vec<UnionElement<'db>>,
+    db: &'db dyn Db,
+    env: ProgramEnvironment<'db>,
+    unpack_aliases: bool,
+    /// This is enabled when joining types in a `cycle_recovery` function. Because recovery cannot
+    /// introduce a new cycle, relation-based union simplifications are skipped in this mode.
+    cycle_recovery: bool,
+    recursively_defined: RecursivelyDefined,
+}
+
+/// Accumulates types into a union.
+///
+/// Most real-world type variables only accumulate one or two constraints. We keep those cases as
+/// plain `Type`s and only allocate a `UnionBuilder` once we know the accumulation is larger.
+pub(crate) enum UnionAccumulator<'db> {
+    One(Type<'db>),
+    Two(Type<'db>, Type<'db>),
+    Deferred(UnionBuilder<'db>),
+}
+
+impl<'db> UnionAccumulator<'db> {
+    pub(crate) fn new(ty: Type<'db>) -> Self {
+        UnionAccumulator::One(ty)
+    }
+
+    pub(crate) fn add(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
+        match self {
+            UnionAccumulator::One(existing) => {
+                *self = UnionAccumulator::Two(*existing, ty);
+            }
+            UnionAccumulator::Two(first, second) => {
+                let mut builder = UnionBuilder::new(db, env);
+                builder.add_in_place(*first);
+                builder.add_in_place(*second);
+                builder.add_in_place(ty);
+                *self = UnionAccumulator::Deferred(builder);
+            }
+            UnionAccumulator::Deferred(builder) => builder.add_in_place(ty),
+        }
+    }
+
+    pub(crate) fn get_or_build(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        match self {
+            UnionAccumulator::One(ty) => *ty,
+            UnionAccumulator::Two(first, second) => {
+                let ty = UnionType::from_two_elements(db, env, *first, *second);
+                *self = UnionAccumulator::One(ty);
+                ty
+            }
+            UnionAccumulator::Deferred(_) => {
+                let ty =
+                    std::mem::replace(self, UnionAccumulator::new(Type::Never)).into_type(db, env);
+                *self = UnionAccumulator::new(ty);
+                ty
+            }
+        }
+    }
+
+    pub(crate) fn into_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        match self {
+            UnionAccumulator::One(ty) => ty,
+            UnionAccumulator::Two(first, second) => {
+                UnionType::from_two_elements(db, env, first, second)
+            }
+            UnionAccumulator::Deferred(builder) => builder.build(),
+        }
+    }
+}
+
+impl<'db> UnionBuilder<'db> {
+    pub(crate) fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+        Self {
+            db,
+            env: env.clone(),
+            elements: vec![],
+            unpack_aliases: true,
+            cycle_recovery: false,
+            recursively_defined: RecursivelyDefined::No,
+        }
+    }
+
+    pub(crate) fn unpack_aliases(mut self, val: bool) -> Self {
+        self.unpack_aliases = val;
+        self
+    }
+
+    pub(crate) fn cycle_recovery(mut self, val: bool) -> Self {
+        self.cycle_recovery = val;
+        if self.cycle_recovery {
+            self.unpack_aliases = false;
+        }
+        self
+    }
+
+    /// Preserve recursion from both the source union and any transformed elements already added.
+    pub(crate) fn or_recursively_defined(mut self, val: RecursivelyDefined) -> Self {
+        self.recursively_defined = self.recursively_defined.or(val);
+        self
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.elements.is_empty()
+    }
+
+    /// Collapse the union to a single type: `object`.
+    fn collapse_to_object(&mut self) {
+        self.elements.clear();
+        self.elements.push(UnionElement::Type(Type::object()));
+    }
+
+    fn widen_literal_types(&mut self, seen_aliases: &mut Vec<Type<'db>>) {
+        let db = self.db;
+        let mut replace_with = vec![];
+        for elem in &self.elements {
+            match elem {
+                UnionElement::IntLiterals(_) => {
+                    replace_with.push(KnownClass::Int.to_instance(db, &self.env));
+                }
+                UnionElement::StringLiterals(_) => {
+                    replace_with.push(KnownClass::Str.to_instance(db, &self.env));
+                }
+                UnionElement::BytesLiterals(_) => {
+                    replace_with.push(KnownClass::Bytes.to_instance(db, &self.env));
+                }
+                UnionElement::EnumLiterals { literals, .. } => {
+                    let (enum_literal, _) = literals.first().unwrap();
+                    replace_with.push(enum_literal.enum_class_instance(db, &self.env));
+                }
+                UnionElement::Type(_) => {}
+            }
+        }
+        for ty in replace_with {
+            self.add_in_place_impl(ty, seen_aliases);
+        }
+    }
+
+    /// Adds a type to this union.
+    pub(crate) fn add(mut self, ty: Type<'db>) -> Self {
+        self.add_in_place(ty);
+        self
+    }
+
+    /// Adds a type to this union.
+    pub(crate) fn add_in_place(&mut self, ty: Type<'db>) {
+        ty.assert_not_recursive_var();
+        self.add_in_place_impl(ty, &mut vec![]);
+    }
+
+    fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+        let db = self.db;
+        let cycle_recovery = self.cycle_recovery;
+        // When preserving aliases in an annotation, defer comparisons with their bodies
+        // until the union is expanded. The expanded body may subsume a whole literal group.
+        let can_compare_with_literals =
+            |ty: Type<'db>| !cycle_recovery && (self.unpack_aliases || !ty.is_alias_like());
+        let should_widen = |literals, recursively_defined: RecursivelyDefined| {
+            if recursively_defined.is_yes() && cycle_recovery {
+                literals >= MAX_RECURSIVE_UNION_LITERALS
+            } else {
+                literals >= MAX_NON_RECURSIVE_UNION_LITERALS
+            }
+        };
+
+        let mut ty_negated_cache = None;
+        let mut ty_negated = || *ty_negated_cache.get_or_insert_with(|| ty.negate(db, &self.env));
+
+        match ty {
+            Type::Union(union) => {
+                let new_elements = union.elements(db);
+                self.elements.reserve(new_elements.len());
+                for element in new_elements {
+                    self.add_in_place_impl(*element, seen_aliases);
+                }
+                self.recursively_defined =
+                    self.recursively_defined.or(union.recursively_defined(db));
+                if self.cycle_recovery && self.recursively_defined.is_yes() {
+                    let literals = self.elements.iter().fold(0, |acc, elem| match elem {
+                        UnionElement::IntLiterals(literals) => acc + literals.len(),
+                        UnionElement::StringLiterals(literals) => acc + literals.len(),
+                        UnionElement::BytesLiterals(literals) => acc + literals.len(),
+                        UnionElement::EnumLiterals { literals, .. } => acc + literals.len(),
+                        UnionElement::Type(_) => acc,
+                    });
+                    if should_widen(literals, self.recursively_defined) {
+                        self.widen_literal_types(seen_aliases);
+                    }
+                }
+            }
+            // Adding `Never` to a union is a no-op.
+            Type::Never => {}
+            Type::TypeAlias(_) if self.unpack_aliases => {
+                if seen_aliases.contains(&ty) {
+                    // Union contains itself recursively via a type alias. This is an error, just
+                    // leave out the recursive alias. TODO surface this error.
+                } else {
+                    seen_aliases.push(ty);
+                    self.add_in_place_impl(ty.resolve_type_alias(db), seen_aliases);
+                }
+            }
+            Type::LiteralValue(literal) => {
+                self.recursively_defined =
+                    self.recursively_defined.or(literal.recursively_defined());
+                match literal.kind() {
+                    // If adding a string literal, look for an existing `UnionElement::StringLiterals` to
+                    // add it to, or an existing element that is a super-type of string literals, which
+                    // means we shouldn't add it. Otherwise, add a new `UnionElement::StringLiterals`
+                    // containing it.
+                    LiteralValueTypeKind::String(string_literal) => {
+                        let mut found = None;
+                        let mut to_remove = None;
+                        for (index, element) in self.elements.iter_mut().enumerate() {
+                            match element {
+                                UnionElement::StringLiterals(literals) => {
+                                    if should_widen(literals.len(), self.recursively_defined) {
+                                        let replace_with =
+                                            KnownClass::Str.to_instance(db, &self.env);
+                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        return;
+                                    }
+                                    found = Some(literals);
+                                    continue;
+                                }
+                                UnionElement::Type(existing)
+                                    if cycle_recovery
+                                        && literal.fallback_instance(db, &self.env)
+                                            == *existing =>
+                                {
+                                    return;
+                                }
+                                UnionElement::Type(existing)
+                                    if can_compare_with_literals(*existing) =>
+                                {
+                                    // Neither a string literal nor its complement is a subtype of
+                                    // `type[C]`. The reverse check still matters when the callable
+                                    // used as C's metaclass returns `Never`.
+                                    let is_subclass_of = existing.is_subclass_of();
+
+                                    // e.g. `existing` could be `Literal[""] & Any`,
+                                    // and `ty` could be `Literal[""]`
+                                    if !is_subclass_of
+                                        && ty.is_redundant_with(db, &self.env, *existing)
+                                    {
+                                        return;
+                                    }
+                                    if existing.is_redundant_with(db, &self.env, ty) {
+                                        to_remove = Some(index);
+                                        continue;
+                                    }
+                                    if !is_subclass_of
+                                        && ty_negated().is_subtype_of(db, &self.env, *existing)
+                                    {
+                                        // The type that includes both this new element, and its negation
+                                        // (or a supertype of its negation), must be simply `object`.
+                                        self.collapse_to_object();
+                                        return;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        if let Some(found) = found {
+                            let is_promotable = literal.is_promotable();
+                            *found.entry(string_literal).or_insert(is_promotable) &= is_promotable;
+                        } else {
+                            self.elements.push(UnionElement::StringLiterals(
+                                FxOrderMap::from_iter([(string_literal, literal.is_promotable())]),
+                            ));
+                        }
+                        if let Some(index) = to_remove {
+                            self.elements.swap_remove(index);
+                        }
+                    }
+                    // Same for bytes literals as for string literals, above.
+                    LiteralValueTypeKind::Bytes(bytes_literal) => {
+                        let mut found = None;
+                        let mut to_remove = None;
+                        for (index, element) in self.elements.iter_mut().enumerate() {
+                            match element {
+                                UnionElement::BytesLiterals(literals) => {
+                                    if should_widen(literals.len(), self.recursively_defined) {
+                                        let replace_with =
+                                            KnownClass::Bytes.to_instance(db, &self.env);
+                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        return;
+                                    }
+                                    found = Some(literals);
+                                    continue;
+                                }
+                                UnionElement::Type(existing)
+                                    if cycle_recovery
+                                        && literal.fallback_instance(db, &self.env)
+                                            == *existing =>
+                                {
+                                    return;
+                                }
+                                UnionElement::Type(existing)
+                                    if can_compare_with_literals(*existing) =>
+                                {
+                                    if ty.is_redundant_with(db, &self.env, *existing) {
+                                        return;
+                                    }
+                                    // e.g. `existing` could be `Literal[b""] & Any`,
+                                    // and `ty` could be `Literal[b""]`
+                                    if existing.is_redundant_with(db, &self.env, ty) {
+                                        to_remove = Some(index);
+                                        continue;
+                                    }
+                                    if ty_negated().is_subtype_of(db, &self.env, *existing) {
+                                        // The type that includes both this new element, and its negation
+                                        // (or a supertype of its negation), must be simply `object`.
+                                        self.collapse_to_object();
+                                        return;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        if let Some(found) = found {
+                            let is_promotable = literal.is_promotable();
+                            *found.entry(bytes_literal).or_insert(is_promotable) &= is_promotable;
+                        } else {
+                            self.elements
+                                .push(UnionElement::BytesLiterals(FxOrderMap::from_iter([(
+                                    bytes_literal,
+                                    literal.is_promotable(),
+                                )])));
+                        }
+                        if let Some(index) = to_remove {
+                            self.elements.swap_remove(index);
+                        }
+                    }
+                    // And same for int literals as well.
+                    LiteralValueTypeKind::Int(int_literal) => {
+                        let mut found = None;
+                        let mut to_remove = None;
+                        for (index, element) in self.elements.iter_mut().enumerate() {
+                            match element {
+                                UnionElement::IntLiterals(literals) => {
+                                    if should_widen(literals.len(), self.recursively_defined) {
+                                        let replace_with =
+                                            KnownClass::Int.to_instance(db, &self.env);
+                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        return;
+                                    }
+                                    found = Some(literals);
+                                    continue;
+                                }
+                                UnionElement::Type(existing)
+                                    if cycle_recovery
+                                        && literal.fallback_instance(db, &self.env)
+                                            == *existing =>
+                                {
+                                    return;
+                                }
+                                UnionElement::Type(existing)
+                                    if can_compare_with_literals(*existing) =>
+                                {
+                                    if ty.is_redundant_with(db, &self.env, *existing) {
+                                        return;
+                                    }
+                                    // e.g. `existing` could be `Literal[1] & Any`,
+                                    // and `ty` could be `Literal[1]`
+                                    if existing.is_redundant_with(db, &self.env, ty) {
+                                        to_remove = Some(index);
+                                        continue;
+                                    }
+                                    if ty_negated().is_subtype_of(db, &self.env, *existing) {
+                                        // The type that includes both this new element, and its negation
+                                        // (or a supertype of its negation), must be simply `object`.
+                                        self.collapse_to_object();
+                                        return;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        if let Some(found) = found {
+                            let is_promotable = literal.is_promotable();
+                            *found.entry(int_literal.as_i64()).or_insert(is_promotable) &=
+                                is_promotable;
+                        } else {
+                            self.elements
+                                .push(UnionElement::IntLiterals(FxOrderMap::from_iter([(
+                                    int_literal.as_i64(),
+                                    literal.is_promotable(),
+                                )])));
+                        }
+                        if let Some(index) = to_remove {
+                            self.elements.swap_remove(index);
+                        }
+                    }
+                    LiteralValueTypeKind::Enum(enum_member_to_add) => {
+                        let enum_class_literal = enum_member_to_add.enum_class_literal(db);
+                        let enum_class = enum_class_literal.class_literal(db);
+                        let enum_member_count = enum_class_literal.member_count(db);
+                        let members_are_exhaustive = enum_class_literal.members_are_exhaustive(db);
+
+                        if members_are_exhaustive && enum_member_count == 1 {
+                            self.add_in_place_impl(
+                                enum_member_to_add.enum_class_instance(db, &self.env),
+                                seen_aliases,
+                            );
+                            return;
+                        }
+
+                        let mut found = None;
+                        let mut to_remove = None;
+                        for (index, element) in self.elements.iter_mut().enumerate() {
+                            match element {
+                                UnionElement::EnumLiterals {
+                                    enum_class: existing_enum_class,
+                                    literals,
+                                } => {
+                                    if *existing_enum_class != enum_class {
+                                        continue;
+                                    }
+                                    if should_widen(literals.len(), self.recursively_defined) {
+                                        let (literal, _) = literals.first().unwrap();
+                                        let replace_with =
+                                            literal.enum_class_instance(db, &self.env);
+                                        self.add_in_place_impl(replace_with, seen_aliases);
+                                        return;
+                                    }
+                                    found = Some(literals);
+                                    continue;
+                                }
+                                UnionElement::Type(existing)
+                                    if cycle_recovery
+                                        && literal.fallback_instance(db, &self.env)
+                                            == *existing =>
+                                {
+                                    return;
+                                }
+                                UnionElement::Type(existing)
+                                    if can_compare_with_literals(*existing) =>
+                                {
+                                    if ty.is_redundant_with(db, &self.env, *existing) {
+                                        return;
+                                    }
+                                    // e.g. `existing` could be `Literal[Foo.X] & Any`,
+                                    // and `ty` could be `Literal[Foo.X]`
+                                    if existing.is_redundant_with(db, &self.env, ty) {
+                                        to_remove = Some(index);
+                                        continue;
+                                    }
+                                    if ty_negated().is_subtype_of(db, &self.env, *existing) {
+                                        // The type that includes both this new element, and its negation
+                                        // (or a supertype of its negation), must be simply `object`.
+                                        self.collapse_to_object();
+                                        return;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        if let Some(found) = found {
+                            match found.entry(enum_member_to_add) {
+                                ordermap::map::Entry::Vacant(entry) => {
+                                    entry.insert(literal.is_promotable());
+
+                                    if members_are_exhaustive && found.len() == enum_member_count {
+                                        self.add_in_place_impl(
+                                            enum_member_to_add.enum_class_instance(db, &self.env),
+                                            seen_aliases,
+                                        );
+                                        return;
+                                    }
+                                }
+                                ordermap::map::Entry::Occupied(mut entry) => {
+                                    *entry.get_mut() &= literal.is_promotable();
+                                }
+                            }
+                        } else {
+                            self.elements.push(UnionElement::EnumLiterals {
+                                enum_class,
+                                literals: FxOrderMap::from_iter([(
+                                    enum_member_to_add,
+                                    literal.is_promotable(),
+                                )]),
+                            });
+                        }
+                        if let Some(index) = to_remove {
+                            self.elements.swap_remove(index);
+                        }
+                    }
+                    _ => self.push_type(ty, seen_aliases),
+                }
+            }
+            // Adding `object` to a union results in `object`.
+            ty if ty.is_object() && !cycle_recovery => self.collapse_to_object(),
+            _ => self.push_type(ty, seen_aliases),
+        }
+    }
+
+    /// Return whether two distinct types can skip union redundancy and complement checks.
+    ///
+    /// A `true` result guarantees that neither type subsumes the other under union redundancy,
+    /// and that their union cannot cover `object`. The caller must handle equal types first.
+    /// A `false` result leaves the decision to the general relation checks.
+    ///
+    /// Distinct class and module literals identify different objects. Applying the same truthiness
+    /// guard to two class literals preserves that distinction.
+    ///
+    /// Bound methods expose the underlying function as `__func__`, so distinct function
+    /// literals keep their methods distinct even when the signatures are identical. Similarly,
+    /// `__self__` distinguishes methods bound to different singleton literals:
+    ///
+    /// ```python
+    /// from typing import Literal, LiteralString, reveal_type
+    ///
+    /// def select(s: Literal["a", "b"], other: LiteralString, flag: bool):
+    ///     method = s.isalpha
+    ///     reveal_type(method.__self__)  # Literal["a", "b"]
+    ///
+    ///     mixed = method if flag else other.isalpha
+    ///     reveal_type(mixed.__self__)  # LiteralString
+    /// ```
+    ///
+    /// `LiteralString` is excluded because it is not a singleton: its bound method can subsume
+    /// methods bound to particular strings, as in `mixed` above.
+    ///
+    /// Dynamic types remain alongside non-`object` nominal instances: assignability to `Any`
+    /// does not make a union element redundant. `object` is excluded because it subsumes every
+    /// other type.
+    fn is_incomparable_for_union(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
+        match (left, right) {
+            // Unmaterialized markers survive redundancy checks and are their own
+            // negations. Materialized markers can act like `object` or `Never`.
+            (Type::Divergent(left), Type::Divergent(right)) => {
+                left.materialization_kind().is_none() && right.materialization_kind().is_none()
+            }
+            (Type::ClassLiteral(_), Type::ClassLiteral(_))
+            | (Type::ModuleLiteral(_), Type::ModuleLiteral(_)) => true,
+            // Distributing `Any & Literal["a", "b"]` produces one intersection per
+            // value. Each intersection is still bounded by its literal.
+            (Type::Intersection(left), Type::Intersection(right))
+                if let Some(left) = left.gradual_literal(db)
+                    && let Some(right) = right.gradual_literal(db) =>
+            {
+                left.is_disjoint_from(db, right)
+            }
+            (Type::Intersection(left), Type::Intersection(right)) => {
+                let class_guard = |ty: IntersectionType<'db>| {
+                    let Ok(Type::ClassLiteral(_)) = ty.iter_positive(db).exactly_one() else {
+                        return None;
+                    };
+                    match ty.iter_negative(db).exactly_one() {
+                        Ok(guard @ (Type::AlwaysTruthy | Type::AlwaysFalsy)) => Some(guard),
+                        _ => None,
+                    }
+                };
+                class_guard(left).is_some_and(|guard| class_guard(right) == Some(guard))
+            }
+            (Type::Dynamic(_), Type::NominalInstance(instance))
+            | (Type::NominalInstance(instance), Type::Dynamic(_))
+                if !instance.is_object() =>
+            {
+                true
+            }
+            // Each `str.startswith` here is bound to a distinct string literal.
+            (
+                Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)),
+                Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(_)),
+            ) => true,
+            (Type::BoundMethod(left), Type::BoundMethod(right))
+                if left.has_distinct_function(db, right) =>
+            {
+                true
+            }
+            (Type::BoundMethod(left), Type::BoundMethod(right))
+                if let (Type::LiteralValue(left), Type::LiteralValue(right)) =
+                    (left.self_instance(db), right.self_instance(db))
+                    && !left.is_literal_string()
+                    && !right.is_literal_string()
+                    && left.kind() != right.kind() =>
+            {
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+        let db = self.db;
+        let mut ty = ty;
+        let bool_pair = |ty: Type<'db>| {
+            if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind() {
+                Some(LiteralValueTypeKind::Bool(!b))
+            } else {
+                None
+            }
+        };
+
+        // If an alias gets here, it means we aren't unpacking aliases, and we also
+        // shouldn't try to simplify aliases out of the union, because that will require
+        // unpacking them.
+        let should_simplify_full = !ty.is_alias_like() && !self.cycle_recovery;
+
+        let mut ty_negated: Option<Type> = None;
+        let mut reductions = UnionReductions::default();
+
+        for (i, element) in self.elements.iter().enumerate() {
+            let element_type = match element.try_reduce(
+                db,
+                &self.env,
+                ty,
+                self.cycle_recovery,
+                self.unpack_aliases,
+            ) {
+                ReduceResult::KeepIf(keep) => {
+                    if !keep {
+                        reductions.to_remove.push(i);
+                    }
+                    continue;
+                }
+                ReduceResult::RetainLiterals(keep) => {
+                    reductions.literal_filters.push((i, keep));
+                    continue;
+                }
+                ReduceResult::Type(ty) => ty,
+                ReduceResult::CollapseToObject => {
+                    self.collapse_to_object();
+                    return;
+                }
+                ReduceResult::Ignore => {
+                    return;
+                }
+            };
+
+            // Comparing `TypedDict`s for redundancy requires iterating over their fields, which is
+            // problematic if some of those fields point to recursive `Union`s. Compare their
+            // identities before trying any pairwise union simplifications.
+            if let (Type::TypedDict(left), Type::TypedDict(right)) = (ty, element_type) {
+                if left == right {
+                    return;
+                }
+                continue;
+            }
+
+            if ty == element_type {
+                return;
+            }
+
+            if Self::is_incomparable_for_union(db, ty, element_type) {
+                continue;
+            }
+
+            // `object` already contains every possible union element.
+            if !self.cycle_recovery && element_type == Type::object() {
+                return;
+            }
+
+            if !self.cycle_recovery
+                && should_preserve_hashable_union(db, &self.env, ty, element_type)
+            {
+                continue;
+            }
+
+            // The empty and non-empty range refinements are disjoint, but together they cover
+            // the ordinary `range` instance type.
+            if let (
+                Type::KnownInstance(KnownInstanceType::Range { is_non_empty: left }),
+                Type::KnownInstance(KnownInstanceType::Range {
+                    is_non_empty: right,
+                }),
+            ) = (ty, element_type)
+                && left != right
+            {
+                reductions.to_remove.push(i);
+                ty = KnownClass::Range.to_instance(db, &self.env);
+                continue;
+            }
+
+            // Fold `(T & ~AlwaysTruthy) | (T & ~AlwaysFalsy)` to `T`.
+            if !self.cycle_recovery
+                && let Some(merged_type) =
+                    merge_truthiness_guarded_pair(db, &self.env, ty, element_type)
+            {
+                reductions.to_remove.push(i);
+                // A nominal core can replace the first element in place; no earlier elements
+                // need to be reconsidered.
+                if i == 0 && merged_type.is_nominal_instance() && !merged_type.is_object() {
+                    ty = merged_type;
+                    continue;
+                }
+                reductions.apply(&mut self.elements, None);
+                // The merged type can also subsume earlier elements, such as `bool` when
+                // the truthy and falsy parts of `int` merge.
+                self.add_in_place_impl(merged_type, seen_aliases);
+                return;
+            }
+
+            if !self.cycle_recovery
+                && element_type
+                    .as_literal_value_kind()
+                    .zip(bool_pair(ty))
+                    .is_some_and(|(element, pair)| element == pair)
+            {
+                self.add_in_place_impl(KnownClass::Bool.to_instance(db, &self.env), seen_aliases);
+                return;
+            }
+
+            if should_simplify_full && !element_type.is_alias_like() {
+                if let (Type::NominalInstance(left), Type::NominalInstance(right)) =
+                    (ty, element_type)
+                    && left.has_unrelated_class(db, right)
+                {
+                    continue;
+                }
+
+                // Disjoint leading literals distinguish tagged tuples. Only inspect
+                // the tags when we would otherwise check both directions for redundancy.
+                if let Some(left) = ty.exact_tuple_instance_spec(db)
+                    && let Some(left) = left.as_fixed_length()
+                    && let Some(Type::LiteralValue(tag)) = left.elements_slice().first()
+                    && let Some(right) = element_type.exact_tuple_instance_spec(db)
+                    && let Some(right) = right.as_fixed_length()
+                    && let Some(Type::LiteralValue(other)) = right.elements_slice().first()
+                    && tag.is_disjoint_from(db, *other)
+                {
+                    continue;
+                }
+
+                // Narrowing a union of classes can add the same exclusions to every
+                // alternative. Neither side can restore a shared exclusion. If each
+                // also requires a nominal bound the other lacks, neither subsumes the
+                // other and together they cannot cover `object`.
+                if let (Type::Intersection(left), Type::Intersection(right)) = (ty, element_type)
+                    && left.negative(db) == right.negative(db)
+                    && left.iter_negative(db).all(Type::is_nominal_instance)
+                    && has_unrelated_nominal_bound(db, left, right)
+                    && has_unrelated_nominal_bound(db, right, left)
+                {
+                    continue;
+                }
+
+                // Preserving aliases also excludes comparisons that expand aliases nested in
+                // type arguments. A recursive alias can rebuild this union during specialization.
+                if !self.unpack_aliases
+                    && [ty, element_type]
+                        .into_iter()
+                        .any(|ty| any_over_type(db, &self.env, ty, false, Type::is_alias_like))
+                {
+                    continue;
+                }
+                if let Some(merged) = merge_disjoint_exclusions(db, &self.env, ty, element_type) {
+                    reductions.to_remove.push(i);
+                    reductions.apply(&mut self.elements, None);
+                    // The common part can also subsume elements we already visited.
+                    self.add_in_place_impl(merged, seen_aliases);
+                    return;
+                }
+                let remove_covered_by = |intersection, covering: Type<'db>| {
+                    // Fast path: strict subtyping already rejects a dynamic covering type for
+                    // any nonempty exclusion. Avoid interning and querying those type pairs.
+                    if covering.is_dynamic() {
+                        return None;
+                    }
+                    remove_covered_exclusions(db, &self.env, intersection, |excluded| {
+                        // An element that also excludes `E` cannot restore it. Check exact
+                        // containment before interning a pair and evaluating its relation.
+                        if let Type::Intersection(covering) = covering
+                            && covering.negative(db).contains(&excluded)
+                        {
+                            return false;
+                        }
+                        // Strict subtyping covers every materialization of a gradual exclusion;
+                        // assignability would not suffice.
+                        !should_preserve_hashable_union(db, &self.env, excluded, covering)
+                            && exclusion_is_covered(
+                                db,
+                                TypePair::new(db, self.env.program(db), excluded, covering),
+                            )
+                    })
+                };
+                if let Some(widened) = remove_covered_by(ty, element_type) {
+                    reductions.apply(&mut self.elements, None);
+                    // The covering element is unchanged. Recheck only the widened incoming
+                    // type against earlier elements that it might now subsume.
+                    self.add_in_place_impl(widened, seen_aliases);
+                    return;
+                }
+                if let Some(widened) = remove_covered_by(element_type, ty) {
+                    reductions.to_remove.push(i);
+                    reductions.apply(&mut self.elements, None);
+                    // The existing element changed, so recheck it against the whole union
+                    // before adding the incoming covering type.
+                    self.add_in_place_impl(widened, seen_aliases);
+                    self.add_in_place_impl(ty, seen_aliases);
+                    return;
+                }
+                if ty.is_redundant_with(db, &self.env, element_type) {
+                    return;
+                }
+
+                if element_type.is_redundant_with(db, &self.env, ty) {
+                    reductions.to_remove.push(i);
+                    continue;
+                }
+
+                if ty.negation_is_subtype_of_cached(db, &self.env, element_type, &mut ty_negated) {
+                    // We add `ty` to the union. We just checked that `~ty` is a subtype of an
+                    // existing `element`. This also means that `~ty | ty` is a subtype of
+                    // `element | ty`, because both elements in the first union are subtypes of
+                    // the corresponding elements in the second union. But `~ty | ty` is just
+                    // `object`. Since `object` is a subtype of `element | ty`, we can only
+                    // conclude that `element | ty` must be `object` (object has no other
+                    // supertypes). This means we can simplify the whole union to just
+                    // `object`, since all other potential elements would also be subtypes of
+                    // `object`.
+                    self.collapse_to_object();
+                    return;
+                }
+            } else if !self.cycle_recovery
+                && let (alias @ Type::Recursive(_), Type::Intersection(negated))
+                | (Type::Intersection(negated), alias @ Type::Recursive(_)) = (ty, element_type)
+                && negated.is_simple_negation(db)
+                && negated.negative(db).contains(&alias)
+                && !alias.has_unguarded_alias_cycle(db)
+                && alias.is_subtype_of(db, &self.env, alias)
+            {
+                // Apply the same complement law to an exact recursive alias pair. Avoid
+                // provisional binders, and require reflexive subtyping to exclude gradual types.
+                self.collapse_to_object();
+                return;
+            }
+        }
+
+        reductions.apply(&mut self.elements, Some(ty));
+    }
+
+    pub(crate) fn build(self) -> Type<'db> {
+        self.try_build().unwrap_or(Type::Never)
+    }
+
+    pub(crate) fn try_build(self) -> Option<Type<'db>> {
+        let db = self.db;
+
+        let unpack_aliases = self.unpack_aliases;
+        let cycle_recovery = self.cycle_recovery;
+        let recursively_defined = self.recursively_defined;
+
+        // Both complement reductions need a second element. A single ordinary
+        // type is already normalized and doesn't need a temporary vector.
+        if let [UnionElement::Type(ty)] = self.elements.as_slice() {
+            return Some(*ty);
+        }
+
+        let type_count = self.elements.iter().map(UnionElement::type_count).sum();
+        let mut types = Vec::with_capacity(type_count);
+        for element in self.elements {
+            match element {
+                UnionElement::IntLiterals(literals) => {
+                    types.extend(literals.into_iter().map(|(literal, promotable)| {
+                        Type::from(
+                            LiteralValueType::new(literal, promotable)
+                                .with_recursively_defined(recursively_defined),
+                        )
+                    }));
+                }
+                UnionElement::StringLiterals(literals) => {
+                    types.extend(literals.into_iter().map(|(literal, promotable)| {
+                        Type::from(
+                            LiteralValueType::new(literal, promotable)
+                                .with_recursively_defined(recursively_defined),
+                        )
+                    }));
+                }
+                UnionElement::BytesLiterals(literals) => {
+                    types.extend(literals.into_iter().map(|(literal, promotable)| {
+                        Type::from(
+                            LiteralValueType::new(literal, promotable)
+                                .with_recursively_defined(recursively_defined),
+                        )
+                    }));
+                }
+                UnionElement::EnumLiterals { literals, .. } => {
+                    types.extend(literals.into_iter().map(|(literal, promotable)| {
+                        Type::from(
+                            LiteralValueType::new(literal, promotable)
+                                .with_recursively_defined(recursively_defined),
+                        )
+                    }));
+                }
+                UnionElement::Type(ty) => types.push(ty),
+            }
+        }
+
+        if (!cycle_recovery
+            && normalize_covered_literal_exclusions(db, &self.env, &mut types, unpack_aliases))
+            || normalize_enum_complement_unions(db, &self.env, &mut types)
+        {
+            let builder = UnionBuilder::new(db, &self.env)
+                .unpack_aliases(unpack_aliases)
+                .cycle_recovery(cycle_recovery)
+                .or_recursively_defined(recursively_defined);
+            return types
+                .into_iter()
+                .fold(builder, UnionBuilder::add)
+                .try_build();
+        }
+
+        match types.len() {
+            0 => None,
+            1 => Some(types[0]),
+            _ => Some(Type::Union(UnionType::new(
+                db,
+                types.into_boxed_slice(),
+                recursively_defined,
+            ))),
+        }
+    }
+}
+
+/// Controls expansion without making ordinary intersection construction fallible.
+trait IntersectionLimits {
+    type Break;
+    const BOUNDED: bool;
+
+    fn check_terms(terms: usize) -> ControlFlow<Self::Break>;
+}
+
+struct UnboundedIntersection;
+
+impl IntersectionLimits for UnboundedIntersection {
+    type Break = Infallible;
+    const BOUNDED: bool = false;
+
+    fn check_terms(_terms: usize) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+}
+
+struct BoundedIntersection;
+
+impl IntersectionLimits for BoundedIntersection {
+    type Break = ();
+    const BOUNDED: bool = true;
+
+    fn check_terms(terms: usize) -> ControlFlow<Self::Break> {
+        const MAX_INTERSECTION_DNF_TERMS: usize = 4;
+        if terms > MAX_INTERSECTION_DNF_TERMS {
+            ControlFlow::Break(())
+        } else {
+            ControlFlow::Continue(())
+        }
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct IntersectionBuilder<'db> {
+    // Really this builds a union-of-intersections, because we always keep our set-theoretic types
+    // in disjunctive normal form (DNF), a union of intersections. In the simplest case there's
+    // just a single intersection in this vector, and we are building a single intersection type,
+    // but if a union is added to the intersection, we'll distribute ourselves over that union and
+    // create a union of intersections.
+    intersections: Vec<InnerIntersectionBuilder<'db>>,
+    db: &'db dyn Db,
+    env: ProgramEnvironment<'db>,
+    // One disjunction does not multiply alternatives. Only subsequent distributions consume
+    // the bounded constructor's budget, after impossible and redundant branches are removed.
+    has_disjunction: bool,
+    preserve_positive_aliases: bool,
+}
+
+impl<'db> IntersectionBuilder<'db> {
+    pub(crate) fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+        Self {
+            db,
+            env: env.clone(),
+            intersections: vec![InnerIntersectionBuilder::default()],
+            has_disjunction: false,
+            preserve_positive_aliases: false,
+        }
+    }
+
+    /// Retain positive aliases when rebuilding mapped intersections.
+    ///
+    /// A positive alias can represent a type on its own, while `~A` is represented as an
+    /// intersection with `A` as a negative element. Negative aliases that survive simplification
+    /// are retained by default to preserve recursive self-references. Positive aliases are unfolded
+    /// by default to preserve existing intersection normalization.
+    ///
+    /// Unfolding aliases after their mapping has completed can repeatedly insert a recursive
+    /// type into itself, so mapped intersections retain positive aliases as well. Direct unions and
+    /// intersections still distribute and flatten, and elements are simplified using their alias
+    /// values.
+    pub(crate) fn preserve_positive_aliases(mut self, preserve: bool) -> Self {
+        self.preserve_positive_aliases = preserve;
+        self
+    }
+
+    /// Add DNF branches, dropping `Never` and duplicate branches so later distribution does not
+    /// multiply dead or repeated branches.
+    fn extend_distributed<L: IntersectionLimits>(
+        &self,
+        distributed: &mut FxIndexSet<InnerIntersectionBuilder<'db>>,
+        other: Self,
+        check_budget: bool,
+    ) -> ControlFlow<L::Break> {
+        // Retain the whole first disjunction: a later factor can eliminate all but a few of its
+        // alternatives, including alternatives that occur beyond the budget's position.
+        if !L::BOUNDED || !check_budget {
+            distributed.extend(
+                other
+                    .intersections
+                    .into_iter()
+                    .filter(|intersection| !intersection.contains_never()),
+            );
+            return ControlFlow::Continue(());
+        }
+
+        let db = self.db;
+        let env = &self.env;
+        for candidate in other.intersections {
+            // Some branches only collapse during `build`, for example when a constrained
+            // type variable has no remaining constraints. Those do not consume the budget.
+            let candidate_type = candidate.clone().build(db, env);
+            if candidate_type.is_never()
+                || distributed.iter().any(|old| {
+                    candidate_type.is_redundant_with(db, env, old.clone().build(db, env))
+                })
+            {
+                continue;
+            }
+            distributed.retain(|old| {
+                !old.clone()
+                    .build(db, env)
+                    .is_redundant_with(db, env, candidate_type)
+            });
+            L::check_terms(distributed.len() + 1)?;
+            distributed.insert(candidate);
+        }
+        ControlFlow::Continue(())
+    }
+
+    pub(super) fn bounded_from_elements<I, T>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        elements: I,
+    ) -> Option<Type<'db>>
+    where
+        I: IntoIterator<Item = T>,
+        I::IntoIter: Clone,
+        Type<'db>: From<T>,
+    {
+        let elements = elements.into_iter().map(Type::from);
+        let mut first_elements = elements.clone();
+        let Some(first) = first_elements.next() else {
+            return Some(Type::object());
+        };
+        if first_elements.next().is_none() {
+            return Some(first);
+        }
+
+        // Before distributing multiple disjunctions, apply narrowing factors regardless of their
+        // input order. With at most one disjunction, retain the original intersection element order.
+        // Classification follows aliases and negations without expanding into DNF; the builder
+        // performs that expansion under its budget and recursion guard.
+        let is_disjunctive = |ty: &Type<'db>| Self::is_disjunctive(db, env, *ty);
+        let multiple_disjunctions = elements.clone().filter(is_disjunctive).nth(1).is_some();
+        let mut builder = Self::new(db, env);
+        for element in elements
+            .clone()
+            .filter(|ty| !multiple_disjunctions || !is_disjunctive(ty))
+            .chain(elements.filter(|ty| multiple_disjunctions && is_disjunctive(ty)))
+        {
+            builder
+                .add_positive_impl::<BoundedIntersection>(element, &mut vec![])
+                .continue_value()?;
+        }
+        Some(builder.build())
+    }
+
+    /// Whether expanding a factor can introduce alternatives, including through De Morgan's law.
+    fn is_disjunctive(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> bool {
+        let mut pending = SmallVec::<[_; 4]>::from_slice(&[(ty, false)]);
+        let mut seen_aliases = FxHashSet::default();
+        while let Some((ty, negated)) = pending.pop() {
+            match ty {
+                Type::TypeAlias(_) | Type::Recursive(_) => {
+                    if seen_aliases.insert((ty, negated)) {
+                        pending.push((ty.resolve_type_alias(db), negated));
+                    }
+                }
+                Type::Union(union) => {
+                    if !negated {
+                        return true;
+                    }
+                    pending.extend(union.elements(db).iter().map(|ty| (*ty, true)));
+                }
+                Type::Intersection(intersection) => {
+                    if negated
+                        && intersection.positive(db).len() + intersection.negative(db).len() > 1
+                    {
+                        return true;
+                    }
+                    pending.extend(intersection.positive(db).iter().map(|ty| (*ty, negated)));
+                    pending.extend(intersection.negative(db).iter().map(|ty| (*ty, !negated)));
+                }
+                Type::EnumComplement(complement) => {
+                    pending.push((complement.to_intersection(db, env), negated));
+                }
+                _ => {}
+            }
+        }
+        false
+    }
+
+    pub(crate) fn add_positive(mut self, ty: Type<'db>) -> Self {
+        self.add_positive_in_place(ty);
+        self
+    }
+
+    pub(crate) fn add_positive_in_place(&mut self, ty: Type<'db>) {
+        let ControlFlow::Continue(()) =
+            self.add_positive_impl::<UnboundedIntersection>(ty, &mut vec![]);
+    }
+
+    fn add_positive_impl<L: IntersectionLimits>(
+        &mut self,
+        ty: Type<'db>,
+        seen_aliases: &mut Vec<Type<'db>>,
+    ) -> ControlFlow<L::Break> {
+        let db = self.db;
+        let original = ty;
+        let ty = match ty {
+            Type::TypeAlias(_) | Type::Recursive(_) => {
+                if seen_aliases.contains(&ty) {
+                    // Recursive alias, add it without expanding to avoid infinite recursion.
+                    for inner in &mut self.intersections {
+                        inner.positive.insert(ty);
+                    }
+                    return ControlFlow::Continue(());
+                }
+                seen_aliases.push(ty);
+                ty.resolve_type_alias(db)
+            }
+            _ => ty,
+        };
+        match ty {
+            Type::TypeAlias(_) | Type::Recursive(_) => {
+                self.add_positive_impl::<L>(ty, seen_aliases)?;
+            }
+            Type::Union(union) => {
+                // Distribute ourself over this union: for each union element, clone ourself and
+                // intersect with that union element, then create a new union-of-intersections with all
+                // of those sub-intersections in it. E.g. if `self` is a simple intersection `T1 & T2`
+                // and we add `T3 | T4` to the intersection, we don't get `T1 & T2 & (T3 | T4)` (that's
+                // not in DNF), we distribute the union and get `(T1 & T3) | (T2 & T3) | (T1 & T4) |
+                // (T2 & T4)`. If `self` is already a union-of-intersections `(T1 & T2) | (T3 & T4)`
+                // and we add `T5 | T6` to it, that flattens all the way out to `(T1 & T2 & T5) | (T1 &
+                // T2 & T6) | (T3 & T4 & T5) ...` -- you get the idea.
+                let mut distributed = FxIndexSet::default();
+                for elem in union.elements(db) {
+                    let mut branch = self.clone();
+                    branch.add_positive_impl::<L>(*elem, seen_aliases)?;
+                    self.extend_distributed::<L>(&mut distributed, branch, self.has_disjunction)?;
+                }
+                self.intersections = distributed.into_iter().collect();
+                self.has_disjunction = true;
+            }
+            // `(A & B & ~C) & (D & E & ~F)` -> `A & B & D & E & ~C & ~F`
+            Type::Intersection(other) => {
+                for pos in other.positive(db) {
+                    self.add_positive_impl::<L>(*pos, seen_aliases)?;
+                }
+                let negatives = other.negative(db);
+                if let [inner] = &mut self.intersections[..]
+                    && inner.can_use_set_membership(negatives)
+                {
+                    if inner.can_copy_literal_exclusions(db, &self.env, negatives) {
+                        inner.negative = negatives.clone();
+                        return ControlFlow::Continue(());
+                    }
+                    // Distinct built-in literal exclusions never simplify each other. With
+                    // matching flags, set membership also detects equal literal values.
+                    for neg in negatives {
+                        inner.add_negative_impl(
+                            db,
+                            &self.env,
+                            *neg,
+                            ExclusionComparison::SetMembership,
+                        );
+                    }
+                } else {
+                    for neg in negatives {
+                        self.add_negative_impl::<L>(*neg, seen_aliases)?;
+                    }
+                }
+            }
+            Type::EnumComplement(complement) => {
+                let intersection = complement.to_intersection(db, &self.env);
+                self.add_positive_impl::<L>(intersection, seen_aliases)?;
+            }
+            _ => {
+                // If we are already a union-of-intersections, distribute the new intersected element
+                // across all of those intersections.
+                let element =
+                    if self.preserve_positive_aliases && matches!(original, Type::TypeAlias(_)) {
+                        original
+                    } else {
+                        ty
+                    };
+                for inner in &mut self.intersections {
+                    inner.add_positive(db, &self.env, element);
+                }
+            }
+        }
+        ControlFlow::Continue(())
+    }
+
+    pub(crate) fn add_negative(mut self, ty: Type<'db>) -> Self {
+        self.add_negative_in_place(ty);
+        self
+    }
+
+    /// Add a negative element without expanding multiple disjunctions beyond the intersection budget.
+    ///
+    /// Returns `None` if the exact result exceeds the budget.
+    pub(crate) fn bounded_add_negative(mut self, ty: Type<'db>) -> Option<Self> {
+        self.add_negative_impl::<BoundedIntersection>(ty, &mut vec![])
+            .continue_value()?;
+        Some(self)
+    }
+
+    pub(crate) fn add_negative_in_place(&mut self, ty: Type<'db>) {
+        let ControlFlow::Continue(()) =
+            self.add_negative_impl::<UnboundedIntersection>(ty, &mut vec![]);
+    }
+
+    fn add_negative_impl<L: IntersectionLimits>(
+        &mut self,
+        ty: Type<'db>,
+        seen_aliases: &mut Vec<Type<'db>>,
+    ) -> ControlFlow<L::Break> {
+        let db = self.db;
+        // See comments above in `add_positive`; this is just the negated version.
+        let original = ty;
+        let ty = match ty {
+            Type::TypeAlias(_) | Type::Recursive(_) => {
+                if seen_aliases.contains(&ty) {
+                    // Recursive alias, add it without expanding to avoid infinite recursion.
+                    for inner in &mut self.intersections {
+                        inner.negative.insert(ty);
+                    }
+                    return ControlFlow::Continue(());
+                }
+                seen_aliases.push(ty);
+                ty.resolve_type_alias(db)
+            }
+            _ => ty,
+        };
+        match ty {
+            Type::TypeAlias(_) | Type::Recursive(_) => {
+                self.add_negative_impl::<L>(ty, seen_aliases)?;
+            }
+            // Retain recursive unions of instance types: their negations expose no positive
+            // constraints or literal exclusions, and unfolding during mapping can repeatedly
+            // insert the alias's body. Other members still need normalization, for example
+            // `bool & ~(Literal[True] | list[A])` simplifies to `Literal[False]`.
+            Type::Union(union)
+                if !union.elements(db).iter().all(|element| {
+                    matches!(element.resolve_type_alias(db), Type::NominalInstance(_))
+                }) || (!matches!(original, Type::Recursive(_))
+                    && !matches!(original, Type::TypeAlias(alias) if alias.is_recursive(db))) =>
+            {
+                for elem in union.elements(db) {
+                    self.add_negative_impl::<L>(*elem, seen_aliases)?;
+                }
+            }
+            Type::Intersection(intersection) => {
+                // (A | B) & ~(C & ~D)
+                // -> (A | B) & (~C | D)
+                // -> ((A | B) & ~C) | ((A | B) & D)
+                // i.e. if we have an intersection of positive constraints C
+                // and negative constraints D, then our new intersection
+                // is (existing & ~C) | (existing & D)
+
+                let mut distributed = FxIndexSet::default();
+                // A single negative element can encode double negation. It only introduces a
+                // disjunction if expanding that element does, for example `~~Alias` for a union.
+                let branches = intersection.positive(db).len() + intersection.negative(db).len();
+                let check_budget = self.has_disjunction && branches > 1;
+                let mut has_disjunction = self.has_disjunction || branches > 1;
+                // We negate all the positive constraints while distributing.
+                for elem in intersection.positive(db) {
+                    let mut branch = self.clone();
+                    branch.add_negative_impl::<L>(*elem, &mut seen_aliases.clone())?;
+                    has_disjunction |= branch.has_disjunction;
+                    self.extend_distributed::<L>(&mut distributed, branch, check_budget)?;
+                }
+                // All negative constraints end up becoming positive constraints.
+                for elem in intersection.negative(db) {
+                    let mut branch = self.clone();
+                    branch.add_positive_impl::<L>(*elem, &mut seen_aliases.clone())?;
+                    has_disjunction |= branch.has_disjunction;
+                    self.extend_distributed::<L>(&mut distributed, branch, check_budget)?;
+                }
+                self.intersections = distributed.into_iter().collect();
+                self.has_disjunction = has_disjunction;
+            }
+            Type::EnumComplement(complement) => {
+                let intersection = complement.to_intersection(db, &self.env);
+                self.add_negative_impl::<L>(intersection, seen_aliases)?;
+            }
+            _ => {
+                // Pass the original alias to preserve recursive self-references.
+                // `InnerIntersectionBuilder::add_negative` resolves it for simplification
+                // (for example, `~Any` becomes `Any`) and stores it if it remains negative.
+                for inner in &mut self.intersections {
+                    inner.add_negative(db, &self.env, original);
+                }
+            }
+        }
+        ControlFlow::Continue(())
+    }
+
+    pub(crate) fn positive_elements<I, T>(mut self, elements: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        for element in elements {
+            self.add_positive_in_place(element.into());
+        }
+        self
+    }
+
+    pub(crate) fn build(self) -> Type<'db> {
+        let db = self.db;
+        UnionType::from_elements(
+            db,
+            &self.env,
+            self.intersections
+                .into_iter()
+                .map(|inner| inner.build(db, &self.env)),
+        )
+    }
+}
+
+/// How to compare an incoming exclusion with the existing exclusions.
+#[derive(Copy, Clone)]
+enum ExclusionComparison {
+    Pairwise,
+    /// Exact duplicates are redundant, and distinct exclusions cannot simplify each other.
+    SetMembership,
+}
+
+/// The signs of a pair of intersection elements. For `Mixed`, the first is positive.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::SalsaValue)]
+enum IntersectionPolarity {
+    Positive,
+    Negative,
+    Mixed,
+}
+
+/// Describes the signed intersection elements, so `Disjoint` also covers `S & ~T` when `S <: T`.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
+enum IntersectionSimplification {
+    Unchanged,
+    FirstRedundant,
+    SecondRedundant,
+    Disjoint,
+}
+
+fn simplify_intersection_pair<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    first: Type<'db>,
+    second: Type<'db>,
+    polarity: IntersectionPolarity,
+) -> IntersectionSimplification {
+    // Built-in literal values have no inference dependencies, so these simplifications cannot
+    // participate in a cycle and do not need an interned pair or a tracked relation query.
+    if let (Type::LiteralValue(first), Type::LiteralValue(second)) = (first, second)
+        && first.is_concrete_builtin()
+        && second.is_concrete_builtin()
+    {
+        return match (polarity, first.kind() == second.kind()) {
+            (IntersectionPolarity::Positive, true) => {
+                // Redundancy depends on promotability and full literal identity, including
+                // the recursive-definition flag. Subtyping only compares the literal values.
+                if first == second || first.is_promotable() {
+                    IntersectionSimplification::SecondRedundant
+                } else if second.is_promotable() {
+                    IntersectionSimplification::FirstRedundant
+                } else {
+                    IntersectionSimplification::Unchanged
+                }
+            }
+            (IntersectionPolarity::Positive, false) | (IntersectionPolarity::Mixed, true) => {
+                IntersectionSimplification::Disjoint
+            }
+            (IntersectionPolarity::Negative, true) | (IntersectionPolarity::Mixed, false) => {
+                IntersectionSimplification::SecondRedundant
+            }
+            (IntersectionPolarity::Negative, false) => IntersectionSimplification::Unchanged,
+        };
+    }
+
+    simplify_intersection_pair_impl(
+        db,
+        TypePair::new(db, env.program(db), first, second),
+        polarity,
+    )
+}
+
+/// Simplify a pair of intersection elements using non-circular relation checks.
+///
+/// If this simplification participates in an inference cycle, retain both signed
+/// elements. Ordinary type relations keep their usual cycle handling, including for
+/// recursive protocols.
+///
+/// ```python
+/// class C:
+///     def __init__(self):
+///         if not hasattr(self, "x"):
+///             self.x = self.__str__
+/// ```
+///
+/// Inferring `C.x` needs the guarded type of `self`. The guard cannot use that unfinished
+/// inference to prove that `C` already satisfies the protocol for `x` and erase the branch.
+#[salsa::tracked(
+    returns(copy),
+    cycle_result=|_, _, _, _| IntersectionSimplification::Unchanged,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn simplify_intersection_pair_impl<'db>(
+    db: &'db dyn Db,
+    types: TypePair<'db>,
+    polarity: IntersectionPolarity,
+) -> IntersectionSimplification {
+    let env = ProgramEnvironment::from_program(types.program(db));
+    let first = types.first(db);
+    let second = types.second(db);
+
+    match polarity {
+        IntersectionPolarity::Positive => {
+            // S & T = S if S <: T.
+            if first.is_redundant_with(db, &env, second) {
+                return IntersectionSimplification::SecondRedundant;
+            }
+            let first_redundant = second.is_redundant_with(db, &env, first);
+            if second.is_disjoint_from(db, &env, first) {
+                return IntersectionSimplification::Disjoint;
+            }
+            if first_redundant {
+                return IntersectionSimplification::FirstRedundant;
+            }
+        }
+        IntersectionPolarity::Negative => {
+            // ~S & ~T = ~T if S <: T; the narrower exclusion is redundant.
+            let first_redundant = first.is_redundant_with(db, &env, second);
+            if second.is_subtype_of(db, &env, first) {
+                return IntersectionSimplification::SecondRedundant;
+            }
+            if first_redundant {
+                return IntersectionSimplification::FirstRedundant;
+            }
+        }
+        IntersectionPolarity::Mixed => {
+            // S & ~T = Never if S <: T, and S & ~T = S if S and T are disjoint.
+            if first.is_subtype_of(db, &env, second) {
+                return IntersectionSimplification::Disjoint;
+            }
+            if first.is_disjoint_from(db, &env, second) {
+                return IntersectionSimplification::SecondRedundant;
+            }
+        }
+    }
+    IntersectionSimplification::Unchanged
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+struct InnerIntersectionBuilder<'db> {
+    positive: FxOrderSet<Type<'db>>,
+    negative: NegativeIntersectionElements<'db>,
+}
+
+impl<'db> InnerIntersectionBuilder<'db> {
+    /// Whether set membership can replace pairwise simplification for these exclusions.
+    fn can_use_set_membership(&self, incoming: &NegativeIntersectionElements<'db>) -> bool {
+        // Only scan the existing set if we can reuse the result across multiple insertions.
+        if incoming.len() <= 1 {
+            return false;
+        }
+        let Some(Type::LiteralValue(first)) = incoming.iter().next() else {
+            return false;
+        };
+        self.negative.iter().chain(incoming).all(|ty| {
+            ty.as_literal_value().is_some_and(|literal| {
+                literal.is_concrete_builtin() && literal.has_same_flags(*first)
+            })
+        })
+    }
+
+    fn contains_never(&self) -> bool {
+        self.positive.contains(&Type::Never)
+    }
+
+    /// Test the underlying value without discarding an unchanged alias from the intersection.
+    fn contains_positive(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        self.positive.contains(&ty)
+            || self
+                .positive
+                .iter()
+                .any(|existing| existing.resolve_type_alias(db) == ty)
+    }
+
+    /// Remove the actual stored element when its resolved value satisfies a simplification rule.
+    fn remove_positive(&mut self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        if self.positive.swap_remove(&ty) {
+            return true;
+        }
+        let index = self
+            .positive
+            .iter()
+            .position(|existing| existing.resolve_type_alias(db) == ty);
+        index.is_some_and(|index| self.positive.swap_remove_index(index).is_some())
+    }
+
+    fn remove_negative(&mut self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        if self.negative.swap_remove(&ty) {
+            return true;
+        }
+        let index = self
+            .negative
+            .iter()
+            .position(|existing| existing.resolve_type_alias(db) == ty);
+        index.is_some_and(|index| self.negative.swap_remove_index(index).is_some())
+    }
+
+    /// Return `true` when an intersection excludes every member of an enum class.
+    ///
+    /// This recognizes enum complements that have become empty, such as
+    /// `Color & ~Literal[Color.RED] & ~Literal[Color.BLUE]` for a two-member enum.
+    ///
+    /// ```python
+    /// from enum import Enum
+    ///
+    /// class Color(Enum):
+    ///     RED = 1
+    ///     BLUE = 2
+    ///
+    /// def f(color: Color):
+    ///     if color is not Color.RED and color is not Color.BLUE:
+    ///         reveal_type(color)  # Never
+    /// ```
+    fn has_empty_enum_complement(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        for positive in &self.positive {
+            let Type::NominalInstance(instance) = positive.resolve_type_alias(db) else {
+                continue;
+            };
+
+            let Some(enum_class_literal) = instance.class_literal(db, env).into_enum_class(db)
+            else {
+                continue;
+            };
+            if !enum_class_literal.members_are_exhaustive(db) {
+                continue;
+            }
+
+            let mut excluded_names = FxHashSet::default();
+            for negative in &self.negative {
+                let Some(enum_literal) = negative.resolve_type_alias(db).as_enum_literal() else {
+                    continue;
+                };
+                if enum_literal.enum_class_literal(db) != enum_class_literal {
+                    continue;
+                }
+
+                let name = enum_literal.name(db);
+                let Some(canonical_name) = enum_class_literal.resolve_member(db, name) else {
+                    continue;
+                };
+                excluded_names.insert(canonical_name.clone());
+            }
+
+            if excluded_names.is_empty() {
+                continue;
+            }
+
+            if enum_class_literal
+                .member_names(db)
+                .all(|name| excluded_names.contains(name))
+            {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Adds a positive type to this intersection.
+    fn add_positive(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut new_positive: Type<'db>,
+    ) {
+        // `Never & T` -> `Never`
+        if self.positive.contains(&Type::Never) {
+            return;
+        }
+
+        // `T & Never` -> `Never`
+        if new_positive.resolve_type_alias(db).is_never() {
+            *self = Self::default();
+            self.positive.insert(Type::Never);
+            return;
+        }
+
+        // `T & Divergent` -> `Divergent`. Conceptually, `Divergent` behaves like `Never` here and
+        // dominates intersections. However, `Divergent` is actually a dynamic/gradual type, so
+        // `~Divergent` acts like `Divergent` rather than dropping out like `~Never` does.
+        // `Divergent` also gets a lot of special handling in cycle recovery.
+        // Pending narrowing takes precedence over recursive markers: the predicate must be
+        // resolved before its intersection can contribute to the inferred type.
+        if self.positive.iter().any(Type::is_pending_narrowing) {
+            return;
+        }
+        if new_positive.resolve_type_alias(db).is_divergent() {
+            *self = Self::default();
+            self.positive.insert(new_positive.resolve_type_alias(db));
+            return;
+        }
+        // `Divergent & T` -> `Divergent`
+        if self.positive.iter().any(Type::is_divergent) {
+            return;
+        }
+
+        // A runtime class value of `TypeForm[T]` has type `type[T]`.
+        match new_positive.resolve_type_alias(db) {
+            Type::TypeForm(typeform) => {
+                if let Ok(narrowed) = SubclassOfType::try_from_instance(
+                    db,
+                    env,
+                    typeform.type_argument(db).resolve_type_alias(db),
+                ) && self.remove_positive(db, KnownClass::Type.to_instance(db, env))
+                {
+                    new_positive = narrowed;
+                }
+            }
+            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
+                if let Some((index, narrowed)) =
+                    self.positive
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, positive)| match positive.resolve_type_alias(db) {
+                            Type::TypeForm(typeform) => SubclassOfType::try_from_instance(
+                                db,
+                                env,
+                                typeform.type_argument(db).resolve_type_alias(db),
+                            )
+                            .ok()
+                            .map(|narrowed| (index, narrowed)),
+                            _ => None,
+                        })
+                {
+                    self.positive.swap_remove_index(index);
+                    new_positive = narrowed;
+                }
+            }
+            _ => {}
+        }
+
+        match new_positive.resolve_type_alias(db) {
+            // `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
+            Type::AlwaysTruthy if self.contains_positive(db, Type::literal_string()) => {
+                self.add_negative(db, env, Type::string_literal(db, ""));
+            }
+            // `LiteralString & AlwaysFalsy` -> `Literal[""]`
+            Type::AlwaysFalsy if self.remove_positive(db, Type::literal_string()) => {
+                self.add_positive(db, env, Type::string_literal(db, ""));
+            }
+            // `AlwaysTruthy & LiteralString` -> `LiteralString & ~Literal[""]`
+            Type::LiteralValue(literal)
+                if literal.is_literal_string() && self.remove_positive(db, Type::AlwaysTruthy) =>
+            {
+                self.add_positive(db, env, Type::literal_string());
+                self.add_negative(db, env, Type::string_literal(db, ""));
+            }
+            // `AlwaysFalsy & LiteralString` -> `Literal[""]`
+            Type::LiteralValue(literal)
+                if literal.is_literal_string() && self.remove_positive(db, Type::AlwaysFalsy) =>
+            {
+                self.add_positive(db, env, Type::string_literal(db, ""));
+            }
+            // `LiteralString & ~AlwaysTruthy` -> `LiteralString & AlwaysFalsy` -> `Literal[""]`
+            Type::LiteralValue(literal)
+                if literal.is_literal_string() && self.remove_negative(db, Type::AlwaysTruthy) =>
+            {
+                self.add_positive(db, env, Type::string_literal(db, ""));
+            }
+            // `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
+            Type::LiteralValue(literal)
+                if literal.is_literal_string() && self.remove_negative(db, Type::AlwaysFalsy) =>
+            {
+                self.add_positive(db, env, Type::literal_string());
+                self.add_negative(db, env, Type::string_literal(db, ""));
+            }
+
+            _ => {
+                let positive_as_instance =
+                    new_positive.resolve_type_alias(db).as_nominal_instance();
+
+                if let Some(instance) = positive_as_instance
+                    && instance.is_object()
+                {
+                    // `object & T` -> `T`; it is always redundant to add `object` to an intersection
+                    return;
+                }
+
+                let addition_is_bool_instance = positive_as_instance
+                    .is_some_and(|instance| instance.has_known_class(db, KnownClass::Bool));
+
+                for (index, existing_positive) in self.positive.iter().enumerate() {
+                    match existing_positive.resolve_type_alias(db) {
+                        // `AlwaysTruthy & bool` -> `Literal[True]`
+                        Type::AlwaysTruthy if addition_is_bool_instance => {
+                            new_positive = Type::bool_literal(true);
+                        }
+                        // `AlwaysFalsy & bool` -> `Literal[False]`
+                        Type::AlwaysFalsy if addition_is_bool_instance => {
+                            new_positive = Type::bool_literal(false);
+                        }
+                        Type::NominalInstance(instance)
+                            if instance.has_known_class(db, KnownClass::Bool) =>
+                        {
+                            match new_positive.resolve_type_alias(db) {
+                                // `bool & AlwaysTruthy` -> `Literal[True]`
+                                Type::AlwaysTruthy => {
+                                    new_positive = Type::bool_literal(true);
+                                }
+                                // `bool & AlwaysFalsy` -> `Literal[False]`
+                                Type::AlwaysFalsy => {
+                                    new_positive = Type::bool_literal(false);
+                                }
+                                _ => continue,
+                            }
+                        }
+                        _ => continue,
+                    }
+                    self.positive.swap_remove_index(index);
+                    break;
+                }
+
+                if addition_is_bool_instance {
+                    for (index, existing_negative) in self.negative.iter().enumerate() {
+                        match existing_negative.resolve_type_alias(db) {
+                            // `bool & ~Literal[False]` -> `Literal[True]`
+                            // `bool & ~Literal[True]` -> `Literal[False]`
+                            Type::LiteralValue(literal) => match literal.kind() {
+                                LiteralValueTypeKind::Bool(bool_value) => {
+                                    new_positive = Type::bool_literal(!bool_value);
+                                }
+                                _ => continue,
+                            },
+                            // `bool & ~AlwaysTruthy` -> `Literal[False]`
+                            Type::AlwaysTruthy => {
+                                new_positive = Type::bool_literal(false);
+                            }
+                            // `bool & ~AlwaysFalsy` -> `Literal[True]`
+                            Type::AlwaysFalsy => {
+                                new_positive = Type::bool_literal(true);
+                            }
+                            _ => continue,
+                        }
+                        self.negative.swap_remove_index(index);
+                        break;
+                    }
+                }
+
+                let mut to_remove = SmallVec::<[usize; 1]>::new();
+                let mut replacement = None;
+                for (index, existing_positive) in self.positive.iter().enumerate() {
+                    let new_value = new_positive.resolve_type_alias(db);
+                    let existing_value = existing_positive.resolve_type_alias(db);
+                    if let Some(result) =
+                        generic_gradual_intersection(db, env, new_value, existing_value)
+                    {
+                        let GenericIntersection::Simplified(merged) = result else {
+                            continue;
+                        };
+                        if merged == existing_value {
+                            return;
+                        }
+                        let merged = if merged == new_value {
+                            new_positive
+                        } else {
+                            merged
+                        };
+                        replacement = Some((index, merged));
+                        break;
+                    }
+                    match simplify_intersection_pair(
+                        db,
+                        env,
+                        *existing_positive,
+                        new_positive,
+                        IntersectionPolarity::Positive,
+                    ) {
+                        IntersectionSimplification::Unchanged => {}
+                        IntersectionSimplification::SecondRedundant => return,
+                        IntersectionSimplification::FirstRedundant => to_remove.push(index),
+                        IntersectionSimplification::Disjoint => {
+                            *self = Self::default();
+                            self.positive.insert(Type::Never);
+                            return;
+                        }
+                    }
+                }
+                if let Some((index, value)) = replacement {
+                    self.positive.swap_remove_index(index);
+                    self.add_positive(db, env, value);
+                    return;
+                }
+                for index in to_remove.into_iter().rev() {
+                    self.positive.swap_remove_index(index);
+                }
+
+                let mut to_remove = SmallVec::<[usize; 1]>::new();
+                for (index, existing_negative) in self.negative.iter().enumerate() {
+                    match simplify_intersection_pair(
+                        db,
+                        env,
+                        new_positive,
+                        *existing_negative,
+                        IntersectionPolarity::Mixed,
+                    ) {
+                        IntersectionSimplification::Unchanged => {}
+                        IntersectionSimplification::SecondRedundant => to_remove.push(index),
+                        IntersectionSimplification::FirstRedundant => return,
+                        IntersectionSimplification::Disjoint => {
+                            *self = Self::default();
+                            self.positive.insert(Type::Never);
+                            return;
+                        }
+                    }
+                }
+                for index in to_remove.into_iter().rev() {
+                    self.negative.swap_remove_index(index);
+                }
+
+                self.positive.insert(new_positive);
+            }
+        }
+    }
+
+    /// Whether all the distinct built-in literals in `exclusions` would survive insertion.
+    ///
+    /// A nominal instance overlaps a built-in literal if the literal's class is a subclass of
+    /// the instance's class. Consecutive literals of the same class need only one such check.
+    /// Excluding a boolean from `bool` can also narrow it to the opposite literal.
+    fn can_copy_literal_exclusions(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        exclusions: &NegativeIntersectionElements<'db>,
+    ) -> bool {
+        if !self.negative.is_empty() {
+            return false;
+        }
+        let mut positives = self.positive.iter();
+        let Some(positive) = positives.next() else {
+            return true;
+        };
+        let Type::NominalInstance(instance) = positive else {
+            return false;
+        };
+        if positives.next().is_some() || instance.has_known_class(db, KnownClass::Bool) {
+            return false;
+        }
+
+        let class = instance.class(db, env);
+        exclusions
+            .iter()
+            .map(|ty| {
+                ty.as_literal_value_kind()
+                    .and_then(LiteralValueTypeKind::known_class)
+            })
+            .dedup()
+            .all(|excluded| {
+                excluded.is_some_and(|excluded| excluded.is_subclass_of(db, env, class))
+            })
+    }
+
+    /// Adds a negative type to this intersection.
+    fn add_negative(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        new_negative: Type<'db>,
+    ) {
+        self.add_negative_impl(db, env, new_negative, ExclusionComparison::Pairwise);
+    }
+
+    fn add_negative_impl(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        new_negative: Type<'db>,
+        comparison: ExclusionComparison,
+    ) {
+        // `Never & ~T` -> `Never`.
+        if self.positive.contains(&Type::Never) {
+            return;
+        }
+
+        // `Divergent & ~T` -> `Divergent`.
+        if self.positive.iter().any(Type::is_divergent) && !new_negative.is_pending_narrowing() {
+            debug_assert_eq!(self.positive.len(), 1, "`Divergent` should be alone");
+            return;
+        }
+
+        if let Some(negated_divergent) = new_negative.resolve_type_alias(db).negated_divergent() {
+            *self = Self::default();
+            self.positive.insert(negated_divergent);
+            return;
+        }
+
+        let contains_bool = || {
+            self.positive
+                .iter()
+                .filter_map(|ty| ty.resolve_type_alias(db).as_nominal_instance())
+                .filter_map(|instance| instance.known_class(db))
+                .any(KnownClass::is_bool)
+        };
+
+        match new_negative.resolve_type_alias(db) {
+            Type::Intersection(inter) => {
+                for pos in inter.positive(db) {
+                    self.add_negative(db, env, *pos);
+                }
+                for neg in inter.negative(db) {
+                    self.add_positive(db, env, *neg);
+                }
+            }
+            Type::Never => {
+                // Adding ~Never to an intersection is a no-op.
+            }
+            Type::NominalInstance(instance) if instance.is_object() => {
+                // Adding ~object to an intersection results in Never.
+                *self = Self::default();
+                self.positive.insert(Type::Never);
+            }
+            ty @ Type::Dynamic(_) => {
+                // Adding any of these types to the negative side of an intersection
+                // is equivalent to adding it to the positive side. We do this to
+                // simplify the representation.
+                self.add_positive(db, env, ty);
+            }
+            // `bool & ~AlwaysTruthy` -> `bool & Literal[False]`
+            Type::AlwaysTruthy if contains_bool() => {
+                self.add_positive(db, env, Type::bool_literal(false));
+            }
+            // `bool & ~Literal[True]` -> `bool & Literal[False]`
+            Type::LiteralValue(literal) if literal.as_bool() == Some(true) && contains_bool() => {
+                self.add_positive(db, env, Type::bool_literal(false));
+            }
+            // `LiteralString & ~AlwaysTruthy` -> `LiteralString & Literal[""]`
+            Type::AlwaysTruthy if self.contains_positive(db, Type::literal_string()) => {
+                self.add_positive(db, env, Type::string_literal(db, ""));
+            }
+            // `bool & ~AlwaysFalsy` -> `bool & Literal[True]`
+            Type::AlwaysFalsy if contains_bool() => {
+                self.add_positive(db, env, Type::bool_literal(true));
+            }
+            // `bool & ~Literal[False]` -> `bool & Literal[True]`
+            Type::LiteralValue(literal) if literal.as_bool() == Some(false) && contains_bool() => {
+                self.add_positive(db, env, Type::bool_literal(true));
+            }
+            // `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
+            Type::AlwaysFalsy if self.contains_positive(db, Type::literal_string()) => {
+                self.add_negative(db, env, Type::string_literal(db, ""));
+            }
+            _ => {
+                let new_negative_enum = new_negative.resolve_type_alias(db).as_enum_literal();
+                let mut to_remove = SmallVec::<[usize; 1]>::new();
+                let negatives = match comparison {
+                    ExclusionComparison::Pairwise => &self.negative,
+                    ExclusionComparison::SetMembership => {
+                        if self.negative.contains(&new_negative) {
+                            return;
+                        }
+                        &NegativeIntersectionElements::Empty
+                    }
+                };
+                for (index, existing_negative) in negatives.iter().enumerate() {
+                    if let Some(new_enum) = new_negative_enum
+                        && existing_negative
+                            .resolve_type_alias(db)
+                            .as_enum_literal()
+                            .is_some_and(|existing_enum| {
+                                existing_enum.enum_class(db) == new_enum.enum_class(db)
+                            })
+                    {
+                        if existing_negative.resolve_type_alias(db).as_enum_literal()
+                            == Some(new_enum)
+                        {
+                            return;
+                        }
+                        continue;
+                    }
+
+                    match simplify_intersection_pair(
+                        db,
+                        env,
+                        *existing_negative,
+                        new_negative,
+                        IntersectionPolarity::Negative,
+                    ) {
+                        IntersectionSimplification::Unchanged => {}
+                        IntersectionSimplification::SecondRedundant => return,
+                        IntersectionSimplification::FirstRedundant => to_remove.push(index),
+                        IntersectionSimplification::Disjoint => {
+                            *self = Self::default();
+                            self.positive.insert(Type::Never);
+                            return;
+                        }
+                    }
+                }
+                for index in to_remove.into_iter().rev() {
+                    self.negative.swap_remove_index(index);
+                }
+
+                let mut to_remove = SmallVec::<[usize; 1]>::new();
+                for (index, existing_positive) in self.positive.iter().enumerate() {
+                    if let Some(new_enum) = new_negative_enum {
+                        if let Some(existing_enum) =
+                            existing_positive.resolve_type_alias(db).as_enum_literal()
+                            && existing_enum.enum_class(db) == new_enum.enum_class(db)
+                        {
+                            if existing_enum == new_enum {
+                                *self = Self::default();
+                                self.positive.insert(Type::Never);
+                            }
+                            return;
+                        }
+
+                        if existing_positive
+                            .resolve_type_alias(db)
+                            .as_nominal_instance()
+                            .is_some_and(|instance| {
+                                instance.class_literal(db, env) == new_enum.enum_class(db)
+                            })
+                        {
+                            continue;
+                        }
+                    }
+
+                    match simplify_intersection_pair(
+                        db,
+                        env,
+                        *existing_positive,
+                        new_negative,
+                        IntersectionPolarity::Mixed,
+                    ) {
+                        IntersectionSimplification::Unchanged => {}
+                        IntersectionSimplification::SecondRedundant => return,
+                        IntersectionSimplification::FirstRedundant => to_remove.push(index),
+                        IntersectionSimplification::Disjoint => {
+                            *self = Self::default();
+                            self.positive.insert(Type::Never);
+                            return;
+                        }
+                    }
+                }
+
+                for index in to_remove.into_iter().rev() {
+                    self.positive.swap_remove_index(index);
+                }
+
+                self.negative.insert(new_negative);
+            }
+        }
+    }
+
+    /// Tries to simplify any constrained typevars in the intersection.
+    ///
+    /// We must preserve the constrained `TypeVar` itself in the result, even if only a single
+    /// compatible constraint remains, because other occurrences of the same `TypeVar` still need
+    /// to correlate with it (for example, when returning a narrowed value as `T`).
+    ///
+    /// - If the intersection contains negative entries for all but one of the constraints, we can
+    ///   add that remaining constraint as a positive entry.
+    ///
+    /// - If the intersection contains negative entries for all of the constraints, the overall
+    ///   intersection is `Never`.
+    fn simplify_constrained_typevars(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) {
+        let mut to_add = SmallVec::<[Type<'db>; 1]>::new();
+
+        for ty in &self.positive {
+            let Type::TypeVar(bound_typevar) = ty.resolve_type_alias(db) else {
+                continue;
+            };
+            let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
+                bound_typevar.typevar(db).bound_or_constraints(db, env)
+            else {
+                continue;
+            };
+
+            // Determine which constraints appear as negative entries in the intersection.
+            let constraints = constraints.elements(db);
+            let mut remaining_constraints: Vec<_> = constraints.iter().copied().map(Some).collect();
+            for negative in &self.negative {
+                // This linear search should be fine as long as we don't encounter typevars with
+                // thousands of constraints.
+                let matching_constraints = constraints
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, c)| c.is_subtype_of(db, env, *negative));
+                for (constraint_index, _) in matching_constraints {
+                    remaining_constraints[constraint_index] = None;
+                }
+            }
+
+            let mut iter = remaining_constraints.into_iter().flatten();
+            let Some(remaining_constraint) = iter.next() else {
+                // All of the typevar constraints have been removed, so the entire intersection is
+                // `Never`.
+                *self = Self::default();
+                self.positive.insert(Type::Never);
+                return;
+            };
+
+            let more_than_one_remaining_constraint = iter.next().is_some();
+            if more_than_one_remaining_constraint {
+                // This typevar cannot be simplified.
+                continue;
+            }
+
+            // Only one typevar constraint remains. Adding it as a positive element lets the normal
+            // intersection simplification remove any incompatible negatives, while keeping the
+            // original typevar in the result.
+            to_add.push(remaining_constraint);
+        }
+
+        for remaining_constraint in to_add {
+            self.add_positive(db, env, remaining_constraint);
+        }
+    }
+
+    fn build(mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        if self.has_empty_enum_complement(db, env) {
+            return Type::Never;
+        }
+
+        self.simplify_constrained_typevars(db, env);
+
+        // If any typevars are in `self.positive`, speculatively solve all bounded type variables
+        // to their upper bound and all constrained type variables to the union of their constraints.
+        // If that speculative intersection simplifies to `Never`, this intersection must also simplify
+        // to `Never`.
+        if self.positive.iter().any(|ty| {
+            matches!(
+                ty.resolve_type_alias(db),
+                Type::TypeVar(_) | Type::NewTypeInstance(_)
+            )
+        }) {
+            let speculative =
+                expand_intersection_typevars_and_newtypes(db, env, &self.positive, &self.negative);
+            if speculative.is_never() {
+                return Type::Never;
+            }
+
+            if let Type::EnumComplement(complement) = speculative
+                && complement.is_singleton(db)
+                && self.positive.iter().any(|positive| {
+                    matches!(positive.resolve_type_alias(db), Type::NewTypeInstance(_))
+                })
+            {
+                // Preserve the NewType while making its remaining enum member explicit.
+                self.add_positive(db, env, complement.remaining_literal_union(db, env));
+            }
+        }
+
+        if let Some(complement) =
+            EnumComplement::from_intersection_parts(db, env, &self.positive, &self.negative)
+        {
+            return Type::EnumComplement(complement);
+        }
+
+        match (self.positive.len(), self.negative.len()) {
+            (0, 0) => Type::object(),
+            (1, 0) => self.positive[0],
+            _ => {
+                self.positive.shrink_to_fit();
+                self.negative.shrink_to_fit();
+                Type::Intersection(IntersectionType::new(db, self.positive, self.negative))
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        IntersectionBuilder, IntersectionPolarity, MAX_NON_RECURSIVE_UNION_LITERALS,
+        MAX_RECURSIVE_UNION_LITERALS, RecursivelyDefined, Type, UnionBuilder, UnionType,
+        simplify_intersection_pair, simplify_intersection_pair_impl,
+    };
+
+    use crate::db::tests::{TestDb, setup_db};
+    use crate::place::{global_symbol, known_module_symbol};
+    use crate::types::enums::enum_member_literals;
+    use crate::types::tuple::TupleType;
+    use crate::types::type_alias::TypeAliasType;
+    use crate::types::{
+        BoundTypeVarInstance, BytesLiteralType, KnownClass, KnownInstanceType, LiteralValueType,
+        LiteralValueTypeKind, Signature, StringLiteralType, Truthiness, TypePair,
+        TypeVarBoundOrConstraints, TypeVarVariance,
+    };
+
+    use ruff_db::system::DbWithWritableSystem as _;
+    use ruff_python_ast::name::Name;
+    use ty_module_resolver::KnownModule;
+    use ty_python_core::ProgramFile;
+
+    #[test]
+    fn build_union_no_elements() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+
+        let empty_union = UnionBuilder::new(db, &env).build();
+        assert_eq!(empty_union, Type::Never);
+    }
+
+    #[test]
+    fn build_union_single_element() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+
+        let t0 = Type::int_literal(0);
+        let union = UnionType::from_elements(db, &env, [t0]);
+        assert_eq!(union, t0);
+    }
+
+    #[test]
+    fn build_union_two_elements() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+
+        let t0 = Type::int_literal(0);
+        let t1 = Type::int_literal(1);
+        let union = UnionType::from_elements(db, &env, [t0, t1]).expect_union();
+
+        assert_eq!(union.elements(db), &[t0, t1]);
+    }
+
+    #[test]
+    fn discarding_a_member_preserves_partially_covered_literal_groups() {
+        let db = setup_db();
+        let env = db.program_environment();
+        // Recovery skips redundancy checks, so the group still contains the truthy literal.
+        let builder = UnionBuilder::new(&db, &env)
+            .cycle_recovery(true)
+            .add(Type::int_literal(0))
+            .add(Type::int_literal(1))
+            .add(Type::AlwaysTruthy)
+            .cycle_recovery(false);
+
+        assert_eq!(
+            builder.clone().add(Type::AlwaysTruthy).build(),
+            builder.build()
+        );
+    }
+
+    #[test]
+    fn restoring_an_excluded_literal_does_not_widen_a_full_group() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let limit =
+            i64::try_from(MAX_NON_RECURSIVE_UNION_LITERALS).expect("literal limit fits in i64");
+        let [t, u] = ["T", "U"].map(|name| {
+            let var = BoundTypeVarInstance::synthetic(
+                db,
+                &env,
+                Name::new_static(name),
+                TypeVarVariance::Invariant,
+            );
+            Type::TypeVar(var.map_bound_or_constraints(db, |_| {
+                Some(TypeVarBoundOrConstraints::UpperBound(Type::AlwaysTruthy))
+            }))
+        });
+        let last = IntersectionBuilder::new(db, &env)
+            .add_positive(Type::int_literal(limit))
+            .add_negative(t)
+            .build();
+        let t_without_u = IntersectionBuilder::new(db, &env)
+            .add_positive(t)
+            .add_negative(u)
+            .build();
+
+        // AlwaysTruthy can restore the last literal directly or by first restoring T.
+        // In either case, adding the literal to the still-full group would widen it to int.
+        for intermediate in [None, Some(t_without_u)] {
+            let elements = (0..limit)
+                .map(Type::int_literal)
+                .chain(intermediate)
+                .chain([last, Type::AlwaysTruthy]);
+            let union = UnionType::from_elements(db, &env, elements);
+            assert_eq!(
+                union.expect_union().elements(db),
+                &[Type::int_literal(0), Type::AlwaysTruthy]
+            );
+        }
+    }
+
+    #[test]
+    fn cycle_recovery_widens_recursive_literal_union() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let literal_limit =
+            i64::try_from(MAX_RECURSIVE_UNION_LITERALS).expect("literal limit fits in i64");
+
+        let union = (0..=literal_limit).map(Type::int_literal).fold(
+            UnionBuilder::new(db, &env)
+                .cycle_recovery(true)
+                .or_recursively_defined(RecursivelyDefined::Yes),
+            UnionBuilder::add,
+        );
+
+        assert_eq!(union.build(), KnownClass::Int.to_instance(db, &env));
+
+        let assert_widens = |literal, instance| {
+            for (first, second) in [(literal, instance), (instance, literal)] {
+                let union = UnionBuilder::new(db, &env)
+                    .cycle_recovery(true)
+                    .add(first)
+                    .add(second)
+                    .build();
+                assert_eq!(union, instance);
+            }
+        };
+
+        assert_widens(Type::int_literal(1), KnownClass::Int.to_instance(db, &env));
+        assert_widens(
+            Type::string_literal(db, "literal"),
+            KnownClass::Str.to_instance(db, &env),
+        );
+        assert_widens(
+            Type::bytes_literal(db, b"literal"),
+            KnownClass::Bytes.to_instance(db, &env),
+        );
+
+        let safe_uuid_class = known_module_symbol(db, &env, KnownModule::Uuid, "SafeUUID")
+            .place
+            .expect_type()
+            .expect_class_literal();
+        let enum_literal = enum_member_literals(db, safe_uuid_class, None)
+            .expect("SafeUUID is an enum")
+            .next()
+            .expect("SafeUUID has members");
+        assert_widens(
+            enum_literal,
+            enum_literal
+                .expect_enum_literal()
+                .enum_class_instance(db, &env),
+        );
+    }
+
+    #[test]
+    fn cycle_recovery_skips_other_redundancy_simplification() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+
+        for (left, right) in [
+            (Type::string_literal(db, "literal"), Type::literal_string()),
+            (
+                Type::bool_literal(true),
+                KnownClass::Bool.to_instance(db, &env),
+            ),
+            (Type::int_literal(1), Type::object()),
+            (Type::bool_literal(true), Type::bool_literal(false)),
+        ] {
+            for (first, second) in [(left, right), (right, left)] {
+                let union = UnionBuilder::new(db, &env)
+                    .cycle_recovery(true)
+                    .add(first)
+                    .add(second)
+                    .build()
+                    .expect_union();
+                assert!(union.elements(db).contains(&left));
+                assert!(union.elements(db).contains(&right));
+            }
+        }
+    }
+
+    #[test]
+    fn cycle_recovery_preserves_same_length_tuples() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let first = Type::heterogeneous_tuple(&db, &env, [Type::int_literal(1)]);
+        let second = Type::heterogeneous_tuple(&db, &env, [Type::int_literal(2)]);
+
+        let union = UnionType::from_elements_cycle_recovery(&db, &env, [first, second]);
+        assert_eq!(union.expect_union().elements(&db), &[first, second]);
+        assert_eq!(
+            UnionType::widen_growing_tuples(&db, &env, first, second),
+            None
+        );
+    }
+
+    #[test]
+    fn cycle_recovery_widens_growing_tuple_lengths() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(&db, &env);
+        let first = Type::heterogeneous_tuple(&db, &env, [int]);
+        let second = Type::heterogeneous_tuple(&db, &env, [int, int]);
+        let widened = Type::homogeneous_tuple(&db, &env, int);
+
+        for (left, right) in [(first, second), (second, first)] {
+            assert_eq!(
+                UnionType::widen_growing_tuples(&db, &env, left, right),
+                Some(widened),
+            );
+        }
+
+        // Appending to the widened result adds a fixed suffix, which recovery must absorb.
+        let appended = Type::tuple(TupleType::mixed(&db, &env, [], int, [int]));
+        let other = Type::bool_literal(true);
+        let previous = UnionType::from_elements_cycle_recovery(&db, &env, [other, widened]);
+        let current = UnionType::from_elements_cycle_recovery(&db, &env, [previous, appended]);
+        let union = UnionType::widen_growing_tuples(&db, &env, previous, current).unwrap();
+        assert_eq!(union.expect_union().elements(&db), &[other, widened]);
+
+        // Initial cycle iterations can discard unrelated alternatives from the previous result.
+        assert_eq!(
+            UnionType::widen_growing_tuples(&db, &env, previous, appended),
+            Some(widened)
+        );
+    }
+
+    #[test]
+    fn cycle_recovery_widens_tuples_without_relation_queries() {
+        let db = setup_db();
+        let mut events_db = db.clone();
+        let env = db.program_environment();
+        let literal = LiteralValueType::promotable(1_i64);
+        let first = Type::heterogeneous_tuple(&db, &env, [Type::from(literal)]);
+        let second = Type::heterogeneous_tuple(&db, &env, [Type::from(literal), Type::object()]);
+        events_db.clear_salsa_events();
+
+        let result = UnionType::widen_growing_tuples(&db, &env, first, second).unwrap();
+        let tuple = result.exact_tuple_instance_spec(&db).unwrap();
+        let elements = tuple.variable_element_type(&db).unwrap().expect_union();
+        assert_eq!(
+            elements.elements(&db),
+            &[
+                Type::from(literal.with_recursively_defined(RecursivelyDefined::Yes)),
+                Type::object(),
+            ]
+        );
+        assert!(
+            events_db
+                .take_salsa_events()
+                .iter()
+                .all(|event| !matches!(event.kind, salsa::EventKind::WillExecute { .. }))
+        );
+    }
+
+    #[test]
+    fn cycle_recovery_widens_never_tuples_to_an_upper_bound() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(&db, &env);
+        let first = Type::heterogeneous_tuple(&db, &env, [Type::Never]);
+
+        for (last_element, widened_element) in [(Type::Never, Type::object()), (int, int)] {
+            let second = Type::heterogeneous_tuple(&db, &env, [Type::Never, last_element]);
+            let result = UnionType::widen_growing_tuples(&db, &env, first, second).unwrap();
+
+            assert_eq!(result, Type::homogeneous_tuple(&db, &env, widened_element));
+            assert!(first.is_subtype_of(&db, &env, result));
+            assert!(second.is_subtype_of(&db, &env, result));
+        }
+    }
+
+    #[test]
+    fn union_common_literal_supertype() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+
+        let str_union = UnionType::from_elements(
+            db,
+            &env,
+            [Type::string_literal(db, "a"), Type::string_literal(db, "b")],
+        )
+        .expect_union();
+        assert_eq!(
+            str_union.common_literal_supertype(db, &env),
+            Some(Type::literal_string())
+        );
+
+        let int_union =
+            UnionType::from_elements(db, &env, [Type::int_literal(1), Type::int_literal(2)])
+                .expect_union();
+        assert_eq!(
+            int_union.common_literal_supertype(db, &env),
+            Some(KnownClass::Int.to_instance(db, &env))
+        );
+
+        let mixed_union = UnionType::from_elements(
+            db,
+            &env,
+            [Type::string_literal(db, "a"), Type::int_literal(1)],
+        )
+        .expect_union();
+        assert_eq!(mixed_union.common_literal_supertype(db, &env), None);
+    }
+
+    fn map_marker<'db>(ty: &Type<'db>, marker: Type<'db>, replacement: Type<'db>) -> Type<'db> {
+        if *ty == marker { replacement } else { *ty }
+    }
+
+    #[test]
+    fn map_rebuilds_prefix_for_literal_widening() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+
+        let marker = KnownClass::Str.to_instance(db, &env);
+        let literal_limit =
+            i64::try_from(MAX_NON_RECURSIVE_UNION_LITERALS).expect("literal limit fits in i64");
+        let widening_literal = Type::int_literal(literal_limit);
+        let expected = KnownClass::Int.to_instance(db, &env);
+
+        let elements = (0..literal_limit).map(Type::int_literal).chain([marker]);
+        let union = UnionType::from_elements(db, &env, elements).expect_union();
+
+        assert_eq!(
+            union.map(db, &env, |ty| map_marker(ty, marker, widening_literal)),
+            expected
+        );
+        assert_eq!(
+            union.map_leave_aliases(db, &env, |ty| map_marker(ty, marker, widening_literal)),
+            expected
+        );
+        assert_eq!(
+            union.try_map(db, &env, |ty| Some(map_marker(
+                ty,
+                marker,
+                widening_literal
+            ))),
+            Some(expected)
+        );
+    }
+
+    #[test]
+    fn map_preserves_alias_unpacking_behavior() {
+        let mut db = setup_db();
+        db.write_dedented("/src/a.py", "type Alias = int").unwrap();
+        let env = db.program_environment();
+
+        let module = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+        let module = ProgramFile::new(&db, module, db.program_environment().program(&db));
+        let alias_ty = global_symbol(&db, module, "Alias").place.expect_type();
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))) =
+            alias_ty
+        else {
+            panic!("Expected `Alias` to be a type alias");
+        };
+
+        let alias = Type::TypeAlias(TypeAliasType::PEP695(alias));
+        let str_instance = KnownClass::Str.to_instance(&db, &env);
+        let union_ty = UnionType::from_elements_leave_aliases(&db, &env, [alias, str_instance]);
+        let union = union_ty.expect_union();
+        let unpacked = UnionType::from_elements(
+            &db,
+            &env,
+            [KnownClass::Int.to_instance(&db, &env), str_instance],
+        );
+
+        assert_eq!(union.map(&db, &env, |ty| *ty), unpacked);
+        assert_eq!(union.try_map(&db, &env, |ty| Some(*ty)), Some(unpacked));
+        assert_eq!(union.map_leave_aliases(&db, &env, |ty| *ty), union_ty);
+    }
+
+    #[test]
+    fn build_intersection_empty_intersection_equals_object() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+
+        let intersection = IntersectionBuilder::new(db, &env).build();
+        assert_eq!(intersection, Type::object());
+    }
+
+    #[test]
+    fn build_intersection_preserves_negated_alias() {
+        let mut db = setup_db();
+        db.write_dedented("/src/a.py", "type Alias = int").unwrap();
+        let env = db.program_environment();
+        let file = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+        let module = ProgramFile::new(&db, file, env.program(&db));
+        let alias = Type::TypeAlias(
+            global_symbol(&db, module, "Alias")
+                .place
+                .expect_type()
+                .as_type_alias()
+                .expect("Alias is a type alias"),
+        );
+
+        let negated = IntersectionBuilder::new(&db, &env)
+            .add_negative(alias)
+            .build();
+        assert!(matches!(negated, Type::Intersection(intersection)
+            if intersection.is_simple_negation(&db) && intersection.iter_negative(&db).eq([alias])));
+        assert_eq!(negated, alias.negate(&db, &env));
+    }
+
+    #[test]
+    fn literal_intersection_simplification_matches_relations() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+
+        let literals: Vec<_> = [
+            LiteralValueTypeKind::from(0),
+            LiteralValueTypeKind::from(1),
+            LiteralValueTypeKind::Bool(false),
+            LiteralValueTypeKind::Bool(true),
+            LiteralValueTypeKind::String(StringLiteralType::new(db, "a")),
+            LiteralValueTypeKind::String(StringLiteralType::new(db, "b")),
+            LiteralValueTypeKind::Bytes(BytesLiteralType::new(db, b"a".as_slice())),
+            LiteralValueTypeKind::Bytes(BytesLiteralType::new(db, b"b".as_slice())),
+        ]
+        .into_iter()
+        .flat_map(|kind| {
+            [false, true].into_iter().flat_map(move |promotable| {
+                [RecursivelyDefined::No, RecursivelyDefined::Yes]
+                    .into_iter()
+                    .map(move |recursive| {
+                        Type::LiteralValue(
+                            LiteralValueType::new(kind, promotable)
+                                .with_recursively_defined(recursive),
+                        )
+                    })
+            })
+        })
+        .collect();
+
+        for &first in &literals {
+            for &second in &literals {
+                for polarity in [
+                    IntersectionPolarity::Positive,
+                    IntersectionPolarity::Negative,
+                    IntersectionPolarity::Mixed,
+                ] {
+                    assert_eq!(
+                        simplify_intersection_pair(db, &env, first, second, polarity),
+                        simplify_intersection_pair_impl(
+                            db,
+                            TypePair::new(db, env.program(db), first, second),
+                            polarity,
+                        ),
+                        "{first:?}, {second:?}, {polarity:?}",
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn build_intersection_discards_never_dnf_branches() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(db, &env);
+        let str = KnownClass::Str.to_instance(db, &env);
+        let bytes = KnownClass::Bytes.to_instance(db, &env);
+
+        let int_or_str = UnionType::from_elements(db, &env, [int, str]);
+        let int_or_bytes = UnionType::from_elements(db, &env, [int, bytes]);
+        let intersection = IntersectionBuilder::new(db, &env)
+            .add_positive(int_or_str)
+            .add_positive(int_or_bytes);
+
+        assert_eq!(intersection.intersections.len(), 1);
+        assert_eq!(intersection.build(), int);
+    }
+
+    #[test]
+    fn build_intersection_deduplicates_dnf_branches() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let callable = Type::single_callable(db, Signature::dynamic(Type::object()));
+        let intersection = IntersectionBuilder::new(db, &env)
+            .add_positive(callable)
+            .add_negative(callable)
+            .build();
+        let negated = intersection.negate(db, &env);
+
+        let mut negative_builder = IntersectionBuilder::new(db, &env);
+        let mut positive_builder = IntersectionBuilder::new(db, &env);
+        for _ in 0..8 {
+            negative_builder.add_negative_in_place(intersection);
+            positive_builder.add_positive_in_place(negated);
+        }
+
+        // A gradual callable C can overlap its negation, so distribution retains C & ~C
+        // alongside C and ~C. Repeating the same clause must not multiply these alternatives.
+        assert!(
+            negative_builder.intersections.len() <= 3,
+            "{:?}",
+            negative_builder.intersections,
+        );
+        assert!(
+            positive_builder.intersections.len() <= 3,
+            "{:?}",
+            positive_builder.intersections,
+        );
+
+        assert!(negative_builder.build().is_equivalent_to(db, &env, negated));
+        assert!(positive_builder.build().is_equivalent_to(db, &env, negated));
+    }
+
+    #[test]
+    fn build_intersection_simplify_split_bool() {
+        let db = setup_db();
+
+        build_intersection_simplify_split_bool_impl(&db, Type::bool_literal(true));
+        build_intersection_simplify_split_bool_impl(&db, Type::bool_literal(false));
+        build_intersection_simplify_split_bool_impl(&db, Type::AlwaysTruthy);
+        build_intersection_simplify_split_bool_impl(&db, Type::AlwaysFalsy);
+    }
+
+    fn build_intersection_simplify_split_bool_impl(db: &TestDb, t_splitter: Type) {
+        let env = db.program_environment();
+        let bool_value = t_splitter.bool(db, &env) == Truthiness::AlwaysTrue;
+
+        // We add t_object in various orders (in first or second position) in
+        // the tests below to ensure that the boolean simplification eliminates
+        // everything from the intersection, not just `bool`.
+        let t_object = Type::object();
+        let t_bool = KnownClass::Bool.to_instance(db, &env);
+
+        let ty = IntersectionBuilder::new(db, &env)
+            .add_positive(t_object)
+            .add_positive(t_bool)
+            .add_negative(t_splitter)
+            .build();
+        assert_eq!(ty, Type::bool_literal(!bool_value));
+
+        let ty = IntersectionBuilder::new(db, &env)
+            .add_positive(t_bool)
+            .add_positive(t_object)
+            .add_negative(t_splitter)
+            .build();
+        assert_eq!(ty, Type::bool_literal(!bool_value));
+
+        let ty = IntersectionBuilder::new(db, &env)
+            .add_positive(t_object)
+            .add_negative(t_splitter)
+            .add_positive(t_bool)
+            .build();
+        assert_eq!(ty, Type::bool_literal(!bool_value));
+
+        let ty = IntersectionBuilder::new(db, &env)
+            .add_negative(t_splitter)
+            .add_positive(t_object)
+            .add_positive(t_bool)
+            .build();
+        assert_eq!(ty, Type::bool_literal(!bool_value));
+    }
+
+    #[test]
+    fn build_intersection_enums() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+
+        let safe_uuid_class = known_module_symbol(db, &env, KnownModule::Uuid, "SafeUUID")
+            .place
+            .ignore_possibly_undefined()
+            .unwrap();
+
+        let literals = enum_member_literals(db, safe_uuid_class.expect_class_literal(), None)
+            .unwrap()
+            .collect::<Vec<_>>();
+        assert_eq!(literals.len(), 3);
+
+        // SafeUUID.safe
+        let l_safe = literals[0];
+        assert_eq!(l_safe.expect_enum_literal().name(db), "safe");
+        // SafeUUID.unsafe
+        let l_unsafe = literals[1];
+        assert_eq!(l_unsafe.expect_enum_literal().name(db), "unsafe");
+        // SafeUUID.unknown
+        let l_unknown = literals[2];
+        assert_eq!(l_unknown.expect_enum_literal().name(db), "unknown");
+
+        // The enum itself: SafeUUID
+        let safe_uuid = l_safe.expect_enum_literal().enum_class_instance(db, &env);
+
+        {
+            let actual = IntersectionBuilder::new(db, &env)
+                .add_positive(safe_uuid)
+                .add_negative(l_safe)
+                .build();
+
+            assert_eq!(
+                actual.display(db, &db.program_environment()).to_string(),
+                "Literal[SafeUUID.unsafe, SafeUUID.unknown]"
+            );
+        }
+        {
+            // Same as above, but with the order reversed
+            let actual = IntersectionBuilder::new(db, &env)
+                .add_negative(l_safe)
+                .add_positive(safe_uuid)
+                .build();
+
+            assert_eq!(
+                actual.display(db, &db.program_environment()).to_string(),
+                "Literal[SafeUUID.unsafe, SafeUUID.unknown]"
+            );
+        }
+        {
+            // Also the same, but now with a nested intersection
+            let actual = IntersectionBuilder::new(db, &env)
+                .add_positive(safe_uuid)
+                .add_positive(
+                    IntersectionBuilder::new(db, &env)
+                        .add_negative(l_safe)
+                        .build(),
+                )
+                .build();
+
+            assert_eq!(
+                actual.display(db, &db.program_environment()).to_string(),
+                "Literal[SafeUUID.unsafe, SafeUUID.unknown]"
+            );
+        }
+        {
+            let actual = IntersectionBuilder::new(db, &env)
+                .add_negative(l_safe)
+                .add_positive(safe_uuid)
+                .add_negative(l_unsafe)
+                .build();
+
+            assert_eq!(
+                actual.display(db, &db.program_environment()).to_string(),
+                "Literal[SafeUUID.unknown]"
+            );
+        }
+    }
+}

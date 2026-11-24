@@ -23,11 +23,11 @@ One thing that is supported is error messages for using type qualifiers in type 
 from typing_extensions import Final, ClassVar, Required, NotRequired, ReadOnly
 
 def _(
-    # error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
+    # error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in parameter annotations"
     a: Final | int,
-    # error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type expressions (only in annotation expressions)"
+    # error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in parameter annotations"
     b: ClassVar | int,
-    # error: [invalid-type-form] "Type qualifier `typing.ReadOnly` is not allowed in type expressions (only in annotation expressions, and only with exactly one argument)"
+    # error: [invalid-type-form] "Type qualifier `typing.ReadOnly` is not allowed in parameter annotations"
     c: ReadOnly | int,
 ) -> None:
     reveal_type(a)  # revealed: Unknown | int

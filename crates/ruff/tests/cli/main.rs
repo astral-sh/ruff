@@ -18,12 +18,23 @@ use tempfile::TempDir;
 mod analyze_graph;
 mod format;
 mod lint;
+mod show_settings;
+mod version;
 
 const BIN_NAME: &str = "ruff";
 
 /// Creates a regex filter for replacing temporary directory paths in snapshots
 pub(crate) fn tempdir_filter(path: impl AsRef<str>) -> String {
     format!(r"{}[\\/]?", regex::escape(path.as_ref()))
+}
+
+fn output_format_settings(_: &Path, mut settings: insta::Settings) -> insta::Settings {
+    // JSON double escapes backslashes.
+    settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
+    // CI annotations can contain an escaped directory prefix.
+    settings.add_filter(r",file=[^,\n]+[\\/]", ",file=[TMP]/");
+    settings.add_filter(r";sourcepath=[^;\n]+[\\/]", ";sourcepath=[TMP]/");
+    settings
 }
 
 /// A test fixture for running ruff CLI tests with temporary directories and files.
@@ -86,6 +97,10 @@ impl CliTest {
         let mut settings = setup_settings(&project_dir, insta::Settings::clone_current());
 
         settings.add_filter(&tempdir_filter(project_dir.to_str().unwrap()), "[TMP]/");
+        settings.add_filter(
+            &tempdir_filter(Self::crate_root().to_str().unwrap()),
+            "CRATE_ROOT/",
+        );
         settings.add_filter(r#"\\([\w&&[^nr"]]\w|\s|\.)"#, "/$1");
         settings.add_filter(r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>");
         settings.add_filter(ruff_linter::VERSION, "[VERSION]");
@@ -152,6 +167,13 @@ impl CliTest {
         Ok(())
     }
 
+    /// Reads a file from the test directory.
+    pub(crate) fn read_file(&self, path: impl AsRef<Path>) -> Result<String> {
+        let file_path = self.project_dir.join(path);
+        fs::read_to_string(&file_path)
+            .with_context(|| format!("Failed to read file `{}`", file_path.display()))
+    }
+
     pub(crate) fn write_files<'a>(
         &self,
         files: impl IntoIterator<Item = (&'a str, &'a str)>,
@@ -165,6 +187,21 @@ impl CliTest {
     /// Returns the path to the test directory root.
     pub(crate) fn root(&self) -> &Path {
         &self.project_dir
+    }
+
+    /// Returns the path to the crate root.
+    pub(crate) fn crate_root() -> &'static Path {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+    }
+
+    /// Returns the path to a fixture file inside the crate root.
+    #[expect(clippy::unused_self)]
+    pub(crate) fn fixture_path(&self, filename: &str) -> PathBuf {
+        Self::crate_root()
+            .join("resources")
+            .join("test")
+            .join("fixtures")
+            .join(filename)
     }
 
     /// Creates a pre-configured ruff command for testing.

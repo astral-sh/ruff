@@ -6,6 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of cryptographic keys with vulnerable key sizes.
@@ -33,7 +34,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [CSRC: Transitioning the Use of Cryptographic Algorithms and Key Lengths](https://csrc.nist.gov/pubs/sp/800/131/a/r2/final)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Security)]
 pub(crate) struct WeakCryptographicKey {
     cryptographic_key: CryptographicKey,
 }
@@ -120,10 +121,9 @@ fn extract_cryptographic_key(
             "ec" => {
                 let argument = call.arguments.find_argument_value("curve", 0)?;
                 let ExprAttribute { attr, value, .. } = argument.as_attribute_expr()?;
-                let qualified_name = checker.semantic().resolve_qualified_name(value)?;
-                if matches!(
-                    qualified_name.segments(),
-                    ["cryptography", "hazmat", "primitives", "asymmetric", "ec"]
+                if checker.semantic().matches_qualified_name(
+                    value,
+                    &["cryptography", "hazmat", "primitives", "asymmetric", "ec"],
                 ) {
                     Some((
                         CryptographicKey::Ec {

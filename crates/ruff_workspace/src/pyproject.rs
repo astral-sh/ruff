@@ -1,10 +1,13 @@
 //! Utilities for locating (and extracting configuration from) a pyproject.toml.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use log::debug;
 use pep440_rs::{Operator, Version, VersionSpecifiers};
+use ruff_db::system::SystemPathBuf;
+use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
@@ -14,8 +17,8 @@ use ruff_linter::settings::types::{PythonVersion, RequiredVersion};
 use crate::options::{Options, validate_required_version};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-struct Tools {
-    ruff: Option<Options>,
+pub(super) struct Tools {
+    pub(super) ruff: Option<Options>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -30,19 +33,14 @@ pub struct Pyproject {
     project: Option<Project>,
 }
 
-impl Pyproject {
-    pub const fn new(options: Options) -> Self {
-        Self {
-            tool: Some(Tools {
-                ruff: Some(options),
-            }),
-            project: None,
-        }
-    }
-}
+fn parse_toml<T: DeserializeOwned>(path: &Path, table_path: &[&str]) -> Result<T> {
+    let _guard = ValueSourceGuard::new(
+        ValueSource::File(Arc::new(SystemPathBuf::from_path_buf_lossy(
+            path.to_path_buf(),
+        ))),
+        true,
+    );
 
-fn parse_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P, table_path: &[&str]) -> Result<T> {
-    let path = path.as_ref();
     let contents = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
 
@@ -66,18 +64,18 @@ fn parse_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P, table_path: &[&str])
 }
 
 /// Parse a `ruff.toml` file.
-fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
+fn parse_ruff_toml(path: &Path) -> Result<Options> {
     parse_toml(path, &[])
 }
 
 /// Parse a `pyproject.toml` file.
-fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
+fn parse_pyproject_toml(path: &Path) -> Result<Pyproject> {
     parse_toml(path, &["tool", "ruff"])
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
-pub fn ruff_enabled<P: AsRef<Path>>(path: P) -> Result<bool> {
-    let pyproject = parse_pyproject_toml(path)?;
+fn ruff_enabled<P: AsRef<Path>>(path: P) -> Result<bool> {
+    let pyproject = parse_pyproject_toml(path.as_ref())?;
     Ok(pyproject.tool.and_then(|tool| tool.ruff).is_some())
 }
 
@@ -117,7 +115,7 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
     Ok(None)
 }
 
-fn check_required_version(value: &toml::de::DeTable, table_path: &[&str]) -> Result<()> {
+pub(super) fn check_required_version(value: &toml::de::DeTable, table_path: &[&str]) -> Result<()> {
     let mut current = value;
     for key in table_path {
         let Some(next) = current.get(*key) else {
@@ -181,10 +179,7 @@ pub fn find_user_settings_toml() -> Option<PathBuf> {
 }
 
 /// Load `Options` from a `pyproject.toml` or `ruff.toml` file.
-pub(super) fn load_options<P: AsRef<Path>>(
-    path: P,
-    version_strategy: &TargetVersionStrategy,
-) -> Result<Options> {
+pub(super) fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
     let path = path.as_ref();
     if path.ends_with("pyproject.toml") {
         let pyproject = parse_pyproject_toml(path)?;
@@ -201,31 +196,15 @@ pub(super) fn load_options<P: AsRef<Path>>(
         }
         Ok(ruff)
     } else {
-        let mut ruff = parse_ruff_toml(path);
-        if let Ok(ref mut ruff) = ruff {
+        let ruff = parse_ruff_toml(path);
+        if let Ok(ruff) = ruff {
             if ruff.target_version.is_none() {
-                debug!("No `target-version` found in `ruff.toml`");
-                match version_strategy {
-                    TargetVersionStrategy::UseDefault => {}
-                    TargetVersionStrategy::RequiresPythonFallback => {
-                        if let Some(dir) = path.parent() {
-                            let fallback = get_fallback_target_version(dir);
-                            if let Some(version) = fallback {
-                                debug!(
-                                    "Derived `target-version` from `requires-python` in `pyproject.toml`: {version:?}"
-                                );
-                            } else {
-                                debug!(
-                                    "No `pyproject.toml` with `requires-python` in same directory; `target-version` unspecified"
-                                );
-                            }
-                            ruff.target_version = fallback;
-                        }
-                    }
-                }
+                debug!("No `target-version` found in `{}`", path.display());
             }
+            Ok(ruff)
+        } else {
+            ruff
         }
-        ruff
     }
 }
 
@@ -255,7 +234,9 @@ fn get_fallback_target_version(dir: &Path) -> Option<PythonVersion> {
 }
 
 /// Infer the minimum supported [`PythonVersion`] from a `requires-python` specifier.
-fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<PythonVersion> {
+pub(super) fn get_minimum_supported_version(
+    requires_version: &VersionSpecifiers,
+) -> Option<PythonVersion> {
     /// Truncate a version to its major and minor components.
     fn major_minor(version: &Version) -> Option<Version> {
         let major = version.release().first()?;
@@ -286,33 +267,31 @@ fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option
     PythonVersion::iter().find(|version| Version::from(*version) == minimum_version)
 }
 
-/// Strategy for handling missing `target-version` in configuration.
-#[derive(Debug)]
-pub(super) enum TargetVersionStrategy {
-    /// Use default `target-version`
-    UseDefault,
-    /// Derive from `requires-python` if available
-    RequiresPythonFallback,
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;
     use std::str::FromStr;
+    use std::sync::Arc;
 
     use anyhow::{Context, Result};
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
-    use ruff_linter::codes;
+    use ruff_db::system::SystemPathBuf;
+    use ruff_linter::UnresolvedRuleSelector;
     use ruff_linter::line_width::LineLength;
     use ruff_linter::settings::types::PatternPrefixPair;
+    use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 
     use crate::options::{Flake8BuiltinsOptions, LintCommonOptions, LintOptions, Options};
     use crate::pyproject::{Pyproject, Tools, find_settings_toml, parse_pyproject_toml};
 
     #[test]
     fn deserialize() -> Result<()> {
+        let _guard = ValueSourceGuard::new(
+            ValueSource::File(Arc::new(SystemPathBuf::from("<filename>"))),
+            true,
+        );
         let pyproject: Pyproject = toml::from_str(r"")?;
         assert_eq!(pyproject.tool, None);
 
@@ -383,7 +362,7 @@ select = ["E501"]
                 ruff: Some(Options {
                     lint: Some(LintOptions {
                         common: LintCommonOptions {
-                            select: Some(vec![codes::Pycodestyle::E501.into()]),
+                            select: Some(vec![UnresolvedRuleSelector::cli("E501")]),
                             ..LintCommonOptions::default()
                         },
                         ..LintOptions::default()
@@ -407,8 +386,8 @@ ignore = ["E501"]
                 ruff: Some(Options {
                     lint: Some(LintOptions {
                         common: LintCommonOptions {
-                            extend_select: Some(vec![codes::Ruff::_100.into()]),
-                            ignore: Some(vec![codes::Pycodestyle::E501.into()]),
+                            extend_select: Some(vec![UnresolvedRuleSelector::cli("RUF100",)]),
+                            ignore: Some(vec![UnresolvedRuleSelector::cli("E501")]),
                             ..LintCommonOptions::default()
                         },
                         ..LintOptions::default()
@@ -486,7 +465,7 @@ line_length = 79
 select = ["E123"]
 "#,
             )
-            .is_err()
+            .is_ok()
         );
 
         assert!(
@@ -501,33 +480,6 @@ other-attribute = 1
             .is_err()
         );
 
-        let invalid_line_length = toml::from_str::<Pyproject>(
-            r"
-[tool.ruff]
-line-length = 500
-",
-        )
-        .expect_err("Deserialization should have failed for a too large line-length");
-
-        assert_eq!(
-            invalid_line_length.message(),
-            "line-length must be between 1 and 320 (got 500)"
-        );
-
-        // Test value at u16::MAX boundary (65535) - should show range error
-        let invalid_line_length_65535 = toml::from_str::<Pyproject>(
-            r"
-[tool.ruff]
-line-length = 65535
-",
-        )
-        .expect_err("Deserialization should have failed for line-length at u16::MAX");
-
-        assert_eq!(
-            invalid_line_length_65535.message(),
-            "line-length must be between 1 and 320 (got 65535)"
-        );
-
         // Test value exceeding u16::MAX (65536) - should show clear error
         let invalid_line_length_65536 = toml::from_str::<Pyproject>(
             r"
@@ -539,7 +491,7 @@ line-length = 65536
 
         assert_eq!(
             invalid_line_length_65536.message(),
-            "line-length must be between 1 and 320 (got 65536)"
+            "line-length must be between 1 and 65535 (got 65536)"
         );
 
         // Test value far exceeding u16::MAX (99_999) - should show clear error
@@ -553,7 +505,7 @@ line-length = 99_999
 
         assert_eq!(
             invalid_line_length_99999.message(),
-            "line-length must be between 1 and 320 (got 99999)"
+            "line-length must be between 1 and 65535 (got 99999)"
         );
 
         // Test negative value - should show clear error
@@ -567,7 +519,7 @@ line-length = -5
 
         assert_eq!(
             invalid_line_length_negative.message(),
-            "line-length must be between 1 and 320 (got -5)"
+            "line-length must be between 1 and 65535 (got -5)"
         );
 
         Ok(())
@@ -595,7 +547,7 @@ per-file-ignores = { "__init__.py" = ["F401"] }
 
         let pyproject =
             find_settings_toml(tempdir.path())?.context("Failed to find pyproject.toml")?;
-        let pyproject = parse_pyproject_toml(pyproject)?;
+        let pyproject = parse_pyproject_toml(&pyproject)?;
         let config = pyproject
             .tool
             .context("Expected to find [tool] field")?
@@ -615,7 +567,7 @@ per-file-ignores = { "__init__.py" = ["F401"] }
                     common: LintCommonOptions {
                         per_file_ignores: Some(FxHashMap::from_iter([(
                             "__init__.py".to_string(),
-                            vec![codes::Pyflakes::_401.into()]
+                            vec![UnresolvedRuleSelector::cli("F401")]
                         )])),
                         ..LintCommonOptions::default()
                     },
@@ -635,7 +587,7 @@ per-file-ignores = { "__init__.py" = ["F401"] }
         let result = PatternPrefixPair::from_str("foo: E501");
         assert!(result.is_ok());
         let result = PatternPrefixPair::from_str("E501:foo");
-        assert!(result.is_err());
+        assert!(result.is_ok());
         let result = PatternPrefixPair::from_str("E501");
         assert!(result.is_err());
         let result = PatternPrefixPair::from_str("foo");
@@ -645,6 +597,6 @@ per-file-ignores = { "__init__.py" = ["F401"] }
         let result = PatternPrefixPair::from_str("**/bar:E501");
         assert!(result.is_ok());
         let result = PatternPrefixPair::from_str("bar:E503");
-        assert!(result.is_err());
+        assert!(result.is_ok());
     }
 }

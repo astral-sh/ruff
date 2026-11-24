@@ -7,4 +7,3 @@ F404 `from __future__` imports must occur at the beginning of the file
 1 | import random
 2 | from __future__ import annotations  # Error; not at top of file
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |

@@ -14,8 +14,8 @@ We test the whole matrix of possible boundness and declaredness states. The curr
 summarized in the following table, while the tests below demonstrate each case. Note that some of
 this behavior is questionable and might change in the future. See the TODOs in `symbol_by_id`
 (`types.rs`) and [this issue](https://github.com/astral-sh/ruff/issues/14297) for more information.
-In particular, we should raise errors in the "possibly-undeclared-and-unbound" as well as the
-"undeclared-and-possibly-unbound" cases (marked with a "?").
+In particular, we should raise an error in the "possibly-undeclared-and-unbound" case (marked with a
+"?").
 
 | **Public type**  | declared     | possibly-undeclared        | undeclared              |
 | ---------------- | ------------ | -------------------------- | ----------------------- |
@@ -23,11 +23,14 @@ In particular, we should raise errors in the "possibly-undeclared-and-unbound" a
 | possibly-unbound | `T_declared` | `T_declared \| T_inferred` | `Unknown \| T_inferred` |
 | unbound          | `T_declared` | `T_declared`               | `Unknown`               |
 
-| **Diagnostic**   | declared | possibly-undeclared       | undeclared          |
-| ---------------- | -------- | ------------------------- | ------------------- |
-| bound            |          |                           |                     |
-| possibly-unbound |          | `possibly-missing-import` | ?                   |
-| unbound          |          | ?                         | `unresolved-import` |
+| **Diagnostic**   | declared | possibly-undeclared          | undeclared                   |
+| ---------------- | -------- | ---------------------------- | ---------------------------- |
+| bound            |          |                              |                              |
+| possibly-unbound |          | `possibly-missing-attribute` | `possibly-missing-attribute` |
+| unbound          |          | ?                            | `missing-attribute`          |
+
+When the declared and inferred types are mutually assignable, we use `T_declared` directly instead
+of unioning it with `T_inferred`.
 
 ## Declared
 
@@ -70,7 +73,7 @@ class Public:
     c: Any
     d: int
 
-    if flag:
+    if flag():
         a = 1
         b = 2  # error: [invalid-assignment]
         c = 3
@@ -137,8 +140,7 @@ Public.a = None
 
 If a symbol is possibly undeclared and possibly unbound, we also use the union of the declared and
 inferred types. This case is interesting because the "possibly declared" definition might not be the
-same as the "possibly bound" definition (symbol `b`). Note that we raise a `possibly-missing-import`
-error for both `a` and `b`:
+same as the "possibly bound" definition:
 
 ```py
 from typing import Any
@@ -148,13 +150,10 @@ def flag() -> bool:
 
 class Public:
     if flag():
-        a: Any = 1
         b = 2
     else:
         b: str
 
-# error: [possibly-missing-attribute]
-reveal_type(Public.a)  # revealed: Literal[1] | Any
 # error: [possibly-missing-attribute]
 reveal_type(Public.b)  # revealed: Literal[2] | str
 
@@ -190,9 +189,9 @@ Public.a = None
 
 ### Undeclared but bound
 
-If a symbol is *undeclared*, we use the union of `Unknown` with the inferred type. Note that we
-treat this case differently from the case where a symbol is implicitly declared with `Unknown`,
-possibly due to the usage of an unknown name in the annotation:
+If a symbol is *undeclared*, we use the inferred type directly. Note that we treat this case
+differently from the case where a symbol is implicitly declared with `Unknown`, possibly due to the
+usage of an unknown name in the annotation:
 
 ```py
 class Public:
@@ -202,33 +201,37 @@ class Public:
     # Implicitly declared with `Unknown`, due to the usage of an unknown name in the annotation:
     b: SomeUnknownName = 1  # error: [unresolved-reference]
 
-reveal_type(Public.a)  # revealed: Unknown | Literal[1]
+reveal_type(Public.a)  # revealed: int
 reveal_type(Public.b)  # revealed: Unknown
 
-# All external modifications of `a` are allowed:
+# External modifications of `a` are checked against the inferred type:
+# error: [invalid-assignment]
 Public.a = None
 ```
 
 ### Undeclared and possibly unbound
 
-If a symbol is undeclared and *possibly* unbound, we currently do not raise an error. This seems
-inconsistent when compared to the "possibly-undeclared-and-possibly-unbound" case.
+If a symbol is undeclared and *possibly* unbound, we raise a `possibly-missing-attribute` error
+because the attribute might not exist.
 
 ```py
 def flag() -> bool:
     return True
 
 class Public:
-    if flag:
+    if flag():
         a = 1
         b: SomeUnknownName = 1  # error: [unresolved-reference]
 
-# TODO: these should raise an error. Once we fix this, update the section description and the table
-# on top of this document.
-reveal_type(Public.a)  # revealed: Unknown | Literal[1]
-reveal_type(Public.b)  # revealed: Unknown
+# error: [possibly-missing-attribute]
+reveal_type(Public.a)  # revealed: int
+# error: [possibly-missing-attribute]
+reveal_type(Public.b)  # revealed: Literal[1] | Unknown
 
-# All external modifications of `a` are allowed:
+# External modifications of `a` are checked against the inferred type:
+#
+# error: [invalid-assignment]
+# error: [possibly-missing-attribute]
 Public.a = None
 ```
 
@@ -241,11 +244,11 @@ class Public:
     if False:
         a: int = 1
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(Public.a)  # revealed: Unknown
 
 # Modification attempts yield an error:
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 Public.a = None
 ```
 
@@ -306,7 +309,7 @@ if False:
 ```
 
 ```py
-# error: [unresolved-import]
+# error: [missing-module-member]
 from mod import MyInt
 
 reveal_type(MyInt)  # revealed: Unknown

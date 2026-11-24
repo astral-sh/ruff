@@ -1,11 +1,13 @@
 use anyhow::Result;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_stdlib::open_mode::OpenMode;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -30,7 +32,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Pedantic)]
 pub(crate) struct RedundantOpenModes {
     replacement: String,
 }
@@ -57,17 +59,15 @@ impl AlwaysFixableViolation for RedundantOpenModes {
 }
 
 /// UP015
-pub(crate) fn redundant_open_modes(checker: &Checker, call: &ast::ExprCall) {
-    if !checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["" | "builtins" | "aiofiles", "open"]
-            )
-        })
-    {
+pub(crate) fn redundant_open_modes(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
+    if !matches!(
+        qualified_name.segments(),
+        ["" | "builtins" | "aiofiles", "open"]
+    ) {
         return;
     }
 
@@ -129,7 +129,7 @@ fn create_remove_argument_fix(
             break;
         }
         match token.kind() {
-            TokenKind::Name if delete_first_arg => {
+            TokenKind::Identifier if delete_first_arg => {
                 fix_end = Some(token.start());
                 break;
             }

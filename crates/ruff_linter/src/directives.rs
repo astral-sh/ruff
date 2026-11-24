@@ -12,7 +12,9 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
+use crate::comments::shebang::leading_shebang_range;
 use crate::noqa::NoqaMapping;
+use crate::registry::LintSource;
 use crate::settings::LinterSettings;
 
 bitflags! {
@@ -27,8 +29,7 @@ impl Flags {
     pub fn from_settings(settings: &LinterSettings) -> Self {
         if settings
             .rules
-            .iter_enabled()
-            .any(|rule_code| rule_code.lint_source().is_imports())
+            .any_enabled_in(LintSource::Imports.rule_set())
         {
             Self::NOQA | Self::ISORT
         } else {
@@ -40,10 +41,10 @@ impl Flags {
 #[derive(Default, Debug)]
 pub struct IsortDirectives {
     /// Ranges for which sorting is disabled
-    pub exclusions: Vec<TextRange>,
+    pub(crate) exclusions: Vec<TextRange>,
     /// Text positions at which splits should be inserted
-    pub splits: Vec<TextSize>,
-    pub skip_file: bool,
+    pub(crate) splits: Vec<TextSize>,
+    pub(crate) skip_file: bool,
 }
 
 pub struct Directives {
@@ -124,6 +125,8 @@ fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) 
         }
     }
 
+    let shebang_mapping = leading_shebang_range(locator.contents(), tokens);
+
     // The capacity allocated here might be more than we need if there are
     // nested interpolated strings.
     let mut interpolated_string_mappings =
@@ -173,18 +176,24 @@ fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) 
 
     // Merge the mappings in sorted order
     let mut mappings = NoqaMapping::with_capacity(
-        continuation_mappings.len() + string_mappings.len() + interpolated_string_mappings.len(),
+        continuation_mappings.len()
+            + string_mappings.len()
+            + interpolated_string_mappings.len()
+            + usize::from(shebang_mapping.is_some()),
     );
 
-    let string_mappings = SortedMergeIter {
+    let all_mappings = SortedMergeIter {
         left: interpolated_string_mappings.into_iter().peekable(),
         right: string_mappings.into_iter().peekable(),
     };
     let all_mappings = SortedMergeIter {
-        left: string_mappings.peekable(),
+        left: all_mappings.peekable(),
         right: continuation_mappings.into_iter().peekable(),
     };
 
+    if let Some(mapping) = shebang_mapping {
+        mappings.push_mapping(mapping);
+    }
     for mapping in all_mappings {
         mappings.push_mapping(mapping);
     }
@@ -287,17 +296,12 @@ pub(crate) struct TodoDirective<'a> {
 impl<'a> TodoDirective<'a> {
     /// Extract a [`TodoDirective`] from a comment.
     pub(crate) fn from_comment(comment: &'a str, comment_range: TextRange) -> Option<Self> {
-        // The directive's offset from the start of the comment.
-        let mut relative_offset = TextSize::new(0);
         let mut subset = comment;
 
         // Loop over `#`-delimited sections of the comment to check for directives. This will
         // correctly handle cases like `# foo # TODO`.
         loop {
             let trimmed = subset.trim_start_matches('#').trim_start();
-
-            let offset = subset.text_len() - trimmed.text_len();
-            relative_offset += offset;
 
             // Find the first word. Don't use split by whitespace because that would include the `:` character
             // in `TODO:`
@@ -306,25 +310,22 @@ impl<'a> TodoDirective<'a> {
             // If we detect a TodoDirectiveKind variant substring in the comment, construct and
             // return the appropriate TodoDirective
             if let Ok(directive_kind) = first_word.parse::<TodoDirectiveKind>() {
-                let len = directive_kind.len();
+                let range = comment.substr_range(first_word)?;
+                let first_word_range = TextRange::new(
+                    TextSize::try_from(range.start).ok()?,
+                    TextSize::try_from(range.end).ok()?,
+                );
 
                 return Some(Self {
-                    content: &comment[TextRange::at(relative_offset, len)],
-                    range: TextRange::at(comment_range.start() + relative_offset, len),
+                    content: first_word,
+                    range: first_word_range + comment_range.start(),
                     kind: directive_kind,
                 });
             }
 
             // Shrink the subset to check for the next phrase starting with "#".
-            if let Some(new_offset) = trimmed.find('#') {
-                relative_offset += TextSize::try_from(new_offset).unwrap();
-                subset = &comment[relative_offset.to_usize()..];
-            } else {
-                break;
-            }
+            subset = &trimmed[trimmed.find('#')?..];
         }
-
-        None
     }
 }
 
@@ -346,16 +347,6 @@ impl FromStr for TodoDirectiveKind {
             "todo" => Ok(TodoDirectiveKind::Todo),
             "xxx" => Ok(TodoDirectiveKind::Xxx),
             _ => Err(()),
-        }
-    }
-}
-
-impl TodoDirectiveKind {
-    fn len(&self) -> TextSize {
-        match self {
-            TodoDirectiveKind::Xxx => TextSize::new(3),
-            TodoDirectiveKind::Hack | TodoDirectiveKind::Todo => TextSize::new(4),
-            TodoDirectiveKind::Fixme => TextSize::new(5),
         }
     }
 }
@@ -696,6 +687,19 @@ z = x + 1";
             content: "TODO",
             range: TextRange::new(TextSize::new(9), TextSize::new(13)),
             kind: TodoDirectiveKind::Todo,
+        };
+        assert_eq!(
+            expected,
+            TodoDirective::from_comment(test_comment, test_comment_range).unwrap()
+        );
+
+        // The Kelvin sign lowercases to `k`, but takes three bytes in the source.
+        let test_comment = "# noqa # HAC\u{212A}: hack tag";
+        let test_comment_range = TextRange::at(TextSize::new(0), test_comment.text_len());
+        let expected = TodoDirective {
+            content: "HAC\u{212A}",
+            range: TextRange::new(TextSize::new(9), TextSize::new(15)),
+            kind: TodoDirectiveKind::Hack,
         };
         assert_eq!(
             expected,

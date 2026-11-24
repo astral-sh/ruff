@@ -81,10 +81,12 @@ class ShareableList(Generic[_SLT]):
     """
 
     shm: SharedMemory
+
     @overload
     def __init__(self, sequence: None = None, *, name: str | None = None) -> None: ...
     @overload
     def __init__(self, sequence: Iterable[_SLT], *, name: str | None = None) -> None: ...
+
     def __getitem__(self, position: int) -> _SLT: ...
     def __setitem__(self, position: int, value: _SLT) -> None: ...
     def __reduce__(self) -> tuple[Self, tuple[_SLT, ...]]: ...
@@ -104,5 +106,6 @@ class ShareableList(Generic[_SLT]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """

@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix};
 use crate::{FixAvailability, Violation};
 
@@ -22,6 +23,7 @@ use crate::{FixAvailability, Violation};
 /// @dataclass
 /// class Foo:
 ///     bar: list[int] = field(default_factory=lambda: [])
+///     baz: dict[str, int] = field(default_factory=lambda: {})
 /// ```
 ///
 /// Use instead:
@@ -36,9 +38,10 @@ use crate::{FixAvailability, Violation};
 /// ```
 ///
 /// ## References
-/// - [Python documentation: `list`](https://docs.python.org/3/library/functions.html#func-list)
+/// - [Python documentation: `list`](https://docs.python.org/3/builtins/functions.html#func-list)
+/// - [Python documentation: `dict`](https://docs.python.org/3/builtins/functions.html#func-dict)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Complexity)]
 pub(crate) struct ReimplementedContainerBuiltin {
     container: Container,
 }

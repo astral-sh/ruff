@@ -6,7 +6,6 @@ use insta::assert_json_snapshot;
 fn text_document() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_file("foo.py", "")?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -39,7 +38,6 @@ test()
 fn notebook() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_file("test.ipynb", "")?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 

@@ -8,8 +8,8 @@ from abc import abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from ctypes import CDLL, ArgumentError as ArgumentError, c_void_p
 from types import GenericAlias
-from typing import Any, ClassVar, Final, Generic, Literal, TypeVar, final, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing import Any, ClassVar, Final, Generic, Literal, SupportsIndex, TypeAlias, TypeVar, final, overload, type_check_only
+from typing_extensions import Self
 
 _T = TypeVar("_T")
 _CT = TypeVar("_CT", bound=_CData)
@@ -42,6 +42,7 @@ if sys.platform == "win32":
 
     def CopyComPointer(src: _PointerLike, dst: _PointerLike | _CArgObject) -> int:
         """CopyComPointer(src, dst) -> HRESULT value"""
+
     FUNCFLAG_HRESULT: Final = 0x2
     FUNCFLAG_STDCALL: Final = 0x0
 
@@ -72,6 +73,7 @@ if sys.platform == "win32":
 else:
     def dlclose(handle: int, /) -> None:
         """dlclose a library"""
+
     # The default for flag is RTLD_GLOBAL|RTLD_LOCAL, which is platform dependent.
     def dlopen(name: StrOrBytesPath, flag: int = ..., /) -> int:
         """dlopen(name, flag={RTLD_GLOBAL|RTLD_LOCAL}) open a shared library"""
@@ -124,7 +126,10 @@ class _PyCSimpleType(_CTypeBaseType):
         def __rmul__(self: type[_CT], value: int, /) -> type[Array[_CT]]: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
 
 class _SimpleCData(_CData, Generic[_T], metaclass=_PyCSimpleType):
-    """XXX to be provided"""
+    """This non-public class is the base class of all fundamental ctypes data types.
+    It contains the common attributes of the fundamental ctypes data types.
+    _SimpleCData is a subclass of _CData, so it inherits their methods and attributes.
+    """
 
     value: _T
     """current value"""
@@ -155,7 +160,12 @@ class _PyCPointerType(_CTypeBaseType):
         def __rmul__(cls: type[_CT], other: int) -> type[Array[_CT]]: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
 
 class _Pointer(_PointerLike, _CData, Generic[_CT], metaclass=_PyCPointerType):
-    """XXX to be provided"""
+    """Private, abstract base class for pointers.
+
+    Concrete pointer types are created by calling POINTER() with the type that will be pointed to; this is done automatically by pointer().
+
+    If a pointer points to an array, its elements can be read and written using standard subscript and slice accesses. Pointer objects have no size, so len() will raise TypeError. Negative subscripts will read from the memory before the pointer (as in C), and out-of-range subscripts will probably crash with an access violation (if you’re lucky).
+    """
 
     _type_: type[_CT]
     contents: _CT
@@ -165,12 +175,13 @@ class _Pointer(_PointerLike, _CData, Generic[_CT], metaclass=_PyCPointerType):
     def __init__(self) -> None: ...
     @overload
     def __init__(self, arg: _CT) -> None: ...
+
     @overload
     def __getitem__(self, key: int, /) -> Any:
         """Return self[key]."""
-
     @overload
-    def __getitem__(self, key: slice, /) -> list[Any]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> list[Any]: ...
+
     def __setitem__(self, key: int, value: Any, /) -> None:
         """Set self[key] to value."""
 
@@ -185,9 +196,9 @@ if sys.version_info < (3, 14):
         Pointer types are cached and reused internally,
         so calling this function repeatedly is cheap.
         """
-
     @overload
     def POINTER(type: type[_CT], /) -> type[_Pointer[_CT]]: ...
+
     def pointer(obj: _CT, /) -> _Pointer[_CT]:
         """Create a new pointer instance, pointing to 'obj'.
 
@@ -242,6 +253,7 @@ class CFuncPtr(_PointerLike, _CData, metaclass=_PyCFuncPtrType):
 
     # Abstract attribute that must be defined on subclasses
     _flags_: ClassVar[int]
+
     @overload
     def __new__(cls) -> Self: ...
     @overload
@@ -300,9 +312,9 @@ if sys.version_info >= (3, 14):
         @overload
         def __get__(self, instance: None, owner: builtins.type[Any] | None = None, /) -> Self:
             """Return an attribute of instance, which is of type owner."""
-
         @overload
         def __get__(self, instance: Any, owner: builtins.type[Any] | None = None, /) -> _GetT: ...
+
         def __set__(self, instance: Any, value: _SetT, /) -> None:
             """Set an attribute of instance to value."""
 
@@ -314,16 +326,11 @@ else:
     class _CField(Generic[_CT, _GetT, _SetT]):
         offset: int
         size: int
-        if sys.version_info >= (3, 10):
-            @overload
-            def __get__(self, instance: None, owner: type[Any] | None = None, /) -> Self: ...
-            @overload
-            def __get__(self, instance: Any, owner: type[Any] | None = None, /) -> _GetT: ...
-        else:
-            @overload
-            def __get__(self, instance: None, owner: type[Any] | None, /) -> Self: ...
-            @overload
-            def __get__(self, instance: Any, owner: type[Any] | None, /) -> _GetT: ...
+
+        @overload
+        def __get__(self, instance: None, owner: type[Any] | None = None, /) -> Self: ...
+        @overload
+        def __get__(self, instance: Any, owner: type[Any] | None = None, /) -> _GetT: ...
 
         def __set__(self, instance: Any, value: _SetT, /) -> None: ...
 
@@ -338,7 +345,7 @@ class _UnionType(_CTypeBaseType):
     # At runtime, various attributes are created on a Union subclass based
     # on its _fields_. This method doesn't exist, but represents those
     # dynamically created attributes.
-    def __getattr__(self, name: str) -> _CField[Any, Any, Any]: ...
+    def __getattr__(self, name: str, /) -> _CField[Any, Any, Any]: ...
     if sys.version_info < (3, 13):
         # Inherited from CType_Type starting on 3.13
         def __mul__(cls: type[_CT], other: int) -> type[Array[_CT]]: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
@@ -354,8 +361,8 @@ class Union(_CData, metaclass=_UnionType):
         _align_: ClassVar[int]
 
     def __init__(self, *args: Any, **kw: Any) -> None: ...
-    def __getattr__(self, name: str) -> Any: ...
-    def __setattr__(self, name: str, value: Any) -> None: ...
+    def __getattr__(self, name: str, /) -> Any: ...
+    def __setattr__(self, name: str, value: Any, /) -> None: ...
 
 # This class is not exposed. It calls itself _ctypes.PyCStructType.
 @type_check_only
@@ -368,7 +375,7 @@ class _PyCStructType(_CTypeBaseType):
     # At runtime, various attributes are created on a Structure subclass based
     # on its _fields_. This method doesn't exist, but represents those
     # dynamically created attributes.
-    def __getattr__(self, name: str) -> _CField[Any, Any, Any]: ...
+    def __getattr__(self, name: str, /) -> _CField[Any, Any, Any]: ...
     if sys.version_info < (3, 13):
         # Inherited from CType_Type starting on 3.13
         def __mul__(cls: type[_CT], other: int) -> type[Array[_CT]]: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
@@ -388,7 +395,7 @@ class Structure(_CData, metaclass=_PyCStructType):
         _layout_: ClassVar[Literal["ms", "gcc-sysv"]]
 
     def __init__(self, *args: Any, **kw: Any) -> None: ...
-    def __getattr__(self, name: str) -> Any: ...
+    def __getattr__(self, name: str, /) -> Any: ...
     def __setattr__(self, name: str, value: Any) -> None: ...
 
 # This class is not exposed. It calls itself _ctypes.PyCArrayType.
@@ -419,16 +426,19 @@ class Array(_CData, Generic[_CT], metaclass=_PyCArrayType):
     def _length_(self) -> int: ...
     @_length_.setter
     def _length_(self, value: int) -> None: ...
+
     @property
     @abstractmethod
     def _type_(self) -> type[_CT]: ...
     @_type_.setter
     def _type_(self, value: type[_CT]) -> None: ...
+
     # Note: only available if _CT == c_char
     @property
     def raw(self) -> bytes: ...
     @raw.setter
     def raw(self, value: ReadableBuffer) -> None: ...
+
     value: Any  # Note: bytes if _CT == c_char, str if _CT == c_wchar, unavailable otherwise
     # TODO: These methods cannot be annotated correctly at the moment.
     # All of these "Any"s stand for the array's element type, but it's not possible to use _CT
@@ -443,18 +453,19 @@ class Array(_CData, Generic[_CT], metaclass=_PyCArrayType):
     # This special behavior is not easy to model in a stub, so for now all places where
     # the array element type would belong are annotated with Any instead.
     def __init__(self, *args: Any) -> None: ...
+
     @overload
     def __getitem__(self, key: int, /) -> Any:
         """Return self[key]."""
-
     @overload
-    def __getitem__(self, key: slice, /) -> list[Any]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> list[Any]: ...
+
     @overload
     def __setitem__(self, key: int, value: Any, /) -> None:
         """Set self[key] to value."""
-
     @overload
-    def __setitem__(self, key: slice, value: Iterable[Any], /) -> None: ...
+    def __setitem__(self, key: slice[SupportsIndex | None], value: Iterable[Any], /) -> None: ...
+
     def __iter__(self) -> Iterator[Any]: ...
     # Can't inherit from Sized because the metaclass conflict between
     # Sized and _CData prevents using _CDataMeta.
@@ -462,7 +473,7 @@ class Array(_CData, Generic[_CT], metaclass=_PyCArrayType):
         """Return len(self)."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """Arrays are generic over the type of their elements"""
 
 def addressof(obj: _CData | _CDataType, /) -> int:
     """Return the address of the C instance internal buffer"""
@@ -489,3 +500,9 @@ def buffer_info(o: _CData | _CDataType | type[_CData | _CDataType], /) -> tuple[
 
 def call_cdeclfunction(address: int, arguments: tuple[Any, ...], /) -> Any: ...
 def call_function(address: int, arguments: tuple[Any, ...], /) -> Any: ...
+
+# dllist() is available on Linux and other platforms like NetBSD
+if sys.version_info >= (3, 14) and sys.platform != "win32" and sys.platform != "darwin":
+    # Added in Python 3.14.7
+    def dllist() -> list[str]:
+        """dllist() return a list of loaded shared libraries"""

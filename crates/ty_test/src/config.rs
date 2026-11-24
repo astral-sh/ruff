@@ -5,6 +5,9 @@
 //! ```toml
 //! log = true # or log = "ty=WARN"
 //!
+//! [rules]
+//! possibly-unresolved-reference = "warn"
+//!
 //! [environment]
 //! python-version = "3.10"
 //!
@@ -12,11 +15,20 @@
 //! dependencies = ["pydantic==2.12.2"]
 //! ```
 
-use anyhow::Context;
+use std::collections::BTreeMap;
+
+use char_str::CharStr;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::script::ScriptTag;
 use serde::{Deserialize, Serialize};
-use ty_python_semantic::PythonPlatform;
+use ty_module_resolver::ModuleName;
+use ty_python_core::platform::PythonPlatform;
+use ty_python_semantic::ReturnTypeInference;
+use ty_python_semantic::dependency::{
+    DependencyDistribution, DependencyMetadata, DependencyProject, DependencyProjectKind,
+};
+use ty_python_semantic::lint::Level;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -24,6 +36,8 @@ pub(crate) struct MarkdownTestConfig {
     pub(crate) environment: Option<Environment>,
 
     pub(crate) log: Option<Log>,
+
+    pub(crate) rules: Option<Rules>,
 
     pub(crate) analysis: Option<Analysis>,
 
@@ -34,13 +48,16 @@ pub(crate) struct MarkdownTestConfig {
 
     /// Project configuration for installing external dependencies.
     pub(crate) project: Option<Project>,
+
+    /// Dependency declarations and module ownership without installing packages.
+    pub(crate) dependency_metadata: Option<DependencyMetadataFixture>,
+
+    /// Simulate the use passing `-v` on the command line,
+    /// which can be used to show more information in test diagnostics.
+    pub(crate) verbose: Option<bool>,
 }
 
 impl MarkdownTestConfig {
-    pub(crate) fn from_str(s: &str) -> anyhow::Result<Self> {
-        toml::from_str(s).context("Error while parsing Markdown TOML config")
-    }
-
     pub(crate) fn python_version(&self) -> Option<PythonVersion> {
         self.environment.as_ref()?.python_version
     }
@@ -64,7 +81,49 @@ impl MarkdownTestConfig {
     pub(crate) fn dependencies(&self) -> Option<&[String]> {
         self.project.as_ref()?.dependencies.as_deref()
     }
+
+    pub(crate) fn verbose(&self) -> bool {
+        self.verbose.unwrap_or_default()
+    }
 }
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub(crate) struct ScriptOptions {
+    pub(crate) rules: Option<Rules>,
+    pub(crate) analysis: Option<Analysis>,
+    pub(crate) dependency_metadata: Option<DependencyMetadataFixture>,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct ScriptMetadata {
+    tool: Option<ScriptTool>,
+}
+
+impl ScriptMetadata {
+    pub(crate) fn from_source(source: &str) -> Option<Self> {
+        let tag = ScriptTag::parse(source)?;
+        toml::from_str(tag.metadata()).ok()
+    }
+
+    pub(crate) fn into_options(self) -> Option<ScriptOptions> {
+        let mut options = self.tool?.ty?;
+        if let Some(fixture) = &mut options.dependency_metadata {
+            for project in &mut fixture.metadata.projects {
+                project.kind = DependencyProjectKind::Script;
+            }
+        }
+
+        Some(options)
+    }
+}
+
+#[derive(Deserialize)]
+struct ScriptTool {
+    ty: Option<ScriptOptions>,
+}
+
+pub(crate) type Rules = BTreeMap<String, Level>;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
@@ -79,16 +138,16 @@ pub(crate) struct Environment {
     /// stable version supported by ty is used (see `ty check --help` output).
     ///
     /// ty will not infer the Python version from the Python environment at this time.
-    pub(crate) python_version: Option<PythonVersion>,
+    python_version: Option<PythonVersion>,
 
     /// Target platform to assume when resolving types.
-    pub(crate) python_platform: Option<PythonPlatform>,
+    python_platform: Option<PythonPlatform>,
 
     /// Path to a custom typeshed directory.
-    pub(crate) typeshed: Option<SystemPathBuf>,
+    typeshed: Option<SystemPathBuf>,
 
     /// Additional search paths to consider when resolving modules.
-    pub(crate) extra_paths: Option<Vec<SystemPathBuf>>,
+    extra_paths: Option<Vec<SystemPathBuf>>,
 
     /// Path to the Python environment.
     ///
@@ -102,14 +161,27 @@ pub(crate) struct Environment {
     /// ty will search in the resolved environment's `site-packages` directories for type
     /// information and third-party imports.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub python: Option<SystemPathBuf>,
+    python: Option<SystemPathBuf>,
 }
 
 #[derive(Deserialize, Default, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct Analysis {
+    pub(crate) return_type_inference: Option<ReturnTypeInference>,
+
+    /// Whether narrowing with generic classes uses the top materialization.
+    pub(crate) strict_generic_narrowing: Option<bool>,
+
+    /// Whether equality-based checks should preserve possible subclass behavior.
+    #[serde(alias = "strict-literal-narrowing")]
+    pub(crate) strict_equality_semantics: Option<bool>,
+
     /// Whether ty should support `type: ignore` comments.
     pub(crate) respect_type_ignore_comments: Option<bool>,
+
+    pub(crate) allowed_unresolved_imports: Option<Vec<String>>,
+
+    pub(crate) replace_imports_with_any: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -147,5 +219,86 @@ pub(crate) struct Project {
     /// The site-packages directory will then be copied into the test's filesystem.
     ///
     /// Example: `dependencies = ["pydantic==2.12.2"]`
-    pub(crate) dependencies: Option<Vec<String>>,
+    dependencies: Option<Vec<String>>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(try_from = "DependencyMetadataOptions")]
+pub(crate) struct DependencyMetadataFixture {
+    pub(crate) metadata: DependencyMetadata,
+}
+
+impl TryFrom<DependencyMetadataOptions> for DependencyMetadataFixture {
+    type Error = String;
+
+    fn try_from(options: DependencyMetadataOptions) -> Result<Self, Self::Error> {
+        let module_owners = options
+            .module_owners
+            .into_iter()
+            .map(|(module, owners)| {
+                let module_name = ModuleName::new(&module)
+                    .ok_or_else(|| format!("Invalid dependency module name `{module}`"))?;
+                Ok((module_name, owners.into_boxed_slice()))
+            })
+            .collect::<Result<_, Self::Error>>()?;
+
+        Ok(Self {
+            metadata: DependencyMetadata {
+                projects: options
+                    .projects
+                    .into_iter()
+                    .map(|project| DependencyProject {
+                        path: project.path,
+                        kind: DependencyProjectKind::Project,
+                        distribution: project.distribution,
+                        dependencies: project.dependencies.into_iter().collect(),
+                        group_dependencies: project.group_dependencies.into_iter().collect(),
+                    })
+                    .collect(),
+                distributions: options
+                    .distributions
+                    .into_iter()
+                    .map(|(id, distribution)| {
+                        (
+                            id,
+                            DependencyDistribution {
+                                name: distribution.name,
+                                editable_path: distribution.editable_path,
+                            },
+                        )
+                    })
+                    .collect(),
+                module_owners,
+            },
+        })
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+struct DependencyMetadataOptions {
+    #[serde(default)]
+    projects: Vec<DependencyProjectOptions>,
+    #[serde(default)]
+    distributions: BTreeMap<CharStr, DependencyDistributionOptions>,
+    #[serde(default)]
+    module_owners: BTreeMap<CharStr, Vec<CharStr>>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+struct DependencyProjectOptions {
+    path: SystemPathBuf,
+    distribution: Option<CharStr>,
+    #[serde(default)]
+    dependencies: Vec<CharStr>,
+    #[serde(default)]
+    group_dependencies: Vec<CharStr>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+struct DependencyDistributionOptions {
+    name: CharStr,
+    editable_path: Option<SystemPathBuf>,
 }

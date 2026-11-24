@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::registry::Rule;
 
 /// ## What it does
@@ -54,7 +55,7 @@ use crate::registry::Rule;
 /// - [Python documentation: `abc`](https://docs.python.org/3/library/abc.html)
 /// - [Python documentation: `typing.ClassVar`](https://docs.python.org/3/library/typing.html#typing.ClassVar)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.118")]
+#[violation_metadata(stable_since = "v0.0.118", category = Category::Suspicious)]
 pub(crate) struct AbstractBaseClassWithoutAbstractMethod {
     name: String,
 }
@@ -100,7 +101,7 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
 /// ## References
 /// - [Python documentation: `abc`](https://docs.python.org/3/library/abc.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.118")]
+#[violation_metadata(stable_since = "v0.0.118", category = Category::Suspicious)]
 pub(crate) struct EmptyMethodWithoutAbstractDecorator {
     name: String,
 }
@@ -118,16 +119,10 @@ impl Violation for EmptyMethodWithoutAbstractDecorator {
 fn is_abc_class(bases: &[Expr], keywords: &[Keyword], semantic: &SemanticModel) -> bool {
     keywords.iter().any(|keyword| {
         keyword.arg.as_ref().is_some_and(|arg| arg == "metaclass")
-            && semantic
-                .resolve_qualified_name(&keyword.value)
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["abc", "ABCMeta"])
-                })
-    }) || bases.iter().any(|base| {
-        semantic
-            .resolve_qualified_name(base)
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["abc", "ABC"]))
-    })
+            && semantic.matches_qualified_name(&keyword.value, &["abc", "ABCMeta"])
+    }) || bases
+        .iter()
+        .any(|base| semantic.matches_qualified_name(base, &["abc", "ABC"]))
 }
 
 fn is_empty_body(body: &[Stmt]) -> bool {

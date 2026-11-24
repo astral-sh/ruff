@@ -223,4 +223,3 @@ Module(
 4 | call(yield x)
 5 | call(yield from x)
   |      ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
-  |

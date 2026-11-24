@@ -4,10 +4,8 @@ use criterion::{
     BenchmarkId, Criterion, Throughput, criterion_group, criterion_main, measurement::WallTime,
 };
 use ruff_benchmark::{
-    LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestCase, UNICODE_PYPINYIN,
+    LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestFile, UNICODE_PYPINYIN,
 };
-use ruff_python_ast::Stmt;
-use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_parser::parse_module;
 
 #[cfg(target_os = "windows")]
@@ -27,25 +25,14 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-fn create_test_cases() -> Vec<TestCase> {
+fn create_test_cases() -> Vec<TestFile> {
     vec![
-        TestCase::fast(NUMPY_GLOBALS.clone()),
-        TestCase::fast(UNICODE_PYPINYIN.clone()),
-        TestCase::normal(PYDANTIC_TYPES.clone()),
-        TestCase::normal(NUMPY_CTYPESLIB.clone()),
-        TestCase::slow(LARGE_DATASET.clone()),
+        NUMPY_GLOBALS.clone(),
+        UNICODE_PYPINYIN.clone(),
+        PYDANTIC_TYPES.clone(),
+        NUMPY_CTYPESLIB.clone(),
+        LARGE_DATASET.clone(),
     ]
-}
-
-struct CountVisitor {
-    count: usize,
-}
-
-impl<'a> StatementVisitor<'a> for CountVisitor {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        walk_stmt(self, stmt);
-        self.count += 1;
-    }
 }
 
 fn benchmark_parser(criterion: &mut Criterion<WallTime>) {
@@ -58,14 +45,8 @@ fn benchmark_parser(criterion: &mut Criterion<WallTime>) {
             BenchmarkId::from_parameter(case.name()),
             &case,
             |b, case| {
-                b.iter(|| {
-                    let parsed = parse_module(case.code())
-                        .expect("Input should be a valid Python code")
-                        .into_suite();
-
-                    let mut visitor = CountVisitor { count: 0 };
-                    visitor.visit_body(&parsed);
-                    visitor.count
+                b.iter_with_large_drop(|| {
+                    parse_module(case.code()).expect("Input should be a valid Python code")
                 });
             },
         );

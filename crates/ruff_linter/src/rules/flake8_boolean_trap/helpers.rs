@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::settings::LinterSettings;
 
 /// Returns `true` if a function call is allowed to use a boolean trap.
-pub(super) fn is_allowed_func_call(name: &str) -> bool {
+fn is_allowed_func_call(name: &str) -> bool {
     matches!(
         name,
         "__setattr__"
@@ -50,8 +50,13 @@ pub(super) fn is_allowed_func_call(name: &str) -> bool {
     )
 }
 
+/// Returns `true` if a call is semantically allowed to use a boolean trap.
+fn is_semantically_allowed_func_call(call: &ast::ExprCall, semantic: &SemanticModel) -> bool {
+    semantic.matches_qualified_name(&call.func, &["multiprocessing", "Value"])
+}
+
 /// Returns `true` if a call is allowed by the user to use a boolean trap.
-pub(super) fn is_user_allowed_func_call(
+fn is_user_allowed_func_call(
     call: &ast::ExprCall,
     semantic: &SemanticModel,
     settings: &LinterSettings,
@@ -73,78 +78,44 @@ pub(super) fn is_user_allowed_func_call(
 /// This only includes operators, i.e., functions that are usually not called directly.
 ///
 /// See: <https://docs.python.org/3/library/operator.html>
-pub(super) fn is_operator_method(name: &str) -> bool {
-    matches!(
-        name,
-        "__contains__"  // in
-            // item access ([])
-            | "__getitem__"  // []
-            | "__setitem__"  // []=
-            | "__delitem__"  // del []
-            // addition (+)
-            | "__add__"  // +
-            | "__radd__"  // +
-            | "__iadd__"  // +=
-            // subtraction (-)
-            | "__sub__"  // -
-            | "__rsub__"  // -
-            | "__isub__"  // -=
-            // multiplication (*)
-            | "__mul__"  // *
-            | "__rmul__"  // *
-            | "__imul__"  // *=
-            // division (/)
-            | "__truediv__"  // /
-            | "__rtruediv__"  // /
-            | "__itruediv__"  // /=
-            // floor division (//)
-            | "__floordiv__"  // //
-            | "__rfloordiv__"  // //
-            | "__ifloordiv__"  // //=
-            // remainder (%)
-            | "__mod__"  // %
-            | "__rmod__"  // %
-            | "__imod__"  // %=
-            // exponentiation (**)
-            | "__pow__"  // **
-            | "__rpow__"  // **
-            | "__ipow__"  // **=
-            // left shift (<<)
-            | "__lshift__"  // <<
-            | "__rlshift__"  // <<
-            | "__ilshift__"  // <<=
-            // right shift (>>)
-            | "__rshift__"  // >>
-            | "__rrshift__"  // >>
-            | "__irshift__"  // >>=
-            // matrix multiplication (@)
-            | "__matmul__"  // @
-            | "__rmatmul__"  // @
-            | "__imatmul__"  // @=
-            // meet (&)
-            | "__and__"  // &
-            | "__rand__"  // &
-            | "__iand__"  // &=
-            // join (|)
-            | "__or__"  // |
-            | "__ror__"  // |
-            | "__ior__"  // |=
-            // xor (^)
-            | "__xor__"  // ^
-            | "__rxor__"  // ^
-            | "__ixor__"  // ^=
-            // comparison (>, <, >=, <=, ==, !=)
-            | "__gt__"  // >
-            | "__lt__"  // <
-            | "__ge__"  // >=
-            | "__le__"  // <=
-            | "__eq__"  // ==
-            | "__ne__" // !=
-            // unary operators (included for completeness)
-            | "__pos__"  // +
-            | "__neg__"  // -
-            | "__invert__" // ~
-    )
+fn is_operator_method(name: &str) -> bool {
+    match name {
+        // Membership (`in`).
+        "__contains__" => true,
+        // Item access (`[]`, `[]=`, and `del []`).
+        "__getitem__" | "__setitem__" | "__delitem__" => true,
+        // Addition (`+` and `+=`).
+        "__add__" | "__radd__" | "__iadd__" => true,
+        // Subtraction (`-` and `-=`).
+        "__sub__" | "__rsub__" | "__isub__" => true,
+        // Multiplication (`*` and `*=`).
+        "__mul__" | "__rmul__" | "__imul__" => true,
+        // Division (`/` and `/=`).
+        "__truediv__" | "__rtruediv__" | "__itruediv__" => true,
+        // Floor division (`//` and `//=`).
+        "__floordiv__" | "__rfloordiv__" | "__ifloordiv__" => true,
+        // Remainder (`%` and `%=`).
+        "__mod__" | "__rmod__" | "__imod__" => true,
+        // Exponentiation (`**` and `**=`).
+        "__pow__" | "__rpow__" | "__ipow__" => true,
+        // Left shift (`<<` and `<<=`).
+        "__lshift__" | "__rlshift__" | "__ilshift__" => true,
+        // Right shift (`>>` and `>>=`).
+        "__rshift__" | "__rrshift__" | "__irshift__" => true,
+        // Matrix multiplication (`@` and `@=`).
+        "__matmul__" | "__rmatmul__" | "__imatmul__" => true,
+        // Meet (`&` and `&=`).
+        "__and__" | "__rand__" | "__iand__" => true,
+        // Join (`|` and `|=`).
+        "__or__" | "__ror__" | "__ior__" => true,
+        // Exclusive-or (`^` and `^=`).
+        "__xor__" | "__rxor__" | "__ixor__" => true,
+        // Comparison (`>`, `<`, `>=`, `<=`, `==`, and `!=`).
+        "__gt__" | "__lt__" | "__ge__" | "__le__" | "__eq__" | "__ne__" => true,
+        // Unary operators (`+`, `-`, and `~`), included for completeness.
+        "__pos__" | "__neg__" | "__invert__" => true,
+        _ => false,
+    }
 }
 
 /// Returns `true` if a function definition is allowed to use a boolean trap.
@@ -184,6 +155,11 @@ pub(super) fn allow_boolean_trap(call: &ast::ExprCall, checker: &Checker) -> boo
         {
             return true;
         }
+    }
+
+    // If the function is explicitly allowed, then the boolean trap is allowed.
+    if is_semantically_allowed_func_call(call, checker.semantic()) {
+        return true;
     }
 
     // If the call is explicitly allowed by the user, then the boolean trap is allowed.

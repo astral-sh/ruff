@@ -3,11 +3,12 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::contains_effect;
+use ruff_python_ast::helpers::side_effect;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -31,9 +32,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as safe, unless the expression contains comments.
+/// This rule's fix is marked as safe, unless the expression contains comments
+/// or may have side effects.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Complexity)]
 pub(crate) struct UnnecessaryKeyCheck;
 
 impl AlwaysFixableViolation for UnnecessaryKeyCheck {
@@ -67,21 +69,11 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
     };
 
     // Left should be, e.g., `key in dct`.
-    let Expr::Compare(ast::ExprCompare {
-        left: key_left,
-        ops,
-        comparators,
-        ..
-    }) = left
-    else {
+    let Expr::Compare(compare) = left else {
         return;
     };
 
-    if !matches!(&**ops, [CmpOp::In]) {
-        return;
-    }
-
-    let [obj_left] = &**comparators else {
+    let Some((key_left, CmpOp::In, obj_left)) = compare.as_single() else {
         return;
     };
 
@@ -101,19 +93,21 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(obj_left, |id| checker.semantic().has_builtin_binding(id))
-        || contains_effect(key_left, |id| checker.semantic().has_builtin_binding(id))
-    {
+    let obj_effect = side_effect(obj_left, |id| checker.semantic().has_builtin_binding(id));
+    let key_effect = side_effect(key_left, |id| checker.semantic().has_builtin_binding(id));
+    let combined = obj_effect.merge(key_effect);
+    if combined.is_present() {
         return;
     }
 
     let mut diagnostic = checker.report_diagnostic(UnnecessaryKeyCheck, expr.range());
 
-    let applicability = if checker.comment_ranges().intersects(expr.range()) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
+    let applicability =
+        if !combined.is_absent() || checker.comment_ranges().intersects(expr.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
 
     diagnostic.set_fix(Fix::applicable_edit(
         Edit::range_replacement(

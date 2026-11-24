@@ -9,11 +9,11 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::{FxHashMap, FxHashSet};
 
-    use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::rules::flake8_import_conventions::settings::{BannedAliases, default_aliases};
-    use crate::settings::LinterSettings;
+    use crate::settings::{LinterSettings, types::PreviewMode};
     use crate::test::test_path;
+    use crate::{assert_diagnostics, assert_diagnostics_diff};
 
     #[test]
     fn defaults() -> Result<()> {
@@ -26,8 +26,30 @@ mod tests {
     }
 
     #[test]
+    fn defaults_preview() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("flake8_import_conventions/defaults.py"),
+            &LinterSettings {
+                flake8_import_conventions: super::settings::Settings::new(PreviewMode::Disabled),
+                ..LinterSettings::for_rules([
+                    Rule::UnconventionalImportAlias,
+                    Rule::BannedImportAlias
+                ])
+            },
+            &LinterSettings {
+                flake8_import_conventions: super::settings::Settings::new(PreviewMode::Enabled),
+                ..LinterSettings::for_rules([
+                    Rule::UnconventionalImportAlias,
+                    Rule::BannedImportAlias
+                ])
+            },
+        );
+        Ok(())
+    }
+
+    #[test]
     fn custom() -> Result<()> {
-        let mut aliases = default_aliases();
+        let mut aliases = default_aliases(PreviewMode::Disabled);
         aliases.extend(FxHashMap::from_iter([
             ("dask.array".to_string(), "da".to_string()),
             ("dask.dataframe".to_string(), "dd".to_string()),
@@ -53,7 +75,7 @@ mod tests {
             Path::new("flake8_import_conventions/custom_banned.py"),
             &LinterSettings {
                 flake8_import_conventions: super::settings::Settings {
-                    aliases: default_aliases(),
+                    aliases: default_aliases(PreviewMode::Disabled),
                     banned_aliases: FxHashMap::from_iter([
                         (
                             "typing".to_string(),
@@ -87,7 +109,7 @@ mod tests {
             Path::new("flake8_import_conventions/custom_banned_from.py"),
             &LinterSettings {
                 flake8_import_conventions: super::settings::Settings {
-                    aliases: default_aliases(),
+                    aliases: default_aliases(PreviewMode::Disabled),
                     banned_aliases: FxHashMap::default(),
                     banned_from: FxHashSet::from_iter([
                         "logging.config".to_string(),
@@ -126,7 +148,7 @@ mod tests {
 
     #[test]
     fn override_defaults() -> Result<()> {
-        let mut aliases = default_aliases();
+        let mut aliases = default_aliases(PreviewMode::Disabled);
         aliases.extend(FxHashMap::from_iter([(
             "numpy".to_string(),
             "nmp".to_string(),
@@ -149,7 +171,7 @@ mod tests {
 
     #[test]
     fn from_imports() -> Result<()> {
-        let mut aliases = default_aliases();
+        let mut aliases = default_aliases(PreviewMode::Disabled);
         aliases.extend(FxHashMap::from_iter([
             ("xml.dom.minidom".to_string(), "md".to_string()),
             (
@@ -185,7 +207,7 @@ mod tests {
 
     #[test]
     fn same_name() -> Result<()> {
-        let mut aliases = default_aliases();
+        let mut aliases = default_aliases(PreviewMode::Disabled);
         aliases.extend(FxHashMap::from_iter([(
             "django.conf.settings".to_string(),
             "settings".to_string(),

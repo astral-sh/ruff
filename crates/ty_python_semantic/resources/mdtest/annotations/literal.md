@@ -39,8 +39,7 @@ def f():
     reveal_type(a7)  # revealed: None
     reveal_type(a8)  # revealed: Literal[1]
     reveal_type(b1)  # revealed: Literal[Color.RED]
-    # TODO should be `Literal[MissingT.MISSING]`
-    reveal_type(b2)  # revealed: @Todo(functional `Enum` syntax)
+    reveal_type(b2)  # revealed: MissingT
 
 # error: [invalid-type-form]
 invalid1: Literal[3 + 4]
@@ -48,6 +47,10 @@ invalid1: Literal[3 + 4]
 invalid2: Literal[4 + 3j]
 # error: [invalid-type-form]
 invalid3: Literal[(3, 4)]
+# error: [invalid-type-form]
+invalid4: Literal[-3.14]
+# error: [invalid-type-form]
+invalid5: Literal[-3j]
 
 hello = "hello"
 invalid4: Literal[
@@ -329,8 +332,7 @@ from other import Literal
 #
 # ?
 #
-# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
-# error: [invalid-type-form] "Invalid subscript of object of type `_SpecialForm` in type expression"
+# error: [invalid-type-form] "Invalid subscript of object of type `_SpecialForm` in a type expression"
 a1: Literal[26]
 
 def f():
@@ -353,7 +355,73 @@ def f():
 ```py
 from typing import Literal
 
-# error: [invalid-type-form] "`typing.Literal` requires at least one argument when used in a type expression"
+# error: [invalid-type-form] "`typing.Literal` requires at least one argument when used in a parameter annotation"
 def _(x: Literal):
     reveal_type(x)  # revealed: Unknown
+```
+
+## Invalid expressions in string annotations
+
+Invalid `Literal` arguments in string annotations are checked without looking up assignment
+expressions that are absent from the semantic index. Missing names retain their diagnostics.
+
+`runtime.py`:
+
+```py
+from typing import Literal
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+a: "Literal[int[(name := missing)]]"
+b: "Literal[(name := int)[0]]"  # error: [invalid-type-form]
+c: "Literal[(name := 0).real]"  # error: [invalid-type-form]
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_nested` used when not defined"
+value: "Literal[int[missing_nested]]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_call` used when not defined"
+call: "Literal[int[missing_call()]]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_left` used when not defined"
+# error: [unresolved-reference] "Name `missing_right` used when not defined"
+arguments: "Literal[int[(missing_left, missing_right)]]"
+
+def valid(value: "Literal[Literal[1], None]"):
+    reveal_type(value)  # revealed: Literal[1] | None
+```
+
+The same error recovery applies in stub files.
+
+`stub.pyi`:
+
+```pyi
+from typing import Literal
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+a: "Literal[int[(name := missing)]]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_nested` used when not defined"
+b: "Literal[int[missing_nested]]"
+```
+
+## Invalid expressions in evaluated annotations
+
+When an annotation is evaluated, errors in its invalid arguments are still reported.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Literal
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+value: Literal[int[(name := missing)]]
 ```

@@ -5,15 +5,46 @@ mod notebook;
 mod range;
 mod text_document;
 
-use lsp_types::{PositionEncodingKind, Url};
-use ruff_db::system::{SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
+use std::collections::HashMap;
 
+use lsp_types::{PositionEncodingKind, TextEdit, Uri};
+use ruff_db::system::{SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
+use ty_ide::RangedValue;
+
+use crate::Db;
 use crate::system::AnySystemPath;
 pub(crate) use location::ToLink;
 pub use notebook::NotebookDocument;
-pub(crate) use range::{FileRangeExt, PositionExt, RangeExt, TextSizeExt, ToRangeExt};
+pub(crate) use range::{
+    FileRangeExt, PositionExt, RangeExt, TextSizeExt, ToRangeExt, cell_range,
+    resolve_file_uri_range,
+};
 pub use text_document::TextDocument;
 pub(crate) use text_document::{DocumentVersion, LanguageId};
+
+/// Appends replacements grouped by document URI, skipping edits without an LSP location.
+pub(crate) fn extend_lsp_edits<T: Into<String>>(
+    db: &dyn Db,
+    encoding: PositionEncoding,
+    edits: impl IntoIterator<Item = RangedValue<T>>,
+    changes: &mut HashMap<Uri, Vec<TextEdit>>,
+) {
+    for edit in edits {
+        if let Some(range) = edit.range.to_lsp_range(db, encoding)
+            && let Some(location) = range.into_location()
+        {
+            changes
+                .entry(location.uri)
+                .or_default()
+                .push(TextEdit::new(location.range, edit.value.into()));
+        } else {
+            tracing::debug!(
+                path = %edit.range.file().path(db),
+                "Skipping edit because its LSP location could not be resolved"
+            );
+        }
+    }
+}
 
 /// A convenient enumeration for supported text encodings. Can be converted to [`lsp_types::PositionEncodingKind`].
 // Please maintain the order from least to greatest priority for the derived `Ord` impl.
@@ -40,7 +71,7 @@ impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
     }
 }
 
-/// A unique document ID, derived from a URL passed as part of an LSP request.
+/// A unique document ID, derived from a URI passed as part of an LSP request.
 /// This document ID can point to either be a standalone Python file, a full notebook, or a cell within a notebook.
 ///
 /// The `DocumentKey` is very similar to `AnySystemPath`. The important distinction is that
@@ -48,9 +79,9 @@ impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
 /// ty also doesn't support resolving settings per cell, instead, settings are resolved per file or notebook.
 ///
 /// Thus, the motivation of `DocumentKey` is to prevent accidental use of Cell keys for operations
-/// that expect to work on a file path level. That's what [`DocumentHandle::to_file_path`]
-/// is for, it returns a file path for any document, taking into account that these methods should
-/// return the notebook for cell documents and notebooks.
+/// that expect to work on a file path level.
+/// [`OpenDocumentHandle::notebook_or_file_path`](crate::session::OpenDocumentHandle::notebook_or_file_path)
+/// returns the containing notebook's path for a cell, and the document's own path otherwise.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub(super) enum DocumentKey {
     /// A URI using the `file` schema and maps to a valid path.
@@ -63,24 +94,24 @@ pub(super) enum DocumentKey {
 }
 
 impl DocumentKey {
-    /// Converts the given [`Url`] to an [`DocumentKey`].
+    /// Converts the given [`Uri`] to an [`DocumentKey`].
     ///
-    /// If the URL scheme is `file`, then the path is converted to a [`SystemPathBuf`] unless
-    /// the url isn't a valid file path.
+    /// If the URI scheme is `file`, then the path is converted to a [`SystemPathBuf`] unless
+    /// the uri isn't a valid file path.
     ///
-    /// In all other cases, the URL is kept as an opaque identifier ([`Self::Opaque`]).
-    pub(crate) fn from_url(url: &Url) -> Self {
-        if url.scheme() == "file" {
-            if let Ok(path) = url.to_file_path() {
-                Self::File(SystemPathBuf::from_path_buf(path).expect("URL to be valid UTF-8"))
+    /// In all other cases, the URI is kept as an opaque identifier ([`Self::Opaque`]).
+    pub(crate) fn from_uri(uri: &Uri) -> Self {
+        if uri.scheme() == "file" {
+            if let Ok(path) = uri.to_file_path() {
+                Self::File(SystemPathBuf::from_path_buf(path).expect("URI to be valid UTF-8"))
             } else {
                 tracing::warn!(
-                    "Treating `file:` url `{url}` as opaque URL as it isn't a valid file path"
+                    "Treating `file:` uri `{uri}` as opaque URI as it isn't a valid file path"
                 );
-                Self::Opaque(url.to_string())
+                Self::Opaque(uri.to_string())
             }
         } else {
-            Self::Opaque(url.to_string())
+            Self::Opaque(uri.to_string())
         }
     }
 

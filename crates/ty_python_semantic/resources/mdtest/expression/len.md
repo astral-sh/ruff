@@ -11,6 +11,9 @@ reveal_type(len(r"conca\t" "ena\tion"))  # revealed: Literal[14]
 reveal_type(len(b"ytes lite" rb"al"))  # revealed: Literal[11]
 reveal_type(len("𝒰𝕹🄸©🕲𝕕ℇ"))  # revealed: Literal[7]
 
+reveal_type("abc".__len__)  # revealed: () -> Literal[3]
+reveal_type(b"abc".__len__)  # revealed: () -> Literal[3]
+
 # fmt: off
 
 reveal_type(len(  # revealed: Literal[7]
@@ -98,7 +101,7 @@ class UnknownLengthSubclassWithDunderLenOverridden(tuple[int, ...]):
 reveal_type(len(UnknownLengthSubclassWithDunderLenOverridden()))  # revealed: Literal[42]
 
 class FixedLengthSubclassWithDunderLenOverridden(tuple[int]):
-    def __len__(self) -> Literal[42]:  # error: [invalid-method-override]
+    def __len__(self) -> Literal[42]:  # error: [incompatible-method-override]
         return 42
 
 reveal_type(len(FixedLengthSubclassWithDunderLenOverridden((1,))))  # revealed: Literal[42]

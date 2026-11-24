@@ -10,11 +10,15 @@ use std::{path::PathBuf, str::FromStr, sync::Arc};
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{
     Layer,
-    fmt::{format::FmtSpan, time::ChronoLocal, writer::BoxMakeWriter},
+    fmt::{
+        format::{FmtSpan, Writer},
+        time::FormatTime,
+        writer::BoxMakeWriter,
+    },
     layer::SubscriberExt,
 };
 
-pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Path>) {
+pub fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Path>) {
     let log_file = log_file
         .map(|path| {
             // this expands `logFile` so that tildes and environment variables
@@ -53,7 +57,7 @@ pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Pat
     let is_trace_level = log_level == LogLevel::Trace;
     let subscriber = tracing_subscriber::Registry::default().with(
         tracing_subscriber::fmt::layer()
-            .with_timer(ChronoLocal::new("%Y-%m-%d %H:%M:%S.%f".to_string()))
+            .with_timer(LocalTime)
             .with_thread_names(is_trace_level)
             .with_target(is_trace_level)
             .with_ansi(false)
@@ -68,12 +72,24 @@ pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Pat
     tracing_log::LogTracer::init().unwrap();
 }
 
+struct LocalTime;
+
+impl FormatTime for LocalTime {
+    fn format_time(&self, writer: &mut Writer<'_>) -> std::fmt::Result {
+        write!(
+            writer,
+            "{}",
+            jiff::Zoned::now().strftime("%Y-%m-%d %H:%M:%S.%9f")
+        )
+    }
+}
+
 /// The log level for the server as provided by the client during initialization.
 ///
 /// The default log level is `info`.
 #[derive(Clone, Copy, Debug, Deserialize, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum LogLevel {
+pub enum LogLevel {
     Error,
     Warn,
     #[default]

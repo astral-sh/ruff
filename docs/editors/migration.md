@@ -1,10 +1,9 @@
 # Migrating from `ruff-lsp`
 
-[`ruff-lsp`][ruff-lsp] is the [Language Server Protocol] implementation for Ruff to power the editor
-integrations. It is written in Python and is a separate package from Ruff itself. The **native
-server**, however, is the [Language Server Protocol] implementation which is **written in Rust** and
-is available under the `ruff server` command. This guide is intended to help users migrate from
-[`ruff-lsp`][ruff-lsp] to the native server.
+Ruff's previous [Language Server Protocol] implementation, [`ruff-lsp`][ruff-lsp], was written in
+Python and distributed separately from Ruff. It is no longer supported. This guide explains how to
+migrate to Ruff's **native server**, which is written in Rust and available through the
+`ruff server` command.
 
 !!! note
 
@@ -26,9 +25,9 @@ that enumerate some of the common settings and how to migrate them.
 
 The following [`ruff-lsp`][ruff-lsp] settings are not supported by the native server:
 
-- [`lint.run`](settings.md#lintrun): This setting is no longer relevant for the native language
+- `lint.run`: This setting is no longer relevant for the native language
     server, which runs on every keystroke by default.
-- [`lint.args`](settings.md#lintargs), [`format.args`](settings.md#formatargs): These settings have
+- `lint.args`, `format.args`: These settings have
     been replaced by more granular settings in the native server like [`lint.select`](settings.md#select),
     [`format.preview`](settings.md#format_preview), etc. along with the ability to override any
     configuration using the [`configuration`](settings.md#configuration) setting.
@@ -43,8 +42,8 @@ Refer to their respective documentation for more information on how each is used
 
 Additionally, the following settings are not supported by the native server and should be removed:
 
-- [`ignoreStandardLibrary`](settings.md#ignorestandardlibrary)
-- [`showNotifications`](settings.md#shownotifications)
+- `ignoreStandardLibrary`
+- `showNotifications`
 
 ## New Settings
 
@@ -76,8 +75,8 @@ If you've been providing a configuration file as shown below:
 }
 ```
 
-You can migrate to the new server by using the [`configuration`](settings.md#configuration) setting
-like below which will apply the configuration to both the linter and the formatter:
+To migrate to the new server, use the [`configuration`](settings.md#configuration) setting to apply
+the configuration to both the linter and the formatter:
 
 ```json
 {

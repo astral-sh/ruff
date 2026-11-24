@@ -36,21 +36,37 @@ pub(crate) fn split_by_forced_separate<'a>(
         import_from_as,
         import_from_star,
     } = block;
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "splitting only moves entries between unordered import blocks"
+    )]
     for (imp, comment_set) in import {
         blocks[find_block_index(forced_separate, &imp)]
             .import
             .insert(imp, comment_set);
     }
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "splitting only moves entries between unordered import blocks"
+    )]
     for (imp, val) in import_from {
         blocks[find_block_index(forced_separate, &imp)]
             .import_from
             .insert(imp, val);
     }
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "splitting only moves entries between unordered import blocks"
+    )]
     for ((imp, alias), val) in import_from_as {
         blocks[find_block_index(forced_separate, &imp)]
             .import_from_as
             .insert((imp, alias), val);
     }
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "splitting only moves entries between unordered import blocks"
+    )]
     for (imp, comment_set) in import_from_star {
         blocks[find_block_index(forced_separate, &imp)]
             .import_from_star

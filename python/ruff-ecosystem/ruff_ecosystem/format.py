@@ -6,10 +6,11 @@ from __future__ import annotations
 
 import time
 from asyncio import create_subprocess_exec
+from collections.abc import Sequence
 from enum import Enum
 from pathlib import Path
 from subprocess import PIPE
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 from unidiff import PatchSet
 
@@ -172,7 +173,9 @@ async def format_then_format(
     config_overrides: ConfigOverrides,
     cloned_repo: ClonedRepository,
 ) -> Sequence[str]:
-    with config_overrides.patch_config(cloned_repo.path, options.preview):
+    with config_overrides.patch_config(
+        cloned_repo.path, options.preview, ruff_comparison_executable.resolve()
+    ):
         # Run format to get the baseline
         await format(
             formatter=baseline_formatter,
@@ -182,7 +185,7 @@ async def format_then_format(
             options=options,
         )
         # Then get the diff from stdout
-        diff = await format(
+        return await format(
             formatter=Formatter.ruff,
             executable=ruff_comparison_executable.resolve(),
             path=cloned_repo.path,
@@ -190,7 +193,6 @@ async def format_then_format(
             options=options,
             diff=True,
         )
-    return diff
 
 
 async def format_and_format(
@@ -201,7 +203,9 @@ async def format_and_format(
     config_overrides: ConfigOverrides,
     cloned_repo: ClonedRepository,
 ) -> Sequence[str]:
-    with config_overrides.patch_config(cloned_repo.path, options.preview):
+    with config_overrides.patch_config(
+        cloned_repo.path, options.preview, ruff_comparison_executable.resolve()
+    ):
         # Run format without diff to get the baseline
         await format(
             formatter=baseline_formatter,
@@ -218,7 +222,9 @@ async def format_and_format(
     # Then reset
     await cloned_repo.reset()
 
-    with config_overrides.patch_config(cloned_repo.path, options.preview):
+    with config_overrides.patch_config(
+        cloned_repo.path, options.preview, ruff_comparison_executable.resolve()
+    ):
         # Then run format again
         await format(
             formatter=Formatter.ruff,
@@ -229,9 +235,7 @@ async def format_and_format(
         )
 
     # Then get the diff from the commit
-    diff = await cloned_repo.diff(commit)
-
-    return diff
+    return await cloned_repo.diff(commit)
 
 
 async def format(
@@ -271,8 +275,7 @@ async def format(
     if proc.returncode not in [0, 1]:
         raise ToolError(err.decode("utf8"))
 
-    lines = result.decode("utf8").splitlines()
-    return lines
+    return result.decode("utf8").splitlines()
 
 
 class FormatComparison(Enum):

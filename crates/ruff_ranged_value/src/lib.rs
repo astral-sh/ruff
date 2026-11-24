@@ -1,0 +1,371 @@
+use std::cell::RefCell;
+use std::cmp::Ordering;
+use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+
+use serde::{Deserialize, Deserializer};
+use toml::Spanned;
+
+use ruff_db::Db;
+use ruff_db::files::{File, system_path_to_file};
+use ruff_db::system::SystemPathBuf;
+use ruff_python_ast::script::ScriptSourceMap;
+use ruff_text_size::{TextRange, TextSize};
+
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub enum ValueSource {
+    /// Value loaded from a project's configuration file.
+    ///
+    /// Ideally, we'd use [`ruff_db::files::File`] but we can't because the database hasn't been
+    /// created when loading the configuration.
+    File(Arc<SystemPathBuf>),
+
+    /// Value loaded from inline metadata in a standalone script.
+    ///
+    /// Unlike project configuration, scripts are parsed after the database exists, so their
+    /// existing Salsa file can be retained directly, including for virtual files.
+    ScriptMetadata(File),
+
+    /// The value comes from a CLI argument, while it's left open if specified using a short argument,
+    /// long argument (`--extra-paths`) or `--config key=value`.
+    Cli,
+
+    /// The value comes from the user's editor,
+    /// while it's left open if specified as a setting
+    /// or if the value was auto-discovered by the editor
+    /// (e.g., the Python environment)
+    Editor,
+
+    /// The value was provided by uv metadata for a project or standalone script.
+    UvMetadata,
+}
+
+impl ValueSource {
+    /// Resolves the file containing this setting, if its source is file-backed.
+    pub fn file(&self, db: &dyn Db) -> Option<File> {
+        match self {
+            ValueSource::File(path) => system_path_to_file(db, &**path).ok(),
+            ValueSource::ScriptMetadata(file) => Some(*file),
+            ValueSource::Cli => None,
+            ValueSource::Editor => None,
+            ValueSource::UvMetadata => None,
+        }
+    }
+}
+
+thread_local! {
+    /// Serde doesn't provide any easy means to pass a value to a [`Deserialize`] implementation,
+    /// but we want to associate each deserialized [`RelativePath`] with the source from
+    /// which it originated. We use a thread local variable to work around this limitation.
+    ///
+    /// Use the [`ValueSourceGuard`] to initialize the thread local before calling into any
+    /// deserialization code. It ensures that the thread local variable gets cleaned up
+    /// once deserialization is done (once the guard gets dropped).
+    static VALUE_SOURCE: RefCell<Option<ValueSourceContext>> = const { RefCell::new(None) };
+}
+
+/// Guard to safely change the [`ValueSource`] for the current thread.
+#[must_use]
+pub struct ValueSourceGuard {
+    prev_value: Option<ValueSourceContext>,
+}
+
+impl ValueSourceGuard {
+    pub fn new(source: ValueSource, is_toml: bool) -> Self {
+        Self::replace(ValueSourceContext {
+            source,
+            has_span: is_toml,
+            source_map: None,
+        })
+    }
+
+    /// Sets the source and maps deserialized TOML ranges into that source.
+    pub fn with_source_map(source: ValueSource, source_map: ScriptSourceMap) -> Self {
+        Self::replace(ValueSourceContext {
+            source,
+            has_span: true,
+            source_map: Some(source_map),
+        })
+    }
+
+    pub fn without_spans() -> Self {
+        let source = VALUE_SOURCE.with_borrow(|current| {
+            current
+                .as_ref()
+                .expect("value source to be set before disabling spans")
+                .source
+                .clone()
+        });
+        Self::new(source, false)
+    }
+
+    fn replace(context: ValueSourceContext) -> Self {
+        let prev = VALUE_SOURCE.replace(Some(context));
+        Self { prev_value: prev }
+    }
+}
+
+impl Drop for ValueSourceGuard {
+    fn drop(&mut self) {
+        VALUE_SOURCE.set(self.prev_value.take());
+    }
+}
+
+struct ValueSourceContext {
+    source: ValueSource,
+    has_span: bool,
+    source_map: Option<ScriptSourceMap>,
+}
+
+/// A value that "remembers" where it comes from (source) and its range in source.
+///
+/// ## Equality, Hash, and Ordering
+/// The equality, hash, and ordering are solely based on the value. They disregard the value's range
+/// or source.
+///
+/// This ensures that two resolved configurations are identical even if the position of a value has changed
+/// or if the values were loaded from different sources.
+#[derive(Clone, serde::Serialize)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+#[serde(transparent)]
+pub struct RangedValue<T> {
+    value: T,
+    #[serde(skip)]
+    source: ValueSource,
+
+    /// The byte range of `value` in `source`.
+    ///
+    /// Can be `None` because not all sources support a range.
+    /// For example, arguments provided on the CLI won't have a range attached.
+    #[serde(skip)]
+    range: Option<TextRange>,
+}
+
+#[cfg(feature = "schemars")]
+impl<T> schemars::JsonSchema for RangedValue<T>
+where
+    T: schemars::JsonSchema,
+{
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        T::schema_name()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        T::schema_id()
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        T::json_schema(generator)
+    }
+
+    fn _schemars_private_non_optional_json_schema(
+        generator: &mut schemars::SchemaGenerator,
+    ) -> schemars::Schema {
+        T::_schemars_private_non_optional_json_schema(generator)
+    }
+
+    fn _schemars_private_is_option() -> bool {
+        T::_schemars_private_is_option()
+    }
+}
+
+impl<T> RangedValue<T> {
+    pub fn new(value: T, source: ValueSource) -> Self {
+        Self {
+            value,
+            source,
+            range: None,
+        }
+    }
+
+    pub fn cli(value: T) -> Self {
+        Self::new(value, ValueSource::Cli)
+    }
+
+    pub fn python_extension(value: T) -> Self {
+        Self::new(value, ValueSource::Editor)
+    }
+
+    fn with_range(value: T, source: ValueSource, range: TextRange) -> Self {
+        Self {
+            value,
+            range: Some(range),
+            source,
+        }
+    }
+
+    pub fn range(&self) -> Option<TextRange> {
+        self.range
+    }
+
+    pub fn source(&self) -> &ValueSource {
+        &self.source
+    }
+
+    #[must_use]
+    pub fn map_value<R>(self, f: impl FnOnce(T) -> R) -> RangedValue<R> {
+        RangedValue {
+            value: f(self.value),
+            source: self.source,
+            range: self.range,
+        }
+    }
+
+    pub fn into_inner(self) -> T {
+        self.value
+    }
+}
+
+impl<T> IntoIterator for RangedValue<T>
+where
+    T: IntoIterator,
+{
+    type Item = T::Item;
+    type IntoIter = T::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.value.into_iter()
+    }
+}
+
+// The type already has an `iter` method thanks to `Deref`.
+#[expect(clippy::into_iter_without_iter)]
+impl<'a, T> IntoIterator for &'a RangedValue<T>
+where
+    &'a T: IntoIterator,
+{
+    type Item = <&'a T as IntoIterator>::Item;
+    type IntoIter = <&'a T as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.value.into_iter()
+    }
+}
+
+// The type already has a `into_iter_mut` method thanks to `DerefMut`.
+#[expect(clippy::into_iter_without_iter)]
+impl<'a, T> IntoIterator for &'a mut RangedValue<T>
+where
+    &'a mut T: IntoIterator,
+{
+    type Item = <&'a mut T as IntoIterator>::Item;
+    type IntoIter = <&'a mut T as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.value.into_iter()
+    }
+}
+
+impl<T> fmt::Debug for RangedValue<T>
+where
+    T: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.value.fmt(f)
+    }
+}
+
+impl<T> fmt::Display for RangedValue<T>
+where
+    T: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.value.fmt(f)
+    }
+}
+
+impl<T> Deref for RangedValue<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl<T> DerefMut for RangedValue<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.value
+    }
+}
+
+impl<T, U: ?Sized> AsRef<U> for RangedValue<T>
+where
+    T: AsRef<U>,
+{
+    fn as_ref(&self) -> &U {
+        self.value.as_ref()
+    }
+}
+
+impl<T: PartialEq> PartialEq for RangedValue<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.value.eq(&other.value)
+    }
+}
+
+impl<T: PartialEq<T>> PartialEq<T> for RangedValue<T> {
+    fn eq(&self, other: &T) -> bool {
+        self.value.eq(other)
+    }
+}
+
+impl<T: Eq> Eq for RangedValue<T> {}
+
+impl<T: Hash> Hash for RangedValue<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.value.hash(state);
+    }
+}
+
+impl<T: PartialOrd> PartialOrd for RangedValue<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.value.partial_cmp(&other.value)
+    }
+}
+
+impl<T: PartialOrd<T>> PartialOrd<T> for RangedValue<T> {
+    fn partial_cmp(&self, other: &T) -> Option<Ordering> {
+        self.value.partial_cmp(other)
+    }
+}
+
+impl<T: Ord> Ord for RangedValue<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.value.cmp(&other.value)
+    }
+}
+
+impl<'de, T> Deserialize<'de> for RangedValue<T>
+where
+    T: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        VALUE_SOURCE.with_borrow(|source| {
+            let context = source
+                .as_ref()
+                .expect("value source to be set before deserializing a ranged value");
+            let source = context.source.clone();
+
+            if context.has_span {
+                let spanned: Spanned<T> = Spanned::deserialize(deserializer)?;
+                let span = spanned.span();
+                let range = TextRange::new(
+                    TextSize::try_from(span.start)
+                        .expect("Configuration file to be smaller than 4GB"),
+                    TextSize::try_from(span.end)
+                        .expect("Configuration file to be smaller than 4GB"),
+                );
+                let range = context
+                    .source_map
+                    .as_ref()
+                    .map_or(range, |source_map| source_map.map_range(range));
+
+                Ok(Self::with_range(spanned.into_inner(), source, range))
+            } else {
+                Ok(Self::new(T::deserialize(deserializer)?, source))
+            }
+        })
+    }
+}

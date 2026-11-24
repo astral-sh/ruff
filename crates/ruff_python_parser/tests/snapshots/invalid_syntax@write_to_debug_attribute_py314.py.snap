@@ -1,0 +1,153 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/write_to_debug_attribute_py314.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..103,
+        body: [
+            Assign(
+                StmtAssign {
+                    node_index: NodeIndex(None),
+                    range: 44..69,
+                    targets: [
+                        Attribute(
+                            ExprAttribute {
+                                node_index: NodeIndex(None),
+                                range: 44..55,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 44..45,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                attr: Identifier {
+                                    id: Name("__debug__"),
+                                    range: 46..55,
+                                    node_index: NodeIndex(None),
+                                },
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Attribute(
+                        ExprAttribute {
+                            node_index: NodeIndex(None),
+                            range: 58..69,
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 58..59,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("__debug__"),
+                                range: 60..69,
+                                node_index: NodeIndex(None),
+                            },
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            AugAssign(
+                StmtAugAssign {
+                    node_index: NodeIndex(None),
+                    range: 70..86,
+                    target: Attribute(
+                        ExprAttribute {
+                            node_index: NodeIndex(None),
+                            range: 70..81,
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 70..71,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("__debug__"),
+                                range: 72..81,
+                                node_index: NodeIndex(None),
+                            },
+                            ctx: Store,
+                        },
+                    ),
+                    op: Add,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            node_index: NodeIndex(None),
+                            range: 85..86,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Delete(
+                StmtDelete {
+                    node_index: NodeIndex(None),
+                    range: 87..102,
+                    targets: [
+                        Attribute(
+                            ExprAttribute {
+                                node_index: NodeIndex(None),
+                                range: 91..102,
+                                value: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 91..92,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                attr: Identifier {
+                                    id: Name("__debug__"),
+                                    range: 93..102,
+                                    node_index: NodeIndex(None),
+                                },
+                                ctx: Del,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.14"}
+2 | x.__debug__ = x.__debug__
+  | ^^^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+3 | x.__debug__ += 1
+4 | del x.__debug__
+  |
+
+
+  |
+1 | # parse_options: {"target-version": "3.14"}
+2 | x.__debug__ = x.__debug__
+3 | x.__debug__ += 1
+  | ^^^^^^^^^^^ Syntax Error: cannot assign to `__debug__` on Python 3.14 (syntax was removed in 3.14)
+4 | del x.__debug__
+  |
+
+
+  |
+2 | x.__debug__ = x.__debug__
+3 | x.__debug__ += 1
+4 | del x.__debug__
+  |     ^^^^^^^^^^^ Syntax Error: cannot delete `__debug__` on Python 3.14 (syntax was removed in 3.14)

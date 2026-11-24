@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Violation};
 
 /// ## What it does
@@ -75,10 +76,10 @@ use crate::{AlwaysFixableViolation, Violation};
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.236")]
-pub(crate) struct LoggingStringFormat;
+#[violation_metadata(stable_since = "v0.0.236", category = Category::Pedantic)]
+pub(crate) struct LoggingStrFormat;
 
-impl Violation for LoggingStringFormat {
+impl Violation for LoggingStrFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Logging statement uses `str.format`".to_string()
@@ -160,7 +161,7 @@ impl Violation for LoggingStringFormat {
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.236")]
+#[violation_metadata(stable_since = "v0.0.236", category = Category::Pedantic)]
 pub(crate) struct LoggingPercentFormat;
 
 impl Violation for LoggingPercentFormat {
@@ -244,7 +245,7 @@ impl Violation for LoggingPercentFormat {
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.236")]
+#[violation_metadata(stable_since = "v0.0.236", category = Category::Pedantic)]
 pub(crate) struct LoggingStringConcat;
 
 impl Violation for LoggingStringConcat {
@@ -320,6 +321,15 @@ impl Violation for LoggingStringConcat {
 /// logging.info("%s - Something happened", user)
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is always marked as unsafe because formatting an object in an f-string
+/// evaluates its `__format__` method, whereas `%s` formatting evaluates its
+/// `__str__` method. If an object implements both methods with different behaviors,
+/// converting from an f-string to `%s` formatting can alter the logged message.
+///
+/// Additionally, if the message or the parentheses around it contain comments,
+/// the comments will be deleted.
+///
 /// ## Options
 /// - `lint.logger-objects`
 ///
@@ -327,7 +337,7 @@ impl Violation for LoggingStringConcat {
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.236")]
+#[violation_metadata(stable_since = "v0.0.236", category = Category::Pedantic)]
 pub(crate) struct LoggingFString;
 
 impl Violation for LoggingFString {
@@ -385,7 +395,7 @@ impl Violation for LoggingFString {
 /// - [Python documentation: `logging.warning`](https://docs.python.org/3/library/logging.html#logging.warning)
 /// - [Python documentation: `logging.Logger.warning`](https://docs.python.org/3/library/logging.html#logging.Logger.warning)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.236")]
+#[violation_metadata(stable_since = "v0.0.236", category = Category::Suspicious)]
 pub(crate) struct LoggingWarn;
 
 impl AlwaysFixableViolation for LoggingWarn {
@@ -453,7 +463,7 @@ impl AlwaysFixableViolation for LoggingWarn {
 /// ## References
 /// - [Python documentation: LogRecord attributes](https://docs.python.org/3/library/logging.html#logrecord-attributes)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.236")]
+#[violation_metadata(stable_since = "v0.0.236", category = Category::Correctness)]
 pub(crate) struct LoggingExtraAttrClash(pub String);
 
 impl Violation for LoggingExtraAttrClash {
@@ -516,10 +526,10 @@ impl Violation for LoggingExtraAttrClash {
 /// - [Python documentation: `logging.error`](https://docs.python.org/3/library/logging.html#logging.error)
 /// - [Python documentation: `error`](https://docs.python.org/3/library/logging.html#logging.Logger.error)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.236")]
-pub(crate) struct LoggingExcInfo;
+#[violation_metadata(stable_since = "v0.0.236", category = Category::Complexity)]
+pub(crate) struct LoggingErrorWithExcInfo;
 
-impl Violation for LoggingExcInfo {
+impl Violation for LoggingErrorWithExcInfo {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`"
@@ -579,7 +589,7 @@ impl Violation for LoggingExcInfo {
 /// - [Python documentation: `logging.error`](https://docs.python.org/3/library/logging.html#logging.error)
 /// - [Python documentation: `error`](https://docs.python.org/3/library/logging.html#logging.Logger.error)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.236")]
+#[violation_metadata(stable_since = "v0.0.236", category = Category::Style)]
 pub(crate) struct LoggingRedundantExcInfo;
 
 impl Violation for LoggingRedundantExcInfo {

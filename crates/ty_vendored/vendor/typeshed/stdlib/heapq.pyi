@@ -32,9 +32,9 @@ maintains the heap invariant!
 
 import sys
 from _heapq import *
-from _typeshed import SupportsRichComparison
+from _typeshed import SupportsRichComparison, SupportsRichComparisonT as _T
 from collections.abc import Callable, Generator, Iterable
-from typing import Any, Final, TypeVar
+from typing import Final, TypeVar, overload
 
 __all__ = ["heappush", "heappop", "heapify", "heapreplace", "merge", "nlargest", "nsmallest", "heappushpop"]
 
@@ -46,9 +46,8 @@ _S = TypeVar("_S")
 
 __about__: Final[str]
 
-def merge(
-    *iterables: Iterable[_S], key: Callable[[_S], SupportsRichComparison] | None = None, reverse: bool = False
-) -> Generator[_S]:
+@overload
+def merge(*iterables: Iterable[_S], key: Callable[[_S], SupportsRichComparison], reverse: bool = False) -> Generator[_S]:
     """Merge multiple sorted inputs into a single sorted output.
 
     Similar to sorted(itertools.chain(*iterables)) but returns a generator,
@@ -65,18 +64,26 @@ def merge(
     ['dog', 'cat', 'fish', 'horse', 'kangaroo']
 
     """
+@overload
+def merge(*iterables: Iterable[_T], key: None = None, reverse: bool = False) -> Generator[_T]: ...
 
-def nlargest(n: int, iterable: Iterable[_S], key: Callable[[_S], SupportsRichComparison] | None = None) -> list[_S]:
+@overload
+def nlargest(n: int, iterable: Iterable[_S], key: Callable[[_S], SupportsRichComparison]) -> list[_S]:
     """Find the n largest elements in a dataset.
 
     Equivalent to:  sorted(iterable, key=key, reverse=True)[:n]
     """
+@overload
+def nlargest(n: int, iterable: Iterable[_T], key: None = None) -> list[_T]: ...
 
-def nsmallest(n: int, iterable: Iterable[_S], key: Callable[[_S], SupportsRichComparison] | None = None) -> list[_S]:
+@overload
+def nsmallest(n: int, iterable: Iterable[_S], key: Callable[[_S], SupportsRichComparison]) -> list[_S]:
     """Find the n smallest elements in a dataset.
 
     Equivalent to:  sorted(iterable, key=key)[:n]
     """
+@overload
+def nsmallest(n: int, iterable: Iterable[_T], key: None = None) -> list[_T]: ...
 
-def _heapify_max(heap: list[Any], /) -> None:  # undocumented
+def _heapify_max(heap: list[SupportsRichComparison], /) -> None:  # undocumented
     """Maxheap variant of heapify."""

@@ -3,6 +3,7 @@ use ruff_python_ast::{Expr, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::refurb::helpers::IterLocation;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
@@ -44,7 +45,7 @@ use crate::rules::refurb::helpers::parenthesize_loop_iter_if_necessary;
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.5")]
+#[violation_metadata(preview_since = "v0.3.5", category = Category::Complexity)]
 pub(crate) struct ForLoopSetMutations {
     method_name: &'static str,
     batch_method_name: &'static str,
@@ -108,16 +109,25 @@ pub(crate) fn for_loop_set_mutations(checker: &Checker, for_stmt: &StmtFor) {
             format!(
                 "{}.{batch_method_name}({})",
                 set.id,
-                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Call),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Call).0,
             )
         }
-        (for_target, arg) => format!(
-            "{}.{batch_method_name}({} for {} in {})",
-            set.id,
-            locator.slice(arg),
-            locator.slice(for_target),
-            parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension),
-        ),
+        (for_target, arg) => {
+            let arg_content = match arg {
+                Expr::Generator(generator) if !generator.parenthesized => {
+                    format!("({})", locator.slice(arg))
+                }
+                _ => locator.slice(arg).to_string(),
+            };
+            format!(
+                "{}.{batch_method_name}({} for {} in {})",
+                set.id,
+                arg_content,
+                locator.slice(for_target),
+                parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension)
+                    .0,
+            )
+        }
     };
 
     let applicability = if checker.comment_ranges().intersects(for_stmt.range) {

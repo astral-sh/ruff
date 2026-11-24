@@ -12,6 +12,7 @@ use ruff_text_size::{Ranged, TextSize};
 
 use crate::Fix;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::add_parameter;
 use crate::rules::fastapi::rules::is_fastapi_route_decorator;
 use crate::{FixAvailability, Violation};
@@ -64,7 +65,7 @@ use crate::{FixAvailability, Violation};
 /// This rule's fix is marked as unsafe, as modifying a function signature can
 /// change the behavior of the code.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Suspicious)]
 pub(crate) struct FastApiUnusedPathParameter {
     arg_name: String,
     function_name: String,
@@ -194,11 +195,13 @@ pub(crate) fn fastapi_unused_path_parameter(
                 .sub_end(TextSize::from((path.len() - range.end + 1) as u32)),
         );
         if !is_positional && is_identifier(path_param) && path_param != "__debug__" {
-            diagnostic.set_fix(Fix::unsafe_edit(add_parameter(
+            if let Some(edit) = add_parameter(
                 path_param,
                 &function_def.parameters,
                 checker.locator().contents(),
-            )));
+            ) {
+                diagnostic.set_fix(Fix::unsafe_edit(edit));
+            }
         }
     }
 }
@@ -305,13 +308,27 @@ impl<'a> Dependency<'a> {
     }
 
     fn from_depends_call(arguments: &'a Arguments, semantic: &SemanticModel<'a>) -> Option<Self> {
-        let Some(Expr::Name(name)) = arguments.find_argument_value("dependency", 0) else {
-            return None;
-        };
+        let dep_arg = arguments.find_argument_value("dependency", 0)?;
 
-        Self::from_dependency_name(name, semantic)
+        match dep_arg {
+            // `Depends(some_callable)` — a name reference (function or class).
+            Expr::Name(name) => Self::from_dependency_name(name, semantic),
+            // `Depends(SomeClass(...))` — a call expression. If the callee is a
+            // class, FastAPI will invoke `__call__` on the resulting instance.
+            Expr::Call(call) => {
+                let Expr::Name(name) = call.func.as_ref() else {
+                    return None;
+                };
+                Self::from_dependency_instance(name, semantic)
+            }
+            _ => None,
+        }
     }
 
+    /// Resolve a dependency that is a name reference (e.g. `Depends(Query)`).
+    ///
+    /// For classes, FastAPI calls the class constructor, so the parameters come
+    /// from `__init__`.
     fn from_dependency_name(name: &'a ast::ExprName, semantic: &SemanticModel<'a>) -> Option<Self> {
         let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
             return Some(Self::Unknown);
@@ -332,45 +349,71 @@ impl<'a> Dependency<'a> {
                 Some(Self::Function(parameter_names))
             }
             BindingKind::ClassDefinition(scope_id) => {
-                let scope = &semantic.scopes[scope_id];
-
-                let ScopeKind::Class(class_def) = scope.kind else {
-                    return Some(Self::Unknown);
-                };
-
-                let parameter_names = if class_def
-                    .bases()
-                    .iter()
-                    .any(|expr| is_pydantic_base_model(expr, semantic))
-                {
-                    class_def
-                        .body
-                        .iter()
-                        .filter_map(|stmt| {
-                            stmt.as_ann_assign_stmt()
-                                .and_then(|ann_assign| ann_assign.target.as_name_expr())
-                                .map(|name| name.id.as_str())
-                        })
-                        .collect()
-                } else if let Some(init_def) = class_def
-                    .body
-                    .iter()
-                    .filter_map(|stmt| stmt.as_function_def_stmt())
-                    .find(|func_def| func_def.name.as_str() == "__init__")
-                {
-                    // Skip `self` parameter
-                    non_posonly_non_variadic_parameters(init_def)
-                        .skip(1)
-                        .map(|param| param.name().as_str())
-                        .collect()
-                } else {
-                    return None;
-                };
-
-                Some(Self::Class(parameter_names))
+                Self::class_params_from_method(semantic, scope_id, "__init__")
             }
             _ => Some(Self::Unknown),
         }
+    }
+
+    /// Resolve a dependency that is a class instance (e.g. `Depends(Query())`).
+    ///
+    /// FastAPI calls the instance, so the parameters come from `__call__`.
+    fn from_dependency_instance(
+        name: &'a ast::ExprName,
+        semantic: &SemanticModel<'a>,
+    ) -> Option<Self> {
+        let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+            return Some(Self::Unknown);
+        };
+
+        match binding.kind {
+            BindingKind::ClassDefinition(scope_id) => {
+                Self::class_params_from_method(semantic, scope_id, "__call__")
+            }
+            _ => Some(Self::Unknown),
+        }
+    }
+
+    /// Extract parameters from a specific method (`__init__` or `__call__`) of a class.
+    fn class_params_from_method(
+        semantic: &SemanticModel<'a>,
+        scope_id: ruff_python_semantic::ScopeId,
+        method_name: &str,
+    ) -> Option<Self> {
+        let scope = &semantic.scopes[scope_id];
+
+        let ScopeKind::Class(class_def) = scope.kind else {
+            return Some(Self::Unknown);
+        };
+
+        let parameter_names = if class_def
+            .bases()
+            .iter()
+            .any(|expr| is_pydantic_base_model(expr, semantic))
+        {
+            class_def
+                .body
+                .iter()
+                .filter_map(|stmt| {
+                    stmt.as_ann_assign_stmt()
+                        .and_then(|ann_assign| ann_assign.target.as_name_expr())
+                        .map(|name| name.id.as_str())
+                })
+                .collect()
+        } else {
+            let method_def = class_def
+                .body
+                .iter()
+                .filter_map(|stmt| stmt.as_function_def_stmt())
+                .find(|func_def| func_def.name.as_str() == method_name)?;
+            // Skip `self` parameter
+            non_posonly_non_variadic_parameters(method_def)
+                .skip(1)
+                .map(|param| param.name().as_str())
+                .collect()
+        };
+
+        Some(Self::Class(parameter_names))
     }
 }
 
@@ -390,17 +433,11 @@ fn depends_arguments<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a
 }
 
 fn is_fastapi_depends(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["fastapi", "Depends"]))
+    semantic.matches_qualified_name(expr, &["fastapi", "Depends"])
 }
 
 fn is_pydantic_base_model(expr: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(expr)
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["pydantic", "BaseModel"])
-        })
+    semantic.matches_qualified_name(expr, &["pydantic", "BaseModel"])
 }
 
 /// Extract the expected in-route name for a given parameter, if it has an alias.
@@ -439,10 +476,7 @@ fn parameter_alias<'a>(parameter: &'a Parameter, semantic: &SemanticModel) -> Op
     }
 
     // Verify that the call was a `fastapi.Path`.
-    if !semantic
-        .resolve_qualified_name(&path.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["fastapi", "Path"]))
-    {
+    if !semantic.matches_qualified_name(&path.func, &["fastapi", "Path"]) {
         return None;
     }
 

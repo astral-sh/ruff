@@ -1,14 +1,17 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_compound_statement;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
-use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::registry::Rule;
 
 use crate::rules::flake8_pytest_style::helpers::is_empty_or_null_string;
+
+const PYTEST_WARNS: &[&str] = &["pytest", "warns"];
 
 /// ## What it does
 /// Checks for `pytest.warns` context managers with multiple statements.
@@ -50,7 +53,7 @@ use crate::rules::flake8_pytest_style::helpers::is_empty_or_null_string;
 /// ## References
 /// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Suspicious)]
 pub(crate) struct PytestWarnsWithMultipleStatements;
 
 impl Violation for PytestWarnsWithMultipleStatements {
@@ -102,7 +105,7 @@ impl Violation for PytestWarnsWithMultipleStatements {
 /// ## References
 /// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Pedantic)]
 pub(crate) struct PytestWarnsTooBroad {
     warning: String,
 }
@@ -122,8 +125,9 @@ impl Violation for PytestWarnsTooBroad {
 /// Checks for `pytest.warns` calls without an expected warning.
 ///
 /// ## Why is this bad?
-/// `pytest.warns` expects to receive an expected warning as its first
-/// argument. If omitted, the `pytest.warns` call will fail at runtime.
+/// When called without arguments, `pytest.warns` defaults to `Warning`, accepting any warning type.
+/// Specifying the expected warning type makes the test more precise and prevents unrelated warnings
+/// from causing it to pass unexpectedly.
 ///
 /// ## Example
 /// ```python
@@ -148,7 +152,7 @@ impl Violation for PytestWarnsTooBroad {
 /// ## References
 /// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.9.2")]
+#[violation_metadata(preview_since = "0.9.2", category = Category::Pedantic)]
 pub(crate) struct PytestWarnsWithoutWarning;
 
 impl Violation for PytestWarnsWithoutWarning {
@@ -158,10 +162,8 @@ impl Violation for PytestWarnsWithoutWarning {
     }
 }
 
-pub(crate) fn is_pytest_warns(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "warns"]))
+fn is_pytest_warns(qualified_name: &QualifiedName) -> bool {
+    qualified_name.segments() == PYTEST_WARNS
 }
 
 const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
@@ -173,8 +175,8 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 }
 
 /// PT029, PT030
-pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall) {
-    if is_pytest_warns(&call.func, checker.semantic()) {
+pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall, qualified_name: &QualifiedName) {
+    if is_pytest_warns(qualified_name) {
         if checker.is_rule_enabled(Rule::PytestWarnsWithoutWarning) {
             if call.arguments.is_empty() {
                 checker.report_diagnostic(PytestWarnsWithoutWarning, call.func.range());
@@ -198,7 +200,9 @@ pub(crate) fn warns_call(checker: &Checker, call: &ast::ExprCall) {
 /// PT031
 pub(crate) fn complex_warns(checker: &Checker, stmt: &Stmt, items: &[WithItem], body: &[Stmt]) {
     let warns_called = items.iter().any(|item| match &item.context_expr {
-        Expr::Call(ast::ExprCall { func, .. }) => is_pytest_warns(func, checker.semantic()),
+        Expr::Call(ast::ExprCall { func, .. }) => checker
+            .semantic()
+            .matches_qualified_name(func, PYTEST_WARNS),
         _ => false,
     });
 

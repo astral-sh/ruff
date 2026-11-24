@@ -13,7 +13,7 @@ fn lint_select() {
     exit_code: 0
     ----- stdout -----
     A list of rule codes or prefixes to enable. Prefixes can specify exact
-    rules (like `F841`), entire categories (like `F`), or anything in
+    rules (like `F841`), entire groups (like `F`), or anything in
     between.
 
     When breaking ties between enabled and disabled rules (via `select` and
@@ -21,12 +21,15 @@ fn lint_select() {
     specific prefixes. `ignore` takes precedence over `select` if the
     same prefix appears in both.
 
-    Default value: ["E4", "E7", "E9", "F"]
+    In preview, categories like `correctness` and `suspicious` can be used
+    in addition to rule codes and linter group prefixes.
+
+    Default value: See https://docs.astral.sh/ruff/default-rules/ or run `ruff check --show-settings --isolated`
     Type: list[RuleSelector]
     Example usage:
     ```toml
-    # On top of the defaults (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
-    select = ["E4", "E7", "E9", "F", "B", "Q"]
+    # On top of the defaults, enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+    extend-select = ["B", "Q"]
     ```
 
     ----- stderr -----
@@ -42,11 +45,11 @@ fn lint_select_json() {
     exit_code: 0
     ----- stdout -----
     {
-      "doc": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.",
-      "default": "[\"E4\", \"E7\", \"E9\", \"F\"]",
+      "doc": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
+      "default": "See https://docs.astral.sh/ruff/default-rules/ or run `ruff check --show-settings --isolated`",
       "value_type": "list[RuleSelector]",
       "scope": null,
-      "example": "# On top of the defaults (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).\nselect = [\"E4\", \"E7\", \"E9\", \"F\", \"B\", \"Q\"]",
+      "example": "# On top of the defaults, enable flake8-bugbear (`B`) and flake8-quotes (`Q`).\nextend-select = [\"B\", \"Q\"]",
       "deprecated": null
     }
 

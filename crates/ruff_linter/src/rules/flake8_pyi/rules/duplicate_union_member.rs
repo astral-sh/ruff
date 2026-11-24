@@ -4,12 +4,12 @@ use std::collections::HashSet;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{AtomicNodeIndex, Expr, ExprBinOp, ExprNoneLiteral, Operator, PythonVersion};
-use ruff_python_semantic::analyze::typing::{traverse_union, traverse_union_and_optional};
+use ruff_python_semantic::analyze::typing::traverse_union_and_optional;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use super::generate_union_fix;
 use crate::checkers::ast::Checker;
-use crate::preview::is_optional_as_none_in_union_enabled;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -37,7 +37,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `typing.Union`](https://docs.python.org/3/library/typing.html#typing.Union)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Correctness)]
 pub(crate) struct DuplicateUnionMember {
     duplicate_name: String,
 }
@@ -72,9 +72,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
             union_type = UnionKind::PEP604;
         }
 
-        let virtual_expr = if is_optional_as_none_in_union_enabled(checker.settings())
-            && is_optional_type(checker, expr)
-        {
+        let virtual_expr = if is_optional_type(checker, expr) {
             // If the union member is an `Optional`, add a virtual `None` literal.
             optional_present = true;
             &VIRTUAL_NONE_LITERAL
@@ -97,11 +95,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
     };
 
     // Traverse the union, collect all diagnostic members
-    if is_optional_as_none_in_union_enabled(checker.settings()) {
-        traverse_union_and_optional(&mut check_for_duplicate_members, checker.semantic(), expr);
-    } else {
-        traverse_union(&mut check_for_duplicate_members, checker.semantic(), expr);
-    }
+    traverse_union_and_optional(&mut check_for_duplicate_members, checker.semantic(), expr);
 
     if diagnostics.is_empty() {
         return;

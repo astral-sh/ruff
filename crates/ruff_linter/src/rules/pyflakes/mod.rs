@@ -11,18 +11,19 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
-    use ruff_db::diagnostic::Diagnostic;
+    use ruff_db::diagnostic::{Diagnostic, DummyFileResolver};
     use ruff_python_parser::ParseOptions;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
 
-    use ruff_python_ast::PySourceType;
+    use ruff_python_ast::{PySourceType, PythonVersion};
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_trivia::textwrap::dedent;
 
     use crate::linter::check_path;
     use crate::registry::{Linter, Rule};
+    use crate::rules::flake8_type_checking::settings::RuntimeSemantics;
     use crate::rules::isort;
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
@@ -30,7 +31,9 @@ mod tests {
     use crate::source_kind::SourceKind;
     use crate::suppression::Suppressions;
     use crate::test::{test_contents, test_path, test_snippet};
-    use crate::{Locator, assert_diagnostics, assert_diagnostics_diff, directives};
+    use crate::{
+        Applicability, Fix, Locator, assert_diagnostics, assert_diagnostics_diff, directives,
+    };
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_1.py"))]
@@ -60,30 +63,30 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_34.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.ipynb"))]
-    #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"))]
+    #[test_case(Rule::StarImport, Path::new("F403.py"))]
     #[test_case(Rule::LateFutureImport, Path::new("F404_0.py"))]
     #[test_case(Rule::LateFutureImport, Path::new("F404_1.py"))]
-    #[test_case(Rule::UndefinedLocalWithImportStarUsage, Path::new("F405.py"))]
-    #[test_case(Rule::UndefinedLocalWithNestedImportStarUsage, Path::new("F406.py"))]
+    #[test_case(Rule::PossiblyUndefinedNameWithStarImport, Path::new("F405.py"))]
+    #[test_case(Rule::NonModuleLevelStarImport, Path::new("F406.py"))]
     #[test_case(Rule::FutureFeatureNotDefined, Path::new("F407.py"))]
-    #[test_case(Rule::PercentFormatInvalidFormat, Path::new("F50x.py"))]
+    #[test_case(Rule::PercentFormatInvalidSyntax, Path::new("F50x.py"))]
     #[test_case(Rule::PercentFormatExpectedMapping, Path::new("F502.py"))]
     #[test_case(Rule::PercentFormatExpectedMapping, Path::new("F50x.py"))]
     #[test_case(Rule::PercentFormatExpectedSequence, Path::new("F503.py"))]
     #[test_case(Rule::PercentFormatExpectedSequence, Path::new("F50x.py"))]
-    #[test_case(Rule::PercentFormatExtraNamedArguments, Path::new("F504.py"))]
-    #[test_case(Rule::PercentFormatExtraNamedArguments, Path::new("F50x.py"))]
+    #[test_case(Rule::PercentFormatUnusedNamedArguments, Path::new("F504.py"))]
+    #[test_case(Rule::PercentFormatUnusedNamedArguments, Path::new("F50x.py"))]
     #[test_case(Rule::PercentFormatMissingArgument, Path::new("F504.py"))]
     #[test_case(Rule::PercentFormatMissingArgument, Path::new("F50x.py"))]
     #[test_case(Rule::PercentFormatMixedPositionalAndNamed, Path::new("F50x.py"))]
     #[test_case(Rule::PercentFormatPositionalCountMismatch, Path::new("F50x.py"))]
     #[test_case(Rule::PercentFormatStarRequiresSequence, Path::new("F50x.py"))]
     #[test_case(Rule::PercentFormatUnsupportedFormatCharacter, Path::new("F50x.py"))]
-    #[test_case(Rule::StringDotFormatInvalidFormat, Path::new("F521.py"))]
-    #[test_case(Rule::StringDotFormatExtraNamedArguments, Path::new("F522.py"))]
-    #[test_case(Rule::StringDotFormatExtraPositionalArguments, Path::new("F523.py"))]
-    #[test_case(Rule::StringDotFormatMissingArguments, Path::new("F524.py"))]
-    #[test_case(Rule::StringDotFormatMixingAutomatic, Path::new("F525.py"))]
+    #[test_case(Rule::StrFormatInvalidSyntax, Path::new("F521.py"))]
+    #[test_case(Rule::StrFormatUnusedKeywordArguments, Path::new("F522.py"))]
+    #[test_case(Rule::StrFormatUnusedPositionalArguments, Path::new("F523.py"))]
+    #[test_case(Rule::StrFormatMissingArguments, Path::new("F524.py"))]
+    #[test_case(Rule::StrFormatMixedPlaceholderNumbering, Path::new("F525.py"))]
     #[test_case(Rule::FStringMissingPlaceholders, Path::new("F541.py"))]
     #[test_case(Rule::MultiValueRepeatedKeyLiteral, Path::new("F601.py"))]
     #[test_case(Rule::MultiValueRepeatedKeyVariable, Path::new("F602.py"))]
@@ -132,6 +135,9 @@ mod tests {
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_30.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_31.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_32.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_33.pyi"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_35.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_36.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_0.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_1.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_2.py"))]
@@ -168,6 +174,8 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_31.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_32.pyi"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_33.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_34.pyi"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_34.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
@@ -182,7 +190,7 @@ mod tests {
     #[test_case(Rule::UnusedAnnotation, Path::new("F842.py"))]
     #[test_case(Rule::RaiseNotImplemented, Path::new("F901.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
@@ -196,15 +204,18 @@ mod tests {
         rule_code: Rule,
         path: &Path,
     ) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings {
                 flake8_type_checking: crate::rules::flake8_type_checking::settings::Settings {
-                    runtime_required_base_classes: vec![
-                        "pydantic.BaseModel".to_string(),
-                        "sqlalchemy.orm.DeclarativeBase".to_string(),
-                    ],
+                    runtime_evaluated_base_classes: FxHashMap::from_iter([
+                        ("pydantic.BaseModel".to_string(), RuntimeSemantics::Required),
+                        (
+                            "sqlalchemy.orm.DeclarativeBase".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                    ]),
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(rule_code)
@@ -218,10 +229,30 @@ mod tests {
     fn f821_with_builtin_added_on_new_py_version_but_old_target_version_specified() {
         let diagnostics = test_snippet(
             "PythonFinalizationError",
-            &LinterSettings {
-                unresolved_target_version: ruff_python_ast::PythonVersion::PY312.into(),
-                ..LinterSettings::for_rule(Rule::UndefinedName)
-            },
+            &LinterSettings::for_rule(Rule::UndefinedName)
+                .with_target_version(ruff_python_ast::PythonVersion::PY312),
+        );
+        assert_diagnostics!(diagnostics);
+    }
+
+    #[test]
+    fn f821_frozendict_py315_available() {
+        // frozendict is available starting in Python 3.15.
+        let diagnostics = test_snippet(
+            "frozendict",
+            &LinterSettings::for_rule(Rule::UndefinedName)
+                .with_target_version(ruff_python_ast::PythonVersion::PY315),
+        );
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn f821_frozendict_pre_py315_undefined() {
+        // frozendict is not available before Python 3.15.
+        let diagnostics = test_snippet(
+            "frozendict",
+            &LinterSettings::for_rule(Rule::UndefinedName)
+                .with_target_version(ruff_python_ast::PythonVersion::PY314),
         );
         assert_diagnostics!(diagnostics);
     }
@@ -234,18 +265,12 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("__init__.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_36.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
-            },
+            &LinterSettings::for_rule(rule_code).with_preview_mode(),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -262,9 +287,21 @@ mod tests {
         FOO = 42",
         "f401_preview_first_party_submodule_dunder_all"
     )]
+    // Regression test for https://github.com/astral-sh/ruff/issues/22221
+    #[test_case(
+        r"
+        import submodule.bar
+        import submodule.baz
+        __all__ = ['submodule']
+        FOO = 42",
+        "f401_preview_dunder_all_multiple_bindings"
+    )]
     fn f401_preview_first_party_submodule(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
-            &SourceKind::Python(dedent(contents).to_string()),
+            &SourceKind::Python {
+                code: dedent(contents).to_string(),
+                is_stub: false,
+            },
             Path::new("f401_preview_first_party_submodule/__init__.py"),
             &LinterSettings {
                 preview: PreviewMode::Enabled,
@@ -292,11 +329,7 @@ mod tests {
     // Regression test for https://github.com/astral-sh/ruff/issues/12897
     #[test_case(Rule::UnusedImport, Path::new("F401_33/__init__.py"))]
     fn f401_preview_local_init_import(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let settings = LinterSettings {
             preview: PreviewMode::Enabled,
             isort: isort::settings::Settings {
@@ -325,11 +358,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
     fn f401_stable(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "{}_stable_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("{}_stable_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
@@ -348,7 +377,7 @@ mod tests {
     fn f401_deprecated_option(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "{}_deprecated_option_{}",
-            rule_code.noqa_code(),
+            rule_code.name(),
             path.to_string_lossy()
         );
         let diagnostics = test_path(
@@ -427,10 +456,7 @@ mod tests {
             snapshot,
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
-            }
+            &LinterSettings::for_rule(rule_code).with_preview_mode()
         );
         Ok(())
     }
@@ -563,12 +589,12 @@ mod tests {
     )]
     fn f401_preview_refined_submodule_handling(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
-            &SourceKind::Python(dedent(contents).to_string()),
-            Path::new("f401_preview_submodule.py"),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(Rule::UnusedImport)
+            &SourceKind::Python {
+                code: dedent(contents).to_string(),
+                is_stub: false,
             },
+            Path::new("f401_preview_submodule.py"),
+            &LinterSettings::for_rule(Rule::UnusedImport).with_preview_mode(),
         )
         .0;
         assert_diagnostics!(snapshot, diagnostics);
@@ -688,6 +714,29 @@ mod tests {
                 typing_modules: vec!["foo.typical".to_string()],
                 ..LinterSettings::for_rule(Rule::UndefinedName)
             },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn f811_typing_modules_overload() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes/F811_33.py"),
+            &LinterSettings {
+                typing_modules: vec!["std".to_string()],
+                ..LinterSettings::for_rule(Rule::RedefinedWhileUnused)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn f811_annotated_assignment_redefinition() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes/F811_34.py"),
+            &LinterSettings::for_rule(Rule::RedefinedWhileUnused).with_preview_mode(),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -939,7 +988,10 @@ mod tests {
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
         let source_type = PySourceType::default();
-        let source_kind = SourceKind::Python(contents.to_string());
+        let source_kind = SourceKind::Python {
+            code: contents.to_string(),
+            is_stub: source_type.is_stub(),
+        };
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
         let target_version = settings.unresolved_target_version;
         let options =
@@ -957,7 +1009,7 @@ mod tests {
             &indexer,
         );
         let suppressions =
-            Suppressions::from_tokens(&settings, locator.contents(), parsed.tokens(), &indexer);
+            Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer, &settings);
         let mut messages = check_path(
             Path::new("<filename>"),
             None,
@@ -973,7 +1025,10 @@ mod tests {
             target_version,
             &suppressions,
         );
-        messages.sort_by(Diagnostic::ruff_start_ordering);
+        messages.sort_by(|a, b| {
+            a.rendering_sort_key(&DummyFileResolver)
+                .cmp(&b.rendering_sort_key(&DummyFileResolver))
+        });
         let actual = messages
             .iter()
             .filter(|msg| !msg.is_invalid_syntax())
@@ -1156,6 +1211,21 @@ mod tests {
     }
 
     #[test]
+    fn builtin_after_exception_target_cleanup() {
+        flakes(
+            r"
+            try:
+                pass
+            except Exception as len:
+                pass
+
+            print(len)
+            ",
+            &[Rule::UnusedVariable],
+        );
+    }
+
+    #[test]
     fn magic_globals_name() {
         // Use of the C{__name__} magic global should not emit an undefined name
         // warning.
@@ -1221,10 +1291,7 @@ mod tests {
         // Can't find undefined names with import *.
         flakes(
             "from fu import *; bar",
-            &[
-                Rule::UndefinedLocalWithImportStar,
-                Rule::UndefinedLocalWithImportStarUsage,
-            ],
+            &[Rule::StarImport, Rule::PossiblyUndefinedNameWithStarImport],
         );
     }
 
@@ -1334,6 +1401,43 @@ mod tests {
         test = True
         if False:
             del(test)
+        assert(test)
+        ",
+            &[],
+        );
+    }
+
+    #[test]
+    fn del_conditional_except() {
+        // Ignores conditional bindings deletion.
+        flakes(
+            r"
+        context = None
+        test = True
+        try:
+            ...
+        except Exception:
+            del(test)
+        else:
+            assert(test)
+        ",
+            &[],
+        );
+    }
+
+    #[test]
+    fn del_conditional_orelse() {
+        // Ignores conditional bindings deletion.
+        flakes(
+            r"
+        context = None
+        test = True
+        try:
+            ...
+        except Exception:
+            print(test)
+        else:
+            del test
         assert(test)
         ",
             &[],
@@ -2602,7 +2706,7 @@ mod tests {
         try: pass
         except Exception as fu: pass
         ",
-            &[Rule::UnusedVariable, Rule::RedefinedWhileUnused],
+            &[Rule::RedefinedWhileUnused, Rule::UnusedVariable],
         );
     }
 
@@ -3156,6 +3260,93 @@ lambda: fu
         );
     }
 
+    #[test_case(PythonVersion::PY312, &[Rule::LateFutureImport]; "py312")]
+    #[test_case(PythonVersion::PY313, &[]; "py313")]
+    fn relative_future_import_position(target_version: PythonVersion, expected: &[Rule]) {
+        let diagnostics = test_snippet(
+            "
+            x = 5
+            from .__future__ import division
+            ",
+            &LinterSettings::for_rule(Rule::LateFutureImport).with_target_version(target_version),
+        );
+        assert_eq!(
+            diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
+            expected
+                .iter()
+                .map(|rule| rule.name().as_str())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test_case(PythonVersion::PY312, &[Rule::FutureFeatureNotDefined]; "py312")]
+    #[test_case(PythonVersion::PY313, &[]; "py313")]
+    fn relative_future_import_feature(target_version: PythonVersion, expected: &[Rule]) {
+        let diagnostics = test_snippet(
+            "from .__future__ import unknown_feature",
+            &LinterSettings::for_rule(Rule::FutureFeatureNotDefined)
+                .with_target_version(target_version),
+        );
+        assert_eq!(
+            diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
+            expected
+                .iter()
+                .map(|rule| rule.name().as_str())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn relative_future_import_star() {
+        let diagnostics = test_snippet(
+            "from .__future__ import *",
+            &LinterSettings::for_rule(Rule::StarImport).with_target_version(PythonVersion::PY313),
+        );
+        assert_eq!(
+            diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
+            [Rule::StarImport.name().as_str()]
+        );
+    }
+
+    #[test]
+    fn unused_relative_future_import_py313() {
+        let diagnostics = test_snippet(
+            "from .__future__ import annotations",
+            &LinterSettings::for_rule(Rule::UnusedImport).with_target_version(PythonVersion::PY313),
+        );
+        assert_eq!(
+            diagnostics
+                .iter()
+                .map(|diagnostic| (diagnostic.name(), diagnostic.fix().map(Fix::applicability)))
+                .collect::<Vec<_>>(),
+            [(
+                Rule::UnusedImport.name().as_str(),
+                Some(Applicability::Safe)
+            )]
+        );
+    }
+
+    #[test]
+    fn unused_relative_future_import_py312() {
+        let diagnostics = test_snippet(
+            "from .__future__ import annotations",
+            &LinterSettings::for_rule(Rule::UnusedImport).with_target_version(PythonVersion::PY312),
+        );
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn unused_relative_future_import_without_target_version() {
+        let diagnostics = test_snippet(
+            "from .__future__ import division",
+            &LinterSettings::for_rule(Rule::UnusedImport),
+        );
+        assert_eq!(
+            diagnostics.iter().map(Diagnostic::name).collect::<Vec<_>>(),
+            [Rule::UnusedImport.name().as_str()]
+        );
+    }
+
     #[test]
     fn ignored_in_function() {
         // An C{__all__} definition does not suppress unused import warnings in a
@@ -3331,10 +3522,10 @@ lambda: fu
         csc(1)
         ",
             &[
-                Rule::UndefinedLocalWithImportStar,
-                Rule::UndefinedLocalWithImportStarUsage,
-                Rule::UndefinedLocalWithImportStarUsage,
-                Rule::UndefinedLocalWithImportStarUsage,
+                Rule::StarImport,
+                Rule::PossiblyUndefinedNameWithStarImport,
+                Rule::PossiblyUndefinedNameWithStarImport,
+                Rule::PossiblyUndefinedNameWithStarImport,
             ],
         );
     }
@@ -3349,7 +3540,7 @@ lambda: fu
         a = 1
         __all__ = ['a']
         ",
-            &[Rule::UndefinedLocalWithImportStar, Rule::UnusedImport],
+            &[Rule::StarImport, Rule::UnusedImport],
         );
     }
 
@@ -4030,6 +4221,13 @@ lambda: fu
 
         flakes(
             r"
+        lazy from __future__ import annotations
+        ",
+            &[Rule::UnusedImport],
+        );
+
+        flakes(
+            r"
         from __future__ import annotations
         def f(a: A) -> A: pass
         class A:
@@ -4369,7 +4567,7 @@ lambda: fu
     }
 
     #[test]
-    fn idiomiatic_typing_guards() {
+    fn idiomatic_typing_guards() {
         // typing.TYPE_CHECKING: python3.5.3+.
         flakes(
             r"
@@ -4438,6 +4636,9 @@ lambda: fu
             List[TypedDict("x", x=int)]
             List[NamedTuple("a", a=int)]
             List[NamedTuple("a", [("a", int)])]
+
+            # Keyword arguments no longer define fields on Python 3.13+.
+            List[TypedDict("x", x="Y")]
         "#,
             &[],
         );
@@ -4446,7 +4647,6 @@ lambda: fu
             from typing import TypedDict, List, NamedTuple, TypeVar
 
             List[TypedDict("x", {"x": "Y"})]
-            List[TypedDict("x", x="Y")]
             List[NamedTuple("a", [("a", "Y")])]
             List[NamedTuple("a", a="Y")]
             List[TypedDict("x", {"x": List["a"]})]
@@ -4454,7 +4654,6 @@ lambda: fu
             List[TypeVar("A", List["C"])]
         "#,
             &[
-                Rule::UndefinedName,
                 Rule::UndefinedName,
                 Rule::UndefinedName,
                 Rule::UndefinedName,

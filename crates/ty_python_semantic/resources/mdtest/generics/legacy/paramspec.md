@@ -22,6 +22,15 @@ P = ParamSpec(name="P")
 reveal_type(P.__name__)  # revealed: Literal["P"]
 ```
 
+### Requires a name
+
+```py
+from typing import ParamSpec
+
+# error: [invalid-paramspec] "The `name` parameter of `ParamSpec` is required."
+P = ParamSpec()
+```
+
 ### Must be directly assigned to a variable
 
 ```py
@@ -51,19 +60,60 @@ reveal_type(tuple_with_typevar[1])  # revealed: ParamSpec
 ### `ParamSpec` parameter must match variable name
 
 ```py
-from typing import ParamSpec
+from typing import Callable, Generic, ParamSpec
 
 P1 = ParamSpec("P1")
 
-# error: [invalid-paramspec]
+# snapshot: mismatched-paramspec-name
 P2 = ParamSpec("P3")
+
+class Wrapper(Generic[P2]): ...
+
+def decorator(f: Callable[P2, int]) -> Callable[P2, int]:
+    return f
 ```
 
-### Accepts only a single `name` argument
+```snapshot
+warning[mismatched-paramspec-name]: The name passed to `ParamSpec` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:6:16
+  |
+6 | P2 = ParamSpec("P3")
+  |                ^^^^ Expected "P2", got "P3"
+```
 
-> The runtime should accept bounds and covariant and contravariant arguments in the declaration just
-> as typing.TypeVar does, but for now we will defer the standardization of the semantics of those
-> options to a later PEP.
+### Name supplied at runtime
+
+When ty cannot verify the name match, it displays the `ParamSpec` using the assignment target.
+
+```py
+from collections.abc import Callable
+from typing import ParamSpec
+
+def runtime_name() -> str:
+    return "P"
+
+P = ParamSpec(runtime_name())  # error: [mismatched-paramspec-name]
+
+def as_unary(callback: Callable[P, int]) -> Callable[[int], int]:
+    # snapshot: invalid-explicit-return
+    return callback
+```
+
+```snapshot
+error[invalid-explicit-return]: Return type does not match returned value
+  --> src/mdtest_snippet.py:11:12
+   |
+ 9 | def as_unary(callback: Callable[P, int]) -> Callable[[int], int]:
+   |                                             -------------------- Expected `(int, /) -> int` because of return type
+10 |     # snapshot: invalid-explicit-return
+11 |     return callback
+   |            ^^^^^^^^ expected `(int, /) -> int`, found `(**P@as_unary) -> int`
+info: the first parameter has an incompatible type: `int` is not assignable to `P@as_unary.args`
+```
+
+### Bounds and constraints
+
+`ParamSpec` does not allow defining bounds or constraints.
 
 ```py
 from typing import ParamSpec
@@ -72,10 +122,271 @@ from typing import ParamSpec
 P1 = ParamSpec("P1", bound=int)
 # error: [invalid-paramspec]
 P2 = ParamSpec("P2", int, str)
+```
+
+### Variance
+
+Legacy `ParamSpec` accepts `covariant` and `contravariant` arguments. A `ParamSpec` with no variance
+specified is invariant, and a `ParamSpec` with `infer_variance=True` uses variance inference.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Generic, ParamSpec
+
+P = ParamSpec("P")
+
+class InvariantParamSpec(Generic[P]):
+    callback: Callable[P, None]
+
+in_out_obj: InvariantParamSpec[object] = InvariantParamSpec[int]()  # error: [invalid-assignment]
+in_out_int: InvariantParamSpec[int] = InvariantParamSpec[object]()  # error: [invalid-assignment]
+
+InP = ParamSpec("InP", contravariant=True)
+
+class ContravariantParamSpec(Generic[InP]):
+    def parameters(self) -> Callable[InP, None]:
+        raise NotImplementedError
+
+in_obj: ContravariantParamSpec[object] = ContravariantParamSpec[int]()  # error: [invalid-assignment]
+in_int: ContravariantParamSpec[int] = ContravariantParamSpec[object]()
+
+OutP = ParamSpec("OutP", covariant=True)
+
+class CovariantParamSpec(Generic[OutP]):
+    def accepts_callback(self, callback: Callable[OutP, None]) -> None:
+        raise NotImplementedError
+
+out_int: CovariantParamSpec[int] = CovariantParamSpec[object]()  # error: [invalid-assignment]
+out_obj: CovariantParamSpec[object] = CovariantParamSpec[int]()
+
+InferredInP = ParamSpec("InferredInP", infer_variance=True)
+
+class InferredContravariantParamSpec(Generic[InferredInP]):
+    def parameters(self) -> Callable[InferredInP, None]:
+        raise NotImplementedError
+
+inferred_in_obj: InferredContravariantParamSpec[object] = InferredContravariantParamSpec[int]()  # error: [invalid-assignment]
+inferred_in_int: InferredContravariantParamSpec[int] = InferredContravariantParamSpec[object]()
+
+InferredOutP = ParamSpec("InferredOutP", infer_variance=True)
+
+class InferredCovariantParamSpec(Generic[InferredOutP]):
+    def accepts_callback(self, callback: Callable[InferredOutP, None]) -> None:
+        raise NotImplementedError
+
+inferred_out_int: InferredCovariantParamSpec[int] = InferredCovariantParamSpec[object]()  # error: [invalid-assignment]
+inferred_out_obj: InferredCovariantParamSpec[object] = InferredCovariantParamSpec[int]()
+```
+
+```py
+from typing import ParamSpec
+
+def cond() -> bool:
+    return True
+
 # error: [invalid-paramspec]
-P3 = ParamSpec("P3", covariant=True)
+Both = ParamSpec("Both", covariant=True, contravariant=True)
 # error: [invalid-paramspec]
-P4 = ParamSpec("P4", contravariant=True)
+AmbiguousCovariant = ParamSpec("AmbiguousCovariant", covariant=cond())
+# error: [invalid-paramspec]
+AmbiguousContravariant = ParamSpec("AmbiguousContravariant", contravariant=cond())
+# error: [invalid-paramspec]
+AmbiguousInferVariance = ParamSpec("AmbiguousInferVariance", infer_variance=cond())
+# error: [invalid-paramspec]
+CovariantAndInferred = ParamSpec("CovariantAndInferred", covariant=True, infer_variance=True)
+```
+
+### Variance in method signatures
+
+Returning `Callable[P, None]` uses `P` contravariantly. Accepting that callable as a parameter
+reverses the direction, using `P` covariantly. An explicit variance declaration must permit these
+uses.
+
+```py
+from typing import Callable, Generic, ParamSpec
+
+P_co = ParamSpec("P_co", covariant=True)
+P_contra = ParamSpec("P_contra", contravariant=True)
+
+class Covariant(Generic[P_co]):
+    def accepts(self, callback: Callable[P_co, None]) -> None: ...
+
+    # snapshot: invalid-generic-class
+    def returns(self) -> Callable[P_co, None]:
+        raise NotImplementedError
+
+class Contravariant(Generic[P_contra]):
+    def returns(self) -> Callable[P_contra, None]:
+        raise NotImplementedError
+
+    # error: [invalid-generic-class] "Variance of type variable `P_contra` is incompatible with method `accepts`"
+    def accepts(self, callback: Callable[P_contra, None]) -> None: ...
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `P_co` is incompatible with method `returns`
+  --> src/mdtest_snippet.py:10:26
+   |
+10 |     def returns(self) -> Callable[P_co, None]:
+   |                          ^^^^^^^^^^^^^^^^^^^^
+info: Type variable `P_co` is declared as covariant, but this method requires it to be contravariant
+```
+
+Forwarding `P.args` and `P.kwargs` also consumes `P`.
+
+```py
+class CovariantForwarder(Generic[P_co]):
+    # snapshot: invalid-generic-class
+    def call(self, *args: P_co.args, **kwargs: P_co.kwargs) -> None: ...
+
+class ContravariantForwarder(Generic[P_contra]):
+    def call(self, *args: P_contra.args, **kwargs: P_contra.kwargs) -> None: ...
+    def returns(self) -> Callable[P_contra, None]:
+        raise NotImplementedError
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `P_co` is incompatible with method `call`
+  --> src/mdtest_snippet.py:21:27
+   |
+21 |     def call(self, *args: P_co.args, **kwargs: P_co.kwargs) -> None: ...
+   |                           ^^^^^^^^^
+info: Type variable `P_co` is declared as covariant, but this method requires it to be contravariant
+```
+
+Constructors can establish a specialization without respecting its declared variance. A `ParamSpec`
+bound to a function or method instead of the class ignores its declared variance.
+
+```py
+class Constructed(Generic[P_co]):
+    def __init__(self, *args: P_co.args, **kwargs: P_co.kwargs) -> None: ...
+    def __new__(cls, *args: P_co.args, **kwargs: P_co.kwargs) -> "Constructed[P_co]":
+        raise NotImplementedError
+
+def returns() -> Callable[P_co, None]:
+    raise NotImplementedError
+
+class NotGeneric:
+    def returns(self) -> Callable[P_co, None]:
+        raise NotImplementedError
+```
+
+Class methods are checked too. A static method has no receiver, so its first parameter contributes
+to its variance.
+
+```py
+class MethodKinds(Generic[P_contra]):
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_method(cls, callback: Callable[P_contra, None]) -> None: ...
+    @staticmethod
+    # error: [invalid-generic-class]
+    def static_method(callback: Callable[P_contra, None]) -> None: ...
+```
+
+### Variance in overloaded methods
+
+TODO: Variance validation is deferred for overloaded methods until it accounts for the complete
+overload set. We miss the invalid use of a covariant `ParamSpec` in the first overload's return
+type.
+
+```py
+from typing import Callable, Generic, ParamSpec, overload
+
+P_co = ParamSpec("P_co", covariant=True)
+
+class Overloaded(Generic[P_co]):
+    @overload
+    # TODO: Emit `invalid-generic-class`; this use of `P_co` requires contravariance.
+    def method(self, value: int) -> Callable[P_co, None]: ...
+    @overload
+    def method(self, value: str) -> None: ...
+    def method(self, value: object) -> Callable[P_co, None] | None:
+        return None
+```
+
+### Variance in generic methods
+
+A method's independent type variable can accept any argument. The `Callable[P_contra, None]` arm in
+the parameter annotation is redundant because `T` already accepts that argument, and the result
+includes both types. This signature respects the class's contravariance.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Generic, ParamSpec, TypeVar
+
+P_contra = ParamSpec("P_contra", contravariant=True)
+T = TypeVar("T")
+
+class Contravariant(Generic[P_contra]):
+    def identity(self, value: Callable[P_contra, None] | T) -> Callable[P_contra, None] | T:
+        return value
+```
+
+TODO: Until those relationships are checked, we defer validation for generic methods, including type
+parameters scoped to a returned callable. The incompatible return annotations below are not yet
+reported.
+
+```py
+P_co = ParamSpec("P_co", covariant=True)
+
+class GenericMethods(Generic[P_co]):
+    # TODO: Emit `invalid-generic-class`; this use of `P_co` requires contravariance.
+    def legacy(self, value: T) -> Callable[P_co, T]:
+        raise NotImplementedError
+
+    # TODO: Emit `invalid-generic-class`; this use of `P_co` requires contravariance.
+    def pep695[U](self, value: U) -> Callable[P_co, U]:
+        raise NotImplementedError
+
+    # TODO: Emit `invalid-generic-class`; this use of `P_co` requires contravariance.
+    def returned_callable(self) -> Callable[P_co, T]:
+        raise NotImplementedError
+```
+
+### Variance with explicit receivers
+
+`Self` and the class's own `ParamSpec` do not restrict the receiver. A covariant `ParamSpec` in a
+returned callable's parameters still violates covariance.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Callable, Generic, ParamSpec, Self
+
+P_co = ParamSpec("P_co", covariant=True)
+
+class Unrestricted(Generic[P_co]):
+    # error: [invalid-generic-class]
+    def method(self: Self) -> Callable[P_co, None]:
+        raise NotImplementedError
+
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_method(cls: type["Unrestricted[P_co]"]) -> Callable[P_co, None]:
+        raise NotImplementedError
+
+    def accepts(self: "Unrestricted[P_co]", callback: Callable[P_co, None]) -> None: ...
+```
+
+A specialized receiver does not make this contravariant use of `P_co` valid.
+
+```py
+class Restricted(Generic[P_co]):
+    # error: [invalid-generic-class]
+    def method(self: "Restricted[[int]]") -> Callable[P_co, None]:
+        raise NotImplementedError
 ```
 
 ### Defaults
@@ -93,6 +404,10 @@ from typing import ParamSpec
 P1 = ParamSpec("P1", default=[int, str])
 P2 = ParamSpec("P2", default=...)
 P3 = ParamSpec("P3", default=P2)
+Q = ParamSpec("Q")
+
+# error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+P5 = ParamSpec("P5", default=[Q])
 ```
 
 Other values are invalid.
@@ -134,6 +449,35 @@ P4 = ExtParamSpec("P4", default=P3)
 P5 = ExtParamSpec("P5", default=int)
 ```
 
+### `typing_extensions.ParamSpec` defaults specialize generic classes
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Generic
+from typing_extensions import ParamSpec
+
+PList = ParamSpec("PList", default=[str])
+PEllipsis = ParamSpec("PEllipsis", default=...)
+PAnother = ParamSpec("PAnother", default=PList)
+
+class C1(Generic[PList]):
+    x: Callable[PList, None]
+
+class C2(Generic[PEllipsis]):
+    x: Callable[PEllipsis, None]
+
+class C3(Generic[PList, PAnother]):
+    x: Callable[PAnother, None]
+
+reveal_type(C1().x)  # revealed: (str, /) -> None
+reveal_type(C2().x)  # revealed: (...) -> None
+reveal_type(C3().x)  # revealed: (str, /) -> None
+```
+
 ### Forward references in stub files
 
 Stubs natively support forward references, so patterns that would raise `NameError` at runtime are
@@ -153,10 +497,24 @@ class B: ...
 In type annotations, `ParamSpec` is only valid as the first element to `Callable`, the final element
 to `Concatenate`, or as a type parameter to `Protocol` or `Generic`.
 
+<!-- snapshot-diagnostics -->
+
+`library.py`:
+
 ```py
-from typing import ParamSpec, Callable, Concatenate, Protocol, Generic
+from typing import ParamSpec
+
+LibraryP = ParamSpec("LibraryP")
+```
+
+`main.py`:
+
+```py
+import library
+from typing import Any, Final, ParamSpec, Callable, Concatenate, Protocol, Generic, Union, Optional, Annotated
 
 P = ParamSpec("P")
+Q = ParamSpec("Q")
 
 class ValidProtocol(Protocol[P]):
     def method(self, c: Callable[P, int]) -> None: ...
@@ -167,18 +525,67 @@ class ValidGeneric(Generic[P]):
 def valid(
     a1: Callable[P, int],
     a2: Callable[Concatenate[int, P], int],
+    a3: Callable["P", int],
+    a4: Callable[Concatenate[int, "P"], int],
+    a5: Callable[library.LibraryP, int],
+    a6: Callable["Concatenate[int, P]", int],
+    a7: Callable["library.LibraryP", int],
 ) -> None: ...
 def invalid(
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a1: P,
-    # TODO: error
-    a2: list[P],
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a3: Callable[[P], int],
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a4: Callable[..., P],
-    # TODO: error
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a5: Callable[Concatenate[P, ...], int],
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a6: P | int,
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a7: Union[P, int],
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a8: Optional[P],
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a9: Annotated[P, "metadata"],
+    # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+    a10: Callable["[int, str]", str],
+    # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+    a11: Callable["...", int],
+) -> None: ...
+
+# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+def invalid_return() -> P:
+    raise NotImplementedError
+
+def invalid_variable_annotation(y: Any) -> None:
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    x: P = y
+
+def invalid_with_qualifier(y: Any) -> None:
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    x: Final[P] = y
+
+# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+def invalid_stringified_return() -> "P":
+    raise NotImplementedError
+
+def invalid_stringified_annotation(
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a: "P",
+) -> None: ...
+def invalid_stringified_variable_annotation(y: Any) -> None:
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    x: "P" = y
+
+class InvalidSpecializationTarget(Generic[P]):
+    attr: Callable[P, None]
+
+def invalid_specialization(
+    # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+    a: InvalidSpecializationTarget[[Q]],
+    # error: [invalid-type-form] "Bare ParamSpec `Q` is not valid in this context"
+    b: InvalidSpecializationTarget[Q,],
 ) -> None: ...
 ```
 
@@ -189,6 +596,7 @@ annotated types of `*args` and `**kwargs` respectively.
 
 ```py
 from typing import Generic, Callable, ParamSpec
+from ty_extensions._internal import generic_context
 
 P = ParamSpec("P")
 
@@ -201,39 +609,116 @@ def foo1(c: Callable[P, int]) -> None:
         **kwargs: P.args,
     ) -> None: ...
 
-    # TODO: error
+    # error: [invalid-paramspec] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
     def nested3(*args: P.args) -> None: ...
 
-    # TODO: error
+    # error: [invalid-paramspec] "`**kwargs: P.kwargs` must be accompanied by `*args: P.args`"
     def nested4(**kwargs: P.kwargs) -> None: ...
 
-    # TODO: error
+    # error: [invalid-paramspec] "No parameters may appear between `*args: P.args` and `**kwargs: P.kwargs`"
     def nested5(*args: P.args, x: int, **kwargs: P.kwargs) -> None: ...
 
-# TODO: error
+    # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args`"
+    def nested6(x: P.args) -> None: ...
+    def nested7(
+        *args: P.args,
+        # error: [invalid-paramspec] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
+        **kwargs: int,
+    ) -> None: ...
+```
+
+`P.args` and `P.kwargs` do not bind `P` themselves. They must refer to a `ParamSpec` bound by
+another parameter annotation or a visible enclosing generic context. A return annotation on the same
+function is not sufficient. A generic outer class does not make its `ParamSpec` visible across a
+nested class boundary.
+
+```py
+# snapshot: unbound-type-variable
 def bar1(*args: P.args, **kwargs: P.kwargs) -> None:
     pass
 
+# error: [unbound-type-variable] "ParamSpec `P` is not in scope"
+def return_only(*args: P.args, **kwargs: P.kwargs) -> Callable[P, int]:
+    raise NotImplementedError
+
 class Foo1:
-    # TODO: error
+    # error: [unbound-type-variable] "ParamSpec `P` is not in scope"
     def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class Outer(Generic[P]):
+    def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+    class Inner:
+        # error: [unbound-type-variable] "ParamSpec `P` is not in scope"
+        def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+    def method_with_nested_class(self, callback: Callable[P, int]) -> None:
+        class Inner:
+            # error: [unbound-type-variable] "ParamSpec `P` is not in scope"
+            def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+    def method_with_components(self, *outer_args: P.args, **outer_kwargs: P.kwargs) -> None:
+        class Inner:
+            # error: [unbound-type-variable] "ParamSpec `P` is not in scope"
+            def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+```
+
+```snapshot
+error[unbound-type-variable]: ParamSpec `P` is not in scope
+  --> src/mdtest_snippet.py:32:17
+   |
+32 | def bar1(*args: P.args, **kwargs: P.kwargs) -> None:
+   |                 ^^^^^^            -------- This component uses the same out-of-scope ParamSpec
+```
+
+A `ParamSpec` moved to an enclosing factory's returned callable remains lexically visible within the
+factory's body. A nested function referring to it through its components owns its own binding,
+consistently with an ordinary return-only `TypeVar`:
+
+```py
+def callable_factory() -> Callable[P, int]:
+    def nested(*args: P.args, **kwargs: P.kwargs) -> int:
+        return 1
+
+    def nested_with_parameter(callback: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> int:
+        return callback(*args, **kwargs)
+
+    # revealed: ty_extensions._internal.GenericContext[P@nested_with_parameter]
+    reveal_type(generic_context(nested_with_parameter))
+    return nested
+
+def repeated_paramspec_factory() -> Callable[P, Callable[P, int]]:
+    def nested(*args: P.args, **kwargs: P.kwargs) -> Callable[P, int]:
+        callback: Callable[P, int]
+        raise NotImplementedError
+
+    return nested
+
+def nested_components_factory() -> Callable[P, int]:
+    def outer(*args: P.args, **kwargs: P.kwargs) -> int:
+        def inner(*inner_args: P.args, **inner_kwargs: P.kwargs) -> int:
+            return 1
+
+        return inner(*args, **kwargs)
+
+    return outer
 ```
 
 And, they need to be used together.
 
 ```py
 def foo2(c: Callable[P, int]) -> None:
-    # TODO: error
+    # error: [invalid-paramspec] "`*args: P.args` must be accompanied by `**kwargs: P.kwargs`"
     def nested1(*args: P.args) -> None: ...
 
-    # TODO: error
+    # error: [invalid-paramspec] "`**kwargs: P.kwargs` must be accompanied by `*args: P.args`"
     def nested2(**kwargs: P.kwargs) -> None: ...
 
 class Foo2:
-    # TODO: error
+    # error: [invalid-paramspec] "`P.args` is only valid for annotating `*args` function parameters"
     args: P.args
 
-    # TODO: error
+    # error: [invalid-paramspec] "`P.kwargs` is only valid for annotating `**kwargs` function parameters"
     kwargs: P.kwargs
 ```
 
@@ -250,6 +735,73 @@ class Foo3(Generic[P]):
         # error: [invalid-type-form] "`P.args` is valid only in `*args` annotation: Did you mean `P.kwargs`?"
         **paramspec_kwargs: P.args,
     ) -> None: ...
+```
+
+Error messages for `invalid-paramspec` also use the actual parameter names:
+
+```py
+def bar(c: Callable[P, int]) -> None:
+    # error: [invalid-paramspec] "`*my_args: P.args` must be accompanied by `**my_kwargs: P.kwargs`"
+    def f1(*my_args: P.args, **my_kwargs: int) -> None: ...
+
+    # error: [invalid-paramspec] "`*positional: P.args` must be accompanied by `**kwargs: P.kwargs`"
+    def f2(*positional: P.args) -> None: ...
+
+    # error: [invalid-paramspec] "`**keyword: P.kwargs` must be accompanied by `*args: P.args`"
+    def f3(**keyword: P.kwargs) -> None: ...
+
+    # error: [invalid-paramspec] "No parameters may appear between `*a: P.args` and `**kw: P.kwargs`"
+    def f4(*a: P.args, x: int, **kw: P.kwargs) -> None: ...
+```
+
+## Return-only ParamSpecs own nested callables
+
+A legacy `ParamSpec` appearing only in a factory's returned callable belongs to the callable, just
+as a return-only `TypeVar` does. The nested callable should therefore own its `ParamSpec`, making it
+possible to infer concrete arguments when the callable is used inside the factory.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+from ty_extensions._internal import generic_context
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+def takes_int(value: int) -> int:
+    return value
+
+def paramspec_factory() -> Callable[P, int]:
+    def nested(*args: P.args, **kwargs: P.kwargs) -> int:
+        reveal_type(args)  # revealed: P@nested.args
+        return 1
+
+    def with_callback(callback: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> int:
+        reveal_type(callback)  # revealed: (**P@with_callback) -> int
+        return callback(*args, **kwargs)
+
+    reveal_type(generic_context(nested))  # revealed: ty_extensions._internal.GenericContext[P@nested]
+    reveal_type(generic_context(with_callback))  # revealed: ty_extensions._internal.GenericContext[P@with_callback]
+    reveal_type(with_callback(takes_int, 1))  # revealed: int
+    return nested
+
+def typevar_factory() -> Callable[[T], int]:
+    def nested(value: T) -> int:
+        reveal_type(value)  # revealed: T@nested
+        return 1
+
+    reveal_type(generic_context(nested))  # revealed: ty_extensions._internal.GenericContext[T@nested]
+    return nested
+```
+
+A genuinely generic enclosing function still owns the `ParamSpec` captured by its nested callable.
+
+```py
+def public_paramspec(callback: Callable[P, int]) -> None:
+    def nested(*args: P.args, **kwargs: P.kwargs) -> int:
+        reveal_type(args)  # revealed: P@public_paramspec.args
+        return callback(*args, **kwargs)
+
+    reveal_type(generic_context(nested))  # revealed: None
 ```
 
 ## Specializing generic classes explicitly
@@ -270,6 +822,9 @@ class TwoParamSpec(Generic[P1, P2]):
 
 class TypeVarAndParamSpec(Generic[T1, P1]):
     attr: Callable[P1, T1]
+
+class ParamSpecAndTypeVar(Generic[P1, T1]):
+    attr: Callable[P1, T1]
 ```
 
 Explicit specialization of a generic class involving `ParamSpec` is done by providing either a list
@@ -283,7 +838,7 @@ reveal_type(OnlyParamSpec[...]().attr)  # revealed: (...) -> None
 def func(c: Callable[P2, None]):
     reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (**P2@func) -> None
 
-# error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
+# error: [unbound-type-variable] "Type variable `P2` is not bound to any outer generic context"
 reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
 
 # error: [invalid-type-arguments] "No type argument provided for required type variable `P1` of class `OnlyParamSpec`"
@@ -298,14 +853,14 @@ it having the same AST as the one without the parentheses. Both mypy and Pyright
 reveal_type(OnlyParamSpec[(int, str)]().attr)  # revealed: (int, str, /) -> None
 ```
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 # error: [invalid-syntax]
 reveal_type(OnlyParamSpec[]().attr)  # revealed: (...) -> None
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
 
 The square brackets can be omitted when `ParamSpec` is the only type variable
 
@@ -326,8 +881,9 @@ reveal_type(TypeVarAndParamSpec[int, []]().attr)  # revealed: () -> int
 reveal_type(TypeVarAndParamSpec[int, [int, str]]().attr)  # revealed: (int, str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, [str]]().attr)  # revealed: (str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
+reveal_type(ParamSpecAndTypeVar[[int, str], str]().attr)  # revealed: (int, str, /) -> str
 
-# error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
+# error: [unbound-type-variable] "Type variable `P2` is not bound to any outer generic context"
 reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> int
 # error: [invalid-type-arguments] "Type argument for `ParamSpec` must be either a list of types, `ParamSpec`, `Concatenate`, or `...`"
 reveal_type(TypeVarAndParamSpec[int, int]().attr)  # revealed: (...) -> int
@@ -355,6 +911,455 @@ both mypy and Pyright allow this and there are usages of this in the wild e.g.,
 
 ```py
 reveal_type(TypeVarAndParamSpec[int, Any]().attr)  # revealed: (...) -> int
+```
+
+`...` has the same gradual behavior when used as a `ParamSpec` argument in a generic class,
+regardless of the variance of the `ParamSpec`.
+
+```py
+from typing import Callable, Generic, ParamSpec
+
+# legacy ParamSpec with no variance specified is invariant
+P = ParamSpec("P")
+
+class Command(Generic[P]):
+    callback: Callable[P, None]
+
+# confirm that Command is invariant in P
+def _(of_int: Command[int], of_bool: Command[bool]) -> None:
+    a: Command[int] = of_bool  # error: [invalid-assignment]
+    b: Command[bool] = of_int  # error: [invalid-assignment]
+
+# but gradual signature is still assignable in both directions
+def _(concrete: Command[[str]], gradual: Command[...]) -> None:
+    a: Command[...] = concrete
+    b: Command[[str]] = gradual
+```
+
+`ParamSpec` specializations in generic classes are compared using the callable parameter relation.
+This avoids rejecting wrappers around callbacks that are safe to use with a positional-only callback
+protocol.
+
+```py
+from collections.abc import Callable
+from typing import Final, Generic, ParamSpec
+
+P = ParamSpec("P", contravariant=True)
+
+class Job(Generic[P]):
+    target: Final[Callable[P, None]]
+
+    def __init__(self, target: Callable[P, None]) -> None:
+        self.target = target
+
+def named(x: int) -> None:
+    pass
+
+def defaulted(x: int | None = None) -> None:
+    pass
+
+def wrong(x: str) -> None:
+    pass
+
+named_job = Job(named)
+defaulted_job = Job(defaulted)
+wrong_job = Job(wrong)
+
+def takes_int_job(job: Job[[int]]) -> None:
+    pass
+
+takes_int_job(named_job)
+takes_int_job(defaulted_job)
+takes_int_job(wrong_job)  # error: [invalid-argument-type]
+```
+
+A fixed `ParamSpec` can contain required parameters. A wrapper around such a callback cannot be used
+as a wrapper around a callback that accepts no arguments.
+
+```py
+def erase_parameters(job: Job[P]) -> Job[[]]:
+    return job  # error: [invalid-explicit-return]
+```
+
+The same restriction applies in the other direction when a class consumes callbacks. A consumer of
+callbacks with no parameters cannot accept a callback with arbitrary required parameters.
+
+```py
+P_co = ParamSpec("P_co", covariant=True)
+
+class CallbackConsumer(Generic[P_co]):
+    def consume(self, callback: Callable[P_co, None]) -> None: ...
+
+def broaden_parameters(consumer: CallbackConsumer[[]]) -> CallbackConsumer[P_co]:
+    return consumer  # error: [invalid-explicit-return]
+```
+
+Depending on `Q`, callers of `job.target` may pass `flag="yes"` or omit `flag` entirely. An optional
+keyword-only parameter of type `object` or `Any` accepts both calls.
+
+```py
+from typing import Any
+from ty_extensions._internal import TypeOf
+
+def reserved(*args: Any, flag: bool = False, **kwargs: Any) -> None: ...
+def required(*args: Any, flag: Any, **kwargs: Any) -> None: ...
+def accepts_object(*args: Any, flag: object = False, **kwargs: Any) -> None: ...
+def accepts_any(*args: Any, flag: Any = False, **kwargs: Any) -> None: ...
+
+Q = ParamSpec("Q")
+
+def check(job: Job[Q]) -> None:
+    reserved_job = Job(reserved)
+    a: Job[Q] = reserved_job  # error: [invalid-assignment]
+    b: Job[Q] = Job(required)  # error: [invalid-assignment]
+    c: Job[Q] = Job(accepts_object)  # ok
+    d: Job[Q] = Job(accepts_any)  # ok
+    # Q might exclude the flag keyword altogether.
+    e: TypeOf[reserved_job] = job  # error: [invalid-assignment]
+```
+
+## A reserved keyword in an overload implementation
+
+The first overload forwards `P`, which could accept `return_state="yes"`. The implementation
+reserves that keyword for a `bool`.
+
+```py
+from typing import Any, Generic, ParamSpec, overload
+
+P = ParamSpec("P")
+
+class Task(Generic[P]):
+    @overload
+    # error: [inconsistent-overload-implementation]
+    def submit(self: "Task[P]", *args: P.args, **kwargs: P.kwargs) -> None: ...
+    @overload
+    def submit(self: "Task[P]", *, return_state: bool) -> None: ...
+    def submit(self: "Task[P]", *args: Any, return_state: bool = False, **kwargs: Any) -> None: ...
+```
+
+## Inferring an invariant `ParamSpec` through `Concatenate`
+
+A `Concatenate` prefix is positional-only, so a callback whose first parameter also accepts a
+keyword is not compatible with an invariant wrapper. Even though that argument is rejected, its
+remaining parameters must still be inferred precisely.
+
+```py
+from typing import Callable, Concatenate, Generic, ParamSpec
+
+P = ParamSpec("P")
+
+class Callback(Generic[P]):
+    def __init__(self, callback: Callable[P, None]) -> None: ...
+
+def without_first(callback: Callback[Concatenate[object, P]]) -> Callable[P, None]:
+    raise NotImplementedError
+
+def original(first: object, value: str) -> None: ...
+
+wrapped = Callback(original)
+remaining = without_first(wrapped)  # error: [invalid-argument-type]
+reveal_type(remaining)  # revealed: (value: str) -> None
+remaining(1)  # error: [invalid-argument-type]
+```
+
+When constructed inline, `Callback` infers the positional-only prefix based on the outer type
+context:
+
+```py
+remaining = without_first(Callback(original))
+reveal_type(remaining)  # revealed: (value: str) -> None
+remaining(1)  # error: [invalid-argument-type]
+```
+
+## Inferring a contravariant `ParamSpec` through `Concatenate`
+
+The same callback is compatible with a contravariant wrapper, and its remaining parameters must
+still be inferred precisely enough to reject an incompatible later argument.
+
+```py
+from typing import Callable, Concatenate, Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P", contravariant=True)
+
+class Callback(Generic[P]):
+    def __init__(self, callback: Callable[P, None]) -> None: ...
+
+def without_first(callback: Callback[Concatenate[object, P]]) -> Callable[P, None]:
+    raise NotImplementedError
+
+def original(first: object, value: str) -> None: ...
+
+remaining = without_first(Callback(original))
+reveal_type(remaining)  # revealed: (value: str) -> None
+remaining(1)  # error: [invalid-argument-type]
+```
+
+A contravariant callback can accept a broader positional-only prefix than a bounded type variable
+requires. The separate `Middle()` argument determines the narrower specialization without rejecting
+the valid callback.
+
+```py
+class Base: ...
+class Middle(Base): ...
+class Other: ...
+
+Bounded = TypeVar("Bounded", bound=Middle)
+Q = ParamSpec("Q")
+
+def accepts_base(first: Base, /, value: str) -> None: ...
+def bounded(callback: Callback[Concatenate[Bounded, Q]], witness: Bounded) -> tuple[Bounded, Callable[Q, None]]:
+    raise NotImplementedError
+
+bounded_result = bounded(Callback(accepts_base), Middle())
+reveal_type(bounded_result)  # revealed: tuple[Middle, (value: str) -> None]
+bounded_result[1](1)  # error: [invalid-argument-type]
+```
+
+The same contravariant relationship remains valid when the prefix type variable has explicit
+constraints instead of an upper bound.
+
+```py
+Constrained = TypeVar("Constrained", Middle, Other)
+
+def constrained(callback: Callback[Concatenate[Constrained, Q]], witness: Constrained) -> tuple[Constrained, Callable[Q, None]]:
+    raise NotImplementedError
+
+constrained_result = constrained(Callback(accepts_base), Middle())
+reveal_type(constrained_result)  # revealed: tuple[Middle, (value: str) -> None]
+constrained_result[1](1)  # error: [invalid-argument-type]
+```
+
+## Inferring a covariant `ParamSpec` through `Concatenate`
+
+A covariant wrapper containing a callback with a narrower positional-only prefix remains valid,
+whether the wrapper is stored first or constructed inline.
+
+```py
+from typing import Callable, Concatenate, Generic, ParamSpec
+
+P = ParamSpec("P", covariant=True)
+Q = ParamSpec("Q")
+
+class Base: ...
+class Middle(Base): ...
+
+class Callback(Generic[P]):
+    def __init__(self, callback: Callable[P, None]) -> None: ...
+
+def without_first(callback: Callback[Concatenate[Base, Q]]) -> Callable[Q, None]:
+    raise NotImplementedError
+
+def original(first: Middle, /, value: str) -> None: ...
+
+wrapped = Callback(original)
+reveal_type(without_first(wrapped))  # revealed: (value: str) -> None
+reveal_type(without_first(Callback(original)))  # revealed: (value: str) -> None
+```
+
+## Registering a wrapper that forwards to its callback
+
+The first argument of `invoke` is a callback. Its remaining parameters and its return type match
+that callback. A decorator requiring this relationship accepts `invoke`.
+
+```py
+from typing import Callable, Concatenate, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def register(wrapper: Callable[Concatenate[Callable[P, R], P], R]) -> Callable[P, R]:
+    raise NotImplementedError
+
+def invoke(fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return fn(*args, **kwargs)
+
+register(invoke)  # ok
+```
+
+Passing `parse` to `wrap` fixes `P` to the parameter `s: str` and `R` to `int`. With that
+specialization, `invoke` accepts a callback of type `(s: str) -> int` followed by the argument `s`
+to forward.
+
+```py
+def wrap(fn: Callable[P, R], wrapper: Callable[Concatenate[Callable[P, R], P], R]) -> Callable[P, R]:
+    raise NotImplementedError
+
+def parse(s: str) -> int:
+    return int(s)
+
+# TODO: No error. Specialize `invoke`'s `P` and `R` when checking its first parameter.
+# We currently compare the signature of `parse` against the still-generic `Callable[P, R]`.
+wrap(parse, invoke)  # error: [invalid-argument-type]
+```
+
+## Choosing an overload from a callback's leading parameters
+
+The two overloads of `command` accept callbacks with one or two parameters before `P`. When the
+callback is a union of those two signatures, ty resolves the call separately for each signature.
+
+```py
+from typing import Callable, Concatenate, ParamSpec, TypeVar, overload
+
+O = TypeVar("O")
+C = TypeVar("C")
+P = ParamSpec("P")
+R = TypeVar("R")
+
+@overload
+def command(f: Callable[Concatenate[O, C, P], R]) -> tuple[O, R]: ...
+@overload
+def command(f: Callable[Concatenate[C, P], R]) -> tuple[None, R]: ...
+def command(f):
+    raise NotImplementedError
+
+def check(
+    callback: Callable[Concatenate[O, C, P], R] | Callable[Concatenate[C, P], R],
+    standalone: Callable[Concatenate[C, P], R],
+):
+    reveal_type(command(callback))  # revealed: tuple[O@check, R@check] | tuple[None, R@check]
+    reveal_type(command(standalone))  # revealed: tuple[None, R@check]
+    owned: tuple[O, R] = command(standalone)  # error: [invalid-assignment]
+```
+
+## Forwarding a positional argument to a generic callable
+
+`pipe` passes its first argument to the callback. That argument can determine the callback's return
+type even when there are no remaining arguments in `P`.
+
+```py
+from typing import Callable, Concatenate, ParamSpec, TypeVar
+
+T = TypeVar("T")
+A = TypeVar("A")
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def pipe(value: A, f: Callable[Concatenate[A, P], R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return f(value, *args, **kwargs)
+
+def identity(value: T, /) -> T:
+    return value
+
+reveal_type(pipe(1, identity))  # revealed: Literal[1]
+```
+
+The leading argument contributes `Literal[1]` to the inferred type of `T` even when `P` captures
+another parameter of type `T`.
+
+```py
+def first(x: T, y: T, /) -> T:
+    return x
+
+reveal_type(pipe(1, first, 1))  # revealed: Literal[1]
+```
+
+Matching the `int` prefix determines the result even when the signature only mentions `P` in the
+callback.
+
+```py
+def result_of(f: Callable[Concatenate[int, P], R]) -> R:
+    raise NotImplementedError
+
+reveal_type(result_of(first))  # revealed: int
+```
+
+An invariant return type can require a wider specialization of `T` that accommodates both arguments.
+
+```py
+def both(x: T, y: T, /) -> list[T]:
+    return [x, y]
+
+# TODO: Infer `list[int | str]` from both arguments, as in the direct call `both(1, "a")`.
+reveal_type(pipe(1, both, "a"))  # revealed: Unknown
+values: list[int | str] = pipe(1, both, "a")  # ok
+```
+
+## Inferring through unions of structural `ParamSpec` protocols
+
+Different protocols with the same parameter list can satisfy a target protocol structurally, even
+when they appear in a union nested inside an invariant or contravariant wrapper.
+
+```py
+from typing import Generic, ParamSpec, Protocol, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+TContra = TypeVar("TContra", contravariant=True)
+
+class Invariant(Generic[T]):
+    value: T
+
+class Contravariant(Generic[TContra]):
+    def put(self, value: TContra) -> None: ...
+
+class Target(Protocol[P]):
+    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class Actual(Protocol[P]):
+    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class Other(Protocol[P]):
+    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+def invariant(value: Invariant[Target[P]]) -> Target[P]:
+    raise NotImplementedError
+
+def contravariant(value: Contravariant[Target[P]]) -> Target[P]:
+    raise NotImplementedError
+
+def compatible(
+    first: Invariant[Actual[[str]] | Other[[str]]],
+    second: Contravariant[Actual[[str]] | Other[[str]]],
+) -> None:
+    reveal_type(invariant(first))  # revealed: Target[(str, /)]
+    reveal_type(contravariant(second))  # revealed: Target[(str, /)]
+```
+
+Invariant wrappers reject differing parameter lists, while contravariant ones can match a member.
+
+```py
+def incompatible(
+    first: Invariant[Actual[[str]] | Other[[bytes]]],
+    second: Contravariant[Actual[[str]] | Other[[bytes]]],
+) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(invariant(first))  # revealed: Target[(str, /)]
+    reveal_type(contravariant(second))  # revealed: Target[(str, /)]
+```
+
+## `ParamSpec` cannot specialize a `TypeVar`, and vice versa
+
+<!-- snapshot-diagnostics -->
+
+A `ParamSpec` is not a valid type argument for a regular `TypeVar`, and vice versa.
+
+```py
+from typing import Generic, Callable, TypeVar, ParamSpec
+
+T = TypeVar("T")
+P = ParamSpec("P")
+
+class OnlyTypeVar(Generic[T]):
+    attr: T
+
+def func(c: Callable[P, None]):
+    # error: [invalid-type-arguments] "ParamSpec `P` cannot be used to specialize type variable `T`"
+    a: OnlyTypeVar[P]
+
+class OnlyParamSpec(Generic[P]):
+    attr: Callable[P, None]
+
+# This is fine due to the special case whereby `OnlyParamSpec[T]` is interpreted the same as
+# `OnlyParamSpec[[T]]`, due to the fact that `OnlyParamSpec` is only generic over a single
+# `ParamSpec` and no other type variables.
+def func2(c: OnlyParamSpec[T], other: T):
+    reveal_type(c.attr)  # revealed: (T@func2, /) -> None
+
+class ParamSpecAndTypeVar(Generic[P, T]):
+    attr: Callable[P, T]
+
+# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be either a list of types, `ParamSpec`, `Concatenate`, or `...`"
+def func3(c: ParamSpecAndTypeVar[T, int], other: T): ...
 ```
 
 ## Specialization when defaults are involved
@@ -425,17 +1430,1593 @@ reveal_type(p3.attr1)  # revealed: (int, /) -> None
 reveal_type(p3.attr2)  # revealed: (str, /) -> None
 
 # Un-ordered type variables as the default of `PAnother` is `P`
-class ParamSpecWithDefault5(Generic[PAnother, P]):  # error: [invalid-generic-class]
+# error: [invalid-generic-class]
+# error: [invalid-generic-class]
+class ParamSpecWithDefault5(Generic[PAnother, P]):
     attr: Callable[PAnother, None]
 
-# TODO: error
 # PAnother has default as P (another ParamSpec) which is not in scope
+# error: [invalid-generic-class]
 class ParamSpecWithDefault6(Generic[PAnother]):
     attr: Callable[PAnother, None]
 ```
 
 ## Semantics
 
-The semantics of `ParamSpec` are described in
-[the PEP 695 `ParamSpec` document](./../pep695/paramspec.md) to avoid duplication unless there are
-any behavior specific to the legacy `ParamSpec` implementation.
+See [the PEP 695 `ParamSpec` document](./../pep695/paramspec.md) for corresponding examples using
+type parameter lists.
+
+### Binding contexts
+
+A nested definition can use a `ParamSpec` from an enclosing class or function without adding it to
+its own generic context:
+
+```py
+from typing import Callable, Generic, ParamSpec
+from ty_extensions._internal import generic_context
+
+P = ParamSpec("P")
+
+class C(Generic[P]):
+    def method(self, *args: P.args, **kwargs: P.kwargs): ...
+
+# revealed: ty_extensions._internal.GenericContext[Self@method]
+reveal_type(generic_context(C.method))
+
+def outer(_: Callable[P, None]):
+    def inner(_: Callable[P, None]): ...
+
+    reveal_type(generic_context(inner))  # revealed: None
+```
+
+### Immediate literal forwarding
+
+A literal unpack can supply several arguments to a forwarded `ParamSpec`. The wrapped callable
+checks their individual types and argument count.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def forward(callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+def target(x: int, y: int) -> int:
+    return x + y
+
+reveal_type(forward(target, *[1, 2]))  # revealed: int
+reveal_type(forward(target, **{"x": 1, "y": 2}))  # revealed: int
+forward(target, *[1])  # error: [missing-argument]
+forward(target, **{"x": 1, "y": "wrong"})  # error: [invalid-argument-type]
+```
+
+A positional unpack can supply the callback and some or all of its arguments.
+
+```py
+def write(x: int, y: str) -> None: ...
+
+forward(*(write, 1, "ok"))  # ok
+forward(*(write, 1), "ok")  # ok
+forward(*[write, 1, "ok"])  # ok
+forward(*(write, 1, 2))  # error: 9 [invalid-argument-type] "Expected `str`"
+forward(*(write, 1), 2)  # error: 22 [invalid-argument-type] "Expected `str`"
+```
+
+When a variable-length segment follows the callback, we check its element type and any fixed
+arguments after it.
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def check_words(words: tuple[str, ...]):
+    forward(*(write, *words))  # error: [invalid-argument-type] "Expected `int`, found `str`"
+
+def check_parts(callback: Callable[[*Ts, str], None], values: tuple[*Ts]):
+    forward(*(callback, *values, "ok"))  # ok
+    forward(*(callback, *values, 2))  # error: [invalid-argument-type] "Expected `str`"
+```
+
+Here `0` is either the callback or an argument to a callback that takes none.
+
+```py
+def check_callbacks(callbacks: tuple[Callable[[], None], ...]):
+    forward(*(*callbacks, 0))  # error: [invalid-argument-type]
+```
+
+A dictionary can supply both a wrapper parameter and arguments to forward. The wrapper checks its
+own parameter and forwards only the remaining keys.
+
+```py
+def forward_prefix(callback: Callable[P, R], prefix: int, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+reveal_type(forward_prefix(target, **{"prefix": 0, "x": 1, "y": 2}))  # revealed: int
+reveal_type(forward_prefix(target, **{"prefix": 0, "x": 1}, y=2))  # revealed: int
+forward_prefix(target, **{"prefix": "wrong", "x": 1, "y": 2})  # error: [invalid-argument-type]
+forward_prefix(target, **{"prefix": 0, "x": 1, "y": "wrong"})  # error: [invalid-argument-type]
+```
+
+### Forwarding part of an unpacked tuple from a method
+
+The bound method takes the callback and tag from the tuple. The remaining value fills the callback's
+first parameter, so its second parameter provides the type context for the list.
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+
+class Runner:
+    def run(self, callback: Callable[P, None], tag: object, /, *args: P.args, **kwargs: P.kwargs) -> None:
+        callback(*args, **kwargs)
+
+def consume(value: int, items: list[object]) -> None: ...
+
+Runner().run(*(consume, None, 1), reveal_type([1]))  # revealed: list[object]
+```
+
+Each tuple must supply arguments that match an overload after the method takes its tag. A trailing
+argument can fill a different parameter for each tuple length.
+
+```py
+from typing import overload
+
+@overload
+def pair(x: int, y: int = 0) -> None: ...
+@overload
+def pair(x: str, y: str) -> None: ...
+def pair(x, y=0) -> None: ...
+def check(
+    matching: tuple[None, int, int] | tuple[None, str, str],
+    mixed: tuple[None, int, int] | tuple[None, str, int],
+    varying: tuple[None] | tuple[None, int],
+):
+    Runner().run(pair, *matching)  # ok
+    Runner().run(pair, *mixed)  # error: 24 [invalid-argument-type]
+    Runner().run(pair, *varying)  # error: [missing-argument]
+    Runner().run(pair, *varying, 1)  # ok
+    Runner().run(pair, *varying, "bad")  # error: 34 [invalid-argument-type]
+```
+
+### Constructor overrides with receiver-inferred parameters
+
+In the below example, `Base.__new__` takes the same arguments as the class's `build` method. Binding
+its `cls` receiver infers an `int` parameter from `Base.build`, so an override accepting only `str`
+is incompatible.
+
+```py
+from __future__ import annotations
+from typing import ParamSpec, Protocol
+from typing_extensions import Self, override
+
+P = ParamSpec("P")
+
+class Builder(Protocol[P]):
+    def build(self, *args: P.args, **kwargs: P.kwargs) -> object: ...
+
+class Base:
+    @staticmethod
+    def build(value: int) -> object:
+        return object()
+
+    def __new__(cls: Builder[P], *args: P.args, **kwargs: P.kwargs) -> Base:
+        raise NotImplementedError
+
+class Invalid(Base):
+    @override
+    def __new__(cls, value: str) -> Self:  # error: [incompatible-method-override]
+        raise NotImplementedError
+```
+
+### Wrapped classmethod factories passed to callbacks
+
+A classmethod can use a callable instance to forward arguments to the class constructor. Passing
+this factory to `asyncio.to_thread` infers the constructor's parameters and its instance type from
+the captured class. The `to_thread` definition below is based on typeshed's stub.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+async def to_thread(func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    raise NotImplementedError
+
+class Factory:
+    def __call__(self, cls: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+        return cls(*args, **kwargs)
+
+class C:
+    def __init__(self, value: int, *, label: str = "") -> None: ...
+    make = classmethod(Factory())
+
+async def check():
+    reveal_type(await to_thread(C.make, 1, label="label"))  # revealed: C
+    await to_thread(C.make)  # error: [missing-argument] "No argument provided for required parameter `value`"
+    await to_thread(C.make, "wrong")  # error: [invalid-argument-type] "Expected `int`"
+    await to_thread(C.make, 1, label=2)  # error: [invalid-argument-type] "Expected `str`"
+```
+
+### Preserving parameter kinds and defaults
+
+Capturing a parameter list preserves names, parameter kinds, defaults, and variadic parameters.
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def preserve(callback: Callable[P, int]) -> Callable[P, str]:
+    raise NotImplementedError
+
+def shaped(value: int, /, label: str = "x", *, enabled: bool = False) -> int:
+    return value
+
+def variadic(*args: int, **kwargs: str) -> int:
+    return 1
+
+reveal_type(preserve(variadic))  # revealed: (*args: int, **kwargs: str) -> str
+```
+
+The resulting callable validates arguments against the captured parameter list.
+
+```py
+wrapped = preserve(shaped)
+# revealed: (value: int, /, label: str = "x", *, enabled: bool = False) -> str
+reveal_type(wrapped)
+wrapped(1)
+wrapped(1, label="label", enabled=True)
+wrapped(1, enabled="yes")  # error: [invalid-argument-type]
+wrapped()  # error: [missing-argument]
+```
+
+### Assignability to a callable with a gradual tail
+
+If the target requires an initial `int`, the callback must accept it before `P`. The caller can
+specialize `P` to an empty parameter list.
+
+```py
+from typing import Callable, Concatenate, ParamSpec
+
+P = ParamSpec("P")
+
+def takes_int(callback: Callable[Concatenate[int, ...], None]) -> None: ...
+def check(
+    bare: Callable[P, None],
+    accepts_int: Callable[Concatenate[int, P], None],
+    accepts_str: Callable[Concatenate[str, P], None],
+) -> None:
+    takes_int(bare)  # error: [invalid-argument-type]
+    takes_int(accepts_int)  # ok
+    takes_int(accepts_str)  # error: [invalid-argument-type]
+```
+
+### Matching overloads by prefix length
+
+Only the second overload applies when the callback guarantees one positional parameter.
+
+```py
+from typing import Callable, Concatenate, ParamSpec, overload
+
+P = ParamSpec("P")
+
+@overload
+def pick(f: Callable[Concatenate[str, str, P], None]) -> str: ...
+@overload
+def pick(f: Callable[Concatenate[str, P], None]) -> None: ...
+def pick(f):
+    raise NotImplementedError
+
+def check(callback: Callable[Concatenate[str, P], None]) -> None:
+    reveal_type(pick(callback))  # revealed: None
+```
+
+### Matching generic callbacks with `Concatenate`
+
+A decorator can accept a generic wrapper that forwards its remaining arguments to a callback.
+
+```py
+from typing import Callable, Concatenate, ParamSpec
+
+P = ParamSpec("P")
+Q = ParamSpec("Q")
+
+def register(wrapper: Callable[Concatenate[Callable[..., int], P], int]) -> Callable[P, int]:
+    raise NotImplementedError
+
+@register  # ok
+def invoke(callback: Callable[Q, int], /, *args: Q.args, **kwargs: Q.kwargs) -> int:
+    return callback(*args, **kwargs)
+```
+
+A callback whose leading parameter is bounded by `int` cannot accept the required `str`. The
+remaining parameter list does not affect the mismatch.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=int)
+
+def accepts_str(callback: Callable[Concatenate[str, P], int]) -> None: ...
+def identity(value: T, /) -> T:
+    return value
+
+accepts_str(identity)  # error: [invalid-argument-type]
+```
+
+### Parameter lists inferred from consumers
+
+A consumer of a callback supplies an upper bound on the callback's parameter list.
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def from_consumer(consumer: Callable[[Callable[P, None]], None]) -> Callable[P, None]:
+    raise NotImplementedError
+
+def consume(callback: Callable[[int], None]) -> None: ...
+
+reveal_type(from_consumer(consume))  # revealed: (int, /) -> None
+```
+
+A callback and a consumer can bound the same parameter list from opposite directions.
+
+```py
+def between(callback: Callable[P, None], consumer: Callable[[Callable[P, None]], None]) -> Callable[P, None]:
+    return callback
+
+def accepts_object(value: object, /) -> None: ...
+def accepts_str(value: str, /) -> None: ...
+
+reveal_type(between(accepts_object, consume))  # revealed: (value: object, /) -> None
+between(accepts_str, consume)  # error: [invalid-argument-type]
+
+def consumer_first(consumer: Callable[[Callable[P, None]], None], callback: Callable[P, None]) -> Callable[P, None]:
+    return callback
+
+reveal_type(consumer_first(consume, accepts_object))  # revealed: (value: object, /) -> None
+```
+
+Consumers of different signatures produce a callback that supports calls using either signature.
+
+```py
+from typing import Concatenate
+
+def combine(left: Callable[[Callable[P, None]], None], right: Callable[[Callable[P, None]], None]) -> Callable[P, bytes]:
+    raise NotImplementedError
+
+def text(callback: Callable[[str], None]) -> None: ...
+def empty(callback: Callable[[], None]) -> None: ...
+
+callback = combine(consume, text)
+reveal_type(callback(1))  # revealed: bytes
+reveal_type(callback("text"))  # revealed: bytes
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+callback(None)
+
+with_empty = combine(consume, empty)
+reveal_type(with_empty())  # revealed: bytes
+reveal_type(with_empty(1))  # revealed: bytes
+```
+
+A `ParamSpec` wrapper should preserve the combined callable's supported signatures.
+
+```py
+def preserve(callback: Callable[P, bytes]) -> Callable[P, bytes]:
+    return callback
+
+reveal_type(callback)  # revealed: ((int, /) -> bytes) & ((str, /) -> bytes)
+preserved = preserve(callback)
+# TODO: ((int, /) -> bytes) & ((str, /) -> bytes)
+reveal_type(preserved)  # revealed: (int, /) -> bytes
+preserved(1)
+# TODO: no error
+preserved("text")  # error: [invalid-argument-type]
+```
+
+A `Concatenate` prefix is required for every signature in the result.
+
+```py
+def prefixed(
+    left: Callable[[Callable[P, None]], None], right: Callable[[Callable[P, None]], None]
+) -> Callable[Concatenate[bytes, P], str]:
+    raise NotImplementedError
+
+callback = prefixed(consume, text)
+reveal_type(callback(b"prefix", 1))  # revealed: str
+reveal_type(callback(b"prefix", "text"))  # revealed: str
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+callback(None, 1)
+```
+
+A callback in a `Concatenate` prefix must accept calls from both consumers.
+
+```py
+def with_callback(
+    left: Callable[[Callable[P, None]], None], right: Callable[[Callable[P, None]], None]
+) -> Callable[Concatenate[Callable[P, None], P], None]:
+    def run(callback: Callable[P, None], /, *args: P.args, **kwargs: P.kwargs) -> None:
+        left(callback)
+        right(callback)
+    return run
+
+run = with_callback(consume, text)
+run(accepts_object, 1)  # ok
+# error: [invalid-argument-type] "Argument is incorrect: Expected `((int, /) -> None) & ((str, /) -> None)`, found `def accepts_str(value: str, /) -> None`"
+# error: [invalid-argument-type] "Argument is incorrect: Expected `((int, /) -> None) & ((str, /) -> None)`, found `def accepts_str(value: str, /) -> None`"
+# error: [invalid-argument-type] "Argument is incorrect: Expected `int`, found `Literal["text"]`"
+run(accepts_str, "text")
+```
+
+A returned callback accepts either argument regardless of which one the outer call used.
+
+```py
+def nested(
+    left: Callable[[Callable[P, None]], None], right: Callable[[Callable[P, None]], None]
+) -> Callable[P, Callable[P, None]]:
+    raise NotImplementedError
+
+inner = nested(consume, text)(1)
+reveal_type(inner)  # revealed: ((int, /) -> None) & ((str, /) -> None)
+inner("text")  # ok
+```
+
+### Type variable variance alongside a parameter list
+
+A captured parameter list does not change how other type variables follow variance.
+
+```py
+from typing import Callable, Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+V = TypeVar("V", contravariant=True)
+
+class Consumer(Generic[V]):
+    def consume(self, value: V) -> None: ...
+
+def use(shape: Callable[P, None], consumer: Consumer[Callable[[T], None]], value: T) -> T:
+    return value
+
+def empty() -> None: ...
+def _(consumer: Consumer[Callable[[object], None]]):
+    reveal_type(use(empty, consumer, 1))  # revealed: object
+```
+
+### Return context respects a callback's parameter type
+
+The declared result allows `list[object]`, but the callback only accepts `int`.
+
+```py
+from typing import Callable, Concatenate, ParamSpec, Sequence, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+U = TypeVar("U")
+
+def f(callback: Callable[Concatenate[T, P], None], x: U) -> tuple[list[T], list[U]]:
+    raise NotImplementedError
+
+def takes_int(x: int) -> None: ...
+
+result: tuple[list[object] | list[int], list[str] | Sequence[int]] = f(takes_int, 0)
+reveal_type(result)  # revealed: tuple[list[int], list[int]]
+```
+
+### Repeated parameter lists combine callback constraints
+
+Both callbacks constrain `P`. Comparable signatures simplify regardless of argument order.
+
+Incompatible parameter kinds are rejected.
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def first(left: Callable[P, None], right: Callable[P, None]) -> Callable[P, None]:
+    return left
+
+def integer(value: int, /) -> None: ...
+def anything(value: object, /) -> None: ...
+def keyword(*, value: int) -> None: ...
+
+reveal_type(first(integer, anything))  # revealed: (value: int, /) -> None
+reveal_type(first(anything, integer))  # revealed: (value: int, /) -> None
+# error: [invalid-argument-type]
+# revealed: (value: int, /) -> None
+reveal_type(first(integer, keyword))
+```
+
+Return types are inferred independently of the combined parameter-list constraints.
+
+```py
+from typing import TypeVar
+
+R = TypeVar("R")
+
+def returning(left: Callable[P, None], right: Callable[P, R]) -> Callable[P, R]:
+    return right
+
+def returns_str(value: object, /) -> str:
+    return ""
+
+reveal_type(returning(integer, returns_str))  # revealed: (value: int, /) -> str
+```
+
+### Parameter lists inferred from callback collections
+
+Callbacks in one iterable must share a parameter list.
+
+TODO: We reject incomparable signatures until we can construct their common parameter list.
+
+When no common signature is inferred, the first parameter list supplies the result type.
+
+```py
+from typing import Callable, Iterable, ParamSpec
+
+P = ParamSpec("P")
+
+def combine(callbacks: Iterable[Callable[P, int]]) -> Callable[P, list[int]]:
+    def both(*args: P.args, **kwargs: P.kwargs) -> list[int]:
+        return [callback(*args, **kwargs) for callback in callbacks]
+    return both
+
+def left(x: int, y: object, /) -> int:
+    return x
+
+def right(x: object, y: int, /) -> int:
+    return y
+
+combine([left, right])  # error: [invalid-argument-type]
+combine([right, left])  # error: [invalid-argument-type]
+reveal_type(combine([left, left]))  # revealed: (x: int, y: object, /) -> list[int]
+```
+
+### Repeated parameter lists retain outer variables
+
+A concrete parameter list cannot satisfy an arbitrary enclosing `ParamSpec`.
+
+The first parameter list is retained here too, including an enclosing `ParamSpec`.
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+Q = ParamSpec("Q")
+
+def combine(left: Callable[P, None], right: Callable[P, None]) -> Callable[P, None]:
+    return left
+
+def integer(value: int, /) -> None: ...
+def generic(callback: Callable[Q, None]):
+    # error: [invalid-argument-type]
+    # revealed: (**Q@generic) -> None
+    reveal_type(combine(callback, integer))
+    # error: [invalid-argument-type]
+    # revealed: (value: int, /) -> None
+    reveal_type(combine(integer, callback))
+```
+
+Argument checking reports both the incompatible callback and the invalid forwarded argument.
+
+```py
+def forward(left: Callable[P, None], right: Callable[P, None], /, *args: P.args, **kwargs: P.kwargs) -> None:
+    left(*args, **kwargs)
+    right(*args, **kwargs)
+
+def generic(callback: Callable[Q, None]):
+    # TODO: The `Q@generic.args` diagnostic selects the wrong callable (`integer`).
+    # This requirement comes from `callback`.
+    # snapshot: invalid-argument-type
+    # error: [missing-argument]
+    # snapshot: invalid-argument-type
+    forward(callback, integer, "foo")
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `forward` is incorrect
+  --> src/mdtest_snippet.py:27:23
+   |
+27 |     forward(callback, integer, "foo")
+   |                       ^^^^^^^ Expected `(**Q@generic) -> None`, found `def integer(value: int, /) -> None`
+info: Function defined here
+  --> src/mdtest_snippet.py:17:5
+   |
+17 | def forward(left: Callable[P, None], right: Callable[P, None], /, *args: P.args, **kwargs: P.kwargs) -> None:
+   |     ^^^^^^^                          ------------------------ Parameter declared here
+
+
+error[invalid-argument-type]: Argument to function `forward` is incorrect
+  --> src/mdtest_snippet.py:27:32
+   |
+27 |     forward(callback, integer, "foo")
+   |                                ^^^^^ Expected `Q@generic.args`, found `Literal["foo"]`
+info: Function defined here
+ --> src/mdtest_snippet.py:9:5
+  |
+9 | def integer(value: int, /) -> None: ...
+  |     ^^^^^^^ ---------- Parameter declared here
+```
+
+### Repeated parameter lists in forwarded calls
+
+Incomparable callbacks are rejected even when the forwarded arguments satisfy both signatures.
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def forward(left: Callable[P, None], right: Callable[P, None], /, *args: P.args, **kwargs: P.kwargs) -> None:
+    left(*args, **kwargs)
+    right(*args, **kwargs)
+
+def left(x: int, y: object, /) -> None: ...
+def right(x: object, y: int, /) -> None: ...
+
+# TODO: no error as the common parameter list would be `(int, int, /)`.
+forward(left, right, 1, 1)  # error: [invalid-argument-type]
+# TODO: no error as the common parameter list would be `(int, int, /)`.
+forward(right, left, 1, 1)  # error: [invalid-argument-type]
+forward(left, right, 1, "bad")  # error: [invalid-argument-type]
+# error: [invalid-argument-type]
+forward(left, right, "bad", 1)  # error: [invalid-argument-type]
+# error: [invalid-argument-type]
+# error: [missing-argument]
+forward(left, right, 1)
+```
+
+Optional keyword parameters still require a common parameter list to be inferred.
+
+```py
+def left(*, value: int | str = 0) -> None: ...
+def right(*, value: int | bytes = 0) -> None: ...
+
+# TODO: no error as the common parameter list would be `(*, value: int = 0)`.
+forward(left, right)  # error: [invalid-argument-type]
+# TODO: no error as the common parameter list would be `(*, value: int = 0)`.
+forward(left, right, value=1)  # error: [invalid-argument-type]
+forward(left, right, value="bad")  # error: [invalid-argument-type]
+# error: [invalid-argument-type]
+forward(left, right, value=b"bad")  # error: [invalid-argument-type]
+```
+
+### Combined parameter lists with gradual forwarding
+
+A gradual second callback preserves the first callback's requirements and supplies the return type.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def forward(left: Callable[P, None], right: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    left(*args, **kwargs)
+    return right(*args, **kwargs)
+
+def integer(value: int, /) -> None: ...
+def check(gradual: Callable[..., str]) -> None:
+    reveal_type(forward(integer, gradual, 1))  # revealed: str
+    forward(integer, gradual, "bad")  # error: [invalid-argument-type]
+    forward(integer, gradual)  # error: [missing-argument]
+```
+
+### Shared parameter lists provide argument context
+
+Comparable signatures provide a shared parameter list and context for a forwarded container literal.
+
+```py
+from typing import Callable, ParamSpec, TypedDict
+
+P = ParamSpec("P")
+
+class Item(TypedDict):
+    name: str
+
+def forward(left: Callable[P, None], right: Callable[P, None], /, *args: P.args, **kwargs: P.kwargs) -> None:
+    left(*args, **kwargs)
+    right(*args, **kwargs)
+
+def left(items: list[Item], kind: int | str, /) -> None: ...
+def right(items: list[Item], kind: int, /) -> None: ...
+
+forward(left, right, [{"name": "item"}], 1)
+forward(right, left, [{"name": "item"}], 1)
+```
+
+### Combined parameter lists in partial applications
+
+Partial application does not yet preserve intersected parameter lists inferred from callback
+consumers.
+
+```py
+from functools import partial
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def invoke(
+    left: Callable[[Callable[P, None]], None],
+    right: Callable[[Callable[P, None]], None],
+    /,
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> None: ...
+def integer(callback: Callable[[int], None]) -> None: ...
+def text(callback: Callable[[str], None]) -> None: ...
+
+callback = partial(invoke, integer, text)
+# TODO: Preserve both captured parameter lists in the partial.
+reveal_type(callback)  # revealed: partial[Unknown]
+callback(1)  # ok
+callback("text")  # ok
+# TODO: error: [invalid-argument-type]
+callback(None)
+```
+
+### Repeated parameter lists from generic instances
+
+An invariant generic callable retains the concrete parameter list in either argument order.
+
+A concrete callable supplies the parameter list when paired with a gradual instance.
+
+```py
+from typing import Callable, Generic, ParamSpec
+
+P = ParamSpec("P")
+
+class Callback(Generic[P]):
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+def instances(left: Callback[P], right: Callback[P]) -> Callback[P]:
+    return left
+
+def instance_first(left: Callback[P], right: Callable[P, None]) -> Callback[P]:
+    return left
+
+def callable_first(left: Callable[P, None], right: Callback[P]) -> Callable[P, None]:
+    return left
+
+def integer(value: int, /) -> None: ...
+def anything(value: object, /) -> None: ...
+def _(concrete: Callback[[int]], gradual: Callback[...]) -> None:
+    callback = instances(concrete, gradual)
+    reveal_type(callback)  # revealed: Callback[(int, /)]
+    callback(1)  # ok
+    callback("bad")  # error: [invalid-argument-type]
+
+    callback = instances(gradual, concrete)
+    reveal_type(callback)  # revealed: Callback[(int, /)]
+    callback(1)  # ok
+    callback("bad")  # error: [invalid-argument-type]
+
+    reveal_type(instance_first(concrete, anything))  # revealed: Callback[(int, /)]
+    # revealed: (value: int, /) -> None
+    reveal_type(callable_first(integer, gradual))
+```
+
+### Empty parameter lists override defaults
+
+A missing callback uses the default parameter list. An explicit empty parameter list remains empty.
+
+```py
+from typing import Callable, Generic
+from typing_extensions import ParamSpec
+
+P = ParamSpec("P", default=[int])
+
+class OptionalCallback(Generic[P]):
+    callback: Callable[P, None]
+
+    def __init__(self, callback: Callable[P, None] | None = None) -> None: ...
+
+def empty() -> None: ...
+
+reveal_type(OptionalCallback().callback)  # revealed: (int, /) -> None
+reveal_type(OptionalCallback(empty).callback)  # revealed: () -> None
+OptionalCallback(empty).callback()
+OptionalCallback(empty).callback(1)  # error: [too-many-positional-arguments]
+```
+
+### Forwarded arguments with type-variable bounds
+
+When a type variable is bounded by `LiteralString`, string literals are not promoted to `str` when
+providing context for other arguments. This applies to ordinary calls and calls forwarded through a
+`ParamSpec`.
+
+```py
+from typing import Any, Callable, ParamSpec, TypeVar
+from typing_extensions import LiteralString
+
+P = ParamSpec("P")
+T = TypeVar("T", bound=LiteralString)
+
+def forward(function: Callable[P, Any], /, *args: P.args, **kwargs: P.kwargs): ...
+def target(first: T, values: list[T]) -> None: ...
+
+target("a", ["a"])
+forward(target, "a", ["a"])
+```
+
+### Forwarded arguments with type-variable constraints
+
+A constrained generic callback can receive an argument matching any of its constraints. Capturing
+its parameters in a `ParamSpec` does not restrict the callback to its first constraint:
+
+```py
+from collections.abc import Callable
+from typing import ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T", str, bytes)
+
+def forward(function: Callable[P, object], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def identity(value: T) -> T:
+    return value
+
+forward(identity, b"text")  # ok
+```
+
+### Generic constructors with bounded return types
+
+A class object can be passed as a callable that constructs instances. `Factory` takes no constructor
+arguments, but its instances have a generic, writable `value` attribute:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Factory(Generic[T]):
+    value: T
+```
+
+The `construct` helper captures a callable's parameters in `P`, forwards its arguments, and returns
+the resulting instance. The bound on `R` requires that instance to be assignable to
+`Factory[object]`:
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+R = TypeVar("R", bound=Factory[object])
+
+def construct(factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+```
+
+`P` captures an empty parameter list, so the forwarded call supplies no information for `T`.
+
+```py
+# `R` is bounded by `Factory[object]`, and since `Factory` is invariant, no other fully static
+# specialization of `Factory` can satisfy that bound.
+reveal_type(construct(Factory))  # revealed: Factory[object]
+```
+
+Two arguments can capture the same generic constructor with different return bounds:
+
+```py
+Q = ParamSpec("Q")
+First = TypeVar("First", bound=Factory[int])
+Second = TypeVar("Second", bound=Factory[str])
+
+def pair(first: Callable[P, First], second: Callable[Q, Second]) -> tuple[First, Second]:
+    raise NotImplementedError
+
+reveal_type(pair(Factory, Factory))  # revealed: tuple[Factory[int], Factory[str]]
+```
+
+### Class method with a generic callable receiver
+
+A class method's receiver can be a generic callable whose parameters are captured by a `ParamSpec`.
+
+```py
+from typing import Callable, Generic, ParamSpec, TypeVar
+
+class Protocol: ...
+
+P = TypeVar("P", bound=Protocol)
+Params = ParamSpec("Params")
+R = TypeVar("R", bound="Factory[Protocol]")
+
+class Factory(Generic[P]):
+    @classmethod
+    def for_protocol(cls: Callable[Params, R], protocol: Callable[[], P]) -> "Factory[P]":
+        raise NotImplementedError
+
+Factory.for_protocol(Protocol)  # ok
+```
+
+### Inferring lambda parameters through nested calls
+
+When the outer call leaves the callback's parameter list unspecified, the lambda parameter remains
+unknown.
+
+```py
+from typing import Callable, Concatenate, ParamSpec
+
+P = ParamSpec("P")
+
+def wrap(callback: Callable[P, object]) -> Callable[P, object]:
+    return callback
+
+def register(callback: Callable[P, object]) -> None: ...
+
+register(wrap(lambda x: chr(reveal_type(x))))  # revealed: Unknown
+```
+
+A fixed prefix still supplies types for the corresponding lambda parameters.
+
+```py
+def register_prefixed(callback: Callable[Concatenate[int, P], object]) -> None: ...
+
+# revealed: tuple[int, Unknown, Unknown]
+register_prefixed(wrap(lambda x, y, z: reveal_type((x, y, z))))
+```
+
+### Inferring the result of a callback that forwards arguments
+
+`run` passes a function returning `int` to its callback. The callback's own return type determines
+the result of `run`, even when the function's parameter list is gradual.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def run(callback: Callable[[Callable[..., int]], R]) -> R:
+    return callback(lambda: 1)
+
+def stringify(fn: Callable[P, int], /, *args: P.args, **kwargs: P.kwargs) -> str:
+    return str(fn(*args, **kwargs))
+
+reveal_type(run(stringify))  # revealed: str
+```
+
+When the callback returns the function's result directly, `T` specializes to `int`.
+
+```py
+T = TypeVar("T")
+
+def invoke(fn: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
+    return fn(*args, **kwargs)
+
+reveal_type(run(invoke))  # revealed: int
+```
+
+### A factory and its callbacks share a parameter list
+
+`register` requires the factory and its callbacks to accept the same arguments. Since `empty` takes
+no arguments, `P` is empty and `T` specializes to `Callable[[], int]`.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+Factory = Callable[P, list[Callable[P, int]]]
+
+def register(factory: Factory[P]) -> Factory[P]:
+    return factory
+
+@register
+def empty() -> list[T]:
+    return []
+
+reveal_type(empty())  # revealed: list[() -> int]
+```
+
+For a factory with a required generic parameter, the argument determines the parameter type of each
+returned callback.
+
+```py
+K = TypeVar("K")
+
+@register
+def empty_for(key: K) -> list[T]:
+    return []
+
+reveal_type(empty_for(1))  # revealed: list[(key: int) -> int]
+empty_for()  # error: [missing-argument]
+```
+
+### A decorator's unsolved parameter list
+
+The parameter list of `identity` is local to that function. When there is no callback to specialize
+it, ty infers `Unknown` for the result of `return_type_of(identity)`.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def identity(f: Callable[P, str]) -> Callable[P, str]:
+    return f
+
+def return_type_of(f: Callable[..., R]) -> R:
+    raise NotImplementedError
+
+reveal_type(return_type_of(identity))  # revealed: Unknown
+```
+
+Since `Word` always denotes `str`, its parameter list has no effect on the result.
+
+```py
+from typing_extensions import TypeAliasType
+
+Word = TypeAliasType("Word", str, type_params=(P,))
+
+def word(f: Callable[P, str]) -> Word[P]:
+    return "word"
+
+reveal_type(return_type_of(word))  # revealed: str
+```
+
+### Returning the result of a forwarded generic call
+
+The forwarded argument specializes the identity function's `T`. The result keeps its type when
+stored in a local variable.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T")
+
+def invoke(fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return fn(*args, **kwargs)
+
+def identity(x: T) -> T:
+    return x
+
+items: list[int] = [invoke(identity, 1)]  # ok
+value = invoke(identity, 1)
+reveal_type(value)  # revealed: Literal[1]
+good: int = value  # ok
+bad: str = invoke(identity, 1)  # error: [invalid-assignment]
+wrong: list[str] = [value]  # error: [invalid-assignment]
+```
+
+When `T` occurs in an invariant position, the forwarded call promotes the literal just like a direct
+call.
+
+```py
+def boxed(x: T) -> list[T]:
+    return [x]
+
+reveal_type(invoke(boxed, 1))  # revealed: list[int]
+nested: list[list[int]] = [invoke(boxed, 1)]  # ok
+wide: list[object] = invoke(boxed, 1)  # ok
+```
+
+If the wrapper also returns the callback, it remains generic.
+
+```py
+def both(fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> tuple[Callable[P, R], R]:
+    return fn, fn(*args, **kwargs)
+
+kept, _ = both(identity, 1)
+reveal_type(kept("ok"))  # revealed: Literal["ok"]
+```
+
+A variable-length unpack can be empty, in which case `first` returns the trailing string.
+
+```py
+def first(x: T, *rest: object) -> T:
+    return x
+
+def unpack(xs: tuple[int, ...]):
+    n: int = invoke(first, *xs, "fallback")  # error: [invalid-assignment]
+```
+
+### Forwarding a recursive call
+
+Passing `x` back to the same function preserves the caller's `T`. Passing an unrelated argument does
+not justify returning the result as `T`.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T")
+
+def invoke(fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return fn(*args, **kwargs)
+
+def once(x: T, repeat: bool = True) -> T:
+    if repeat:
+        return invoke(once, x, False)  # ok
+    return x
+
+def changed(x: T, repeat: bool = True) -> T:
+    if repeat:
+        return invoke(changed, 1, False)  # error: [invalid-explicit-return]
+    return x
+```
+
+### Nested parameter captures in a decorator
+
+`run` calls the decorated identity with an `int`. Matching its required callable signature
+specializes the identity's `T` to `int` and gives `X` the same type.
+
+```py
+from typing import Callable, ParamSpec, Protocol, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T")
+X = TypeVar("X")
+
+class Identity(Protocol):
+    def __call__(self, value: T, /) -> T: ...
+
+identity: Identity = lambda value: value
+
+def decorate(fn: Callable[P, R]) -> Callable[P, R]:
+    return fn
+
+def run(decorator: Callable[[Identity], Callable[[int], X]]) -> X:
+    return decorator(identity)(1)
+
+# TODO: Accept the signature-preserving decorator as an argument to run.
+result = run(decorate)  # error: [invalid-argument-type]
+reveal_type(result)  # revealed: int
+```
+
+In `invoke`, `Q` captures the signature of `decorate`, including `P`, which in turn captures `T`
+from `Identity.__call__`. The returned `Identity` specializes `T` when called.
+
+```py
+Q = ParamSpec("Q")
+
+def invoke(decorator: Callable[Q, Identity], *args: Q.args, **kwargs: Q.kwargs) -> Identity:
+    return decorator(*args, **kwargs)
+
+reveal_type(invoke(decorate, identity)(1))  # revealed: Literal[1]
+
+def decorate_twice(fn: Identity) -> None:
+    reveal_type(decorate(decorate(fn))(1))  # revealed: Literal[1]
+```
+
+`keep` carries the decorated function's parameter list into its return type through `Q`. The
+returned callable stays generic in the identity's `T`.
+
+```py
+def keep(decorator: Callable[[Identity], Callable[Q, X]]) -> Callable[Q, X]:
+    return decorator(identity)
+
+# TODO: Accept the signature-preserving decorator as an argument to keep.
+wrapped = keep(decorate)  # error: [invalid-argument-type]
+reveal_type(wrapped)  # revealed: [T](value: T, /) -> T
+```
+
+A decorator generic over the entire function also preserves the relationship between the parameter
+and return types of `Identity.__call__`.
+
+```py
+F = TypeVar("F")
+
+def passthrough(fn: F) -> F:
+    return fn
+
+reveal_type(keep(passthrough))  # revealed: [T](value: T, /) -> T
+```
+
+`passthrough` also preserves a type variable used only in the return type. When `P` captures the
+parameter list of `empty`, its `T` stays in scope as `R` specializes to `list[T]`.
+
+```py
+def empty() -> list[T]:
+    return []
+
+def decorate_with(fn: Callable[P, R], decorator: Callable[[Callable[P, R]], X]) -> X:
+    return decorator(fn)
+
+reveal_type(decorate_with(empty, passthrough))  # revealed: [T]() -> list[T]
+```
+
+### A transform that returns a generic callback
+
+`accept` requires the result of `replace` to be usable as its input. Comparing the two signatures
+relates `list[T]` to `list[R]`, where `T` belongs to the returned callback and `R` to `replace`.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T")
+F = TypeVar("F")
+
+def replace(fn: Callable[P, list[R]]) -> Callable[[T, Callable[P, T]], list[T]]:
+    return lambda value, _: [value]
+
+def accept(transform: Callable[[F], F]) -> None: ...
+
+accept(replace)  # ok
+```
+
+`apply` calls `run` with just `fn`, so `P` specializes to an empty parameter list. Checking the `F`
+arm of `F | R` compares the returned callback, which binds its own `T`, with `fn`.
+
+```py
+def run(fn: Callable[P, int], /, *args: P.args, **kwargs: P.kwargs) -> Callable[P, int | T]:
+    fn(*args, **kwargs)
+    return fn
+
+def apply(transform: Callable[[F], F | R], fn: F) -> F | R:
+    return transform(fn)
+
+apply(run, lambda *args, **kwargs: 1)  # ok
+```
+
+### A fixed type variable in the callback's parameter and return types
+
+The callback can return `None`, but it only accepts `T` as an argument. Capturing its parameter list
+preserves that distinction.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T")
+
+def keep(callback: Callable[P, R]) -> Callable[P, R]:
+    return callback
+
+def outer(callback: Callable[[T], T | None]) -> None:
+    reveal_type(keep(callback))  # revealed: (T@outer, /) -> T@outer | None
+```
+
+`functools.wraps` preserves separate parameter lists for the wrapped function and its wrapper. The
+wrapper can accept `None` elements and filter them out before calling the wrapped function.
+
+```py
+from collections.abc import Iterable
+from functools import wraps
+
+def decorate(wrapped: Callable[[Iterable[T]], T | None]) -> Callable[[Iterable[T | None]], T | None]:
+    @wraps(wrapped)
+    def wrapper(items: Iterable[T | None]) -> T | None:
+        return wrapped(item for item in items if item is not None)
+
+    return wrapper
+```
+
+### Captured and fixed variables in a return type
+
+Capturing a callable's type variable does not permit a second, enclosing variable in its return type
+to violate a bound. An enclosing variable whose bound already satisfies the return bound is
+accepted.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R", bound=tuple[object, str])
+T = TypeVar("T")
+S = TypeVar("S")
+BoundedS = TypeVar("BoundedS", bound=str)
+
+def forward(factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+
+def unrestricted(fixed: S) -> None:
+    def make(value: T) -> tuple[T, S]:
+        return value, fixed
+
+    forward(make, 1)  # error: [invalid-argument-type]
+
+def non_generic(fixed: S) -> None:
+    def make(value: int) -> tuple[int, S]:
+        return value, fixed
+
+    forward(make, 1)  # error: [invalid-argument-type]
+
+def bounded(fixed: BoundedS) -> None:
+    def make(value: T) -> tuple[T, BoundedS]:
+        return value, fixed
+
+    forward(make, 1)  # ok
+```
+
+### Specializing a captured variable to satisfy a return bound
+
+The callable can be specialized with `T = str` to accept `"text"` and satisfy the return bound. The
+call with `1` is invalid even after specializing `T` to match the argument.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R", bound=tuple[str, str])
+T = TypeVar("T")
+S = TypeVar("S", bound=str)
+
+def forward(factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+
+def outer(fixed: S) -> None:
+    def make(value: T) -> tuple[T, S]:
+        return value, fixed
+
+    forward(make, "text")  # ok
+    # TODO: Reject this call because `T` cannot satisfy both the argument and the return bound.
+    forward(make, 1)  # ok
+```
+
+### Parameter lists after incomplete inference
+
+Inferring `T` can exceed the work limit without losing a known parameter list.
+
+`A | B` and `C | D` have four possible intersections; adding `E` exceeds the limit.
+
+```py
+from typing import Callable, TypeVar
+from typing_extensions import ParamSpec
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+
+def capture(
+    shape: Callable[P, None],
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> Callable[P, T]:
+    raise NotImplementedError
+
+def shape(*, value: str) -> None: ...
+def left(value: A | B) -> None: ...
+def right_small(value: C | D) -> None: ...
+def right_large(value: C | D | E) -> None: ...
+
+# revealed: (*, value: str) -> (A & C) | (B & C) | (A & D) | (B & D)
+reveal_type(capture(shape, left, right_small))
+
+result = capture(shape, left, right_large)
+reveal_type(result)  # revealed: (*, value: str) -> Unknown
+result(value="a")
+result(value=1)  # error: [invalid-argument-type]
+```
+
+When no argument supplies a parameter list, its default still applies even though `T` is unknown.
+
+```py
+from typing import Generic
+
+Q = ParamSpec("Q", default=[int])
+
+class Defaulted(Generic[T, Q]):
+    callback: Callable[Q, T]
+
+    def __init__(self, left: Callable[[T], None], right: Callable[[T], None]) -> None: ...
+
+defaulted = Defaulted(left, right_large).callback
+reveal_type(defaulted)  # revealed: (int, /) -> Unknown
+defaulted(1)
+defaulted("a")  # error: [invalid-argument-type]
+```
+
+### Tuple inference alongside parameter lists
+
+A captured parameter list does not change inference from alternatives in a tuple argument.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+def first(callback: Callable[P, None], value: tuple[T, ...]) -> T:
+    return value[0]
+
+def callback(*, label: str) -> None: ...
+def check(value: tuple[int] | tuple[str]):
+    reveal_type(first(callback, value))  # revealed: int | str
+```
+
+### Preserving method variables on callable receivers
+
+Binding a callable receiver preserves the method's other type variables for argument inference.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class Callback:
+    def __call__(self, text: str) -> int:
+        return len(text)
+
+    def call(self: Callable[P, int], value: T, /, *args: P.args, **kwargs: P.kwargs) -> T:
+        self(*args, **kwargs)
+        return value
+
+callback = Callback()
+reveal_type(callback.call(1, "text"))  # revealed: Literal[1]
+reveal_type(callback.call("value", "text"))  # revealed: Literal["value"]
+callback.call(1, 2)  # error: [invalid-argument-type]
+```
+
+### Alternative parameter lists inferred from a class method receiver
+
+The callbacks in `Pair` take incompatible arguments, so no single `P` matches both in the last union
+arm. The first two arms each match a different callback. Binding `call` keeps both parameter lists
+available.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+Callback = Callable[P, None]
+
+class Pair(tuple[Callback[[]], Callback[[int]]]):
+    @classmethod
+    def call(
+        cls: type[tuple[Callback[P], T] | tuple[T, Callback[P]] | tuple[Callback[P], Callback[P]]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> None: ...
+
+no_args: Callback[[]] = Pair.call  # ok
+one_arg: Callback[[int]] = Pair.call  # ok
+```
+
+### Capturing both constructor signatures
+
+A class callback loses the required initializer argument when `__new__` accepts arbitrary arguments.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+from typing_extensions import Self
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def capture(fn: Callable[P, R]) -> Callable[P, R]:
+    return fn
+
+class Example:
+    def __new__(cls, *args, **kwargs) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, value: int) -> None: ...
+
+constructor = capture(Example)
+reveal_type(constructor(1))  # revealed: Example
+# TODO: error: [missing-argument]
+constructor()
+```
+
+## Calling methods on a union of `ParamSpec` specializations
+
+A caller's parameter list can be shared by the receivers while the return type preserves the
+relationship between each receiver and its other type argument.
+
+```py
+from typing import Callable, Generic, TypeVar
+from typing_extensions import ParamSpec, Self
+
+T = TypeVar("T")
+P = ParamSpec("P")
+
+class Box(Generic[P, T]):
+    value: T
+
+    def invoke(self, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> tuple[Self, T]:
+        callback(*args, **kwargs)
+        return self, self.value
+
+def forward(
+    a: Box[P, str], b: Box[P, T], cond: bool, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs
+) -> tuple[Box[P, str], str] | tuple[Box[P, T], T]:
+    box = a if cond else b
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    box.invoke(callback, 1)
+    result = box.invoke(callback, *args, **kwargs)  # ok
+    # revealed: tuple[Box[P@forward, str], str] | tuple[Box[P@forward, T@forward], T@forward]
+    reveal_type(result)
+    return result  # ok
+
+def reverse(
+    a: Box[P, str], b: Box[P, T], cond: bool, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs
+) -> tuple[Box[P, str], str] | tuple[Box[P, T], T]:
+    invoke = b.invoke if cond else a.invoke
+    return invoke(callback, *args, **kwargs)  # ok
+```
+
+## Calling a union of methods with a `ParamSpec`
+
+The caller's `ParamSpec` remains fixed while each method is specialized for its own receiver.
+
+```py
+from typing import Callable, Generic, TypeVar
+from typing_extensions import ParamSpec, Self
+
+T = TypeVar("T")
+P = ParamSpec("P")
+
+class Box(Generic[T]):
+    value: T
+
+    def invoke(self, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> tuple[Self, T]:
+        callback(*args, **kwargs)
+        return self, self.value
+
+def forward(
+    a: Box[str], b: Box[T], cond: bool, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs
+) -> tuple[Box[str], str] | tuple[Box[T], T]:
+    box = a if cond else b
+    result = box.invoke(callback, *args, **kwargs)  # ok
+    # revealed: tuple[Box[str], str] | tuple[Box[T@forward], T@forward]
+    reveal_type(result)
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    # error: [missing-argument]
+    # error: [missing-argument]
+    box.invoke(callback, 1)
+    return result  # ok
+
+def callback(x: int, *, label: str) -> None: ...
+def concrete(a: Box[str], b: Box[int], cond: bool):
+    box = a if cond else b
+    reveal_type(box.invoke(callback, 1, label="ok"))  # revealed: tuple[Box[str], str] | tuple[Box[int], int]
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    box.invoke(callback, 1, label=1)
+    # error: [missing-argument]
+    # error: [missing-argument]
+    box.invoke(callback, 1)
+```
+
+## Method specialization preserves a callable's parameter list
+
+The callback stored in the owner's type argument can accept different parameters from the callback
+passed to its method.
+
+```py
+from typing import Callable, Generic, ParamSpec, TypeVar
+
+C = TypeVar("C")
+P = ParamSpec("P")
+
+class Box(Generic[C]):
+    @staticmethod
+    def get(f: Callable[P, int]) -> C:
+        def check(other: Box[Callable[P, int]], f: Callable[[int], int]) -> None:
+            callback = other.get(f)
+            # revealed: (**P@get) -> int
+            reveal_type(callback)
+            # error: [missing-argument]
+            # error: [invalid-argument-type]
+            callback(1)
+
+        raise NotImplementedError
+```

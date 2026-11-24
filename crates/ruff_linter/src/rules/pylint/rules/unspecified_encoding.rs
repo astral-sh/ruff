@@ -7,6 +7,7 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::add_argument;
 use crate::{AlwaysFixableViolation, Fix};
 
@@ -54,7 +55,7 @@ use crate::{AlwaysFixableViolation, Fix};
 ///
 /// [PEP 597]: https://peps.python.org/pep-0597/
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.1")]
+#[violation_metadata(preview_since = "v0.1.1", category = Category::Pedantic)]
 pub(crate) struct UnspecifiedEncoding {
     function_name: String,
     mode: ModeArgument,
@@ -114,11 +115,7 @@ enum Callee<'a> {
 impl<'a> Callee<'a> {
     fn is_pathlib_path_call(expr: &Expr, semantic: &SemanticModel) -> bool {
         if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-            semantic
-                .resolve_qualified_name(func)
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["pathlib", "Path"])
-                })
+            semantic.matches_qualified_name(func, &["pathlib", "Path"])
         } else {
             false
         }
@@ -154,7 +151,7 @@ impl<'a> Callee<'a> {
     fn mode_argument(&self) -> ModeArgument {
         match self {
             Callee::Qualified(qualified_name) => match qualified_name.segments() {
-                ["" | "codecs" | "_io", "open"] => ModeArgument::Supported,
+                ["" | "builtins" | "codecs" | "_io", "open"] => ModeArgument::Supported,
                 [
                     "tempfile",
                     "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile",
@@ -223,7 +220,7 @@ fn is_violation(call: &ast::ExprCall, qualified_name: &Callee) -> bool {
     }
     match qualified_name {
         Callee::Qualified(qualified_name) => match qualified_name.segments() {
-            ["" | "codecs" | "_io", "open"] => {
+            ["" | "builtins" | "codecs" | "_io", "open"] => {
                 if let Some(mode_arg) = call.arguments.find_argument_value("mode", 1) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
                         // binary mode or unknown mode is no violation

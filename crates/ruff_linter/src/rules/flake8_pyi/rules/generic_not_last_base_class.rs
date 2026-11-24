@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, helpers::map_subscript};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, add_argument, remove_argument};
 use crate::{Fix, FixAvailability, Violation};
 
@@ -84,7 +85,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// [1]: https://github.com/python/cpython/issues/106102
 /// [MRO]: https://docs.python.org/3/glossary.html#term-method-resolution-order
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.13.0")]
+#[violation_metadata(stable_since = "0.13.0", category = Category::Correctness)]
 pub(crate) struct GenericNotLastBaseClass;
 
 impl Violation for GenericNotLastBaseClass {
@@ -141,7 +142,7 @@ pub(crate) fn generic_not_last_base_class(checker: &Checker, class_def: &ast::St
     // where we would naively try to put `Generic[T]` after `*[str]`, which is also after a keyword
     // argument, causing the error.
     if bases
-        .arguments_source_order()
+        .iter_source_order()
         .any(|arg| arg.value().is_starred_expr())
     {
         return;

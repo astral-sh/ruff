@@ -26,7 +26,7 @@ mod tests {
         Rule::SingledispatchmethodFunction,
         Path::new("singledispatchmethod_function.py")
     )]
-    #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
+    #[test_case(Rule::AssertStringLiteral, Path::new("assert_string_literal.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.ipynb"))]
     #[test_case(Rule::BadOpenMode, Path::new("bad_open_mode.py"))]
@@ -46,13 +46,20 @@ mod tests {
     #[test_case(Rule::CompareToEmptyString, Path::new("compare_to_empty_string.py"))]
     #[test_case(Rule::ComparisonOfConstant, Path::new("comparison_of_constant.py"))]
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
+    #[test_case(
+        Rule::SwapWithTemporaryVariable,
+        Path::new("swap_with_temporary_variable.py")
+    )]
     #[test_case(Rule::EqWithoutHash, Path::new("eq_without_hash.py"))]
     #[test_case(Rule::EmptyComment, Path::new("empty_comment.py"))]
     #[test_case(Rule::EmptyComment, Path::new("empty_comment_line_continuation.py"))]
     #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
     #[test_case(Rule::IfStmtMinMax, Path::new("if_stmt_min_max.py"))]
     #[test_case(Rule::SingleStringSlots, Path::new("single_string_slots.py"))]
-    #[test_case(Rule::StopIterationReturn, Path::new("stop_iteration_return.py"))]
+    #[test_case(
+        Rule::RaiseStopIterationInGenerator,
+        Path::new("raise_stop_iteration_in_generator.py")
+    )]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_0.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_1.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_2.py"))]
@@ -100,24 +107,30 @@ mod tests {
     )]
     #[test_case(Rule::InvalidStrReturnType, Path::new("invalid_return_type_str.py"))]
     #[test_case(Rule::DuplicateBases, Path::new("duplicate_bases.py"))]
-    #[test_case(Rule::InvalidCharacterBackspace, Path::new("invalid_characters.py"))]
-    #[test_case(Rule::InvalidCharacterEsc, Path::new("invalid_characters.py"))]
-    #[test_case(Rule::InvalidCharacterNul, Path::new("invalid_characters.py"))]
-    #[test_case(Rule::InvalidCharacterSub, Path::new("invalid_characters.py"))]
+    #[test_case(Rule::UnescapedBackspaceCharacter, Path::new("invalid_characters.py"))]
+    #[test_case(Rule::UnescapedEscapeCharacter, Path::new("invalid_characters.py"))]
+    #[test_case(Rule::UnescapedNullCharacter, Path::new("invalid_characters.py"))]
+    #[test_case(Rule::UnescapedSubstituteCharacter, Path::new("invalid_characters.py"))]
     #[test_case(
-        Rule::InvalidCharacterZeroWidthSpace,
+        Rule::UnescapedZeroWidthSpaceCharacter,
         Path::new("invalid_characters.py")
     )]
     #[test_case(
-        Rule::InvalidCharacterBackspace,
+        Rule::UnescapedBackspaceCharacter,
         Path::new("invalid_characters_syntax_error.py")
     )]
     #[test_case(Rule::ShallowCopyEnviron, Path::new("shallow_copy_environ.py"))]
     #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"))]
-    #[test_case(Rule::InvalidEnvvarValue, Path::new("invalid_envvar_value.py"))]
+    #[test_case(Rule::InvalidGetenvKey, Path::new("invalid_getenv_key.py"))]
     #[test_case(Rule::IterationOverSet, Path::new("iteration_over_set.py"))]
-    #[test_case(Rule::LoggingTooFewArgs, Path::new("logging_too_few_args.py"))]
-    #[test_case(Rule::LoggingTooManyArgs, Path::new("logging_too_many_args.py"))]
+    #[test_case(
+        Rule::LoggingTooFewArguments,
+        Path::new("logging_too_few_arguments.py")
+    )]
+    #[test_case(
+        Rule::LoggingTooManyArguments,
+        Path::new("logging_too_many_arguments.py")
+    )]
     #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"))]
     #[test_case(Rule::ModifiedIteratingSet, Path::new("modified_iterating_set.py"))]
     #[test_case(
@@ -134,20 +147,27 @@ mod tests {
     #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"))]
     #[test_case(Rule::RedeclaredAssignedName, Path::new("redeclared_assigned_name.py"))]
     #[test_case(
-        Rule::RedefinedArgumentFromLocal,
-        Path::new("redefined_argument_from_local.py")
+        Rule::RedefinedParameterFromLocal,
+        Path::new("redefined_parameter_from_local.py")
     )]
-    #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"))]
-    #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"))]
-    #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"))]
     #[test_case(
-        Rule::TooManyPositionalArguments,
-        Path::new("too_many_positional_arguments.py")
+        Rule::RedefinedForOrWithTarget,
+        Path::new("redefined_for_or_with_target.py")
+    )]
+    #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"))]
+    #[test_case(Rule::TooManyParameters, Path::new("too_many_parameters.py"))]
+    #[test_case(
+        Rule::TooManyPositionalParameters,
+        Path::new("too_many_positional_parameters.py")
     )]
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"))]
     #[test_case(
         Rule::TooManyReturnStatements,
         Path::new("too_many_return_statements.py")
+    )]
+    #[test_case(
+        Rule::TooManyStatementsInTryClause,
+        Path::new("too_many_try_statements.py")
     )]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"))]
     #[test_case(Rule::TypeBivariance, Path::new("type_bivariance.py"))]
@@ -195,7 +215,7 @@ mod tests {
     )]
     #[test_case(Rule::UnspecifiedEncoding, Path::new("unspecified_encoding.py"))]
     #[test_case(Rule::BadDunderMethodName, Path::new("bad_dunder_method_name.py"))]
-    #[test_case(Rule::NoSelfUse, Path::new("no_self_use.py"))]
+    #[test_case(Rule::UnusedSelf, Path::new("unused_self.py"))]
     #[test_case(Rule::MisplacedBareRaise, Path::new("misplaced_bare_raise.py"))]
     #[test_case(Rule::LiteralMembership, Path::new("literal_membership.py"))]
     #[test_case(Rule::GlobalAtModuleLevel, Path::new("global_at_module_level.py"))]
@@ -210,9 +230,9 @@ mod tests {
         Rule::UnnecessaryListIndexLookup,
         Path::new("unnecessary_list_index_lookup.py")
     )]
-    #[test_case(Rule::NoClassmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::NonDecoratorClassmethod, Path::new("non_decorator_methods.py"))]
     #[test_case(Rule::UnnecessaryDunderCall, Path::new("unnecessary_dunder_call.py"))]
-    #[test_case(Rule::NoStaticmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::NonDecoratorStaticmethod, Path::new("non_decorator_methods.py"))]
     #[test_case(Rule::PotentialIndexError, Path::new("potential_index_error.py"))]
     #[test_case(Rule::SuperWithoutBrackets, Path::new("super_without_brackets.py"))]
     #[test_case(Rule::SelfOrClsAssignment, Path::new("self_or_cls_assignment.py"))]
@@ -230,13 +250,13 @@ mod tests {
     )]
     #[test_case(Rule::NanComparison, Path::new("nan_comparison.py"))]
     #[test_case(
-        Rule::BadStaticmethodArgument,
-        Path::new("bad_staticmethod_argument.py")
+        Rule::BadStaticmethodParameter,
+        Path::new("bad_staticmethod_parameter.py")
     )]
     #[test_case(Rule::LenTest, Path::new("len_as_condition.py"))]
     #[test_case(Rule::MissingMaxsplitArg, Path::new("missing_maxsplit_arg.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pylint").join(path).as_path(),
             &LinterSettings {
@@ -258,23 +278,13 @@ mod tests {
         Path::new("useless_exception_statement.py")
     )]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
 
         assert_diagnostics_diff!(
             snapshot,
             Path::new("pylint").join(path).as_path(),
-            &LinterSettings {
-                preview: PreviewMode::Disabled,
-                ..LinterSettings::for_rule(rule_code)
-            },
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
-            }
+            &LinterSettings::for_rule(rule_code),
+            &LinterSettings::for_rule(rule_code).with_preview_mode()
         );
         Ok(())
     }
@@ -287,6 +297,17 @@ mod tests {
                 .with_target_version(PythonVersion::PY37),
         )?;
         assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn continue_in_finally_python_38() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/continue_in_finally.py"),
+            &LinterSettings::for_rule(Rule::ContinueInFinally)
+                .with_target_version(PythonVersion::PY38),
+        )?;
+        assert!(diagnostics.is_empty());
         Ok(())
     }
 
@@ -309,13 +330,13 @@ mod tests {
     #[test]
     fn max_args() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("pylint/too_many_arguments_params.py"),
+            Path::new("pylint/too_many_parameters_settings.py"),
             &LinterSettings {
                 pylint: pylint::settings::Settings {
                     max_args: 4,
                     ..pylint::settings::Settings::default()
                 },
-                ..LinterSettings::for_rule(Rule::TooManyArguments)
+                ..LinterSettings::for_rule(Rule::TooManyParameters)
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -325,10 +346,10 @@ mod tests {
     #[test]
     fn max_args_with_dummy_variables() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("pylint/too_many_arguments_params.py"),
+            Path::new("pylint/too_many_parameters_settings.py"),
             &LinterSettings {
                 dummy_variable_rgx: Regex::new(r"skip_.*").unwrap(),
-                ..LinterSettings::for_rule(Rule::TooManyArguments)
+                ..LinterSettings::for_rule(Rule::TooManyParameters)
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -344,7 +365,7 @@ mod tests {
                     max_positional_args: 4,
                     ..pylint::settings::Settings::default()
                 },
-                ..LinterSettings::for_rule(Rule::TooManyPositionalArguments)
+                ..LinterSettings::for_rule(Rule::TooManyPositionalParameters)
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -466,6 +487,20 @@ mod tests {
                     Rule::ImportOutsideTopLevel,
                 ])
             },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    /// Regression test for <https://github.com/astral-sh/ruff/issues/23587>.
+    #[test]
+    fn conflict_with_definition_rules() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/swap_with_temporary_variable_1.py"),
+            &LinterSettings::for_rules(vec![
+                Rule::SwapWithTemporaryVariable,
+                Rule::UnannotatedParameter,
+            ]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())

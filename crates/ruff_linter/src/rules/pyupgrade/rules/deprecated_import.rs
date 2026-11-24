@@ -9,9 +9,10 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pyupgrade::fixes;
 use crate::rules::pyupgrade::rules::unnecessary_future_import::is_import_required_by_isort;
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 use super::RequiredImports;
@@ -63,8 +64,12 @@ enum Deprecation {
 /// ```python
 /// from collections.abc import Sequence
 /// ```
+///
+/// ## Fix safety
+/// This fix is marked unsafe if the import statement contains comments, since
+/// rewriting the import may delete them.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.239")]
+#[violation_metadata(stable_since = "v0.0.239", category = Category::Suspicious)]
 pub(crate) struct DeprecatedImport {
     deprecation: Deprecation,
 }
@@ -109,6 +114,7 @@ fn is_relevant_module(module: &str) -> bool {
             | "mypy_extensions"
             | "typing_extensions"
             | "typing"
+            | "typing.io"
             | "typing.re"
             | "backports.strenum"
     )
@@ -191,7 +197,6 @@ const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
     "ValuesView",
     "cast",
     "no_type_check",
-    "no_type_check_decorator",
     // Introduced in Python 3.5.2, but `typing_extensions` contains backported bugfixes and
     // optimizations,
     // "NewType",
@@ -217,6 +222,14 @@ const TYPING_EXTENSIONS_TO_TYPING_37: &[&str] = &[
     // "AsyncGenerator",
     // "NamedTuple",
 ];
+
+// Members of `typing.io` that were moved to `typing`.
+// Note that the `typing.io` namespace has pretty much always been unnecessary.
+const TYPING_IO_TO_TYPING_37: &[&str] = &["BinaryIO", "IO", "TextIO"];
+
+// Members of `typing.re` that were moved to `typing`.
+// Note that the `typing.re` namespace has pretty much always been unnecessary.
+const TYPING_RE_TO_TYPING_37: &[&str] = &["Match", "Pattern"];
 
 // Python 3.8+
 
@@ -244,7 +257,6 @@ const TYPING_TO_COLLECTIONS_ABC_39: &[&str] = &[
     "AsyncIterable",
     "AsyncIterator",
     "Awaitable",
-    "ByteString",
     "Collection",
     "Container",
     "Coroutine",
@@ -268,7 +280,7 @@ const TYPING_TO_COLLECTIONS_ABC_39: &[&str] = &[
 // Members of `typing` that were moved to `collections`.
 const TYPING_TO_COLLECTIONS_39: &[&str] = &["ChainMap", "Counter", "OrderedDict"];
 
-// Members of `typing` that were moved to `typing.re`.
+// Members of `typing` that were moved to `re`.
 const TYPING_TO_RE_39: &[&str] = &["Match", "Pattern"];
 
 // Members of `typing.re` that were moved to `re`.
@@ -407,6 +419,11 @@ const TYPING_EXTENSIONS_TO_TYPES_313: &[&str] = &["CapsuleType"];
 // Members of typing_extensions that were moved to `warnings`
 const TYPING_EXTENSIONS_TO_WARNINGS_313: &[&str] = &["deprecated"];
 
+// Python 3.15+
+
+// Members of `typing_extensions` that were moved to `typing`.
+const TYPING_EXTENSIONS_TO_TYPING_315: &[&str] = &["TypeForm"];
+
 struct ImportReplacer<'a> {
     import_from_stmt: &'a StmtImportFrom,
     module: &'a str,
@@ -543,6 +560,9 @@ impl<'a> ImportReplacer<'a> {
                 if self.version >= PythonVersion::PY313 {
                     typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_313);
                 }
+                if self.version >= PythonVersion::PY315 {
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_315);
+                }
                 if let Some(operation) = self.try_replace(&typing_extensions_to_typing, "typing") {
                     operations.push(operation);
                 }
@@ -592,9 +612,20 @@ impl<'a> ImportReplacer<'a> {
                     operations.push(operation);
                 }
             }
-            "typing.re" if self.version >= PythonVersion::PY39 => {
-                if let Some(operation) = self.try_replace(TYPING_RE_TO_RE_39, "re") {
+            "typing.io" if self.version >= PythonVersion::PY37 => {
+                if let Some(operation) = self.try_replace(TYPING_IO_TO_TYPING_37, "typing") {
                     operations.push(operation);
+                }
+            }
+            "typing.re" => {
+                if self.version >= PythonVersion::PY39 {
+                    if let Some(operation) = self.try_replace(TYPING_RE_TO_RE_39, "re") {
+                        operations.push(operation);
+                    }
+                } else if self.version >= PythonVersion::PY37 {
+                    if let Some(operation) = self.try_replace(TYPING_RE_TO_TYPING_37, "typing") {
+                        operations.push(operation);
+                    }
                 }
             }
             "backports.strenum" if self.version >= PythonVersion::PY311 => {
@@ -624,7 +655,7 @@ impl<'a> ImportReplacer<'a> {
         }
 
         if unmatched_names.is_empty() {
-            let matched = ImportReplacer::format_import_from(&matched_names, target);
+            let matched = self.format_import_from(&matched_names, target);
             let operation = WithoutRename {
                 target: target.to_string(),
                 members: matched_names
@@ -654,7 +685,7 @@ impl<'a> ImportReplacer<'a> {
                 return Some((operation, fix));
             };
 
-            let matched = ImportReplacer::format_import_from(&matched_names, target);
+            let matched = self.format_import_from(&matched_names, target);
             let unmatched = fixes::remove_import_members(
                 self.locator,
                 self.import_from_stmt,
@@ -704,7 +735,7 @@ impl<'a> ImportReplacer<'a> {
 
     /// Converts a list of names and a module into an `import from`-style
     /// import.
-    fn format_import_from(names: &[&Alias], module: &str) -> String {
+    fn format_import_from(&self, names: &[&Alias], module: &str) -> String {
         // Construct the whitespace strings.
         // Generate the formatted names.
         let qualified_names: String = names
@@ -714,7 +745,12 @@ impl<'a> ImportReplacer<'a> {
                 None => format!("{}", name.name),
             })
             .join(", ");
-        format!("from {module} import {qualified_names}")
+        let prefix = if self.import_from_stmt.is_lazy {
+            "lazy "
+        } else {
+            ""
+        };
+        format!("{prefix}from {module} import {qualified_names}")
     }
 }
 
@@ -750,6 +786,8 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
     );
 
     for (operation, fix) in fixer.without_renames() {
+        let preserves_laziness = import_from_stmt.is_lazy
+            || checker.import_rewrite_preserves_laziness(module, &operation.target);
         let mut diagnostic = checker.report_diagnostic(
             DeprecatedImport {
                 deprecation: Deprecation::WithoutRename(operation),
@@ -757,11 +795,21 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
             import_from_stmt.range(),
         );
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
-        if let Some(content) = fix {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                content,
-                import_from_stmt.range(),
-            )));
+        if let Some(content) = fix
+            && preserves_laziness
+        {
+            let applicability = if checker
+                .comment_ranges()
+                .intersects(import_from_stmt.range())
+            {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(content, import_from_stmt.range()),
+                applicability,
+            ));
         }
     }
 

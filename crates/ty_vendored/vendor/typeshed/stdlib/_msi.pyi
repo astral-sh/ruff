@@ -56,7 +56,7 @@ if sys.platform == "win32":
     def UuidCreate() -> str:
         """Return the string representation of a new unique identifier."""
 
-    def FCICreate(cabname: str, files: list[str], /) -> None:
+    def FCICreate(cabname: str, files: list[tuple[str, str]], /) -> None:
         """Create a new CAB file.
 
         cabname
@@ -81,6 +81,7 @@ if sys.platform == "win32":
         count
           the number of fields of the record
         """
+
     MSICOLINFO_NAMES: Final[int]
     MSICOLINFO_TYPES: Final[int]
     MSIDBOPEN_CREATE: Final[int]

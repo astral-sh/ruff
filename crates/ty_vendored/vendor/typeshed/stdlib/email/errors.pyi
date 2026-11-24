@@ -1,7 +1,5 @@
 """email package exception classes."""
 
-import sys
-
 class MessageError(Exception):
     """Base class for errors in the email package."""
 
@@ -85,8 +83,7 @@ class ObsoleteHeaderDefect(HeaderDefect):
     """Header uses syntax declared obsolete by RFC 5322"""
 
 class NonASCIILocalPartDefect(HeaderDefect):
-    """local_part contains non-ASCII characters"""
+    """Unused. Note: this error is deprecated and may be removed in the future."""
 
-if sys.version_info >= (3, 10):
-    class InvalidDateDefect(HeaderDefect):
-        """Header has unparsable or invalid date"""
+class InvalidDateDefect(HeaderDefect):
+    """Header has unparsable or invalid date"""

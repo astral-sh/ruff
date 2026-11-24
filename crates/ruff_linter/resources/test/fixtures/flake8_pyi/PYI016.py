@@ -146,3 +146,13 @@ field49: typing.Optional[complex | complex] | complex
 # Regression test for https://github.com/astral-sh/ruff/issues/19403
 # Should throw duplicate union member but not fix
 isinstance(None, typing.Union[None, None])
+
+# Regression test for https://github.com/astral-sh/ruff/issues/19914
+# f-string debug (=) specifier: different source text means different output
+field50: typing.Literal[f"{00=}"] | typing.Literal[f"{000=}"]  # OK (f"{00=}" -> "00=0", f"{000=}" -> "000=0")
+field51: typing.Literal[f"{x=}"] | typing.Literal[f"{x}"]  # OK (f"{x=}" -> "x=1", f"{x}" -> "1")
+field52: typing.Literal[f"{x=}"] | typing.Literal[f"{x=}"]  # Error (true duplicate)
+field53: typing.Literal[f"{x:.2f}"] | typing.Literal[f"{x:.3f}"]  # OK (different format specs)
+field54: typing.Literal[f"{x}"] | typing.Literal[f"{x}"]  # Error (true duplicate)
+field55: typing.Literal[f"{x =}"] | typing.Literal[f"{x=}"]  # OK (different debug text due to spaces)
+field56: typing.Literal[f"{0x0=}"] | typing.Literal[f"{0o0=}"]  # OK (different source text: "0x0" vs "0o0")

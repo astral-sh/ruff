@@ -7,7 +7,7 @@ use std::sync::LazyLock;
 
 /// The source commit of the vendored typeshed.
 pub const SOURCE_COMMIT: &str =
-    include_str!("../../../crates/ty_vendored/vendor/typeshed/source_commit.txt").trim_ascii_end();
+    include_str!("../vendor/typeshed/source_commit.txt").trim_ascii_end();
 
 static_assertions::const_assert_eq!(SOURCE_COMMIT.len(), 40);
 

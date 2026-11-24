@@ -37,7 +37,9 @@ class Ham(Protocol[T1, T2, DefaultStrT, T3]):  # error: [invalid-generic-class]
     pass
 
 class VeryBad(
-    Protocol[T1, T2, DefaultStrT, T3],  # error: [invalid-generic-class]
+    # error: [invalid-generic-class]
+    # error: [invalid-generic-class]
+    Protocol[T1, T2, DefaultStrT, T3],
     Generic[T1, T2, DefaultStrT, T3],
 ): ...
 ```

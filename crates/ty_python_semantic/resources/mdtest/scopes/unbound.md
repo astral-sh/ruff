@@ -17,8 +17,8 @@ class C:
         x = 2
 
 # error: [possibly-missing-attribute] "Attribute `x` may be missing on class `C`"
-reveal_type(C.x)  # revealed: Unknown | Literal[2]
-reveal_type(C.y)  # revealed: Unknown | Literal[1]
+reveal_type(C.x)  # revealed: int
+reveal_type(C.y)  # revealed: int
 ```
 
 ## Possibly unbound in class and global scope
@@ -37,7 +37,7 @@ class C:
     # Possibly unbound variables in enclosing scopes are considered bound.
     y = x
 
-reveal_type(C.y)  # revealed: Unknown | Literal[1, "abc"]
+reveal_type(C.y)  # revealed: int | str
 ```
 
 ## Possibly unbound in class scope with multiple declarations
@@ -70,4 +70,15 @@ def f():
     x = 2
     # revealed: Literal[2]
     reveal_type(x)
+```
+
+## Unbound function local named `reveal_type`
+
+The convenience fallback for an unimported `reveal_type` only applies when name resolution does not
+find the name. It does not replace an unbound local.
+
+```py
+def f():
+    reveal_type(1)  # error: [unresolved-reference]
+    reveal_type = lambda value: value
 ```

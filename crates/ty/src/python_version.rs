@@ -1,15 +1,12 @@
-/// Enumeration of all supported Python versions
-///
-/// TODO: unify with the `PythonVersion` enum in the linter/formatter crates?
-#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
-pub enum PythonVersion {
+/// Enumeration of the Python versions accepted by the ty CLI.
+#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum)]
+pub(crate) enum PythonVersion {
     #[value(name = "3.7")]
     Py37,
     #[value(name = "3.8")]
     Py38,
     #[value(name = "3.9")]
     Py39,
-    #[default]
     #[value(name = "3.10")]
     Py310,
     #[value(name = "3.11")]
@@ -20,6 +17,8 @@ pub enum PythonVersion {
     Py313,
     #[value(name = "3.14")]
     Py314,
+    #[value(name = "3.15")]
+    Py315,
 }
 
 impl PythonVersion {
@@ -33,6 +32,7 @@ impl PythonVersion {
             Self::Py312 => "3.12",
             Self::Py313 => "3.13",
             Self::Py314 => "3.14",
+            Self::Py315 => "3.15",
         }
     }
 }
@@ -43,30 +43,18 @@ impl std::fmt::Display for PythonVersion {
     }
 }
 
-impl From<PythonVersion> for ruff_python_ast::PythonVersion {
+impl From<PythonVersion> for ty_project::metadata::python_version::SupportedPythonVersion {
     fn from(value: PythonVersion) -> Self {
         match value {
-            PythonVersion::Py37 => Self::PY37,
-            PythonVersion::Py38 => Self::PY38,
-            PythonVersion::Py39 => Self::PY39,
-            PythonVersion::Py310 => Self::PY310,
-            PythonVersion::Py311 => Self::PY311,
-            PythonVersion::Py312 => Self::PY312,
-            PythonVersion::Py313 => Self::PY313,
-            PythonVersion::Py314 => Self::PY314,
+            PythonVersion::Py37 => Self::Py37,
+            PythonVersion::Py38 => Self::Py38,
+            PythonVersion::Py39 => Self::Py39,
+            PythonVersion::Py310 => Self::Py310,
+            PythonVersion::Py311 => Self::Py311,
+            PythonVersion::Py312 => Self::Py312,
+            PythonVersion::Py313 => Self::Py313,
+            PythonVersion::Py314 => Self::Py314,
+            PythonVersion::Py315 => Self::Py315,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::python_version::PythonVersion;
-
-    #[test]
-    fn same_default_as_python_version() {
-        assert_eq!(
-            ruff_python_ast::PythonVersion::from(PythonVersion::default()),
-            ruff_python_ast::PythonVersion::default()
-        );
     }
 }

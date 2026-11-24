@@ -1,4 +1,4 @@
-use super::{Arguments, FormatElement, write};
+use super::{Arguments, FormatElement, Formatter, write};
 use crate::format_element::Interned;
 use crate::prelude::{LineMode, Tag};
 use crate::{FormatResult, FormatState};
@@ -92,7 +92,7 @@ pub enum BufferSnapshot {
 
 impl BufferSnapshot {
     /// Creates a new buffer snapshot that points to the specified position.
-    pub const fn position(index: usize) -> Self {
+    const fn position(index: usize) -> Self {
         Self::Position(index)
     }
 
@@ -101,7 +101,7 @@ impl BufferSnapshot {
     /// # Panics
     ///
     /// If self is not a [`BufferSnapshot::Position`]
-    pub fn unwrap_position(&self) -> usize {
+    fn unwrap_position(&self) -> usize {
         match self {
             BufferSnapshot::Position(index) => *index,
             BufferSnapshot::Any(_) => panic!("Tried to unwrap Any snapshot as a position."),
@@ -113,7 +113,7 @@ impl BufferSnapshot {
     /// # Panics
     ///
     /// If `self` is not a [`BufferSnapshot::Any`].
-    pub fn unwrap_any<T: 'static>(self) -> T {
+    fn unwrap_any<T: 'static>(self) -> T {
         match self {
             BufferSnapshot::Position(_) => {
                 panic!("Tried to unwrap Position snapshot as Any snapshot.")
@@ -179,12 +179,12 @@ impl<'a, Context> VecBuffer<'a, Context> {
         Self::new_with_vec(state, Vec::new())
     }
 
-    pub fn new_with_vec(state: &'a mut FormatState<Context>, elements: Vec<FormatElement>) -> Self {
+    fn new_with_vec(state: &'a mut FormatState<Context>, elements: Vec<FormatElement>) -> Self {
         Self { state, elements }
     }
 
     /// Creates a buffer with the specified capacity
-    pub fn with_capacity(capacity: usize, state: &'a mut FormatState<Context>) -> Self {
+    pub(crate) fn with_capacity(capacity: usize, state: &'a mut FormatState<Context>) -> Self {
         Self {
             state,
             elements: Vec::with_capacity(capacity),
@@ -218,6 +218,10 @@ impl<Context> DerefMut for VecBuffer<'_, Context> {
 
 impl<Context> Buffer for VecBuffer<'_, Context> {
     type Context = Context;
+
+    fn write_fmt(&mut self, arguments: Arguments<Context>) -> FormatResult<()> {
+        Formatter::new_vec(self).write_fmt(arguments)
+    }
 
     fn write_element(&mut self, element: FormatElement) {
         self.elements.push(element);
@@ -383,7 +387,8 @@ fn clean_interned(
     } else {
         let mut state = RemoveSoftLineBreaksState::default();
 
-        // Find the first soft line break element or interned element that must be changed
+        // Find the first soft line break element, interned element, or best-fitting element that
+        // must be changed
         let result = interned
             .iter()
             .enumerate()
@@ -406,6 +411,11 @@ fn clean_interned(
                         Some((cleaned, &interned[index + 1..]))
                     }
                 }
+                FormatElement::BestFitting { .. } => {
+                    let mut cleaned = Vec::new();
+                    cleaned.extend_from_slice(&interned[..index]);
+                    Some((cleaned, &interned[index..]))
+                }
 
                 element => {
                     if state.should_drop(element) {
@@ -422,20 +432,28 @@ fn clean_interned(
         let result = match result {
             // Copy the whole interned buffer so that becomes possible to change the necessary elements.
             Some((mut cleaned, rest)) => {
-                for element in rest {
+                let mut element_stack = rest.iter().rev().collect::<Vec<_>>();
+                while let Some(element) = element_stack.pop() {
                     if state.should_drop(element) {
                         continue;
                     }
 
-                    let element = match element {
-                        FormatElement::Line(LineMode::SoftOrSpace) => FormatElement::Space,
+                    match element {
+                        FormatElement::Line(LineMode::SoftOrSpace) => {
+                            cleaned.push(FormatElement::Space);
+                        }
                         FormatElement::Interned(interned) => {
-                            FormatElement::Interned(clean_interned(interned, interned_cache))
+                            cleaned.push(FormatElement::Interned(clean_interned(
+                                interned,
+                                interned_cache,
+                            )));
+                        }
+                        FormatElement::BestFitting { variants, mode: _ } => {
+                            element_stack.extend(variants.most_flat().iter().rev());
                         }
 
-                        element => element.clone(),
-                    };
-                    cleaned.push(element);
+                        element => cleaned.push(element.clone()),
+                    }
                 }
 
                 Interned::new(cleaned)
@@ -461,6 +479,12 @@ impl<Context> Buffer for RemoveSoftLinesBuffer<'_, Context> {
             FormatElement::Line(LineMode::SoftOrSpace) => FormatElement::Space,
             FormatElement::Interned(interned) => {
                 FormatElement::Interned(self.clean_interned(&interned))
+            }
+            FormatElement::BestFitting { variants, mode: _ } => {
+                for element in variants.most_flat() {
+                    self.write_element(element.clone());
+                }
+                return;
             }
 
             element => element,
@@ -509,6 +533,10 @@ impl RemoveSoftLineBreaksState {
         match self {
             Self::Default => match element {
                 FormatElement::Line(LineMode::Soft) => true,
+
+                // `BestFitting` is resolved to its most-flat entry by this buffer, so we can drop
+                // the start and end tags, leaving only their contents.
+                FormatElement::Tag(Tag::StartBestFittingEntry | Tag::EndBestFittingEntry) => true,
 
                 // Entered the start of an `if_group_breaks` or `if_group_fits`
                 // For `if_group_breaks`: Remove the start and end tag and all content in between.

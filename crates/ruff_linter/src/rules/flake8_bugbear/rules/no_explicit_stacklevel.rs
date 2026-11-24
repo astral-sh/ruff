@@ -1,7 +1,9 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Fix};
 use crate::{checkers::ast::Checker, fix::edits::add_argument};
 
@@ -18,6 +20,9 @@ use crate::{checkers::ast::Checker, fix::edits::add_argument};
 /// It's recommended to use a `stacklevel` of 2 or higher, to give the caller
 /// more context about the warning.
 ///
+/// In Python 3.12 and higher, one may also use `skip_file_prefixes` to specify
+/// which file prefixes are ignored when counting the stack level. This implicitly overrides the `stacklevel` to be
+/// at least 2, according to the [Python documentation].
 /// ## Example
 /// ```python
 /// import warnings
@@ -39,9 +44,11 @@ use crate::{checkers::ast::Checker, fix::edits::add_argument};
 /// higher stacklevel to address the diagnostic.
 ///
 /// ## References
-/// - [Python documentation: `warnings.warn`](https://docs.python.org/3/library/warnings.html#warnings.warn)
+/// - [Python documentation: `warnings.warn`][Python documentation]
+///
+///[Python documentation]: https://docs.python.org/3/library/warnings.html#warnings.warn
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Pedantic)]
 pub(crate) struct NoExplicitStacklevel;
 
 impl AlwaysFixableViolation for NoExplicitStacklevel {
@@ -56,12 +63,12 @@ impl AlwaysFixableViolation for NoExplicitStacklevel {
 }
 
 /// B028
-pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
-    if !checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["warnings", "warn"]))
-    {
+pub(crate) fn no_explicit_stacklevel(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
+    if !matches!(qualified_name.segments(), ["warnings", "warn"]) {
         return;
     }
 

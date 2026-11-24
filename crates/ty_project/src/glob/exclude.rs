@@ -20,7 +20,7 @@ use crate::glob::portable::AbsolutePortableGlobPattern;
 ///
 /// # Equality
 ///
-/// Two filters are equal if they're constructed from the same patterns (including order).
+/// Two filters are equal if they're constructed from the same absolute globs (including order).
 /// Two filters that exclude the exact same files but were constructed from different patterns aren't considered
 /// equal.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
@@ -50,7 +50,7 @@ impl ExcludeFilter {
                 // No hit or an allow hit means the file or directory is not excluded.
                 false
             }
-            GlobFilterCheckMode::Adhoc => {
+            GlobFilterCheckMode::WalkRoot | GlobFilterCheckMode::Adhoc => {
                 // If the path is allowlisted or there's no hit, try the parent to ensure we don't return false
                 // for a folder where there's an exclude for a parent.
                 path.ancestors()
@@ -112,7 +112,7 @@ impl ExcludeFilterBuilder {
 ///
 /// # Equality
 ///
-/// Two ignore matches are only equal if they're constructed from the same patterns (including order).
+/// Two ignore matchers are only equal if they're constructed from the same absolute globs (including order).
 /// Two matchers that were constructed from different patterns but result in
 /// including the same files don't compare equal.
 #[derive(Clone, get_size2::GetSize)]
@@ -120,6 +120,7 @@ struct Gitignore {
     #[get_size(ignore)]
     set: GlobSet,
     globs: Vec<IgnoreGlob>,
+    scope: MatchScope,
     #[get_size(ignore)]
     matches: Arc<Pool<Vec<usize>>>,
 }
@@ -133,7 +134,12 @@ impl Gitignore {
     ///
     /// The path must be absolute or it will only match prefix-wildcard patterns.
     fn matched(&self, path: &SystemPath, is_dir: bool) -> Match {
-        if self.globs.is_empty() {
+        let can_match = match self.scope {
+            MatchScope::Empty => false,
+            MatchScope::DirectoriesOnly => is_dir,
+            MatchScope::FilesAndDirectories => true,
+        };
+        if !can_match {
             return Match::None;
         }
 
@@ -170,6 +176,14 @@ impl PartialEq for Gitignore {
 
 impl Eq for Gitignore {}
 
+/// The kinds of paths the glob set can match.
+#[derive(Copy, Clone, Debug, get_size2::GetSize)]
+enum MatchScope {
+    Empty,
+    DirectoriesOnly,
+    FilesAndDirectories,
+}
+
 #[derive(Copy, Clone, Debug)]
 enum Match {
     /// The path matches no pattern.
@@ -192,7 +206,7 @@ impl Match {
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 struct IgnoreGlob {
-    /// The pattern that was originally parsed.
+    /// The original absolute glob, before removing negation or a trailing slash.
     original: String,
 
     /// This is a pattern allowing a path (it starts with a `!`, possibly undoing a previous ignore)
@@ -231,10 +245,18 @@ impl GitignoreBuilder {
     /// Once a matcher is built, no new globs can be added to it.
     fn build(&self) -> Result<Gitignore, globset::Error> {
         let set = self.builder.build()?;
+        let scope = if self.globs.is_empty() {
+            MatchScope::Empty
+        } else if self.globs.iter().all(|glob| glob.is_only_dir) {
+            MatchScope::DirectoriesOnly
+        } else {
+            MatchScope::FilesAndDirectories
+        };
 
         Ok(Gitignore {
             set,
             globs: self.globs.clone(),
+            scope,
             matches: Arc::new(Pool::new(Vec::new)),
         })
     }
@@ -247,7 +269,7 @@ impl GitignoreBuilder {
         pattern: &AbsolutePortableGlobPattern,
     ) -> Result<&mut GitignoreBuilder, globset::Error> {
         let mut glob = IgnoreGlob {
-            original: pattern.relative().to_string(),
+            original: pattern.absolute().to_string(),
             is_allow: false,
             is_only_dir: false,
         };
@@ -289,5 +311,34 @@ impl GitignoreBuilder {
         self.globs.push(glob);
 
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ExcludeFilter, ExcludeFilterBuilder};
+    use crate::GlobFilterCheckMode;
+    use crate::glob::{PortableGlobKind, PortableGlobPattern};
+    use ruff_db::system::SystemPath;
+
+    #[test]
+    fn equality_accounts_for_pattern_root() -> anyhow::Result<()> {
+        let build = |root| -> anyhow::Result<ExcludeFilter> {
+            let mut builder = ExcludeFilterBuilder::new();
+            builder.add(
+                &PortableGlobPattern::parse("**/.venv/", PortableGlobKind::Exclude)?
+                    .into_absolute(root),
+            )?;
+            Ok(builder.build()?)
+        };
+        let member = build("/workspace/project")?;
+        let workspace = build("/workspace")?;
+        let environment = SystemPath::new("/workspace/.venv");
+
+        assert!(!member.match_directory(environment, GlobFilterCheckMode::Adhoc));
+        assert!(workspace.match_directory(environment, GlobFilterCheckMode::Adhoc));
+        assert_ne!(member, workspace);
+        assert_eq!(workspace, build("/workspace")?);
+        Ok(())
     }
 }

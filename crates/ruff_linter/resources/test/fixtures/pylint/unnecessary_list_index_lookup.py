@@ -83,3 +83,27 @@ def nested_index_lookup():
     column_names = ["a", "b"]
     for index, column_name in enumerate(column_names):
         _ = data[column_names[index]]  # PLR1736
+
+
+def while_loop_mutation():
+    for index, letter in enumerate(letters):
+        while len(letters[index]) < 5:
+            letters[index] += "a"
+
+    # unpack assignment to index
+    for index, letter in enumerate(letters):
+        index, _ = 1, 2
+        print(letters[index])
+
+    # list unpack assignment to letter
+    for index, letter in enumerate(letters):
+        [_, letter] = 1, "d"
+        print(letters[index])
+
+
+def comprehension_if_clause(xs):
+    return [1 for i, x in enumerate(xs) if xs[i]]  # PLR1736
+
+
+def enumerate_not_first_generator(xs, ys):
+    return [xs[i] for _ in ys for i, x in enumerate(xs)]  # PLR1736

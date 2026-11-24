@@ -1,0 +1,54 @@
+name: Prepare a fuzz corpus
+description: Reuse a fixed-seed Python corpus and publish it from main when stale
+inputs:
+  python-version:
+    description: Python version used by the fuzzer
+    required: true
+  seeds:
+    description: Inclusive seed range in the corpus
+    required: true
+outputs:
+  path:
+    description: Directory containing the sources, if available
+    value: ${{ steps.download.outputs.download-path || steps.generate.outputs.path }}
+runs:
+  using: composite
+  steps:
+    - name: Find the fuzz corpus
+      id: lookup
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        UV_PYTHON: ${{ inputs.python-version }}
+        FUZZ_SEEDS: ${{ inputs.seeds }}
+      run: |
+        uv run --locked "$GITHUB_ACTION_PATH/prepare_corpus.py" "$FUZZ_SEEDS" >> "$GITHUB_OUTPUT"
+    - name: Download the fuzz corpus
+      id: download
+      if: ${{ steps.lookup.outputs.run-id }}
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        github-token: ${{ github.token }}
+        run-id: ${{ steps.lookup.outputs.run-id }}
+        name: ${{ steps.lookup.outputs.name }}
+        path: ${{ runner.temp }}/fuzz-corpus
+    - name: Generate a missing corpus on main
+      id: generate
+      if: ${{ !steps.lookup.outputs.run-id && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule') }}
+      shell: bash
+      env:
+        UV_PYTHON: ${{ inputs.python-version }}
+        FUZZ_SEEDS: ${{ inputs.seeds }}
+      run: |
+        uv run --project="$GITHUB_ACTION_PATH" --locked --no-dev \
+          generate-fuzz-corpus "$FUZZ_SEEDS" "$RUNNER_TEMP/fuzz-corpus"
+        echo "path=$RUNNER_TEMP/fuzz-corpus" >> "$GITHUB_OUTPUT"
+    - name: Upload the fuzz corpus
+      if: ${{ steps.generate.outputs.path }}
+      continue-on-error: true
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ steps.lookup.outputs.name }}
+        path: ${{ steps.generate.outputs.path }}
+        if-no-files-found: error
+        overwrite: true

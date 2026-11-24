@@ -1,9 +1,11 @@
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -38,10 +40,13 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Options
 /// - `target-version`
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
+///
 /// ## References
 /// - [Python documentation: `@functools.cache`](https://docs.python.org/3/library/functools.html#functools.cache)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.225")]
+#[violation_metadata(stable_since = "v0.0.225", category = Category::Style)]
 pub(crate) struct LRUCacheWithMaxsizeNone;
 
 impl AlwaysFixableViolation for LRUCacheWithMaxsizeNone {
@@ -67,7 +72,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &Checker, decorator_list: &[D
                     range: _,
                     node_index: _,
                 },
-            range: _,
+            range_start: _,
             node_index: _,
         }) = &decorator.expression
         else {
@@ -79,10 +84,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &Checker, decorator_list: &[D
             && keywords.len() == 1
             && checker
                 .semantic()
-                .resolve_qualified_name(func)
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["functools", "lru_cache"])
-                })
+                .matches_qualified_name(func, &["functools", "lru_cache"])
         {
             let Keyword {
                 arg,
@@ -103,7 +105,21 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &Checker, decorator_list: &[D
                     )?;
                     let reference_edit =
                         Edit::range_replacement(binding, decorator.expression.range());
-                    Ok(Fix::safe_edits(import_edit, [reference_edit]))
+
+                    let applicability = if checker
+                        .comment_ranges()
+                        .intersects(decorator.expression.range())
+                    {
+                        Applicability::Unsafe
+                    } else {
+                        Applicability::Safe
+                    };
+
+                    Ok(Fix::applicable_edits(
+                        import_edit,
+                        [reference_edit],
+                        applicability,
+                    ))
                 });
             }
         }

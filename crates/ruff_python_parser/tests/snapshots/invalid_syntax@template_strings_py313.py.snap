@@ -166,4 +166,3 @@ Module(
 4 | / t"""what's
 5 | | happening?"""
   | |_____________^ Syntax Error: Cannot use t-strings on Python 3.13 (syntax was added in Python 3.14)
-  |

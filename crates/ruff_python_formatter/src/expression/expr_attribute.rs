@@ -2,13 +2,11 @@ use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprAttribute, ExprNumberLiteral, Number};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, find_only_token_in_range};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::dangling_comments;
 use crate::expression::CallChainLayout;
-use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
-};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::prelude::*;
 use crate::preview::is_fluent_layout_split_first_call_enabled;
 
@@ -37,15 +35,24 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
         } = item;
 
         let call_chain_layout = self.call_chain_layout.apply_in_node(item, f);
+        let comments = f.context().comments().clone();
+        let dangling = comments.dangling(item);
+
+        // Names and identifiers both preserve their source spelling. A contiguous `a.b`
+        // can therefore share one slice, provided no comments or fluent layout intervene.
+        if value.is_name_expr()
+            && !call_chain_layout.is_fluent()
+            && &f.context().source()[TextRange::new(value.end(), attr.start())] == "."
+            && !comments.has(value.as_ref())
+            && dangling.is_empty()
+        {
+            return source_text_slice(item.range()).fmt(f);
+        }
 
         let format_inner = format_with(|f: &mut PyFormatter| {
             let parenthesize_value =
                 is_base_ten_number_literal(value.as_ref(), f.context().source()) || {
-                    is_expression_parenthesized(
-                        value.into(),
-                        f.context().comments().ranges(),
-                        f.context().source(),
-                    )
+                    f.context().is_expression_parenthesized(value.into())
                 };
 
             if call_chain_layout.is_fluent() {
@@ -79,8 +86,6 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             } else {
                 value.format().with_options(Parentheses::Never).fmt(f)?;
             }
-
-            let comments = f.context().comments().clone();
 
             // Always add a line break if the value is parenthesized and there's an
             // end of line comment on the same line as the closing parenthesis.
@@ -131,10 +136,12 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                 if parenthesize_value
                     || value.is_call_expr()
                     || value.is_subscript_expr()
-                    // Remember to update the doc-comment above when
-                    // stabilizing this behavior.
-                    || (is_fluent_layout_split_first_call_enabled(f.context())
-                        && call_chain_layout.is_first_call_like())
+                    || (
+                        // Remember to update the doc-comment above when
+                        // stabilizing this behavior.
+                        is_fluent_layout_split_first_call_enabled(f.context())
+                            && call_chain_layout.is_first_call_like()
+                    )
                 {
                     soft_line_break().fmt(f)?;
                 }
@@ -152,7 +159,13 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             //      b
             // )
             // ```
-            let dangling = comments.dangling(item);
+            let dot_start = attr.start() - TextSize::new(1);
+            if dangling.is_empty()
+                && f.context().source().as_bytes()[usize::from(dot_start)] == b'.'
+            {
+                return source_text_slice(TextRange::new(dot_start, attr.end())).fmt(f);
+            }
+
             let (before_dot, after_dot) = if dangling.is_empty() {
                 (dangling, dangling)
             } else {
@@ -194,21 +207,11 @@ impl NeedsParentheses for ExprAttribute {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         // Checks if there are any own line comments in an attribute chain (a.b.c).
-        if CallChainLayout::from_expression(
-            self.into(),
-            context.comments().ranges(),
-            context.source(),
-        )
-        .is_fluent()
-        {
+        if CallChainLayout::from_expression(self.into(), context).is_fluent() {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {
             OptionalParentheses::Always
-        } else if is_expression_parenthesized(
-            self.value.as_ref().into(),
-            context.comments().ranges(),
-            context.source(),
-        ) {
+        } else if context.is_expression_parenthesized(self.value.as_ref().into()) {
             // We have to avoid creating syntax errors like
             // ```python
             // variable = (something) # trailing

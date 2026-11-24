@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::de::{self};
@@ -19,12 +19,15 @@ use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
-use ruff_linter::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
+use ruff_linter::rules::flake8_tidy_imports::settings::{
+    AllImports, ApiBan, ImportSelection, ImportSelector, Strictness,
+};
+use ruff_linter::rules::flake8_type_checking::settings::RuntimeSemantics;
 use ruff_linter::rules::isort::settings::RelativeImportsOrder;
 use ruff_linter::rules::isort::{ImportSection, ImportType};
 use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
 use ruff_linter::rules::pydocstyle::settings::Convention;
-use ruff_linter::rules::pylint::settings::ConstantType;
+use ruff_linter::rules::pylint::settings::{AllowedValue, ConstantType};
 use ruff_linter::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
@@ -32,15 +35,16 @@ use ruff_linter::rules::{
     pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
+    IdentifierPattern, Language, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
 };
-use ruff_linter::{RuleSelector, warn_user_once};
-use ruff_macros::{CombineOptions, OptionsMetadata};
+use ruff_linter::{UnresolvedRuleSelector, warn_user_once};
+use ruff_macros::{CacheKey, CombineOptions, OptionsMetadata};
 use ruff_options_metadata::{OptionsMetadata, Visit};
 use ruff_python_ast::name::Name;
 use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 use ruff_python_semantic::NameImports;
 use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_ranged_value::ValueSourceGuard;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -103,6 +107,30 @@ pub struct Options {
         "#
     )]
     pub output_format: Option<OutputFormat>,
+
+    /// Whether to prefer rule codes over human-readable rule names in diagnostic output, even
+    /// when preview mode is enabled.
+    ///
+    /// Diagnostics without rule codes, such as syntax errors and formatting diagnostics, will
+    /// continue to use the human-readable name, but those corresponding to lint rules will use the
+    /// rule's code. For example, the concise diagnostic for an unused import will use the code
+    /// `F401` instead of the name `unused-import`:
+    ///
+    /// ```console
+    /// $ ruff check --preview --config 'output-prefer-rule-codes = true' --output-format=concise example.py
+    /// example.py:1:8: F401 [*] `math` imported but unused
+    /// $ ruff check --preview --config 'output-prefer-rule-codes = false' --output-format=concise example.py
+    /// example.py:1:8: unused-import: [*] `math` imported but unused
+    /// ```
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Display rule codes instead of human-readable rule names.
+            output-prefer-rule-codes = true
+        "#
+    )]
+    pub output_prefer_rule_codes: Option<bool>,
 
     /// Enable fix behavior by-default when running `ruff` (overridden
     /// by the `--fix` and `--no-fix` command-line flags).
@@ -254,15 +282,16 @@ pub struct Options {
     /// A list of file patterns to include when linting.
     ///
     /// Inclusion are based on globs, and should be single-path patterns, like
-    /// `*.pyw`, to include any file with the `.pyw` extension. `pyproject.toml` is
-    /// included here not for configuration but because we lint whether e.g. the
-    /// `[project]` matches the schema.
+    /// `*.pyw`, to include any file with the `.pyw` extension.
+    /// `pyproject.toml`, `ruff.toml`, and `.ruff.toml` are included here not for
+    /// configuration but because we lint whether e.g. the `[project]` matches
+    /// the schema in `pyproject.toml` or that rule names are used as selectors.
     ///
     /// Notebook files (`.ipynb` extension) are included by default on Ruff 0.6.0+.
     ///
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
-        default = r#"["*.py", "*.pyi", "*.pyw", "*.ipynb", "**/pyproject.toml"]"#,
+        default = r#"["*.py", "*.pyi", "*.pyw", "*.ipynb", "*.md", "**/pyproject.toml", "**/ruff.toml", "**/.ruff.toml"]"#,
         value_type = "list[str]",
         example = r#"
             include = ["*.py"]
@@ -281,6 +310,24 @@ pub struct Options {
         "#
     )]
     pub respect_gitignore: Option<bool>,
+
+    /// A mapping of custom file extensions to known file types (overridden
+    /// by the `--extension` command-line flag).
+    ///
+    /// Supported file types include `python`, `pyi`, `ipynb`, and `markdown`.
+    ///
+    /// Any file extensions listed here will be automatically added to the
+    /// default `include` list as a `*.{ext}` glob, so that they are linted
+    /// and formatted without needing any additional configuration settings.
+    #[option(
+        default = "{}",
+        value_type = "dict[str, Language]",
+        example = r#"
+            # Add a custom file extension mapped to Python
+            extension = {rpy="python"}
+        "#
+    )]
+    pub extension: Option<FxHashMap<String, Language>>,
 
     // Generic python options
     /// A list of builtins to treat as defined references, in addition to the
@@ -310,8 +357,8 @@ pub struct Options {
     /// code upgrades, like rewriting type annotations. Ruff will not propose
     /// changes using features that are not available in the given version.
     ///
-    /// For example, to represent supporting Python >=3.11 or ==3.11
-    /// specify `target-version = "py311"`.
+    /// For example, to represent supporting Python >=3.12 or ==3.12
+    /// specify `target-version = "py312"`.
     ///
     /// If you're already using a `pyproject.toml` file, we recommend
     /// `project.requires-python` instead, as it's based on Python packaging
@@ -338,8 +385,8 @@ pub struct Options {
     /// file than it would for an equivalent runtime file with the same target
     /// version.
     #[option(
-        default = r#""py310""#,
-        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312" | "py313" | "py314""#,
+        default = r#""py311""#,
+        value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312" | "py313" | "py314" | "py315""#,
         example = r#"
             # Always generate Python 3.7-compatible code.
             target-version = "py37"
@@ -419,7 +466,7 @@ pub struct Options {
     /// The length is determined by the number of characters per line, except for lines containing East Asian characters or emojis.
     /// For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.
     ///
-    /// The value must be greater than `0` and less than or equal to `320`.
+    /// The value must be greater than `0`.
     ///
     /// Note: While the formatter will attempt to format lines such that they remain
     /// within the `line-length`, it isn't a hard upper bound, and formatted lines may
@@ -468,6 +515,13 @@ pub struct Options {
     /// Options to configure import map generation.
     #[option_group]
     pub analyze: Option<AnalyzeOptions>,
+}
+
+impl Options {
+    /// Deserialize inline configuration in one crate, avoiding repeated code generation.
+    pub fn from_toml_table(table: toml::Table) -> Result<Self, toml::de::Error> {
+        table.try_into()
+    }
 }
 
 /// Configures how Ruff checks your code.
@@ -560,21 +614,33 @@ pub struct LintOptions {
     pub future_annotations: Option<bool>,
 }
 
-pub fn validate_required_version(required_version: &RequiredVersion) -> anyhow::Result<()> {
+pub(crate) fn validate_required_version(required_version: &RequiredVersion) -> anyhow::Result<()> {
     let ruff_pkg_version = pep440_rs::Version::from_str(RUFF_PKG_VERSION)
         .expect("RUFF_PKG_VERSION is not a valid PEP 440 version specifier");
     if !required_version.contains(&ruff_pkg_version) {
         return Err(anyhow::anyhow!(
-            "Required version `{required_version}` does not match the running version `{RUFF_PKG_VERSION}`"
+            "Required version `{required_version}` does not match the running version \
+            `{RUFF_PKG_VERSION}`"
         ));
     }
     Ok(())
 }
 
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
-#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize)]
 #[serde(transparent)]
-pub struct DeprecatedTopLevelLintOptions(pub LintCommonOptions);
+pub struct DeprecatedTopLevelLintOptions(pub(crate) LintCommonOptions);
+
+impl<'de> Deserialize<'de> for DeprecatedTopLevelLintOptions {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Temporarily disable span information because the flattened values don't retain spans.
+        let _guard = ValueSourceGuard::without_spans();
+        LintCommonOptions::deserialize(deserializer).map(Self)
+    }
+}
 
 impl OptionsMetadata for DeprecatedTopLevelLintOptions {
     fn record(_visit: &mut dyn Visit) {
@@ -644,9 +710,10 @@ pub struct LintCommonOptions {
 
     /// A regular expression used to identify "dummy" variables, or those which
     /// should be ignored when enforcing (e.g.) unused-variable rules. The
-    /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
+    /// default expression matches `_`, `__`, `_var`, and `_次`, but not `_var_`
+    /// or `_次_`.
     #[option(
-        default = r#""^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$""#,
+        default = r#""^(_+|(_+[\\p{XID_Continue}]*[\\p{XID_Continue}--_]+?))$""#,
         value_type = "str",
         example = r#"
             # Only ignore variables named "_".
@@ -657,6 +724,14 @@ pub struct LintCommonOptions {
 
     /// A list of rule codes or prefixes to ignore, in addition to those
     /// specified by `ignore`.
+    ///
+    /// This option is deprecated because it is now interchangeable with
+    /// [`ignore`](#lint_ignore). In earlier versions of Ruff, `ignore` would
+    /// _replace_ the set of ignored rules when using configuration inheritance
+    /// (via the top-level [`extend`](https://docs.astral.sh/ruff/settings/#extend)
+    /// setting), while `extend-ignore` would _add_ to the inherited set. Ruff
+    /// now merges both `ignore` and `extend-ignore` into a single set, so the
+    /// distinction no longer applies. Use [`ignore`](#lint_ignore) instead.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
@@ -665,22 +740,39 @@ pub struct LintCommonOptions {
             extend-ignore = ["F841"]
         "#
     )]
-    #[deprecated(
-        note = "The `extend-ignore` option is now interchangeable with [`ignore`](#lint_ignore). Please update your configuration to use the [`ignore`](#lint_ignore) option instead."
-    )]
-    pub extend_ignore: Option<Vec<RuleSelector>>,
+    #[deprecated(note = "The `extend-ignore` option is now interchangeable with \
+        [`ignore`](#lint_ignore). Please update your configuration to use the \
+        [`ignore`](#lint_ignore) option instead.")]
+    pub extend_ignore: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes to enable, in addition to those
     /// specified by [`select`](#lint_select).
+    ///
+    /// Unlike [`select`](#lint_select), which _replaces_ the default rule set
+    /// when specified, `extend-select` _adds_ to whatever rules are already
+    /// active. This makes `extend-select` the preferred option when you want
+    /// to enable additional rules on top of the defaults without having to
+    /// enumerate them.
+    ///
+    /// For example, to enable the defaults plus flake8-bugbear:
+    ///
+    /// ```toml
+    /// [tool.ruff.lint]
+    /// # Adds flake8-bugbear on top of the default rules.
+    /// extend-select = ["B"]
+    /// ```
+    ///
+    /// Using `select = ["B"]` instead would _replace_ the defaults, enabling
+    /// only flake8-bugbear.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
         example = r#"
-            # On top of the default `select` (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            # On top of the default `select`, enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
             extend-select = ["B", "Q"]
         "#
     )]
-    pub extend_select: Option<Vec<RuleSelector>>,
+    pub extend_select: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes to consider fixable, in addition to those
     /// specified by [`fixable`](#lint_fixable).
@@ -692,14 +784,14 @@ pub struct LintCommonOptions {
             extend-fixable = ["B"]
         "#
     )]
-    pub extend_fixable: Option<Vec<RuleSelector>>,
+    pub extend_fixable: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes to consider non-auto-fixable, in addition to those
     /// specified by [`unfixable`](#lint_unfixable).
-    #[deprecated(
-        note = "The `extend-unfixable` option is now interchangeable with [`unfixable`](#lint_unfixable). Please update your configuration to use the `unfixable` option instead."
-    )]
-    pub extend_unfixable: Option<Vec<RuleSelector>>,
+    #[deprecated(note = "The `extend-unfixable` option is now interchangeable with \
+        [`unfixable`](#lint_unfixable). Please update your configuration to \
+        use the `unfixable` option instead.")]
+    pub extend_unfixable: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes that are unsupported by Ruff, but should be
     /// preserved when (e.g.) validating `# noqa` directives. Useful for
@@ -726,16 +818,19 @@ pub struct LintCommonOptions {
             fixable = ["E", "F"]
         "#
     )]
-    pub fixable: Option<Vec<RuleSelector>>,
+    pub fixable: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes to ignore. Prefixes can specify exact
-    /// rules (like `F841`), entire categories (like `F`), or anything in
+    /// rules (like `F841`), entire groups (like `F`), or anything in
     /// between.
     ///
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes. `ignore` takes precedence over `select` if the same
     /// prefix appears in both.
+    ///
+    /// In preview, categories like `correctness` and `suspicious` can be used
+    /// in addition to rule codes and linter group prefixes.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
@@ -744,7 +839,7 @@ pub struct LintCommonOptions {
             ignore = ["F841"]
         "#
     )]
-    pub ignore: Option<Vec<RuleSelector>>,
+    pub ignore: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes for which unsafe fixes should be considered
     /// safe.
@@ -756,7 +851,7 @@ pub struct LintCommonOptions {
             extend-safe-fixes = ["E", "F401"]
         "#
     )]
-    pub extend_safe_fixes: Option<Vec<RuleSelector>>,
+    pub extend_safe_fixes: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes for which safe fixes should be considered
     /// unsafe.
@@ -768,7 +863,7 @@ pub struct LintCommonOptions {
             extend-unsafe-fixes = ["E", "F401"]
         "#
     )]
-    pub extend_unsafe_fixes: Option<Vec<RuleSelector>>,
+    pub extend_unsafe_fixes: Option<Vec<UnresolvedRuleSelector>>,
 
     /// Avoid automatically removing unused imports in `__init__.py` files. Such
     /// imports will still be flagged, but with a dedicated message suggesting
@@ -786,7 +881,10 @@ pub struct LintCommonOptions {
     )]
     #[deprecated(
         since = "0.4.4",
-        note = "`ignore-init-module-imports` will be removed in a future version because F401 now recommends appropriate fixes for unused imports in `__init__.py` (currently in preview mode). See documentation for more information and please update your configuration."
+        note = "`ignore-init-module-imports` will be removed in a future version because F401 now \
+            recommends appropriate fixes for unused imports in `__init__.py` (currently in \
+            preview mode). See documentation for more information and please update your \
+            configuration."
     )]
     pub ignore_init_module_imports: Option<bool>,
 
@@ -816,22 +914,25 @@ pub struct LintCommonOptions {
     pub logger_objects: Option<Vec<String>>,
 
     /// A list of rule codes or prefixes to enable. Prefixes can specify exact
-    /// rules (like `F841`), entire categories (like `F`), or anything in
+    /// rules (like `F841`), entire groups (like `F`), or anything in
     /// between.
     ///
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes. `ignore` takes precedence over `select` if the
     /// same prefix appears in both.
+    ///
+    /// In preview, categories like `correctness` and `suspicious` can be used
+    /// in addition to rule codes and linter group prefixes.
     #[option(
-        default = r#"["E4", "E7", "E9", "F"]"#,
+        default = r#"See https://docs.astral.sh/ruff/default-rules/ or run `ruff check --show-settings --isolated`"#,
         value_type = "list[RuleSelector]",
         example = r#"
-            # On top of the defaults (`E4`, E7`, `E9`, and `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
-            select = ["E4", "E7", "E9", "F", "B", "Q"]
+            # On top of the defaults, enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
+            extend-select = ["B", "Q"]
         "#
     )]
-    pub select: Option<Vec<RuleSelector>>,
+    pub select: Option<Vec<UnresolvedRuleSelector>>,
 
     /// Whether to require exact codes to select preview rules. When enabled,
     /// preview rules will not be selected by prefixes — the full code of each
@@ -884,7 +985,7 @@ pub struct LintCommonOptions {
             unfixable = ["F401"]
         "#
     )]
-    pub unfixable: Option<Vec<RuleSelector>>,
+    pub unfixable: Option<Vec<UnresolvedRuleSelector>>,
 
     // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
     /// Options for the `flake8-annotations` plugin.
@@ -993,6 +1094,8 @@ pub struct LintCommonOptions {
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, when considering any matching files. An initial '!' negates
     /// the file pattern.
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
@@ -1003,9 +1106,11 @@ pub struct LintCommonOptions {
             "path/to/file.py" = ["E402"]
             # Ignore `D` rules everywhere except for the `src/` directory.
             "!src/**.py" = ["D"]
+            # Ignore check for packages that are missing an `__init__.py` file.
+            "{benchmark,scripts,.github/action-name/}/*.py" = ["INP001"]
         "#
     )]
-    pub per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    pub per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,
 
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, in addition to any rules excluded by [`per-file-ignores`](#lint_per-file-ignores).
@@ -1018,7 +1123,7 @@ pub struct LintCommonOptions {
             "__init__.py" = ["E402"]
         "#
     )]
-    pub extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    pub extend_per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,
     // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
 }
 
@@ -1036,7 +1141,7 @@ pub struct Flake8AnnotationsOptions {
         value_type = "bool",
         example = "mypy-init-return = true"
     )]
-    pub mypy_init_return: Option<bool>,
+    mypy_init_return: Option<bool>,
 
     /// Whether to suppress `ANN000`-level violations for arguments matching the
     /// "dummy" variable regex (like `_`).
@@ -1045,7 +1150,7 @@ pub struct Flake8AnnotationsOptions {
         value_type = "bool",
         example = "suppress-dummy-args = true"
     )]
-    pub suppress_dummy_args: Option<bool>,
+    suppress_dummy_args: Option<bool>,
 
     /// Whether to suppress `ANN200`-level violations for functions that meet
     /// either of the following criteria:
@@ -1058,7 +1163,7 @@ pub struct Flake8AnnotationsOptions {
         value_type = "bool",
         example = "suppress-none-returning = true"
     )]
-    pub suppress_none_returning: Option<bool>,
+    suppress_none_returning: Option<bool>,
 
     /// Whether to suppress `ANN401` for dynamically typed `*args` and
     /// `**kwargs` arguments.
@@ -1067,7 +1172,7 @@ pub struct Flake8AnnotationsOptions {
         value_type = "bool",
         example = "allow-star-arg-any = true"
     )]
-    pub allow_star_arg_any: Option<bool>,
+    allow_star_arg_any: Option<bool>,
 
     /// Whether to suppress `ANN*` rules for any declaration
     /// that hasn't been typed at all.
@@ -1077,11 +1182,13 @@ pub struct Flake8AnnotationsOptions {
         value_type = "bool",
         example = "ignore-fully-untyped = true"
     )]
-    pub ignore_fully_untyped: Option<bool>,
+    ignore_fully_untyped: Option<bool>,
 }
 
 impl Flake8AnnotationsOptions {
-    pub fn into_settings(self) -> ruff_linter::rules::flake8_annotations::settings::Settings {
+    pub(crate) fn into_settings(
+        self,
+    ) -> ruff_linter::rules::flake8_annotations::settings::Settings {
         ruff_linter::rules::flake8_annotations::settings::Settings {
             mypy_init_return: self.mypy_init_return.unwrap_or(false),
             suppress_dummy_args: self.suppress_dummy_args.unwrap_or(false),
@@ -1105,7 +1212,7 @@ pub struct Flake8BanditOptions {
         value_type = "list[str]",
         example = "hardcoded-tmp-directory = [\"/foo/bar\"]"
     )]
-    pub hardcoded_tmp_directory: Option<Vec<String>>,
+    hardcoded_tmp_directory: Option<Vec<String>>,
 
     /// A list of directories to consider temporary, in addition to those
     /// specified by [`hardcoded-tmp-directory`](#lint_flake8-bandit_hardcoded-tmp-directory) (see `S108`).
@@ -1114,7 +1221,7 @@ pub struct Flake8BanditOptions {
         value_type = "list[str]",
         example = "hardcoded-tmp-directory-extend = [\"/foo/bar\"]"
     )]
-    pub hardcoded_tmp_directory_extend: Option<Vec<String>>,
+    hardcoded_tmp_directory_extend: Option<Vec<String>>,
 
     /// Whether to disallow `try`-`except`-`pass` (`S110`) for specific
     /// exception types. By default, `try`-`except`-`pass` is only
@@ -1124,7 +1231,7 @@ pub struct Flake8BanditOptions {
         value_type = "bool",
         example = "check-typed-exception = true"
     )]
-    pub check_typed_exception: Option<bool>,
+    check_typed_exception: Option<bool>,
 
     /// A list of additional callable names that behave like
     /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
@@ -1136,7 +1243,7 @@ pub struct Flake8BanditOptions {
         value_type = "list[str]",
         example = "extend-markup-names = [\"webhelpers.html.literal\", \"my_package.Markup\"]"
     )]
-    pub extend_markup_names: Option<Vec<String>>,
+    extend_markup_names: Option<Vec<String>>,
 
     /// A list of callable names, whose result may be safely passed into
     /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
@@ -1168,11 +1275,11 @@ pub struct Flake8BanditOptions {
         value_type = "list[str]",
         example = "allowed-markup-calls = [\"bleach.clean\", \"my_package.sanitize\"]"
     )]
-    pub allowed_markup_calls: Option<Vec<String>>,
+    allowed_markup_calls: Option<Vec<String>>,
 }
 
 impl Flake8BanditOptions {
-    pub fn into_settings(
+    pub(crate) fn into_settings(
         self,
         ruff_options: Option<&RuffOptions>,
     ) -> ruff_linter::rules::flake8_bandit::settings::Settings {
@@ -1218,11 +1325,13 @@ pub struct Flake8BooleanTrapOptions {
         value_type = "list[str]",
         example = "extend-allowed-calls = [\"pydantic.Field\", \"django.db.models.Value\"]"
     )]
-    pub extend_allowed_calls: Option<Vec<String>>,
+    extend_allowed_calls: Option<Vec<String>>,
 }
 
 impl Flake8BooleanTrapOptions {
-    pub fn into_settings(self) -> ruff_linter::rules::flake8_boolean_trap::settings::Settings {
+    pub(crate) fn into_settings(
+        self,
+    ) -> ruff_linter::rules::flake8_boolean_trap::settings::Settings {
         ruff_linter::rules::flake8_boolean_trap::settings::Settings {
             extend_allowed_calls: self.extend_allowed_calls.unwrap_or_default(),
         }
@@ -1237,7 +1346,7 @@ impl Flake8BooleanTrapOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8BugbearOptions {
     /// Additional callable functions to consider "immutable" when evaluating, e.g., the
-    /// `function-call-in-default-argument` rule (`B008`) or `function-call-in-dataclass-defaults`
+    /// `function-call-in-parameter-default` rule (`B008`) or `function-call-in-dataclass-field-default`
     /// rule (`RUF009`).
     ///
     /// Expects to receive a list of fully-qualified names (e.g., `fastapi.Query`, rather than
@@ -1250,11 +1359,11 @@ pub struct Flake8BugbearOptions {
             extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
         "#
     )]
-    pub extend_immutable_calls: Option<Vec<String>>,
+    extend_immutable_calls: Option<Vec<String>>,
 }
 
 impl Flake8BugbearOptions {
-    pub fn into_settings(self) -> ruff_linter::rules::flake8_bugbear::settings::Settings {
+    pub(crate) fn into_settings(self) -> ruff_linter::rules::flake8_bugbear::settings::Settings {
         ruff_linter::rules::flake8_bugbear::settings::Settings {
             extend_immutable_calls: self.extend_immutable_calls.unwrap_or_default(),
         }
@@ -1282,7 +1391,7 @@ pub struct Flake8BuiltinsOptions {
         since = "0.10.0",
         note = "`builtins-ignorelist` has been renamed to `ignorelist`. Use that instead."
     )]
-    pub builtins_ignorelist: Option<Vec<String>>,
+    pub(crate) builtins_ignorelist: Option<Vec<String>>,
 
     /// Ignore list of builtins.
     #[option(
@@ -1290,7 +1399,7 @@ pub struct Flake8BuiltinsOptions {
         value_type = "list[str]",
         example = "ignorelist = [\"id\"]"
     )]
-    pub ignorelist: Option<Vec<String>>,
+    pub(crate) ignorelist: Option<Vec<String>>,
 
     /// DEPRECATED: This option has been renamed to `allowed-modules`. Use `allowed-modules` instead.
     ///
@@ -1304,9 +1413,10 @@ pub struct Flake8BuiltinsOptions {
     )]
     #[deprecated(
         since = "0.10.0",
-        note = "`builtins-allowed-modules` has been renamed to `allowed-modules`. Use that instead."
+        note = "`builtins-allowed-modules` has been renamed to `allowed-modules`. \
+            Use that instead."
     )]
-    pub builtins_allowed_modules: Option<Vec<String>>,
+    pub(crate) builtins_allowed_modules: Option<Vec<String>>,
 
     /// List of builtin module names to allow.
     #[option(
@@ -1314,7 +1424,7 @@ pub struct Flake8BuiltinsOptions {
         value_type = "list[str]",
         example = "allowed-modules = [\"secrets\"]"
     )]
-    pub allowed_modules: Option<Vec<String>>,
+    pub(crate) allowed_modules: Option<Vec<String>>,
 
     /// DEPRECATED: This option has been renamed to `strict-checking`. Use `strict-checking` instead.
     ///
@@ -1328,9 +1438,10 @@ pub struct Flake8BuiltinsOptions {
     )]
     #[deprecated(
         since = "0.10.0",
-        note = "`builtins-strict-checking` has been renamed to `strict-checking`. Use that instead."
+        note = "`builtins-strict-checking` has been renamed to `strict-checking`. \
+            Use that instead."
     )]
-    pub builtins_strict_checking: Option<bool>,
+    pub(crate) builtins_strict_checking: Option<bool>,
 
     /// Compare module names instead of full module paths.
     ///
@@ -1340,11 +1451,11 @@ pub struct Flake8BuiltinsOptions {
         value_type = "bool",
         example = "strict-checking = true"
     )]
-    pub strict_checking: Option<bool>,
+    pub(crate) strict_checking: Option<bool>,
 }
 
 impl Flake8BuiltinsOptions {
-    pub fn into_settings(self) -> ruff_linter::rules::flake8_builtins::settings::Settings {
+    pub(crate) fn into_settings(self) -> ruff_linter::rules::flake8_builtins::settings::Settings {
         #[expect(deprecated)]
         ruff_linter::rules::flake8_builtins::settings::Settings {
             ignorelist: self
@@ -1377,11 +1488,13 @@ pub struct Flake8ComprehensionsOptions {
         value_type = "bool",
         example = "allow-dict-calls-with-keyword-arguments = true"
     )]
-    pub allow_dict_calls_with_keyword_arguments: Option<bool>,
+    allow_dict_calls_with_keyword_arguments: Option<bool>,
 }
 
 impl Flake8ComprehensionsOptions {
-    pub fn into_settings(self) -> ruff_linter::rules::flake8_comprehensions::settings::Settings {
+    pub(crate) fn into_settings(
+        self,
+    ) -> ruff_linter::rules::flake8_comprehensions::settings::Settings {
         ruff_linter::rules::flake8_comprehensions::settings::Settings {
             allow_dict_calls_with_keyword_arguments: self
                 .allow_dict_calls_with_keyword_arguments
@@ -1412,12 +1525,12 @@ pub struct Flake8CopyrightOptions {
         value_type = "str",
         example = r#"notice-rgx = "(?i)Copyright \\(C\\) \\d{4}""#
     )]
-    pub notice_rgx: Option<String>,
+    notice_rgx: Option<String>,
 
     /// Author to enforce within the copyright notice. If provided, the
     /// author must be present immediately following the copyright notice.
     #[option(default = "null", value_type = "str", example = r#"author = "Ruff""#)]
-    pub author: Option<String>,
+    author: Option<String>,
 
     /// A minimum file size (in bytes) required for a copyright notice to
     /// be enforced. By default, all files are validated.
@@ -1429,11 +1542,11 @@ pub struct Flake8CopyrightOptions {
             min-file-size = 1024
         "#
     )]
-    pub min_file_size: Option<usize>,
+    min_file_size: Option<usize>,
 }
 
 impl Flake8CopyrightOptions {
-    pub fn try_into_settings(self) -> anyhow::Result<flake8_copyright::settings::Settings> {
+    pub(crate) fn try_into_settings(self) -> anyhow::Result<flake8_copyright::settings::Settings> {
         Ok(flake8_copyright::settings::Settings {
             notice_rgx: self
                 .notice_rgx
@@ -1455,11 +1568,11 @@ impl Flake8CopyrightOptions {
 pub struct Flake8ErrMsgOptions {
     /// Maximum string length for string literals in exception messages.
     #[option(default = "0", value_type = "int", example = "max-string-length = 20")]
-    pub max_string_length: Option<usize>,
+    max_string_length: Option<usize>,
 }
 
 impl Flake8ErrMsgOptions {
-    pub fn into_settings(self) -> flake8_errmsg::settings::Settings {
+    pub(crate) fn into_settings(self) -> flake8_errmsg::settings::Settings {
         flake8_errmsg::settings::Settings {
             max_string_length: self.max_string_length.unwrap_or_default(),
         }
@@ -1479,7 +1592,7 @@ pub struct Flake8GetTextOptions {
         value_type = "list[str]",
         example = r#"function-names = ["_", "gettext", "ngettext", "ugettetxt"]"#
     )]
-    pub function_names: Option<Vec<Name>>,
+    function_names: Option<Vec<Name>>,
 
     /// Additional function names to consider as internationalization calls, in addition to those
     /// included in [`function-names`](#lint_flake8-gettext_function-names).
@@ -1488,11 +1601,11 @@ pub struct Flake8GetTextOptions {
         value_type = "list[str]",
         example = r#"extend-function-names = ["ugettetxt"]"#
     )]
-    pub extend_function_names: Option<Vec<Name>>,
+    extend_function_names: Option<Vec<Name>>,
 }
 
 impl Flake8GetTextOptions {
-    pub fn into_settings(self) -> flake8_gettext::settings::Settings {
+    pub(crate) fn into_settings(self) -> flake8_gettext::settings::Settings {
         flake8_gettext::settings::Settings {
             function_names: self
                 .function_names
@@ -1528,11 +1641,11 @@ pub struct Flake8ImplicitStrConcatOptions {
             allow-multiline = false
         "#
     )]
-    pub allow_multiline: Option<bool>,
+    allow_multiline: Option<bool>,
 }
 
 impl Flake8ImplicitStrConcatOptions {
-    pub fn into_settings(self) -> flake8_implicit_str_concat::settings::Settings {
+    pub(crate) fn into_settings(self) -> flake8_implicit_str_concat::settings::Settings {
         flake8_implicit_str_concat::settings::Settings {
             allow_multiline: self.allow_multiline.unwrap_or(true),
         }
@@ -1549,23 +1662,35 @@ pub struct Flake8ImportConventionsOptions {
     /// The conventional aliases for imports. These aliases can be extended by
     /// the [`extend-aliases`](#lint_flake8-import-conventions_extend-aliases) option.
     #[option(
-        default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "numpy.typing": "npt", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa", "xml.etree.ElementTree": "ET"}"#,
+        default = r#"{"altair": "alt", "datetime": "dt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "networkx": "nx", "numpy": "np", "numpy.typing": "npt", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa", "xml.etree.ElementTree": "ET"}"#,
         value_type = "dict[str, str]",
         scope = "aliases",
         example = r#"
             # Declare the default aliases.
             altair = "alt"
+            datetime = "dt"
+            matplotlib = "mpl"
             "matplotlib.pyplot" = "plt"
+            networkx = "nx"
             numpy = "np"
+            "numpy.typing" = "npt"
             pandas = "pd"
             seaborn = "sns"
-            scipy = "sp"
+            tensorflow = "tf"
+            tkinter = "tk"
+            holoviews = "hv"
+            panel = "pn"
+            "plotly.express" = "px"
+            polars = "pl"
+            pyarrow = "pa"
+            "xml.etree.ElementTree" = "ET"
         "#
     )]
-    pub aliases: Option<FxHashMap<ModuleName, Alias>>,
+    aliases: Option<FxHashMap<ModuleName, Alias>>,
 
     /// A mapping from module to conventional import alias. These aliases will
-    /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.
+    /// be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping
+    /// and will override any existing `aliases` if the two settings overlap.
     #[option(
         default = r#"{}"#,
         value_type = "dict[str, str]",
@@ -1575,7 +1700,7 @@ pub struct Flake8ImportConventionsOptions {
             "dask.dataframe" = "dd"
         "#
     )]
-    pub extend_aliases: Option<FxHashMap<ModuleName, Alias>>,
+    extend_aliases: Option<FxHashMap<ModuleName, Alias>>,
 
     /// A mapping from module to its banned import aliases.
     #[option(
@@ -1587,7 +1712,7 @@ pub struct Flake8ImportConventionsOptions {
             "tensorflow.keras.backend" = ["K"]
     "#
     )]
-    pub banned_aliases: Option<FxHashMap<String, BannedAliases>>,
+    banned_aliases: Option<FxHashMap<String, BannedAliases>>,
 
     /// A list of modules that should not be imported from using the
     /// `from ... import ...` syntax.
@@ -1602,7 +1727,7 @@ pub struct Flake8ImportConventionsOptions {
             banned-from = ["typing"]
     "#
     )]
-    pub banned_from: Option<FxHashSet<String>>,
+    banned_from: Option<FxHashSet<String>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default, Serialize)]
@@ -1610,7 +1735,7 @@ pub struct Flake8ImportConventionsOptions {
 pub struct ModuleName(String);
 
 impl ModuleName {
-    pub fn into_string(self) -> String {
+    fn into_string(self) -> String {
         self.0
     }
 }
@@ -1637,7 +1762,7 @@ impl<'de> Deserialize<'de> for ModuleName {
 pub struct Alias(String);
 
 impl Alias {
-    pub fn into_string(self) -> String {
+    fn into_string(self) -> String {
         self.0
     }
 }
@@ -1669,15 +1794,16 @@ impl<'de> Deserialize<'de> for Alias {
 }
 
 impl Flake8ImportConventionsOptions {
-    pub fn try_into_settings(
+    pub(crate) fn try_into_settings(
         self,
+        preview: PreviewMode,
     ) -> anyhow::Result<flake8_import_conventions::settings::Settings> {
         let mut aliases: FxHashMap<String, String> = match self.aliases {
             Some(options_aliases) => options_aliases
                 .into_iter()
                 .map(|(module, alias)| (module.into_string(), alias.into_string()))
                 .collect(),
-            None => flake8_import_conventions::settings::default_aliases(),
+            None => flake8_import_conventions::settings::default_aliases(preview),
         };
         if let Some(extend_aliases) = self.extend_aliases {
             aliases.extend(
@@ -1688,19 +1814,28 @@ impl Flake8ImportConventionsOptions {
         }
 
         let mut normalized_aliases: FxHashMap<String, String> = FxHashMap::default();
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "every invalid alias is rejected, regardless of which one is reported first"
+        )]
         for (module, alias) in aliases {
             let normalized_alias = alias.nfkc().collect::<String>();
             if normalized_alias == "__debug__" {
                 anyhow::bail!(
-                    "Invalid alias for module '{module}': alias normalizes to '__debug__', which is not allowed."
+                    "Invalid alias for module '{module}': alias normalizes to '__debug__', \
+                    which is not allowed."
                 );
             }
             normalized_aliases.insert(module, normalized_alias);
         }
 
+        let banned_aliases = self.banned_aliases.unwrap_or_else(|| {
+            flake8_import_conventions::settings::default_banned_aliases(preview)
+        });
+
         Ok(flake8_import_conventions::settings::Settings {
             aliases: normalized_aliases,
-            banned_aliases: self.banned_aliases.unwrap_or_default(),
+            banned_aliases,
             banned_from: self.banned_from.unwrap_or_default(),
         })
     }
@@ -1723,7 +1858,7 @@ pub struct Flake8PytestStyleOptions {
         value_type = "bool",
         example = "fixture-parentheses = true"
     )]
-    pub fixture_parentheses: Option<bool>,
+    fixture_parentheses: Option<bool>,
 
     /// Expected type for multiple argument names in `@pytest.mark.parametrize`.
     /// The following values are supported:
@@ -1738,7 +1873,7 @@ pub struct Flake8PytestStyleOptions {
         value_type = r#""csv" | "tuple" | "list""#,
         example = "parametrize-names-type = \"list\""
     )]
-    pub parametrize_names_type: Option<types::ParametrizeNameType>,
+    parametrize_names_type: Option<types::ParametrizeNameType>,
 
     /// Expected type for the list of values rows in `@pytest.mark.parametrize`.
     /// The following values are supported:
@@ -1750,7 +1885,7 @@ pub struct Flake8PytestStyleOptions {
         value_type = r#""tuple" | "list""#,
         example = "parametrize-values-type = \"tuple\""
     )]
-    pub parametrize_values_type: Option<types::ParametrizeValuesType>,
+    parametrize_values_type: Option<types::ParametrizeValuesType>,
 
     /// Expected type for each row of values in `@pytest.mark.parametrize` in
     /// case of multiple parameters. The following values are supported:
@@ -1764,7 +1899,7 @@ pub struct Flake8PytestStyleOptions {
         value_type = r#""tuple" | "list""#,
         example = "parametrize-values-row-type = \"list\""
     )]
-    pub parametrize_values_row_type: Option<types::ParametrizeValuesRowType>,
+    parametrize_values_row_type: Option<types::ParametrizeValuesRowType>,
 
     /// List of exception names that require a match= parameter in a
     /// `pytest.raises()` call.
@@ -1776,7 +1911,7 @@ pub struct Flake8PytestStyleOptions {
         value_type = "list[str]",
         example = "raises-require-match-for = [\"requests.RequestException\"]"
     )]
-    pub raises_require_match_for: Option<Vec<String>>,
+    raises_require_match_for: Option<Vec<String>>,
 
     /// List of additional exception names that require a match= parameter in a
     /// `pytest.raises()` call. This extends the default list of exceptions
@@ -1794,7 +1929,7 @@ pub struct Flake8PytestStyleOptions {
         value_type = "list[str]",
         example = "raises-extend-require-match-for = [\"requests.RequestException\"]"
     )]
-    pub raises_extend_require_match_for: Option<Vec<String>>,
+    raises_extend_require_match_for: Option<Vec<String>>,
 
     /// Boolean flag specifying whether `@pytest.mark.foo()` without parameters
     /// should have parentheses. If the option is set to `false` (the
@@ -1806,7 +1941,7 @@ pub struct Flake8PytestStyleOptions {
         value_type = "bool",
         example = "mark-parentheses = true"
     )]
-    pub mark_parentheses: Option<bool>,
+    mark_parentheses: Option<bool>,
 
     /// List of warning names that require a match= parameter in a
     /// `pytest.warns()` call.
@@ -1818,7 +1953,7 @@ pub struct Flake8PytestStyleOptions {
         value_type = "list[str]",
         example = "warns-require-match-for = [\"requests.RequestsWarning\"]"
     )]
-    pub warns_require_match_for: Option<Vec<String>>,
+    warns_require_match_for: Option<Vec<String>>,
 
     /// List of additional warning names that require a match= parameter in a
     /// `pytest.warns()` call. This extends the default list of warnings that
@@ -1838,11 +1973,13 @@ pub struct Flake8PytestStyleOptions {
         value_type = "list[str]",
         example = "warns-extend-require-match-for = [\"requests.RequestsWarning\"]"
     )]
-    pub warns_extend_require_match_for: Option<Vec<String>>,
+    warns_extend_require_match_for: Option<Vec<String>>,
 }
 
 impl Flake8PytestStyleOptions {
-    pub fn try_into_settings(self) -> anyhow::Result<flake8_pytest_style::settings::Settings> {
+    pub(crate) fn try_into_settings(
+        self,
+    ) -> anyhow::Result<flake8_pytest_style::settings::Settings> {
         Ok(flake8_pytest_style::settings::Settings {
             fixture_parentheses: self.fixture_parentheses.unwrap_or_default(),
             parametrize_names_type: self.parametrize_names_type.unwrap_or_default(),
@@ -1916,7 +2053,7 @@ pub struct Flake8QuotesOptions {
             inline-quotes = "single"
         "#
     )]
-    pub inline_quotes: Option<Quote>,
+    inline_quotes: Option<Quote>,
 
     /// Quote style to prefer for multiline strings (either "single" or
     /// "double").
@@ -1930,7 +2067,7 @@ pub struct Flake8QuotesOptions {
             multiline-quotes = "single"
         "#
     )]
-    pub multiline_quotes: Option<Quote>,
+    multiline_quotes: Option<Quote>,
 
     /// Quote style to prefer for docstrings (either "single" or "double").
     ///
@@ -1943,7 +2080,7 @@ pub struct Flake8QuotesOptions {
             docstring-quotes = "single"
         "#
     )]
-    pub docstring_quotes: Option<Quote>,
+    docstring_quotes: Option<Quote>,
 
     /// Whether to avoid using single quotes if a string contains single quotes,
     /// or vice-versa with double quotes, as per [PEP 8](https://peps.python.org/pep-0008/#string-quotes).
@@ -1956,11 +2093,11 @@ pub struct Flake8QuotesOptions {
             avoid-escape = false
         "#
     )]
-    pub avoid_escape: Option<bool>,
+    avoid_escape: Option<bool>,
 }
 
 impl Flake8QuotesOptions {
-    pub fn into_settings(self) -> flake8_quotes::settings::Settings {
+    pub(crate) fn into_settings(self) -> flake8_quotes::settings::Settings {
         flake8_quotes::settings::Settings {
             inline_quotes: self.inline_quotes.unwrap_or_default(),
             multiline_quotes: self.multiline_quotes.unwrap_or_default(),
@@ -1985,7 +2122,7 @@ pub struct Flake8SelfOptions {
             ignore-names = ["_new"]
         "#
     )]
-    pub ignore_names: Option<Vec<Name>>,
+    ignore_names: Option<Vec<Name>>,
 
     /// Additional names to ignore when considering `flake8-self` violations,
     /// in addition to those included in [`ignore-names`](#lint_flake8-self_ignore-names).
@@ -1994,11 +2131,11 @@ pub struct Flake8SelfOptions {
         value_type = "list[str]",
         example = r#"extend-ignore-names = ["_base_manager", "_default_manager",  "_meta"]"#
     )]
-    pub extend_ignore_names: Option<Vec<Name>>,
+    extend_ignore_names: Option<Vec<Name>>,
 }
 
 impl Flake8SelfOptions {
-    pub fn into_settings(self) -> flake8_self::settings::Settings {
+    pub(crate) fn into_settings(self) -> flake8_self::settings::Settings {
         let defaults = flake8_self::settings::Settings::default();
         flake8_self::settings::Settings {
             ignore_names: self
@@ -2028,9 +2165,12 @@ pub struct Flake8TidyImportsOptions {
             ban-relative-imports = "all"
         "#
     )]
-    pub ban_relative_imports: Option<Strictness>,
+    ban_relative_imports: Option<Strictness>,
 
     /// Specific modules or module members that may not be imported or accessed.
+    /// These can be extended by the
+    /// [`extend-banned-api`](#lint_flake8-tidy-imports_extend-banned-api) option.
+    ///
     /// Note that this rule is only meant to flag accidental uses,
     /// and can be circumvented via `eval` or `importlib`.
     #[option(
@@ -2042,7 +2182,21 @@ pub struct Flake8TidyImportsOptions {
             "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
         "#
     )]
-    pub banned_api: Option<FxHashMap<String, ApiBan>>,
+    banned_api: Option<FxHashMap<String, ApiBan>>,
+
+    /// Additional modules or module members that may not be imported or accessed.
+    /// These entries will be added to the
+    /// [`banned-api`](#lint_flake8-tidy-imports_banned-api) mapping and will override
+    /// any existing entries if the two settings overlap.
+    #[option(
+        default = r#"{}"#,
+        value_type = r#"dict[str, { "msg": str }]"#,
+        scope = "extend-banned-api",
+        example = r#"
+            "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+        "#
+    )]
+    extend_banned_api: Option<FxHashMap<String, ApiBan>>,
 
     /// List of specific modules that may not be imported at module level, and should instead be
     /// imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:`
@@ -2057,16 +2211,137 @@ pub struct Flake8TidyImportsOptions {
             banned-module-level-imports = ["torch", "tensorflow"]
         "#
     )]
-    pub banned_module_level_imports: Option<Vec<String>>,
+    banned_module_level_imports: Option<Vec<String>>,
+
+    /// Specific modules that must be imported lazily in contexts where `lazy import` is legal, or
+    /// `"all"` to require every lazily-convertible import to use the `lazy` keyword. Ruff ignores
+    /// contexts where `lazy import` is invalid, such as functions, classes, `try`/`except`
+    /// blocks, `__future__` imports, and `from ... import *` statements. This rule is only
+    /// enforced when targeting Python 3.15 or newer.
+    #[option(
+        default = r#"[]"#,
+        value_type = r#""all" | list[str] | { include = "all" | list[str], exclude = list[str] }"#,
+        example = r#"
+            # Require lazy imports for specific modules.
+            require-lazy = ["typing", "foo"]
+
+            # Require lazy imports by default, except for modules with import-time side effects.
+            require-lazy = { include = "all", exclude = ["sitecustomize"] }
+        "#
+    )]
+    require_lazy: Option<ImportSelector>,
+
+    /// Specific modules that may not be imported lazily, or `"all"` to forbid lazy imports except
+    /// for any modules excluded from the selector. This rule is only enforced when targeting
+    /// Python 3.15 or newer.
+    #[option(
+        default = r#"[]"#,
+        value_type = r#""all" | list[str] | { include = "all" | list[str], exclude = list[str] }"#,
+        example = r#"
+            # Forbid lazy imports for specific modules.
+            ban-lazy = ["sitecustomize"]
+
+            # Forbid lazy imports by default, while allowing specific exceptions.
+            ban-lazy = { include = "all", exclude = ["typing"] }
+        "#
+    )]
+    ban_lazy: Option<ImportSelector>,
 }
 
 impl Flake8TidyImportsOptions {
-    pub fn into_settings(self) -> flake8_tidy_imports::settings::Settings {
-        flake8_tidy_imports::settings::Settings {
-            ban_relative_imports: self.ban_relative_imports.unwrap_or(Strictness::Parents),
-            banned_api: self.banned_api.unwrap_or_default(),
-            banned_module_level_imports: self.banned_module_level_imports.unwrap_or_default(),
+    pub(crate) fn try_into_settings(self) -> Result<flake8_tidy_imports::settings::Settings> {
+        let mut banned_api = self.banned_api.unwrap_or_default();
+        if let Some(extend_banned_api) = self.extend_banned_api {
+            banned_api.extend(extend_banned_api);
         }
+
+        let require_lazy = self.require_lazy.unwrap_or_default();
+        let ban_lazy = self.ban_lazy.unwrap_or_default();
+
+        if conflicting_lazy_import_settings(&require_lazy, &ban_lazy) {
+            return Err(anyhow!(
+                "`require-lazy` and `ban-lazy` must not overlap after applying exclusions"
+            ));
+        }
+
+        Ok(flake8_tidy_imports::settings::Settings {
+            ban_relative_imports: self.ban_relative_imports.unwrap_or(Strictness::Parents),
+            banned_api,
+            banned_module_level_imports: self.banned_module_level_imports.unwrap_or_default(),
+            require_lazy,
+            ban_lazy,
+        })
+    }
+}
+
+fn conflicting_lazy_import_settings(
+    require_lazy: &ImportSelector,
+    ban_lazy: &ImportSelector,
+) -> bool {
+    overlapping_import_selectors(require_lazy, ban_lazy)
+}
+
+fn overlapping_import_selectors(left: &ImportSelector, right: &ImportSelector) -> bool {
+    match (left.include(), right.include()) {
+        (ImportSelection::All(AllImports::All), ImportSelection::All(AllImports::All)) => true,
+        (ImportSelection::All(AllImports::All), ImportSelection::Imports(imports))
+        | (ImportSelection::Imports(imports), ImportSelection::All(AllImports::All)) => imports
+            .iter()
+            .any(|candidate| candidate_has_overlap(candidate, left.exclude(), right.exclude())),
+        (ImportSelection::Imports(left_imports), ImportSelection::Imports(right_imports)) => {
+            left_imports.iter().any(|left_import| {
+                right_imports.iter().any(|right_import| {
+                    overlapping_root(left_import, right_import).is_some_and(|candidate| {
+                        candidate_has_overlap(candidate, left.exclude(), right.exclude())
+                    })
+                })
+            })
+        }
+    }
+}
+
+fn candidate_has_overlap(
+    candidate: &str,
+    left_excludes: &[String],
+    right_excludes: &[String],
+) -> bool {
+    !is_fully_excluded(candidate, left_excludes) && !is_fully_excluded(candidate, right_excludes)
+}
+
+fn overlapping_root<'a>(left: &'a str, right: &'a str) -> Option<&'a str> {
+    if matches_module_prefix(left, right) {
+        Some(right)
+    } else if matches_module_prefix(right, left) {
+        Some(left)
+    } else {
+        None
+    }
+}
+
+fn is_fully_excluded(candidate: &str, excludes: &[String]) -> bool {
+    excludes
+        .iter()
+        .any(|exclude| matches_module_prefix(candidate, exclude))
+}
+
+fn matches_module_prefix(module: &str, prefix: &str) -> bool {
+    module == prefix
+        || module
+            .strip_prefix(prefix)
+            .is_some_and(|suffix| suffix.starts_with('.'))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
+#[serde(untagged)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+enum AnnotationSemanticsSelection {
+    Table(FxHashMap<String, RuntimeSemantics>),
+    List(Vec<String>),
+}
+
+impl Default for AnnotationSemanticsSelection {
+    fn default() -> Self {
+        Self::Table(FxHashMap::default())
     }
 }
 
@@ -2088,7 +2363,7 @@ pub struct Flake8TypeCheckingOptions {
             strict = true
         "#
     )]
-    pub strict: Option<bool>,
+    strict: Option<bool>,
 
     /// Exempt certain modules from needing to be moved into type-checking
     /// blocks.
@@ -2099,26 +2374,54 @@ pub struct Flake8TypeCheckingOptions {
             exempt-modules = ["typing", "typing_extensions"]
         "#
     )]
-    pub exempt_modules: Option<Vec<String>>,
+    exempt_modules: Option<Vec<String>>,
 
     /// Exempt classes that list any of the enumerated classes as a base class
     /// from needing to be moved into type-checking blocks.
     ///
-    /// Common examples include Pydantic's `pydantic.BaseModel` and SQLAlchemy's
-    /// `sqlalchemy.orm.DeclarativeBase`, but can also support user-defined
-    /// classes that inherit from those base classes. For example, if you define
-    /// a common `DeclarativeBase` subclass that's used throughout your project
-    /// (e.g., `class Base(DeclarativeBase) ...` in `base.py`), you can add it to
-    /// this list (`runtime-evaluated-base-classes = ["base.Base"]`) to exempt
+    /// This can either be configured as a list, if all entries share the same
+    /// runtime semantics of being runtime required. Or a table where each entry
+    /// is assigned to its desired runtime semantics.
+    ///
+    /// A common example for `"runtime"` required semantics is Pydantic's `pydantic.BaseModel`
+    /// but can also support user-defined classes that inherit from those base classes.
+    /// For example, if you define a common `BaseModel` subclass that's used throughout
+    /// your project (e.g., `class Base(BaseModel) ...` in `base.py`), you can add it to
+    /// this list/table (`runtime-evaluated-base-classes = ["base.Base"]`) to exempt
     /// models from being moved into type-checking blocks.
+    ///
+    /// ```toml
+    /// [tool.ruff.lint.flake8-type-checking]
+    /// runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+    /// ```
+    ///
+    /// Or
+    ///
+    /// ```toml
+    /// [tool.ruff.lint.flake8-type-checking.runtime-evaluated-base-classes]
+    /// "pydantic.BaseModel" = "required"
+    /// ```
+    ///
+    /// For some use-cases like SQLAlchemy's `sqlalchemy.orm.DeclarativeBase` it makes more
+    /// sense to mark the class as runtime `"ambiguous"`, since references to other models do
+    /// not need to resolve at runtime. With these semantics ruff will assume the annotations
+    /// already contain all of the correct forward references, and will not attempt to move
+    /// related imports and/or quote annotations.
+    ///
+    /// ```toml
+    /// [tool.ruff.lint.flake8-type-checking.runtime-evaluated-base-classes]
+    /// "sqlalchemy.orm.DeclarativeBase" = "ambiguous"
+    /// ```
     #[option(
-        default = "[]",
-        value_type = "list[str]",
+        default = "{}",
+        value_type = "list[str] | dict[str, \"required\" | \"ambiguous\"]",
+        scope = "runtime-evaluated-base-classes",
         example = r#"
-            runtime-evaluated-base-classes = ["pydantic.BaseModel", "sqlalchemy.orm.DeclarativeBase"]
+            "pydantic.BaseModel" = "required"
+            "sqlalchemy.orm.DeclarativeBase" = "ambiguous"
         "#
     )]
-    pub runtime_evaluated_base_classes: Option<Vec<String>>,
+    runtime_evaluated_base_classes: Option<AnnotationSemanticsSelection>,
 
     /// Exempt classes and functions decorated with any of the enumerated
     /// decorators from being moved into type-checking blocks.
@@ -2131,7 +2434,7 @@ pub struct Flake8TypeCheckingOptions {
     ///
     /// For example:
     /// ```python
-    /// import fastapi
+    /// from fastapi import FastAPI
     ///
     /// app = FastAPI("app")
     ///
@@ -2140,14 +2443,19 @@ pub struct Flake8TypeCheckingOptions {
     /// ```
     ///
     /// Here `app.get` will correctly be identified as `fastapi.FastAPI.get`.
+    ///
+    /// Just like with `runtime-evaluated-base-classes` it's possible to mark
+    /// decorators as runtime `"ambiguous"`.
     #[option(
-        default = "[]",
-        value_type = "list[str]",
+        default = "{}",
+        value_type = "list[str] | dict[str, \"required\" | \"ambiguous\"]",
+        scope = "runtime-evaluated-decorators",
         example = r#"
-            runtime-evaluated-decorators = ["pydantic.validate_call", "attrs.define"]
+            "pydantic.validate_call" = "required"
+            "sqlalchemy.orm.declared_attr" = "ambiguous"
         "#
     )]
-    pub runtime_evaluated_decorators: Option<Vec<String>>,
+    runtime_evaluated_decorators: Option<AnnotationSemanticsSelection>,
 
     /// Whether to add quotes around type annotations, if doing so would allow
     /// the corresponding import to be moved into a type-checking block.
@@ -2199,18 +2507,36 @@ pub struct Flake8TypeCheckingOptions {
             quote-annotations = true
         "#
     )]
-    pub quote_annotations: Option<bool>,
+    quote_annotations: Option<bool>,
 }
 
 impl Flake8TypeCheckingOptions {
-    pub fn into_settings(self) -> flake8_type_checking::settings::Settings {
+    pub(crate) fn into_settings(self) -> flake8_type_checking::settings::Settings {
         flake8_type_checking::settings::Settings {
             strict: self.strict.unwrap_or(false),
             exempt_modules: self
                 .exempt_modules
                 .unwrap_or_else(|| vec!["typing".to_string()]),
-            runtime_required_base_classes: self.runtime_evaluated_base_classes.unwrap_or_default(),
-            runtime_required_decorators: self.runtime_evaluated_decorators.unwrap_or_default(),
+            runtime_evaluated_base_classes: match self
+                .runtime_evaluated_base_classes
+                .unwrap_or_default()
+            {
+                AnnotationSemanticsSelection::Table(map) => map,
+                AnnotationSemanticsSelection::List(vector) => vector
+                    .into_iter()
+                    .map(|name| (name, RuntimeSemantics::Required))
+                    .collect(),
+            },
+            runtime_evaluated_decorators: match self
+                .runtime_evaluated_decorators
+                .unwrap_or_default()
+            {
+                AnnotationSemanticsSelection::Table(map) => map,
+                AnnotationSemanticsSelection::List(vector) => vector
+                    .into_iter()
+                    .map(|name| (name, RuntimeSemantics::Required))
+                    .collect(),
+            },
             quote_annotations: self.quote_annotations.unwrap_or_default(),
         }
     }
@@ -2229,11 +2555,11 @@ pub struct Flake8UnusedArgumentsOptions {
         value_type = "bool",
         example = "ignore-variadic-names = true"
     )]
-    pub ignore_variadic_names: Option<bool>,
+    ignore_variadic_names: Option<bool>,
 }
 
 impl Flake8UnusedArgumentsOptions {
-    pub fn into_settings(self) -> flake8_unused_arguments::settings::Settings {
+    pub(crate) fn into_settings(self) -> flake8_unused_arguments::settings::Settings {
         flake8_unused_arguments::settings::Settings {
             ignore_variadic_names: self.ignore_variadic_names.unwrap_or_default(),
         }
@@ -2274,7 +2600,7 @@ pub struct IsortOptions {
             combine-as-imports = true
         "#
     )]
-    pub force_wrap_aliases: Option<bool>,
+    force_wrap_aliases: Option<bool>,
 
     /// Forces all from imports to appear on their own line.
     #[option(
@@ -2282,7 +2608,7 @@ pub struct IsortOptions {
         value_type = "bool",
         example = r#"force-single-line = true"#
     )]
-    pub force_single_line: Option<bool>,
+    force_single_line: Option<bool>,
 
     /// One or more modules to exclude from the single line rule.
     #[option(
@@ -2292,7 +2618,7 @@ pub struct IsortOptions {
             single-line-exclusions = ["os", "json"]
         "#
     )]
-    pub single_line_exclusions: Option<Vec<String>>,
+    single_line_exclusions: Option<Vec<String>>,
 
     /// Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports)
     /// option.
@@ -2303,7 +2629,7 @@ pub struct IsortOptions {
             combine-as-imports = true
         "#
     )]
-    pub combine_as_imports: Option<bool>,
+    combine_as_imports: Option<bool>,
 
     /// If a comma is placed after the last member in a multi-line import, then
     /// the imports will never be folded into one line.
@@ -2319,7 +2645,7 @@ pub struct IsortOptions {
             split-on-trailing-comma = false
         "#
     )]
-    pub split_on_trailing_comma: Option<bool>,
+    split_on_trailing_comma: Option<bool>,
 
     /// Order imports by type, which is determined by case, in addition to
     /// alphabetically.
@@ -2333,7 +2659,7 @@ pub struct IsortOptions {
             order-by-type = true
         "#
     )]
-    pub order_by_type: Option<bool>,
+    order_by_type: Option<bool>,
 
     /// Don't sort straight-style imports (like `import sys`) before from-style
     /// imports (like `from itertools import groupby`). Instead, sort the
@@ -2345,7 +2671,7 @@ pub struct IsortOptions {
             force-sort-within-sections = true
         "#
     )]
-    pub force_sort_within_sections: Option<bool>,
+    force_sort_within_sections: Option<bool>,
 
     /// Sort imports taking into account case sensitivity.
     ///
@@ -2358,7 +2684,7 @@ pub struct IsortOptions {
             case-sensitive = true
         "#
     )]
-    pub case_sensitive: Option<bool>,
+    case_sensitive: Option<bool>,
 
     /// Force specific imports to the top of their appropriate section.
     #[option(
@@ -2368,7 +2694,7 @@ pub struct IsortOptions {
             force-to-top = ["src"]
         "#
     )]
-    pub force_to_top: Option<Vec<String>>,
+    force_to_top: Option<Vec<String>>,
 
     /// A list of modules to consider first-party, regardless of whether they
     /// can be identified as such via introspection of the local filesystem.
@@ -2382,7 +2708,7 @@ pub struct IsortOptions {
             known-first-party = ["src"]
         "#
     )]
-    pub known_first_party: Option<Vec<String>>,
+    known_first_party: Option<Vec<String>>,
 
     /// A list of modules to consider third-party, regardless of whether they
     /// can be identified as such via introspection of the local filesystem.
@@ -2396,7 +2722,7 @@ pub struct IsortOptions {
             known-third-party = ["src"]
         "#
     )]
-    pub known_third_party: Option<Vec<String>>,
+    known_third_party: Option<Vec<String>>,
 
     /// A list of modules to consider being a local folder.
     /// Generally, this is reserved for relative imports (`from . import module`).
@@ -2410,7 +2736,7 @@ pub struct IsortOptions {
             known-local-folder = ["src"]
         "#
     )]
-    pub known_local_folder: Option<Vec<String>>,
+    known_local_folder: Option<Vec<String>>,
 
     /// A list of modules to consider standard-library, in addition to those
     /// known to Ruff in advance.
@@ -2424,7 +2750,7 @@ pub struct IsortOptions {
             extra-standard-library = ["path"]
         "#
     )]
-    pub extra_standard_library: Option<Vec<String>>,
+    extra_standard_library: Option<Vec<String>>,
 
     /// Whether to place "closer" imports (fewer `.` characters, most local)
     /// before "further" imports (more `.` characters, least local), or vice
@@ -2441,7 +2767,7 @@ pub struct IsortOptions {
             relative-imports-order = "closest-to-furthest"
         "#
     )]
-    pub relative_imports_order: Option<RelativeImportsOrder>,
+    relative_imports_order: Option<RelativeImportsOrder>,
 
     /// Add the specified import line to all files.
     #[option(
@@ -2451,7 +2777,7 @@ pub struct IsortOptions {
             required-imports = ["from __future__ import annotations"]
         "#
     )]
-    pub required_imports: Option<Vec<NameImports>>,
+    required_imports: Option<Vec<NameImports>>,
 
     /// An override list of tokens to always recognize as a Class for
     /// [`order-by-type`](#lint_isort_order-by-type) regardless of casing.
@@ -2462,7 +2788,7 @@ pub struct IsortOptions {
             classes = ["SVC"]
         "#
     )]
-    pub classes: Option<Vec<String>>,
+    classes: Option<Vec<String>>,
 
     /// An override list of tokens to always recognize as a CONSTANT
     /// for [`order-by-type`](#lint_isort_order-by-type) regardless of casing.
@@ -2473,7 +2799,7 @@ pub struct IsortOptions {
             constants = ["constant"]
         "#
     )]
-    pub constants: Option<Vec<String>>,
+    constants: Option<Vec<String>>,
 
     /// An override list of tokens to always recognize as a var
     /// for [`order-by-type`](#lint_isort_order-by-type) regardless of casing.
@@ -2484,7 +2810,7 @@ pub struct IsortOptions {
             variables = ["VAR"]
         "#
     )]
-    pub variables: Option<Vec<String>>,
+    variables: Option<Vec<String>>,
 
     /// A list of sections that should _not_ be delineated from the previous
     /// section via empty lines.
@@ -2495,7 +2821,28 @@ pub struct IsortOptions {
             no-lines-before = ["future", "standard-library"]
         "#
     )]
-    pub no_lines_before: Option<Vec<ImportSection>>,
+    no_lines_before: Option<Vec<ImportSection>>,
+
+    /// A mapping from import section names to their heading comments.
+    ///
+    /// When set, a comment with the specified text will be added above imports
+    /// in the corresponding section. If a heading comment already exists, it
+    /// will be replaced.
+    ///
+    /// Compatible with isort's `import_heading_{section_name}` settings.
+    #[option(
+        default = r#"{}"#,
+        value_type = r#"dict["future" | "standard-library" | "third-party" | "first-party" | "local-folder" | str, str]"#,
+        scope = "import-heading",
+        example = r#"
+            future = "Future imports"
+            standard-library = "Standard library imports"
+            third-party = "Third party imports"
+            first-party = "First party imports"
+            local-folder = "Local folder imports"
+        "#
+    )]
+    import_heading: Option<FxHashMap<ImportSection, String>>,
 
     /// The number of blank lines to place after imports.
     /// Use `-1` for automatic determination.
@@ -2513,7 +2860,7 @@ pub struct IsortOptions {
             lines-after-imports = 1
         "#
     )]
-    pub lines_after_imports: Option<isize>,
+    lines_after_imports: Option<isize>,
 
     /// The number of lines to place between "direct" and `import from` imports.
     ///
@@ -2527,7 +2874,7 @@ pub struct IsortOptions {
             lines-between-types = 1
         "#
     )]
-    pub lines_between_types: Option<usize>,
+    lines_between_types: Option<usize>,
 
     /// A list of modules to separate into auxiliary block(s) of imports,
     /// in the order specified.
@@ -2538,7 +2885,7 @@ pub struct IsortOptions {
             forced-separate = ["tests"]
         "#
     )]
-    pub forced_separate: Option<Vec<String>>,
+    forced_separate: Option<Vec<String>>,
 
     /// Override in which order the sections should be output. Can be used to move custom sections.
     #[option(
@@ -2548,7 +2895,7 @@ pub struct IsortOptions {
             section-order = ["future", "standard-library", "first-party", "local-folder", "third-party"]
         "#
     )]
-    pub section_order: Option<Vec<ImportSection>>,
+    section_order: Option<Vec<ImportSection>>,
 
     /// Define a default section for any imports that don't fit into the specified [`section-order`](#lint_isort_section-order).
     #[option(
@@ -2558,7 +2905,7 @@ pub struct IsortOptions {
             default-section = "first-party"
         "#
     )]
-    pub default_section: Option<ImportSection>,
+    default_section: Option<ImportSection>,
 
     /// Put all imports into the same section bucket.
     ///
@@ -2585,7 +2932,7 @@ pub struct IsortOptions {
             no-sections = true
         "#
     )]
-    pub no_sections: Option<bool>,
+    no_sections: Option<bool>,
 
     /// Whether to automatically mark imports from within the same package as first-party.
     /// For example, when `detect-same-package = true`, then when analyzing files within the
@@ -2601,7 +2948,7 @@ pub struct IsortOptions {
             detect-same-package = false
         "#
     )]
-    pub detect_same_package: Option<bool>,
+    detect_same_package: Option<bool>,
 
     /// Whether to place `import from` imports before straight imports when sorting.
     ///
@@ -2627,7 +2974,7 @@ pub struct IsortOptions {
             from-first = true
         "#
     )]
-    pub from_first: Option<bool>,
+    from_first: Option<bool>,
 
     /// Sort imports by their string length, such that shorter imports appear
     /// before longer imports. For example, by default, imports will be sorted
@@ -2650,7 +2997,7 @@ pub struct IsortOptions {
             length-sort = true
         "#
     )]
-    pub length_sort: Option<bool>,
+    length_sort: Option<bool>,
 
     /// Sort straight imports by their string length. Similar to [`length-sort`](#lint_isort_length-sort),
     /// but applies only to straight imports and doesn't affect `from` imports.
@@ -2661,7 +3008,7 @@ pub struct IsortOptions {
             length-sort-straight = true
         "#
     )]
-    pub length_sort_straight: Option<bool>,
+    length_sort_straight: Option<bool>,
 
     // Tables are required to go last.
     /// A list of mappings from section names to modules.
@@ -2705,11 +3052,11 @@ pub struct IsortOptions {
             "django" = ["django"]
         "#
     )]
-    pub sections: Option<FxHashMap<ImportSection, Vec<String>>>,
+    sections: Option<FxHashMap<ImportSection, Vec<String>>>,
 }
 
 impl IsortOptions {
-    pub fn try_into_settings(
+    pub(crate) fn try_into_settings(
         self,
     ) -> Result<isort::settings::Settings, isort::settings::SettingsError> {
         // Verify that if `no_sections` is set, then `section_order` is empty.
@@ -2729,7 +3076,8 @@ impl IsortOptions {
         let lines_between_types = self.lines_between_types.unwrap_or_default();
         if force_sort_within_sections && lines_between_types != 0 {
             warn_user_once!(
-                "`lines-between-types` is ignored when `force-sort-within-sections` is set to `true`"
+                "`lines-between-types` is ignored when `force-sort-within-sections` \
+                is set to `true`"
             );
         }
 
@@ -2790,7 +3138,7 @@ impl IsortOptions {
         let sections = self.sections.unwrap_or_default();
 
         // Verify that `sections` doesn't contain any built-in sections.
-        let sections: FxHashMap<String, Vec<glob::Pattern>> = sections
+        let sections: FxHashMap<String, Vec<IdentifierPattern>> = sections
             .into_iter()
             .filter_map(|(section, modules)| match section {
                 ImportSection::Known(section) => {
@@ -2843,6 +3191,19 @@ impl IsortOptions {
             }
         }
 
+        let import_heading = self.import_heading.unwrap_or_default();
+
+        // Verify that all sections listed in `import_heading` are defined in `sections`.
+        let mut import_heading_sections = import_heading.keys().collect::<Vec<_>>();
+        import_heading_sections.sort_unstable();
+        for section in import_heading_sections {
+            if let ImportSection::UserDefined(section_name) = section {
+                if !sections.contains_key(section_name) {
+                    warn_user_once!("`import-heading` contains unknown section: `{:?}`", section,);
+                }
+            }
+        }
+
         // Verify that `default_section` is in `section_order`.
         if !section_order.contains(&default_section) {
             warn_user_once!(
@@ -2883,6 +3244,10 @@ impl IsortOptions {
             constants: FxHashSet::from_iter(self.constants.unwrap_or_default()),
             variables: FxHashSet::from_iter(self.variables.unwrap_or_default()),
             no_lines_before: FxHashSet::from_iter(no_lines_before),
+            import_headings: import_heading
+                .into_iter()
+                .map(|(section, heading)| (section, format!("# {heading}")))
+                .collect(),
             lines_after_imports: self.lines_after_imports.unwrap_or(-1),
             lines_between_types,
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
@@ -2912,11 +3277,11 @@ pub struct McCabeOptions {
             max-complexity = 5
         "#
     )]
-    pub max_complexity: Option<usize>,
+    max_complexity: Option<usize>,
 }
 
 impl McCabeOptions {
-    pub fn into_settings(self) -> mccabe::settings::Settings {
+    pub(crate) fn into_settings(self) -> mccabe::settings::Settings {
         mccabe::settings::Settings {
             max_complexity: self
                 .max_complexity
@@ -2944,7 +3309,7 @@ pub struct Pep8NamingOptions {
             ignore-names = ["callMethod"]
         "#
     )]
-    pub ignore_names: Option<Vec<String>>,
+    ignore_names: Option<Vec<String>>,
 
     /// Additional names (or patterns) to ignore when considering `pep8-naming` violations,
     /// in addition to those included in [`ignore-names`](#lint_pep8-naming_ignore-names).
@@ -2957,7 +3322,7 @@ pub struct Pep8NamingOptions {
         value_type = "list[str]",
         example = r#"extend-ignore-names = ["callMethod"]"#
     )]
-    pub extend_ignore_names: Option<Vec<String>>,
+    extend_ignore_names: Option<Vec<String>>,
 
     /// A list of decorators that, when applied to a method, indicate that the
     /// method should be treated as a class method (in addition to the builtin
@@ -2983,7 +3348,7 @@ pub struct Pep8NamingOptions {
             ]
         "#
     )]
-    pub classmethod_decorators: Option<Vec<String>>,
+    classmethod_decorators: Option<Vec<String>>,
 
     /// A list of decorators that, when applied to a method, indicate that the
     /// method should be treated as a static method (in addition to the builtin
@@ -3003,11 +3368,11 @@ pub struct Pep8NamingOptions {
             staticmethod-decorators = ["belay.Device.teardown"]
         "#
     )]
-    pub staticmethod_decorators: Option<Vec<String>>,
+    staticmethod_decorators: Option<Vec<String>>,
 }
 
 impl Pep8NamingOptions {
-    pub fn try_into_settings(
+    pub(crate) fn try_into_settings(
         self,
     ) -> Result<pep8_naming::settings::Settings, pep8_naming::settings::SettingsError> {
         Ok(pep8_naming::settings::Settings {
@@ -3084,7 +3449,10 @@ pub struct PycodestyleOptions {
 }
 
 impl PycodestyleOptions {
-    pub fn into_settings(self, global_line_length: LineLength) -> pycodestyle::settings::Settings {
+    pub(crate) fn into_settings(
+        self,
+        global_line_length: LineLength,
+    ) -> pycodestyle::settings::Settings {
         pycodestyle::settings::Settings {
             max_doc_length: self.max_doc_length,
             max_line_length: self.max_line_length.unwrap_or(global_line_length),
@@ -3125,6 +3493,53 @@ pub struct PydocstyleOptions {
     /// convention = "google"
     /// ```
     ///
+    /// The PEP 257 convention includes all `D` errors apart from:
+    /// [`D203`](rules/incorrect-blank-line-before-class-docstring.md),
+    /// [`D212`](rules/multiline-docstring-summary-on-separate-line.md),
+    /// [`D213`](rules/multiline-docstring-summary-on-first-line.md),
+    /// [`D214`](rules/over-indented-docstring-section.md),
+    /// [`D215`](rules/over-indented-docstring-section-underline.md),
+    /// [`D404`](rules/docstring-starts-with-this.md),
+    /// [`D405`](rules/incorrectly-capitalized-docstring-section-name.md),
+    /// [`D406`](rules/missing-newline-after-docstring-section-name.md),
+    /// [`D407`](rules/missing-docstring-section-underline.md),
+    /// [`D408`](rules/blank-line-before-docstring-section-underline.md),
+    /// [`D409`](rules/incorrect-docstring-section-underline-length.md),
+    /// [`D410`](rules/missing-blank-line-after-docstring-section.md),
+    /// [`D411`](rules/missing-blank-line-before-docstring-section.md),
+    /// [`D413`](rules/missing-blank-line-after-last-docstring-section.md),
+    /// [`D415`](rules/docstring-summary-without-terminal-punctuation.md),
+    /// [`D416`](rules/docstring-section-name-without-colon.md),
+    /// [`D417`](rules/undocumented-parameter.md), and
+    /// [`D420`](rules/incorrect-docstring-section-order.md).
+    ///
+    /// The NumPy convention includes all `D` errors apart from:
+    /// [`D107`](rules/undocumented-public-init.md),
+    /// [`D203`](rules/incorrect-blank-line-before-class-docstring.md),
+    /// [`D212`](rules/multiline-docstring-summary-on-separate-line.md),
+    /// [`D213`](rules/multiline-docstring-summary-on-first-line.md),
+    /// [`D402`](rules/signature-in-docstring.md),
+    /// [`D413`](rules/missing-blank-line-after-last-docstring-section.md),
+    /// [`D415`](rules/docstring-summary-without-terminal-punctuation.md),
+    /// [`D416`](rules/docstring-section-name-without-colon.md), and
+    /// [`D417`](rules/undocumented-parameter.md).
+    ///
+    /// The Google convention includes all `D` errors apart from:
+    /// [`D203`](rules/incorrect-blank-line-before-class-docstring.md),
+    /// [`D204`](rules/incorrect-blank-line-after-class-docstring.md),
+    /// [`D213`](rules/multiline-docstring-summary-on-first-line.md),
+    /// [`D215`](rules/over-indented-docstring-section-underline.md),
+    /// [`D400`](rules/docstring-summary-without-period.md),
+    /// [`D401`](rules/non-imperative-docstring-summary.md),
+    /// [`D404`](rules/docstring-starts-with-this.md),
+    /// [`D406`](rules/missing-newline-after-docstring-section-name.md),
+    /// [`D407`](rules/missing-docstring-section-underline.md),
+    /// [`D408`](rules/blank-line-before-docstring-section-underline.md),
+    /// [`D409`](rules/incorrect-docstring-section-underline-length.md), and
+    /// [`D413`](rules/missing-blank-line-after-last-docstring-section.md).
+    ///
+    /// For more information see the [FAQ](faq.md#does-ruff-support-numpy-or-google-style-docstrings) entry.
+    ///
     /// To enable an additional rule that's excluded from the convention,
     /// select the desired rule via its fully qualified rule code (e.g.,
     /// `D400` instead of `D4` or `D40`):
@@ -3145,7 +3560,7 @@ pub struct PydocstyleOptions {
             convention = "google"
         "#
     )]
-    pub convention: Option<Convention>,
+    pub(crate) convention: Option<Convention>,
 
     /// Ignore docstrings for functions or methods decorated with the
     /// specified fully-qualified decorators.
@@ -3156,7 +3571,7 @@ pub struct PydocstyleOptions {
             ignore-decorators = ["typing.overload"]
         "#
     )]
-    pub ignore_decorators: Option<Vec<String>>,
+    pub(crate) ignore_decorators: Option<Vec<String>>,
 
     /// A list of decorators that, when applied to a method, indicate that the
     /// method should be treated as a property (in addition to the builtin
@@ -3171,7 +3586,7 @@ pub struct PydocstyleOptions {
             property-decorators = ["gi.repository.GObject.Property"]
         "#
     )]
-    pub property_decorators: Option<Vec<String>>,
+    pub(crate) property_decorators: Option<Vec<String>>,
 
     /// If set to `true`, ignore missing documentation for `*args` and `**kwargs` parameters.
     #[option(
@@ -3181,11 +3596,11 @@ pub struct PydocstyleOptions {
             ignore-var-parameters = true
         "#
     )]
-    pub ignore_var_parameters: Option<bool>,
+    pub(crate) ignore_var_parameters: Option<bool>,
 }
 
 impl PydocstyleOptions {
-    pub fn into_settings(self) -> pydocstyle::settings::Settings {
+    pub(crate) fn into_settings(self) -> pydocstyle::settings::Settings {
         let PydocstyleOptions {
             convention,
             ignore_decorators,
@@ -3220,11 +3635,11 @@ pub struct PydoclintOptions {
             ignore-one-line-docstrings = true
         "#
     )]
-    pub ignore_one_line_docstrings: Option<bool>,
+    ignore_one_line_docstrings: Option<bool>,
 }
 
 impl PydoclintOptions {
-    pub fn into_settings(self) -> pydoclint::settings::Settings {
+    pub(crate) fn into_settings(self) -> pydoclint::settings::Settings {
         pydoclint::settings::Settings {
             ignore_one_line_docstrings: self.ignore_one_line_docstrings.unwrap_or_default(),
         }
@@ -3249,7 +3664,7 @@ pub struct PyflakesOptions {
         value_type = "list[str]",
         example = "extend-generics = [\"django.db.models.ForeignKey\"]"
     )]
-    pub extend_generics: Option<Vec<String>>,
+    extend_generics: Option<Vec<String>>,
 
     /// A list of modules to ignore when considering unused imports.
     ///
@@ -3264,11 +3679,11 @@ pub struct PyflakesOptions {
         value_type = "list[str]",
         example = r#"allowed-unused-imports = ["hvplot.pandas"]"#
     )]
-    pub allowed_unused_imports: Option<Vec<String>>,
+    allowed_unused_imports: Option<Vec<String>>,
 }
 
 impl PyflakesOptions {
-    pub fn into_settings(self) -> pyflakes::settings::Settings {
+    pub(crate) fn into_settings(self) -> pyflakes::settings::Settings {
         pyflakes::settings::Settings {
             extend_generics: self.extend_generics.unwrap_or_default(),
             allowed_unused_imports: self.allowed_unused_imports.unwrap_or_default(),
@@ -3291,7 +3706,28 @@ pub struct PylintOptions {
             allow-magic-value-types = ["int"]
         "#
     )]
-    pub allow_magic_value_types: Option<Vec<ConstantType>>,
+    allow_magic_value_types: Option<Vec<ConstantType>>,
+
+    /// Specific literal values to ignore when used as "magic values" (see `PLR2004`).
+    #[option(
+        default = r#"[0, 1, -1, 0.0, 1.0, -1.0, "", "__main__"]"#,
+        value_type = r#"list[str | int | float]"#,
+        example = r#"
+            allow-magic-values = [42, 3.14, "special"]
+        "#
+    )]
+    allow_magic_values: Option<Vec<AllowedValue>>,
+
+    /// Literal values to ignore when used as "magic values" (see `PLR2004`),
+    /// in addition to those included in [`allow-magic-values`](#lint_pylint_allow-magic-values).
+    #[option(
+        default = r#"[]"#,
+        value_type = r#"list[str | int | float]"#,
+        example = r#"
+            extend-allow-magic-values = [42, 3.14, "magic"]
+        "#
+    )]
+    extend_allow_magic_values: Option<Vec<AllowedValue>>,
 
     /// Dunder methods name to allow, in addition to the default set from the
     /// Python standard library (see `PLW3201`).
@@ -3302,21 +3738,21 @@ pub struct PylintOptions {
             allow-dunder-method-names = ["__tablename__", "__table_args__"]
         "#
     )]
-    pub allow_dunder_method_names: Option<FxHashSet<String>>,
+    allow_dunder_method_names: Option<FxHashSet<String>>,
 
     /// Maximum number of branches allowed for a function or method body (see `PLR0912`).
     #[option(default = r"12", value_type = "int", example = r"max-branches = 15")]
-    pub max_branches: Option<usize>,
+    max_branches: Option<usize>,
 
     /// Maximum number of return statements allowed for a function or method
     /// body (see `PLR0911`)
     #[option(default = r"6", value_type = "int", example = r"max-returns = 10")]
-    pub max_returns: Option<usize>,
+    max_returns: Option<usize>,
 
     /// Maximum number of arguments allowed for a function or method definition
     /// (see `PLR0913`).
     #[option(default = r"5", value_type = "int", example = r"max-args = 10")]
-    pub max_args: Option<usize>,
+    max_args: Option<usize>,
 
     /// Maximum number of positional arguments allowed for a function or method definition
     /// (see `PLR0917`).
@@ -3327,15 +3763,23 @@ pub struct PylintOptions {
         value_type = "int",
         example = r"max-positional-args = 3"
     )]
-    pub max_positional_args: Option<usize>,
+    max_positional_args: Option<usize>,
 
     /// Maximum number of local variables allowed for a function or method body (see `PLR0914`).
     #[option(default = r"15", value_type = "int", example = r"max-locals = 20")]
-    pub max_locals: Option<usize>,
+    max_locals: Option<usize>,
 
     /// Maximum number of statements allowed for a function or method body (see `PLR0915`).
     #[option(default = r"50", value_type = "int", example = r"max-statements = 75")]
-    pub max_statements: Option<usize>,
+    max_statements: Option<usize>,
+
+    /// Maximum number of statements allowed for a try clause body (see `W0717`).
+    #[option(
+        default = r"5",
+        value_type = "int",
+        example = r"max-statements-in-try = 10"
+    )]
+    max_statements_in_try: Option<usize>,
 
     /// Maximum number of public methods allowed for a class (see `PLR0904`).
     #[option(
@@ -3343,12 +3787,12 @@ pub struct PylintOptions {
         value_type = "int",
         example = r"max-public-methods = 30"
     )]
-    pub max_public_methods: Option<usize>,
+    max_public_methods: Option<usize>,
 
     /// Maximum number of Boolean expressions allowed within a single `if` statement
     /// (see `PLR0916`).
     #[option(default = r"5", value_type = "int", example = r"max-bool-expr = 10")]
-    pub max_bool_expr: Option<usize>,
+    max_bool_expr: Option<usize>,
 
     /// Maximum number of nested blocks allowed within a function or method body
     /// (see `PLR1702`).
@@ -3357,16 +3801,23 @@ pub struct PylintOptions {
         value_type = "int",
         example = r"max-nested-blocks = 10"
     )]
-    pub max_nested_blocks: Option<usize>,
+    max_nested_blocks: Option<usize>,
 }
 
 impl PylintOptions {
-    pub fn into_settings(self) -> pylint::settings::Settings {
+    pub(crate) fn into_settings(self) -> pylint::settings::Settings {
         let defaults = pylint::settings::Settings::default();
+        let mut allow_magic_values = self
+            .allow_magic_values
+            .unwrap_or(defaults.allow_magic_values);
+        if let Some(extend) = self.extend_allow_magic_values {
+            allow_magic_values.extend(extend);
+        }
         pylint::settings::Settings {
             allow_magic_value_types: self
                 .allow_magic_value_types
                 .unwrap_or(defaults.allow_magic_value_types),
+            allow_magic_values,
             allow_dunder_method_names: self.allow_dunder_method_names.unwrap_or_default(),
             max_args: self.max_args.unwrap_or(defaults.max_args),
             max_positional_args: self
@@ -3377,6 +3828,9 @@ impl PylintOptions {
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
             max_branches: self.max_branches.unwrap_or(defaults.max_branches),
             max_statements: self.max_statements.unwrap_or(defaults.max_statements),
+            max_statements_in_try: self
+                .max_statements_in_try
+                .unwrap_or(defaults.max_statements_in_try),
             max_public_methods: self
                 .max_public_methods
                 .unwrap_or(defaults.max_public_methods),
@@ -3431,11 +3885,11 @@ pub struct PyUpgradeOptions {
             keep-runtime-typing = true
         "#
     )]
-    pub keep_runtime_typing: Option<bool>,
+    keep_runtime_typing: Option<bool>,
 }
 
 impl PyUpgradeOptions {
-    pub fn into_settings(self) -> pyupgrade::settings::Settings {
+    pub(crate) fn into_settings(self) -> pyupgrade::settings::Settings {
         pyupgrade::settings::Settings {
             keep_runtime_typing: self.keep_runtime_typing.unwrap_or_default(),
         }
@@ -3459,7 +3913,7 @@ pub struct RuffOptions {
         parenthesize-tuple-in-subscript = true
         "#
     )]
-    pub parenthesize_tuple_in_subscript: Option<bool>,
+    parenthesize_tuple_in_subscript: Option<bool>,
 
     /// A list of additional callable names that behave like
     /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
@@ -3473,9 +3927,10 @@ pub struct RuffOptions {
     )]
     #[deprecated(
         since = "0.10.0",
-        note = "The `extend-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
+        note = "The `extend-markup-names` option has been moved to the `flake8-bandit` section of \
+            the configuration."
     )]
-    pub extend_markup_names: Option<Vec<String>>,
+    extend_markup_names: Option<Vec<String>>,
 
     /// A list of callable names, whose result may be safely passed into
     /// [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).
@@ -3509,24 +3964,25 @@ pub struct RuffOptions {
     )]
     #[deprecated(
         since = "0.10.0",
-        note = "The `allowed-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
+        note = "The `allowed-markup-names` option has been moved to the `flake8-bandit` section \
+            of the configuration."
     )]
-    pub allowed_markup_calls: Option<Vec<String>>,
+    allowed_markup_calls: Option<Vec<String>>,
     /// Whether to require `__init__.py` files to contain no code at all, including imports and
-    /// docstrings (see `RUF067`).
+    /// `__all__` assignments (see `RUF067`). Module and attribute docstrings are still allowed.
     #[option(
         default = r#"false"#,
         value_type = "bool",
         example = r#"
-        # Make it a violation to include any code, including imports and docstrings in `__init__.py`
+        # Make it a violation to include any code, including imports, in `__init__.py`
         strictly-empty-init-modules = true
         "#
     )]
-    pub strictly_empty_init_modules: Option<bool>,
+    strictly_empty_init_modules: Option<bool>,
 }
 
 impl RuffOptions {
-    pub fn into_settings(self) -> ruff::settings::Settings {
+    pub(crate) fn into_settings(self) -> ruff::settings::Settings {
         ruff::settings::Settings {
             parenthesize_tuple_in_subscript: self
                 .parenthesize_tuple_in_subscript
@@ -3638,6 +4094,27 @@ pub struct FormatOptions {
         "#
     )]
     pub quote_style: Option<QuoteStyle>,
+
+    /// Controls the quote style for nested strings inside interpolated string expressions.
+    ///
+    /// - `alternating` (default): Use alternating quotes.
+    /// - `preferred`: Use the configured [`quote-style`](#format_quote-style).
+    ///
+    /// ```python
+    /// f"{data['key']}"  # alternating (default)
+    /// f"{data["key"]}"  # preferred
+    /// ```
+    ///
+    /// Note: This setting has no effect when targeting Python versions below 3.12.
+    #[option(
+        default = r#""alternating""#,
+        value_type = r#""alternating" | "preferred""#,
+        example = r#"
+            # Use the configured quote style for nested strings (Python 3.12+ only).
+            nested-string-quote-style = "preferred"
+        "#
+    )]
+    pub nested_string_quote_style: Option<ruff_python_formatter::NestedStringQuoteStyle>,
 
     /// Ruff uses existing trailing commas as an indication that short lines should be left separate.
     /// If this option is set to `true`, the magic trailing comma is ignored.
@@ -3861,7 +4338,7 @@ pub struct AnalyzeOptions {
             exclude = ["generated"]
         "#
     )]
-    pub exclude: Option<Vec<String>>,
+    pub(crate) exclude: Option<Vec<String>>,
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will expose unstable
     /// commands.
     #[option(
@@ -3872,7 +4349,7 @@ pub struct AnalyzeOptions {
             preview = true
         "#
     )]
-    pub preview: Option<bool>,
+    pub(crate) preview: Option<bool>,
     /// Whether to generate a map from file to files that it depends on (dependencies) or files that
     /// depend on it (dependents).
     #[option(
@@ -3882,7 +4359,7 @@ pub struct AnalyzeOptions {
             direction = "dependencies"
         "#
     )]
-    pub direction: Option<Direction>,
+    pub(crate) direction: Option<Direction>,
     /// Whether to detect imports from string literals. When enabled, Ruff will search for string
     /// literals that "look like" import paths, and include them in the import map, if they resolve
     /// to valid Python modules.
@@ -3893,7 +4370,7 @@ pub struct AnalyzeOptions {
             detect-string-imports = true
         "#
     )]
-    pub detect_string_imports: Option<bool>,
+    pub(crate) detect_string_imports: Option<bool>,
     /// The minimum number of dots in a string to consider it a valid import.
     ///
     /// This setting is only relevant when [`detect-string-imports`](#detect-string-imports) is enabled.
@@ -3906,7 +4383,7 @@ pub struct AnalyzeOptions {
             string-imports-min-dots = 2
         "#
     )]
-    pub string_imports_min_dots: Option<usize>,
+    pub(crate) string_imports_min_dots: Option<usize>,
     /// A map from file path to the list of Python or non-Python file paths or globs that should be
     /// considered dependencies of that file, regardless of whether relevant imports are detected.
     #[option(
@@ -3918,7 +4395,7 @@ pub struct AnalyzeOptions {
             "foo/baz/reader.py" = ["configs/bar.json"]
         "#
     )]
-    pub include_dependencies: Option<BTreeMap<PathBuf, Vec<String>>>,
+    pub(crate) include_dependencies: Option<BTreeMap<PathBuf, Vec<String>>>,
     /// Whether to include imports that are only used for type checking (i.e., imports within `if TYPE_CHECKING:` blocks).
     /// When enabled (default), type-checking-only imports are included in the import graph.
     /// When disabled, they are excluded.
@@ -3930,7 +4407,7 @@ pub struct AnalyzeOptions {
             type-checking-imports = false
         "#
     )]
-    pub type_checking_imports: Option<bool>,
+    pub(crate) type_checking_imports: Option<bool>,
 }
 
 /// Like [`LintCommonOptions`], but with any `#[serde(flatten)]` fields inlined. This leads to far,
@@ -3941,22 +4418,22 @@ pub struct LintOptionsWire {
     // common: LintCommonOptions
     allowed_confusables: Option<Vec<char>>,
     dummy_variable_rgx: Option<String>,
-    extend_ignore: Option<Vec<RuleSelector>>,
-    extend_select: Option<Vec<RuleSelector>>,
-    extend_fixable: Option<Vec<RuleSelector>>,
-    extend_unfixable: Option<Vec<RuleSelector>>,
+    extend_ignore: Option<Vec<UnresolvedRuleSelector>>,
+    extend_select: Option<Vec<UnresolvedRuleSelector>>,
+    extend_fixable: Option<Vec<UnresolvedRuleSelector>>,
+    extend_unfixable: Option<Vec<UnresolvedRuleSelector>>,
     external: Option<Vec<String>>,
-    fixable: Option<Vec<RuleSelector>>,
-    ignore: Option<Vec<RuleSelector>>,
-    extend_safe_fixes: Option<Vec<RuleSelector>>,
-    extend_unsafe_fixes: Option<Vec<RuleSelector>>,
+    fixable: Option<Vec<UnresolvedRuleSelector>>,
+    ignore: Option<Vec<UnresolvedRuleSelector>>,
+    extend_safe_fixes: Option<Vec<UnresolvedRuleSelector>>,
+    extend_unsafe_fixes: Option<Vec<UnresolvedRuleSelector>>,
     ignore_init_module_imports: Option<bool>,
     logger_objects: Option<Vec<String>>,
-    select: Option<Vec<RuleSelector>>,
+    select: Option<Vec<UnresolvedRuleSelector>>,
     explicit_preview_rules: Option<bool>,
     task_tags: Option<Vec<String>>,
     typing_modules: Option<Vec<String>>,
-    unfixable: Option<Vec<RuleSelector>>,
+    unfixable: Option<Vec<UnresolvedRuleSelector>>,
     flake8_annotations: Option<Flake8AnnotationsOptions>,
     flake8_bandit: Option<Flake8BanditOptions>,
     flake8_boolean_trap: Option<Flake8BooleanTrapOptions>,
@@ -3982,8 +4459,8 @@ pub struct LintOptionsWire {
     pyflakes: Option<PyflakesOptions>,
     pylint: Option<PylintOptions>,
     pyupgrade: Option<PyUpgradeOptions>,
-    per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
-    extend_per_file_ignores: Option<FxHashMap<String, Vec<RuleSelector>>>,
+    per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,
+    extend_per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,
 
     exclude: Option<Vec<String>>,
     pydoclint: Option<PydoclintOptions>,
@@ -4110,8 +4587,11 @@ impl From<LintOptionsWire> for LintOptions {
 
 #[cfg(test)]
 mod tests {
-    use crate::options::Flake8SelfOptions;
+    use crate::options::{Flake8SelfOptions, Flake8TidyImportsOptions};
     use ruff_linter::rules::flake8_self;
+    use ruff_linter::rules::flake8_tidy_imports::settings::{
+        AllImports, ImportSelection, ImportSelector, ImportSelectorSettings,
+    };
     use ruff_python_ast::name::Name;
 
     #[test]
@@ -4158,6 +4638,65 @@ mod tests {
         assert_eq!(
             settings.ignore_names,
             vec![Name::new_static("_foo"), Name::new_static("_bar")]
+        );
+    }
+
+    #[test]
+    fn flake8_tidy_imports_options_allow_disjoint_lazy_import_selectors() {
+        let settings = Flake8TidyImportsOptions {
+            require_lazy: Some(ImportSelector::Settings(ImportSelectorSettings {
+                include: ImportSelection::All(AllImports::All),
+                exclude: vec!["sitecustomize".to_string()],
+            })),
+            ban_lazy: Some(ImportSelector::Selection(ImportSelection::Imports(vec![
+                "sitecustomize".to_string(),
+            ]))),
+            ..Default::default()
+        }
+        .try_into_settings()
+        .unwrap();
+
+        assert!(settings.require_lazy.includes_all());
+        assert!(settings.ban_lazy.exclude().is_empty());
+    }
+
+    #[test]
+    fn flake8_tidy_imports_options_reject_overlapping_lazy_import_selectors() {
+        let error = Flake8TidyImportsOptions {
+            require_lazy: Some(ImportSelector::Selection(ImportSelection::All(
+                AllImports::All,
+            ))),
+            ban_lazy: Some(ImportSelector::Selection(ImportSelection::Imports(vec![
+                "typing".to_string(),
+            ]))),
+            ..Default::default()
+        }
+        .try_into_settings()
+        .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "`require-lazy` and `ban-lazy` must not overlap after applying exclusions"
+        );
+    }
+
+    #[test]
+    fn flake8_tidy_imports_options_reject_all_on_both_sides() {
+        let error = Flake8TidyImportsOptions {
+            require_lazy: Some(ImportSelector::Selection(ImportSelection::All(
+                AllImports::All,
+            ))),
+            ban_lazy: Some(ImportSelector::Selection(ImportSelection::All(
+                AllImports::All,
+            ))),
+            ..Default::default()
+        }
+        .try_into_settings()
+        .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "`require-lazy` and `ban-lazy` must not overlap after applying exclusions"
         );
     }
 }

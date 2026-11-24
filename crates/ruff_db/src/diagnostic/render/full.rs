@@ -1,35 +1,35 @@
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 
-use similar::{ChangeTag, TextDiff};
+use similar::{ChangeTag, DiffOp, TextDiff};
 
-use ruff_annotate_snippets::Renderer as AnnotateRenderer;
+use annotate_snippets::{
+    Group as AnnotateGroup, Level as AnnotateLevel, Renderer as AnnotateRenderer,
+};
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::diagnostic::render::{FileResolver, Resolved};
+use crate::diagnostic::render::{FileResolver, Renderer, Resolved};
 use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
 use crate::diagnostic::{Diagnostic, DiagnosticSource, DisplayDiagnosticConfig};
 
-pub(super) struct FullRenderer<'a> {
+pub struct FullRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> FullRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+    pub fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
         Self { resolver, config }
     }
+}
 
-    pub(super) fn render(
-        &self,
-        f: &mut std::fmt::Formatter,
-        diagnostics: &[Diagnostic],
-    ) -> std::fmt::Result {
+impl Renderer for FullRenderer<'_> {
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         let stylesheet = if self.config.color {
-            DiagnosticStylesheet::styled()
+            DiagnosticStylesheet::styled().hyperlinks(self.config.hyperlinks)
         } else {
             DiagnosticStylesheet::plain()
         };
@@ -39,7 +39,8 @@ impl<'a> FullRenderer<'a> {
         } else {
             AnnotateRenderer::plain()
         }
-        .cut_indicator("…");
+        .cut_indicator("…")
+        .anonymized_line_numbers(self.config.anonymized_line_numbers);
 
         renderer = renderer
             .error(stylesheet.error)
@@ -47,7 +48,7 @@ impl<'a> FullRenderer<'a> {
             .info(stylesheet.info)
             .note(stylesheet.note)
             .help(stylesheet.help)
-            .line_no(stylesheet.line_no)
+            .line_num(stylesheet.line_no)
             .emphasis(stylesheet.emphasis)
             .none(stylesheet.none)
             .hyperlink(stylesheet.hyperlink);
@@ -58,16 +59,17 @@ impl<'a> FullRenderer<'a> {
             }
 
             let resolved = Resolved::new(self.resolver, diag, self.config);
-            let renderable = resolved.to_renderable(self.config.context);
+            let renderable = resolved.to_renderable(self.config);
             for diag in renderable.diagnostics.iter() {
-                writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
+                writeln!(f, "{}", renderer.render(&[diag.to_annotate()]))?;
             }
 
-            if self.config.show_fix_diff
-                && diag.has_applicable_fix(self.config)
-                && let Some(diff) = Diff::from_diagnostic(diag, &stylesheet, self.resolver)
+            if let Some(diff) = Diff::from_diagnostic(diag, &stylesheet, self.resolver, self.config)
             {
                 write!(f, "{diff}")?;
+                if let Some(applicability) = to_applicability_annotate(diff.fix) {
+                    writeln!(f, "{}", renderer.render(&[applicability]))?;
+                }
             }
 
             writeln!(f)?;
@@ -76,6 +78,8 @@ impl<'a> FullRenderer<'a> {
         Ok(())
     }
 }
+
+const FIX_CONTEXT: usize = 1;
 
 /// Renders a diff that shows the code fixes.
 ///
@@ -90,6 +94,7 @@ struct Diff<'a> {
     diagnostic_source: DiagnosticSource,
     notebook_index: Option<NotebookIndex>,
     stylesheet: &'a DiagnosticStylesheet,
+    merge_window: usize,
 }
 
 impl<'a> Diff<'a> {
@@ -97,6 +102,7 @@ impl<'a> Diff<'a> {
         diagnostic: &'a Diagnostic,
         stylesheet: &'a DiagnosticStylesheet,
         resolver: &'a dyn FileResolver,
+        config: &DisplayDiagnosticConfig,
     ) -> Option<Diff<'a>> {
         let file = &diagnostic.primary_span_ref()?.file;
         Some(Diff {
@@ -104,76 +110,104 @@ impl<'a> Diff<'a> {
             diagnostic_source: file.diagnostic_source(resolver),
             notebook_index: resolver.notebook_index(file),
             stylesheet,
+            merge_window: config.merge_window,
         })
     }
-}
 
-impl std::fmt::Display for Diff<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn write(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let source_code = self.diagnostic_source.as_source_code();
         let source_text = source_code.text();
 
-        // Partition the source code into end offsets for each cell. If `self.notebook_index` is
-        // `None`, indicating a regular script file, all the lines will be in one "cell" under the
-        // `None` key.
-        let cells = if let Some(notebook_index) = &self.notebook_index {
-            let mut last_cell_index = OneIndexed::MIN;
-            let mut cells: Vec<(Option<OneIndexed>, TextSize)> = Vec::new();
-            for cell in notebook_index.iter() {
-                if cell.cell_index() != last_cell_index {
-                    let offset = source_code.line_start(cell.start_row());
-                    cells.push((Some(last_cell_index), offset));
-                    last_cell_index = cell.cell_index();
-                }
-            }
-            cells.push((Some(last_cell_index), source_text.text_len()));
-            cells
-        } else {
-            vec![(None, source_text.text_len())]
-        };
+        let cell_ranges = self.cell_ranges();
 
-        let mut last_end = TextSize::ZERO;
-        for (cell, offset) in cells {
-            let range = TextRange::new(last_end, offset);
-            last_end = offset;
+        for (cell_index, range) in cell_ranges {
+            // For non-notebooks, construct and diff only the source surrounding the edits.
+            let (range, line_offset) = if cell_index.is_none()
+                && let Some(first) = self.fix.edits().first()
+                && let Some(last) = self.fix.edits().last()
+            {
+                let start_line = source_code
+                    .line_index(first.start())
+                    .saturating_sub(DIFF_CONTEXT_WINDOW);
+                let last_source_line = source_code.line_index(source_text.text_len());
+                let end_line = source_code
+                    .line_index(last.end())
+                    .saturating_add(DIFF_CONTEXT_WINDOW)
+                    .min(last_source_line);
+
+                (
+                    TextRange::new(
+                        source_code.line_start(start_line),
+                        source_code.line_end(end_line),
+                    ),
+                    start_line.to_zero_indexed(),
+                )
+            } else {
+                (range, 0)
+            };
+
+            let edits = self
+                .fix
+                .edits()
+                .iter()
+                .filter(|edit| range.contains_range(edit.range()))
+                .collect::<Vec<_>>();
+            // No edits were applied, so there's no need to diff.
+            if edits.is_empty() {
+                continue;
+            }
+
             let input = source_code.slice(range);
 
             let mut output = String::with_capacity(input.len());
             let mut last_end = range.start();
 
-            let mut applied = 0;
-            for edit in self.fix.edits() {
-                if range.contains_range(edit.range()) {
-                    output.push_str(source_code.slice(TextRange::new(last_end, edit.start())));
-                    output.push_str(edit.content().unwrap_or_default());
-                    last_end = edit.end();
-                    applied += 1;
-                }
-            }
-
-            // No edits were applied, so there's no need to diff.
-            if applied == 0 {
-                continue;
+            for edit in edits {
+                output.push_str(source_code.slice(TextRange::new(last_end, edit.start())));
+                output.push_str(edit.content().unwrap_or_default());
+                last_end = edit.end();
             }
 
             output.push_str(&source_text[usize::from(last_end)..usize::from(range.end())]);
 
             let diff = TextDiff::from_lines(input, &output);
 
-            let grouped_ops = diff.grouped_ops(3);
+            let mut grouped_ops: Vec<Vec<DiffOp>> = Vec::new();
+            for group in diff.grouped_ops(FIX_CONTEXT) {
+                if let Some(previous) = grouped_ops.last_mut()
+                    && let Some(DiffOp::Equal { new_index, len, .. }) = previous.last_mut()
+                    && let [
+                        DiffOp::Equal {
+                            new_index: next_new_index,
+                            len: next_len,
+                            ..
+                        },
+                        rest @ ..,
+                    ] = group.as_slice()
+                    && next_new_index.saturating_sub(*new_index + *len) <= self.merge_window
+                {
+                    // Restore the unchanged lines that `grouped_ops` omitted between the groups.
+                    *len = next_new_index + next_len - *new_index;
+                    previous.extend_from_slice(rest);
+                } else {
+                    grouped_ops.push(group);
+                }
+            }
 
             // Find the new line number with the largest number of digits to align all of the line
             // number separators.
             let last_op = grouped_ops.last().and_then(|group| group.last());
-            let largest_new = last_op.map(|op| op.new_range().end).unwrap_or_default();
+            let largest_new = last_op.map_or_default(|op| op.new_range().end + line_offset);
 
             let digit_with = OneIndexed::new(largest_new).unwrap_or_default().digits();
 
-            if let Some(cell) = cell {
+            if let Some(cell_index) = cell_index {
                 // Room for 1 digit, 1 space, 1 `|`, and 1 more following space. This centers the
                 // three colons on the pipe.
-                writeln!(f, "{:>1$} cell {cell}", ":::", digit_with.get() + 3)?;
+                writeln!(f, "{:>1$} cell {cell_index}", ":::", digit_with.get() + 3)?;
             }
+
+            self.write_gutter(f, digit_with)?;
 
             for (idx, group) in grouped_ops.iter().enumerate() {
                 if idx > 0 {
@@ -203,18 +237,26 @@ impl std::fmt::Display for Diff<'_> {
                         };
 
                         let line = Line {
-                            index: index.map(OneIndexed::from_zero_indexed),
+                            index: index.map(|i| {
+                                OneIndexed::from_zero_indexed(i).saturating_add(line_offset)
+                            }),
                             width: digit_with,
                         };
 
                         write!(
                             f,
-                            "{line} {sign} ",
+                            "{line} {sign}",
                             line = fmt_styled(line, self.stylesheet.line_no),
                             sign = fmt_styled(sign, line_no_style),
                         )?;
 
+                        let mut needs_separator = true;
                         for (emphasized, value) in change.iter_strings_lossy() {
+                            if needs_separator && !value.trim_end_matches(['\n', '\r']).is_empty() {
+                                f.write_str(" ")?;
+                                needs_separator = false;
+                            }
+
                             let value = show_nonprinting(&value);
                             let styled = fmt_styled(value, style);
                             if emphasized {
@@ -229,37 +271,59 @@ impl std::fmt::Display for Diff<'_> {
                     }
                 }
             }
-        }
 
-        match self.fix.applicability() {
-            Applicability::Safe => {}
-            Applicability::Unsafe => {
-                writeln!(
-                    f,
-                    "{note}: {msg}",
-                    note = fmt_styled("note", self.stylesheet.warning),
-                    msg = fmt_styled(
-                        "This is an unsafe fix and may change runtime behavior",
-                        self.stylesheet.emphasis
-                    )
-                )?;
-            }
-            Applicability::DisplayOnly => {
-                // Note that this is still only used in tests. There's no `--display-only-fixes`
-                // analog to `--unsafe-fixes` for users to activate this or see the styling.
-                writeln!(
-                    f,
-                    "{note}: {msg}",
-                    note = fmt_styled("note", self.stylesheet.error),
-                    msg = fmt_styled(
-                        "This is a display-only fix and is likely to be incorrect",
-                        self.stylesheet.emphasis
-                    )
-                )?;
-            }
+            self.write_gutter(f, digit_with)?;
         }
 
         Ok(())
+    }
+
+    fn cell_ranges(&self) -> Vec<(Option<usize>, TextRange)> {
+        let source_code = self.diagnostic_source.as_source_code();
+        let source_text = source_code.text();
+
+        let mut last_end = TextSize::ZERO;
+        let Some(notebook_index) = self.notebook_index.as_ref() else {
+            // a regular script file, all the lines will be in one "cell" under the `None` key
+            let offset = source_text.text_len();
+            let range = TextRange::new(last_end, offset);
+            return vec![(None, range)];
+        };
+
+        // Partition the source code into end offsets for each cell.
+        let mut last_cell_index = OneIndexed::MIN;
+        let mut cells: Vec<(Option<usize>, TextRange)> = Vec::new();
+        for cell in notebook_index.iter() {
+            if cell.cell_index() != last_cell_index {
+                let offset = source_code.line_start(cell.start_row());
+                let range = TextRange::new(last_end, offset);
+                cells.push((Some(last_cell_index.get()), range));
+                last_end = offset;
+                last_cell_index = cell.cell_index();
+            }
+        }
+        let offset = source_text.text_len();
+        let range = TextRange::new(last_end, offset);
+        cells.push((Some(last_cell_index.get()), range));
+        cells
+    }
+
+    fn write_gutter(&self, f: &mut std::fmt::Formatter, width: NonZeroUsize) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{line} {separator}",
+            line = fmt_styled(Line { index: None, width }, self.stylesheet.line_no),
+            separator = fmt_styled("|", self.stylesheet.line_no),
+        )
+    }
+}
+
+/// Limit diffs to a narrow range around each fix rather than diffing the whole file.
+const DIFF_CONTEXT_WINDOW: usize = 3;
+
+impl std::fmt::Display for Diff<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.write(f)
     }
 }
 
@@ -283,16 +347,79 @@ impl std::fmt::Display for Line {
 }
 
 fn show_nonprinting(s: &str) -> Cow<'_, str> {
-    if s.find(['\x07', '\x08', '\x1b', '\x7f']).is_some() {
-        Cow::Owned(
-            s.replace('\x07', "␇")
-                .replace('\x08', "␈")
-                .replace('\x1b', "␛")
-                .replace('\x7f', "␡"),
-        )
-    } else {
-        Cow::Borrowed(s)
+    // The diff includes its line ending in the text to display.
+    let content = s.trim_end_matches(['\r', '\n']);
+
+    // Accumulate the comparisons without an early exit so LLVM can vectorize the scan.
+    // The Unicode characters below start with 0xE2 or 0xEF in UTF-8. Other lead bytes
+    // in that range are harmless false positives.
+    let mut may_need_replacement = false;
+    for byte in content.bytes() {
+        let control = byte.is_ascii_control() && byte != b'\t';
+        may_need_replacement |= control | (0xe2..=0xef).contains(&byte);
     }
+    if !may_need_replacement {
+        return Cow::Borrowed(s);
+    }
+
+    let mut output = String::with_capacity(s.len());
+    for ch in content.chars() {
+        let visible = match ch {
+            '\0' => '␀',
+            '\x01' => '␁',
+            '\x02' => '␂',
+            '\x03' => '␃',
+            '\x04' => '␄',
+            '\x05' => '␅',
+            '\x06' => '␆',
+            '\x07' => '␇',
+            '\x08' => '␈',
+            '\x0b' => '␋',
+            '\x0c' => '␌',
+            '\r' => '␍',
+            '\x0e' => '␎',
+            '\x0f' => '␏',
+            '\x10' => '␐',
+            '\x11' => '␑',
+            '\x12' => '␒',
+            '\x13' => '␓',
+            '\x14' => '␔',
+            '\x15' => '␕',
+            '\x16' => '␖',
+            '\x17' => '␗',
+            '\x18' => '␘',
+            '\x19' => '␙',
+            '\x1a' => '␚',
+            '\x1b' => '␛',
+            '\x1c' => '␜',
+            '\x1d' => '␝',
+            '\x1e' => '␞',
+            '\x1f' => '␟',
+            '\x7f' => '␡',
+            '\u{200d}' => continue,
+            '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}' | '\u{feff}' => '�',
+            _ => ch,
+        };
+        output.push(visible);
+    }
+    output.push_str(&s[content.len()..]);
+    Cow::Owned(output)
+}
+
+fn to_applicability_annotate(fix: &Fix) -> Option<AnnotateGroup<'static>> {
+    let (level, message) = match fix.applicability() {
+        Applicability::Safe => return None,
+        Applicability::Unsafe => (
+            AnnotateLevel::WARNING.with_name("note"),
+            "This is an unsafe fix and may change runtime behavior",
+        ),
+        Applicability::DisplayOnly => (
+            AnnotateLevel::WARNING.with_name("note"),
+            "This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically",
+        ),
+    };
+
+    Some(AnnotateGroup::with_title(level.primary_title(message)))
 }
 
 #[cfg(test)]
@@ -301,26 +428,38 @@ mod tests {
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::diagnostic::{
-        Annotation, DiagnosticFormat, Severity,
+        Annotation, Severity,
         render::tests::{
-            NOTEBOOK, TestEnvironment, create_diagnostics, create_notebook_diagnostics,
-            create_syntax_error_diagnostics,
+            DiagnosticFormat, NOTEBOOK, TestEnvironment, create_diagnostics,
+            create_notebook_diagnostics, create_syntax_error_diagnostics,
         },
     };
+
+    #[test]
+    fn nonprinting_diff_characters() {
+        assert_eq!(
+            super::show_nonprinting("→\u{200d}\u{202e}a\r\u{2069}\t\u{feff}！\r\n"),
+            "→�a␍�\t�！\r\n"
+        );
+    }
 
     #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Full);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r#"
-        error[unused-import]: `os` imported but unused
+        error[F401]: `os` imported but unused
          --> fib.py:1:8
           |
         1 | import os
           |        ^^
-          |
         help: Remove unused import: `os`
+          |
+          - import os
+        1 |
+          |
+        note: This is an unsafe fix and may change runtime behavior
 
-        error[unused-variable]: Local variable `x` is assigned to but never used
+        error[F841]: Local variable `x` is assigned to but never used
          --> fib.py:6:5
           |
         4 | def fibonacci(n):
@@ -331,12 +470,36 @@ mod tests {
         8 |         return 0
           |
         help: Remove assignment to unused variable `x`
+          |
+        5 |     """Compute the nth number in the Fibonacci sequence."""
+          -     x = 1
+        6 +     
+        7 |     if n == 0:
+          |
+        note: This is an unsafe fix and may change runtime behavior
 
-        error[undefined-name]: Undefined name `a`
+        error[F821]: Undefined name `a`
          --> undef.py:1:4
           |
         1 | if a == 1: pass
           |    ^
+
+        error[F821]: Undefined name `fibonaccii`
+          --> fib.py:12:16
+           |
+        10 |         return 1
+        11 |     else:
+        12 |         return fibonaccii(n - 1) + fibonacci(n - 2)
+           |                ^^^^^^^^^^          -
+        info: Did you mean to import it from `/some/path/def.py`?
+         --> fib.py:4:5
+          |
+        4 | def fibonacci(n):
+          |     ^^^^^^^^^ `fibonacci` is defined here
+        5 |     """Compute the nth number in the Fibonacci sequence."""
+          |     ------------------------------------------------------- `fibonacci` is documented here
+        6 |     x = 1
+        7 |     if n == 0:
           |
         "#);
     }
@@ -380,8 +543,12 @@ mod tests {
           |
         1 | import os
           |        ^^
-          |
         help: Remove unused import: `os`
+          |
+          - import os
+        1 |
+          |
+        note: This is an unsafe fix and may change runtime behavior
 
         F841 [*] Local variable `x` is assigned to but never used
          --> fib.py:6:5
@@ -394,12 +561,36 @@ mod tests {
         8 |         return 0
           |
         help: Remove assignment to unused variable `x`
+          |
+        5 |     """Compute the nth number in the Fibonacci sequence."""
+          -     x = 1
+        6 +     
+        7 |     if n == 0:
+          |
+        note: This is an unsafe fix and may change runtime behavior
 
         F821 Undefined name `a`
          --> undef.py:1:4
           |
         1 | if a == 1: pass
           |    ^
+
+        F821 Undefined name `fibonaccii`
+          --> fib.py:12:16
+           |
+        10 |         return 1
+        11 |     else:
+        12 |         return fibonaccii(n - 1) + fibonacci(n - 2)
+           |                ^^^^^^^^^^          -
+        info: Did you mean to import it from `/some/path/def.py`?
+         --> fib.py:4:5
+          |
+        4 | def fibonacci(n):
+          |     ^^^^^^^^^ `fibonacci` is defined here
+        5 |     """Compute the nth number in the Fibonacci sequence."""
+          |     ------------------------------------------------------- `fibonacci` is documented here
+        6 |     x = 1
+        7 |     if n == 0:
           |
         "#);
     }
@@ -475,7 +666,6 @@ print()
         2 | if False:
         3 | print()
           | ^
-          |
         ");
     }
 
@@ -513,9 +703,8 @@ print()
         error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1a" instead
          --> example.py:1:25
           |
-        1 | nested_fstrings = f'␈{f'{f'␛'}'}'
+        1 | nested_fstrings = f'␈{f'␚{f'␛'}'}'
           |                         ^
-          |
         "#);
     }
 
@@ -538,9 +727,8 @@ print()
         error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1a" instead
          --> example.py:1:2
           |
-        1 | ␈␛
+        1 | ␈␚␛
           |  ^
-          |
         "#);
 
         Ok(())
@@ -563,7 +751,6 @@ print()
         1 | def foo():
         2 |     return 1
           |     ^^^^^^^^
-          |
         ");
     }
 
@@ -592,17 +779,21 @@ print()
     fn notebook_output() {
         let (mut env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
         env.show_fix_status(true);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
-        error[unused-import][*]: `os` imported but unused
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
+        error[F401][*]: `os` imported but unused
          --> notebook.ipynb:cell 1:2:8
           |
         1 | # cell 1
         2 | import os
           |        ^^
-          |
         help: Remove unused import: `os`
+         ::: cell 1
+          |
+        1 | # cell 1
+          - import os
+          |
 
-        error[unused-import][*]: `math` imported but unused
+        error[F401][*]: `math` imported but unused
          --> notebook.ipynb:cell 2:2:8
           |
         1 | # cell 2
@@ -612,16 +803,28 @@ print()
         4 | print('hello world')
           |
         help: Remove unused import: `math`
+         ::: cell 2
+          |
+        1 | # cell 2
+          - import math
+        2 |
+          |
 
-        error[unused-variable]: Local variable `x` is assigned to but never used
+        error[F841]: Local variable `x` is assigned to but never used
          --> notebook.ipynb:cell 3:4:5
           |
         2 | def foo():
         3 |     print()
         4 |     x = 1
           |     ^
-          |
         help: Remove assignment to unused variable `x`
+         ::: cell 3
+          |
+        3 |     print()
+          -     x = 1
+        4 |
+          |
+        note: This is an unsafe fix and may change runtime behavior
         ");
     }
 
@@ -683,7 +886,6 @@ print()
         3 |     print()
         4 |     x = 1
           |     - second cell
-          |
         help: Remove unused import: `os`
 
         error[test-diagnostic]: main diagnostic message
@@ -695,7 +897,6 @@ print()
         3 |
         4 | print('hello world')
           | ----- print statement
-          |
         help: Remove `print` statement
         ");
     }
@@ -704,7 +905,6 @@ print()
     #[test]
     fn notebook_output_with_diff() {
         let (mut env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
-        env.show_fix_diff(true);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
 
@@ -714,7 +914,6 @@ print()
     #[test]
     fn notebook_output_with_diff_spanning_cells() {
         let (mut env, mut diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
-        env.show_fix_diff(true);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
 
@@ -782,7 +981,6 @@ print()
           |
         1 | import foo
           | ^
-          |
         ");
     }
 
@@ -803,7 +1001,28 @@ print()
           |
         1 | import foo
           | ^
+        ");
+    }
+
+    #[test]
+    fn bom_with_full_file_range() {
+        let mut env = TestEnvironment::new();
+        let contents = "\u{feff}import foo";
+        env.add("example.py", contents);
+        env.format(DiagnosticFormat::Full);
+
+        let mut diagnostic = env.err().build();
+        let span = env
+            .path("example.py")
+            .with_range(TextRange::up_to(contents.text_len()));
+        diagnostic.annotate(Annotation::primary(span));
+
+        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        error[test-diagnostic]: main diagnostic message
+         --> example.py:1:1
           |
+        1 | import foo
+          | ^^^^^^^^^^
         ");
     }
 
@@ -826,11 +1045,10 @@ print()
 
         insta::assert_snapshot!(env.render(&diagnostic), @r"
         error[test-diagnostic]: main diagnostic message
-         --> example.py:2:1
+         --> example.py:1:16
           |
         1 | unexpected eof
           |               ^
-          |
         ");
     }
 
@@ -867,7 +1085,6 @@ line 10
         ";
         env.add("example.py", contents);
         env.format(DiagnosticFormat::Full);
-        env.show_fix_diff(true);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
 
@@ -881,7 +1098,7 @@ line 10
             range,
         )));
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        insta::assert_snapshot!(env.render(&diagnostic), @"
         error[test-diagnostic][*]: main diagnostic message
          --> example.py:3:1
           |
@@ -893,15 +1110,77 @@ line 10
         5 | line 5
           |
         help: Start of diff:
+          |
+        6 | line 6
+          - line 7
+        7 + fixed line 7
+        8 | line 8
+          |
+        note: This is an unsafe fix and may change runtime behavior
+        ");
+    }
+
+    #[test]
+    fn nearby_fix_edits_share_diff_frame() {
+        let mut env = TestEnvironment::new();
+        let contents = "\
+line 1
+line 2
+line 3
+line 4
+line 5
+line 6
+line 7
+line 8
+line 9
+line 10
+line 11
+line 12
+line 13
+";
+        env.add("example.py", contents);
+        env.format(DiagnosticFormat::Full);
+        env.context(0);
+        env.merge_window(2);
+
+        let replacement = |target: &str| {
+            let start = contents.find(target).unwrap();
+            Edit::range_replacement(
+                format!("fixed {target}"),
+                TextRange::at(TextSize::try_from(start).unwrap(), target.text_len()),
+            )
+        };
+
+        let mut diagnostic = env.err().primary("example.py", "2", "2", "").build();
+        diagnostic.help("Replace three lines");
+        diagnostic.set_fix(Fix::safe_edits(
+            replacement("line 2"),
+            [replacement("line 7"), replacement("line 13")],
+        ));
+
+        insta::assert_snapshot!(env.render(&diagnostic), @"
+        error[test-diagnostic]: main diagnostic message
+         --> example.py:2:1
+          |
+        2 | line 2
+          | ^^^^^^
+        help: Replace three lines
+           |
+        1  | line 1
+           - line 2
+        2  + fixed line 2
+        3  | line 3
         4  | line 4
         5  | line 5
         6  | line 6
            - line 7
         7  + fixed line 7
         8  | line 8
-        9  | line 9
-        10 | line 10
-        note: This is an unsafe fix and may change runtime behavior
+        --------------------------------------------------------------------------------
+        12 | line 12
+           - line 13
+        13 + fixed line 13
+           |
         ");
     }
 }

@@ -326,19 +326,19 @@ Module(
                                                         ExprCompare {
                                                             node_index: NodeIndex(None),
                                                             range: 79..83,
-                                                            left: NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 79..80,
-                                                                    value: Int(
-                                                                        3,
-                                                                    ),
-                                                                },
-                                                            ),
                                                             ops: [
                                                                 NotEq,
                                                             ],
-                                                            comparators: [
+                                                            operands: [
+                                                                NumberLiteral(
+                                                                    ExprNumberLiteral {
+                                                                        node_index: NodeIndex(None),
+                                                                        range: 79..80,
+                                                                        value: Int(
+                                                                            3,
+                                                                        ),
+                                                                    },
+                                                                ),
                                                                 NumberLiteral(
                                                                     ExprNumberLiteral {
                                                                         node_index: NodeIndex(None),
@@ -585,6 +585,7 @@ Module(
                                                     debug_text: Some(
                                                         DebugText {
                                                             leading: "  ",
+                                                            expression: "foo",
                                                             trailing: " =  ",
                                                         },
                                                     ),
@@ -635,6 +636,7 @@ Module(
                                                     debug_text: Some(
                                                         DebugText {
                                                             leading: "  ",
+                                                            expression: "foo",
                                                             trailing: " =  ",
                                                         },
                                                     ),
@@ -699,6 +701,7 @@ Module(
                                                     debug_text: Some(
                                                         DebugText {
                                                             leading: "  ",
+                                                            expression: "foo",
                                                             trailing: " =  ",
                                                         },
                                                     ),
@@ -769,6 +772,7 @@ Module(
                                                     debug_text: Some(
                                                         DebugText {
                                                             leading: "  ",
+                                                            expression: "1, 2",
                                                             trailing: "  =  ",
                                                         },
                                                     ),
@@ -834,6 +838,7 @@ Module(
                                                                                     debug_text: Some(
                                                                                         DebugText {
                                                                                             leading: "",
+                                                                                            expression: "3.1415",
                                                                                             trailing: "=",
                                                                                         },
                                                                                     ),
@@ -1360,6 +1365,7 @@ Module(
                                                     debug_text: Some(
                                                         DebugText {
                                                             leading: " (  ",
+                                                            expression: "foo",
                                                             trailing: " )  = ",
                                                         },
                                                     ),
@@ -1895,6 +1901,7 @@ Module(
                                                     debug_text: Some(
                                                         DebugText {
                                                             leading: "",
+                                                            expression: "x",
                                                             trailing: " =",
                                                         },
                                                     ),
@@ -1945,6 +1952,7 @@ Module(
                                                     debug_text: Some(
                                                         DebugText {
                                                             leading: "    ",
+                                                            expression: "x",
                                                             trailing: " = ",
                                                         },
                                                     ),
@@ -1995,6 +2003,7 @@ Module(
                                                     debug_text: Some(
                                                         DebugText {
                                                             leading: "",
+                                                            expression: "x",
                                                             trailing: "=",
                                                         },
                                                     ),
@@ -2104,6 +2113,7 @@ Module(
                                                     debug_text: Some(
                                                         DebugText {
                                                             leading: "",
+                                                            expression: "x",
                                                             trailing: " = ",
                                                         },
                                                     ),
@@ -2709,68 +2719,66 @@ Module(
                                                             range: 847..861,
                                                             value: FStringValue {
                                                                 inner: Single(
-                                                                    FString(
-                                                                        FString {
-                                                                            range: 847..861,
-                                                                            node_index: NodeIndex(None),
-                                                                            elements: [
-                                                                                Interpolation(
-                                                                                    InterpolatedElement {
-                                                                                        range: 849..860,
-                                                                                        node_index: NodeIndex(None),
-                                                                                        expression: TString(
-                                                                                            ExprTString {
-                                                                                                node_index: NodeIndex(None),
-                                                                                                range: 850..859,
-                                                                                                value: TStringValue {
-                                                                                                    inner: Single(
-                                                                                                        TString {
-                                                                                                            range: 850..859,
-                                                                                                            node_index: NodeIndex(None),
-                                                                                                            elements: [
-                                                                                                                Interpolation(
-                                                                                                                    InterpolatedElement {
-                                                                                                                        range: 852..858,
-                                                                                                                        node_index: NodeIndex(None),
-                                                                                                                        expression: Name(
-                                                                                                                            ExprName {
-                                                                                                                                node_index: NodeIndex(None),
-                                                                                                                                range: 853..857,
-                                                                                                                                id: Name("this"),
-                                                                                                                                ctx: Load,
-                                                                                                                            },
-                                                                                                                        ),
-                                                                                                                        debug_text: None,
-                                                                                                                        conversion: None,
-                                                                                                                        format_spec: None,
-                                                                                                                    },
-                                                                                                                ),
-                                                                                                            ],
-                                                                                                            flags: TStringFlags {
-                                                                                                                quote_style: Double,
-                                                                                                                prefix: Regular,
-                                                                                                                triple_quoted: false,
-                                                                                                                unclosed: false,
-                                                                                                            },
+                                                                    FString {
+                                                                        range: 847..861,
+                                                                        node_index: NodeIndex(None),
+                                                                        elements: [
+                                                                            Interpolation(
+                                                                                InterpolatedElement {
+                                                                                    range: 849..860,
+                                                                                    node_index: NodeIndex(None),
+                                                                                    expression: TString(
+                                                                                        ExprTString {
+                                                                                            node_index: NodeIndex(None),
+                                                                                            range: 850..859,
+                                                                                            value: TStringValue {
+                                                                                                inner: Single(
+                                                                                                    TString {
+                                                                                                        range: 850..859,
+                                                                                                        node_index: NodeIndex(None),
+                                                                                                        elements: [
+                                                                                                            Interpolation(
+                                                                                                                InterpolatedElement {
+                                                                                                                    range: 852..858,
+                                                                                                                    node_index: NodeIndex(None),
+                                                                                                                    expression: Name(
+                                                                                                                        ExprName {
+                                                                                                                            node_index: NodeIndex(None),
+                                                                                                                            range: 853..857,
+                                                                                                                            id: Name("this"),
+                                                                                                                            ctx: Load,
+                                                                                                                        },
+                                                                                                                    ),
+                                                                                                                    debug_text: None,
+                                                                                                                    conversion: None,
+                                                                                                                    format_spec: None,
+                                                                                                                },
+                                                                                                            ),
+                                                                                                        ],
+                                                                                                        flags: TStringFlags {
+                                                                                                            quote_style: Double,
+                                                                                                            prefix: Regular,
+                                                                                                            triple_quoted: false,
+                                                                                                            unclosed: false,
                                                                                                         },
-                                                                                                    ),
-                                                                                                },
+                                                                                                    },
+                                                                                                ),
                                                                                             },
-                                                                                        ),
-                                                                                        debug_text: None,
-                                                                                        conversion: None,
-                                                                                        format_spec: None,
-                                                                                    },
-                                                                                ),
-                                                                            ],
-                                                                            flags: FStringFlags {
-                                                                                quote_style: Double,
-                                                                                prefix: Regular,
-                                                                                triple_quoted: false,
-                                                                                unclosed: false,
-                                                                            },
+                                                                                        },
+                                                                                    ),
+                                                                                    debug_text: None,
+                                                                                    conversion: None,
+                                                                                    format_spec: None,
+                                                                                },
+                                                                            ),
+                                                                        ],
+                                                                        flags: FStringFlags {
+                                                                            quote_style: Double,
+                                                                            prefix: Regular,
+                                                                            triple_quoted: false,
+                                                                            unclosed: false,
                                                                         },
-                                                                    ),
+                                                                    },
                                                                 ),
                                                             },
                                                         },

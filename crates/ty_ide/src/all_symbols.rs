@@ -1,7 +1,9 @@
+use compact_str::CompactString;
+use rayon::prelude::*;
 use ruff_db::files::File;
-use ruff_python_ast::name::Name;
-use ty_module_resolver::{Module, ModuleName, all_modules, resolve_real_shadowable_module};
-use ty_project::Db;
+use ty_module_resolver::{Module, all_modules};
+use ty_project::{Db, parallel::ParallelIteratorExt};
+use ty_python_core::ProgramFile;
 
 use crate::{
     SymbolKind,
@@ -14,7 +16,7 @@ use crate::{
 /// by the query.
 pub fn all_symbols<'db>(
     db: &'db dyn Db,
-    importing_from: File,
+    importing_from: ProgramFile<'db>,
     query: &QueryPattern,
 ) -> Vec<AllSymbolInfo<'db>> {
     // If the query is empty, return immediately to avoid expensive file scanning
@@ -25,71 +27,60 @@ pub fn all_symbols<'db>(
     let all_symbols_span = tracing::debug_span!("all_symbols");
     let _span = all_symbols_span.enter();
 
-    let typing_extensions = ModuleName::new_static("typing_extensions").unwrap();
-    let is_typing_extensions_available = importing_from.is_stub(db)
-        || resolve_real_shadowable_module(db, importing_from, &typing_extensions).is_some();
+    let program = importing_from.program(db);
+    let resolver_environment = importing_from.resolver_environment(db);
 
-    let results = std::sync::Mutex::new(Vec::new());
-    {
-        let modules = all_modules(db);
-        let db = db.dyn_clone();
-        let all_symbols_span = &all_symbols_span;
-        let results = &results;
-        let query = &query;
+    let results = all_modules(db, resolver_environment)
+        .into_par_iter()
+        .map_with_db(db, |db, module| {
+            let name = module.name(db);
 
-        rayon::scope(move |s| {
-            // For each file, extract symbols and add them to results
-            for module in modules {
-                let db = db.dyn_clone();
-                let Some(file) = module.file(&*db) else {
-                    continue;
-                };
+            let is_non_first_party = module.search_path(db).is_none_or(|sp| !sp.is_first_party());
 
-                // By convention, modules starting with an underscore
-                // are generally considered unexported. However, we
-                // should consider first party modules fair game.
-                //
-                // Note that we apply this recursively. e.g.,
-                // `numpy._core.multiarray` is considered private
-                // because it's a child of `_core`.
-                if module.name(&*db).components().any(|c| c.starts_with('_'))
-                    && module
-                        .search_path(&*db)
-                        .is_none_or(|sp| !sp.is_first_party())
-                {
-                    continue;
-                }
-                // TODO: also make it available in `TYPE_CHECKING` blocks
-                // (we'd need https://github.com/astral-sh/ty/issues/1553 to do this well)
-                if !is_typing_extensions_available && module.name(&*db) == &typing_extensions {
-                    continue;
-                }
-                s.spawn(move |_| {
-                    let symbols_for_file_span = tracing::debug_span!(
-                        parent: all_symbols_span,
-                        "symbols_for_file_global_only",
-                        path = %file.path(&*db),
-                    );
-                    let _entered = symbols_for_file_span.entered();
-
-                    let mut symbols = vec![];
-                    if query.is_match_symbol_name(module.name(&*db)) {
-                        symbols.push(AllSymbolInfo::from_module(&*db, module, file));
-                    }
-                    for (_, symbol) in symbols_for_file_global_only(&*db, file).search(query) {
-                        symbols.push(AllSymbolInfo::from_non_module_symbol(
-                            &*db,
-                            symbol.to_owned(),
-                            module,
-                            file,
-                        ));
-                    }
-                    results.lock().unwrap().extend(symbols);
-                });
+            // Filter out non-first-party test and private modules, while retaining private
+            // typeshed packages that are useful when writing type annotations.
+            if is_non_first_party
+                && (name.is_test_module()
+                    || name.is_private() && !module.is_bundled_typing_stub(db))
+            {
+                return Vec::new();
             }
-        });
-    }
-    merge::merge(db, results.into_inner().unwrap())
+
+            let Some(file) = module.file(db) else {
+                return Vec::new();
+            };
+            let program_file = ProgramFile::new(db, file, program);
+
+            let symbols_for_file_span = tracing::debug_span!(
+                parent: &all_symbols_span,
+                "symbols_for_file_global_only",
+                path = %file.path(db),
+            );
+            let _entered = symbols_for_file_span.entered();
+
+            let mut symbols = vec![];
+            if query.is_match_symbol_name(module.name(db)) {
+                symbols.push(AllSymbolInfo::from_module(db, module, file));
+            }
+            for (_, symbol) in symbols_for_file_global_only(db, program_file).search(query) {
+                // Test functions (starting with `test_`) in third-party
+                // packages are almost never useful to import.
+                if is_non_first_party && symbol.name.starts_with("test_") {
+                    continue;
+                }
+                symbols.push(AllSymbolInfo::from_non_module_symbol(
+                    db,
+                    symbol.to_owned(),
+                    module,
+                    file,
+                ));
+            }
+            symbols
+        })
+        .flat_map_iter(|symbols| symbols)
+        .collect();
+
+    merge::merge(db, results)
 }
 
 /// A symbol found in the workspace and dependencies, including the
@@ -101,7 +92,7 @@ pub struct AllSymbolInfo<'db> {
     /// When absent, this implies the symbol is the module itself.
     symbol: Option<SymbolInfo<'static>>,
     /// The fully qualified name of this symbol.
-    qualified: Name,
+    qualified: CompactString,
     /// The module containing the symbol.
     module: Module<'db>,
     /// The file containing the symbol.
@@ -118,11 +109,11 @@ impl<'db> AllSymbolInfo<'db> {
         module: Module<'db>,
         file: File,
     ) -> AllSymbolInfo<'db> {
-        let qualified = Name::from(compact_str::format_compact!(
+        let qualified = compact_str::format_compact!(
             "{module_name}.{name}",
             module_name = module.name(db),
             name = symbol.name,
-        ));
+        );
         AllSymbolInfo {
             symbol: Some(symbol),
             qualified,
@@ -173,6 +164,11 @@ impl<'db> AllSymbolInfo<'db> {
             .unwrap_or(SymbolKind::Module)
     }
 
+    /// Returns whether this symbol has a `@deprecated` decorator.
+    pub fn deprecated(&self) -> bool {
+        self.symbol.as_ref().is_some_and(|symbol| symbol.deprecated)
+    }
+
     /// Returns the module this symbol is exported from.
     pub fn module(&self) -> Module<'db> {
         self.module
@@ -190,7 +186,7 @@ impl<'db> AllSymbolInfo<'db> {
     ///
     /// This is only available for symbols that have been imported
     /// into `Self::module()` *and* are determined to be re-exports.
-    pub(crate) fn imported_from(&self) -> Option<&ImportedFrom> {
+    fn imported_from(&self) -> Option<&ImportedFrom> {
         self.symbol
             .as_ref()
             .and_then(|symbol| symbol.imported_from.as_ref())
@@ -390,6 +386,10 @@ mod merge {
                 let origin_module_name = origin.module().name(db);
                 let top = origin_module_name.first_component();
                 let mut min_reexport_len = None;
+                #[expect(
+                    clippy::iter_over_hash_type,
+                    reason = "each re-export update is independent and the minimum is commutative"
+                )]
                 for &reexport_index in &self.all_reexports {
                     let reexport = &mut self.reexport[reexport_index];
                     // Merge the kind from the original symbol into the
@@ -411,6 +411,7 @@ mod merge {
                         (&origin.symbol, &mut reexport.symbol)
                     {
                         reexport_sym.kind = origin_sym.kind;
+                        reexport_sym.deprecated = origin_sym.deprecated;
                     }
 
                     // Now we want to find the shortest (in terms of
@@ -442,6 +443,10 @@ mod merge {
                 if origin_len > min_reexport_len {
                     self.origin_keep[origin_index] = false;
                 }
+                #[expect(
+                    clippy::iter_over_hash_type,
+                    reason = "each re-export keep flag is updated independently"
+                )]
                 for &reexport_index in &self.all_reexports {
                     let reexport = &self.reexport[reexport_index];
                     if reexport.module().name(db).components().count() > min_reexport_len {
@@ -597,14 +602,12 @@ def zqzqzq():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:27
           |
         2 | from pandas.io.api import zqzqzq
           |                           ^^^^^^
-        3 | __all__ = ['zqzqzq']
-          |
         info: Function zqzqzq
         ");
     }
@@ -643,13 +646,12 @@ def zqzqzq():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:37
           |
         2 | from pandas.io.api import zqzqzq as zqzqzq
           |                                     ^^^^^^
-          |
         info: Function zqzqzq
         ");
     }
@@ -688,15 +690,25 @@ def zqzqzq():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
-         --> pandas/__init__.py:2:5
+         --> pandas/__init__.py:2:27
           |
         2 | from pandas.io.api import *
-          |     ^^^^^^
-          |
+          |                           ^
         info: Function zqzqzq
         ");
+
+        let symbols = all_symbols(
+            &test.db,
+            test.program_file(test.cursor.file),
+            &QueryPattern::fuzzy("zqzqzq"),
+        );
+        let symbol = symbols
+            .iter()
+            .find_map(|info| info.symbol.as_ref())
+            .expect("wildcard-imported symbol");
+        assert_eq!(symbol.full_range, symbol.name_range);
     }
 
     /// This tests that when we have multiple re-exports
@@ -739,14 +751,12 @@ def zqzqzq():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/io/api.py:2:31
           |
         2 | from pandas.io.parsers import zqzqzq
           |                               ^^^^^^
-        3 | __all__ = ['zqzqzq']
-          |
         info: Function zqzqzq
 
         info[all-symbols]: AllSymbolInfo
@@ -754,8 +764,6 @@ def zqzqzq():
           |
         2 | from pandas.io.parsers.readers import zqzqzq
           |                                       ^^^^^^
-        3 | __all__ = ['zqzqzq']
-          |
         info: Function zqzqzq
         ");
     }
@@ -802,14 +810,12 @@ __all__ = ['zqzqzq']
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:5
           |
         2 | def zqzqzq():
           |     ^^^^^^
-        3 |     pass
-          |
         info: Function zqzqzq
         ");
     }
@@ -834,14 +840,12 @@ def zqzqzq():
             .source("sub1/sub2/sub3.py", "from pandas import zqzqzq as zqzqzq")
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:5
           |
         2 | def zqzqzq():
           |     ^^^^^^
-        3 |     pass
-          |
         info: Function zqzqzq
 
         info[all-symbols]: AllSymbolInfo
@@ -849,7 +853,6 @@ def zqzqzq():
           |
         1 | from pandas import zqzqzq as zqzqzq
           |                              ^^^^^^
-          |
         info: Function zqzqzq
         ");
     }
@@ -877,14 +880,12 @@ def zqzqzq():
             .source("sub1/sub2/sub3.py", "from pandas import zqzqzq as zqzqzq")
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:5
           |
         2 | def zqzqzq():
           |     ^^^^^^
-        3 |     pass
-          |
         info: Function zqzqzq
 
         info[all-symbols]: AllSymbolInfo
@@ -892,7 +893,6 @@ def zqzqzq():
           |
         1 | from pandas import zqzqzq as zqzqzq
           |                              ^^^^^^
-          |
         info: Function zqzqzq
 
         info[all-symbols]: AllSymbolInfo
@@ -900,7 +900,6 @@ def zqzqzq():
           |
         1 | from pandas import zqzqzq as zqzqzq
           |                              ^^^^^^
-          |
         info: Function zqzqzq
         ");
     }
@@ -942,7 +941,6 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
           |
         2 | ABCDEFGHIJKLMNOP = 'https://api.example.com'
           | ^^^^^^^^^^^^^^^^
-          |
         info: Constant ABCDEFGHIJKLMNOP
 
         info[all-symbols]: AllSymbolInfo
@@ -950,9 +948,6 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
           |
         2 | class Abcdefghijklmnop:
           |       ^^^^^^^^^^^^^^^^
-        3 |     '''A data model class'''
-        4 |     def __init__(self):
-          |
         info: Class Abcdefghijklmnop
 
         info[all-symbols]: AllSymbolInfo
@@ -960,16 +955,157 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
           |
         2 | def abcdefghijklmnop():
           |     ^^^^^^^^^^^^^^^^
-        3 |     '''A helpful utility function'''
-        4 |     pass
-          |
         info: Function abcdefghijklmnop
+        ");
+    }
+
+    /// Tests that first-party test modules are NOT filtered out.
+    /// This ensures developers can still auto-import from their own test code.
+    #[test]
+    fn first_party_test_modules_not_filtered() {
+        let test = CursorTest::builder()
+            .source("main.py", "<CURSOR>")
+            .source("mypackage/__init__.py", "")
+            .source("mypackage/tests/__init__.py", "")
+            .source(
+                "mypackage/tests/test_utils.py",
+                "
+def test_helper_xyzxyzxyz():
+    '''A test helper function'''
+    pass
+",
+            )
+            .build();
+
+        // First-party test symbols should still be available
+        // (both test_ prefixed and non-test_ prefixed)
+        assert_snapshot!(test.all_symbols("xyzxyzxyz"), @"
+        info[all-symbols]: AllSymbolInfo
+         --> mypackage/tests/test_utils.py:2:5
+          |
+        2 | def test_helper_xyzxyzxyz():
+          |     ^^^^^^^^^^^^^^^^^^^^^
+        info: Function test_helper_xyzxyzxyz
+        ");
+    }
+
+    /// Tests that test modules and test functions are filtered out from
+    /// third-party (site-packages) code.
+    #[test]
+    fn third_party_test_modules_filtered() {
+        let test = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "<CURSOR>")
+            // Regular third-party module (should be included)
+            .site_packages("thirdparty/__init__.py", "def useful_xyzxyzxyz(): pass")
+            // A test module (should be filtered)
+            .site_packages("thirdparty/tests/__init__.py", "")
+            // Another test module (should also be filtered).
+            .site_packages(
+                "thirdparty/tests/test_core.py",
+                "def check_xyzxyzxyz(): pass",
+            )
+            // A conftest module (should be filtered)
+            .site_packages("thirdparty/conftest.py", "def fixture_xyzxyzxyz(): pass")
+            // A module with test_ functions (test_ functions should be filtered)
+            .site_packages(
+                "thirdparty/utils.py",
+                "def helper_xyzxyzxyz(): pass\ndef test_something_xyzxyzxyz(): pass",
+            )
+            .build();
+
+        assert_snapshot!(test.all_symbols("xyzxyzxyz"), @"
+        info[all-symbols]: AllSymbolInfo
+         --> site-packages/thirdparty/utils.py:1:5
+          |
+        1 | def helper_xyzxyzxyz(): pass
+          |     ^^^^^^^^^^^^^^^^
+        info: Function helper_xyzxyzxyz
+
+        info[all-symbols]: AllSymbolInfo
+         --> site-packages/thirdparty/__init__.py:1:5
+          |
+        1 | def useful_xyzxyzxyz(): pass
+          |     ^^^^^^^^^^^^^^^^
+        info: Function useful_xyzxyzxyz
+        ");
+    }
+
+    /// Tests that first-party "private" modules are NOT filtered out.
+    /// This ensures developers can still auto-import from their unexported
+    /// modules.
+    #[test]
+    fn first_party_underscore_modules_not_filtered() {
+        let test = CursorTest::builder()
+            .source("main.py", "<CURSOR>")
+            .source("mypackage/__init__.py", "")
+            .source("mypackage/_test/__init__.py", "ZQZQZQ = 1")
+            .source("mypackage/_tests/__init__.py", "ZQZQZQ = 1")
+            .source("mypackage/_testing/__init__.py", "ZQZQZQ = 1")
+            .source("mypackage/_foo/__init__.py", "ZQZQZQ = 1")
+            .build();
+
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
+        info[all-symbols]: AllSymbolInfo
+         --> mypackage/_foo/__init__.py:1:1
+          |
+        1 | ZQZQZQ = 1
+          | ^^^^^^
+        info: Constant ZQZQZQ
+
+        info[all-symbols]: AllSymbolInfo
+         --> mypackage/_test/__init__.py:1:1
+          |
+        1 | ZQZQZQ = 1
+          | ^^^^^^
+        info: Constant ZQZQZQ
+
+        info[all-symbols]: AllSymbolInfo
+         --> mypackage/_testing/__init__.py:1:1
+          |
+        1 | ZQZQZQ = 1
+          | ^^^^^^
+        info: Constant ZQZQZQ
+
+        info[all-symbols]: AllSymbolInfo
+         --> mypackage/_tests/__init__.py:1:1
+          |
+        1 | ZQZQZQ = 1
+          | ^^^^^^
+        info: Constant ZQZQZQ
+        ");
+    }
+
+    /// Tests that non-first-party "private" modules ARE filtered out.
+    #[test]
+    fn third_party_underscore_modules_are_filtered() {
+        let test = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "<CURSOR>")
+            .site_packages("thirdparty/__init__.py", "ZQZQZQ = 1")
+            .site_packages("thirdparty/_test/__init__.py", "ZQZQZQ = 1")
+            .site_packages("thirdparty/_tests/__init__.py", "ZQZQZQ = 1")
+            .site_packages("thirdparty/_testing/__init__.py", "ZQZQZQ = 1")
+            .site_packages("thirdparty/_foo/__init__.py", "ZQZQZQ = 1")
+            .build();
+
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
+        info[all-symbols]: AllSymbolInfo
+         --> site-packages/thirdparty/__init__.py:1:1
+          |
+        1 | ZQZQZQ = 1
+          | ^^^^^^
+        info: Constant ZQZQZQ
         ");
     }
 
     impl CursorTest {
         fn all_symbols(&self, query: &str) -> String {
-            let symbols = all_symbols(&self.db, self.cursor.file, &QueryPattern::fuzzy(query));
+            let symbols = all_symbols(
+                &self.db,
+                self.program_file(self.cursor.file),
+                &QueryPattern::fuzzy(query),
+            );
 
             if symbols.is_empty() {
                 return "No symbols found".to_string();

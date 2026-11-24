@@ -10,6 +10,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -34,7 +35,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// z = "The quick brown fox."
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.201")]
+#[violation_metadata(stable_since = "v0.0.201", category = Category::Restriction)]
 pub(crate) struct SingleLineImplicitStringConcatenation;
 
 impl Violation for SingleLineImplicitStringConcatenation {
@@ -92,7 +93,7 @@ impl Violation for SingleLineImplicitStringConcatenation {
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.201")]
+#[violation_metadata(stable_since = "v0.0.201", category = Category::Formatting)]
 pub(crate) struct MultiLineImplicitStringConcatenation;
 
 impl Violation for MultiLineImplicitStringConcatenation {

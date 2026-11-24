@@ -53,7 +53,7 @@ file = "file_1.py"
 rename(file, "file_2.py")
 
 rename(
-    # commment 1
+    # comment 1
     file, # comment 2
     "file_2.py"
     ,

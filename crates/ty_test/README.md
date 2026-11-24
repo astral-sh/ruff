@@ -8,12 +8,14 @@ under a certain directory as test suites.
 
 A Markdown test suite can contain any number of tests. A test consists of one or more embedded
 "files", each defined by a triple-backticks fenced code block. The code block must have a tag string
-specifying its language. We currently support `py` (Python files) and `pyi` (type stub files), as
-well as [typeshed `VERSIONS`] files and `toml` for configuration.
+specifying its language. We currently support `py` (Python files), `pyi` (type stub files), and
+`ipynb` (Jupyter notebook files), as well as [typeshed `VERSIONS`] files and `toml` for
+configuration.
 
 The simplest possible test suite consists of just a single test, with a single embedded file:
 
 ````markdown
+
 ```py
 reveal_type(1)  # revealed: Literal[1]
 ```
@@ -36,7 +38,8 @@ See actual example mdtest suites in
 
 ## Assertions
 
-Two kinds of assertions are supported: `# revealed:` (shown above) and `# error:`.
+Three kinds of assertions are supported: `# revealed:` (shown above), `# error:`, and
+[`# snapshot`](#diagnostic-snapshotting).
 
 ### Assertion kinds
 
@@ -141,31 +144,64 @@ f(2)  # error: [invalid-argument-type]
 
 ## Diagnostic Snapshotting
 
-In addition to inline assertions, one can also snapshot the full diagnostic
-output of a test. This is done by adding a `<!-- snapshot-diagnostics -->` directive
-in the corresponding section. For example:
+Inline snapshots store the rendered diagnostics directly in the Markdown file. The test compares
+these diagnostics with the contents of the corresponding `snapshot` block.
+
+Add `# snapshot` or `# snapshot: <code>` to the lines you want to snapshot. The unqualified form
+matches one unmatched diagnostic on the line to which the assertion applies; the qualified form
+matches one with the given rule or diagnostic code.
+
+For example, an mdtest with a generated snapshot block looks like this:
 
 ````markdown
-## Unresolvable module import
-
-<!-- snapshot-diagnostics -->
+# Snapshot example
 
 ```py
-import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve import `zqzqzqzqzqzqzq`"
+x: int = "a"  # snapshot: invalid-assignment
+y: int = "b"  # snapshot
+```
+
+Some explanatory prose can go here.
+
+```snapshot
+error[invalid-assignment]: Object of type `Literal["a"]` is not assignable to `int`
+ --> src/mdtest_snippet.py:1:10
+  |
+1 | x: int = "a"  # snapshot: invalid-assignment
+  |    ---   ^^^ Incompatible value of type `Literal["a"]`
+  |    |
+  |    Declared type
+
+
+error[invalid-assignment]: Object of type `Literal["b"]` is not assignable to `int`
+ --> src/mdtest_snippet.py:2:10
+  |
+2 | y: int = "b"  # snapshot
+  |    ---   ^^^ Incompatible value of type `Literal["b"]`
+  |    |
+  |    Declared type
 ```
 ````
 
-The `snapshot-diagnostics` directive must appear before anything else in
-the section.
+Snapshot assertions follow the same placement rules as other inline assertions.
 
-This will use `insta` to manage an external file snapshot of all diagnostic
-output generated.
+To insert or rewrite inline snapshots automatically, run mdtest with
+`MDTEST_UPDATE_SNAPSHOTS=1` set. This generates a `snapshot` block after each Python code block
+containing snapshot assertions, or updates the existing block for that code. The test path is relative to
+`crates/ty_python_semantic/resources/mdtest`. For example:
 
-Inline assertions, as described above, may be used in conjunction with diagnostic
-snapshotting.
+```sh
+MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty_python_semantic --test mdtest -- diagnostics/missing_argument.md
+```
 
-At present, there is no way to do inline snapshotting or to request more granular
-snapshotting of specific diagnostics.
+Or with a test-name filter:
+
+```sh
+MDTEST_UPDATE_SNAPSHOTS=1 MDTEST_TEST_FILTER="Missing argument diagnostics" cargo test -p ty_python_semantic --test mdtest
+```
+
+External `<!-- snapshot-diagnostics -->` snapshots are still supported, but
+inline snapshots are generally preferred for new tests.
 
 ## Expected panics
 
@@ -342,6 +378,9 @@ When a test has dependencies:
 are installed fresh for each test that specifies them, so tests with many dependencies may be slower
 to run.
 
+To test dependency checks with these packages, also
+[supply dependency metadata](#supplying-dependency-metadata).
+
 #### Lockfiles
 
 Each `.md` file with external dependencies has a corresponding `.lock` file of the same name.
@@ -407,6 +446,78 @@ X = 1
 ```
 ````
 
+The same placeholder can be used in `environment.extra-paths`:
+
+````markdown
+```toml
+[environment]
+extra-paths = ["/.venv/<path-to-site-packages>"]
+```
+````
+
+### Supplying dependency metadata
+
+Tests for dependency checks can supply declarations and module ownership through a
+`[dependency-metadata]` fixture. This does not invoke uv or install packages. The imported modules
+can come from a [mock Python environment](#mocking-a-python-environment) or from
+[external dependencies](#testing-with-external-dependencies) installed through `[project]`.
+
+The two sections are independent: `[project]` supplies installed modules, while
+`[dependency-metadata]` describes the declarations and ownership used by dependency checks.
+Automatically deriving dependency metadata from `[project]` is deferred to future work.
+For now, tests with external dependencies must also supply `[dependency-metadata]` to exercise
+dependency checks. Explicit metadata also lets tests model nested projects and ambiguous module
+ownership using only mocked modules.
+
+````markdown
+```toml
+[environment]
+python = "/.venv"
+
+[dependency-metadata]
+projects = [{ path = "/src", distribution = "app", dependencies = ["requests"] }]
+
+[dependency-metadata.distributions]
+app = { name = "my-project" }
+requests = { name = "requests" }
+
+[dependency-metadata.module-owners]
+my_project = ["app"]
+requests = ["requests"]
+```
+````
+
+Distribution keys are opaque identifiers, and each distribution's `name` is used in diagnostics.
+A project can also specify `group-dependencies`. An editable distribution can specify an absolute
+`editable-path` in the test filesystem. Module-owner keys are validated as absolute Python module
+names, and their values list the distributions that provide each module.
+
+The fixture follows the same section inheritance as other mdtest configuration. Standalone PEP 723
+scripts do not inherit this project metadata. Instead, a script can supply its own fixture under
+`[tool.ty.dependency-metadata]` in its inline metadata block. Each project entry uses the script's
+exact absolute path, not its containing directory:
+
+````markdown
+`script.py`:
+
+```py
+# /// script
+# dependencies = ["requests"]
+# [tool.ty.dependency-metadata]
+# projects = [{ path = "/src/script.py", dependencies = ["requests"] }]
+# [tool.ty.dependency-metadata.distributions]
+# requests = { name = "requests" }
+# [tool.ty.dependency-metadata.module-owners]
+# requests = ["requests"]
+# ///
+
+import requests
+```
+````
+
+`tool.ty.dependency-metadata` is available only in tests. The script's `dependencies` field does not
+automatically populate the fixture, and a script without a fixture has no dependency metadata.
+
 ## Documentation of tests
 
 Arbitrary Markdown syntax (including of course normal prose paragraphs) is permitted (and ignored by
@@ -423,11 +534,11 @@ x: int = "foo"  # error: [invalid-assignment]
 
 ## Running the tests
 
-All Markdown-based tests are executed in a normal `cargo test` / `cargo run nextest` run. If you want to run the Markdown tests
-*only*, you can filter the tests using `mdtest__`:
+All Markdown-based tests are executed in a normal `cargo test` / `cargo nextest run` invocation. If you want to run the Markdown tests
+*only*, you can filter the tests using `mdtest`:
 
 ```bash
-cargo test -p ty_python_semantic -- mdtest__
+cargo test -p ty_python_semantic -- mdtest
 ```
 
 Alternatively, you can use the `mdtest.py` runner which has a watch mode that will re-run corresponding tests when Markdown files change, and recompile automatically when Rust code changes:
@@ -488,17 +599,16 @@ I/O error on read.
 ### Asserting on full diagnostic output
 
 > [!NOTE]
-> At present, one can opt into diagnostic snapshotting that is managed via external files. See
-> the section above for more details. The feature outlined below, *inline* diagnostic snapshotting,
-> is still desirable.
+> [Inline diagnostic snapshots](#diagnostic-snapshotting) use `# snapshot` assertions. The proposal
+> below would allow full output assertions without an inline assertion.
 
 The inline comment diagnostic assertions are useful for making quick, readable assertions about
 diagnostics in a particular location. But sometimes we will want to assert on the full diagnostic
 output of checking an embedded Python file. Or sometimes (see “incremental tests” below) we will
 want to assert on diagnostics in a file, without impacting the contents of that file by changing a
 comment in it. In these cases, a Python code block in a test could be followed by a fenced code
-block with language `output`; this would contain the full diagnostic output for the preceding test
-file:
+block with language `output`; this would contain the full diagnostic output for the default file or
+for an explicitly specified file, as described below:
 
 ````markdown
 # full output
@@ -512,7 +622,7 @@ This is just an example, not a proposal that ty would ever actually output diagn
 precisely this format:
 
 ```output
-mdtest_snippet.py, line 1, col 1: revealed type is 'Literal[1]'
+mdtest_snippet.py, line 2, col 1: revealed type is 'Literal[1]'
 ```
 ````
 

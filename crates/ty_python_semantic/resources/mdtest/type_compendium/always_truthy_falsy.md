@@ -2,7 +2,7 @@
 
 ```toml
 [environment]
-python-version = "3.12"
+python-version = "3.14"
 ```
 
 The types `AlwaysTruthy` and `AlwaysFalsy` describe the set of values that are always truthy or
@@ -50,7 +50,8 @@ af = CustomAlwaysFalsyType()
 It follows directly from the definition that `AlwaysTruthy` and `AlwaysFalsy` are disjoint types:
 
 ```py
-from ty_extensions import static_assert, is_disjoint_from, AlwaysTruthy, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import is_disjoint_from
 
 static_assert(is_disjoint_from(AlwaysTruthy, AlwaysFalsy))
 ```
@@ -65,15 +66,16 @@ Finally, we can also define the type `AmbiguousTruthiness = Truthy & Falsy`, whi
 of values that can be truthy *and* falsy. This intersection is not empty. In the following, we give
 examples for values that belong to these three types:
 
-```py
-from ty_extensions import static_assert, is_equivalent_to, is_disjoint_from, Not, Intersection, AlwaysTruthy, AlwaysFalsy
+```pyi
+from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import is_equivalent_to, is_disjoint_from
 from typing_extensions import Never
 from random import choice
 
-type Truthy = Not[AlwaysFalsy]
-type Falsy = Not[AlwaysTruthy]
+type Truthy = ~AlwaysFalsy
+type Falsy = ~AlwaysTruthy
 
-type AmbiguousTruthiness = Intersection[Truthy, Falsy]
+type AmbiguousTruthiness = Truthy & Falsy
 
 static_assert(is_disjoint_from(AlwaysTruthy, AmbiguousTruthiness))
 static_assert(is_disjoint_from(AlwaysFalsy, AmbiguousTruthiness))
@@ -115,7 +117,8 @@ f = CustomAmbiguousTruthinessType()  # error: [invalid-assignment]
 ## Subtypes of `AlwaysTruthy`, `AlwaysFalsy`
 
 ```py
-from ty_extensions import static_assert, is_subtype_of, is_disjoint_from, AlwaysTruthy, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import is_subtype_of, is_disjoint_from
 from typing_extensions import Literal
 ```
 
@@ -163,7 +166,8 @@ Is `tuple[()]` always falsy? We currently model it this way, but this is
 [under discussion](https://github.com/astral-sh/ruff/issues/15528).
 
 ```py
-from ty_extensions import static_assert, is_subtype_of, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysFalsy
+from ty_extensions._internal import is_subtype_of
 
 static_assert(is_subtype_of(tuple[()], AlwaysFalsy))
 ```

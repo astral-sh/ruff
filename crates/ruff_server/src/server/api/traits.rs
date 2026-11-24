@@ -29,13 +29,13 @@
 
 use crate::session::{Client, DocumentSnapshot, Session};
 
-use lsp_types::notification::Notification as LSPNotification;
-use lsp_types::request::Request;
+use lsp_types::{LspNotificationMethod, LspRequestMethod, Notification, Request};
 
 /// A supertrait for any server request handler.
 pub(super) trait RequestHandler {
     type RequestType: Request;
-    const METHOD: &'static str = <<Self as RequestHandler>::RequestType as Request>::METHOD;
+    const METHOD: LspRequestMethod<'static> =
+        <<Self as RequestHandler>::RequestType as Request>::METHOD;
 }
 
 /// A request handler that needs mutable access to the session.
@@ -53,29 +53,74 @@ pub(super) trait SyncRequestHandler: RequestHandler {
 
 /// A request handler that can be run on a background thread.
 ///
-/// This handler is specific to requests that operate on a single document.
-pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
-    /// Returns the URL of the document that this request handler operates on.
-    ///
-    /// This method can be implemented automatically using the [`define_document_url`] macro.
-    ///
-    /// [`define_document_url`]: super::define_document_url
-    fn document_url(
+/// Unlike [`BackgroundDocumentRequestHandler`], this handler does not assume that it can derive a
+/// document URI from the LSP request parameters. Implementations are responsible for extracting
+/// any state they need from the [`Session`] during [`Self::snapshot`].
+pub(super) trait BackgroundRequestHandler: RequestHandler {
+    type Snapshot: Send + 'static;
+
+    fn snapshot(
+        session: &Session,
         params: &<<Self as RequestHandler>::RequestType as Request>::Params,
-    ) -> std::borrow::Cow<'_, lsp_types::Url>;
+    ) -> Self::Snapshot;
 
     fn run_with_snapshot(
-        snapshot: DocumentSnapshot,
+        snapshot: Self::Snapshot,
         client: &Client,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
 }
 
+/// A request handler that can be run on a background thread.
+///
+/// This handler is specific to requests that operate on a single document.
+pub(super) trait BackgroundDocumentRequestHandler:
+    BackgroundRequestHandler<Snapshot = std::result::Result<DocumentSnapshot, lsp_types::Uri>>
+{
+    /// Returns the URI of the document that this request handler operates on.
+    ///
+    /// This method can be implemented automatically using the [`define_document_uri`] macro.
+    ///
+    /// [`define_document_uri`]: super::define_document_uri
+    fn document_uri(
+        params: &<<Self as RequestHandler>::RequestType as Request>::Params,
+    ) -> std::borrow::Cow<'_, lsp_types::Uri>;
+
+    fn run_with_snapshot(
+        snapshot: Self::Snapshot,
+        client: &Client,
+        params: <<Self as RequestHandler>::RequestType as Request>::Params,
+    ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
+}
+
+impl<T> BackgroundRequestHandler for T
+where
+    T: BackgroundDocumentRequestHandler,
+{
+    type Snapshot = std::result::Result<DocumentSnapshot, lsp_types::Uri>;
+
+    fn snapshot(
+        session: &Session,
+        params: &<<Self as RequestHandler>::RequestType as Request>::Params,
+    ) -> Self::Snapshot {
+        let uri = Self::document_uri(params).into_owned();
+        session.take_snapshot(uri.clone()).ok_or(uri)
+    }
+
+    fn run_with_snapshot(
+        snapshot: Self::Snapshot,
+        client: &Client,
+        params: <<Self as RequestHandler>::RequestType as Request>::Params,
+    ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result> {
+        <T as BackgroundDocumentRequestHandler>::run_with_snapshot(snapshot, client, params)
+    }
+}
+
 /// A supertrait for any server notification handler.
 pub(super) trait NotificationHandler {
-    type NotificationType: LSPNotification;
-    const METHOD: &'static str =
-        <<Self as NotificationHandler>::NotificationType as LSPNotification>::METHOD;
+    type NotificationType: Notification;
+    const METHOD: LspNotificationMethod<'static> =
+        <<Self as NotificationHandler>::NotificationType as Notification>::METHOD;
 }
 
 /// A notification handler that needs mutable access to the session.
@@ -87,24 +132,24 @@ pub(super) trait SyncNotificationHandler: NotificationHandler {
     fn run(
         session: &mut Session,
         client: &Client,
-        params: <<Self as NotificationHandler>::NotificationType as LSPNotification>::Params,
+        params: <<Self as NotificationHandler>::NotificationType as Notification>::Params,
     ) -> super::Result<()>;
 }
 
 /// A notification handler that can be run on a background thread.
 pub(super) trait BackgroundDocumentNotificationHandler: NotificationHandler {
-    /// Returns the URL of the document that this notification handler operates on.
+    /// Returns the URI of the document that this notification handler operates on.
     ///
-    /// This method can be implemented automatically using the [`define_document_url`] macro.
+    /// This method can be implemented automatically using the [`define_document_uri`] macro.
     ///
-    /// [`define_document_url`]: super::define_document_url
-    fn document_url(
-        params: &<<Self as NotificationHandler>::NotificationType as LSPNotification>::Params,
-    ) -> std::borrow::Cow<'_, lsp_types::Url>;
+    /// [`define_document_uri`]: super::define_document_uri
+    fn document_uri(
+        params: &<<Self as NotificationHandler>::NotificationType as Notification>::Params,
+    ) -> std::borrow::Cow<'_, lsp_types::Uri>;
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,
         client: &Client,
-        params: <<Self as NotificationHandler>::NotificationType as LSPNotification>::Params,
+        params: <<Self as NotificationHandler>::NotificationType as Notification>::Params,
     ) -> super::Result<()>;
 }

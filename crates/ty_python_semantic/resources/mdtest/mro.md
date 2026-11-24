@@ -12,18 +12,18 @@ For documentation on method resolution orders, see:
 
 At runtime, the MRO for a class can be inspected using the `__mro__` attribute. However, rather than
 special-casing inference of that attribute, we allow our inferred MRO of a class to be introspected
-using the `ty_extensions.reveal_mro` function. This is because the MRO ty infers for a class will
-often be different than a class's "real MRO" at runtime. This is often deliberate and desirable, but
-would be confusing to users. For example, typeshed pretends that builtin sequences such as `tuple`
-and `list` inherit from `collections.abc.Sequence`, resulting in a much longer inferred MRO for
-these classes than what they actually have at runtime. Other differences to "real MROs" at runtime
-include the facts that ty's inferred MRO will often include non-class elements, such as generic
-aliases, `Any` and `Unknown`.
+using the `ty_extensions._internal.reveal_mro` function. This is because the MRO ty infers for a
+class will often be different than a class's "real MRO" at runtime. This is often deliberate and
+desirable, but would be confusing to users. For example, typeshed pretends that builtin sequences
+such as `tuple` and `list` inherit from `collections.abc.Sequence`, resulting in a much longer
+inferred MRO for these classes than what they actually have at runtime. Other differences to "real
+MROs" at runtime include the facts that ty's inferred MRO will often include non-class elements,
+such as generic aliases, `Any` and `Unknown`.
 
 ## No bases
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class C: ...
 
@@ -33,7 +33,7 @@ reveal_mro(C)  # revealed: (<class 'C'>, <class 'object'>)
 ## The special case: `object` itself
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 reveal_mro(object)  # revealed: (<class 'object'>,)
 ```
@@ -41,7 +41,7 @@ reveal_mro(object)  # revealed: (<class 'object'>,)
 ## Explicit inheritance from `object`
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class C(object): ...
 
@@ -51,7 +51,7 @@ reveal_mro(C)  # revealed: (<class 'C'>, <class 'object'>)
 ## Explicit inheritance from non-`object` single base
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A: ...
 class B(A): ...
@@ -62,7 +62,7 @@ reveal_mro(B)  # revealed: (<class 'B'>, <class 'A'>, <class 'object'>)
 ## Linearization of multiple bases
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A: ...
 class B: ...
@@ -76,7 +76,7 @@ reveal_mro(C)  # revealed: (<class 'C'>, <class 'A'>, <class 'B'>, <class 'objec
 This is "ex_2" from <https://docs.python.org/3/howto/mro.html#the-end>
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class O: ...
 class X(O): ...
@@ -93,7 +93,7 @@ reveal_mro(B)  # revealed: (<class 'B'>, <class 'Y'>, <class 'X'>, <class 'O'>, 
 This is "ex_5" from <https://docs.python.org/3/howto/mro.html#the-end>
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class O: ...
 class F(O): ...
@@ -116,7 +116,7 @@ reveal_mro(A)
 This is "ex_6" from <https://docs.python.org/3/howto/mro.html#the-end>
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class O: ...
 class F(O): ...
@@ -139,7 +139,7 @@ reveal_mro(A)
 This is "ex_9" from <https://docs.python.org/3/howto/mro.html#the-end>
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class O: ...
 class A(O): ...
@@ -165,8 +165,8 @@ reveal_mro(Z)
 ## Inheritance from `Unknown`
 
 ```py
-from ty_extensions import reveal_mro
-from does_not_exist import DoesNotExist  # error: [unresolved-import]
+from ty_extensions._internal import reveal_mro
+from does_not_exist import DoesNotExist  # error: [import-not-found]
 
 class A(DoesNotExist): ...
 class B: ...
@@ -188,8 +188,8 @@ An intersection that includes `Unknown` or `Any` is permitted as long as the int
 disjoint from `type`.
 
 ```py
-from ty_extensions import reveal_mro
-from does_not_exist import DoesNotExist  # error: [unresolved-import]
+from ty_extensions._internal import reveal_mro
+from does_not_exist import DoesNotExist  # error: [import-not-found]
 
 reveal_type(DoesNotExist)  # revealed: Unknown
 
@@ -208,12 +208,27 @@ if not isinstance(DoesNotExist, type):
 
 ## Inheritance from `type[Any]` and `type[Unknown]`
 
+Using `type[T]` for a non-dynamic `T` as a base keeps the class analyzable, even though the exact
+MRO cannot be determined:
+
+```py
+from ty_extensions._internal import reveal_mro
+
+class Base:
+    base_attr: int = 1
+
+def f(x: type[Base]):
+    class Foo(x): ...  # error: [unsupported-base]
+    reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
+```
+
 Inheritance from `type[Any]` and `type[Unknown]` is also permitted, in keeping with the gradual
 guarantee:
 
 ```py
 from typing import Any
-from ty_extensions import Unknown, Intersection, reveal_mro
+from ty_extensions import Intersection
+from ty_extensions._internal import Unknown, reveal_mro
 
 def f(x: type[Any], y: Intersection[Unknown, type[Any]]):
     class Foo(x): ...
@@ -229,7 +244,7 @@ If the class's `__bases__` cause an exception to be raised at runtime and theref
 creation to fail, we infer the class's `__mro__` as being `[<class>, Unknown, object]`:
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Foo` with bases list `[<class 'object'>, <class 'int'>]`"
 class Foo(object, int): ...
@@ -261,6 +276,42 @@ class AA(Z): ...
 reveal_mro(AA)  # revealed: (<class 'AA'>, <class 'Z'>, Unknown, <class 'object'>)
 ```
 
+## Fallback MROs keep `object` last
+
+A class cannot inherit from `object` before another base. Its fallback MRO retains the known bases
+for member lookup, but defers `object` to the end. Subclasses also keep `object` last, whether they
+use single or multiple inheritance.
+
+```py
+from typing import Any
+from ty_extensions._internal import reveal_mro
+
+class A:
+    value: int
+
+class Other: ...
+
+# error: [inconsistent-mro]
+Broken = type("Broken", (object, A), {})
+
+class Child(Broken): ...
+class Multiple(Broken, Other): ...
+
+reveal_mro(Broken)  # revealed: (<class 'Broken'>, <class 'A'>, <class 'object'>)
+reveal_mro(Child)  # revealed: (<class 'Child'>, <class 'Broken'>, <class 'A'>, <class 'object'>)
+# revealed: (<class 'Multiple'>, <class 'Broken'>, <class 'A'>, <class 'Other'>, <class 'object'>)
+reveal_mro(Multiple)
+reveal_type(Multiple().value)  # revealed: int
+```
+
+The same fallback applies when a gradual base suppresses the MRO error.
+
+```py
+Gradual = type("Gradual", (object, A, Any), {})
+
+reveal_mro(Gradual)  # revealed: (<class 'Gradual'>, <class 'A'>, Any, <class 'object'>)
+```
+
 ## `__bases__` includes a `Union`
 
 <!-- snapshot-diagnostics -->
@@ -270,7 +321,7 @@ find a union type in a class's bases, we infer the class's `__mro__` as being
 `[<class>, Unknown, object]`, the same as for MROs that cause errors at runtime.
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 def returns_bool() -> bool:
     return True
@@ -293,6 +344,7 @@ reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 def f():
     if returns_bool():
         class C: ...
+
     else:
         class C: ...
 
@@ -316,12 +368,12 @@ class Foo(EitherOr): ...
 ## `__bases__` is a union of a dynamic type and valid bases
 
 If a dynamic type such as `Any` or `Unknown` is one of the elements in the union, and all other
-types *would be* valid class bases, we do not emit an `invalid-base` or `unsupported-base`
+types _would be_ valid class bases, we do not emit an `invalid-base` or `unsupported-base`
 diagnostic, and we use the dynamic type as a base to prevent further downstream errors.
 
 ```py
 from typing import Any
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 def _(flag: bool, any: Any):
     if flag:
@@ -336,7 +388,7 @@ def _(flag: bool, any: Any):
 ## `__bases__` includes multiple `Union`s
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 def returns_bool() -> bool:
     return True
@@ -369,7 +421,7 @@ reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 ## `__bases__` lists that cause errors... now with `Union`s
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 def returns_bool() -> bool:
     return True
@@ -442,12 +494,26 @@ class BadSub1(Bad1()): ...  # error: [invalid-base]
 class BadSub2(Bad2()): ...  # error: [invalid-base]
 ```
 
+For a union base where one member lacks `__mro_entries__`, `invalid-base` should be emitted with a
+sub-diagnostic identifying the problematic union member:
+
+```py
+class HasMroEntries:
+    def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
+        return ()
+
+class NoMroEntries: ...
+
+def _(base: HasMroEntries | NoMroEntries):
+    class Foo(base): ...  # error: [invalid-base]
+```
+
 ## `__bases__` lists with duplicate bases
 
 <!-- snapshot-diagnostics -->
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
 
@@ -498,52 +564,31 @@ class VeryEggyOmelette(
 # fmt: off
 ```
 
-A `type: ignore` comment can suppress `duplicate-bases` errors if it is on the first or last line of
-the class "header":
+A `type: ignore` comment can only suppress `duplicate-bases` errors if it is on the same line as the
+class name:
 
 ```py
 # fmt: off
 
 class A: ...
 
-class B(  # type: ignore[duplicate-base]
+class B(  # type: ignore[ty:duplicate-base]
     A,
     A,
 ): ...
 
-class C(
+class C(  # error: [duplicate-base]
     A,
     A
-):  # type: ignore[duplicate-base]
+# error: [unused-type-ignore-comment]
+):  # type: ignore[ty:duplicate-base]
     x: int
 
 # fmt: on
 ```
 
-But it will not suppress the error if it occurs in the class body, or on the duplicate base itself.
-The justification for this is that it is the class definition as a whole that will raise an
-exception at runtime, not a sub-expression in the class's bases list.
-
-```py
-# fmt: off
-
-# error: [duplicate-base]
-class D(
-    A,
-    # error: [unused-ignore-comment]
-    A,  # type: ignore[duplicate-base]
-): ...
-
-# error: [duplicate-base]
-class E(
-    A,
-    A
-):
-    # error: [unused-ignore-comment]
-    x: int  # type: ignore[duplicate-base]
-
-# fmt: on
-```
+This is a limitation that we live with for now, since it seems anyway highly unlikely that anybody
+would want to suppress a `duplicate-base` diagnostic.
 
 ## `__bases__` lists with duplicate `Unknown` bases
 
@@ -554,8 +599,8 @@ however, for gradual types this would break the
 the dynamic base can usually be materialised to a type that would lead to a resolvable MRO.
 
 ```py
-from ty_extensions import reveal_mro
-from unresolvable_module import UnknownBase1, UnknownBase2  # error: [unresolved-import]
+from ty_extensions._internal import reveal_mro
+from unresolvable_module import UnknownBase1, UnknownBase2  # error: [import-not-found]
 
 reveal_type(UnknownBase1)  # revealed: Unknown
 reveal_type(UnknownBase2)  # revealed: Unknown
@@ -577,10 +622,73 @@ class Bar(UnknownBase1, Foo, UnknownBase2, Foo): ...
 reveal_mro(Bar)  # revealed: (<class 'Bar'>, Unknown, <class 'object'>)
 ```
 
+Starred bases that expand to fixed-length tuples still report diagnostics for the unpacked base
+entries:
+
+```py
+from ty_extensions._internal import reveal_mro
+
+duplicate_bases = (int, int)
+invalid_bases = (int, 1)
+
+# error: [duplicate-base] "Duplicate base class `int`"
+class InlineDuplicateBases(*(int, int)): ...
+
+# error: [duplicate-base] "Duplicate base class `int`"
+class NameDuplicateBases(*duplicate_bases): ...
+
+reveal_mro(InlineDuplicateBases)  # revealed: (<class 'InlineDuplicateBases'>, Unknown, <class 'object'>)
+reveal_mro(NameDuplicateBases)  # revealed: (<class 'NameDuplicateBases'>, Unknown, <class 'object'>)
+
+# error: [invalid-base] "Invalid class base with type `Literal[1]`"
+class StarredInvalidBases(*invalid_bases): ...
+```
+
+Per-base lint checks also see the unpacked entries:
+
+```py
+from typing import Generic, NamedTuple, Protocol
+
+# error: [inconsistent-mro]
+# error: [subclass-of-final-class]
+class InheritsFromFinalViaStarred(*(int, bool)): ...
+
+final_bases = (int, bool)
+
+# error: [inconsistent-mro]
+# error: [subclass-of-final-class]
+class InheritsFromFinalViaNamedStarred(*final_bases): ...
+
+# error: [instance-layout-conflict]
+# error: [invalid-named-tuple]
+# error: [invalid-named-tuple]
+class NamedTupleWithStarredBases(NamedTuple, *(int, str)): ...
+
+# error: [inconsistent-mro]
+# error: [invalid-protocol]
+# error: [invalid-protocol]
+class ProtocolWithStarredBases(Protocol, *(int, str)): ...
+
+# error: [invalid-base]
+class BareGenericInStarred(*(int, Generic)): ...
+```
+
+## Inline tuple-literal starred bases point diagnostics at unpacked elements
+
+<!-- snapshot-diagnostics -->
+
+```py
+# error: [duplicate-base]
+class InlineTupleDuplicateBases(*(int, int)): ...
+
+# error: [invalid-base]
+class InlineTupleInvalidBases(*(int, 1)): ...
+```
+
 ## Unrelated objects inferred as `Any`/`Unknown` do not have special `__mro__` attributes
 
 ```py
-from does_not_exist import unknown_object  # error: [unresolved-import]
+from does_not_exist import unknown_object  # error: [import-not-found]
 
 reveal_type(unknown_object)  # revealed: Unknown
 reveal_type(unknown_object.__mro__)  # revealed: Unknown
@@ -590,7 +698,7 @@ reveal_type(unknown_object.__mro__)  # revealed: Unknown
 
 ```py
 from typing import Generic, TypeVar, Iterator
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 T = TypeVar("T")
 
@@ -612,6 +720,81 @@ class Sub(Intermediate[T], Base): ...
 reveal_mro(Sub)
 ```
 
+## Generic ancestors shared by multiple inheritance paths
+
+A generic ancestor appears only once in the MRO, even when one inheritance path leaves its type
+arguments unspecified. A concrete override on the other path takes precedence over that ancestor.
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions._internal import reveal_mro
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    item: T
+
+    def method(self) -> object: ...
+
+class Unspecified(Base): ...  # error: [missing-type-argument]
+
+class Concrete(Base[int]):
+    def method(self) -> int:
+        return 0
+
+class Child(Unspecified, Concrete): ...
+
+# revealed: (<class 'Child'>, <class 'Unspecified'>, <class 'Concrete'>, <class 'Base[Unknown]'>, typing.Generic, <class 'object'>)
+reveal_mro(Child)
+reveal_type(Child().method())  # revealed: int
+reveal_type(Child().item)  # revealed: Unknown
+```
+
+The same ordering applies when the first path supplies the type argument and the concrete override
+inherits an unspecified specialization. The first path's specialization remains available for
+inherited attributes.
+
+```py
+class Specialized(Base[int]): ...
+
+class UnspecifiedConcrete(Unspecified):
+    def method(self) -> int:
+        return 0
+
+class Other(Specialized, UnspecifiedConcrete): ...
+
+# revealed: (<class 'Other'>, <class 'Specialized'>, <class 'UnspecifiedConcrete'>, <class 'Unspecified'>, <class 'Base[int]'>, typing.Generic, <class 'object'>)
+reveal_mro(Other)
+reveal_type(Other().method())  # revealed: int
+reveal_type(Other().item)  # revealed: int
+```
+
+Classes created with `type()` use the same ordering.
+
+```py
+Dynamic = type("Dynamic", (Unspecified, Concrete), {})
+
+# revealed: (<class 'Dynamic'>, <class 'Unspecified'>, <class 'Concrete'>, <class 'Base[Unknown]'>, typing.Generic, <class 'object'>)
+reveal_mro(Dynamic)
+reveal_type(Dynamic().method())  # revealed: int
+```
+
+## Duplicate generic bases
+
+Different specializations of the same class are still duplicate bases when both appear directly in
+the bases list.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]): ...
+
+# error: [duplicate-base]
+class Duplicate(Base[int], Base[str]): ...
+```
+
 ## Unresolvable MROs involving generics have the original bases reported in the error message, not the resolved bases
 
 <!-- snapshot-diagnostics -->
@@ -619,7 +802,7 @@ reveal_mro(Sub)
 ```py
 from typing_extensions import Protocol, TypeVar, Generic
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 
 class Foo(Protocol): ...
 class Bar(Protocol[T]): ...
@@ -631,7 +814,7 @@ class Baz(Protocol[T], Foo, Bar[T]): ...  # error: [inconsistent-mro]
 These are invalid, but we need to be able to handle them gracefully without panicking.
 
 ```pyi
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Foo(Foo): ...  # error: [cyclic-class-definition]
 
@@ -651,7 +834,7 @@ reveal_mro(Boz)  # revealed: (<class 'Boz'>, Unknown, <class 'object'>)
 These are similarly unlikely, but we still shouldn't crash:
 
 ```pyi
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Foo(Bar): ...  # error: [cyclic-class-definition]
 class Bar(Baz): ...  # error: [cyclic-class-definition]
@@ -665,7 +848,7 @@ reveal_mro(Baz)  # revealed: (<class 'Baz'>, Unknown, <class 'object'>)
 ## Classes with cycles in their MROs, and multiple inheritance
 
 ```pyi
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Spam: ...
 class Foo(Bar): ...  # error: [cyclic-class-definition]
@@ -680,7 +863,7 @@ reveal_mro(Baz)  # revealed: (<class 'Baz'>, Unknown, <class 'object'>)
 ## Classes with cycles in their MRO, and a sub-graph
 
 ```pyi
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class FooCycle(BarCycle): ...  # error: [cyclic-class-definition]
 class Foo: ...
@@ -706,22 +889,26 @@ python-version = "3.13"
 ```
 
 ```pyi
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class C(C.a): ...
+
 reveal_type(C.__class__)  # revealed: <class 'type'>
 reveal_mro(C)  # revealed: (<class 'C'>, Unknown, <class 'object'>)
 
-class D(D.a):
+class D(D.a):  # error: [unsupported-base]
     a: D
+
 reveal_type(D.__class__)  # revealed: <class 'type'>
 reveal_mro(D)  # revealed: (<class 'D'>, Unknown, <class 'object'>)
 
 class E[T](E.a): ...
+
 reveal_type(E.__class__)  # revealed: <class 'type'>
 reveal_mro(E)  # revealed: (<class 'E[Unknown]'>, Unknown, typing.Generic, <class 'object'>)
 
 class F[T](F(), F): ...  # error: [cyclic-class-definition]
+
 reveal_type(F.__class__)  # revealed: type[Unknown]
 reveal_mro(F)  # revealed: (<class 'F[Unknown]'>, Unknown, <class 'object'>)
 ```
@@ -734,7 +921,7 @@ directly from `object` (as it does at runtime).
 
 ```py
 import types
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 reveal_mro(types.NotImplementedType)  # revealed: (<class 'NotImplementedType'>, <class 'object'>)
 reveal_mro(type(NotImplemented))  # revealed: (<class 'NotImplementedType'>, <class 'object'>)

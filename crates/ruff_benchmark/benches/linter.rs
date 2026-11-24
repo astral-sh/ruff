@@ -4,7 +4,7 @@ use criterion::{
     BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main,
 };
 use ruff_benchmark::{
-    LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestCase, UNICODE_PYPINYIN,
+    LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestFile, UNICODE_PYPINYIN,
 };
 use ruff_linter::linter::{ParseSource, lint_only};
 use ruff_linter::rule_selector::PreviewOptions;
@@ -52,13 +52,13 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 #[expect(unsafe_code)]
 pub static _rjem_malloc_conf: &[u8] = b"dirty_decay_ms:-1,muzzy_decay_ms:-1\0";
 
-fn create_test_cases() -> Vec<TestCase> {
+fn create_test_cases() -> Vec<TestFile> {
     vec![
-        TestCase::fast(NUMPY_GLOBALS.clone()),
-        TestCase::fast(UNICODE_PYPINYIN.clone()),
-        TestCase::normal(PYDANTIC_TYPES.clone()),
-        TestCase::normal(NUMPY_CTYPESLIB.clone()),
-        TestCase::slow(LARGE_DATASET.clone()),
+        NUMPY_GLOBALS.clone(),
+        UNICODE_PYPINYIN.clone(),
+        PYDANTIC_TYPES.clone(),
+        NUMPY_CTYPESLIB.clone(),
+        LARGE_DATASET.clone(),
     ]
 }
 
@@ -83,13 +83,17 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                         assert!(parsed.has_valid_syntax());
 
                         let path = case.path();
+                        let py_source_type = PySourceType::from(path.as_path());
                         lint_only(
                             &path,
                             None,
                             settings,
                             flags::Noqa::Enabled,
-                            &SourceKind::Python(case.code().to_string()),
-                            PySourceType::from(path.as_path()),
+                            &SourceKind::Python {
+                                code: case.code().to_string(),
+                                is_stub: py_source_type.is_stub(),
+                            },
+                            py_source_type,
                             ParseSource::Precomputed(parsed),
                         )
                     },
@@ -109,8 +113,8 @@ fn benchmark_default_rules(criterion: &mut Criterion) {
 
 /// Disables IO based rules because they are a source of flakiness
 fn disable_io_rules(rules: &mut RuleTable) {
-    rules.disable(Rule::ShebangMissingExecutableFile);
-    rules.disable(Rule::ShebangNotExecutable);
+    rules.disable(Rule::ExecutableFileWithoutShebang);
+    rules.disable(Rule::NonExecutableFileWithShebang);
 }
 
 fn benchmark_all_rules(criterion: &mut Criterion) {

@@ -1,6 +1,6 @@
 """IMAP4 client.
 
-Based on RFC 2060.
+Based on RFC 3501.
 
 Public class:           IMAP4
 Public variable:        Debug
@@ -21,8 +21,8 @@ from re import Pattern
 from socket import socket as _socket
 from ssl import SSLContext, SSLSocket
 from types import TracebackType
-from typing import IO, Any, Literal, SupportsAbs, SupportsInt, overload
-from typing_extensions import Self, TypeAlias, deprecated
+from typing import IO, Any, Literal, SupportsAbs, SupportsInt, TypeAlias, overload
+from typing_extensions import Self, deprecated
 
 __all__ = ["IMAP4", "IMAP4_stream", "Internaldate2tuple", "Int2AP", "ParseFlags", "Time2Internaldate", "IMAP4_SSL"]
 
@@ -107,6 +107,7 @@ class IMAP4:
         This connection will be used by the routines:
             read, readline, send, shutdown.
         """
+
     if sys.version_info >= (3, 14):
         @property
         @deprecated("IMAP4.file is unsupported, can cause errors, and may be removed.")
@@ -154,7 +155,9 @@ class IMAP4:
         (code, [data]) = <instance>.response(code)
         """
 
-    def append(self, mailbox: str, flags: str, date_time: str, message: ReadableBuffer) -> tuple[str, _list[bytes]]:
+    def append(
+        self, mailbox: str | None, flags: str | None, date_time: _TimeLike | None, message: ReadableBuffer
+    ) -> tuple[str, _list[bytes]]:
         """Append message to named mailbox.
 
         (typ, [data]) = <instance>.append(mailbox, flags, date_time, message)
@@ -276,6 +279,7 @@ class IMAP4:
 
         (typ, [[QUOTAROOT responses...], [QUOTA responses]]) = <instance>.getquotaroot(mailbox)
         """
+
     if sys.version_info >= (3, 14):
         def idle(self, duration: float | None = None) -> Idler:
             """Return an iterable IDLE context manager producing untagged responses.
@@ -288,13 +292,24 @@ class IMAP4:
             Note: 'duration' requires a socket connection (not IMAP4_stream).
             """
 
-    def list(self, directory: str = '""', pattern: str = "*") -> tuple[str, _AnyResponseData]:
-        """List mailbox names in directory matching pattern.
+    if sys.version_info >= (3, 13):
+        # Default was fixed in Python 3.13.15, 3.14.7
+        def list(self, directory: str = "", pattern: str = "*") -> tuple[str, _AnyResponseData]:
+            """List mailbox names in directory matching pattern.
 
-        (typ, [data]) = <instance>.list(directory='""', pattern='*')
+            (typ, [data]) = <instance>.list(directory='', pattern='*')
 
-        'data' is list of LIST responses.
-        """
+            'data' is list of LIST responses.
+            """
+
+    else:
+        def list(self, directory: str = '""', pattern: str = "*") -> tuple[str, _AnyResponseData]:
+            """List mailbox names in directory matching pattern.
+
+            (typ, [data]) = <instance>.list(directory='""', pattern='*')
+
+            'data' is list of LIST responses.
+            """
 
     def login(self, user: str, password: str) -> tuple[Literal["OK"], _list[bytes]]:
         """Identify client using plaintext password.
@@ -318,13 +333,24 @@ class IMAP4:
         Returns server 'BYE' response.
         """
 
-    def lsub(self, directory: str = '""', pattern: str = "*") -> _CommandResults:
-        """List 'subscribed' mailbox names in directory matching pattern.
+    if sys.version_info >= (3, 13):
+        # Default was fixed in Python 3.13.15, 3.14.7
+        def lsub(self, directory: str = "", pattern: str = "*") -> _CommandResults:
+            """List 'subscribed' mailbox names in directory matching pattern.
 
-        (typ, [data, ...]) = <instance>.lsub(directory='""', pattern='*')
+            (typ, [data, ...]) = <instance>.lsub(directory='', pattern='*')
 
-        'data' are tuples of message part envelope and data.
-        """
+            'data' are tuples of message part envelope and data.
+            """
+
+    else:
+        def lsub(self, directory: str = '""', pattern: str = "*") -> _CommandResults:
+            """List 'subscribed' mailbox names in directory matching pattern.
+
+            (typ, [data, ...]) = <instance>.lsub(directory='""', pattern='*')
+
+            'data' are tuples of message part envelope and data.
+            """
 
     def myrights(self, mailbox: str) -> _CommandResults:
         """Show my ACLs for a mailbox (i.e. the rights that I have on mailbox).
@@ -395,10 +421,18 @@ class IMAP4:
         (typ, [data]) = <instance>.setacl(mailbox, who, what)
         """
 
-    def setannotation(self, *args: str) -> _CommandResults:
-        """(typ, [data]) = <instance>.setannotation(mailbox[, entry, attribute]+)
-        Set ANNOTATIONs.
-        """
+    if sys.version_info >= (3, 13):
+        # Parameter "mailbox" was added in Python 3.13.15, 3.14.7
+        def setannotation(self, mailbox: str | bytes, *args: str) -> _CommandResults:
+            """(typ, [data]) = <instance>.setannotation(mailbox[, entry, attribute]+)
+            Set ANNOTATIONs.
+            """
+
+    else:
+        def setannotation(self, *args: str) -> _CommandResults:
+            """(typ, [data]) = <instance>.setannotation(mailbox[, entry, attribute]+)
+            Set ANNOTATIONs.
+            """
 
     def setquota(self, root: str, limits: str) -> _CommandResults:
         """Set the quota root's resource limits.
@@ -545,6 +579,7 @@ class IMAP4_SSL(IMAP4):
             ssl_context: None = None,
             timeout: float | None = None,
         ) -> None: ...
+
         keyfile: StrOrBytesPath | None
         certfile: StrOrBytesPath | None
     sslobj: SSLSocket
@@ -615,7 +650,9 @@ def Int2AP(num: SupportsAbs[SupportsInt]) -> bytes:
 def ParseFlags(resp: ReadableBuffer) -> tuple[bytes, ...]:
     """Convert IMAP4 flags response to python tuple."""
 
-def Time2Internaldate(date_time: float | time.struct_time | time._TimeTuple | datetime | str) -> str:
+_TimeLike: TypeAlias = float | time.struct_time | time._TimeTuple | datetime | str
+
+def Time2Internaldate(date_time: _TimeLike) -> str:
     """Convert date_time to IMAP4 INTERNALDATE representation.
 
     Return string in form: '"DD-Mmm-YYYY HH:MM:SS +HHMM"'.  The

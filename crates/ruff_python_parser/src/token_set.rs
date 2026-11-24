@@ -43,10 +43,10 @@ impl<const N: usize> From<[TokenKind; N]> for TokenSet {
 #[test]
 fn token_set_works_for_tokens() {
     use ruff_python_ast::token::TokenKind::*;
-    let mut ts = TokenSet::new([EndOfFile, Name]);
+    let mut ts = TokenSet::new([EndOfFile, Identifier]);
     assert!(ts.contains(EndOfFile));
-    assert!(ts.contains(Name));
+    assert!(ts.contains(Identifier));
     assert!(!ts.contains(Plus));
-    ts = ts.remove(Name);
-    assert!(!ts.contains(Name));
+    ts = ts.remove(Identifier);
+    assert!(!ts.contains(Identifier));
 }

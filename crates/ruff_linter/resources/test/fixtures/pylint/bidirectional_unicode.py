@@ -29,3 +29,6 @@ print("\N{RIGHT-TO-LEFT MARK}")
 
 # OK
 print("Hello World")
+
+# OK
+print("“مرحبا”")

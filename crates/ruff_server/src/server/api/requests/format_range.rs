@@ -1,5 +1,5 @@
 use anyhow::Context;
-use lsp_types::{self as types, Range, request as req};
+use lsp_types::{self as types, DocumentRangeFormattingRequest, Range};
 
 use crate::edit::{RangeExt, ToRangeExt};
 use crate::resolve::is_document_excluded_for_formatting;
@@ -11,16 +11,27 @@ use crate::{PositionEncoding, TextDocument};
 pub(crate) struct FormatRange;
 
 impl super::RequestHandler for FormatRange {
-    type RequestType = req::RangeFormatting;
+    type RequestType = DocumentRangeFormattingRequest;
 }
 
 impl super::BackgroundDocumentRequestHandler for FormatRange {
-    super::define_document_url!(params: &types::DocumentRangeFormattingParams);
+    super::define_document_uri!(params: &types::DocumentRangeFormattingParams);
+
     fn run_with_snapshot(
-        snapshot: DocumentSnapshot,
+        snapshot: Self::Snapshot,
         _client: &Client,
         params: types::DocumentRangeFormattingParams,
     ) -> Result<super::FormatResponse> {
+        let snapshot = match snapshot {
+            Ok(snapshot) => snapshot,
+            Err(uri) => {
+                tracing::warn!(
+                    "Returning no range formatting edits because document `{uri}` isn't open."
+                );
+                return Ok(None);
+            }
+        };
+
         format_document_range(&snapshot, params.range)
     }
 }
@@ -36,10 +47,7 @@ fn format_document_range(
         .context("Failed to get text document for the format range request")
         .unwrap();
     let query = snapshot.query();
-    let backend = snapshot
-        .client_settings()
-        .editor_settings()
-        .format_backend();
+    let backend = snapshot.format_backend();
     format_text_document_range(text_document, range, query, snapshot.encoding(), backend)
 }
 
@@ -51,8 +59,9 @@ fn format_text_document_range(
     encoding: PositionEncoding,
     backend: crate::format::FormatBackend,
 ) -> Result<super::FormatResponse> {
-    let settings = query.settings();
+    let settings = query.project_settings();
     let file_path = query.virtual_file_path();
+    let source_type = query.source_type_for_format();
 
     // If the document is excluded, return early.
     if is_document_excluded_for_formatting(
@@ -64,12 +73,23 @@ fn format_text_document_range(
         return Ok(None);
     }
 
+    let settings = match query.settings() {
+        Ok(settings) => settings,
+        Err(diagnostic) => {
+            tracing::warn!(
+                "Unable to format range in {} due to invalid script metadata: {}",
+                file_path.display(),
+                diagnostic.concise_message()
+            );
+            return Ok(None);
+        }
+    };
     let text = text_document.contents();
     let index = text_document.index();
     let range = range.to_text_range(text, index, encoding);
     let formatted_range = crate::format::format_range(
         text_document,
-        query.source_type(),
+        source_type,
         &settings.formatter,
         range,
         &file_path,

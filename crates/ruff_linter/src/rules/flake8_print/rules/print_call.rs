@@ -1,8 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::name::QualifiedName;
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::delete_stmt;
 use crate::{Fix, FixAvailability, Violation};
 
@@ -52,7 +55,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// This rule's fix is marked as unsafe, as it will remove `print` statements
 /// that are used beyond debugging purposes.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.57")]
+#[violation_metadata(stable_since = "v0.0.57", category = Category::Restriction)]
 pub(crate) struct Print;
 
 impl Violation for Print {
@@ -102,10 +105,10 @@ impl Violation for Print {
 /// This rule's fix is marked as unsafe, as it will remove `pprint` statements
 /// that are used beyond debugging purposes.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.57")]
-pub(crate) struct PPrint;
+#[violation_metadata(stable_since = "v0.0.57", category = Category::Restriction)]
+pub(crate) struct Pprint;
 
-impl Violation for PPrint {
+impl Violation for Pprint {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -119,31 +122,26 @@ impl Violation for PPrint {
 }
 
 /// T201, T203
-pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall, qualified_name: &QualifiedName) {
     let semantic = checker.semantic();
-
-    let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
-        return;
-    };
 
     let diagnostic = match qualified_name.segments() {
         ["" | "builtins", "print"] => {
             // If the print call has a `file=` argument (that isn't `None`, `"sys.stdout"`,
             // or `"sys.stderr"`), don't trigger T201.
-            if let Some(keyword) = call.arguments.find_keyword("file") {
-                if !keyword.value.is_none_literal_expr() {
-                    if semantic.resolve_qualified_name(&keyword.value).is_none_or(
-                        |qualified_name| {
-                            !matches!(qualified_name.segments(), ["sys", "stdout" | "stderr"])
-                        },
-                    ) {
-                        return;
-                    }
-                }
+            if has_non_default_output_target(semantic, call, "file") {
+                return;
             }
             checker.report_diagnostic_if_enabled(Print, call.func.range())
         }
-        ["pprint", "pprint"] => checker.report_diagnostic_if_enabled(PPrint, call.func.range()),
+        ["pprint", "pprint"] => {
+            // If the pprint call has a `stream=` argument (that isn't `None`,
+            // `"sys.stdout"`, or `"sys.stderr"`), don't trigger T203.
+            if has_non_default_output_target(semantic, call, "stream") {
+                return;
+            }
+            checker.report_diagnostic_if_enabled(Pprint, call.func.range())
+        }
         _ => return,
     };
 
@@ -161,4 +159,19 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
                 .isolate(Checker::isolation(semantic.current_statement_parent_id())),
         );
     }
+}
+
+fn has_non_default_output_target(
+    semantic: &SemanticModel,
+    call: &ast::ExprCall,
+    keyword: &str,
+) -> bool {
+    call.arguments.find_keyword(keyword).is_some_and(|keyword| {
+        !keyword.value.is_none_literal_expr()
+            && semantic
+                .resolve_qualified_name(&keyword.value)
+                .is_none_or(|qualified_name| {
+                    !matches!(qualified_name.segments(), ["sys", "stdout" | "stderr"])
+                })
+    })
 }

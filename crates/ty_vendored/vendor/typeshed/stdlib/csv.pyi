@@ -83,11 +83,7 @@ from _csv import (
 
 if sys.version_info >= (3, 12):
     from _csv import QUOTE_NOTNULL as QUOTE_NOTNULL, QUOTE_STRINGS as QUOTE_STRINGS
-if sys.version_info >= (3, 10):
-    from _csv import Reader, Writer
-else:
-    from _csv import _reader as Reader, _writer as Writer
-
+from _csv import Reader, Writer
 from _typeshed import SupportsWrite
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from types import GenericAlias
@@ -122,6 +118,10 @@ if sys.version_info < (3, 13):
 
 _T = TypeVar("_T")
 
+# Note that this is often the wrong class: it is only useful for sub-classing
+# (e.g. csv.excel). Dialect objects returned at runtime, such as the return
+# value of get_dialect(), are usually _csv.Dialect, which is not a subclass
+# of csv.Dialect.
 class Dialect:
     """Describe a CSV dialect.
 
@@ -157,6 +157,7 @@ class DictReader(Generic[_T]):
     reader: Reader
     dialect: _DialectLike
     line_num: int
+
     @overload
     def __init__(
         self,
@@ -193,13 +194,15 @@ class DictReader(Generic[_T]):
         quoting: _QuotingType = 0,
         strict: bool = False,
     ) -> None: ...
+
     def __iter__(self) -> Self: ...
     def __next__(self) -> dict[_T | Any, str | Any]: ...
     if sys.version_info >= (3, 12):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 class DictWriter(Generic[_T]):
@@ -231,7 +234,8 @@ class DictWriter(Generic[_T]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 class Sniffer:
@@ -244,6 +248,10 @@ class Sniffer:
     def sniff(self, sample: str, delimiters: str | None = None) -> type[Dialect]:
         """
         Returns a dialect (or None) corresponding to the sample
+
+        If several delimiters fit the sample equally well, the
+        delimiters listed in the preferred attribute are preferred, in
+        that order, no matter how many times each of them occurs.
         """
 
     def has_header(self, sample: str) -> bool: ...

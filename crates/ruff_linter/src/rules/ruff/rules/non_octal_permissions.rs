@@ -6,6 +6,7 @@ use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -20,18 +21,22 @@ use crate::{FixAvailability, Violation};
 /// ## Example
 ///
 /// ```python
+/// import os
+///
 /// os.chmod("foo", 644)
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
+/// import os
+///
 /// os.chmod("foo", 0o644)
 /// ```
 ///
 /// ## Fix safety
 ///
-/// There are two categories of fix, the first of which is where it looks like
+/// There are two categories of unsafe fixes, the first of which is where it looks like
 /// the author intended to use an octal literal but the `0o` prefix is missing:
 ///
 /// ```python
@@ -72,7 +77,7 @@ use crate::{FixAvailability, Violation};
 ///
 /// A fix is only available if the integer literal matches a set of common modes.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.12.1")]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
 pub(crate) struct NonOctalPermissions;
 
 impl Violation for NonOctalPermissions {
@@ -90,13 +95,20 @@ impl Violation for NonOctalPermissions {
 
 /// RUF064
 pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
-    let mode_arg = find_func_mode_arg(call, checker.semantic())
-        .or_else(|| find_method_mode_arg(call, checker.semantic()));
+    if let Some(mode_arg) = find_func_mode_arg(call, checker.semantic())
+        .or_else(|| find_method_mode_arg(call, checker.semantic()))
+    {
+        check_mode(checker, mode_arg);
+    }
 
-    let Some(mode_arg) = mode_arg else {
-        return;
-    };
+    if let Some(parent_mode_arg) = find_func_parent_mode_arg(call, checker.semantic())
+        .or_else(|| find_method_parent_mode_arg(call, checker.semantic()))
+    {
+        check_mode(checker, parent_mode_arg);
+    }
+}
 
+fn check_mode(checker: &Checker, mode_arg: &Expr) {
     let Expr::NumberLiteral(ast::ExprNumberLiteral {
         value: ast::Number::Int(int),
         ..
@@ -111,8 +123,17 @@ pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(NonOctalPermissions, mode_arg.range());
+    let mut diagnostic = checker.report_custom_diagnostic(NonOctalPermissions, mode_arg.range());
 
+    let Some(mode) = int.as_u16() else {
+        return;
+    };
+
+    diagnostic.info(format_args!(
+        "Current value of {mode_literal} ({:#05o}) sets permissions: {}",
+        mode & 0o7777,
+        get_permissions(mode)
+    ));
     // Don't suggest a fix for 0x or 0b literals.
     if mode_literal.starts_with("0x") || mode_literal.starts_with("0b") {
         return;
@@ -128,7 +149,10 @@ pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
     let Some(suggested) = int.as_u16().and_then(suggest_fix) else {
         return;
     };
-
+    let suggested_permissions = get_permissions(suggested);
+    diagnostic.info(format_args!(
+        "Suggested value of {suggested:#05o} sets permissions: {suggested_permissions}"
+    ));
     let edit = Edit::range_replacement(format!("{suggested:#o}"), mode_arg.range());
     diagnostic.set_fix(Fix::unsafe_edit(edit));
 }
@@ -158,6 +182,30 @@ fn find_method_mode_arg<'a>(call: &'a ExprCall, semantic: &SemanticModel) -> Opt
             ["pathlib", "Path" | "PosixPath" | "WindowsPath"],
             "chmod" | "lchmod" | "mkdir" | "touch",
         ) => call.arguments.find_argument_value("mode", 0),
+        _ => None,
+    }
+}
+
+fn find_func_parent_mode_arg<'a>(call: &'a ExprCall, semantic: &SemanticModel) -> Option<&'a Expr> {
+    if !semantic.matches_qualified_name(&call.func, &["os", "makedirs"]) {
+        return None;
+    }
+    call.arguments
+        .find_keyword("parent_mode")
+        .map(|keyword| &keyword.value)
+}
+
+fn find_method_parent_mode_arg<'a>(
+    call: &'a ExprCall,
+    semantic: &SemanticModel,
+) -> Option<&'a Expr> {
+    let (type_name, attr_name) = resolve_method_call(&call.func, semantic)?;
+
+    match (type_name.segments(), attr_name) {
+        (["pathlib", "Path" | "PosixPath" | "WindowsPath"], "mkdir") => call
+            .arguments
+            .find_keyword("parent_mode")
+            .map(|keyword| &keyword.value),
         _ => None,
     }
 }
@@ -229,4 +277,21 @@ fn suggest_fix(mode: u16) -> Option<u16> {
         777 | 511 => Some(0o777), // r-x--x--x, seems unlikely
         _ => None,
     }
+}
+
+fn get_permissions(mode: u16) -> String {
+    let perm = mode & 0o777;
+    let mut out = String::with_capacity(9);
+    let append_permission = |out: &mut String, bits: u16| {
+        out.push(if bits & 0o4 != 0 { 'r' } else { '-' });
+        out.push(if bits & 0o2 != 0 { 'w' } else { '-' });
+        out.push(if bits & 0o1 != 0 { 'x' } else { '-' });
+    };
+    out.push_str("u=");
+    append_permission(&mut out, (perm >> 6) & 0o7);
+    out.push_str(", g=");
+    append_permission(&mut out, (perm >> 3) & 0o7);
+    out.push_str(", o=");
+    append_permission(&mut out, perm & 0o7);
+    out
 }

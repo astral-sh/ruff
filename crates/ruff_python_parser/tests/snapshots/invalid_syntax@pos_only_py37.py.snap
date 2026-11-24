@@ -299,7 +299,6 @@ Module(
 4 | def foo(a, *args, /, b): ...
 5 | def foo(a, //): ...
   |            ^^ Syntax Error: Expected `,`, found `//`
-  |
 
 
 ## Unsupported Syntax Errors

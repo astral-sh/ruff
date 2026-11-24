@@ -1,0 +1,307 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/unicode_name.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..221,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 80..93,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            node_index: NodeIndex(None),
+                            range: 80..93,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 80..93,
+                                        node_index: NodeIndex(None),
+                                        value: "",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 94..108,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            node_index: NodeIndex(None),
+                            range: 94..108,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 94..108,
+                                        node_index: NodeIndex(None),
+                                        value: "",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 109..127,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            node_index: NodeIndex(None),
+                            range: 109..127,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 109..127,
+                                        node_index: NodeIndex(None),
+                                        value: "",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 128..144,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            node_index: NodeIndex(None),
+                            range: 128..144,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 128..144,
+                                        node_index: NodeIndex(None),
+                                        value: "",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 145..159,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            node_index: NodeIndex(None),
+                            range: 145..159,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 145..159,
+                                        node_index: NodeIndex(None),
+                                        value: "",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 160..182,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            node_index: NodeIndex(None),
+                            range: 160..182,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 160..182,
+                                        node_index: NodeIndex(None),
+                                        value: "",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 183..212,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            node_index: NodeIndex(None),
+                            range: 183..212,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 183..212,
+                                        node_index: NodeIndex(None),
+                                        value: "",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 213..220,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            node_index: NodeIndex(None),
+                            range: 213..220,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 213..220,
+                                        node_index: NodeIndex(None),
+                                        value: "",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # Named escapes require the registered spaces and hyphens, ignoring ASCII case.
+2 | '\N{LOWLINE}'
+  |     ^^^^^^^ Syntax Error: Got unexpected unicode
+3 | '\N{LOW_LINE}'
+4 | '\N{FULL S-T-O-P}'
+  |
+
+
+  |
+1 | # Named escapes require the registered spaces and hyphens, ignoring ASCII case.
+2 | '\N{LOWLINE}'
+3 | '\N{LOW_LINE}'
+  |     ^^^^^^^^ Syntax Error: Got unexpected unicode
+4 | '\N{FULL S-T-O-P}'
+5 | '\N{ FULL STOP}'
+  |
+
+
+  |
+2 | '\N{LOWLINE}'
+3 | '\N{LOW_LINE}'
+4 | '\N{FULL S-T-O-P}'
+  |     ^^^^^^^^^^^^ Syntax Error: Got unexpected unicode
+5 | '\N{ FULL STOP}'
+6 | '\N{new_line}'
+  |
+
+
+  |
+3 | '\N{LOW_LINE}'
+4 | '\N{FULL S-T-O-P}'
+5 | '\N{ FULL STOP}'
+  |     ^^^^^^^^^^ Syntax Error: Got unexpected unicode
+6 | '\N{new_line}'
+7 | '\N{HANGULSYLLABLEGA}'
+  |
+
+
+  |
+4 | '\N{FULL S-T-O-P}'
+5 | '\N{ FULL STOP}'
+6 | '\N{new_line}'
+  |     ^^^^^^^^ Syntax Error: Got unexpected unicode
+7 | '\N{HANGULSYLLABLEGA}'
+8 | '\N{CJKUNIFIEDIDEOGRAPH4E00}'
+  |
+
+
+  |
+5 | '\N{ FULL STOP}'
+6 | '\N{new_line}'
+7 | '\N{HANGULSYLLABLEGA}'
+  |     ^^^^^^^^^^^^^^^^ Syntax Error: Got unexpected unicode
+8 | '\N{CJKUNIFIEDIDEOGRAPH4E00}'
+9 | '\N{-}'
+  |
+
+
+  |
+6 | '\N{new_line}'
+7 | '\N{HANGULSYLLABLEGA}'
+8 | '\N{CJKUNIFIEDIDEOGRAPH4E00}'
+  |     ^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Got unexpected unicode
+9 | '\N{-}'
+  |
+
+
+  |
+7 | '\N{HANGULSYLLABLEGA}'
+8 | '\N{CJKUNIFIEDIDEOGRAPH4E00}'
+9 | '\N{-}'
+  |     ^ Syntax Error: Got unexpected unicode

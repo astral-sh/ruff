@@ -8,21 +8,21 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_db::diagnostic::DiagnosticTag;
     use test_case::test_case;
 
     use crate::assert_diagnostics;
     use crate::registry::Rule;
 
     use crate::settings::LinterSettings;
-    use crate::test::test_path;
+    use crate::test::{test_path, test_snippet};
 
-    use crate::settings::types::PreviewMode;
     use ruff_python_ast::PythonVersion;
 
     #[test_case(Rule::AbstractBaseClassWithoutAbstractMethod, Path::new("B024.py"))]
     #[test_case(Rule::AssertFalse, Path::new("B011.py"))]
-    #[test_case(Rule::AssertRaisesException, Path::new("B017_0.py"))]
-    #[test_case(Rule::AssertRaisesException, Path::new("B017_1.py"))]
+    #[test_case(Rule::AssertRaisesExceptionOrBaseException, Path::new("B017_0.py"))]
+    #[test_case(Rule::AssertRaisesExceptionOrBaseException, Path::new("B017_1.py"))]
     #[test_case(Rule::AssignmentToOsEnviron, Path::new("B003.py"))]
     #[test_case(Rule::CachedInstanceMethod, Path::new("B019.py"))]
     #[test_case(Rule::ClassAsDataStructure, Path::new("class_as_data_structure.py"))]
@@ -34,32 +34,33 @@ mod tests {
     #[test_case(Rule::ExceptWithEmptyTuple, Path::new("B029.py"))]
     #[test_case(Rule::ExceptWithNonExceptionClasses, Path::new("B030.py"))]
     #[test_case(Rule::FStringDocstring, Path::new("B021.py"))]
-    #[test_case(Rule::FunctionCallInDefaultArgument, Path::new("B006_B008.py"))]
+    #[test_case(Rule::FunctionCallInParameterDefault, Path::new("B006_B008.py"))]
     #[test_case(Rule::FunctionUsesLoopVariable, Path::new("B023.py"))]
-    #[test_case(Rule::GetAttrWithConstant, Path::new("B009_B010.py"))]
+    #[test_case(Rule::GetattrWithConstant, Path::new("B009_B010.py"))]
     #[test_case(Rule::JumpStatementInFinally, Path::new("B012.py"))]
     #[test_case(Rule::LoopVariableOverridesIterator, Path::new("B020.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_2.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_3.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_4.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_5.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_6.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_7.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_8.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_9.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.pyi"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_1.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_2.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_3.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_4.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_5.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_6.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_7.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_8.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_9.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_B008.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_1.pyi"))]
     #[test_case(Rule::NoExplicitStacklevel, Path::new("B028.py"))]
     #[test_case(Rule::RaiseLiteral, Path::new("B016.py"))]
     #[test_case(Rule::RaiseWithoutFromInsideExcept, Path::new("B904.py"))]
-    #[test_case(Rule::ReSubPositionalArgs, Path::new("B034.py"))]
+    #[test_case(Rule::ReSubPositionalArguments, Path::new("B034.py"))]
     #[test_case(Rule::RedundantTupleInExceptionHandler, Path::new("B013.py"))]
     #[test_case(Rule::ReuseOfGroupbyGenerator, Path::new("B031.py"))]
-    #[test_case(Rule::SetAttrWithConstant, Path::new("B009_B010.py"))]
-    #[test_case(Rule::StarArgUnpackingAfterKeywordArg, Path::new("B026.py"))]
+    #[test_case(Rule::DelattrWithConstant, Path::new("B043.py"))]
+    #[test_case(Rule::SetattrWithConstant, Path::new("B009_B010.py"))]
+    #[test_case(Rule::StarArgAfterKeyword, Path::new("B026.py"))]
     #[test_case(Rule::StaticKeyDictComprehension, Path::new("B035.py"))]
-    #[test_case(Rule::StripWithMultiCharacters, Path::new("B005.py"))]
+    #[test_case(Rule::StripWithDuplicateCharacters, Path::new("B005.py"))]
     #[test_case(Rule::UnaryPrefixIncrementDecrement, Path::new("B002.py"))]
     #[test_case(Rule::UnintentionalTypeAnnotation, Path::new("B032.py"))]
     #[test_case(Rule::UnreliableCallableCheck, Path::new("B004.py"))]
@@ -73,8 +74,9 @@ mod tests {
     #[test_case(Rule::LoopIteratorMutation, Path::new("B909.py"))]
     #[test_case(Rule::MutableContextvarDefault, Path::new("B039.py"))]
     #[test_case(Rule::BatchedWithoutExplicitStrict, Path::new("B911.py"))]
+    #[test_case(Rule::MapWithoutExplicitStrict, Path::new("B912.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
@@ -83,31 +85,25 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::MapWithoutExplicitStrict, Path::new("B912.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_2.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_3.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_4.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_5.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_6.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_7.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_8.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_9.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.pyi"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_1.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_2.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_3.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_4.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_5.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_6.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_7.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_8.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_9.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_B008.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_1.pyi"))]
+    #[test_case(Rule::StripWithDuplicateCharacters, Path::new("B005.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(path).as_path(),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                unresolved_target_version: PythonVersion::PY314.into(),
-                ..LinterSettings::for_rule(rule_code)
-            },
+            &LinterSettings::for_rule(rule_code)
+                .with_preview_mode()
+                .with_target_version(PythonVersion::PY314),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -123,6 +119,11 @@ mod tests {
         Path::new("B912.py"),
         PythonVersion::PY313
     )]
+    #[test_case(
+        Rule::StaticKeyDictComprehension,
+        Path::new("B035_py315.py"),
+        PythonVersion::PY315
+    )]
     fn rules_with_target_version(
         rule_code: Rule,
         path: &Path,
@@ -130,17 +131,14 @@ mod tests {
     ) -> Result<()> {
         let snapshot = format!(
             "{}_py{}{}_{}",
-            rule_code.noqa_code(),
+            rule_code.name(),
             target_version.major,
             target_version.minor,
             path.to_string_lossy(),
         );
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(path).as_path(),
-            &LinterSettings {
-                unresolved_target_version: target_version.into(),
-                ..LinterSettings::for_rule(rule_code)
-            },
+            &LinterSettings::for_rule(rule_code).with_target_version(target_version),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -169,7 +167,7 @@ mod tests {
                         "custom.ImmutableTypeB".to_string(),
                     ],
                 },
-                ..LinterSettings::for_rule(Rule::MutableArgumentDefault)
+                ..LinterSettings::for_rule(Rule::MutableParameterDefault)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
@@ -190,7 +188,7 @@ mod tests {
                         "B008_extended.Class".to_string(),
                     ],
                 },
-                ..LinterSettings::for_rule(Rule::FunctionCallInDefaultArgument)
+                ..LinterSettings::for_rule(Rule::FunctionCallInParameterDefault)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
@@ -211,5 +209,38 @@ mod tests {
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
+    }
+
+    #[test]
+    fn b007_unnecessary_tag_only_for_certain_cases() {
+        let settings = LinterSettings::for_rule(Rule::UnusedLoopControlVariable);
+
+        let certain = test_snippet(
+            r"
+for i in range(3):
+    print(1)
+",
+            &settings,
+        );
+        assert_eq!(certain.len(), 1);
+        assert!(
+            certain[0]
+                .primary_tags()
+                .is_some_and(|tags| tags.contains(&DiagnosticTag::Unnecessary))
+        );
+
+        let uncertain = test_snippet(
+            r"
+for i in range(3):
+    print(locals())
+",
+            &settings,
+        );
+        assert_eq!(uncertain.len(), 1);
+        assert!(
+            !uncertain[0]
+                .primary_tags()
+                .is_some_and(|tags| tags.contains(&DiagnosticTag::Unnecessary))
+        );
     }
 }

@@ -1,7 +1,6 @@
-use std::borrow::Cow;
-
 use lsp_server::ErrorCode;
-use lsp_types::{self as types, request as req};
+use lsp_types::CodeActionResolveRequest;
+use lsp_types::{self as types};
 
 use ruff_linter::codes::Rule;
 
@@ -12,26 +11,50 @@ use crate::server::Result;
 use crate::server::SupportedCodeAction;
 use crate::server::api::LSPResult;
 use crate::session::Client;
-use crate::session::{DocumentQuery, DocumentSnapshot, ResolvedClientCapabilities};
+use crate::session::{DocumentQuery, DocumentSnapshot, ResolvedClientCapabilities, Session};
 
 pub(crate) struct CodeActionResolve;
 
 impl super::RequestHandler for CodeActionResolve {
-    type RequestType = req::CodeActionResolveRequest;
+    type RequestType = CodeActionResolveRequest;
 }
 
-impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
-    fn document_url(params: &types::CodeAction) -> Cow<'_, types::Url> {
-        let uri: lsp_types::Url = serde_json::from_value(params.data.clone().unwrap_or_default())
-            .expect("code actions should have a URI in their data fields");
-        Cow::Owned(uri)
+impl super::BackgroundRequestHandler for CodeActionResolve {
+    type Snapshot = std::result::Result<DocumentSnapshot, String>;
+
+    fn snapshot(session: &Session, action: &types::CodeAction) -> Self::Snapshot {
+        let data = action
+            .data
+            .clone()
+            .ok_or_else(|| "it doesn't contain Ruff's document URI payload".to_string())?;
+
+        let uri: lsp_types::Uri = serde_json::from_value(data)
+            .map_err(|err| format!("its Ruff document URI payload is invalid: {err}"))?;
+
+        session
+            .take_snapshot(uri.clone())
+            .ok_or_else(|| format!("document `{uri}` isn't open"))
     }
+
     fn run_with_snapshot(
-        snapshot: DocumentSnapshot,
+        snapshot: Self::Snapshot,
         _client: &Client,
         mut action: types::CodeAction,
     ) -> Result<types::CodeAction> {
+        let snapshot = match snapshot {
+            Ok(snapshot) => snapshot,
+            Err(err) => {
+                tracing::warn!("Returning code action unchanged because {err}.");
+                return Ok(action);
+            }
+        };
+
         let query = snapshot.query();
+
+        if query.settings().is_err() {
+            action.edit = None;
+            return Ok(action);
+        }
 
         let code_actions = SupportedCodeAction::from_kind(
             action
@@ -109,7 +132,10 @@ pub(super) fn fix_all_edit(
     query: &DocumentQuery,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    crate::fix::fix_all(query, &query.settings().linter, encoding)
+    let Ok(settings) = query.settings() else {
+        return Ok(Fixes::default());
+    };
+    crate::fix::fix_all(query, &settings.linter, encoding)
 }
 
 pub(super) fn resolve_edit_for_organize_imports(
@@ -126,10 +152,20 @@ pub(super) fn organize_imports_edit(
     query: &DocumentQuery,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    let mut linter_settings = query.settings().linter.clone();
+    let Ok(settings) = query.settings() else {
+        return Ok(Fixes::default());
+    };
+    let mut linter_settings = settings.linter.clone();
     linter_settings.rules = [
         Rule::UnsortedImports,       // I001
         Rule::MissingRequiredImport, // I002
+        // Note: ModuleImportNotAtTopOfFile's fixes are unsafe. We include them
+        // here in order to match isort's behaviour and what we believe
+        // developers want. Since the fixes are unsafe, we're relying on this
+        // edit action not performing them unless the user has opted-in to these
+        // fixes in their settings (i.e: `extend-safe-fixes` in the
+        // `pyproject.toml` or similar).
+        Rule::ModuleImportNotAtTopOfFile, // E402
     ]
     .into_iter()
     .collect();

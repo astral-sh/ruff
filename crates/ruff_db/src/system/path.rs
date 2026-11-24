@@ -8,8 +8,22 @@ use std::path::{Path, PathBuf, StripPrefixError};
 ///
 /// The path is guaranteed to be valid UTF-8.
 #[repr(transparent)]
-#[derive(Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Eq, PartialOrd, Ord)]
 pub struct SystemPath(Utf8Path);
+
+impl PartialEq for SystemPath {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.0.as_std_path().cmp(other.0.as_std_path()).is_eq()
+    }
+}
+
+impl std::hash::Hash for SystemPath {
+    #[inline]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::hash::Hash::hash(&self.0, state);
+    }
+}
 
 impl SystemPath {
     pub fn new(path: &(impl AsRef<Utf8Path> + ?Sized)) -> &Self {
@@ -524,6 +538,13 @@ impl SystemPathBuf {
         Utf8PathBuf::from_path_buf(path).map(Self)
     }
 
+    /// Try to convert from `path` directly, falling back to the lossy string representation on
+    /// error.
+    pub fn from_path_buf_lossy(path: std::path::PathBuf) -> Self {
+        Self::from_path_buf(path)
+            .unwrap_or_else(|path| Self::from(path.to_string_lossy().to_string()))
+    }
+
     /// Extends `self` with `path`.
     ///
     /// If `path` is absolute, it replaces the current path.
@@ -575,6 +596,33 @@ impl SystemPathBuf {
     #[inline]
     pub fn as_path(&self) -> &SystemPath {
         SystemPath::new(&self.0)
+    }
+}
+
+impl From<&SystemPath> for Box<SystemPath> {
+    fn from(path: &SystemPath) -> Self {
+        Box::from(path.to_path_buf())
+    }
+}
+
+impl From<SystemPathBuf> for Box<SystemPath> {
+    fn from(path: SystemPathBuf) -> Self {
+        let path = Box::into_raw(path.0.into_boxed_path()) as *mut SystemPath;
+        // SAFETY: SystemPath is marked as #[repr(transparent)] so the conversion from a
+        // *mut Utf8Path to a *mut SystemPath is valid.
+        unsafe { Box::from_raw(path) }
+    }
+}
+
+impl Clone for Box<SystemPath> {
+    fn clone(&self) -> Self {
+        Box::from(&**self)
+    }
+}
+
+impl get_size2::GetSize for Box<SystemPath> {
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(&self, tracker: T) -> (usize, T) {
+        (std::mem::size_of_val(&**self), tracker)
     }
 }
 
@@ -780,6 +828,33 @@ impl SystemVirtualPathBuf {
     }
 }
 
+impl From<&SystemVirtualPath> for Box<SystemVirtualPath> {
+    fn from(path: &SystemVirtualPath) -> Self {
+        Box::from(path.to_path_buf())
+    }
+}
+
+impl From<SystemVirtualPathBuf> for Box<SystemVirtualPath> {
+    fn from(path: SystemVirtualPathBuf) -> Self {
+        let path = Box::into_raw(path.0.into_boxed_str()) as *mut SystemVirtualPath;
+        // SAFETY: SystemVirtualPath is marked as #[repr(transparent)] so the conversion from a
+        // *mut str to a *mut SystemVirtualPath is valid.
+        unsafe { Box::from_raw(path) }
+    }
+}
+
+impl Clone for Box<SystemVirtualPath> {
+    fn clone(&self) -> Self {
+        Box::from(&**self)
+    }
+}
+
+impl get_size2::GetSize for Box<SystemVirtualPath> {
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(&self, tracker: T) -> (usize, T) {
+        (std::mem::size_of_val(&**self), tracker)
+    }
+}
+
 impl From<String> for SystemVirtualPathBuf {
     fn from(value: String) -> Self {
         SystemVirtualPathBuf(value)
@@ -927,5 +1002,45 @@ where
         }
 
         Some(current)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SystemPath, SystemPathBuf};
+
+    #[test]
+    fn component_equality_and_borrowed_lookup() {
+        let paths = dashmap::DashMap::new();
+        paths.insert(SystemPathBuf::from("a/b"), 1);
+
+        for alias in ["a/b", "a//b", "a/./b", "a/b/", "a/b/."] {
+            let path = SystemPath::new(alias);
+            assert_eq!(path, SystemPath::new("a/b"));
+            assert_eq!(paths.get(path).map(|value| *value), Some(1));
+        }
+        for distinct in ["./a/b", "a/x/../b", "a/c"] {
+            let path = SystemPath::new(distinct);
+            assert_ne!(path, SystemPath::new("a/b"));
+            assert!(paths.get(path).is_none());
+        }
+        assert_ne!(SystemPath::new(""), SystemPath::new("."));
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn windows_component_equality_and_borrowed_lookup() {
+        let paths = dashmap::DashMap::new();
+        paths.insert(SystemPathBuf::from(r"C:\a\b"), 1);
+
+        for alias in [r"C:\a\b", "C:/a/b", r"C:\a\.\b"] {
+            assert_eq!(
+                paths.get(SystemPath::new(alias)).map(|value| *value),
+                Some(1)
+            );
+        }
+        for distinct in [r"C:\a\x\..\b", r"\\?\C:\a\b"] {
+            assert!(paths.get(SystemPath::new(distinct)).is_none());
+        }
     }
 }

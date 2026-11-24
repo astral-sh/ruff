@@ -63,6 +63,435 @@ def _(x: tuple[int, ...]):
         reveal_type(x)  # revealed: tuple[int, ...] & ~AlwaysTruthy
 ```
 
+## Exact length comparisons
+
+Exact length constraints specialize exact tuple types to the observed length and eliminate types
+whose encoded length is incompatible with the comparison. Types that do not encode their length
+remain unchanged:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Literal, assert_never
+
+def _(val: tuple[int] | tuple[str, str] | tuple[int, *tuple[str, ...], int]):
+    if len(val) == 1:
+        reveal_type(val)  # revealed: tuple[int]
+
+    if len(val) == 2:
+        reveal_type(val)  # revealed: tuple[str, str] | tuple[int, int]
+
+    if len(val) == 3:
+        reveal_type(val)  # revealed: tuple[int, str, int]
+
+def _(val: tuple[int] | tuple[str, str]):
+    if 1 != len(val):
+        reveal_type(val)  # revealed: tuple[str, str]
+    else:
+        reveal_type(val)  # revealed: tuple[int]
+
+def _(val: tuple[int, ...]):
+    if val and len(val) == 2:
+        reveal_type(val)  # revealed: tuple[int, int]
+
+def _(val: tuple[int, ...]):
+    if len(val) != 2:
+        reveal_type(val)  # revealed: tuple[int, ...]
+    else:
+        reveal_type(val)  # revealed: tuple[int, int]
+
+def _(val: tuple[int] | tuple[str, str]):
+    if len(val) == True:
+        reveal_type(val)  # revealed: tuple[int]
+        one: tuple[int] = val
+
+def _(val: tuple[()] | tuple[int]):
+    if False == len(val):
+        reveal_type(val)  # revealed: tuple[()]
+        empty: tuple[()] = val
+
+def _(val: tuple[int]):
+    if len(val) == 2:
+        assert_never(val)
+
+def _(x: Literal[b"", b"a"], y: Literal["a", "ab"]):
+    if len(x) == 1:
+        reveal_type(x)  # revealed: Literal[b"a"]
+    else:
+        reveal_type(x)  # revealed: Literal[b""]
+
+    if len(y) == 1:
+        reveal_type(y)  # revealed: Literal["a"]
+    else:
+        reveal_type(y)  # revealed: Literal["ab"]
+```
+
+Exact length narrowing projects through type-variable constraints and bounds while preserving the
+type variable:
+
+```py
+from typing import TypeVar, assert_never
+
+ConstrainedTuple = TypeVar(
+    "ConstrainedTuple",
+    tuple[int, int],
+    tuple[int, int, str],
+)
+
+def constrained_tuple(value: ConstrainedTuple) -> ConstrainedTuple:
+    if len(value) == 2:
+        reveal_type(value)  # revealed: ConstrainedTuple@constrained_tuple & tuple[int, int]
+        return value
+    elif len(value) == 3:
+        reveal_type(value)  # revealed: ConstrainedTuple@constrained_tuple & tuple[int, int, str]
+        return value
+    else:
+        assert_never(value)
+
+BoundTuple = TypeVar(
+    "BoundTuple",
+    bound=tuple[int, int] | tuple[int, int, str],
+)
+
+def bounded_tuple(value: BoundTuple) -> BoundTuple:
+    if len(value) == 2:
+        reveal_type(value)  # revealed: BoundTuple@bounded_tuple & tuple[int, int]
+        return value
+    elif len(value) == 3:
+        reveal_type(value)  # revealed: BoundTuple@bounded_tuple & tuple[int, int, str]
+        return value
+    else:
+        assert_never(value)
+
+VariableTuple = TypeVar(
+    "VariableTuple",
+    tuple[int, ...],
+    tuple[str],
+)
+
+def variable_tuple(value: VariableTuple) -> VariableTuple:
+    if len(value) == 2:
+        reveal_type(value)  # revealed: VariableTuple@variable_tuple & tuple[int, int]
+    return value
+```
+
+Tuple subclasses are filtered using their tuple spec while preserving the subclass:
+
+```py
+class One(tuple[int]): ...
+class Two(tuple[int, int]): ...
+class Variable(tuple[int, ...]): ...
+
+def _(value: One | Two | Variable):
+    if len(value) == 1:
+        reveal_type(value)  # revealed: One | Variable
+    else:
+        reveal_type(value)  # revealed: Two | Variable
+```
+
+Types whose `__len__` return types encode one or more possible lengths are filtered while
+unknown-length alternatives are preserved:
+
+```py
+from typing import Literal
+
+class LengthThree:
+    def __len__(self) -> Literal[3]:
+        return 3
+
+class LengthFour:
+    def __len__(self) -> Literal[4]:
+        return 4
+
+class LengthOneOrTwo:
+    def __len__(self) -> Literal[1, 2]:
+        return 1
+
+def _(value: LengthThree | LengthFour | list[int]):
+    if len(value) == 3:
+        reveal_type(value)  # revealed: LengthThree | list[int]
+    else:
+        reveal_type(value)  # revealed: LengthFour | list[int]
+
+def _(value: LengthOneOrTwo | LengthThree):
+    if len(value) == 3:
+        reveal_type(value)  # revealed: LengthThree
+    else:
+        reveal_type(value)  # revealed: LengthOneOrTwo
+
+def _(value: LengthOneOrTwo | LengthThree):
+    if len(value) == 1:
+        reveal_type(value)  # revealed: LengthOneOrTwo
+    else:
+        reveal_type(value)  # revealed: LengthOneOrTwo | LengthThree
+```
+
+Boolean-valued `__len__` return types are normalized to their corresponding integer lengths before
+filtering:
+
+```py
+from typing import Literal
+
+class TrueLength:
+    def __len__(self) -> Literal[True]:
+        return True
+
+class FalseLength:
+    def __len__(self) -> Literal[False]:
+        return False
+
+def _(value: TrueLength | FalseLength):
+    if len(value) == 1:
+        reveal_type(value)  # revealed: TrueLength
+    else:
+        reveal_type(value)  # revealed: FalseLength
+```
+
+Length narrowing preserves a tuple's shape when a required element has type `Never`:
+
+```py
+from typing import Never
+
+def _(value: tuple[Never, *tuple[int, ...]]) -> None:
+    if len(value) == 1:
+        reveal_type(value)  # revealed: tuple[Never]
+```
+
+## Exact length comparisons with type variable tuples
+
+Narrowing a tuple's length preserves its type variable tuple, so a function can still return its
+input after checking for an empty or nonempty tuple.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def identity[*Ts](value: tuple[*Ts]) -> tuple[*Ts]:
+    if len(value) == 0:
+        reveal_type(value)  # revealed: tuple[*Ts@identity] & tuple[()]
+        return value
+    elif len(value) == 1:
+        reveal_type(value)  # revealed: tuple[*Ts@identity] & tuple[object]
+        return value
+    return value
+```
+
+Fixed prefix and suffix elements retain their types while the original pack is preserved.
+
+```py
+def with_boundaries[*Ts](value: tuple[int, *Ts, str]) -> tuple[int, *Ts, str]:
+    if len(value) == 2:
+        reveal_type(value)  # revealed: tuple[int, *Ts@with_boundaries, str] & tuple[int, str]
+        return value
+    return value
+```
+
+An alias for the tuple preserves the same pack identity when its length is narrowed.
+
+```py
+type Pack[*Ts] = tuple[*Ts]
+
+def aliased_identity[*Ts](value: Pack[*Ts]) -> Pack[*Ts]:
+    if len(value) == 1:
+        reveal_type(value)  # revealed: tuple[*Ts@aliased_identity] & tuple[object]
+        return value
+    return value
+```
+
+With a required `Never` element, the refined type should be `tuple[Never, *Ts] & tuple[Never]`.
+TODO: [#27920](https://github.com/astral-sh/ruff/pull/27920) addresses the tuple-disjointness checks
+that currently collapse this to `Never` and suppress the invalid-return diagnostic.
+
+```py
+from typing import Never
+
+def never_prefix[*Ts](value: tuple[Never, *Ts]) -> str:
+    if len(value) == 1:
+        reveal_type(value)  # revealed: Never
+        return value
+    return ""
+```
+
+## Ordered length comparisons
+
+Ordered length comparisons select the compatible tuple alternatives in both branches. A length check
+can establish that an index is valid, including when `len` appears on the right:
+
+```py
+def _(value: tuple[int] | tuple[int, int]):
+    if len(value) > 1:
+        reveal_type(value)  # revealed: tuple[int, int]
+        reveal_type(value[1])  # revealed: int
+    else:
+        reveal_type(value)  # revealed: tuple[int]
+
+    if 2 <= len(value):
+        reveal_type(value)  # revealed: tuple[int, int]
+    else:
+        reveal_type(value)  # revealed: tuple[int]
+
+    if len(value) < 2:
+        reveal_type(value)  # revealed: tuple[int]
+    else:
+        reveal_type(value)  # revealed: tuple[int, int]
+
+    if 1 >= len(value):
+        reveal_type(value)  # revealed: tuple[int]
+    else:
+        reveal_type(value)  # revealed: tuple[int, int]
+```
+
+## Ordered length comparisons with variable tuples
+
+A variable-length tuple remains possible when some of its lengths satisfy the comparison. Its
+required elements can rule it out when the comparison requires a shorter tuple:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+def _(value: tuple[str] | tuple[int, *tuple[bytes, ...], int]):
+    if len(value) > 2:
+        reveal_type(value)  # revealed: tuple[int, *tuple[bytes, ...], int]
+    else:
+        reveal_type(value)  # revealed: tuple[str] | tuple[int, *tuple[bytes, ...], int]
+
+    if len(value) < 2:
+        reveal_type(value)  # revealed: tuple[str]
+    else:
+        reveal_type(value)  # revealed: tuple[int, *tuple[bytes, ...], int]
+
+    if len(value) <= 1:
+        reveal_type(value)  # revealed: tuple[str]
+
+    if len(value) > 1_000_000_000:
+        reveal_type(value)  # revealed: tuple[int, *tuple[bytes, ...], int]
+```
+
+## Ordered length comparisons with string and bytes literals
+
+String and bytes literals encode their lengths, so ordered comparisons can select between them.
+String lengths count Unicode code points:
+
+```py
+from typing import Literal
+
+def _(text: Literal["é", "ab"], data: Literal[b"", b"a"]):
+    if len(text) >= 2:
+        reveal_type(text)  # revealed: Literal["ab"]
+    else:
+        reveal_type(text)  # revealed: Literal["é"]
+
+    if 0 < len(data):
+        reveal_type(data)  # revealed: Literal[b"a"]
+    else:
+        reveal_type(data)  # revealed: Literal[b""]
+```
+
+## Ordered length comparisons with custom lengths
+
+A custom type is excluded only when none of its declared lengths satisfy the comparison. A list
+remains possible in either branch because its type does not encode its length:
+
+```py
+from typing import Literal
+
+class Short:
+    def __len__(self) -> Literal[1, 2]:
+        return 1
+
+class Long:
+    def __len__(self) -> Literal[3]:
+        return 3
+
+def _(value: Short | Long | list[int]):
+    if len(value) > 2:
+        reveal_type(value)  # revealed: Long | list[int]
+    else:
+        reveal_type(value)  # revealed: Short | list[int]
+
+    if len(value) < 2:
+        reveal_type(value)  # revealed: Short | list[int]
+    else:
+        reveal_type(value)  # revealed: Short | Long | list[int]
+```
+
+## Ordered length comparisons with type variables
+
+Filtering a type variable's upper bound preserves the type variable, so the narrowed value can still
+be returned with its original type:
+
+```py
+from typing import TypeVar
+
+TupleValue = TypeVar("TupleValue", bound=tuple[int] | tuple[str, str])
+
+def identity(value: TupleValue) -> TupleValue:
+    if len(value) >= 2:
+        reveal_type(value)  # revealed: TupleValue@identity & tuple[str, str]
+        return value
+    else:
+        reveal_type(value)  # revealed: TupleValue@identity & tuple[int]
+        return value
+```
+
+## Ordered length comparisons at zero
+
+Lengths are nonnegative, and boolean literals compare as their integer values. Zero separates empty
+tuples from nonempty tuples, while a negative upper bound excludes both alternatives:
+
+```py
+from typing_extensions import assert_never
+
+def _(value: tuple[()] | tuple[int]):
+    if len(value) <= False:
+        reveal_type(value)  # revealed: tuple[()]
+    else:
+        reveal_type(value)  # revealed: tuple[int]
+
+    if len(value) < -1:
+        assert_never(value)
+    else:
+        reveal_type(value)  # revealed: tuple[()] | tuple[int]
+```
+
+## Regression tests
+
+Length constraints must not become stale after mutating a value that does not encode its length:
+
+```py
+def _(items: list[int]):
+    if len(items) == 0:
+        items.append(1)
+        reveal_type(len(items))  # revealed: int
+```
+
+## Aliased exact lengths
+
+PEP 695 aliases are resolved before extracting literal lengths:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+type Two = Literal[2]
+
+def _(val: tuple[int] | tuple[str, str], n: Two):
+    if len(val) == n:
+        reveal_type(val)  # revealed: tuple[str, str]
+```
+
 ## Unions of narrowable types
 
 ```py

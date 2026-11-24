@@ -9,17 +9,20 @@ TC004 [*] Move import `datetime` out of type-checking block. Import is used for 
    |            ^^^^^^^^
 11 |     from array import array  # TC004
    |
+  ::: runtime_evaluated_base_classes_1.py:18:8
+   |
+17 | class A(pydantic.BaseModel):
+18 |     x: datetime.datetime
+   |        -------- Used at runtime here
 help: Move out of type-checking block
-5  | 
-6  | import pydantic
+   |
 7  | from pydantic import BaseModel
 8  + import datetime
-9  | 
+9  |
 10 | if TYPE_CHECKING:
    -     import datetime  # TC004
 11 |     from array import array  # TC004
-12 | 
-13 |     import pandas  # TC004
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
@@ -32,18 +35,21 @@ TC004 [*] Move import `array.array` out of type-checking block. Import is used f
 12 |
 13 |     import pandas  # TC004
    |
+  ::: runtime_evaluated_base_classes_1.py:38:8
+   |
+37 | class G(BaseModel):
+38 |     x: array
+   |        ----- Used at runtime here
 help: Move out of type-checking block
-5  | 
-6  | import pydantic
+   |
 7  | from pydantic import BaseModel
 8  + from array import array
-9  | 
+9  |
 10 | if TYPE_CHECKING:
 11 |     import datetime  # TC004
    -     from array import array  # TC004
-12 | 
-13 |     import pandas  # TC004
-14 |     import pyproj
+12 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC004 [*] Move import `pandas` out of type-checking block. Import is used for more than type hinting.
@@ -55,18 +61,19 @@ TC004 [*] Move import `pandas` out of type-checking block. Import is used for mo
    |            ^^^^^^
 14 |     import pyproj
    |
+  ::: runtime_evaluated_base_classes_1.py:22:8
+   |
+21 | class B(BaseModel):
+22 |     x: pandas.DataFrame
+   |        ------ Used at runtime here
 help: Move out of type-checking block
-5  | 
-6  | import pydantic
+   |
 7  | from pydantic import BaseModel
 8  + import pandas
-9  | 
-10 | if TYPE_CHECKING:
-11 |     import datetime  # TC004
-12 |     from array import array  # TC004
-13 | 
+9  |
+--------------------------------------------------------------------------------
+13 |
    -     import pandas  # TC004
 14 |     import pyproj
-15 | 
-16 | 
+   |
 note: This is an unsafe fix and may change runtime behavior

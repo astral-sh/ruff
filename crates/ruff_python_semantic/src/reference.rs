@@ -6,6 +6,7 @@ use ruff_index::{IndexSlice, IndexVec, newtype_index};
 use ruff_python_ast::ExprContext;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::binding::BindingId;
 use crate::scope::ScopeId;
 use crate::{Exceptions, NodeId, SemanticModelFlags};
 
@@ -61,6 +62,12 @@ impl ResolvedReference {
     pub const fn in_runtime_evaluated_annotation(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::RUNTIME_EVALUATED_ANNOTATION)
+    }
+
+    /// Return `true` if the context is in a runtime-ambiguous type annotation.
+    pub const fn in_runtime_ambiguous_annotation(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::RUNTIME_AMBIGUOUS_ANNOTATION)
     }
 
     /// Return `true` if the context is in a string type definition.
@@ -150,6 +157,8 @@ pub struct UnresolvedReference {
     range: TextRange,
     /// The set of exceptions that were handled when resolution was attempted.
     exceptions: Exceptions,
+    /// The annotation binding from which this unresolved reference originated, if any.
+    annotation_binding_id: Option<BindingId>,
     /// Flags indicating the context in which the reference occurs.
     flags: UnresolvedReferenceFlags,
 }
@@ -168,6 +177,11 @@ impl UnresolvedReference {
     /// The set of exceptions that were handled when resolution was attempted.
     pub const fn exceptions(&self) -> Exceptions {
         self.exceptions
+    }
+
+    /// The annotation binding from which this unresolved reference originated, if any.
+    pub const fn annotation_binding_id(&self) -> Option<BindingId> {
+        self.annotation_binding_id
     }
 
     /// Returns `true` if the unresolved reference may be resolved by a wildcard import.
@@ -202,11 +216,13 @@ impl UnresolvedReferences {
         &mut self,
         range: TextRange,
         exceptions: Exceptions,
+        annotation_binding_id: Option<BindingId>,
         flags: UnresolvedReferenceFlags,
     ) {
         self.0.push(UnresolvedReference {
             range,
             exceptions,
+            annotation_binding_id,
             flags,
         });
     }

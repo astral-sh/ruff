@@ -129,7 +129,6 @@ Module(
 6 |     # comment
 7 | 🐶)
   | ^^ Syntax Error: Got unexpected token 🐶
-  |
 
 
   |
@@ -137,7 +136,6 @@ Module(
 6 |     # comment
 7 | 🐶)
   |   ^ Syntax Error: Expected a statement
-  |
 
 
   |
@@ -145,4 +143,3 @@ Module(
 6 |     # comment
 7 | 🐶)
   |    ^ Syntax Error: Expected a statement
-  |

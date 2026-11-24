@@ -140,6 +140,7 @@ class Command:
         'src_option' in the 'src_cmd' command object, and copy it to
         'dst_option' in the current command object".
         """
+
     # NOTE: This list comes directly from the distutils/command folder. Minus bdist_msi and bdist_wininst.
     @overload
     def get_finalized_command(self, command: Literal["bdist"], create: bool | Literal[0, 1] = 1) -> bdist:
@@ -148,7 +149,6 @@ class Command:
         'command', call its 'ensure_finalized()' method, and return the
         finalized command object.
         """
-
     @overload
     def get_finalized_command(self, command: Literal["bdist_dumb"], create: bool | Literal[0, 1] = 1) -> bdist_dumb: ...
     @overload
@@ -191,6 +191,7 @@ class Command:
     def get_finalized_command(self, command: Literal["upload"], create: bool | Literal[0, 1] = 1) -> upload: ...
     @overload
     def get_finalized_command(self, command: str, create: bool | Literal[0, 1] = 1) -> Command: ...
+
     @overload
     def reinitialize_command(self, command: Literal["bdist"], reinit_subcommands: bool | Literal[0, 1] = 0) -> bdist: ...
     @overload
@@ -251,6 +252,7 @@ class Command:
     def reinitialize_command(self, command: str, reinit_subcommands: bool | Literal[0, 1] = 0) -> Command: ...
     @overload
     def reinitialize_command(self, command: _CommandT, reinit_subcommands: bool | Literal[0, 1] = 0) -> _CommandT: ...
+
     def run_command(self, command: str) -> None:
         """Run some other command: uses the 'run_command()' method of
         Distribution, which creates and finalizes the command object if
@@ -270,6 +272,7 @@ class Command:
         self, func: Callable[[Unpack[_Ts]], Unused], args: tuple[Unpack[_Ts]], msg: str | None = None, level: int = 1
     ) -> None: ...
     def mkpath(self, name: str, mode: int = 0o777) -> None: ...
+
     @overload
     def copy_file(
         self,
@@ -284,7 +287,6 @@ class Command:
         former two default to whatever is in the Distribution object, and
         the latter defaults to false for commands that don't define it.)
         """
-
     @overload
     def copy_file(
         self,
@@ -295,6 +297,7 @@ class Command:
         link: str | None = None,
         level: Unused = 1,
     ) -> tuple[_BytesPathT | bytes, bool]: ...
+
     def copy_tree(
         self,
         infile: StrPath,
@@ -311,9 +314,9 @@ class Command:
     @overload
     def move_file(self, src: StrPath, dst: _StrPathT, level: Unused = 1) -> _StrPathT | str:
         """Move a file respecting dry-run flag."""
-
     @overload
     def move_file(self, src: BytesPath, dst: _BytesPathT, level: Unused = 1) -> _BytesPathT | bytes: ...
+
     def spawn(self, cmd: Iterable[str], search_path: bool | Literal[0, 1] = 1, level: Unused = 1) -> None:
         """Spawn an external command respecting dry-run flag."""
 
@@ -337,6 +340,7 @@ class Command:
         owner: str | None = None,
         group: str | None = None,
     ) -> str: ...
+
     def make_file(
         self,
         infiles: str | list[str] | tuple[str, ...],

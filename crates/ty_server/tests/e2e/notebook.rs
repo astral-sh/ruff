@@ -1,5 +1,8 @@
 use insta::assert_json_snapshot;
-use lsp_types::{NotebookCellKind, Position, Range};
+use lsp_types::{
+    Message, NotebookCellKind, Position, Range, TextDocumentContentChangePartial,
+    TextDocumentIdentifier,
+};
 use ruff_db::system::SystemPath;
 use ty_server::ClientOptions;
 
@@ -45,13 +48,108 @@ type Style = Literal["italic", "bold", "underline"]"#,
     builder.open(&mut server);
 
     let cell1_diagnostics =
-        server.await_notification::<lsp_types::notification::PublishDiagnostics>();
+        server.await_notification::<lsp_types::PublishDiagnosticsNotification>();
     let cell2_diagnostics =
-        server.await_notification::<lsp_types::notification::PublishDiagnostics>();
+        server.await_notification::<lsp_types::PublishDiagnosticsNotification>();
     let cell3_diagnostics =
-        server.await_notification::<lsp_types::notification::PublishDiagnostics>();
+        server.await_notification::<lsp_types::PublishDiagnosticsNotification>();
 
     assert_json_snapshot!([cell1_diagnostics, cell2_diagnostics, cell3_diagnostics]);
+
+    Ok(())
+}
+
+#[test]
+fn pull_diagnostics_for_notebook_cells() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    let first_cell = builder.add_python_cell("value: str = 1\n");
+    let second_cell = builder.add_python_cell("def example():\n    unused = 1\n    return 0\n");
+    let third_cell = builder.add_python_cell("value.upper()\n");
+
+    builder.open(&mut server);
+    server.collect_publish_diagnostic_notifications(3);
+
+    let diagnostics = [first_cell, second_cell, third_cell]
+        .into_iter()
+        .map(|uri| {
+            let id = server.send_request::<lsp_types::DocumentDiagnosticRequest>(
+                lsp_types::DocumentDiagnosticParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    identifier: Some("ty".to_string()),
+                    previous_result_id: None,
+                    work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+                    partial_result_params: lsp_types::PartialResultParams::default(),
+                },
+            );
+
+            match server.await_response::<lsp_types::DocumentDiagnosticRequest>(&id) {
+                lsp_types::DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(
+                    report,
+                ) => report.full_document_diagnostic_report.items,
+                lsp_types::DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(
+                    _,
+                ) => {
+                    panic!("Expected a full diagnostic report")
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+
+    assert_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn publish_unused_binding_diagnostics_open() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.initialization_result().unwrap();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    builder.add_python_cell(
+        r#"def f():
+    x = 1
+    return 0
+"#,
+    );
+
+    builder.open(&mut server);
+
+    let diagnostics = server.collect_publish_diagnostic_notifications(1);
+    assert_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn publish_unreachable_code_diagnostics_open() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.initialization_result().unwrap();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    builder.add_python_cell(
+        r#"def f():
+    return 0
+    print("dead")
+    print("still dead")
+"#,
+    );
+
+    builder.open(&mut server);
+
+    let diagnostics = server.collect_publish_diagnostic_notifications(1);
+    assert_json_snapshot!(diagnostics);
 
     Ok(())
 }
@@ -91,33 +189,33 @@ type Style = Literal["italic", "bold", "underline"]"#,
 IOError"#,
     );
 
-    let notebook_url = builder.open(&mut server);
+    let notebook_uri = builder.open(&mut server);
 
     server.collect_publish_diagnostic_notifications(3);
 
-    server.send_notification::<lsp_types::notification::DidChangeNotebookDocument>(
+    server.send_notification::<lsp_types::DidChangeNotebookDocumentNotification>(
         lsp_types::DidChangeNotebookDocumentParams {
             notebook_document: lsp_types::VersionedNotebookDocumentIdentifier {
                 version: 0,
-                uri: notebook_url,
+                uri: notebook_uri,
             },
             change: lsp_types::NotebookDocumentChangeEvent {
                 metadata: None,
-                cells: Some(lsp_types::NotebookDocumentCellChange {
+                cells: Some(lsp_types::NotebookDocumentCellChanges {
                     structure: None,
                     data: None,
-                    text_content: Some(vec![lsp_types::NotebookDocumentChangeTextContent {
+                    text_content: Some(vec![lsp_types::NotebookDocumentCellContentChanges {
                         document: lsp_types::VersionedTextDocumentIdentifier {
-                            uri: cell_3,
+                            text_document_identifier: TextDocumentIdentifier { uri: cell_3 },
                             version: 0,
                         },
 
                         changes: {
-                            vec![lsp_types::TextDocumentContentChangeEvent {
-                                range: Some(Range::new(Position::new(0, 16), Position::new(0, 17))),
-                                range_length: Some(1),
+                            vec![lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangePartial (TextDocumentContentChangePartial{
+                                range: Range::new(Position::new(0, 16), Position::new(0, 17)),
                                 text: String::new(),
-                            }]
+                                ..Default::default()
+                            })]
                         },
                     }]),
                 }),
@@ -179,6 +277,42 @@ type Style = Literal["italic", "bold", "underline"]"#,
 }
 
 #[test]
+fn semantic_tokens_for_cell_do_not_leak_stringified_annotations() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.initialization_result().unwrap();
+
+    let mut builder = NotebookBuilder::virtual_file("src/test.ipynb");
+
+    // Create a first cell that contains semantic tokens.
+    builder.add_python_cell(
+        r#"from typing import cast
+
+x = cast("list[str]", [])"#,
+    );
+
+    // Create a second, empty cell that does not contain any semantic tokens.
+    let second_cell = builder.add_python_cell("");
+
+    builder.open(&mut server);
+
+    // Assert that we didn't receive any semantic tokens for the empty cell.
+    // This proves that none were leaked from the first cell.
+    let response = semantic_tokens_full_for_cell(&mut server, &second_cell);
+    if let Some(tokens) = response {
+        assert!(tokens.data.is_empty());
+    } else {
+        panic!("Expected semantic tokens, but response was empty");
+    }
+
+    server.collect_publish_diagnostic_notifications(2);
+
+    Ok(())
+}
+
+#[test]
 fn swap_cells() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
         .build()
@@ -229,7 +363,7 @@ fn swap_cells() -> anyhow::Result<()> {
     "#);
 
     // Re-order the cells from `b`, `a`, `c` to `a`, `b`, `c` (swapping cell 1 and 2)
-    server.send_notification::<lsp_types::notification::DidChangeNotebookDocument>(
+    server.send_notification::<lsp_types::DidChangeNotebookDocumentNotification>(
         lsp_types::DidChangeNotebookDocumentParams {
             notebook_document: lsp_types::VersionedNotebookDocumentIdentifier {
                 version: 1,
@@ -237,7 +371,7 @@ fn swap_cells() -> anyhow::Result<()> {
             },
             change: lsp_types::NotebookDocumentChangeEvent {
                 metadata: None,
-                cells: Some(lsp_types::NotebookDocumentCellChange {
+                cells: Some(lsp_types::NotebookDocumentCellChanges {
                     structure: Some(lsp_types::NotebookDocumentCellChangeStructure {
                         array: lsp_types::NotebookCellArrayChange {
                             start: 0,
@@ -432,6 +566,157 @@ b: Litera
     Ok(())
 }
 
+/// Completions in an empty trailing cell must not panic when the requested position lies past
+/// the end of the cell (for example, when the client sends a position from before the user
+/// deleted the cell's only character).
+///
+/// Regression test for <https://github.com/astral-sh/ty/issues/4687>.
+#[test]
+fn completion_past_end_of_empty_last_cell() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    builder.add_python_cell("x = 1\n");
+    let empty_cell = builder.add_python_cell("");
+    builder.open(&mut server);
+
+    server.collect_publish_diagnostic_notifications(2);
+
+    for position in [
+        Position::new(0, 0),
+        Position::new(0, 1),
+        Position::new(1, 0),
+    ] {
+        let completions = server.completion_request(&empty_cell, position);
+        assert!(
+            completions.iter().any(|item| item.label == "x"),
+            "expected `x` in completions at {position:?}"
+        );
+    }
+
+    Ok(())
+}
+
+/// A position past the end of a cell resolves to the end of that cell, not to the start of the
+/// next cell.
+#[test]
+fn hover_past_end_of_cell() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    let empty_cell = builder.add_python_cell("");
+    builder.add_python_cell("x = 1\n");
+    builder.open(&mut server);
+
+    server.collect_publish_diagnostic_notifications(2);
+
+    for position in [Position::new(0, 1), Position::new(1, 0)] {
+        let id = server.send_request::<lsp_types::HoverRequest>(lsp_types::HoverParams {
+            text_document_position_params: lsp_types::TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: empty_cell.clone(),
+                },
+                position,
+            },
+            work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+        });
+        let hover = server.await_response::<lsp_types::HoverRequest>(&id);
+        assert_eq!(hover, None, "expected no hover at {position:?}");
+    }
+
+    Ok(())
+}
+
+/// A range that ends past the end of a cell covers only that cell, so a request for the first
+/// cell's inlay hints doesn't return the hints from the second cell.
+#[test]
+fn inlay_hints_range_past_end_of_cell() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .enable_inlay_hints(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    let first_cell = builder.add_python_cell("x = 1\n");
+    let second_cell = builder.add_python_cell("def f(a: int) -> int:\n    return a\n\ny = f(1)\n");
+    builder.open(&mut server);
+
+    server.collect_publish_diagnostic_notifications(2);
+
+    let range = Range::new(Position::new(0, 0), Position::new(10, 0));
+
+    // The second cell has hints of its own.
+    let second_cell_hints = inlay_hints_for_cell(&mut server, &second_cell, range);
+    assert!(!second_cell_hints.is_empty());
+
+    let first_cell_hints = inlay_hints_for_cell(&mut server, &first_cell, range);
+    assert_eq!(first_cell_hints, vec![]);
+
+    Ok(())
+}
+
+/// Cells that use a cell magic, such as `%%bash`, aren't Python code, so they aren't part of the
+/// notebook's Python source. Requests for the cells after them still resolve to the right cell,
+/// and requests for the magic cell itself return no Python results.
+#[test]
+fn cells_after_cell_magic() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    builder.add_python_cell("y = 'a'\n");
+    let magic_cell = builder.add_python_cell("%%bash\necho hi\n");
+    let x_cell = builder.add_python_cell("x = 1\n");
+    builder.add_python_cell("z = \"zz\"\n");
+    builder.open(&mut server);
+
+    server.collect_publish_diagnostic_notifications(4);
+
+    let id = server.send_request::<lsp_types::HoverRequest>(lsp_types::HoverParams {
+        text_document_position_params: lsp_types::TextDocumentPositionParams {
+            text_document: TextDocumentIdentifier {
+                uri: x_cell.clone(),
+            },
+            position: Position::new(0, 0),
+        },
+        work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+    });
+    let hover = server.await_response::<lsp_types::HoverRequest>(&id);
+    assert_json_snapshot!("cells_after_cell_magic_hover", hover);
+
+    let x_cell_tokens = semantic_tokens_full_for_cell(&mut server, &x_cell);
+    assert_json_snapshot!("cells_after_cell_magic_tokens", x_cell_tokens);
+
+    let magic_cell_tokens = semantic_tokens_full_for_cell(&mut server, &magic_cell)
+        .map_or_default(|tokens| tokens.data);
+    assert_eq!(magic_cell_tokens, vec![]);
+
+    Ok(())
+}
+
+#[test]
+fn undefined_reveal_fix_stays_in_cell() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    builder
+        .add_python_cell("from __future__ import annotations\nfrom typing import TYPE_CHECKING\n");
+    builder.add_python_cell("\"\"\"A cell docstring.\"\"\"\nreveal_type(1)\n");
+    builder.open(&mut server);
+
+    let diagnostics = server.collect_publish_diagnostic_notifications(2);
+    assert_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
 #[test]
 fn invalid_syntax_with_syntax_errors_disabled() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
@@ -460,103 +745,136 @@ fn invalid_syntax_with_syntax_errors_disabled() -> anyhow::Result<()> {
 
     let diagnostics = server.collect_publish_diagnostic_notifications(2);
 
-    assert_json_snapshot!(diagnostics, @r#"
-    {
-      "vscode-notebook-cell://src/test.ipynb#0": [],
-      "vscode-notebook-cell://src/test.ipynb#1": []
-    }
-    "#);
+    // We still publish unused-bindings for both cells, even when syntax-error reporting is disabled.
+    assert_eq!(diagnostics.len(), 2);
+    assert!(
+        diagnostics
+            .values()
+            .flatten()
+            .all(|diagnostic| diagnostic.message
+                != Message::String("unexpected EOF while parsing".into()))
+    );
 
     Ok(())
 }
 
+fn inlay_hints_for_cell(
+    server: &mut TestServer,
+    cell_uri: &lsp_types::Uri,
+    range: Range,
+) -> Vec<lsp_types::InlayHint> {
+    server
+        .send_request_await::<lsp_types::InlayHintRequest>(lsp_types::InlayHintParams {
+            text_document: TextDocumentIdentifier {
+                uri: cell_uri.clone(),
+            },
+            range,
+            work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+        })
+        .unwrap_or_default()
+}
+
 fn semantic_tokens_full_for_cell(
     server: &mut TestServer,
-    cell_uri: &lsp_types::Url,
-) -> Option<lsp_types::SemanticTokensResult> {
-    let cell1_tokens_req_id = server.send_request::<lsp_types::request::SemanticTokensFullRequest>(
-        lsp_types::SemanticTokensParams {
+    cell_uri: &lsp_types::Uri,
+) -> Option<lsp_types::SemanticTokens> {
+    let cell1_tokens_req_id =
+        server.send_request::<lsp_types::SemanticTokensRequest>(lsp_types::SemanticTokensParams {
             work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
             partial_result_params: lsp_types::PartialResultParams::default(),
             text_document: lsp_types::TextDocumentIdentifier {
                 uri: cell_uri.clone(),
             },
-        },
-    );
+        });
 
-    server.await_response::<lsp_types::request::SemanticTokensFullRequest>(&cell1_tokens_req_id)
+    server.await_response::<lsp_types::SemanticTokensRequest>(&cell1_tokens_req_id)
 }
 
 #[derive(Debug)]
 pub(crate) struct NotebookBuilder {
-    notebook_url: lsp_types::Url,
-    // The cells: (cell_metadata, content, language_id)
-    cells: Vec<(lsp_types::NotebookCell, String, String)>,
+    notebook_uri: lsp_types::Uri,
+    // The cells: (cell_metadata, content, language_id, version)
+    cells: Vec<(lsp_types::NotebookCell, String, String, i32)>,
 }
 
 impl NotebookBuilder {
     pub(crate) fn virtual_file(name: &str) -> Self {
-        let url: lsp_types::Url = format!("vs-code:/{name}").parse().unwrap();
+        let uri: lsp_types::Uri = format!("vs-code:/{name}").parse().unwrap();
         Self {
-            notebook_url: url,
+            notebook_uri: uri,
             cells: Vec::new(),
         }
     }
 
-    pub(crate) fn add_python_cell(&mut self, content: &str) -> lsp_types::Url {
+    pub(crate) fn add_python_cell(&mut self, content: &str) -> lsp_types::Uri {
+        self.add_python_cell_with_version(content, 0)
+    }
+
+    pub(crate) fn add_python_cell_with_version(
+        &mut self,
+        content: &str,
+        version: i32,
+    ) -> lsp_types::Uri {
         let index = self.cells.len();
         let id = format!(
             "vscode-notebook-cell:/{}#{}",
-            self.notebook_url.path(),
+            self.notebook_uri.path(),
             index
         );
 
-        let url: lsp_types::Url = id.parse().unwrap();
+        let uri: lsp_types::Uri = id.parse().unwrap();
 
         self.cells.push((
             lsp_types::NotebookCell {
                 kind: NotebookCellKind::Code,
-                document: url.clone(),
+                document: uri.clone(),
                 metadata: None,
                 execution_summary: None,
             },
             content.to_string(),
             "python".to_string(),
+            version,
         ));
 
-        url
+        uri
     }
 
-    pub(crate) fn open(self, server: &mut TestServer) -> lsp_types::Url {
-        server.send_notification::<lsp_types::notification::DidOpenNotebookDocument>(
+    pub(crate) fn open(self, server: &mut TestServer) -> lsp_types::Uri {
+        server.send_notification::<lsp_types::DidOpenNotebookDocumentNotification>(
             lsp_types::DidOpenNotebookDocumentParams {
                 notebook_document: lsp_types::NotebookDocument {
-                    uri: self.notebook_url.clone(),
+                    uri: self.notebook_uri.clone(),
                     notebook_type: "jupyter-notebook".to_string(),
                     version: 0,
                     metadata: None,
-                    cells: self.cells.iter().map(|(cell, _, _)| cell.clone()).collect(),
+                    cells: self
+                        .cells
+                        .iter()
+                        .map(|(cell, _, _, _)| cell.clone())
+                        .collect(),
                 },
                 cell_text_documents: self
                     .cells
                     .iter()
-                    .map(|(cell, content, language_id)| lsp_types::TextDocumentItem {
-                        uri: cell.document.clone(),
-                        language_id: language_id.clone(),
-                        version: 0,
-                        text: content.clone(),
-                    })
+                    .map(
+                        |(cell, content, language_id, version)| lsp_types::TextDocumentItem {
+                            uri: cell.document.clone(),
+                            language_id: language_id.clone().into(),
+                            version: *version,
+                            text: content.clone(),
+                        },
+                    )
                     .collect(),
             },
         );
 
-        self.notebook_url
+        self.notebook_uri
     }
 }
 
 fn literal_completions(
     server: &mut TestServer,
-    cell: &lsp_types::Url,
+    cell: &lsp_types::Uri,
     position: Position,
 ) -> Vec<lsp_types::CompletionItem> {
     let mut items = server.completion_request(cell, position);

@@ -17,6 +17,7 @@ Module(
                     module: None,
                     names: [],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
             ImportFrom(
@@ -37,6 +38,7 @@ Module(
                         },
                     ],
                     level: 0,
+                    is_lazy: false,
                 },
             ),
         ],
@@ -56,4 +58,3 @@ Module(
 1 | from
 2 | from import x
   |      ^^^^^^ Syntax Error: Expected a module name
-  |

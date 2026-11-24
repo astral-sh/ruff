@@ -50,4 +50,3 @@ Module(
 5 |
 6 | x + y
   |      ^ Syntax Error: unexpected EOF while parsing
-  |

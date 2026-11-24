@@ -28,8 +28,7 @@ from distutils.command.register import register
 from distutils.command.sdist import sdist
 from distutils.command.upload import upload
 from re import Pattern
-from typing import IO, ClassVar, Literal, TypeVar, overload
-from typing_extensions import TypeAlias
+from typing import IO, ClassVar, Literal, TypeAlias, TypeVar, overload
 
 command_re: Pattern[str]
 
@@ -173,6 +172,7 @@ class Distribution:
         The file in the user's home directory can be disabled with the
         --no-user-cfg option.
         """
+
     commands: Incomplete
     def parse_command_line(self):
         """Parse the setup script's command line, taken from the
@@ -231,6 +231,7 @@ class Distribution:
 
     def get_command_packages(self):
         """Return a list of packages from which commands are loaded."""
+
     # NOTE: This list comes directly from the distutils/command folder. Minus bdist_msi and bdist_wininst.
     @overload
     def get_command_obj(self, command: Literal["bdist"], create: Literal[1, True] = 1) -> bdist:
@@ -239,7 +240,6 @@ class Distribution:
         object for 'command' is in the cache, then we either create and
         return it (if 'create' is true) or return None.
         """
-
     @overload
     def get_command_obj(self, command: Literal["bdist_dumb"], create: Literal[1, True] = 1) -> bdist_dumb: ...
     @overload
@@ -283,6 +283,7 @@ class Distribution:
     # Not replicating the overloads for "Command | None", user may use "isinstance"
     @overload
     def get_command_obj(self, command: str, create: Literal[0, False]) -> Command | None: ...
+
     @overload
     def get_command_class(self, command: Literal["bdist"]) -> type[bdist]:
         """Return the class that implements the Distutils command named by
@@ -296,7 +297,6 @@ class Distribution:
         Raises DistutilsModuleError if the expected module could not be
         found, or if that module does not define the expected class.
         """
-
     @overload
     def get_command_class(self, command: Literal["bdist_dumb"]) -> type[bdist_dumb]: ...
     @overload
@@ -337,6 +337,7 @@ class Distribution:
     def get_command_class(self, command: Literal["upload"]) -> type[upload]: ...
     @overload
     def get_command_class(self, command: str) -> type[Command]: ...
+
     @overload
     def reinitialize_command(self, command: Literal["bdist"], reinit_subcommands: bool = False) -> bdist:
         """Reinitializes a command to the state it was in when first
@@ -357,7 +358,6 @@ class Distribution:
 
         Returns the reinitialized command object.
         """
-
     @overload
     def reinitialize_command(self, command: Literal["bdist_dumb"], reinit_subcommands: bool = False) -> bdist_dumb: ...
     @overload
@@ -402,6 +402,7 @@ class Distribution:
     def reinitialize_command(self, command: str, reinit_subcommands: bool = False) -> Command: ...
     @overload
     def reinitialize_command(self, command: _CommandT, reinit_subcommands: bool = False) -> _CommandT: ...
+
     def announce(self, msg, level: int = 2) -> None: ...
     def run_commands(self) -> None:
         """Run each command that was seen on the setup script command line.

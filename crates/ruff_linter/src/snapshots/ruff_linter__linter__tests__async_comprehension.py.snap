@@ -31,4 +31,3 @@ PLE1142 `await` should be used within an async function
 10 | /     async for _ in elements(1):
 11 | |         pass
    | |____________^
-   |

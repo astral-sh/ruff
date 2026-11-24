@@ -1,21 +1,21 @@
 use std::borrow::Cow;
+use std::collections::hash_map::Entry;
 use std::path::Path;
 
 use anyhow::{Result, anyhow};
 use colored::Colorize;
 use itertools::Itertools;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
-use rustc_hash::FxBuildHasher;
+use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, SecondaryCode};
 use ruff_notebook::Notebook;
 use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, ParseOptions, Parsed, UnsupportedSyntaxError};
-use ruff_source_file::SourceFile;
 
-use crate::checkers::ast::{LintContext, check_ast};
+use crate::checkers::ast::{LazySourceFile, LintContext, check_ast};
 use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
 use crate::checkers::noqa::check_noqa;
@@ -24,17 +24,16 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
-use crate::noqa::add_noqa;
+use crate::noqa::add_suppression;
 use crate::package::PackageRoot;
-use crate::preview::is_py315_support_enabled;
-use crate::registry::Rule;
+use crate::registry::{LintSource, Rule};
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::source_kind::SourceKind;
 use crate::suppression::Suppressions;
-use crate::{Locator, directives, fs, warn_user_once};
+use crate::{Locator, SuppressionKind, directives, fs};
 
 pub(crate) mod float;
 
@@ -58,31 +57,35 @@ impl LinterResult {
 
 #[derive(Debug, Default, PartialEq)]
 struct FixCount {
-    rule_name: &'static str,
+    code: Option<SecondaryCode>,
     count: usize,
 }
 
-/// A mapping from a noqa code to the corresponding lint name and a count of applied fixes.
+/// A mapping from a diagnostic's identifier to its optional noqa code and fix count.
 #[derive(Debug, Default, PartialEq)]
-pub struct FixTable(hashbrown::HashMap<SecondaryCode, FixCount, rustc_hash::FxBuildHasher>);
+pub struct FixTable(FxHashMap<DiagnosticId, FixCount>);
 
 impl FixTable {
     pub fn counts(&self) -> impl Iterator<Item = usize> {
         self.0.values().map(|fc| fc.count)
     }
 
-    pub fn entry<'a>(&'a mut self, code: &'a SecondaryCode) -> FixTableEntry<'a> {
-        FixTableEntry(self.0.entry_ref(code))
+    pub fn entry(&mut self, id: DiagnosticId) -> FixTableEntry<'_> {
+        FixTableEntry(self.0.entry(id))
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&SecondaryCode, &'static str, usize)> {
+    pub fn iter(&self) -> impl Iterator<Item = (DiagnosticId, Option<&SecondaryCode>, usize)> {
         self.0
             .iter()
-            .map(|(code, FixCount { rule_name, count })| (code, *rule_name, *count))
+            .map(|(id, FixCount { code, count })| (*id, code.as_ref(), *count))
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = &SecondaryCode> {
-        self.0.keys()
+    /// Iterate over secondary codes, falling back to rule names for rules without codes.
+    fn identifiers(&self) -> impl Iterator<Item = &str> {
+        self.0.iter().map(|(id, FixCount { code, .. })| {
+            code.as_ref()
+                .map_or_else(|| id.as_str(), SecondaryCode::as_str)
+        })
     }
 
     pub fn is_empty(&self) -> bool {
@@ -90,16 +93,14 @@ impl FixTable {
     }
 }
 
-pub struct FixTableEntry<'a>(
-    hashbrown::hash_map::EntryRef<'a, 'a, SecondaryCode, SecondaryCode, FixCount, FxBuildHasher>,
-);
+pub struct FixTableEntry<'a>(Entry<'a, DiagnosticId, FixCount>);
 
 impl<'a> FixTableEntry<'a> {
-    pub fn or_default(self, rule_name: &'static str) -> &'a mut usize {
+    pub fn or_default(self, code: Option<&SecondaryCode>) -> &'a mut usize {
         &mut (self
             .0
-            .or_insert(FixCount {
-                rule_name,
+            .or_insert_with(|| FixCount {
+                code: code.cloned(),
                 count: 0,
             })
             .count)
@@ -150,10 +151,7 @@ pub fn check_path(
     }
 
     // Run the token-based rules.
-    if context
-        .iter_enabled_rules()
-        .any(|rule_code| rule_code.lint_source().is_tokens())
-    {
+    if context.has_rules_for(LintSource::Tokens) {
         check_tokens(
             tokens,
             path,
@@ -167,10 +165,7 @@ pub fn check_path(
     }
 
     // Run the filesystem-based rules.
-    if context
-        .iter_enabled_rules()
-        .any(|rule_code| rule_code.lint_source().is_filesystem())
-    {
+    if context.has_rules_for(LintSource::Filesystem) {
         check_file_path(
             path,
             package,
@@ -183,10 +178,7 @@ pub fn check_path(
     }
 
     // Run the logical line-based rules.
-    if context
-        .iter_enabled_rules()
-        .any(|rule_code| rule_code.lint_source().is_logical_lines())
-    {
+    if context.has_rules_for(LintSource::LogicalLines) {
         crate::checkers::logical_lines::check_logical_lines(
             tokens, locator, indexer, stylist, settings, &context,
         );
@@ -214,10 +206,7 @@ pub fn check_path(
             &context,
         ));
 
-        let use_imports = !directives.isort.skip_file
-            && context
-                .iter_enabled_rules()
-                .any(|rule_code| rule_code.lint_source().is_imports());
+        let use_imports = !directives.isort.skip_file && context.has_rules_for(LintSource::Imports);
         if use_imports || use_doc_lines {
             if use_imports {
                 check_imports(
@@ -230,7 +219,7 @@ pub fn check_path(
                     package,
                     source_type,
                     cell_offsets,
-                    target_version.linter_version(),
+                    target_version,
                     &context,
                 );
             }
@@ -247,10 +236,7 @@ pub fn check_path(
     }
 
     // Run the lines-based rules.
-    if context
-        .iter_enabled_rules()
-        .any(|rule_code| rule_code.lint_source().is_physical_lines())
-    {
+    if context.has_rules_for(LintSource::PhysicalLines) {
         check_physical_lines(locator, stylist, indexer, &doc_lines, settings, &context);
     }
 
@@ -329,11 +315,7 @@ pub fn check_path(
     }
 
     // Enforce `noqa` directives.
-    if noqa.is_enabled()
-        || context
-            .iter_enabled_rules()
-            .any(|rule_code| rule_code.lint_source().is_noqa())
-    {
+    if noqa.is_enabled() || context.has_rules_for(LintSource::Noqa) {
         let ignored = check_noqa(
             &mut context,
             path,
@@ -360,28 +342,27 @@ pub fn check_path(
         }
     }
 
-    let syntax_errors = parsed.unsupported_syntax_errors();
-
     diagnostics_to_messages(
         diagnostics,
         parsed.errors(),
-        syntax_errors,
+        parsed.unsupported_syntax_errors(),
         &semantic_syntax_errors,
         directives,
         &source_file,
     )
 }
 
-const MAX_ITERATIONS: usize = 100;
+pub(crate) const MAX_ITERATIONS: usize = 100;
 
-/// Add any missing `# noqa` pragmas to the source code at the given `Path`.
-pub fn add_noqa_to_path(
+/// Add any missing suppression comments to the source code at the given `Path`.
+pub fn add_suppressions_to_path(
     path: &Path,
     package: Option<PackageRoot<'_>>,
     source_kind: &SourceKind,
     source_type: PySourceType,
     settings: &LinterSettings,
     reason: Option<&str>,
+    suppression_kind: SuppressionKind,
 ) -> Result<usize> {
     // Parse once.
     let target_version = settings.resolve_target_version(path);
@@ -406,7 +387,7 @@ pub fn add_noqa_to_path(
 
     // Parse range suppression comments
     let suppressions =
-        Suppressions::from_tokens(settings, locator.contents(), parsed.tokens(), &indexer);
+        Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer, settings);
 
     // Generate diagnostics, ignoring any existing `noqa` directives.
     let diagnostics = check_path(
@@ -425,9 +406,9 @@ pub fn add_noqa_to_path(
         &suppressions,
     );
 
-    // Add any missing `# noqa` pragmas.
+    // Add any missing suppression comments.
     // TODO(dhruvmanila): Add support for Jupyter Notebooks
-    add_noqa(
+    add_suppression(
         path,
         &diagnostics,
         &locator,
@@ -437,6 +418,8 @@ pub fn add_noqa_to_path(
         stylist.line_ending(),
         reason,
         &suppressions,
+        suppression_kind,
+        settings.preview,
     )
 }
 
@@ -451,14 +434,6 @@ pub fn lint_only(
     source: ParseSource,
 ) -> LinterResult {
     let target_version = settings.resolve_target_version(path);
-
-    if matches!(target_version.linter_version(), PythonVersion::PY315)
-        && !is_py315_support_enabled(settings)
-    {
-        warn_user_once!(
-            "Support for Python 3.15 is under development and may be unstable. Enable `preview` to remove this warning."
-        );
-    }
 
     let parsed = source.into_parsed(source_kind, source_type, target_version.parser_version());
 
@@ -481,7 +456,7 @@ pub fn lint_only(
 
     // Parse range suppression comments
     let suppressions =
-        Suppressions::from_tokens(settings, locator.contents(), parsed.tokens(), &indexer);
+        Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer, settings);
 
     // Generate diagnostics.
     let diagnostics = check_path(
@@ -515,20 +490,20 @@ fn diagnostics_to_messages(
     unsupported_syntax_errors: &[UnsupportedSyntaxError],
     semantic_syntax_errors: &[SemanticSyntaxError],
     directives: &Directives,
-    source_file: &SourceFile,
+    source_file: &LazySourceFile<'_>,
 ) -> Vec<Diagnostic> {
     parse_errors
         .iter()
         .map(|parse_error| {
-            Diagnostic::invalid_syntax(source_file.clone(), &parse_error.error, parse_error)
+            Diagnostic::invalid_syntax(source_file.get().clone(), &parse_error.error, parse_error)
         })
         .chain(unsupported_syntax_errors.iter().map(|syntax_error| {
-            Diagnostic::invalid_syntax(source_file.clone(), syntax_error, syntax_error)
+            Diagnostic::invalid_syntax(source_file.get().clone(), syntax_error, syntax_error)
         }))
         .chain(
             semantic_syntax_errors
                 .iter()
-                .map(|error| Diagnostic::invalid_syntax(source_file.clone(), error, error)),
+                .map(|error| Diagnostic::invalid_syntax(source_file.get().clone(), error, error)),
         )
         .chain(diagnostics.into_iter().map(|mut diagnostic| {
             if let Some(range) = diagnostic.range() {
@@ -566,14 +541,6 @@ pub fn lint_fix<'a>(
 
     let target_version = settings.resolve_target_version(path);
 
-    if matches!(target_version.linter_version(), PythonVersion::PY315)
-        && !is_py315_support_enabled(settings)
-    {
-        warn_user_once!(
-            "Support for Python 3.15 is under development and may be unstable. Enable `preview` to remove this warning."
-        );
-    }
-
     // Continuously fix until the source code stabilizes.
     loop {
         // Parse once.
@@ -599,7 +566,7 @@ pub fn lint_fix<'a>(
 
         // Parse range suppression comments
         let suppressions =
-            Suppressions::from_tokens(settings, locator.contents(), parsed.tokens(), &indexer);
+            Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer, settings);
 
         // Generate diagnostics.
         let diagnostics = check_path(
@@ -627,7 +594,12 @@ pub fn lint_fix<'a>(
             // syntax error. Return the original code.
             if has_valid_syntax && has_no_syntax_errors {
                 if let Some(error) = parsed.errors().first() {
-                    report_fix_syntax_error(path, transformed.source_code(), error, fixed.keys());
+                    report_fix_syntax_error(
+                        path,
+                        transformed.source_code(),
+                        error,
+                        fixed.identifiers(),
+                    );
                     return Err(anyhow!("Fix introduced a syntax error"));
                 }
             }
@@ -642,8 +614,8 @@ pub fn lint_fix<'a>(
         {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
-                for (rule, name, count) in applied.iter() {
-                    *fixed.entry(rule).or_default(name) += count;
+                for (id, code, count) in applied.iter() {
+                    *fixed.entry(id).or_default(code) += count;
                 }
 
                 transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
@@ -677,8 +649,12 @@ where
 }
 
 #[expect(clippy::print_stderr)]
-fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: &[Diagnostic]) {
-    let codes = collect_rule_codes(diagnostics.iter().filter_map(Diagnostic::secondary_code));
+pub(crate) fn report_failed_to_converge_error(
+    path: &Path,
+    transformed: &str,
+    diagnostics: &[Diagnostic],
+) {
+    let codes = collect_rule_codes(diagnostics.iter().map(Diagnostic::secondary_code_or_id));
     if cfg!(debug_assertions) {
         eprintln!(
             "{}{} Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",
@@ -714,7 +690,7 @@ fn report_fix_syntax_error<'a>(
     path: &Path,
     transformed: &str,
     error: &ParseError,
-    rules: impl IntoIterator<Item = &'a SecondaryCode>,
+    rules: impl IntoIterator<Item = &'a str>,
 ) {
     let codes = collect_rule_codes(rules);
     if cfg!(debug_assertions) {
@@ -770,9 +746,11 @@ impl ParseSource {
     }
 }
 
-/// Like [`ruff_python_parser::parse_unchecked_source`] but with an additional [`PythonVersion`]
-/// argument.
-fn parse_unchecked_source(
+/// Like [`ruff_python_parser::parse_unchecked_source`], but with an explicit [`PythonVersion`] and
+/// per-cell notebook parsing.
+///
+/// Per-cell modules are merged so definitions remain visible across cells.
+pub fn parse_unchecked_source(
     source_kind: &SourceKind,
     source_type: PySourceType,
     target_version: PythonVersion,
@@ -781,9 +759,16 @@ fn parse_unchecked_source(
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`. See
     // `ruff_python_parser::parse_unchecked_source`. We use `parse_unchecked` (and thus
     // have to unwrap) in order to pass the `PythonVersion` via `ParseOptions`.
-    ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
-        .try_into_module()
-        .expect("PySourceType always parses into a module")
+    match source_kind.as_ipy_notebook() {
+        Some(notebook) => ruff_python_parser::parse_cells_unchecked(
+            source_kind.source_code(),
+            notebook.cell_offsets().content_ranges(),
+            &options,
+        ),
+        None => ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
+            .try_into_module()
+            .expect("PySourceType always parses into a module"),
+    }
 }
 
 #[cfg(test)]
@@ -794,14 +779,13 @@ mod tests {
     use ruff_python_ast::{PySourceType, PythonVersion};
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
-    use ruff_python_parser::ParseOptions;
     use ruff_python_trivia::textwrap::dedent;
     use test_case::test_case;
 
-    use ruff_db::diagnostic::Diagnostic;
+    use ruff_db::diagnostic::{Diagnostic, DummyFileResolver};
     use ruff_notebook::{Notebook, NotebookError};
 
-    use crate::linter::check_path;
+    use crate::linter::{check_path, parse_unchecked_source};
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::source_kind::SourceKind;
@@ -967,11 +951,9 @@ mod tests {
     ) -> Vec<Diagnostic> {
         let source_type = PySourceType::from(path);
         let target_version = settings.resolve_target_version(path);
-        let options =
-            ParseOptions::from(source_type).with_target_version(target_version.parser_version());
-        let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
-            .try_into_module()
-            .expect("PySourceType always parses into a module");
+        // Mirror the production parse path so notebooks are validated cell by cell.
+        let parsed =
+            parse_unchecked_source(source_kind, source_type, target_version.parser_version());
         let locator = Locator::new(source_kind.source_code());
         let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
         let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
@@ -982,7 +964,7 @@ mod tests {
             &indexer,
         );
         let suppressions =
-            Suppressions::from_tokens(settings, locator.contents(), parsed.tokens(), &indexer);
+            Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer, settings);
         let mut diagnostics = check_path(
             path,
             None,
@@ -998,7 +980,10 @@ mod tests {
             target_version,
             &suppressions,
         );
-        diagnostics.sort_by(Diagnostic::ruff_start_ordering);
+        diagnostics.sort_by(|a, b| {
+            a.rendering_sort_key(&DummyFileResolver)
+                .cmp(&b.rendering_sort_key(&DummyFileResolver))
+        });
         diagnostics
     }
 
@@ -1022,7 +1007,9 @@ mod tests {
     #[test_case(Path::new("write_to_debug.py"), PythonVersion::PY310)]
     #[test_case(Path::new("invalid_expression.py"), PythonVersion::PY312)]
     #[test_case(Path::new("global_parameter.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("nonlocal_parameter.py"), PythonVersion::PY310)]
     #[test_case(Path::new("annotated_global.py"), PythonVersion::PY314)]
+    #[test_case(Path::new("lazy_future_import.py"), PythonVersion::PY315)]
     fn test_semantic_errors(path: &Path, python_version: PythonVersion) -> Result<()> {
         let snapshot = format!(
             "semantic_syntax_error_{}_{}",
@@ -1031,7 +1018,10 @@ mod tests {
         );
         let path = Path::new("resources/test/fixtures/semantic_errors").join(path);
         let contents = std::fs::read_to_string(&path)?;
-        let source_kind = SourceKind::Python(contents);
+        let source_kind = SourceKind::Python {
+            code: contents,
+            is_stub: false,
+        };
 
         let diagnostics = test_contents_syntax_errors(
             &source_kind,
@@ -1044,7 +1034,7 @@ mod tests {
             },
         );
         insta::with_settings!({filters => vec![(r"\\", "/")]}, {
-                assert_diagnostics!(format!("{snapshot}"), diagnostics);
+                assert_diagnostics!(snapshot, diagnostics);
         });
 
         Ok(())
@@ -1089,7 +1079,10 @@ mod tests {
         let snapshot = path.to_string_lossy().to_string();
         let path = Path::new("resources/test/fixtures/syntax_errors").join(path);
         let diagnostics = test_contents_syntax_errors(
-            &SourceKind::Python(std::fs::read_to_string(&path)?),
+            &SourceKind::Python {
+                code: std::fs::read_to_string(&path)?,
+                is_stub: false,
+            },
             &path,
             &LinterSettings::for_rule(rule),
         );
@@ -1204,15 +1197,46 @@ mod tests {
 		&LinterSettings {
 			unresolved_target_version: PythonVersion { major: 3, minor: 9 }.into(),
 			typing_extensions: false,
-			..LinterSettings::for_rule(Rule::TypeAliasWithoutAnnotation)
+			..LinterSettings::for_rule(Rule::UnannotatedTypeAliasInStub)
 		}
 	)]
     fn test_disabled_typing_extensions_pyi(name: &str, contents: &str, settings: &LinterSettings) {
         let snapshot = format!("disabled_typing_extensions_pyi_{name}");
         let path = Path::new("<filename>.pyi");
         let contents = dedent(contents);
-        let diagnostics =
-            test_contents(&SourceKind::Python(contents.into_owned()), path, settings).0;
+        let diagnostics = test_contents(
+            &SourceKind::Python {
+                code: contents.into_owned(),
+                is_stub: true,
+            },
+            path,
+            settings,
+        )
+        .0;
+        assert_diagnostics!(snapshot, diagnostics);
+    }
+
+    #[test_case(
+        "on_line_one",
+        r#"#!/usr/bin/env python #noqa:D100
+"#
+    )]
+    #[test_case(
+        "on_line_two",
+        r#"#!/usr/bin/env python
+#noqa: D100
+"#
+    )]
+    #[test_case(
+        "on_line_three",
+        r#"#!/usr/bin/env python
+
+#noqa: D100"#
+    )]
+    fn test_shebang_noqa(name: &str, contents: &str) {
+        let snapshot = format!("shebang_noqa_{name}");
+        let settings = LinterSettings::for_rule(Rule::UndocumentedPublicModule);
+        let diagnostics = test_snippet(contents, &settings);
         assert_diagnostics!(snapshot, diagnostics);
     }
 }

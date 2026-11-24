@@ -40,6 +40,38 @@ from exporter import *
 reveal_type(X)  # revealed: bool
 ```
 
+### Assigning to a declared name
+
+The import must satisfy the declaration even if the name is never read.
+
+`exporter.py`:
+
+```py
+x = "hello"
+```
+
+`importer.py`:
+
+```py
+x: int
+from exporter import *  # error: [invalid-assignment]
+```
+
+### Assigning to an implicit module global
+
+`exporter.py`:
+
+```py
+__name__: int = 1  # error: [invalid-declaration]
+__all__ = ["__name__"]
+```
+
+`importer.py`:
+
+```py
+from exporter import *  # error: [invalid-assignment]
+```
+
 ### Overridden by a later definition
 
 `exporter.py`:
@@ -117,10 +149,10 @@ from b import Y
 from c import X
 
 # but `Y` is not because the `from b import Y` import does *not* constitute a re-export
-from c import Y  # error: [unresolved-import]
+from c import Y  # error: [missing-module-member]
 ```
 
-## Esoteric definitions and redefinintions
+## Esoteric definitions and redefinitions
 
 ```toml
 [environment]
@@ -158,12 +190,12 @@ from collections import OrderedDict
 from collections import OrderedDict as Foo
 
 A, B = 1, (C := 2)
-D: (E := 4) = (F := 5)  # error: [invalid-type-form]
+D: (E := 4) = (F := 5)  # error: [invalid-type-form]  # fmt:skip
 
 for G in [1]:
-    ...
+    pass
 
-for (H := 4).whatever in [2]:  # error: [unresolved-attribute]
+for (H := 4).whatever in [2]:  # error: [missing-attribute]
     ...
 
 class I: ...
@@ -187,13 +219,13 @@ def get_object() -> object:
 
 match get_object():
     case {"something": M}:
-        ...
-    case [*N]:
-        ...
+        pass
     case [O]:
-        ...
+        pass
+    case [*N]:
+        pass
     case I(foo=R):
-        ...
+        pass
     case P | Q:  # error: [invalid-syntax] "alternative patterns bind different names"
         ...
 
@@ -201,15 +233,15 @@ match 56:
     case x if something_unresolvable:  # error: [unresolved-reference]
         ...
 
-    case object(S):
-        ...
+    case object(S):  # error: [invalid-match-pattern] "expected 0, got 1"
+        pass
 
 match 12345:
     case x if something_unresolvable:  # error: [unresolved-reference]
         ...
 
     case T:
-        ...
+        pass
 
 def boolean_condition() -> bool:
     return True
@@ -235,8 +267,8 @@ print((
     D,
     E,
     F,
-    G,  # error: [possibly-unresolved-reference]
-    H,  # error: [possibly-unresolved-reference]
+    G,
+    H,
     I,
     J,
     K,
@@ -283,25 +315,25 @@ K = 11
 L = 12
 
 for A in [1]:
-    ...
+    pass
 
 match 42:
     case {"something": B}:
-        ...
+        pass
     case [*C]:
-        ...
+        pass
     case [D]:
-        ...
+        pass
     # error: [invalid-syntax] "name capture `E` makes remaining patterns unreachable"
     # error: [invalid-syntax] "alternative patterns bind different names"
     case E | F:
-        ...
+        pass
     case object(foo=G):
-        ...
-    case object(H):
-        ...
+        pass
+    case object(H):  # error: [invalid-match-pattern] "expected 0, got 1"
+        pass
     case I:
-        ...
+        pass
 
 def boolean_condition() -> bool:
     return True
@@ -353,25 +385,25 @@ might not take place, each symbol is definitely bound by a later definition.
 from typing import Literal
 
 for A in [1]:
-    ...
+    pass
 
 match 42:
     case {"something": B}:
-        ...
+        pass
     case [*C]:
-        ...
+        pass
     case [D]:
-        ...
+        pass
     # error: [invalid-syntax] "name capture `E` makes remaining patterns unreachable"
     # error: [invalid-syntax] "alternative patterns bind different names"
     case E | F:
-        ...
+        pass
     case object(foo=G):
-        ...
-    case object(H):
-        ...
+        pass
+    case object(H):  # error: [invalid-match-pattern] "expected 0, got 1"
+        pass
     case I:
-        ...
+        pass
 
 def boolean_condition() -> bool:
     return True
@@ -425,40 +457,20 @@ print(K)
 print(L)
 ```
 
-### Definitions in function-like scopes are not global definitions
+### Comprehension and lambda locals are not global definitions
 
-Except for some cases involving walrus expressions inside comprehension scopes.
+Comprehension iteration variables, lambda parameters, and assignments inside lambdas are not module
+globals and are therefore not available to a wildcard import.
 
 `exporter.py`:
 
 ```py
-class Iterator:
-    def __next__(self) -> int:
-        return 42
-
-class Iterable:
-    def __iter__(self) -> Iterator:
-        return Iterator()
-
-[a for a in Iterable()]
-{b for b in Iterable()}
-{c: c for c in Iterable()}
-(d for d in Iterable())
+[a for a in [1]]
+{b for b in [1]}
+{c: c for c in [1]}
+(d for d in [1])
 lambda e: (f := 42)
-
-# Definitions created by walruses in a comprehension scope are unique;
-# they "leak out" of the scope and are stored in the surrounding scope
-[(g := h * 2) for h in Iterable()]
-[i for j in Iterable() if (i := j - 10) > 0]
-{(k := l * 2): (m := l * 3) for l in Iterable()}
-list(((o := p * 2) for p in Iterable()))
-
-# A walrus expression nested inside several scopes *still* leaks out
-# to the global scope:
-[[[[(q := r) for r in Iterable()]] for _ in range(42)] for _ in range(42)]
-
-# A walrus inside a lambda inside a comprehension does not leak out
-[(lambda s=s: (t := 42))() for s in Iterable()]
+[(lambda s=s: (t := 42))() for s in [1]]
 ```
 
 `importer.py`:
@@ -466,47 +478,43 @@ list(((o := p * 2) for p in Iterable()))
 ```py
 from exporter import *
 
-# error: [unresolved-reference]
-reveal_type(a)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(b)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(c)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(d)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(e)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(f)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(h)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(j)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(p)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(r)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(s)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(t)  # revealed: Unknown
+a  # error: [unresolved-reference]
+b  # error: [unresolved-reference]
+c  # error: [unresolved-reference]
+d  # error: [unresolved-reference]
+e  # error: [unresolved-reference]
+f  # error: [unresolved-reference]
+s  # error: [unresolved-reference]
+t  # error: [unresolved-reference]
+```
 
-# TODO: these should all reveal `Unknown | int` and should not emit errors.
-# (We don't generally model elsewhere in ty that bindings from walruses
-# "leak" from comprehension scopes into outer scopes, but we should.)
-# See https://github.com/astral-sh/ruff/issues/16954
-# error: [unresolved-reference]
-reveal_type(g)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(i)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(k)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(m)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(o)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(q)  # revealed: Unknown
+### Assignment-expression targets in comprehensions are global definitions
+
+Assignment-expression targets bind in the scope containing the comprehension. At module level,
+targets in an element, filter, dictionary key or value, generator expression, or nested
+comprehension are all available to a wildcard import.
+
+`exporter.py`:
+
+```py
+[(list_value := item) for item in [1]]
+[item for item in [1] if (filtered_value := item - 10) > 0]
+{(dict_key := item * 2): (dict_value := item * 3) for item in [1]}
+list((generator_value := item * 2) for item in [1])
+[[[[(nested_value := item) for item in [1]]] for _ in [1]] for _ in [1]]
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(list_value)  # revealed: int
+reveal_type(filtered_value)  # revealed: int
+reveal_type(dict_key)  # revealed: int
+reveal_type(dict_value)  # revealed: int
+reveal_type(generator_value)  # revealed: int
+reveal_type(nested_value)  # revealed: int
 ```
 
 ### An annotation without a value is a definition in a stub but not a `.py` file
@@ -938,6 +946,201 @@ reveal_type(X)  # revealed: bool
 
 # error: [unresolved-reference]
 reveal_type(Y)  # revealed: Unknown
+```
+
+### A literal `__all__` after a wildcard import
+
+An explicit `__all__` restricts the names re-exported from a wildcard import, even if the source
+module does not define its own `__all__`.
+
+`source.py`:
+
+```py
+included: int = 1
+excluded: str = ""
+```
+
+`exporter.py`:
+
+```py
+from source import *
+
+# The __all__ list limits what this module exports.
+__all__ = ["included"]
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(included)  # revealed: int
+# error: [unresolved-reference]
+reveal_type(excluded)  # revealed: Unknown
+```
+
+### An `__all__` assignment followed by a conditional mutation
+
+The source module has no `__all__`, so ty conservatively treats its public names as potential
+exports when it cannot determine the effect of a conditional mutation.
+
+`source.py`:
+
+```py
+first: int = 1
+second: str = ""
+excluded: bool = True
+```
+
+`exporter.py`:
+
+```py
+import os
+from source import *
+
+__all__ = ["first"]
+if os.getenv("EXTRA") is not None:
+    __all__.append("second")
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(first)  # revealed: int
+reveal_type(second)  # revealed: str
+reveal_type(excluded)  # revealed: bool
+```
+
+### An `__all__` assignment followed by a slice assignment
+
+Slice assignments fall back to treating all public names as potential exports.
+
+`source.py`:
+
+```py
+first: int = 1
+second: str = ""
+```
+
+`exporter.py`:
+
+```py
+from source import *
+
+__all__ = ["first"]
+__all__[:] = ["second"]
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(first)  # revealed: int
+reveal_type(second)  # revealed: str
+```
+
+### Unicode identifiers can modify `__all__`
+
+Python normalizes identifiers, so a different spelling can refer to the same `__all__` variable.
+
+`exporter.py`:
+
+```py
+first: int = 1
+second: str = ""
+__all__ = ["first"]
+__aℓℓ__.append("second")
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(first)  # revealed: int
+reveal_type(second)  # revealed: str
+```
+
+### A later wildcard import can replace `__all__`
+
+`source.py`:
+
+```py
+__all__ = ["__all__", "other"]
+other: str = ""
+```
+
+`exporter.py`:
+
+```py
+included: int = 1
+__all__ = ["included"]
+from source import *
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(other)  # revealed: str
+# error: [unresolved-reference]
+reveal_type(included)  # revealed: Unknown
+```
+
+### Names excluded from `__all__` do not reassign `Final` symbols
+
+A wildcard import does not bind public or private names that are absent from the exporting module's
+`__all__`, so those names cannot overwrite existing `Final` declarations.
+
+`exporter.py`:
+
+```py
+from typing import Final
+
+EXCLUDED: Final[int] = 1
+_PRIVATE: Final[int] = 2
+
+__all__ = []
+```
+
+`importer.py`:
+
+```py
+from typing import Final
+
+EXCLUDED: Final[int] = 3
+_PRIVATE: Final[int] = 4
+
+from exporter import *
+```
+
+### Names included in `__all__` still reassign `Final` symbols
+
+An explicitly exported name is genuinely imported, so existing `Final` declarations still reject the
+reassignment.
+
+`exporter.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+__all__ = ["VALUE"]
+```
+
+`importer.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 2
+
+# error: [invalid-assignment] "Reassignment of `Final` symbol `VALUE` is not allowed"
+from exporter import *
 ```
 
 ### `__all__` with additions later on in the global scope
@@ -1437,7 +1640,7 @@ are present due to `*` imports.
 import collections.abc
 
 reveal_type(collections.abc.Sequence)  # revealed: <class 'Sequence'>
-reveal_type(collections.abc.Callable)  # revealed: <special-form 'typing.Callable'>
+reveal_type(collections.abc.Callable)  # revealed: <special-form 'collections.abc.Callable'>
 reveal_type(collections.abc.Set)  # revealed: <class 'AbstractSet'>
 ```
 
@@ -1449,7 +1652,7 @@ If the module is unresolved, we emit a diagnostic just like for any other unreso
 
 ```py
 # TODO: not a great error message
-from foo import *  # error: [unresolved-import] "Cannot resolve imported module `foo`"
+from foo import *  # error: [import-not-found] "Cannot resolve imported module `foo`"
 ```
 
 ### Nested scope
@@ -1485,7 +1688,7 @@ _Z: bool = True
 
 `b.py`:
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 from a import *, _Y  # error: [invalid-syntax]
@@ -1509,6 +1712,6 @@ from a import *, _Y as fooo  # error: [invalid-syntax]
 from a import *, *, _Y  # error: [invalid-syntax]
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
 
 [python language reference for import statements]: https://docs.python.org/3/reference/simple_stmts.html#the-import-statement

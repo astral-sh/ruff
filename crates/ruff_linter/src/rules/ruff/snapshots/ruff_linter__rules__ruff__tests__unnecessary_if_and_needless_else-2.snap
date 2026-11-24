@@ -1,0 +1,26 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+expression: transformed.source_code()
+---
+### Errors (both RUF047 and RUF050 converge)
+
+# RUF047 removes the else, then RUF050 removes the remaining if.
+
+# Same with elif.
+if sys.version_info >= (3, 11):
+    pass
+elif sys.version_info >= (3, 10):
+    pass
+
+# Side-effect in condition: RUF047 removes the else, then RUF050
+# replaces the remaining `if` with the condition expression
+foo()
+
+
+### No errors
+
+# Non-empty if body: neither rule fires.
+if sys.version_info >= (3, 11):
+    bar()
+else:
+    baz()

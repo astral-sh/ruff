@@ -2,9 +2,11 @@ use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprBinOp, Operator};
 use ruff_python_semantic::{SemanticModel, analyze::typing::traverse_union};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -39,7 +41,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `typing.Never`](https://docs.python.org/3/library/typing.html#typing.Never)
 /// - [Python documentation: `typing.NoReturn`](https://docs.python.org/3/library/typing.html#typing.NoReturn)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Correctness)]
 pub(crate) struct NeverUnion {
     never_like: NeverLike,
     union_like: UnionLike,
@@ -172,7 +174,12 @@ pub(crate) fn never_union(checker: &Checker, expr: &Expr) {
                         Edit::range_replacement(
                             if let [only] = rest.as_slice() {
                                 // Ex) `typing.Union[typing.NoReturn, int]` -> `int`
-                                checker.locator().slice(only).to_string()
+                                let inner = checker.locator().slice(only);
+                                if checker.locator().contains_line_break(only.range()) {
+                                    format!("({inner})")
+                                } else {
+                                    inner.to_string()
+                                }
                             } else {
                                 // Ex) `typing.Union[typing.NoReturn, int, str]` -> `typing.Union[int, str]`
                                 checker

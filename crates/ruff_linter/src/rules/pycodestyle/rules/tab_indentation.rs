@@ -6,6 +6,7 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::Locator;
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for indentation that uses tabs.
@@ -24,7 +25,7 @@ use crate::checkers::ast::LintContext;
 /// [PEP 8]: https://peps.python.org/pep-0008/#tabs-or-spaces
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.254")]
+#[violation_metadata(stable_since = "v0.0.254", category = Category::Formatting)]
 pub(crate) struct TabIndentation;
 
 impl Violation for TabIndentation {

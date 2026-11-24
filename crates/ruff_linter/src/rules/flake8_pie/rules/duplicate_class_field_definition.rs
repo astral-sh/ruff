@@ -6,6 +6,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::{AlwaysFixableViolation, Fix};
 
@@ -35,7 +36,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// This fix is always marked as unsafe since we cannot know
 /// for certain which assignment was intended.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Correctness)]
 pub(crate) struct DuplicateClassFieldDefinition {
     name: String,
 }
@@ -78,7 +79,7 @@ pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: &[Stmt])
 
         // If this is an unrolled augmented assignment (e.g., `x = x + 1`), skip it.
         if let Some(value) = value
-            && any_over_expr(value, &|expr| {
+            && any_over_expr(value, |expr| {
                 expr.as_name_expr().is_some_and(|name| name.id == target.id)
             })
         {

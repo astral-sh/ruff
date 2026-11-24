@@ -5,13 +5,15 @@ use anyhow::Result;
 use indexmap::IndexSet;
 use log::{debug, warn};
 use path_absolutize::CWD;
-use ruff_db::system::{SystemPath, SystemPathBuf};
-use ruff_graph::{Direction, ImportMap, ModuleDb, ModuleImports};
+use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
+use ruff_graph::{
+    Direction, ImportMap, ModuleDb, ModuleImports, ResolverEnvironment, resolve_search_paths,
+};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{warn_user, warn_user_once};
-use ruff_python_ast::{PySourceType, SourceType};
-use ruff_workspace::resolver::{ResolvedFile, match_exclusion, python_files_in_path};
+use ruff_python_ast::SourceType;
+use ruff_workspace::resolver::{ResolvedFile, match_exclusion, project_files_in_path};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -24,8 +26,8 @@ pub(crate) fn analyze_graph(
 ) -> Result<ExitStatus> {
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside the hierarchy.
-    let pyproject_config = resolve(config_arguments, None)?;
-    if pyproject_config.settings.analyze.preview.is_disabled() {
+    let root_project = resolve(config_arguments, None)?;
+    if root_project.project.settings.analyze.preview.is_disabled() {
         warn_user!("`ruff analyze graph` is experimental and may change without warning");
     }
 
@@ -35,7 +37,16 @@ pub(crate) fn analyze_graph(
 
     // Find all Python files.
     let files = resolve_default_files(args.files, false);
-    let (paths, resolver) = python_files_in_path(&files, &pyproject_config, config_arguments)?;
+    let (mut paths, resolver) = project_files_in_path(&files, &root_project, config_arguments)?;
+
+    // Filter to only Python files
+    paths.retain(|path| {
+        if let Ok(ResolvedFile::Root(path) | ResolvedFile::Nested(path)) = path {
+            matches!(SourceType::from(path), SourceType::Python(_))
+        } else {
+            true
+        }
+    });
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
@@ -68,7 +79,8 @@ pub(crate) fn analyze_graph(
     // Add configured `src` paths first (for precedence), filtering to only include existing
     // directories.
     src_roots.extend(
-        pyproject_config
+        root_project
+            .project
             .settings
             .linter
             .src
@@ -86,17 +98,15 @@ pub(crate) fn analyze_graph(
             .filter_map(|path| SystemPathBuf::from_path_buf(path.to_path_buf()).ok()),
     );
 
-    let db = ModuleDb::from_src_roots(
+    let system = OsSystem::default();
+    let search_paths = resolve_search_paths(
+        &system,
         src_roots.into_iter().collect(),
-        pyproject_config
-            .settings
-            .analyze
-            .target_version
-            .as_tuple()
-            .into(),
         args.python
             .and_then(|python| SystemPathBuf::from_path_buf(python).ok()),
     )?;
+    let db = ModuleDb::new(system);
+    search_paths.try_register_static_roots(&db);
 
     let imports = {
         // Create a cache for resolved globs.
@@ -106,6 +116,7 @@ pub(crate) fn analyze_graph(
         let result = Arc::new(Mutex::new(Vec::new()));
         let inner_result = Arc::clone(&result);
         let db = db.clone();
+        let search_paths = &search_paths;
 
         rayon::scope(move |scope| {
             for resolved_file in paths {
@@ -124,6 +135,8 @@ pub(crate) fn analyze_graph(
                 let string_imports = settings.analyze.string_imports;
                 let include_dependencies = settings.analyze.include_dependencies.get(path).cloned();
                 let type_checking_imports = settings.analyze.type_checking_imports;
+                let python_version = settings.analyze.target_version;
+                let source_type = settings.analyze.extension.get_source_type(path);
 
                 // Skip excluded files.
                 if (settings.file_resolver.force_exclude || !resolved_file.is_root())
@@ -135,18 +148,6 @@ pub(crate) fn analyze_graph(
                 {
                     continue;
                 }
-
-                // Ignore non-Python files.
-                let source_type = match settings.analyze.extension.get(path) {
-                    None => match SourceType::from(&path) {
-                        SourceType::Python(source_type) => source_type,
-                        SourceType::Toml(_) => {
-                            debug!("Ignoring TOML file: {}", path.display());
-                            continue;
-                        }
-                    },
-                    Some(language) => PySourceType::from(language),
-                };
 
                 // Convert to system paths.
                 let Ok(package) = package.map(SystemPathBuf::from_path_buf).transpose() else {
@@ -176,13 +177,13 @@ pub(crate) fn analyze_graph(
                         }
                     };
 
-                    let source_code = source_kind.source_code();
+                    let environment = ResolverEnvironment::new(&db, python_version, search_paths);
 
                     // Identify any imports via static analysis.
                     let mut imports = ModuleImports::detect(
                         &db,
-                        source_code,
-                        source_type,
+                        environment,
+                        &source_kind,
                         &path,
                         package.as_deref(),
                         string_imports,

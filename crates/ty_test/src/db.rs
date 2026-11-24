@@ -1,22 +1,28 @@
+use crate::config::{Analysis, Rules, ScriptMetadata};
 use camino::{Utf8Component, Utf8PathBuf};
 use ruff_db::Db as SourceDb;
-use ruff_db::diagnostic::Severity;
+use ruff_db::diagnostic::{Diagnostic, LintName, Severity};
 use ruff_db::files::{File, Files};
+use ruff_db::source::source_text;
 use ruff_db::system::{
-    CaseSensitivity, DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath,
-    SystemPathBuf, WritableSystem,
+    DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath, SystemPathBuf, WhichResult,
+    WritableSystem,
 };
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_notebook::{Notebook, NotebookError};
 use salsa::Setter as _;
 use std::borrow::Cow;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use tempfile::TempDir;
-use ty_module_resolver::SearchPaths;
-use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, Program, default_lint_registry};
-
-use crate::config::Analysis;
+use ty_module_resolver::ModuleGlobSetBuilder;
+use ty_python_core::program::ProgramSettings;
+use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
+use ty_python_semantic::dependency::DependencyMetadata;
+use ty_python_semantic::lint::{LintRegistry, LintRegistryBuilder, LintStatus, RuleSelection};
+use ty_python_semantic::{
+    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, check_file_unwrap, declare_lint,
+    register_lints,
+};
 
 #[salsa::db]
 #[derive(Clone)]
@@ -25,14 +31,13 @@ pub(crate) struct Db {
     files: Files,
     system: MdtestSystem,
     vendored: VendoredFileSystem,
-    rule_selection: Arc<RuleSelection>,
     settings: Option<Settings>,
 }
 
 impl Db {
     pub(crate) fn setup() -> Self {
-        let rule_selection = RuleSelection::all(default_lint_registry(), Severity::Info);
-
+        let vendored = ty_vendored::file_system().clone();
+        let program_settings = ProgramSettings::empty(&vendored);
         let mut db = Self {
             system: MdtestSystem::in_memory(),
             storage: salsa::Storage::new(Some(Box::new({
@@ -40,13 +45,12 @@ impl Db {
                     tracing::trace!("event: {:?}", event);
                 }
             }))),
-            vendored: ty_vendored::file_system().clone(),
+            vendored,
             files: Files::default(),
-            rule_selection: Arc::new(rule_selection),
             settings: None,
         };
 
-        db.settings = Some(Settings::new(&db));
+        db.settings = Some(Settings::new(&db, program_settings));
         db
     }
 
@@ -54,24 +58,46 @@ impl Db {
         self.settings.unwrap()
     }
 
-    pub(crate) fn update_analysis_options(&mut self, options: Option<&Analysis>) {
-        let analysis = if let Some(options) = options {
-            let AnalysisSettings {
-                respect_type_ignore_comments: respect_type_ignore_comments_default,
-            } = AnalysisSettings::default();
+    pub(crate) fn update_program(&mut self, settings: ProgramSettings) {
+        let db_settings = self.settings();
+        if db_settings.program(self) != &settings {
+            settings.search_paths.try_register_static_roots(self);
+            db_settings.set_program(self).to(settings);
+        }
+    }
 
-            AnalysisSettings {
-                respect_type_ignore_comments: options
-                    .respect_type_ignore_comments
-                    .unwrap_or(respect_type_ignore_comments_default),
-            }
-        } else {
-            AnalysisSettings::default()
-        };
+    pub(crate) fn set_verbosity(&mut self, verbose: bool) {
+        self.settings().set_verbose(self).to(verbose);
+    }
+
+    pub(crate) fn update_analysis_options(&mut self, options: Option<&Analysis>) {
+        let analysis = mdtest_analysis_settings(options);
 
         let settings = self.settings();
         if settings.analysis(self) != &analysis {
             settings.set_analysis(self).to(analysis);
+        }
+    }
+
+    pub(crate) fn update_dependency_metadata(&mut self, metadata: Option<&DependencyMetadata>) {
+        let settings = self.settings();
+        if settings.dependency_metadata(self).as_ref() != metadata {
+            settings.set_dependency_metadata(self).to(metadata.cloned());
+        }
+    }
+
+    pub(crate) fn update_mdtest_rule_selection(
+        &mut self,
+        rules: Option<&Rules>,
+        required_rule: Option<&str>,
+    ) {
+        let rule_selection = mdtest_rule_selection(rules, required_rule);
+
+        let settings = self.settings();
+        if settings.rule_selection(self) != &rule_selection {
+            settings
+                .set_rule_selection(self)
+                .to(MdtestRuleSelection(rule_selection));
         }
     }
 
@@ -103,39 +129,76 @@ impl SourceDb for Db {
     fn files(&self) -> &Files {
         &self.files
     }
-
-    fn python_version(&self) -> ruff_python_ast::PythonVersion {
-        Program::get(self).python_version(self)
-    }
 }
 
 #[salsa::db]
-impl ty_module_resolver::Db for Db {
-    fn search_paths(&self) -> &SearchPaths {
-        Program::get(self).search_paths(self)
+impl ty_module_resolver::Db for Db {}
+
+#[salsa::db]
+impl ty_python_core::Db for Db {
+    fn should_check_file(&self, file: File) -> bool {
+        !file.path(self).is_vendored_path()
     }
 }
 
 #[salsa::db]
 impl SemanticDb for Db {
-    fn should_check_file(&self, file: File) -> bool {
-        !file.path(self).is_vendored_path()
+    fn check_file(&self, file: File) -> Vec<Diagnostic> {
+        if !self.should_check_file(file) {
+            return Vec::new();
+        }
+
+        check_file_unwrap(self, self.program_file(file))
     }
 
-    fn rule_selection(&self, _file: File) -> &RuleSelection {
-        &self.rule_selection
+    fn program_file(&self, file: File) -> ProgramFile<'_> {
+        self.program().program_file(self, file)
+    }
+
+    fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
+        &self.settings().program(self).python_version
+    }
+
+    fn rule_selection(&self, file: File) -> &RuleSelection {
+        file_settings(self, file).rules(self)
     }
 
     fn lint_registry(&self) -> &LintRegistry {
-        default_lint_registry()
+        mdtest_lint_registry()
     }
 
     fn verbose(&self) -> bool {
+        self.settings().verbose(self)
+    }
+
+    fn is_open_file(&self, _file: File) -> bool {
         false
     }
 
-    fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
-        self.settings().analysis(self)
+    fn analysis_settings(&self, file: File) -> &AnalysisSettings {
+        file_settings(self, file).analysis(self)
+    }
+
+    fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata> {
+        match file_settings(self, file) {
+            FileSettings::Global => self.settings().dependency_metadata(self).as_ref(),
+            FileSettings::InheritProjectConfig => None,
+            FileSettings::File {
+                dependency_metadata,
+                ..
+            } => dependency_metadata.as_ref(),
+        }
+    }
+
+    fn dyn_clone(&self) -> Box<dyn SemanticDb> {
+        Box::new(self.clone())
+    }
+}
+
+#[salsa::db]
+impl TestProgramDb for Db {
+    fn program_settings(&self) -> &ProgramSettings {
+        self.settings().program(self)
     }
 }
 
@@ -143,17 +206,243 @@ impl SemanticDb for Db {
 impl salsa::Database for Db {}
 
 impl DbWithWritableSystem for Db {
-    type System = MdtestSystem;
-    fn writable_system(&self) -> &Self::System {
-        &self.system
+    fn writable_system(&self) -> ruff_db::system::Result<&dyn WritableSystem> {
+        Ok(&self.system)
+    }
+}
+
+#[salsa::tracked(returns(ref))]
+fn file_settings(db: &dyn SemanticDb, file: File) -> FileSettings {
+    let source = source_text(db, file);
+    if source.is_notebook() {
+        return FileSettings::Global;
+    }
+    let Some(metadata) = ScriptMetadata::from_source(&source) else {
+        return FileSettings::Global;
+    };
+    let Some(options) = metadata.into_options() else {
+        return FileSettings::InheritProjectConfig;
+    };
+
+    FileSettings::File {
+        rules: MdtestRuleSelection(mdtest_rule_selection(options.rules.as_ref(), None)),
+        analysis: mdtest_analysis_settings(options.analysis.as_ref()),
+        dependency_metadata: options.dependency_metadata.map(|fixture| fixture.metadata),
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum FileSettings {
+    Global,
+    /// A script without `[tool.ty]` inherits settings but has its own dependency metadata.
+    InheritProjectConfig,
+    File {
+        rules: MdtestRuleSelection,
+        analysis: AnalysisSettings,
+        dependency_metadata: Option<DependencyMetadata>,
+    },
+}
+
+impl FileSettings {
+    fn rules<'db>(&'db self, db: &'db Db) -> &'db RuleSelection {
+        match self {
+            Self::Global | Self::InheritProjectConfig => db.settings().rule_selection(db),
+            Self::File { rules, .. } => rules,
+        }
+    }
+
+    fn analysis<'db>(&'db self, db: &'db Db) -> &'db AnalysisSettings {
+        match self {
+            Self::Global | Self::InheritProjectConfig => db.settings().analysis(db),
+            Self::File { analysis, .. } => analysis,
+        }
     }
 }
 
 #[salsa::input(debug)]
 struct Settings {
+    #[returns(ref)]
+    program: ProgramSettings,
     #[default]
     #[returns(ref)]
     analysis: AnalysisSettings,
+    #[default]
+    #[returns(ref)]
+    dependency_metadata: Option<DependencyMetadata>,
+    #[default]
+    #[returns(deref)]
+    rule_selection: MdtestRuleSelection,
+    #[default]
+    #[returns(copy)]
+    verbose: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct MdtestRuleSelection(RuleSelection);
+
+impl Default for MdtestRuleSelection {
+    fn default() -> Self {
+        Self(mdtest_rule_selection(None, None))
+    }
+}
+
+impl std::ops::Deref for MdtestRuleSelection {
+    type Target = RuleSelection;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
+    let Some(options) = options else {
+        return AnalysisSettings::default();
+    };
+
+    let AnalysisSettings {
+        return_type_inference: return_type_inference_default,
+        strict_generic_narrowing: strict_generic_narrowing_default,
+        strict_equality_semantics: strict_equality_semantics_default,
+        respect_type_ignore_comments: respect_type_ignore_comments_default,
+        allowed_unresolved_imports: allowed_unresolved_imports_default,
+        replace_imports_with_any: replace_imports_with_any_default,
+    } = AnalysisSettings::default();
+
+    let allowed_unresolved_imports =
+        if let Some(allowed_unresolved_imports) = options.allowed_unresolved_imports.as_deref() {
+            let mut builder = ModuleGlobSetBuilder::new();
+            for pattern in allowed_unresolved_imports {
+                builder
+                    .add(pattern)
+                    .expect("Invalid `allowed-unresolved-imports` pattern `{pattern}`");
+            }
+            builder.build().unwrap()
+        } else {
+            allowed_unresolved_imports_default
+        };
+
+    let replace_imports_with_any =
+        if let Some(replace_imports_with_any) = options.replace_imports_with_any.as_deref() {
+            let mut builder = ModuleGlobSetBuilder::new();
+            for pattern in replace_imports_with_any {
+                builder
+                    .add(pattern)
+                    .expect("Invalid `replace-imports-with-any` pattern `{pattern}`");
+            }
+            builder.build().unwrap()
+        } else {
+            replace_imports_with_any_default
+        };
+
+    AnalysisSettings {
+        return_type_inference: options
+            .return_type_inference
+            .unwrap_or(return_type_inference_default),
+        strict_generic_narrowing: options
+            .strict_generic_narrowing
+            .unwrap_or(strict_generic_narrowing_default),
+        strict_equality_semantics: options
+            .strict_equality_semantics
+            .unwrap_or(strict_equality_semantics_default),
+        respect_type_ignore_comments: options
+            .respect_type_ignore_comments
+            .unwrap_or(respect_type_ignore_comments_default),
+        allowed_unresolved_imports,
+        replace_imports_with_any,
+    }
+}
+
+/// Includes a no-op rule for testing renamed rules in suppression comments.
+fn mdtest_lint_registry() -> &'static LintRegistry {
+    declare_lint! {
+        /// A rule that never emits a diagnostic.
+        static NEW_RULE_NAME = {
+            summary: "example of a renamed rule",
+            status: LintStatus::stable("0.0.0"),
+        }
+    }
+
+    static REGISTRY: LazyLock<LintRegistry> = LazyLock::new(|| {
+        let mut registry = LintRegistryBuilder::default();
+        register_lints(&mut registry);
+        registry.register_lint(&NEW_RULE_NAME);
+        registry.register_alias(LintName::of("old-rule-name"), &NEW_RULE_NAME);
+        registry.build()
+    });
+    &REGISTRY
+}
+
+fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> RuleSelection {
+    // In general (as shown by the initialization of `selection` below), we enable even rules that
+    // are ignored by default in mdtests so that their behaviour is covered alongside the default
+    // rules. There are a few small exceptions to this, however:
+    static DISABLED_IN_MDTESTS: &[&str] = &[
+        // `missing-override-decorator` is an exception: because it is extremely pedantic we have
+        // chosen to keep it opt-in to minimize churn in unrelated tests.
+        "missing-override-decorator",
+        // `experimental-syntax` is also an exception: we make use of `&` and `~` for intersection and
+        // negation types in our tests for better readability.
+        "experimental-syntax",
+        // The `unsound-*` rules and `redundant-condition-strict` are also exceptions because they
+        // are very strict, would result in lots of additional diagnostics in mdtests, and are not
+        // the default behaviour we'll show to our users.
+        "unsound-assignment",
+        "unsound-return",
+        "unsound-yield",
+        "redundant-condition-strict",
+    ];
+
+    let registry = mdtest_lint_registry();
+    let mut selection = RuleSelection::all(registry, Severity::Info);
+
+    for rule in DISABLED_IN_MDTESTS {
+        let lint = registry
+            .get(rule)
+            .unwrap_or_else(|error| panic!("Unknown lint rule `{rule}`: {error}"));
+        selection.disable(lint);
+    }
+
+    if let Some(rules) = rules {
+        let set_lint_level =
+            |selection: &mut RuleSelection, lint, level| match Severity::try_from(level) {
+                Ok(severity) => {
+                    selection.enable(lint, severity, ty_python_semantic::lint::LintSource::File);
+                }
+                Err(()) => selection.disable(lint),
+            };
+
+        // If "all" key is present, use it's value as the default for all rules.
+        if let Some(level) = rules.get("all") {
+            for lint in registry.lints() {
+                set_lint_level(&mut selection, *lint, *level);
+            }
+        }
+
+        // Apply overrides for specific (non-"all") rules.
+        for (rule_name, level) in rules {
+            if rule_name == "all" {
+                continue;
+            }
+
+            let lint = registry
+                .get(rule_name)
+                .unwrap_or_else(|error| panic!("Unknown lint rule `{rule_name}`: {error}"));
+            set_lint_level(&mut selection, lint, *level);
+        }
+    }
+
+    if let Some(required_rule) = required_rule {
+        let lint = registry
+            .get(required_rule)
+            .unwrap_or_else(|error| panic!("Unknown lint rule `{required_rule}`: {error}"));
+        selection.enable(
+            lint,
+            Severity::Info,
+            ty_python_semantic::lint::LintSource::File,
+        );
+    }
+
+    selection
 }
 
 #[derive(Debug, Clone)]
@@ -242,6 +531,15 @@ impl System for MdtestSystem {
         }
     }
 
+    fn is_same_file(
+        &self,
+        first: &SystemPath,
+        second: &SystemPath,
+    ) -> ruff_db::system::Result<bool> {
+        self.as_system()
+            .is_same_file(&self.normalize_path(first), &self.normalize_path(second))
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> ruff_db::system::Result<String> {
         self.as_system().read_to_string(&self.normalize_path(path))
     }
@@ -265,13 +563,8 @@ impl System for MdtestSystem {
         self.as_system().read_virtual_path_to_notebook(path)
     }
 
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        self.as_system()
-            .path_exists_case_sensitive(&self.normalize_path(path), &self.normalize_path(prefix))
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        self.as_system().case_sensitivity()
+    fn which(&self, name: &str) -> WhichResult {
+        self.as_system().which(name)
     }
 
     fn current_directory(&self) -> &SystemPath {
@@ -302,17 +595,6 @@ impl System for MdtestSystem {
         self.as_system().walk_directory(&self.normalize_path(path))
     }
 
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> Result<
-        Box<dyn Iterator<Item = Result<SystemPathBuf, ruff_db::system::GlobError>> + '_>,
-        ruff_db::system::PatternError,
-    > {
-        self.as_system()
-            .glob(self.normalize_path(SystemPath::new(pattern)).as_str())
-    }
-
     fn as_writable(&self) -> Option<&dyn WritableSystem> {
         Some(self)
     }
@@ -338,6 +620,10 @@ impl WritableSystem for MdtestSystem {
     fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> ruff_db::system::Result<()> {
         self.as_system()
             .write_file_bytes(&self.normalize_path(path), content)
+    }
+
+    fn remove_file(&self, path: &SystemPath) -> ruff_db::system::Result<()> {
+        self.as_system().remove_file(&self.normalize_path(path))
     }
 
     fn create_directory_all(&self, path: &SystemPath) -> ruff_db::system::Result<()> {

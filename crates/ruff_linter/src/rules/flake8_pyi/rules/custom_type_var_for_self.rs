@@ -11,6 +11,7 @@ use ruff_python_semantic::{Binding, ResolvedReference, ScopeId, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::{Checker, TypingImporter};
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -89,7 +90,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// [typing_TypeVar]: https://docs.python.org/3/library/typing.html#typing.TypeVar
 /// [typing_extensions]: https://typing-extensions.readthedocs.io/en/latest/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.283")]
+#[violation_metadata(stable_since = "v0.0.283", category = Category::Complexity)]
 pub(crate) struct CustomTypeVarForSelf {
     typevar_name: String,
 }
@@ -101,14 +102,14 @@ impl Violation for CustomTypeVarForSelf {
     fn message(&self) -> String {
         format!(
             "Use `Self` instead of custom TypeVar `{}`",
-            &self.typevar_name
+            self.typevar_name
         )
     }
 
     fn fix_title(&self) -> Option<String> {
         Some(format!(
             "Replace TypeVar `{}` with `Self`",
-            &self.typevar_name
+            self.typevar_name
         ))
     }
 }

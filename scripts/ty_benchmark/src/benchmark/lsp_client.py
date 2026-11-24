@@ -9,6 +9,8 @@ from typing import Any, NamedTuple, override
 from lsprotocol import types as lsp
 from pygls.lsp.client import LanguageClient
 
+logger = logging.getLogger(__name__)
+
 
 def _register_notebook_structure_hooks(converter):
     """Register structure hooks for notebook document types to work around cattrs deserialization issues."""
@@ -60,29 +62,33 @@ class LSPClient(LanguageClient):
 
         self.diagnostics = {}
 
+        # TODO: remove the suppression comment when https://github.com/openlawlibrary/pygls/pull/635 has been released
+        # ty: ignore[dynamic-function-decorator-return]
         @self.feature(lsp.TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS)
         def publish_diagnostics(
             client: LSPClient, params: lsp.PublishDiagnosticsParams
         ):
-            logging.info(
+            logger.info(
                 f"Received publish_diagnostics for {params.uri} with version={params.version}, diagnostics count={len(params.diagnostics)}"
             )
             future = self.diagnostics.get(params.uri, None)
 
             if future is None or future.done():
-                future = asyncio.Future()
+                future = asyncio.Future[lsp.PublishDiagnosticsParams]()
                 self.diagnostics[params.uri] = future
 
             future.set_result(params)
 
+        # TODO: remove the suppression comment when https://github.com/openlawlibrary/pygls/pull/635 has been released
+        # ty: ignore[dynamic-function-decorator-return]
         @self.feature(lsp.WINDOW_LOG_MESSAGE)
         def log_message(client: LSPClient, params: lsp.LogMessageParams):
             if params.type == lsp.MessageType.Error:
-                logging.error(f"server error: {params.message}")
+                logger.error(f"server error: {params.message}")
             elif params.type == lsp.MessageType.Warning:
-                logging.warning(f"server warning: {params.message}")
+                logger.warning(f"server warning: {params.message}")
             else:
-                logging.info(f"server info: {params.message}")
+                logger.info(f"server info: {params.message}")
 
     @override
     async def initialize_async(
@@ -92,9 +98,7 @@ class LSPClient(LanguageClient):
 
         self.server_capabilities = result.capabilities
 
-        logging.info(
-            f"Pull diagnostic support: {self.server_supports_pull_diagnostics}"
-        )
+        logger.info(f"Pull diagnostic support: {self.server_supports_pull_diagnostics}")
 
         return result
 
@@ -150,13 +154,13 @@ class LSPClient(LanguageClient):
         future = self.diagnostics.get(path.as_uri(), None)
 
         if future is None:
-            future = asyncio.Future()
+            future = asyncio.Future[lsp.PublishDiagnosticsParams]()
             self.diagnostics[path.as_uri()] = future
 
         try:
-            logging.info(f"Waiting for push diagnostics for {path}")
+            logger.info(f"Waiting for push diagnostics for {path}")
             result = await asyncio.wait_for(future, timeout)
-            logging.info(f"Awaited push diagnostics for {path}")
+            logger.info(f"Awaited push diagnostics for {path}")
         finally:
             self.diagnostics.pop(path.as_uri())
 

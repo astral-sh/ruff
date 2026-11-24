@@ -26,6 +26,7 @@ Module(
                             asname: None,
                         },
                     ],
+                    is_lazy: false,
                 },
             ),
         ],
@@ -37,4 +38,3 @@ Module(
   |
 1 | import x as
   |            ^ Syntax Error: Expected symbol after `as`
-  |

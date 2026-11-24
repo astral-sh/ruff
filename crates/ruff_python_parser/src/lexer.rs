@@ -7,15 +7,12 @@
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 
 use std::cmp::Ordering;
-use std::str::FromStr;
 
 use unicode_ident::{is_xid_continue, is_xid_start};
-use unicode_normalization::UnicodeNormalization;
 
-use ruff_python_ast::name::Name;
+use ruff_python_ast::StringFlags;
 use ruff_python_ast::str_prefix::{AnyStringPrefix, StringLiteralPrefix};
 use ruff_python_ast::token::{TokenFlags, TokenKind};
-use ruff_python_ast::{Int, IpyEscapeKind, StringFlags};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
@@ -26,12 +23,13 @@ use crate::lexer::indentation::{Indentation, Indentations, IndentationsCheckpoin
 use crate::lexer::interpolated_string::{
     InterpolatedStringContext, InterpolatedStrings, InterpolatedStringsCheckpoint,
 };
+use crate::lexer::keywords::{KEYWORD_HASH_MULTIPLIER, KEYWORD_TABLE};
 use crate::string::InterpolatedStringKind;
-use crate::token::TokenValue;
 
 mod cursor;
 mod indentation;
 mod interpolated_string;
+mod keywords;
 
 const BOM: char = '\u{feff}';
 
@@ -49,9 +47,6 @@ pub struct Lexer<'src> {
 
     /// The range of the current token.
     current_range: TextRange,
-
-    /// The value of the current token.
-    current_value: TokenValue,
 
     /// Flags for the current token.
     current_flags: TokenFlags,
@@ -101,7 +96,6 @@ impl<'src> Lexer<'src> {
             state,
             current_kind: TokenKind::EndOfFile,
             current_range: TextRange::empty(start_offset),
-            current_value: TokenValue::None,
             current_flags: TokenFlags::empty(),
             nesting,
             indentations: Indentations::default(),
@@ -122,27 +116,20 @@ impl<'src> Lexer<'src> {
     }
 
     /// Returns the kind of the current token.
-    pub(crate) fn current_kind(&self) -> TokenKind {
+    pub(crate) const fn current_kind(&self) -> TokenKind {
         self.current_kind
     }
 
     /// Returns the range of the current token.
-    pub(crate) fn current_range(&self) -> TextRange {
+    #[doc(hidden)]
+    pub const fn current_range(&self) -> TextRange {
         self.current_range
     }
 
     /// Returns the flags for the current token.
-    pub(crate) fn current_flags(&self) -> TokenFlags {
+    #[doc(hidden)]
+    pub const fn current_flags(&self) -> TokenFlags {
         self.current_flags
-    }
-
-    /// Takes the token value corresponding to the current token out of the lexer, replacing it
-    /// with the default value.
-    ///
-    /// All the subsequent call to this method without moving the lexer would always return the
-    /// default value which is [`TokenValue::None`].
-    pub(crate) fn take_value(&mut self) -> TokenValue {
-        std::mem::take(&mut self.current_value)
     }
 
     /// Helper function to push the given error, updating the current range with the error location
@@ -155,8 +142,7 @@ impl<'src> Lexer<'src> {
 
     /// Lex the next token.
     pub fn next_token(&mut self) -> TokenKind {
-        self.cursor.start_token();
-        self.current_value = TokenValue::None;
+        // `lex_token` marks the start on the path that lexes each token.
         self.current_flags = TokenFlags::empty();
         self.current_kind = self.lex_token();
         // For `Unknown` token, the `push_error` method updates the current range.
@@ -169,6 +155,7 @@ impl<'src> Lexer<'src> {
     fn lex_token(&mut self) -> TokenKind {
         if let Some(interpolated_string) = self.interpolated_strings.current() {
             if !interpolated_string.is_in_interpolation(self.nesting) {
+                self.cursor.start_token();
                 if let Some(token) = self.lex_interpolated_string_middle_or_end() {
                     if token.is_interpolated_string_end() {
                         self.interpolated_strings.pop();
@@ -178,7 +165,11 @@ impl<'src> Lexer<'src> {
             }
         }
         // Return dedent tokens until the current indentation level matches the indentation of the next token.
-        else if let Some(indentation) = self.pending_indentation.take() {
+        // Avoid `Option::take` here: this check runs for every token, and `take` writes `None`
+        // even when there is no pending indentation.
+        else if let Some(indentation) = self.pending_indentation {
+            self.pending_indentation = None;
+            self.cursor.start_token();
             match self.indentations.current().try_compare(indentation) {
                 Ok(Ordering::Greater) => {
                     self.pending_indentation = Some(indentation);
@@ -201,6 +192,8 @@ impl<'src> Lexer<'src> {
         }
 
         if self.state.is_after_newline() {
+            // Indent and dedent tokens include leading whitespace in their ranges.
+            self.cursor.start_token();
             if let Some(indentation) = self.eat_indentation() {
                 return indentation;
             }
@@ -210,14 +203,14 @@ impl<'src> Lexer<'src> {
             }
         }
 
-        // The lexer might've skipped whitespaces, so update the start offset
+        // Whitespace between tokens is not part of the next token's range.
         self.cursor.start_token();
 
         if let Some(c) = self.cursor.bump() {
             if c.is_ascii() {
                 self.consume_ascii_character(c)
             } else if is_unicode_identifier_start(c) {
-                let identifier = self.lex_identifier(c);
+                let identifier = self.lex_unicode_identifier();
                 self.state = State::Other;
 
                 identifier
@@ -263,7 +256,35 @@ impl<'src> Lexer<'src> {
                             self.token_range(),
                         )));
                     }
-                    indentation = Indentation::root();
+                    // test_ok backslash_continuation_indentation
+                    // if True:
+                    //     \
+                    //         1
+                    //     \
+                    // 2
+                    // else:\
+                    //     3
+
+                    // test_err backslash_continuation_indentation_error
+                    // if True:
+                    //     1
+                    //       \
+                    //     2
+
+                    // > Indentation cannot be split over multiple physical lines using backslashes;
+                    // > the whitespace up to the first backslash determines the indentation.
+                    // >
+                    // > https://docs.python.org/3/reference/lexical_analysis.html#indentation
+                    //
+                    // Skip whitespace after the continuation-line without accumulating it into
+                    // `indentation`. However, if the backslash is at column 0 (no prior
+                    // indentation), let the loop continue so the next line's whitespace is
+                    // accumulated normally.
+                    //
+                    // See also: https://github.com/python/cpython/issues/90249
+                    if indentation != Indentation::root() {
+                        self.cursor.eat_while(is_python_whitespace);
+                    }
                 }
                 // Form feed
                 '\x0C' => {
@@ -331,6 +352,12 @@ impl<'src> Lexer<'src> {
     }
 
     fn skip_whitespace(&mut self) -> Result<(), LexicalError> {
+        let whitespace_start = if matches!(self.cursor.first(), ' ' | '\t' | '\\' | '\x0C') {
+            self.offset()
+        } else {
+            return Ok(());
+        };
+
         loop {
             match self.cursor.first() {
                 ' ' => {
@@ -350,7 +377,10 @@ impl<'src> Lexer<'src> {
                         ));
                     }
                     if self.cursor.is_eof() {
-                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
+                        return Err(LexicalError::new(
+                            LexicalErrorType::Eof,
+                            TextRange::new(whitespace_start, self.offset()),
+                        ));
                     }
                 }
                 // Form feed
@@ -400,27 +430,18 @@ impl<'src> Lexer<'src> {
                 }
             }
 
-            c @ ('%' | '!')
+            '%' | '!'
                 if self.mode == Mode::Ipython
                     && self.state.is_after_equal()
                     && self.nesting == 0 =>
             {
-                // SAFETY: Safe because `c` has been matched against one of the possible escape command token
-                self.lex_ipython_escape_command(IpyEscapeKind::try_from(c).unwrap())
+                self.lex_ipython_escape_command()
             }
 
-            c @ ('%' | '!' | '?' | '/' | ';' | ',')
+            '%' | '!' | '?' | '/' | ';' | ','
                 if self.mode == Mode::Ipython && self.state.is_new_logical_line() =>
             {
-                let kind = if let Ok(kind) = IpyEscapeKind::try_from([c, self.cursor.first()]) {
-                    self.cursor.bump();
-                    kind
-                } else {
-                    // SAFETY: Safe because `c` has been matched against one of the possible escape command token
-                    IpyEscapeKind::try_from(c).unwrap()
-                };
-
-                self.lex_ipython_escape_command(kind)
+                self.lex_ipython_escape_command()
             }
 
             '?' if self.mode == Mode::Ipython => TokenKind::Question,
@@ -616,119 +637,59 @@ impl<'src> Lexer<'src> {
         token
     }
 
-    /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
+    /// Lex an identifier starting with an ASCII character, or a prefixed string.
     fn lex_identifier(&mut self, first: char) -> TokenKind {
-        // Detect potential string like rb'' b'' f'' t'' u'' r''
-        let quote = match (first, self.cursor.first()) {
-            (_, quote @ ('\'' | '"')) => self.try_single_char_prefix(first).then(|| {
-                self.cursor.bump();
-                quote
-            }),
-            (_, second) if is_quote(self.cursor.second()) => {
-                self.try_double_char_prefix([first, second]).then(|| {
-                    self.cursor.bump();
-                    // SAFETY: Safe because of the `is_quote` check in this match arm's guard
-                    self.cursor.bump().unwrap()
-                })
-            }
-            _ => None,
-        };
+        debug_assert!(first.is_ascii());
 
-        if let Some(quote) = quote {
-            if self.current_flags.is_interpolated_string() {
-                if let Some(kind) = self.lex_interpolated_string_start(quote) {
-                    return kind;
+        // Classify the ASCII prefix without decoding each character. Any Unicode suffix still
+        // needs the full identifier-continuation check below.
+        let bytes = self.cursor.rest().as_bytes();
+        let ascii_len = ascii_identifier_prefix_len(bytes);
+        self.cursor.skip_bytes(ascii_len);
+
+        match bytes.get(ascii_len) {
+            Some(quote @ (b'\'' | b'"')) if ascii_len <= 1 => {
+                let is_string_prefix = if ascii_len == 0 {
+                    if let Some(prefix) = single_char_prefix(first) {
+                        self.current_flags |= prefix;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    self.try_double_char_prefix([first, char::from(bytes[0])])
+                };
+                if is_string_prefix {
+                    self.cursor.skip_bytes(1);
+                    let quote = char::from(*quote);
+                    if self.current_flags.is_interpolated_string()
+                        && let Some(kind) = self.lex_interpolated_string_start(quote)
+                    {
+                        return kind;
+                    }
+                    return self.lex_string(quote);
                 }
             }
-
-            return self.lex_string(quote);
-        }
-
-        // Keep track of whether the identifier is ASCII-only or not.
-        //
-        // This is important because Python applies NFKC normalization to
-        // identifiers: https://docs.python.org/3/reference/lexical_analysis.html#identifiers.
-        // We need to therefore do the same in our lexer, but applying NFKC normalization
-        // unconditionally is extremely expensive. If we know an identifier is ASCII-only,
-        // (by far the most common case), we can skip NFKC normalization of the identifier.
-        let mut is_ascii = first.is_ascii();
-        self.cursor
-            .eat_while(|c| is_identifier_continuation(c, &mut is_ascii));
-
-        let text = self.token_text();
-
-        if !is_ascii {
-            self.current_value = TokenValue::Name(text.nfkc().collect::<Name>());
-            return TokenKind::Name;
-        }
-
-        // Short circuit for names that are longer than any known keyword.
-        // It helps Rust to predict that the Name::new call in the keyword match's default branch
-        // is guaranteed to fit into a stack allocated (inline) Name.
-        if text.len() > 8 {
-            self.current_value = TokenValue::Name(Name::new(text));
-            return TokenKind::Name;
-        }
-
-        match text {
-            "False" => TokenKind::False,
-            "None" => TokenKind::None,
-            "True" => TokenKind::True,
-            "and" => TokenKind::And,
-            "as" => TokenKind::As,
-            "assert" => TokenKind::Assert,
-            "async" => TokenKind::Async,
-            "await" => TokenKind::Await,
-            "break" => TokenKind::Break,
-            "case" => TokenKind::Case,
-            "class" => TokenKind::Class,
-            "continue" => TokenKind::Continue,
-            "def" => TokenKind::Def,
-            "del" => TokenKind::Del,
-            "elif" => TokenKind::Elif,
-            "else" => TokenKind::Else,
-            "except" => TokenKind::Except,
-            "finally" => TokenKind::Finally,
-            "for" => TokenKind::For,
-            "from" => TokenKind::From,
-            "global" => TokenKind::Global,
-            "if" => TokenKind::If,
-            "import" => TokenKind::Import,
-            "in" => TokenKind::In,
-            "is" => TokenKind::Is,
-            "lambda" => TokenKind::Lambda,
-            "match" => TokenKind::Match,
-            "nonlocal" => TokenKind::Nonlocal,
-            "not" => TokenKind::Not,
-            "or" => TokenKind::Or,
-            "pass" => TokenKind::Pass,
-            "raise" => TokenKind::Raise,
-            "return" => TokenKind::Return,
-            "try" => TokenKind::Try,
-            "type" => TokenKind::Type,
-            "while" => TokenKind::While,
-            "with" => TokenKind::With,
-            "yield" => TokenKind::Yield,
-            _ => {
-                self.current_value = TokenValue::Name(Name::new(text));
-                TokenKind::Name
+            Some(byte) if !byte.is_ascii() && self.cursor.eat_if(is_xid_continue).is_some() => {
+                // The ASCII prefix is already consumed; continue after the non-ASCII character.
+                return self.lex_unicode_identifier();
             }
+            _ => {}
         }
+
+        KEYWORD_TABLE.lookup(first, bytes, ascii_len + 1)
     }
 
-    /// Try lexing the single character string prefix, updating the token flags accordingly.
-    /// Returns `true` if it matches.
-    fn try_single_char_prefix(&mut self, first: char) -> bool {
-        match first {
-            'f' | 'F' => self.current_flags |= TokenFlags::F_STRING,
-            't' | 'T' => self.current_flags |= TokenFlags::T_STRING,
-            'u' | 'U' => self.current_flags |= TokenFlags::UNICODE_STRING,
-            'b' | 'B' => self.current_flags |= TokenFlags::BYTE_STRING,
-            'r' => self.current_flags |= TokenFlags::RAW_STRING_LOWERCASE,
-            'R' => self.current_flags |= TokenFlags::RAW_STRING_UPPERCASE,
-            _ => return false,
-        }
-        true
+    /// Continues from the cursor after the identifier's first non-ASCII character.
+    fn lex_unicode_identifier(&mut self) -> TokenKind {
+        // The remaining text can start with ASCII in both `α_suffix` and
+        // `prefix_α_suffix`. Scan that run in batches before decoding more characters.
+        let ascii_len = ascii_identifier_prefix_len(self.cursor.rest().as_bytes());
+        self.cursor.skip_bytes(ascii_len);
+        self.cursor.eat_while(is_identifier_continuation);
+        // The parser uses this flag to apply NFKC normalization only to non-ASCII names.
+        self.current_flags |= TokenFlags::NON_ASCII_IDENTIFIER;
+        TokenKind::Identifier
     }
 
     /// Try lexing the double character string prefix, updating the token flags accordingly.
@@ -798,14 +759,6 @@ impl<'src> Lexer<'src> {
             self.current_flags = interpolated_string.flags();
             return Some(string_kind.end_token());
         }
-
-        // We have to decode `{{` and `}}` into `{` and `}` respectively. As an
-        // optimization, we only allocate a new string we find any escaped curly braces,
-        // otherwise this string will remain empty and we'll use a source slice instead.
-        let mut normalized = String::new();
-
-        // Tracks the last offset of token value that has been written to `normalized`.
-        let mut last_offset = self.offset();
 
         // This isn't going to change for the duration of the loop.
         let in_format_spec = interpolated_string.is_in_format_spec(self.nesting);
@@ -886,10 +839,7 @@ impl<'src> Lexer<'src> {
                 '{' => {
                     if self.cursor.second() == '{' && !in_format_spec {
                         self.cursor.bump();
-                        normalized
-                            .push_str(&self.source[TextRange::new(last_offset, self.offset())]);
                         self.cursor.bump(); // Skip the second `{`
-                        last_offset = self.offset();
                     } else {
                         break;
                     }
@@ -900,10 +850,7 @@ impl<'src> Lexer<'src> {
                         self.cursor.bump();
                     } else if self.cursor.second() == '}' && !in_format_spec {
                         self.cursor.bump();
-                        normalized
-                            .push_str(&self.source[TextRange::new(last_offset, self.offset())]);
                         self.cursor.bump(); // Skip the second `}`
-                        last_offset = self.offset();
                     } else {
                         break;
                     }
@@ -917,15 +864,6 @@ impl<'src> Lexer<'src> {
         if range.is_empty() {
             return None;
         }
-
-        let value = if normalized.is_empty() {
-            self.source[range].to_string()
-        } else {
-            normalized.push_str(&self.source[TextRange::new(last_offset, self.offset())]);
-            normalized
-        };
-
-        self.current_value = TokenValue::InterpolatedStringMiddle(value.into_boxed_str());
 
         self.current_flags = interpolated_flags;
         Some(string_kind.middle_token())
@@ -946,10 +884,8 @@ impl<'src> Lexer<'src> {
             self.current_flags |= TokenFlags::TRIPLE_QUOTED_STRING;
         }
 
-        let value_start = self.offset();
-
         let quote_byte = u8::try_from(quote).expect("char that fits in u8");
-        let value_end = if self.current_flags.is_triple_quoted() {
+        if self.current_flags.is_triple_quoted() {
             // For triple-quoted strings, scan until we find the closing quote (ignoring escaped
             // quotes) or the end of the file.
             loop {
@@ -961,7 +897,7 @@ impl<'src> Lexer<'src> {
                         LexicalErrorType::UnclosedStringError,
                         self.token_range(),
                     ));
-                    break self.offset();
+                    break;
                 };
 
                 // Rare case: if there are an odd number of backslashes before the quote, then
@@ -982,7 +918,7 @@ impl<'src> Lexer<'src> {
 
                 // Otherwise, if it's followed by two more quotes, then we're done.
                 if self.cursor.eat_char2(quote, quote) {
-                    break self.offset() - TextSize::new(3);
+                    break;
                 }
             }
         } else {
@@ -1000,7 +936,7 @@ impl<'src> Lexer<'src> {
                         self.token_range(),
                     ));
 
-                    break self.offset();
+                    break;
                 };
 
                 // Rare case: if there are an odd number of backslashes before the quote, then
@@ -1033,23 +969,16 @@ impl<'src> Lexer<'src> {
                             LexicalErrorType::UnclosedStringError,
                             self.token_range(),
                         ));
-                        break self.offset();
+                        break;
                     }
                     ch if ch == quote => {
-                        let value_end = self.offset();
                         self.cursor.bump();
-                        break value_end;
+                        break;
                     }
                     _ => unreachable!("memchr2 returned an index that is not a quote or a newline"),
                 }
             }
-        };
-
-        self.current_value = TokenValue::String(
-            self.source[TextRange::new(value_start, value_end)]
-                .to_string()
-                .into_boxed_str(),
-        );
+        }
 
         TokenKind::String
     }
@@ -1074,28 +1003,19 @@ impl<'src> Lexer<'src> {
     /// Lex a hex/octal/decimal/binary number without a decimal point.
     fn lex_number_radix(&mut self, radix: Radix) -> TokenKind {
         #[cfg(debug_assertions)]
-        debug_assert!(matches!(
-            self.cursor.previous().to_ascii_lowercase(),
-            'x' | 'o' | 'b'
-        ));
+        {
+            use std::debug_assert_matches;
+            debug_assert_matches!(self.cursor.previous().to_ascii_lowercase(), 'x' | 'o' | 'b');
+        }
 
-        // Lex the portion of the token after the base prefix (e.g., `9D5` in `0x9D5`).
-        let mut number = LexedText::new(self.offset(), self.source);
-        self.radix_run(&mut number, radix);
-
-        // Extract the entire number, including the base prefix (e.g., `0x9D5`).
-        let token = &self.source[self.token_range()];
-
-        let value = match Int::from_str_radix(number.as_str(), radix.as_u32(), token) {
-            Ok(int) => int,
-            Err(err) => {
-                return self.push_error(LexicalError::new(
-                    LexicalErrorType::OtherError(format!("{err:?}").into_boxed_str()),
-                    self.token_range(),
-                ));
-            }
-        };
-        self.current_value = TokenValue::Int(value);
+        let number = self.radix_run(radix);
+        if !number.has_digit {
+            let err = u64::from_str_radix("", radix.as_u32()).unwrap_err();
+            return self.push_error(LexicalError::new(
+                LexicalErrorType::OtherError(format!("{err:?}").into_boxed_str()),
+                self.token_range(),
+            ));
+        }
         TokenKind::Int
     }
 
@@ -1105,15 +1025,15 @@ impl<'src> Lexer<'src> {
         debug_assert!(self.cursor.previous().is_ascii_digit() || self.cursor.previous() == '.');
         let start_is_zero = first_digit_or_dot == '0';
 
-        let mut number = LexedText::new(self.token_start(), self.source);
+        let mut integer_part = RadixRun {
+            has_digit: first_digit_or_dot != '.',
+            has_nonzero_digit: first_digit_or_dot != '.' && first_digit_or_dot != '0',
+        };
         if first_digit_or_dot != '.' {
-            number.push(first_digit_or_dot);
-            self.radix_run(&mut number, Radix::Decimal);
+            integer_part.has_nonzero_digit |= self.radix_run(Radix::Decimal).has_nonzero_digit;
         }
 
         let is_float = if first_digit_or_dot == '.' || self.cursor.eat_char('.') {
-            number.push('.');
-
             if self.cursor.eat_char('_') {
                 return self.push_error(LexicalError::new(
                     LexicalErrorType::OtherError("Invalid Syntax".to_string().into_boxed_str()),
@@ -1121,7 +1041,7 @@ impl<'src> Lexer<'src> {
                 ));
             }
 
-            self.radix_run(&mut number, Radix::Decimal);
+            self.radix_run(Radix::Decimal);
             true
         } else {
             // Normal number:
@@ -1131,93 +1051,55 @@ impl<'src> Lexer<'src> {
         let is_float = match self.cursor.rest().as_bytes() {
             [b'e' | b'E', b'0'..=b'9', ..] | [b'e' | b'E', b'-' | b'+', b'0'..=b'9', ..] => {
                 // 'e' | 'E'
-                number.push(self.cursor.bump().unwrap());
+                self.cursor.bump();
 
-                if let Some(sign) = self.cursor.eat_if(|c| matches!(c, '+' | '-')) {
-                    number.push(sign);
-                }
+                self.cursor.eat_if(|c| matches!(c, '+' | '-'));
 
-                self.radix_run(&mut number, Radix::Decimal);
+                self.radix_run(Radix::Decimal);
 
                 true
             }
             _ => is_float,
         };
 
-        if is_float {
-            // Improvement: Use `Cow` instead of pushing to value text
-            let Ok(value) = f64::from_str(number.as_str()) else {
-                return self.push_error(LexicalError::new(
-                    LexicalErrorType::OtherError(
-                        "Invalid decimal literal".to_string().into_boxed_str(),
-                    ),
-                    self.token_range(),
-                ));
-            };
-
-            // Parse trailing 'j':
-            if self.cursor.eat_if(|c| matches!(c, 'j' | 'J')).is_some() {
-                self.current_value = TokenValue::Complex {
-                    real: 0.0,
-                    imag: value,
-                };
-                TokenKind::Complex
-            } else {
-                self.current_value = TokenValue::Float(value);
-                TokenKind::Float
-            }
+        if self.cursor.eat_if(|c| matches!(c, 'j' | 'J')).is_some() {
+            TokenKind::Complex
+        } else if is_float {
+            TokenKind::Float
+        } else if start_is_zero && integer_part.has_nonzero_digit {
+            // Leading zeros in decimal integer literals are not permitted.
+            self.push_error(LexicalError::new(
+                LexicalErrorType::OtherError(
+                    "Invalid decimal integer literal"
+                        .to_string()
+                        .into_boxed_str(),
+                ),
+                self.token_range(),
+            ))
         } else {
-            // Parse trailing 'j':
-            if self.cursor.eat_if(|c| matches!(c, 'j' | 'J')).is_some() {
-                let imag = f64::from_str(number.as_str()).unwrap();
-                self.current_value = TokenValue::Complex { real: 0.0, imag };
-                TokenKind::Complex
-            } else {
-                let value = match Int::from_str(number.as_str()) {
-                    Ok(value) => {
-                        if start_is_zero && value.as_u8() != Some(0) {
-                            // Leading zeros in decimal integer literals are not permitted.
-                            return self.push_error(LexicalError::new(
-                                LexicalErrorType::OtherError(
-                                    "Invalid decimal integer literal"
-                                        .to_string()
-                                        .into_boxed_str(),
-                                ),
-                                self.token_range(),
-                            ));
-                        }
-                        value
-                    }
-                    Err(err) => {
-                        return self.push_error(LexicalError::new(
-                            LexicalErrorType::OtherError(format!("{err:?}").into_boxed_str()),
-                            self.token_range(),
-                        ));
-                    }
-                };
-                self.current_value = TokenValue::Int(value);
-                TokenKind::Int
-            }
+            TokenKind::Int
         }
     }
 
     /// Consume a sequence of numbers with the given radix,
     /// the digits can be decorated with underscores
     /// like this: '`1_2_3_4`' == '1234'
-    fn radix_run(&mut self, number: &mut LexedText, radix: Radix) {
+    fn radix_run(&mut self, radix: Radix) -> RadixRun {
+        let mut run = RadixRun::default();
         loop {
             if let Some(c) = self.cursor.eat_if(|c| radix.is_digit(c)) {
-                number.push(c);
+                run.has_digit = true;
+                run.has_nonzero_digit |= c != '0';
             }
-            // Number that contains `_` separators. Remove them from the parsed text.
+            // Number that contains `_` separators.
             else if self.cursor.first() == '_' && radix.is_digit(self.cursor.second()) {
                 // Skip over `_`
                 self.cursor.bump();
-                number.skip_char();
             } else {
                 break;
             }
         }
+        run
     }
 
     /// Lex a single comment.
@@ -1233,118 +1115,19 @@ impl<'src> Lexer<'src> {
     }
 
     /// Lex a single IPython escape command.
-    fn lex_ipython_escape_command(&mut self, escape_kind: IpyEscapeKind) -> TokenKind {
-        let mut value = String::new();
-
+    fn lex_ipython_escape_command(&mut self) -> TokenKind {
         loop {
             match self.cursor.first() {
                 '\\' => {
-                    // Only skip the line continuation if it is followed by a newline
-                    // otherwise it is a normal backslash which is part of the magic command:
-                    //
-                    //        Skip this backslash
-                    //        v
-                    //   !pwd \
-                    //      && ls -a | sed 's/^/\\    /'
-                    //                          ^^
-                    //                          Don't skip these backslashes
-                    if self.cursor.second() == '\r' {
-                        self.cursor.bump();
-                        self.cursor.bump();
-                        self.cursor.eat_char('\n');
-                        continue;
-                    } else if self.cursor.second() == '\n' {
-                        self.cursor.bump();
-                        self.cursor.bump();
-                        continue;
-                    }
-
+                    // Consume an escaped newline so it doesn't terminate the command. A normal
+                    // backslash is consumed by itself and remains part of the token range.
                     self.cursor.bump();
-                    value.push('\\');
+                    self.cursor.eat_char('\r');
+                    self.cursor.eat_char('\n');
                 }
-                // Help end escape commands are those that end with 1 or 2 question marks.
-                // Here, we're only looking for a subset of help end escape commands which
-                // are the ones that has the escape token at the start of the line as well.
-                // On the other hand, we're not looking for help end escape commands that
-                // are strict in the sense that the escape token is only at the end. For example,
-                //
-                //   * `%foo?` is recognized as a help end escape command but not as a strict one.
-                //   * `foo?` is recognized as a strict help end escape command which is not
-                //     lexed here but is identified at the parser level.
-                //
-                // Help end escape commands implemented in the IPython codebase using regex:
-                // https://github.com/ipython/ipython/blob/292e3a23459ca965b8c1bfe2c3707044c510209a/IPython/core/inputtransformer2.py#L454-L462
-                '?' => {
+                '\n' | '\r' | EOF_CHAR => return TokenKind::IpyEscapeCommand,
+                _ => {
                     self.cursor.bump();
-                    let mut question_count = 1u32;
-                    while self.cursor.eat_char('?') {
-                        question_count += 1;
-                    }
-
-                    // The original implementation in the IPython codebase is based on regex which
-                    // means that it's strict in the sense that it won't recognize a help end escape:
-                    //   * If there's any whitespace before the escape token (e.g. `%foo ?`)
-                    //   * If there are more than 2 question mark tokens (e.g. `%foo???`)
-                    // which is what we're doing here as well. In that case, we'll continue with
-                    // the prefixed escape token.
-                    //
-                    // Now, the whitespace and empty value check also makes sure that an empty
-                    // command (e.g. `%?` or `? ??`, no value after/between the escape tokens)
-                    // is not recognized as a help end escape command. So, `%?` and `? ??` are
-                    // `IpyEscapeKind::Magic` and `IpyEscapeKind::Help` because of the initial `%` and `??`
-                    // tokens.
-                    if question_count > 2
-                        || value.chars().last().is_none_or(is_python_whitespace)
-                        || !matches!(self.cursor.first(), '\n' | '\r' | EOF_CHAR)
-                    {
-                        // Not a help end escape command, so continue with the lexing.
-                        value.reserve(question_count as usize);
-                        for _ in 0..question_count {
-                            value.push('?');
-                        }
-                        continue;
-                    }
-
-                    if escape_kind.is_help() {
-                        // If we've recognize this as a help end escape command, then
-                        // any question mark token / whitespaces at the start are not
-                        // considered as part of the value.
-                        //
-                        // For example, `??foo?` is recognized as `IpyEscapeKind::Help` and
-                        // `value` is `foo` instead of `??foo`.
-                        value = value.trim_start_matches([' ', '?']).to_string();
-                    } else if escape_kind.is_magic() {
-                        // Between `%` and `?` (at the end), the `?` takes priority
-                        // over the `%` so `%foo?` is recognized as `IpyEscapeKind::Help`
-                        // and `value` is `%foo` instead of `foo`. So, we need to
-                        // insert the magic escape token at the start.
-                        value.insert_str(0, escape_kind.as_str());
-                    }
-
-                    let kind = match question_count {
-                        1 => IpyEscapeKind::Help,
-                        2 => IpyEscapeKind::Help2,
-                        _ => unreachable!("`question_count` is always 1 or 2"),
-                    };
-
-                    self.current_value = TokenValue::IpyEscapeCommand {
-                        kind,
-                        value: value.into_boxed_str(),
-                    };
-
-                    return TokenKind::IpyEscapeCommand;
-                }
-                '\n' | '\r' | EOF_CHAR => {
-                    self.current_value = TokenValue::IpyEscapeCommand {
-                        kind: escape_kind,
-                        value: value.into_boxed_str(),
-                    };
-
-                    return TokenKind::IpyEscapeCommand;
-                }
-                c => {
-                    self.cursor.bump();
-                    value.push(c);
                 }
             }
         }
@@ -1547,7 +1330,6 @@ impl<'src> Lexer<'src> {
         self.current_range =
             TextRange::at(self.current_range.start(), self.current_flags.quote_len());
         self.current_kind = kind.end_token();
-        self.current_value = TokenValue::None;
         self.current_flags = TokenFlags::empty();
 
         self.nesting = interpolated_string.nesting();
@@ -1567,7 +1349,7 @@ impl<'src> Lexer<'src> {
     /// f"{test!r"
     /// ```
     ///
-    /// This function re-lexes the `r"` as `r` (a name token). The next `next_token` call will
+    /// This function re-lexes the `r"` as `r` (an identifier token). The next `next_token` call will
     /// return a unclosed string token for `"`, which [`Self::re_lex_string_token_in_interpolation_element`]
     /// can then re-lex as the end of the f-string.
     pub(crate) fn re_lex_raw_string_in_format_spec(&mut self) {
@@ -1586,8 +1368,7 @@ impl<'src> Lexer<'src> {
             }
 
             self.current_range = TextRange::at(self.current_range.start(), 'r'.text_len());
-            self.current_kind = TokenKind::Name;
-            self.current_value = TokenValue::Name(Name::new_static("r"));
+            self.current_kind = TokenKind::Identifier;
             self.current_flags = TokenFlags::empty();
             self.cursor = Cursor::new(self.source);
             self.cursor.skip_bytes(self.current_range.end().to_usize());
@@ -1602,11 +1383,6 @@ impl<'src> Lexer<'src> {
         TextRange::at(end - len, len)
     }
 
-    #[inline]
-    fn token_text(&self) -> &'src str {
-        &self.source[self.token_range()]
-    }
-
     /// Retrieves the current offset of the cursor within the source code.
     // SAFETY: Lexer doesn't allow files larger than 4GB
     #[expect(clippy::cast_possible_truncation)]
@@ -1615,15 +1391,9 @@ impl<'src> Lexer<'src> {
         TextSize::new(self.source.len() as u32) - self.cursor.text_len()
     }
 
-    #[inline]
-    fn token_start(&self) -> TextSize {
-        self.token_range().start()
-    }
-
     /// Creates a checkpoint to which the lexer can later return to using [`Self::rewind`].
     pub(crate) fn checkpoint(&self) -> LexerCheckpoint {
         LexerCheckpoint {
-            value: self.current_value.clone(),
             current_kind: self.current_kind,
             current_range: self.current_range,
             current_flags: self.current_flags,
@@ -1640,7 +1410,6 @@ impl<'src> Lexer<'src> {
     /// Restore the lexer to the given checkpoint.
     pub(crate) fn rewind(&mut self, checkpoint: LexerCheckpoint) {
         let LexerCheckpoint {
-            value,
             current_kind,
             current_range,
             current_flags,
@@ -1657,7 +1426,6 @@ impl<'src> Lexer<'src> {
         // We preserve the previous char using this method.
         cursor.skip_bytes(cursor_offset.to_usize());
 
-        self.current_value = value;
         self.current_kind = current_kind;
         self.current_range = current_range;
         self.current_flags = current_flags;
@@ -1671,13 +1439,12 @@ impl<'src> Lexer<'src> {
         self.errors.truncate(errors_position);
     }
 
-    pub fn finish(self) -> Vec<LexicalError> {
+    pub(crate) fn finish(self) -> Vec<LexicalError> {
         self.errors
     }
 }
 
 pub(crate) struct LexerCheckpoint {
-    value: TokenValue,
     current_kind: TokenKind,
     current_range: TextRange,
     current_flags: TokenFlags,
@@ -1747,8 +1514,22 @@ impl Radix {
     }
 }
 
-const fn is_quote(c: char) -> bool {
-    matches!(c, '\'' | '"')
+#[derive(Default)]
+struct RadixRun {
+    has_digit: bool,
+    has_nonzero_digit: bool,
+}
+
+fn single_char_prefix(c: char) -> Option<TokenFlags> {
+    Some(match c {
+        'f' | 'F' => TokenFlags::F_STRING,
+        't' | 'T' => TokenFlags::T_STRING,
+        'u' | 'U' => TokenFlags::UNICODE_STRING,
+        'b' | 'B' => TokenFlags::BYTE_STRING,
+        'r' => TokenFlags::RAW_STRING_LOWERCASE,
+        'R' => TokenFlags::RAW_STRING_UPPERCASE,
+        _ => return None,
+    })
 }
 
 const fn is_ascii_identifier_start(c: char) -> bool {
@@ -1763,67 +1544,141 @@ fn is_unicode_identifier_start(c: char) -> bool {
 
 /// Checks if the character c is a valid continuation character as described
 /// in <https://docs.python.org/3/reference/lexical_analysis.html#identifiers>.
-///
-/// Additionally, this function also keeps track of whether or not the total
-/// identifier is ASCII-only or not by mutably altering a reference to a
-/// boolean value passed in.
-fn is_identifier_continuation(c: char, identifier_is_ascii_only: &mut bool) -> bool {
+fn is_identifier_continuation(c: char) -> bool {
     // Arrange things such that ASCII codepoints never
     // result in the slower `is_xid_continue` getting called.
     if c.is_ascii() {
         matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')
     } else {
-        *identifier_is_ascii_only = false;
         is_xid_continue(c)
     }
 }
 
-enum LexedText<'a> {
-    Source { source: &'a str, range: TextRange },
-    Owned(String),
-}
-
-impl<'a> LexedText<'a> {
-    fn new(start: TextSize, source: &'a str) -> Self {
-        Self::Source {
-            range: TextRange::empty(start),
-            source,
-        }
-    }
-
-    fn push(&mut self, c: char) {
-        match self {
-            LexedText::Source { range, source } => {
-                *range = range.add_end(c.text_len());
-                debug_assert!(source[*range].ends_with(c));
-            }
-            LexedText::Owned(owned) => owned.push(c),
-        }
-    }
-
-    fn as_str<'b>(&'b self) -> &'b str
-    where
-        'b: 'a,
-    {
-        match self {
-            LexedText::Source { range, source } => &source[*range],
-            LexedText::Owned(owned) => owned,
-        }
-    }
-
-    fn skip_char(&mut self) {
-        match self {
-            LexedText::Source { range, source } => {
-                *self = LexedText::Owned(source[*range].to_string());
-            }
-            LexedText::Owned(_) => {}
-        }
-    }
-}
-
 /// Create a new [`Lexer`] for the given source code and [`Mode`].
+#[doc(hidden)]
 pub fn lex(source: &str, mode: Mode) -> Lexer<'_> {
     Lexer::new(source, mode, TextSize::default())
+}
+
+/// Whether each byte can continue an ASCII identifier: letters, digits, or an underscore.
+/// Non-ASCII bytes are false, so scanning stops before a UTF-8 character that needs
+/// the Unicode identifier check.
+const ASCII_IDENTIFIER_CONTINUE: [bool; 256] = {
+    let mut table = [false; 256];
+    let mut byte = 0u8;
+    while byte < 128 {
+        table[byte as usize] = matches!(byte, b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'0'..=b'9');
+        byte += 1;
+    }
+    table
+};
+
+/// Returns the number of leading ASCII identifier-continuation bytes.
+///
+/// A table lookup classifies each byte without decoding UTF-8. Fixed-size batches
+/// give the compiler an opportunity to unroll the loop; correctness does not depend
+/// on unrolling. The lexer benchmarks in `ruff_benchmark` track performance across
+/// compiler updates.
+fn ascii_identifier_prefix_len(bytes: &[u8]) -> usize {
+    let (chunks, rest) = bytes.as_chunks::<16>();
+    let mut offset = 0;
+    for chunk in chunks {
+        if let Some(end) = chunk
+            .iter()
+            .position(|&byte| !ASCII_IDENTIFIER_CONTINUE[usize::from(byte)])
+        {
+            return offset + end;
+        }
+        offset += 16;
+    }
+    offset
+        + rest
+            .iter()
+            .position(|&byte| !ASCII_IDENTIFIER_CONTINUE[usize::from(byte)])
+            .unwrap_or(rest.len())
+}
+
+/// Packed keyword words and token kinds indexed by a six-bit perfect hash.
+///
+/// Multiplying a packed keyword by `KEYWORD_HASH_MULTIPLIER` and taking the high six
+/// bits gives each keyword a distinct slot in the 64-entry table. This is a perfect
+/// hash for the keywords. Other identifiers can collide and need a full-word comparison.
+///
+/// `phf::Map` uses `SipHash` and a displacement table to find each candidate's slot.
+/// With the same length and first-byte filters, `phf` 0.11.3 took 12–21% longer
+/// to lex the NumPy and Pydantic benchmark files on Apple Silicon.
+///
+/// Edit `KEYWORDS` in the `keywords` module to change the keyword set. Rust finds
+/// the multiplier and builds the table at compile time. Keywords must contain
+/// two to eight ASCII bytes to fit the word representation and length filter.
+#[repr(align(64))]
+struct KeywordTable {
+    words: [u64; 64],
+    kinds: [TokenKind; 64],
+    // Each entry records the possible first bytes for keywords of a given length,
+    // from two to eight bytes. `starts[len - 2]` sets bit `first_byte & 63` for
+    // each keyword of that length. An unset bit rules out a keyword before we
+    // pack or hash the identifier.
+    //
+    // Masking with 63 fits each entry in a u64, but bytes that differ by 64 share
+    // a bit. A set bit therefore only indicates a possible match; lookup still
+    // compares the full packed word to reject other identifiers.
+    starts: [u64; 7],
+}
+
+impl KeywordTable {
+    /// Builds the lookup arrays at compile time, rejecting unsupported lengths and hash collisions.
+    const fn new(mut keywords: &[(&[u8], TokenKind)]) -> Self {
+        let mut starts = [0u64; 7];
+        let mut words = [0; 64];
+        let mut kinds = [TokenKind::Identifier; 64];
+        while let Some((&(keyword, kind), rest)) = keywords.split_first() {
+            let word = keywords::pack(keyword);
+            starts[keyword.len() - 2] |= 1u64 << (keyword[0] & 63);
+            let slot = keywords::slot(word, KEYWORD_HASH_MULTIPLIER);
+            assert!(words[slot] == 0, "keyword hash collision");
+            words[slot] = word;
+            kinds[slot] = kind;
+            keywords = rest;
+        }
+        Self {
+            words,
+            kinds,
+            starts,
+        }
+    }
+
+    /// Classifies an ASCII identifier whose first character has already been consumed.
+    /// `rest` starts after `first` and may extend past the identifier; `len` includes `first`.
+    fn lookup(&self, first: char, rest: &[u8], len: usize) -> TokenKind {
+        // The shortest keywords have two bytes, and the packed word holds at most eight.
+        if len == 1 || len > 8 {
+            return TokenKind::Identifier;
+        }
+
+        if self.starts[len - 2] & (1u64 << (u32::from(first) & 63)) == 0 {
+            return TokenKind::Identifier;
+        }
+
+        let continuation = if let Some(chunk) = rest.first_chunk::<8>() {
+            u64::from_le_bytes(*chunk)
+        } else {
+            let mut padded = [0; 8];
+            padded[..len - 1].copy_from_slice(&rest[..len - 1]);
+            u64::from_le_bytes(padded)
+        };
+        // Pack bytes in little-endian order, aligned to the high end of the word.
+        // For example, "if" becomes 0x6669_0000_0000_0000. Shifting also discards
+        // any bytes loaded from the source after the identifier.
+        let word = ((continuation << 8) | u64::from(u32::from(first))) << ((8 - len) * 8);
+
+        let index = keywords::slot(word, KEYWORD_HASH_MULTIPLIER);
+        if word == self.words[index] {
+            self.kinds[index]
+        } else {
+            TokenKind::Identifier
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1831,40 +1686,53 @@ mod tests {
     use std::fmt::Write;
 
     use insta::assert_snapshot;
+    use ruff_python_ast::token::Token;
+    use ruff_text_size::Ranged;
 
     use super::*;
+
+    #[test]
+    fn keyword_tokens() {
+        for kind in KEYWORD_TABLE.kinds {
+            if !kind.is_keyword() {
+                continue;
+            }
+            let display = kind.to_string();
+            let name = display.trim_matches('`');
+            // Cover both the padded EOF path and the full-word load across a token boundary.
+            for suffix in ["", " continue"] {
+                let source = format!("{name}{suffix}");
+                let mut lexer = Lexer::new(&source, Mode::Module, TextSize::default());
+                assert_eq!(lexer.next_token(), kind, "{source}");
+                assert_eq!(lexer.current_range().len().to_usize(), name.len());
+            }
+        }
+    }
+
+    #[test]
+    fn keyword_hash_collisions_remain_identifiers() {
+        for name in [
+            "iH", "aCd", "Fclse", "asqert", "edcept", "fknally", "glqbal", "m_tch", "noplocal",
+        ] {
+            // Cover both the padded EOF path and the full-word load across a token boundary.
+            for suffix in ["", " continue"] {
+                let source = format!("{name}{suffix}");
+                let mut lexer = Lexer::new(&source, Mode::Module, TextSize::default());
+                assert_eq!(lexer.next_token(), TokenKind::Identifier, "{source}");
+                assert_eq!(lexer.current_range().len().to_usize(), name.len());
+                if !suffix.is_empty() {
+                    assert_eq!(lexer.next_token(), TokenKind::Continue);
+                }
+            }
+        }
+    }
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
     const UNIX_EOL: &str = "\n";
 
-    /// Same as [`Token`] except that this includes the [`TokenValue`] as well.
-    struct TestToken {
-        kind: TokenKind,
-        value: TokenValue,
-        range: TextRange,
-        flags: TokenFlags,
-    }
-
-    impl std::fmt::Debug for TestToken {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            let mut tuple = f.debug_tuple("");
-            let mut tuple = if matches!(self.value, TokenValue::None) {
-                tuple.field(&self.kind)
-            } else {
-                tuple.field(&self.value)
-            };
-            tuple = tuple.field(&self.range);
-            if self.flags.is_empty() {
-                tuple.finish()
-            } else {
-                tuple.field(&self.flags).finish()
-            }
-        }
-    }
-
     struct LexerOutput {
-        tokens: Vec<TestToken>,
+        tokens: Vec<Token>,
         errors: Vec<LexicalError>,
     }
 
@@ -1888,12 +1756,11 @@ mod tests {
             if kind.is_eof() {
                 break;
             }
-            tokens.push(TestToken {
+            tokens.push(Token::new(
                 kind,
-                value: lexer.take_value(),
-                range: lexer.current_range(),
-                flags: lexer.current_flags(),
-            });
+                lexer.current_range(),
+                lexer.current_flags(),
+            ));
         }
         LexerOutput {
             tokens,
@@ -2079,15 +1946,17 @@ pwd = !pwd
 foo = %timeit a = b
 bar = %timeit a % 3
 baz = %matplotlib \
-        inline"
+        inline
+qux = %foo?
+quux = !pwd?"
             .trim();
         assert_snapshot!(lex_jupyter_source(source));
     }
 
-    fn assert_no_ipython_escape_command(tokens: &[TestToken]) {
+    fn assert_no_ipython_escape_command(tokens: &[Token]) {
         for token in tokens {
-            if matches!(token.kind, TokenKind::IpyEscapeCommand) {
-                panic!("Unexpected escape command token at {:?}", token.range)
+            if matches!(token.kind(), TokenKind::IpyEscapeCommand) {
+                panic!("Unexpected escape command token at {:?}", token.range())
             }
         }
     }
@@ -2336,17 +2205,61 @@ if first:
         assert_snapshot!(lex_source(source));
     }
 
-    fn get_tokens_only(source: &str) -> Vec<TokenKind> {
-        let output = lex(source, Mode::Module, TextSize::default());
-        assert!(output.errors.is_empty());
-        output.tokens.into_iter().map(|token| token.kind).collect()
+    #[test]
+    fn non_ascii_identifier_flag() {
+        let source = "a€\naβ = β\nlong_ascii_prefixβ_012 = rβ_012\nβ_long_ascii_suffix_012\nascii";
+        let mut lexer = Lexer::new(source, Mode::Module, TextSize::default());
+        let mut identifiers = Vec::new();
+        loop {
+            let kind = lexer.next_token();
+            if kind.is_eof() {
+                break;
+            }
+            if kind == TokenKind::Identifier {
+                identifiers.push((
+                    &source[lexer.current_range()],
+                    lexer.current_flags().is_non_ascii_identifier(),
+                ));
+            }
+        }
+
+        assert_eq!(lexer.finish().len(), 1);
+        assert_eq!(
+            identifiers,
+            [
+                ("a", false),
+                ("aβ", true),
+                ("β", true),
+                ("long_ascii_prefixβ_012", true),
+                ("rβ_012", true),
+                ("β_long_ascii_suffix_012", true),
+                ("ascii", false),
+            ]
+        );
     }
 
     #[test]
-    fn test_nfkc_normalization() {
-        let source1 = "𝒞 = 500";
-        let source2 = "C = 500";
-        assert_eq!(get_tokens_only(source1), get_tokens_only(source2));
+    fn identifier_boundaries() {
+        for len in [1, 7, 8, 9, 15, 16, 17, 31, 32, 33] {
+            for suffix in ["", "β", "\u{0301}", "β_tail0"] {
+                let name = format!("{}{suffix}", "a".repeat(len));
+                for ending in ["", " ", "\n", "=", "\0", "€", "😀"] {
+                    let source = format!("{name}{ending}");
+                    let mut lexer = Lexer::new(&source, Mode::Module, TextSize::default());
+                    assert_eq!(lexer.next_token(), TokenKind::Identifier, "{source:?}");
+                    assert_eq!(
+                        lexer.current_range(),
+                        TextRange::up_to(name.text_len()),
+                        "{source:?}"
+                    );
+                    assert_eq!(
+                        lexer.current_flags().is_non_ascii_identifier(),
+                        !suffix.is_empty(),
+                        "{source:?}"
+                    );
+                }
+            }
+        }
     }
 
     fn triple_quoted_eol(eol: &str) -> LexerOutput {
@@ -2523,7 +2436,7 @@ if first:
     #[test]
     fn test_fstring_with_multiline_format_spec() {
         // The last f-string is invalid syntactically but we should still lex it.
-        // Note that the `b` is a `Name` token and not a `FStringMiddle` token.
+        // Note that the `b` is an `Identifier` token and not a `FStringMiddle` token.
         let source = r"f'''__{
     x:d
 }__'''
@@ -2708,7 +2621,7 @@ f"{(lambda x:{x})}"
     #[test]
     fn test_tstring_with_multiline_format_spec() {
         // The last t-string is invalid syntactically but we should still lex it.
-        // Note that the `b` is a `Name` token and not a `TStringMiddle` token.
+        // Note that the `b` is an `Identifier` token and not a `TStringMiddle` token.
         let source = r"t'''__{
     x:d
 }__'''
@@ -2878,30 +2791,13 @@ t"{(lambda x:{x})}"
     fn lex_fstring_unclosed() {
         let source = r#"f"hello"#;
 
-        assert_snapshot!(lex_invalid(source, Mode::Module), @r#"
+        assert_snapshot!(lex_invalid(source, Mode::Module), @"
         ## Tokens
         ```
         [
-            (
-                FStringStart,
-                0..2,
-                TokenFlags(
-                    DOUBLE_QUOTES | F_STRING,
-                ),
-            ),
-            (
-                InterpolatedStringMiddle(
-                    "hello",
-                ),
-                2..7,
-                TokenFlags(
-                    DOUBLE_QUOTES | F_STRING,
-                ),
-            ),
-            (
-                Newline,
-                7..7,
-            ),
+            FStringStart 0..2 (flags = DOUBLE_QUOTES | F_STRING),
+            FStringMiddle 2..7 (flags = DOUBLE_QUOTES | F_STRING),
+            Newline 7..7,
         ]
         ```
         ## Errors
@@ -2915,41 +2811,21 @@ t"{(lambda x:{x})}"
             },
         ]
         ```
-        "#);
+        ");
     }
 
     #[test]
     fn lex_fstring_missing_brace() {
         let source = "f'{'";
 
-        assert_snapshot!(lex_invalid(source, Mode::Module), @r#"
+        assert_snapshot!(lex_invalid(source, Mode::Module), @"
         ## Tokens
         ```
         [
-            (
-                FStringStart,
-                0..2,
-                TokenFlags(
-                    F_STRING,
-                ),
-            ),
-            (
-                Lbrace,
-                2..3,
-            ),
-            (
-                String(
-                    "",
-                ),
-                3..4,
-                TokenFlags(
-                    UNCLOSED_STRING,
-                ),
-            ),
-            (
-                Newline,
-                4..4,
-            ),
+            FStringStart 0..2 (flags = F_STRING),
+            Lbrace 2..3,
+            String 3..4 (flags = UNCLOSED_STRING),
+            Newline 4..4,
         ]
         ```
         ## Errors
@@ -2967,51 +2843,23 @@ t"{(lambda x:{x})}"
             },
         ]
         ```
-        "#);
+        ");
     }
 
     #[test]
     fn lex_fstring_missing_brace_after_format_spec() {
         let source = r#"f"{foo!r""#;
 
-        assert_snapshot!(lex_invalid(source, Mode::Module), @r#"
+        assert_snapshot!(lex_invalid(source, Mode::Module), @"
         ## Tokens
         ```
         [
-            (
-                FStringStart,
-                0..2,
-                TokenFlags(
-                    DOUBLE_QUOTES | F_STRING,
-                ),
-            ),
-            (
-                Lbrace,
-                2..3,
-            ),
-            (
-                Name(
-                    Name("foo"),
-                ),
-                3..6,
-            ),
-            (
-                Exclamation,
-                6..7,
-            ),
-            (
-                String(
-                    "",
-                ),
-                7..9,
-                TokenFlags(
-                    DOUBLE_QUOTES | RAW_STRING_LOWERCASE | UNCLOSED_STRING,
-                ),
-            ),
-            (
-                Newline,
-                9..9,
-            ),
+            FStringStart 0..2 (flags = DOUBLE_QUOTES | F_STRING),
+            Lbrace 2..3,
+            Identifier 3..6,
+            Exclamation 6..7,
+            String 7..9 (flags = DOUBLE_QUOTES | RAW_STRING_LOWERCASE | UNCLOSED_STRING),
+            Newline 9..9,
         ]
         ```
         ## Errors
@@ -3029,7 +2877,7 @@ t"{(lambda x:{x})}"
             },
         ]
         ```
-        "#);
+        ");
     }
 
     #[test]
@@ -3060,5 +2908,72 @@ t"{(lambda x:{x})}"
             lex_tstring_error(r#"t""""""#),
             UnterminatedTripleQuotedString
         );
+    }
+
+    #[test]
+    fn backslash_continuation_indentation() {
+        // The first `\` has 4 spaces before it which matches the indentation level at that point,
+        // so the whitespace before `2` is irrelevant and shouldn't produce an indentation error.
+        // Similarly, the second `\` is also at the same indentation level, so the `3` line is also
+        // valid.
+        let source = r"if True:
+    1
+    \
+        2
+    \
+3
+else:
+    pass
+"
+        .to_string();
+        assert_snapshot!(lex_source(&source));
+    }
+
+    #[test]
+    fn backslash_continuation_at_root() {
+        // But, it's a different when the backslash character itself is at the root indentation
+        // level. Then, the whitespaces following it determines the indentation level of the next
+        // line, so `1` is indented with 4 spaces and `2` is indented with 8 spaces, and `3` is
+        // indented with 4 spaces, all of which are valid.
+        let source = r"if True:
+\
+    1
+    if True:
+\
+        2
+else:\
+    3
+"
+        .to_string();
+        assert_snapshot!(lex_source(&source));
+    }
+
+    #[test]
+    fn multiple_backslash_continuation() {
+        // It's only the first backslash character that determines the indentation level of the next
+        // line, so all the lines after the first `\` are indented with 4 spaces, and the remaining
+        // backslashes are just ignored and don't affect the indentation level.
+        let source = r"if True:
+    1
+    \
+            \
+        \
+    \
+    2
+"
+        .to_string();
+        assert_snapshot!(lex_source(&source));
+    }
+
+    #[test]
+    fn backslash_continuation_mismatch_indentation() {
+        // Indentation doesn't match any previous indentation level
+        let source = r"if True:
+    1
+  \
+    2
+"
+        .to_string();
+        assert_snapshot!(lex_invalid(&source, Mode::Module));
     }
 }

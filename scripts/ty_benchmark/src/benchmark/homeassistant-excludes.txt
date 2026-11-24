@@ -1,0 +1,3 @@
+# Pulled in by pytradfri[async], but only distributed as an sdist that requires autoconf.
+# https://github.com/home-assistant/core/blob/a0162d2ff0ed061501405a617961be149b15bd1f/requirements_all.txt#L2781-L2782
+dtlssocket

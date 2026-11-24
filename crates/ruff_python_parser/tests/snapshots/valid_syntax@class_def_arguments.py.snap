@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/class_def_arguments.py
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..32,
+        range: 0..115,
         body: [
             ClassDef(
                 StmtClassDef {
@@ -66,6 +66,163 @@ Module(
                                     ExprEllipsisLiteral {
                                         node_index: NodeIndex(None),
                                         range: 28..31,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            ClassDef(
+                StmtClassDef {
+                    node_index: NodeIndex(None),
+                    range: 32..72,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("Foo"),
+                        range: 38..41,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    arguments: Some(
+                        Arguments {
+                            range: 41..67,
+                            node_index: NodeIndex(None),
+                            args: [
+                                Generator(
+                                    ExprGenerator {
+                                        node_index: NodeIndex(None),
+                                        range: 42..66,
+                                        elt: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 43..47,
+                                                id: Name("base"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        generators: [
+                                            Comprehension {
+                                                range: 48..65,
+                                                node_index: NodeIndex(None),
+                                                target: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 52..56,
+                                                        id: Name("base"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                iter: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 60..65,
+                                                        id: Name("bases"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ifs: [],
+                                                is_async: false,
+                                            },
+                                        ],
+                                        parenthesized: true,
+                                    },
+                                ),
+                            ],
+                            keywords: [],
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 69..72,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 69..72,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            ClassDef(
+                StmtClassDef {
+                    node_index: NodeIndex(None),
+                    range: 73..114,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("Foo"),
+                        range: 79..82,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    arguments: Some(
+                        Arguments {
+                            range: 82..109,
+                            node_index: NodeIndex(None),
+                            args: [
+                                Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 83..108,
+                                        value: Generator(
+                                            ExprGenerator {
+                                                node_index: NodeIndex(None),
+                                                range: 84..108,
+                                                elt: Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 85..89,
+                                                        id: Name("base"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                generators: [
+                                                    Comprehension {
+                                                        range: 90..107,
+                                                        node_index: NodeIndex(None),
+                                                        target: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 94..98,
+                                                                id: Name("base"),
+                                                                ctx: Store,
+                                                            },
+                                                        ),
+                                                        iter: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 102..107,
+                                                                id: Name("bases"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        ifs: [],
+                                                        is_async: false,
+                                                    },
+                                                ],
+                                                parenthesized: true,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            keywords: [],
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 111..114,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 111..114,
                                     },
                                 ),
                             },

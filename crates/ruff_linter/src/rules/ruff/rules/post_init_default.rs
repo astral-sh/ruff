@@ -2,12 +2,14 @@ use anyhow::Context;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
@@ -74,7 +76,7 @@ use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 ///
 /// [documentation]: https://docs.python.org/3/library/dataclasses.html#init-only-variables
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.9.0")]
+#[violation_metadata(stable_since = "0.9.0", category = Category::Suspicious)]
 pub(crate) struct PostInitDefault;
 
 impl Violation for PostInitDefault {
@@ -144,6 +146,21 @@ fn use_initvar(
             "Cannot add a `{}: InitVar` field to the class body, as a field by that name already exists",
             parameter.name
         ));
+    }
+
+    // If the annotation references a type variable scoped to `__post_init__`
+    // (PEP 695), moving it to the class body would produce a `NameError`.
+    if let Some(annotation) = parameter.annotation() {
+        if let Some(type_params) = &post_init_def.type_params {
+            if any_over_expr(annotation, |expr| {
+                expr.as_name_expr()
+                    .is_some_and(|name| type_params.iter().any(|tp| tp.name().id == name.id))
+            }) {
+                return Err(anyhow::anyhow!(
+                    "Annotation references a type variable scoped to `__post_init__`"
+                ));
+            }
+        }
     }
 
     // Ensure that `dataclasses.InitVar` is accessible. For example,

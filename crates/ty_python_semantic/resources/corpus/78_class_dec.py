@@ -1,4 +1,3 @@
 @foo
 class C:
    pass
-

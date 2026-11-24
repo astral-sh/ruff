@@ -11,16 +11,17 @@ I001 [*] Import block is un-sorted or un-formatted
 5 | | # Above
 6 | | from some_module import *  # Aside
   | |_________________________^
-  |
 help: Organize imports
+  |
   - from some_other_module import some_class
   - from some_other_module import *
 1 | # Above
   - from some_module import some_class  # Aside
   - # Above
 2 | from some_module import *  # Aside
-3 + 
+3 +
 4 + # Above
 5 + from some_module import some_class  # Aside
 6 + from some_other_module import *
 7 + from some_other_module import some_class
+  |

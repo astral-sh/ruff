@@ -4,29 +4,32 @@ use anyhow::Result;
 use rustc_hash::FxHashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{PythonVersion, Stmt};
 use ruff_python_semantic::{Binding, Imported, NodeId, Scope};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::{Checker, DiagnosticGuard};
-use crate::codes::Rule;
+use crate::codes::{Category, Rule};
 use crate::fix;
 use crate::importer::ImportedMembers;
+use crate::rules::flake8_tidy_imports::rules::BannedModuleImportPolicies;
 use crate::rules::flake8_type_checking::helpers::{
     TypingReference, filter_contained, quote_annotation,
 };
 use crate::rules::flake8_type_checking::imports::ImportBinding;
 use crate::rules::isort::{ImportSection, ImportType, categorize};
-use crate::{Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for first-party imports that are only used for type annotations, but
-/// aren't defined in a type-checking block.
+/// aren't imported lazily or defined in a type-checking block.
 ///
 /// ## Why is this bad?
-/// Unused imports add a performance overhead at runtime, and risk creating
-/// import cycles. If an import is _only_ used in typing-only contexts, it can
-/// instead be imported conditionally under an `if TYPE_CHECKING:` block to
-/// minimize runtime overhead.
+/// Imports that are only used for type annotations add a performance overhead
+/// at runtime. For first-party imports, they can also contribute to import
+/// cycles. If an import is _only_ used in typing-only contexts, it can instead
+/// be imported conditionally under an `if TYPE_CHECKING:` block to minimize
+/// runtime overhead.
 ///
 /// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
@@ -44,6 +47,11 @@ use crate::{Fix, FixAvailability, Violation};
 /// [`lint.flake8-type-checking.quote-annotations`] setting described above if
 /// both settings are enabled.
 ///
+/// On Python 3.15 and later, lazy imports are also exempt, including imports
+/// made lazy by a literal `__lazy_modules__` declaration. The fix prefers adding
+/// `lazy` to single-name import statements where the syntax is legal and
+/// [`lint.flake8-tidy-imports.ban-lazy`] allows it. This defers the import while
+/// keeping the name available for runtime annotation inspection.
 ///
 /// ## Example
 /// ```python
@@ -70,7 +78,21 @@ use crate::{Fix, FixAvailability, Violation};
 ///     return len(sized)
 /// ```
 ///
+/// On Python 3.15 and later, using a lazy import is also an option:
+/// ```python
+/// lazy from . import local_module
+///
+///
+/// def func(sized: local_module.Container) -> int:
+///     return len(sized)
+/// ```
+///
+/// ## Fix safety
+/// This rule's fixes are unsafe because changing when a module is imported can
+/// affect runtime behavior, including import-time side effects.
+///
 /// ## Options
+/// - `lint.flake8-tidy-imports.ban-lazy`
 /// - `lint.flake8-type-checking.quote-annotations`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
@@ -81,9 +103,10 @@ use crate::{Fix, FixAvailability, Violation};
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Pedantic)]
 pub(crate) struct TypingOnlyFirstPartyImport {
     qualified_name: String,
+    fix_style: ImportFixStyle,
 }
 
 impl Violation for TypingOnlyFirstPartyImport {
@@ -91,24 +114,29 @@ impl Violation for TypingOnlyFirstPartyImport {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Move application import `{}` into a type-checking block",
-            self.qualified_name
-        )
+        match self.fix_style {
+            ImportFixStyle::TypeCheckingBlock => format!(
+                "Move application import `{}` into a type-checking block",
+                self.qualified_name
+            ),
+            ImportFixStyle::LazyImport => {
+                format!("Make application import `{}` lazy", self.qualified_name)
+            }
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Move into type-checking block".to_string())
+        Some(self.fix_style.fix_title().to_string())
     }
 }
 
 /// ## What it does
 /// Checks for third-party imports that are only used for type annotations, but
-/// aren't defined in a type-checking block.
+/// aren't imported lazily or defined in a type-checking block.
 ///
 /// ## Why is this bad?
-/// Unused imports add a performance overhead at runtime, and risk creating
-/// import cycles. If an import is _only_ used in typing-only contexts, it can
+/// Imports that are only used for type annotations add a performance overhead
+/// at runtime. If an import is _only_ used in typing-only contexts, it can
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
@@ -127,6 +155,12 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// moved into an `if TYPE_CHECKING:` block. This takes precedence over the
 /// [`lint.flake8-type-checking.quote-annotations`] setting described above if
 /// both settings are enabled.
+///
+/// On Python 3.15 and later, lazy imports are also exempt, including imports
+/// made lazy by a literal `__lazy_modules__` declaration. The fix prefers adding
+/// `lazy` to single-name import statements where the syntax is legal and
+/// [`lint.flake8-tidy-imports.ban-lazy`] allows it. This defers the import while
+/// keeping the name available for runtime annotation inspection.
 ///
 /// ## Example
 /// ```python
@@ -153,7 +187,21 @@ impl Violation for TypingOnlyFirstPartyImport {
 ///     return len(df)
 /// ```
 ///
+/// On Python 3.15 and later, using a lazy import is also an option:
+/// ```python
+/// lazy import pandas as pd
+///
+///
+/// def func(df: pd.DataFrame) -> int:
+///     return len(df)
+/// ```
+///
+/// ## Fix safety
+/// This rule's fixes are unsafe because changing when a module is imported can
+/// affect runtime behavior, including import-time side effects.
+///
 /// ## Options
+/// - `lint.flake8-tidy-imports.ban-lazy`
 /// - `lint.flake8-type-checking.quote-annotations`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
@@ -164,9 +212,10 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Pedantic)]
 pub(crate) struct TypingOnlyThirdPartyImport {
     qualified_name: String,
+    fix_style: ImportFixStyle,
 }
 
 impl Violation for TypingOnlyThirdPartyImport {
@@ -174,24 +223,29 @@ impl Violation for TypingOnlyThirdPartyImport {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Move third-party import `{}` into a type-checking block",
-            self.qualified_name
-        )
+        match self.fix_style {
+            ImportFixStyle::TypeCheckingBlock => format!(
+                "Move third-party import `{}` into a type-checking block",
+                self.qualified_name
+            ),
+            ImportFixStyle::LazyImport => {
+                format!("Make third-party import `{}` lazy", self.qualified_name)
+            }
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Move into type-checking block".to_string())
+        Some(self.fix_style.fix_title().to_string())
     }
 }
 
 /// ## What it does
 /// Checks for standard library imports that are only used for type
-/// annotations, but aren't defined in a type-checking block.
+/// annotations, but aren't imported lazily or defined in a type-checking block.
 ///
 /// ## Why is this bad?
-/// Unused imports add a performance overhead at runtime, and risk creating
-/// import cycles. If an import is _only_ used in typing-only contexts, it can
+/// Imports that are only used for type annotations add a performance overhead
+/// at runtime. If an import is _only_ used in typing-only contexts, it can
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
@@ -210,6 +264,12 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// moved into an `if TYPE_CHECKING:` block. This takes precedence over the
 /// [`lint.flake8-type-checking.quote-annotations`] setting described above if
 /// both settings are enabled.
+///
+/// On Python 3.15 and later, lazy imports are also exempt, including imports
+/// made lazy by a literal `__lazy_modules__` declaration. The fix prefers adding
+/// `lazy` to single-name import statements where the syntax is legal and
+/// [`lint.flake8-tidy-imports.ban-lazy`] allows it. This defers the import while
+/// keeping the name available for runtime annotation inspection.
 ///
 /// ## Example
 /// ```python
@@ -236,7 +296,21 @@ impl Violation for TypingOnlyThirdPartyImport {
 ///     return str(path)
 /// ```
 ///
+/// On Python 3.15 and later, using a lazy import is also an option:
+/// ```python
+/// lazy from pathlib import Path
+///
+///
+/// def func(path: Path) -> str:
+///     return str(path)
+/// ```
+///
+/// ## Fix safety
+/// This rule's fixes are unsafe because changing when a module is imported can
+/// affect runtime behavior, including import-time side effects.
+///
 /// ## Options
+/// - `lint.flake8-tidy-imports.ban-lazy`
 /// - `lint.flake8-type-checking.quote-annotations`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
@@ -247,9 +321,10 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Pedantic)]
 pub(crate) struct TypingOnlyStandardLibraryImport {
     qualified_name: String,
+    fix_style: ImportFixStyle,
 }
 
 impl Violation for TypingOnlyStandardLibraryImport {
@@ -257,14 +332,22 @@ impl Violation for TypingOnlyStandardLibraryImport {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Move standard library import `{}` into a type-checking block",
-            self.qualified_name
-        )
+        match self.fix_style {
+            ImportFixStyle::TypeCheckingBlock => format!(
+                "Move standard library import `{}` into a type-checking block",
+                self.qualified_name
+            ),
+            ImportFixStyle::LazyImport => {
+                format!(
+                    "Make standard library import `{}` lazy",
+                    self.qualified_name
+                )
+            }
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Move into type-checking block".to_string())
+        Some(self.fix_style.fix_title().to_string())
     }
 }
 
@@ -283,10 +366,9 @@ pub(crate) fn typing_only_runtime_import(
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
 
-        // If we can't add a `__future__` import and in un-strict mode, don't flag typing-only
-        // imports that are implicitly loaded by way of a valid runtime import.
-        if !checker.settings().future_annotations
-            && !checker.settings().flake8_type_checking.strict
+        // If we're in un-strict mode, don't flag typing-only imports that are
+        // implicitly loaded by way of a valid runtime import.
+        if !checker.settings().flake8_type_checking.strict
             && runtime_imports
                 .iter()
                 .any(|import| is_implicit_import(binding, import))
@@ -302,7 +384,9 @@ pub(crate) fn typing_only_runtime_import(
             continue;
         };
 
-        if !binding.context.is_runtime() {
+        if !binding.context.is_runtime()
+            || (checker.target_version() >= PythonVersion::PY315 && binding.is_lazy())
+        {
             continue;
         }
 
@@ -310,7 +394,7 @@ pub(crate) fn typing_only_runtime_import(
             TypingReference::from_references(binding, checker.semantic(), checker.settings());
 
         let needs_future_import = match typing_reference {
-            TypingReference::Runtime => continue,
+            TypingReference::Runtime | TypingReference::RuntimeAmbiguous => continue,
             // We can only get the `Future` variant if `future_annotations` is
             // enabled, so we can unconditionally set this here.
             TypingReference::Future => true,
@@ -374,6 +458,7 @@ pub(crate) fn typing_only_runtime_import(
             range: binding.range(),
             parent_range: binding.parent_range(checker.semantic()),
             needs_future_import,
+            runtime_reference: None,
         };
 
         if checker.rule_is_ignored(rule_for(import_type), import.start())
@@ -395,8 +480,13 @@ pub(crate) fn typing_only_runtime_import(
 
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each statement group produces diagnostics and a fix independently"
+    )]
     for ((node_id, import_type), imports) in errors_by_statement {
-        let fix = fix_imports(checker, node_id, &imports).ok();
+        let fix_style = ImportFixStyle::for_import(checker, scope, node_id);
+        let fix = fix_imports(checker, node_id, &imports, fix_style).ok();
 
         for ImportBinding {
             import,
@@ -409,6 +499,7 @@ pub(crate) fn typing_only_runtime_import(
                 checker,
                 import_type,
                 import.qualified_name().to_string(),
+                fix_style,
                 range,
             );
             if let Some(range) = parent_range {
@@ -422,7 +513,12 @@ pub(crate) fn typing_only_runtime_import(
 
     // Separately, generate a diagnostic for every _ignored_ import, to ensure that the
     // suppression comments aren't marked as unused.
-    for ((_, import_type), imports) in ignores_by_statement {
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each ignored statement group produces diagnostics independently"
+    )]
+    for ((node_id, import_type), imports) in ignores_by_statement {
+        let fix_style = ImportFixStyle::for_import(checker, scope, node_id);
         for ImportBinding {
             import,
             range,
@@ -434,6 +530,7 @@ pub(crate) fn typing_only_runtime_import(
                 checker,
                 import_type,
                 import.qualified_name().to_string(),
+                fix_style,
                 range,
             );
             if let Some(range) = parent_range {
@@ -458,18 +555,31 @@ fn diagnostic_for<'a, 'b>(
     checker: &'a Checker<'b>,
     import_type: ImportType,
     qualified_name: String,
+    fix_style: ImportFixStyle,
     range: TextRange,
 ) -> DiagnosticGuard<'a, 'b> {
     match import_type {
-        ImportType::StandardLibrary => {
-            checker.report_diagnostic(TypingOnlyStandardLibraryImport { qualified_name }, range)
-        }
-        ImportType::ThirdParty => {
-            checker.report_diagnostic(TypingOnlyThirdPartyImport { qualified_name }, range)
-        }
-        ImportType::FirstParty => {
-            checker.report_diagnostic(TypingOnlyFirstPartyImport { qualified_name }, range)
-        }
+        ImportType::StandardLibrary => checker.report_diagnostic(
+            TypingOnlyStandardLibraryImport {
+                qualified_name,
+                fix_style,
+            },
+            range,
+        ),
+        ImportType::ThirdParty => checker.report_diagnostic(
+            TypingOnlyThirdPartyImport {
+                qualified_name,
+                fix_style,
+            },
+            range,
+        ),
+        ImportType::FirstParty => checker.report_diagnostic(
+            TypingOnlyFirstPartyImport {
+                qualified_name,
+                fix_style,
+            },
+            range,
+        ),
         _ => unreachable!("Unexpected import type"),
     }
 }
@@ -501,9 +611,20 @@ fn is_exempt(name: &str, exempt_modules: &[&str]) -> bool {
     }
 }
 
-/// Generate a [`Fix`] to remove typing-only imports from a runtime context.
-fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
+/// Generate a [`Fix`] to defer imports used only for typing.
+fn fix_imports(
+    checker: &Checker,
+    node_id: NodeId,
+    imports: &[ImportBinding],
+    fix_style: ImportFixStyle,
+) -> Result<Fix> {
     let statement = checker.semantic().statement(node_id);
+    if matches!(fix_style, ImportFixStyle::LazyImport) {
+        return Ok(Fix::unsafe_edit(Edit::insertion(
+            "lazy ".to_string(),
+            statement.start(),
+        )));
+    }
     let parent = checker.semantic().parent_statement(node_id);
 
     let member_names: Vec<Cow<'_, str>> = imports
@@ -594,4 +715,52 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
     Ok(fix.isolate(Checker::isolation(
         checker.semantic().parent_statement_id(node_id),
     )))
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ImportFixStyle {
+    TypeCheckingBlock,
+    LazyImport,
+}
+
+impl ImportFixStyle {
+    fn for_import(checker: &Checker, scope: &Scope, node_id: NodeId) -> Self {
+        let semantic = checker.semantic();
+        if checker.target_version() < PythonVersion::PY315
+            || !scope.kind.is_module()
+            || semantic.statements(node_id).skip(1).any(Stmt::is_try_stmt)
+        {
+            return Self::TypeCheckingBlock;
+        }
+
+        let statement = semantic.statement(node_id);
+        let names = match statement {
+            Stmt::Import(import) => &import.names,
+            Stmt::ImportFrom(import) => &import.names,
+            _ => return Self::TypeCheckingBlock,
+        };
+        // Other members may be used at runtime, suppressed, or governed by another lazy-import policy.
+        if names.len() != 1 {
+            return Self::TypeCheckingBlock;
+        }
+
+        let ban_lazy = &checker.settings().flake8_tidy_imports.ban_lazy;
+        for (policy, node) in &BannedModuleImportPolicies::new(statement, checker) {
+            if ban_lazy.includes_all() && statement.is_import_from_stmt() && node.is_alias() {
+                continue;
+            }
+            if ban_lazy.find(&policy).is_some() {
+                return Self::TypeCheckingBlock;
+            }
+        }
+
+        Self::LazyImport
+    }
+
+    fn fix_title(self) -> &'static str {
+        match self {
+            Self::TypeCheckingBlock => "Move into type-checking block",
+            Self::LazyImport => "Convert to a lazy import (or move into a type-checking block)",
+        }
+    }
 }

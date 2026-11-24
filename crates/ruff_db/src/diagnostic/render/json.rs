@@ -1,50 +1,47 @@
 use serde::{Serialize, Serializer, ser::SerializeSeq};
-use serde_json::{Value, json};
+use std::io::Write as _;
+use std::{fmt, io};
 
 use ruff_diagnostics::{Applicability, Edit};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed};
 use ruff_text_size::Ranged;
 
-use crate::diagnostic::{ConciseMessage, Diagnostic, DiagnosticSource, DisplayDiagnosticConfig};
+use crate::diagnostic::{
+    ConciseMessage, Diagnostic, DiagnosticSource, DisplayDiagnosticConfig, Severity,
+};
 
-use super::FileResolver;
+use super::{FileResolver, FmtAdapter, Renderer};
 
-pub(super) struct JsonRenderer<'a> {
+/// Print diagnostics in JSON format.
+///
+/// Unlike [`JsonLinesRenderer`](super::JsonLinesRenderer), this prints all diagnostics as a JSON array.
+pub struct JsonRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> JsonRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+    pub fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
         Self { resolver, config }
     }
 }
 
-impl JsonRenderer<'_> {
-    pub(super) fn render(
-        &self,
-        f: &mut std::fmt::Formatter,
-        diagnostics: &[Diagnostic],
-    ) -> std::fmt::Result {
-        write!(
-            f,
-            "{:#}",
-            diagnostics_to_json_value(diagnostics, self.resolver, self.config)
-        )
+impl Renderer for JsonRenderer<'_> {
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
+        let mut writer = io::BufWriter::new(FmtAdapter { fmt: f });
+        self.write(&mut writer, diagnostics)
+            .and_then(|()| writer.flush())
+            .map_err(|_| fmt::Error)
     }
-}
 
-fn diagnostics_to_json_value<'a>(
-    diagnostics: impl IntoIterator<Item = &'a Diagnostic>,
-    resolver: &dyn FileResolver,
-    config: &DisplayDiagnosticConfig,
-) -> Value {
-    let values: Vec<_> = diagnostics
-        .into_iter()
-        .map(|diag| diagnostic_to_json(diag, resolver, config))
-        .collect();
-    json!(values)
+    fn write(&self, writer: &mut dyn io::Write, diagnostics: &[Diagnostic]) -> io::Result<()> {
+        let values = diagnostics
+            .iter()
+            .map(|diag| diagnostic_to_json(diag, self.resolver, self.config));
+        serde_json::Serializer::pretty(writer).collect_seq(values)?;
+        Ok(())
+    }
 }
 
 pub(super) fn diagnostic_to_json<'a>(
@@ -91,43 +88,38 @@ pub(super) fn diagnostic_to_json<'a>(
         edits: ExpandedEdits {
             edits: fix.edits(),
             notebook_index,
-            config,
             diagnostic_source,
         },
     });
 
-    // In preview, the locations and filename can be optional.
-    if config.preview {
-        JsonDiagnostic {
-            code: diagnostic.secondary_code_or_id(),
-            url: diagnostic.documentation_url(),
-            message: diagnostic.concise_message(),
-            fix,
-            cell: notebook_cell_index,
-            location: start_location.map(JsonLocation::from),
-            end_location: end_location.map(JsonLocation::from),
-            filename,
-            noqa_row: noqa_location.map(|location| location.line),
-        }
+    // In preview, the code can be optional and the severity is displayed.
+    let (code, severity) = if config.preview {
+        (
+            diagnostic.secondary_code().map(|code| code.as_str()),
+            diagnostic.severity(),
+        )
     } else {
-        JsonDiagnostic {
-            code: diagnostic.secondary_code_or_id(),
-            url: diagnostic.documentation_url(),
-            message: diagnostic.concise_message(),
-            fix,
-            cell: notebook_cell_index,
-            location: Some(start_location.unwrap_or_default().into()),
-            end_location: Some(end_location.unwrap_or_default().into()),
-            filename: Some(filename.unwrap_or_default()),
-            noqa_row: noqa_location.map(|location| location.line),
-        }
+        (Some(diagnostic.secondary_code_or_id()), Severity::Error)
+    };
+
+    JsonDiagnostic {
+        code,
+        name: diagnostic.id().as_str(),
+        severity,
+        url: diagnostic.documentation_url(),
+        message: diagnostic.concise_message(),
+        fix,
+        cell: notebook_cell_index,
+        location: start_location.map(JsonLocation::from),
+        end_location: end_location.map(JsonLocation::from),
+        filename,
+        noqa_row: noqa_location.map(|location| location.line),
     }
 }
 
 struct ExpandedEdits<'a> {
     edits: &'a [Edit],
     notebook_index: Option<NotebookIndex>,
-    config: &'a DisplayDiagnosticConfig,
     diagnostic_source: Option<DiagnosticSource>,
 }
 
@@ -192,19 +184,10 @@ impl Serialize for ExpandedEdits<'_> {
                 (None, None)
             };
 
-            // In preview, the locations can be optional.
-            let value = if self.config.preview {
-                JsonEdit {
-                    content: edit.content().unwrap_or_default(),
-                    location: location.map(JsonLocation::from),
-                    end_location: end_location.map(JsonLocation::from),
-                }
-            } else {
-                JsonEdit {
-                    content: edit.content().unwrap_or_default(),
-                    location: Some(location.unwrap_or_default().into()),
-                    end_location: Some(end_location.unwrap_or_default().into()),
-                }
+            let value = JsonEdit {
+                content: edit.content().unwrap_or_default(),
+                location: location.map(JsonLocation::from),
+                end_location: end_location.map(JsonLocation::from),
             };
 
             s.serialize_element(&value)?;
@@ -221,13 +204,15 @@ impl Serialize for ExpandedEdits<'_> {
 #[derive(Serialize)]
 pub(crate) struct JsonDiagnostic<'a> {
     cell: Option<OneIndexed>,
-    code: &'a str,
+    code: Option<&'a str>,
     end_location: Option<JsonLocation>,
     filename: Option<&'a str>,
     fix: Option<JsonFix<'a>>,
     location: Option<JsonLocation>,
     message: ConciseMessage<'a>,
+    name: &'a str,
     noqa_row: Option<OneIndexed>,
+    severity: Severity,
     url: Option<&'a str>,
 }
 
@@ -262,12 +247,9 @@ struct JsonEdit<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::diagnostic::{
-        DiagnosticFormat,
-        render::tests::{
-            TestEnvironment, create_diagnostics, create_notebook_diagnostics,
-            create_syntax_error_diagnostics,
-        },
+    use crate::diagnostic::render::tests::{
+        DiagnosticFormat, TestEnvironment, create_diagnostics, create_notebook_diagnostics,
+        create_syntax_error_diagnostics,
     };
 
     #[test]
@@ -289,47 +271,10 @@ mod tests {
     }
 
     #[test]
-    fn missing_file_stable() {
+    fn missing_file() {
         let mut env = TestEnvironment::new();
         env.format(DiagnosticFormat::Json);
         env.preview(false);
-
-        let diag = env
-            .err()
-            .documentation_url("https://docs.astral.sh/ruff/rules/test-diagnostic")
-            .build();
-
-        insta::assert_snapshot!(
-            env.render(&diag),
-            @r#"
-        [
-          {
-            "cell": null,
-            "code": "test-diagnostic",
-            "end_location": {
-              "column": 1,
-              "row": 1
-            },
-            "filename": "",
-            "fix": null,
-            "location": {
-              "column": 1,
-              "row": 1
-            },
-            "message": "main diagnostic message",
-            "noqa_row": null,
-            "url": "https://docs.astral.sh/ruff/rules/test-diagnostic"
-          }
-        ]
-        "#,
-        );
-    }
-
-    #[test]
-    fn missing_file_preview() {
-        let mut env = TestEnvironment::new();
-        env.format(DiagnosticFormat::Json);
-        env.preview(true);
 
         let diag = env
             .err()
@@ -348,7 +293,9 @@ mod tests {
             "fix": null,
             "location": null,
             "message": "main diagnostic message",
+            "name": "test-diagnostic",
             "noqa_row": null,
+            "severity": "error",
             "url": "https://docs.astral.sh/ruff/rules/test-diagnostic"
           }
         ]

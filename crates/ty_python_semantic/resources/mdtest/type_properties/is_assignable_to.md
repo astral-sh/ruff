@@ -18,7 +18,8 @@ Fully static types participate in subtyping. If a type `S` is a subtype of `T`, 
 assignable to `T`. Two equivalent types are subtypes of each other:
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 class Parent: ...
 class Child1(Parent): ...
@@ -44,7 +45,8 @@ static_assert(not is_assignable_to(Child1, Child2))
 The dynamic type is assignable to or from any type.
 
 ```py
-from ty_extensions import static_assert, is_assignable_to, Unknown
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to
 from typing import Any, Literal
 
 static_assert(is_assignable_to(Unknown, Literal[1]))
@@ -61,7 +63,8 @@ static_assert(is_assignable_to(Literal[1], Any))
 which is in turn a subtype of `int`:
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 from typing import Literal
 
 static_assert(is_assignable_to(Literal[True], Literal[True]))
@@ -75,7 +78,8 @@ static_assert(not is_assignable_to(bool, Literal[True]))
 ### Integer literals
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 from typing import Literal
 
 static_assert(is_assignable_to(Literal[1], Literal[1]))
@@ -92,19 +96,20 @@ All string-literal types are subtypes of (and therefore assignable to) `LiteralS
 turn a subtype of `str`:
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 from typing_extensions import Literal, LiteralString
 from typing import Sequence, Any
 
 static_assert(is_assignable_to(Literal["foo"], Literal["foo"]))
 static_assert(is_assignable_to(Literal["foo"], LiteralString))
 static_assert(is_assignable_to(Literal["foo"], str))
-static_assert(is_assignable_to(Literal["foo"], Sequence))
+static_assert(is_assignable_to(Literal["foo"], Sequence))  # error: [missing-type-argument]
 static_assert(is_assignable_to(Literal["foo"], Sequence[str]))
 static_assert(is_assignable_to(Literal["foo"], Sequence[Any]))
 
 static_assert(is_assignable_to(LiteralString, str))
-static_assert(is_assignable_to(LiteralString, Sequence))
+static_assert(is_assignable_to(LiteralString, Sequence))  # error: [missing-type-argument]
 static_assert(is_assignable_to(LiteralString, Sequence[str]))
 static_assert(is_assignable_to(LiteralString, Sequence[Any]))
 
@@ -120,7 +125,8 @@ their characters.
 
 ```py
 from typing import Literal, Sequence, Iterable, Collection, Reversible
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 static_assert(is_assignable_to(Literal["abba"], Sequence[Literal["a", "b"]]))
 static_assert(is_assignable_to(Literal["abb"], Iterable[Literal["a", "b"]]))
@@ -139,7 +145,8 @@ static_assert(not is_assignable_to(Literal["aa"], Sequence[Literal[""]]))
 ### Byte literals
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 from typing_extensions import Literal, LiteralString
 
 static_assert(is_assignable_to(Literal[b"foo"], bytes))
@@ -155,7 +162,8 @@ static_assert(not is_assignable_to(Literal["foo"], Literal[b"foo"]))
 ### Enum literals
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 from typing_extensions import Literal
 from enum import Enum
 
@@ -182,7 +190,8 @@ static_assert(is_assignable_to(Single, Literal[Single.VALUE]))
 The type of a slice literal is currently inferred as a specialization of `slice`.
 
 ```py
-from ty_extensions import TypeOf, is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to
 
 static_assert(is_assignable_to(TypeOf[1:2:3], slice))
 static_assert(is_assignable_to(TypeOf[1:2:3], slice[int]))
@@ -199,7 +208,8 @@ Both `TypeOf[str]` and `type[str]` are subtypes of `type` and `type[object]`, wh
 is known to be no larger than the set of possible objects represented by `type`.
 
 ```py
-from ty_extensions import static_assert, is_assignable_to, Unknown, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, TypeOf, is_assignable_to
 from typing import Any
 
 static_assert(is_assignable_to(type, type))
@@ -267,7 +277,7 @@ static_assert(is_assignable_to(TypeOf[Bar[bool]], type[Foo[int]]))
 static_assert(is_assignable_to(TypeOf[Bar], type[Foo[int]]))
 static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[int]]))
 static_assert(is_assignable_to(TypeOf[Bar[Unknown]], type[Foo[int]]))
-static_assert(is_assignable_to(TypeOf[Bar], type[Foo]))
+static_assert(is_assignable_to(TypeOf[Bar], type[Foo]))  # error: [missing-type-argument]
 static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[Any]]))
 static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[int]]))
 
@@ -275,11 +285,26 @@ static_assert(not is_assignable_to(TypeOf[Bar[int]], type[Foo[bool]]))
 static_assert(not is_assignable_to(TypeOf[Foo[bool]], type[Bar[int]]))
 ```
 
+## Gradual class types in constraint-producing assignability
+
+`type[Any]` is assignable to class-object types, including specialized generic classes.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_constraint_set_assignable_to
+
+static_assert(is_constraint_set_assignable_to(type, type[Any]))
+static_assert(is_constraint_set_assignable_to(type[Any], TypeOf[list[int]]))
+static_assert(not is_constraint_set_assignable_to(object, type[Any]))
+```
+
 ## `type[]` is not assignable to types disjoint from `builtins.type`
 
 ```py
 from typing import Any
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 static_assert(not is_assignable_to(type[Any], None))
 ```
@@ -288,16 +313,22 @@ static_assert(not is_assignable_to(type[Any], None))
 
 ### Class-literal types
 
-Class-literal types that inherit from `Any` are assignable to any type `T` where `T` is assignable
-to `type`:
+Class-literal types with a dynamically typed base are assignable to any type `T` where `T` is
+assignable to `type`:
 
 ```py
 from typing import Any
-from ty_extensions import is_assignable_to, static_assert, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to
 
-def test(x: Any):
+class A: ...
+
+def test(x: Any, cls: type[Any], union_base: TypeOf[A] | Any):
     class Foo(x): ...
     class Bar(Any): ...
+    class Baz(cls): ...
+    class Mixed(Bar, x): ...
+    class UnionDynamic(union_base): ...
     static_assert(is_assignable_to(TypeOf[Foo], Any))
     static_assert(is_assignable_to(TypeOf[Foo], type))
     static_assert(is_assignable_to(TypeOf[Foo], type[int]))
@@ -308,18 +339,39 @@ def test(x: Any):
     static_assert(is_assignable_to(TypeOf[Bar], type[int]))
     static_assert(is_assignable_to(TypeOf[Bar], type[Any]))
 
+    static_assert(is_assignable_to(TypeOf[Baz], Any))
+    static_assert(is_assignable_to(TypeOf[Baz], type))
+    static_assert(is_assignable_to(TypeOf[Baz], type[int]))
+    static_assert(is_assignable_to(TypeOf[Baz], type[Any]))
+
+    static_assert(is_assignable_to(TypeOf[Mixed], Any))
+    static_assert(is_assignable_to(TypeOf[Mixed], type))
+    static_assert(is_assignable_to(TypeOf[Mixed], type[int]))
+    static_assert(is_assignable_to(TypeOf[Mixed], type[Any]))
+
+    static_assert(is_assignable_to(TypeOf[UnionDynamic], Any))
+    static_assert(is_assignable_to(TypeOf[UnionDynamic], type))
+    static_assert(is_assignable_to(TypeOf[UnionDynamic], type[int]))
+    static_assert(is_assignable_to(TypeOf[UnionDynamic], type[Any]))
+
     static_assert(not is_assignable_to(TypeOf[Foo], int))
     static_assert(not is_assignable_to(TypeOf[Bar], int))
+    static_assert(not is_assignable_to(TypeOf[Baz], int))
+    static_assert(not is_assignable_to(TypeOf[Mixed], int))
+    static_assert(not is_assignable_to(TypeOf[UnionDynamic], int))
 ```
 
-This is because the `Any` element in the MRO could materialize to any subtype of `type`.
+A dynamically typed base could be `int` at runtime, making the new class a subclass of `int`. The
+class object is therefore assignable to `type[int]`, but not to `int`.
 
 ### Nominal instance and subclass-of types
 
-Instances of classes that inherit `Any` are assignable to any non-final type.
+Instances of classes that inherit directly from `Any` are assignable to arbitrary types, including
+final types.
 
 ```py
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 from typing_extensions import Any, final
 
 class InheritsAny(Any):
@@ -335,7 +387,7 @@ class FinalClass:
 static_assert(is_assignable_to(InheritsAny, Arbitrary))
 static_assert(is_assignable_to(InheritsAny, Any))
 static_assert(is_assignable_to(InheritsAny, object))
-static_assert(not is_assignable_to(InheritsAny, FinalClass))
+static_assert(is_assignable_to(InheritsAny, FinalClass))
 ```
 
 Similar for subclass-of types:
@@ -347,10 +399,36 @@ static_assert(is_assignable_to(type[Any], type[Arbitrary]))
 static_assert(is_assignable_to(type[Any], type[object]))
 ```
 
+### Narrowed instances with a gradual base
+
+A class with a gradual base can match a union arm outside its known inheritance hierarchy, even
+after narrowing rules out another type.
+
+```py
+from typing import Any
+from missing import UnknownBase  # error: [import-not-found]
+from ty_extensions import Intersection, Not, static_assert
+from ty_extensions._internal import is_assignable_to
+
+class A: ...
+class B: ...
+class FromAny(Any): ...
+class Mixed(A, UnknownBase): ...
+
+static_assert(is_assignable_to(Intersection[FromAny, Not[int]], A | B))
+```
+
+The first arm excludes `Mixed` itself, but its unknown base can still match `B`.
+
+```py
+static_assert(is_assignable_to(Intersection[Mixed, Not[int]], Intersection[A, Not[Mixed]] | B))
+```
+
 ## Heterogeneous tuple types
 
 ```py
-from ty_extensions import static_assert, is_assignable_to, AlwaysTruthy, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import is_assignable_to
 from typing import Literal, Any
 
 static_assert(is_assignable_to(tuple[()], tuple[()]))
@@ -361,9 +439,9 @@ static_assert(is_assignable_to(tuple[int, str], tuple[int, str]))
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[int, int]))
 static_assert(is_assignable_to(tuple[Any, Literal[2]], tuple[int, int]))
 static_assert(is_assignable_to(tuple[Literal[1], Any], tuple[int, int]))
-static_assert(is_assignable_to(tuple[()], tuple))
-static_assert(is_assignable_to(tuple[int, str], tuple))
-static_assert(is_assignable_to(tuple[Any], tuple))
+static_assert(is_assignable_to(tuple[()], tuple))  # error: [missing-type-argument]
+static_assert(is_assignable_to(tuple[int, str], tuple))  # error: [missing-type-argument]
+static_assert(is_assignable_to(tuple[Any], tuple))  # error: [missing-type-argument]
 
 # TODO: It is not yet clear if we want the following two assertions to hold.
 # See https://github.com/astral-sh/ruff/issues/15528 for more details. The
@@ -392,9 +470,10 @@ While a homogeneous tuple type is not assignable to any heterogeneous tuple type
 tuple type can be assignable to a homogeneous tuple type, and homogeneous tuple types can be
 assignable to `Sequence`:
 
-```py
+```pyi
 from typing import Literal, Any, Sequence
-from ty_extensions import static_assert, is_assignable_to, Not, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysFalsy
+from ty_extensions._internal import is_assignable_to
 
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Literal[1, 2], ...]))
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Literal[1], *tuple[Literal[2], ...]]))
@@ -405,7 +484,7 @@ static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[*tuple[str, 
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[int, ...]))
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[int | str, ...]))
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Any, ...]))
-static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Not[AlwaysFalsy], ...]))
+static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[~AlwaysFalsy, ...]))
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], Sequence[int]))
 static_assert(is_assignable_to(tuple[int, ...], Sequence[int]))
 static_assert(is_assignable_to(tuple[int, ...], Sequence[Any]))
@@ -414,7 +493,7 @@ static_assert(is_assignable_to(tuple[Any, ...], Sequence[int]))
 static_assert(is_assignable_to(tuple[()], tuple[Literal[1, 2], ...]))
 static_assert(is_assignable_to(tuple[()], tuple[int, ...]))
 static_assert(is_assignable_to(tuple[()], tuple[int | str, ...]))
-static_assert(is_assignable_to(tuple[()], tuple[Not[AlwaysFalsy], ...]))
+static_assert(is_assignable_to(tuple[()], tuple[~AlwaysFalsy, ...]))
 static_assert(is_assignable_to(tuple[()], Sequence[int]))
 
 static_assert(not is_assignable_to(tuple[int, int], tuple[str, ...]))
@@ -429,7 +508,8 @@ python-version = "3.12"
 
 ```py
 from typing import Literal, Any, Sequence
-from ty_extensions import static_assert, is_assignable_to, Not, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysFalsy
+from ty_extensions._internal import is_assignable_to
 
 static_assert(
     is_assignable_to(
@@ -552,7 +632,8 @@ is assignable to every tuple of any length.
 
 ```py
 from typing import Any
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 static_assert(is_assignable_to(tuple[Any, ...], tuple[Any, ...]))
 static_assert(is_assignable_to(tuple[Any, ...], tuple[Any]))
@@ -642,10 +723,145 @@ static_assert(not is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[int]
 static_assert(not is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[int, int]))
 ```
 
+An unbounded homogeneous tuple whose element type is an alias of `Any` is also gradual. It is
+assignable to fixed-length tuples, including the empty tuple, even through a chain of aliases.
+
+```py
+type Dynamic = Any
+type DynamicAlias = Dynamic
+
+static_assert(is_assignable_to(tuple[Dynamic, ...], tuple[()]))
+static_assert(is_assignable_to(tuple[Dynamic, ...], tuple[int]))
+static_assert(is_assignable_to(tuple[DynamicAlias, ...], tuple[int, str]))
+```
+
+When unpacked into a mixed tuple, the gradual segment can supply additional elements, but the fixed
+prefix and suffix must still fit within the target and have compatible types.
+
+```py
+static_assert(is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[int, bool, str]))
+static_assert(not is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[int]))
+static_assert(not is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[str, bool, str]))
+static_assert(not is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[int, bool, int]))
+```
+
+## Constraint-producing assignability of gradual tuples
+
+A gradual segment can supply any fixed number of elements, including zero. These concrete tuple
+comparisons produce always-satisfied constraints, matching eager assignability.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, is_assignable_to, is_constraint_set_assignable_to
+
+static_assert(is_assignable_to(tuple[Any, ...], tuple[()]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[()]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[int]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int, str]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[int, str]))
+
+type Dynamic = Any
+
+static_assert(is_assignable_to(tuple[Dynamic, ...], tuple[int]))
+static_assert(is_constraint_set_assignable_to(tuple[Dynamic, ...], tuple[int]))
+```
+
+The gradual segment can also supply a variable-length target's required prefix or suffix.
+
+```py
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int, *tuple[str, ...]]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[int, *tuple[str, ...]]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[*tuple[str, ...], int]))
+static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[*tuple[str, ...], int]))
+```
+
+A mixed tuple's fixed elements must still fit within the target and have compatible types. The
+gradual segment cannot remove a required element or change its type.
+
+```py
+static_assert(is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[int, bool, str]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[int]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[str, bool, str]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[int, bool, int]))
+static_assert(not is_constraint_set_assignable_to(tuple[str, *tuple[Any, ...]], tuple[int, *tuple[bytes, ...]]))
+static_assert(not is_constraint_set_assignable_to(tuple[*tuple[Any, ...], str], tuple[*tuple[bytes, ...], int]))
+```
+
+A static homogeneous tuple can have any length, so it cannot guarantee a fixed length or a required
+element in a variable-length target.
+
+```py
+static_assert(not is_assignable_to(tuple[int, ...], tuple[int]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, ...], tuple[int]))
+static_assert(not is_assignable_to(tuple[int, ...], tuple[int, *tuple[int, ...]]))
+static_assert(not is_constraint_set_assignable_to(tuple[int, ...], tuple[int, *tuple[int, ...]]))
+```
+
+Type variables in fixed source elements are compared normally. The gradual segment can be empty or
+supply additional target elements without discarding constraints on the fixed source elements.
+
+```py
+def source_type_variables[T]() -> None:
+    static_assert(is_constraint_set_assignable_to(tuple[list[T], *tuple[Any, ...]], tuple[object]))
+    static_assert(is_constraint_set_assignable_to(tuple[*tuple[Any, ...], list[T]], tuple[object]))
+    static_assert(is_constraint_set_assignable_to(tuple[T, *tuple[Any, ...]], tuple[int]) == ConstraintSet.upper_bound(T, int))
+    static_assert(is_constraint_set_assignable_to(tuple[*tuple[Any, ...], T], tuple[str]) == ConstraintSet.upper_bound(T, str))
+    static_assert(
+        is_constraint_set_assignable_to(tuple[T, *tuple[Any, ...]], tuple[int, str, *tuple[bytes, ...]])
+        == ConstraintSet.upper_bound(T, int)
+    )
+    static_assert(
+        is_constraint_set_assignable_to(tuple[*tuple[Any, ...], T], tuple[*tuple[bytes, ...], str, int])
+        == ConstraintSet.upper_bound(T, int)
+    )
+```
+
+Each element supplied by the gradual segment contributes its own constraints, even when the variable
+is hidden behind an alias or nested within a container.
+
+```py
+type Identity[T] = T
+
+def _[T, U, V]():
+    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[T]) == ConstraintSet.lower_bound(Any, T))
+    static_assert(is_assignable_to(tuple[Any, ...], tuple[Identity[T]]))
+    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[Identity[T]]) == ConstraintSet.lower_bound(Any, T))
+
+    static_assert(
+        is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[T, U, V])
+        == (ConstraintSet.lower_bound(int, T) & ConstraintSet.lower_bound(Any, U) & ConstraintSet.lower_bound(str, V))
+    )
+    static_assert(not is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[T]))
+
+    static_assert(
+        is_constraint_set_assignable_to(tuple[Dynamic, ...], tuple[T, *tuple[int, ...]]) == ConstraintSet.lower_bound(Any, T)
+    )
+    static_assert(
+        is_constraint_set_assignable_to(tuple[Dynamic, ...], tuple[*tuple[int, ...], T]) == ConstraintSet.lower_bound(Any, T)
+    )
+
+    static_assert(is_assignable_to(tuple[Any, ...], tuple[list[T]]))
+    # TODO: This should be ConstraintSet.equality(T, Any).
+    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[list[T]]) == ConstraintSet.always())
+```
+
+A symbolic `TypeVarTuple` is not gradual: its specialization can have a different length from a
+fixed target tuple.
+
+```py
+def symbolic_pack[T, *Ts]() -> None:
+    static_assert(not is_assignable_to(tuple[*Ts], tuple[int]))
+    static_assert(is_constraint_set_assignable_to(tuple[*Ts], tuple[int]) == ConstraintSet.never())
+    static_assert(is_constraint_set_assignable_to(tuple[*Ts], tuple[T]) == ConstraintSet.never())
+```
+
 ## Union types
 
 ```py
-from ty_extensions import AlwaysTruthy, AlwaysFalsy, static_assert, is_assignable_to, Unknown
+from ty_extensions import AlwaysTruthy, AlwaysFalsy, static_assert
+from ty_extensions._internal import Unknown, is_assignable_to
 from typing_extensions import Literal, Any, LiteralString
 
 static_assert(is_assignable_to(int, int | str))
@@ -677,10 +893,33 @@ static_assert(is_assignable_to(LiteralString, Literal[""] | AlwaysTruthy))
 static_assert(not is_assignable_to(Literal[True] | AlwaysFalsy, Literal[False] | AlwaysTruthy))
 ```
 
-## Intersection types
+## Gradual unions with complementary arms
+
+Separate arms of a gradual union can collectively cover the source. The top materialization of
+`Not[Top[list[Any]]] | list[Any]` is `object`, so every object is assignable to this union. This
+does not make `object` a subtype of the union.
 
 ```py
-from ty_extensions import static_assert, is_assignable_to, Intersection, Not, AlwaysTruthy, AlwaysFalsy
+from typing import Any
+from ty_extensions import Intersection, Not, Top, static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+static_assert(is_assignable_to(object, Not[Top[list[Any]]] | list[Any]))
+static_assert(not is_subtype_of(object, Not[Top[list[Any]]] | list[Any]))
+```
+
+A type variable in the remaining arm still restricts which values the union accepts.
+
+```py
+def restricted[T]() -> None:
+    static_assert(not is_assignable_to(object, Intersection[T, Not[Top[list[Any]]]] | list[Any]))
+```
+
+## Intersection types
+
+```pyi
+from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import is_assignable_to
 from typing_extensions import Any, Literal, final, LiteralString
 
 class Parent: ...
@@ -689,74 +928,79 @@ class Child2(Parent): ...
 class Grandchild(Child1, Child2): ...
 class Unrelated: ...
 
-static_assert(is_assignable_to(Intersection[Child1, Child2], Child1))
-static_assert(is_assignable_to(Intersection[Child1, Child2], Child2))
-static_assert(is_assignable_to(Intersection[Child1, Child2], Parent))
-static_assert(is_assignable_to(Intersection[Child1, Parent], Parent))
+static_assert(is_assignable_to(Child1 & Child2, Child1))
+static_assert(is_assignable_to(Child1 & Child2, Child2))
+static_assert(is_assignable_to(Child1 & Child2, Parent))
+static_assert(is_assignable_to(Child1 & Parent, Parent))
 
-static_assert(is_assignable_to(Intersection[Parent, Unrelated], Parent))
-static_assert(is_assignable_to(Intersection[Child1, Unrelated], Child1))
-static_assert(is_assignable_to(Intersection[Child1, Unrelated, Child2], Intersection[Child1, Unrelated]))
+static_assert(is_assignable_to(Parent & Unrelated, Parent))
+static_assert(is_assignable_to(Child1 & Unrelated, Child1))
+static_assert(is_assignable_to(Child1 & Unrelated & Child2, Child1 & Unrelated))
 
-static_assert(is_assignable_to(Intersection[Child1, Not[Child2]], Child1))
-static_assert(is_assignable_to(Intersection[Child1, Not[Child2]], Parent))
-static_assert(is_assignable_to(Intersection[Child1, Not[Grandchild]], Parent))
+static_assert(is_assignable_to(Child1 & ~Child2, Child1))
+static_assert(is_assignable_to(Child1 & ~Child2, Parent))
+static_assert(is_assignable_to(Child1 & ~Grandchild, Parent))
 
-static_assert(is_assignable_to(Intersection[Child1, Child2], Intersection[Child1, Child2]))
-static_assert(is_assignable_to(Intersection[Child1, Child2], Intersection[Child2, Child1]))
-static_assert(is_assignable_to(Grandchild, Intersection[Child1, Child2]))
-static_assert(not is_assignable_to(Intersection[Child1, Child2], Intersection[Parent, Unrelated]))
+static_assert(is_assignable_to(Child1 & Child2, Child1 & Child2))
+static_assert(is_assignable_to(Child1 & Child2, Child2 & Child1))
+static_assert(is_assignable_to(Grandchild, Child1 & Child2))
+static_assert(not is_assignable_to(Child1 & Child2, Parent & Unrelated))
 
-static_assert(not is_assignable_to(Parent, Intersection[Parent, Unrelated]))
-static_assert(not is_assignable_to(int, Intersection[int, Not[Literal[1]]]))
+static_assert(not is_assignable_to(Parent, Parent & Unrelated))
+static_assert(not is_assignable_to(int, int & ~Literal[1]))
 # The literal `1` is not assignable to `Parent`, so the intersection of int and Parent is definitely an int that is not `1`
-static_assert(is_assignable_to(Intersection[int, Parent], Intersection[int, Not[Literal[1]]]))
-static_assert(not is_assignable_to(int, Not[int]))
-static_assert(not is_assignable_to(int, Not[Literal[1]]))
+static_assert(is_assignable_to(int & Parent, int & ~Literal[1]))
+static_assert(not is_assignable_to(int, ~int))
+static_assert(not is_assignable_to(int, ~Literal[1]))
 
-static_assert(is_assignable_to(Not[Parent], Not[Child1]))
-static_assert(not is_assignable_to(Not[Parent], Parent))
-static_assert(not is_assignable_to(Intersection[Unrelated, Not[Parent]], Parent))
+static_assert(is_assignable_to(~Parent, ~Child1))
+static_assert(not is_assignable_to(~Parent, Parent))
+static_assert(not is_assignable_to(Unrelated & ~Parent, Parent))
 
 # Intersection with `Any` dominates the left hand side of intersections
-static_assert(is_assignable_to(Intersection[Any, Parent], Parent))
-static_assert(is_assignable_to(Intersection[Any, Child1], Parent))
-static_assert(is_assignable_to(Intersection[Any, Child2, Not[Child1]], Parent))
-static_assert(is_assignable_to(Intersection[Any, Parent], Unrelated))
-static_assert(is_assignable_to(Intersection[Any, Parent], Intersection[Parent, Unrelated]))
-static_assert(is_assignable_to(Intersection[Any, Parent, Unrelated], Parent))
-static_assert(is_assignable_to(Intersection[Any, Parent, Unrelated], Intersection[Parent, Unrelated]))
+static_assert(is_assignable_to(Any & Parent, Parent))
+static_assert(is_assignable_to(Any & Child1, Parent))
+static_assert(is_assignable_to(Any & Child2 & ~Child1, Parent))
+static_assert(is_assignable_to(Any & Parent, Unrelated))
+static_assert(is_assignable_to(Any & Parent, Parent & Unrelated))
+static_assert(is_assignable_to(Any & Parent & Unrelated, Parent))
+static_assert(is_assignable_to(Any & Parent & Unrelated, Parent & Unrelated))
 
-# Even Any & Not[Parent] is assignable to Parent, since it could be Never
-static_assert(is_assignable_to(Intersection[Any, Not[Parent]], Parent))
-static_assert(is_assignable_to(Intersection[Any, Not[Parent]], Not[Parent]))
+# Even Any & ~Parent is assignable to Parent, since it could be Never
+static_assert(is_assignable_to(Any & ~Parent, Parent))
+static_assert(is_assignable_to(Any & ~Parent, ~Parent))
 
 # Intersection with `Any` is effectively ignored on the right hand side for the sake of assignment
-static_assert(is_assignable_to(Parent, Intersection[Any, Parent]))
-static_assert(is_assignable_to(Parent, Parent | Intersection[Any, Unrelated]))
-static_assert(is_assignable_to(Child1, Intersection[Any, Parent]))
-static_assert(not is_assignable_to(Literal[1], Intersection[Any, Parent]))
-static_assert(not is_assignable_to(Unrelated, Intersection[Any, Parent]))
+static_assert(is_assignable_to(Parent, Any & Parent))
+static_assert(is_assignable_to(Parent, Parent | Any & Unrelated))
+static_assert(is_assignable_to(Child1, Any & Parent))
+static_assert(not is_assignable_to(Literal[1], Any & Parent))
+static_assert(not is_assignable_to(Unrelated, Any & Parent))
 
 # Intersections with Any on both sides combine the above logic - the LHS dominates and Any is ignored on the right hand side
-static_assert(is_assignable_to(Intersection[Any, Parent], Intersection[Any, Parent]))
-static_assert(is_assignable_to(Intersection[Any, Unrelated], Intersection[Any, Parent]))
-static_assert(is_assignable_to(Intersection[Any, Parent, Unrelated], Intersection[Any, Parent, Unrelated]))
-static_assert(is_assignable_to(Intersection[Unrelated, Any], Intersection[Unrelated, Not[Any]]))
-static_assert(is_assignable_to(Intersection[Literal[1], Any], Intersection[Unrelated, Not[Any]]))
+static_assert(is_assignable_to(Any & Parent, Any & Parent))
+static_assert(is_assignable_to(Any & Unrelated, Any & Parent))
+static_assert(is_assignable_to(Any & Parent & Unrelated, Any & Parent & Unrelated))
+static_assert(is_assignable_to(Unrelated & Any, Unrelated & ~Any))
+static_assert(is_assignable_to(Literal[1] & Any, Unrelated & ~Any))
 
 # TODO: No errors
 # The condition `is_assignable_to(T & U, U)` should still be satisfied after the following transformations:
 # `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
 # error: [static-assert-error]
-static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], AlwaysTruthy))
+static_assert(is_assignable_to(LiteralString & ~Literal[""], AlwaysTruthy))
 # error: [static-assert-error]
-static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal["", "a"]]], AlwaysTruthy))
+static_assert(is_assignable_to(LiteralString & ~Literal["", "a"], AlwaysTruthy))
 # `LiteralString & ~AlwaysFalsy`  -> `LiteralString & ~Literal[""]`
 # error: [static-assert-error]
-static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], Not[AlwaysFalsy]))
+static_assert(is_assignable_to(LiteralString & ~Literal[""], ~AlwaysFalsy))
 # error: [static-assert-error]
-static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
+static_assert(is_assignable_to(LiteralString & ~Literal["", "a"], ~AlwaysFalsy))
+
+# Each member of a union must be assignable to the target intersection
+static_assert(is_assignable_to(Literal[1, 2], int & ~Literal[3]))
+static_assert(not is_assignable_to(Literal[1, 2], int & ~Literal[2]))
+static_assert(not is_assignable_to(Literal[1, "a"], int & ~Literal[3]))
 ```
 
 ## Callable types with Unknown/missing return type
@@ -768,18 +1012,19 @@ of `~type`, the intersection should be assignable to `~type`.
 The root cause was that we failed to properly materialize a `Callable[..., Unknown]` type when the
 `Unknown` return type originated from a missing annotation.
 
-```py
-from ty_extensions import static_assert, is_assignable_to, Intersection, Not, Unknown, CallableTypeOf
+```pyi
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, RegularCallableTypeOf, is_assignable_to
 from typing import Callable
 
 # `Callable[..., Unknown]` has explicit Unknown return type
-static_assert(is_assignable_to(Intersection[Not[type], Not[Callable[..., Unknown]]], Not[type]))
+static_assert(is_assignable_to(~type & ~Callable[..., Unknown], ~type))
 
 # Function with no return annotation (has implicit Unknown return type internally)
 def no_return_annotation(*args, **kwargs): ...
 
-# `CallableTypeOf[no_return_annotation]` has `returns: None` internally (no annotation)
-static_assert(is_assignable_to(Intersection[Not[type], Not[CallableTypeOf[no_return_annotation]]], Not[type]))
+# `RegularCallableTypeOf[no_return_annotation]` has `returns: None` internally (no annotation)
+static_assert(is_assignable_to(~type & ~RegularCallableTypeOf[no_return_annotation], ~type))
 ```
 
 ## Intersections with non-fully-static negated elements
@@ -789,21 +1034,22 @@ materialization of that type is disjoint from the _bottom_ materialization of al
 in the intersection. This differs from subtyping, which should do the disjointness check against the
 _top_ materialization of the negated elements.
 
-```py
+```pyi
 from typing_extensions import Any, Never, Sequence
-from ty_extensions import Not, is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
-# The bottom materialization of `tuple[Any]` is `tuple[Never]`,
-# which simplifies to `Never`, so `tuple[int]` and `tuple[()]` are
-# both assignable to `~tuple[Any]`
-static_assert(is_assignable_to(tuple[int], Not[tuple[Any]]))
-static_assert(is_assignable_to(tuple[()], Not[tuple[Any]]))
+# The bottom materialization of `tuple[Any]` is `tuple[Never]`. Both
+# `tuple[int]` and `tuple[()]` are disjoint from `tuple[Never]`, so they are
+# assignable to `~tuple[Any]`.
+static_assert(is_assignable_to(tuple[int], ~tuple[Any]))
+static_assert(is_assignable_to(tuple[()], ~tuple[Any]))
 
 # But the bottom materialization of `tuple[Any, ...]` is `tuple[Never, ...]`,
 # which simplifies to `tuple[()]`, so `tuple[int]` is still assignable to
 # `~tuple[Any, ...]`, but `tuple[()]` is not
-static_assert(is_assignable_to(tuple[int], Not[tuple[Any, ...]]))
-static_assert(not is_assignable_to(tuple[()], Not[tuple[Any, ...]]))
+static_assert(is_assignable_to(tuple[int], ~tuple[Any, ...]))
+static_assert(not is_assignable_to(tuple[()], ~tuple[Any, ...]))
 
 # Similarly, the bottom materialization of `Sequence[Any]` is `Sequence[Never]`,
 # so `tuple[()]` is not assignable to `~Sequence[Any]`, and nor is `list[Never]`,
@@ -816,15 +1062,15 @@ static_assert(not is_assignable_to(tuple[()], Not[tuple[Any, ...]]))
 # Other `list` and `tuple` specializations *are* assignable to `~Sequence[Any]`,
 # however, since there are many fully static materializations of `Sequence[Any]`
 # that would be disjoint from a given `list` or `tuple` specialization.
-static_assert(not is_assignable_to(tuple[()], Not[Sequence[Any]]))
-static_assert(not is_assignable_to(list[Never], Not[Sequence[Any]]))
-static_assert(not is_assignable_to(tuple[int, ...], Not[Sequence[Any]]))
+static_assert(not is_assignable_to(tuple[()], ~Sequence[Any]))
+static_assert(not is_assignable_to(list[Never], ~Sequence[Any]))
+static_assert(not is_assignable_to(tuple[int, ...], ~Sequence[Any]))
 
 # TODO: should pass (`tuple[int]` should be considered disjoint from `Sequence[Never]`)
-static_assert(is_assignable_to(tuple[int], Not[Sequence[Any]]))  # error: [static-assert-error]
+static_assert(is_assignable_to(tuple[int], ~Sequence[Any]))  # error: [static-assert-error]
 
 # TODO: should pass (`list[int]` should be considered disjoint from `Sequence[Never]`)
-static_assert(is_assignable_to(list[int], Not[Sequence[Any]]))  # error: [static-assert-error]
+static_assert(is_assignable_to(list[int], ~Sequence[Any]))  # error: [static-assert-error]
 
 # If the left-hand side is also not fully static,
 # the left-hand side will be assignable to the right if the bottom materialization
@@ -834,21 +1080,21 @@ static_assert(is_assignable_to(list[int], Not[Sequence[Any]]))  # error: [static
 # `tuple[Any, ...]` cannot be assignable to `~tuple[Any, ...]`,
 # because the bottom materialization of `tuple[Any, ...]` is
 # `tuple[()]`, and `tuple[()]` is not disjoint from itself
-static_assert(not is_assignable_to(tuple[Any, ...], Not[tuple[Any, ...]]))
+static_assert(not is_assignable_to(tuple[Any, ...], ~tuple[Any, ...]))
 
 # but `tuple[Any]` is assignable to `~tuple[Any]`,
 # as the bottom materialization of `tuple[Any]` is `Never`,
 # and `Never` *is* disjoint from itself
-static_assert(is_assignable_to(tuple[Any], Not[tuple[Any]]))
+static_assert(is_assignable_to(tuple[Any], ~tuple[Any]))
 
 # The same principle applies for non-fully-static `list` specializations.
 # TODO: this should pass (`Bottom[list[Any]]` should simplify to `Never`)
-static_assert(is_assignable_to(list[Any], Not[list[Any]]))  # error: [static-assert-error]
+static_assert(is_assignable_to(list[Any], ~list[Any]))  # error: [static-assert-error]
 
 # `Bottom[list[Any]]` is `Never`, which is disjoint from `Bottom[Sequence[Any]]`
 # (which is `Sequence[Never]`).
 # TODO: this should pass (`Bottom[list[Any]]` should simplify to `Never`)
-static_assert(is_assignable_to(list[Any], Not[Sequence[Any]]))  # error: [static-assert-error]
+static_assert(is_assignable_to(list[Any], ~Sequence[Any]))  # error: [static-assert-error]
 ```
 
 ## General properties
@@ -860,7 +1106,8 @@ See also: our property tests in `property_tests.rs`.
 `object` is Python's top type; the set of all possible objects at runtime:
 
 ```py
-from ty_extensions import static_assert, is_assignable_to, Unknown
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to
 from typing import Literal, Any
 
 static_assert(is_assignable_to(str, object))
@@ -880,7 +1127,8 @@ static_assert(is_assignable_to(type[Any], object))
 any type is assignable to them:
 
 ```py
-from ty_extensions import static_assert, is_assignable_to, Unknown
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to
 from typing import Literal, Any
 
 static_assert(is_assignable_to(str, Any))
@@ -910,7 +1158,8 @@ static_assert(is_assignable_to(type[Any], Unknown))
 assignable to any arbitrary type.
 
 ```py
-from ty_extensions import static_assert, is_assignable_to, Unknown
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to
 from typing_extensions import Never, Any, Literal
 
 static_assert(is_assignable_to(Never, str))
@@ -924,6 +1173,25 @@ static_assert(is_assignable_to(Never, type[str]))
 static_assert(is_assignable_to(Never, type[Any]))
 ```
 
+### `Any` / `Unknown` is assignable to `Never`
+
+`Any` and `Unknown` are gradual types. They could materialize to any given type at runtime,
+including `Never`.
+
+```pyi
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to
+from typing_extensions import Never, Any
+
+static_assert(is_assignable_to(Any, Never))
+static_assert(is_assignable_to(Unknown, Never))
+static_assert(is_assignable_to(Any | Unknown, Never))
+static_assert(is_assignable_to(Any & int, Never))
+static_assert(is_assignable_to(Unknown & int, Never))
+static_assert(not is_assignable_to(Any | int, Never))
+static_assert(not is_assignable_to(Unknown | int, Never))
+```
+
 ## Callable
 
 The examples provided below are only a subset of the possible cases and include the ones with
@@ -933,7 +1201,8 @@ are covered in the [subtyping tests](./is_subtype_of.md#callable).
 ### Return type
 
 ```py
-from ty_extensions import CallableTypeOf, Unknown, static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, RegularCallableTypeOf, is_assignable_to
 from typing import Any, Callable
 
 static_assert(is_assignable_to(Callable[[], Any], Callable[[], int]))
@@ -963,7 +1232,8 @@ A `Callable` which uses the gradual form (`...`) for the parameter types is cons
 input signature.
 
 ```py
-from ty_extensions import CallableTypeOf, static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
 from typing import Any, Callable
 
 static_assert(is_assignable_to(Callable[[], None], Callable[..., None]))
@@ -981,12 +1251,12 @@ def keyword_only(*, a: int, b: int) -> None: ...
 def keyword_variadic(**kwargs: int) -> None: ...
 def mixed(a: int, /, b: int, *args: int, c: int, **kwargs: int) -> None: ...
 
-static_assert(is_assignable_to(CallableTypeOf[positional_only], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeOf[positional_or_keyword], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeOf[variadic], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeOf[keyword_only], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeOf[keyword_variadic], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeOf[mixed], Callable[..., None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[positional_only], Callable[..., None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[positional_or_keyword], Callable[..., None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[variadic], Callable[..., None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[keyword_only], Callable[..., None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[keyword_variadic], Callable[..., None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[mixed], Callable[..., None]))
 ```
 
 And, even if the parameters are unannotated.
@@ -999,12 +1269,399 @@ def keyword_only(*, a, b) -> None: ...
 def keyword_variadic(**kwargs) -> None: ...
 def mixed(a, /, b, *args, c, **kwargs) -> None: ...
 
-static_assert(is_assignable_to(CallableTypeOf[positional_only], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeOf[positional_or_keyword], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeOf[variadic], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeOf[keyword_only], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeOf[keyword_variadic], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeOf[mixed], Callable[..., None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[positional_only], Callable[..., None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[positional_or_keyword], Callable[..., None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[variadic], Callable[..., None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[keyword_only], Callable[..., None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[keyword_variadic], Callable[..., None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[mixed], Callable[..., None]))
+```
+
+### Explicit parameters alongside gradual variadics
+
+An explicit parameter keeps its type when the variadic parameters have explicit or implicit `Any`
+annotations.
+
+```py
+from typing import Any, Callable, Concatenate
+from ty_extensions._internal import RegularCallableTypeOf
+
+def takes_str(value: str, *args: Any, **kwargs: Any) -> None: ...
+def implicit(value: str, *args, **kwargs) -> None: ...
+
+one_int: Callable[[int], None] = takes_str  # error: [invalid-assignment]
+one_int = implicit  # error: [invalid-assignment]
+one_str: Callable[[str], None] = takes_str  # ok
+one_str = implicit  # ok
+
+starts_with_int: Callable[Concatenate[int, ...], None] = takes_str  # error: [invalid-assignment]
+starts_with_int = implicit  # error: [invalid-assignment]
+starts_with_str: Callable[Concatenate[str, ...], None] = takes_str  # ok
+starts_with_str = implicit  # ok
+
+two_ints: Callable[[int, int], None] = takes_str  # error: [invalid-assignment]
+two_ints = implicit  # error: [invalid-assignment]
+str_then_int: Callable[[str, int], None] = takes_str  # ok
+str_then_int = implicit  # ok
+```
+
+Calling with `other=""` sends `other` to `**kwargs`, so `value` needs a default.
+
+```py
+def takes_other(other: str) -> None: ...
+def optional_value(value: str = "", *args: Any, **kwargs: Any) -> None: ...
+def optional_positional(value: str = "", /, *args: Any, debug: bool = False, **kwargs: Any) -> None: ...
+
+named: RegularCallableTypeOf[takes_other] = takes_str  # error: [invalid-assignment]
+named = optional_value  # ok
+named = optional_positional  # ok
+```
+
+If the source also declares `other`, it receives the keyword argument and must accept a string.
+
+```py
+def keyword_str(value: str = "", *args: Any, other: str = "", **kwargs: Any) -> None: ...
+def keyword_int(value: str = "", *args: Any, other: int = 0, **kwargs: Any) -> None: ...
+def second_str(value: str = "", other: str = "", *args: Any, **kwargs: Any) -> None: ...
+
+named = keyword_str  # ok
+named = keyword_int  # error: [invalid-assignment]
+named = second_str  # ok
+```
+
+The first positional argument still binds to `value` when the target accepts arbitrary positional
+arguments.
+
+```py
+def strings(*args: str) -> None: ...
+def integers(*args: int) -> None: ...
+
+all_strings: RegularCallableTypeOf[strings] = optional_value  # ok
+all_ints: RegularCallableTypeOf[integers] = optional_value  # error: [invalid-assignment]
+```
+
+Both targets admit the call `callback("one", value="two")`, which binds `value` twice in
+`takes_str`.
+
+```py
+def two_args(other: str, /, *, value: str) -> None: ...
+def gradual_two_args(other: str, /, *args: Any, value: str, **kwargs: Any) -> None: ...
+
+fixed: RegularCallableTypeOf[two_args] = takes_str  # error: [invalid-assignment]
+gradual: RegularCallableTypeOf[gradual_two_args] = takes_str  # error: [invalid-assignment]
+```
+
+A gradual target can accommodate additional required parameters in the source. An explicit
+keyword-only parameter still constrains its type and how it can be passed.
+
+```py
+def keyword_only(*args: Any, value: str, **kwargs: Any) -> None: ...
+def extra(*, value: str, width: int) -> None: ...
+def wrong_type(*, value: int) -> None: ...
+def by_position_or_keyword(value: str) -> None: ...
+
+keyword: RegularCallableTypeOf[keyword_only] = extra  # ok
+keyword = wrong_type  # error: [invalid-assignment]
+either: RegularCallableTypeOf[by_position_or_keyword] = keyword_only  # error: [invalid-assignment]
+```
+
+### Keyword binding with unrestricted variadics
+
+The variadics accept arbitrary arguments because `Obj` is an alias for `object`. Calling
+`takes_value(other="two")` sends `other` to `**kwargs` and uses the default for `value`.
+
+```pyi
+from typing import Never
+from ty_extensions._internal import RegularCallableTypeOf
+
+type Obj = object
+
+def takes_value(value: str = ..., *args: Obj, **kwargs: Obj) -> None: ...
+def takes_other(other: str) -> None: ...
+
+renamed: RegularCallableTypeOf[takes_other] = takes_value  # ok
+```
+
+An optional positional parameter of type `Never` can only be omitted. The caller can still pass
+`value="two"` by keyword. A target that allows `value=2` is incompatible with `takes_value`.
+
+```pyi
+def str_keywords(unused: Never = ..., /, **kw: str) -> None: ...
+def int_keywords(unused: Never = ..., /, **kw: int) -> None: ...
+
+by_keyword: RegularCallableTypeOf[str_keywords] = takes_value  # ok
+by_keyword_int: RegularCallableTypeOf[int_keywords] = takes_value  # error: [invalid-assignment]
+```
+
+Likewise, `*args: Never` accepts no positional arguments. A required `str` after that empty segment
+allows `callback("one", value="two")`, which binds `value` twice in `takes_value`. Using the alias
+`Empty` keeps the variadic segment in the signature until ty compares the callables.
+
+```pyi
+type Empty = Never
+
+def no_positionals(*args: Never, **kw: str) -> None: ...
+def with_suffix(*args: *tuple[*tuple[Empty, ...], str], **kw: str) -> None: ...
+
+empty: RegularCallableTypeOf[no_positionals] = takes_value  # ok
+duplicate: RegularCallableTypeOf[with_suffix] = takes_value  # error: [invalid-assignment]
+```
+
+### Unpacked positional parameters with a required suffix
+
+A variadic positional parameter can accept both the unpacked tuple and a required positional
+parameter following that tuple.
+
+```py
+from typing import Any, Callable, Never, Unpack, cast
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
+
+def expects_suffix(callback: Callable[[Unpack[tuple[str, ...]], None], None]) -> None: ...
+def accepts_unknown(*args): ...
+
+expects_suffix(accepts_unknown)
+```
+
+The variadic parameter's annotation must be compatible with the unpacked elements and the required
+suffix.
+
+```py
+def accepts_objects(*args: object) -> None: ...
+def accepts_strings_or_none(*args: str | None) -> None: ...
+def accepts_strings(*args: str) -> None: ...
+
+expects_suffix(accepts_objects)
+expects_suffix(accepts_strings_or_none)
+expects_suffix(accepts_strings)  # error: [invalid-argument-type]
+
+static_assert(
+    is_assignable_to(
+        RegularCallableTypeOf[accepts_objects],
+        Callable[[Unpack[tuple[str, ...]], None], None],
+    )
+)
+static_assert(
+    is_assignable_to(
+        RegularCallableTypeOf[accepts_strings_or_none],
+        Callable[[Unpack[tuple[str, ...]], None], None],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        RegularCallableTypeOf[accepts_strings],
+        Callable[[Unpack[tuple[str, ...]], None], None],
+    )
+)
+```
+
+An optional positional prefix can receive a variadic argument or the first argument in the required
+suffix. With two optional parameters, the second can also receive the second suffix argument.
+
+```py
+def optional_string(first: str = "", /, *args: Any, **kwargs: Any) -> None: ...
+def two_optional_strings(first: str = "", second: str = "", /, *args: Any, **kwargs: Any) -> None: ...
+
+strings: Callable[[*tuple[str, ...], str], None] = optional_string
+strings_then_int: Callable[[*tuple[str, ...], str, int], None] = optional_string
+strings_then_int = two_optional_strings  # error: [invalid-assignment]
+wrong_element: Callable[[*tuple[int, ...], str], None] = optional_string  # error: [invalid-assignment]
+wrong_suffix: Callable[[*tuple[str, ...], int], None] = optional_string  # error: [invalid-assignment]
+```
+
+Each required suffix element guarantees one positional argument, even when the variadic tuple is
+empty.
+
+```py
+def required_string(first: str, *args: Any, **kwargs: Any) -> None: ...
+def two_required(first: str, second: str | int, *args: Any, **kwargs: Any) -> None: ...
+
+strings = required_string  # ok
+maybe_empty: Callable[[*tuple[str, ...]], None] = required_string  # error: [invalid-assignment]
+strings_then_int = two_required  # ok
+strings = two_required  # error: [invalid-assignment]
+```
+
+A required keyword-only parameter cannot be supplied by the positional callback signature.
+
+```py
+def requires_keyword(*args: object, value: int) -> None: ...
+
+expects_suffix(requires_keyword)  # error: [invalid-argument-type]
+```
+
+A required positional prefix does not prevent the source variadic parameter from also accepting the
+target's required suffix.
+
+```py
+def expects_prefix_and_suffix(
+    callback: Callable[[int, Unpack[tuple[str, ...]], None], None],
+) -> None: ...
+def accepts_prefixed_objects(first: int, *args: object) -> None: ...
+
+expects_prefix_and_suffix(accepts_prefixed_objects)
+```
+
+A required suffix can align with a longer suffix or an equivalent positional prefix when all the
+unpacked elements have the same type.
+
+```py
+def requires_one_integer(*args: *tuple[*tuple[int, ...], int]) -> None: ...
+
+longer_suffix: Callable[[*tuple[int, ...], int, int], None] = requires_one_integer
+equivalent_prefix: Callable[[int, *tuple[int, ...]], None] = requires_one_integer
+
+type OneOrMoreIntegers = RegularCallableTypeOf[requires_one_integer]
+
+static_assert(is_assignable_to(OneOrMoreIntegers, Callable[[*tuple[int, ...], int, int], None]))
+static_assert(is_assignable_to(OneOrMoreIntegers, Callable[[int, *tuple[int, ...]], None]))
+```
+
+A type alias for the variadic element does not prevent the required suffix from matching.
+
+```py
+type Integer = int
+
+def requires_one_aliased_integer(*args: *tuple[*tuple[Integer, ...], int]) -> None: ...
+
+type AliasedIntegers = RegularCallableTypeOf[requires_one_aliased_integer]
+
+static_assert(is_assignable_to(AliasedIntegers, Callable[[int, *tuple[int, ...]], None]))
+```
+
+A longer suffix is aligned from the end when its other elements fit the source variadic parameter.
+
+```py
+def requires_string_suffix(*args: *tuple[*tuple[object, ...], str]) -> None: ...
+def requires_string_after_integers(*args: *tuple[*tuple[int, ...], str]) -> None: ...
+
+type StringSuffix = RegularCallableTypeOf[requires_string_suffix]
+type IntegerStringSuffix = RegularCallableTypeOf[requires_string_after_integers]
+
+static_assert(is_assignable_to(StringSuffix, Callable[[*tuple[object, ...], int, str], None]))
+static_assert(is_assignable_to(IntegerStringSuffix, Callable[[*tuple[int, ...], int, str], None]))
+```
+
+Gradual variadic elements remain assignable in both directions.
+
+```py
+type GradualSuffix = Callable[[*tuple[Any, ...], int], None]
+
+static_assert(is_assignable_to(OneOrMoreIntegers, GradualSuffix))
+static_assert(is_assignable_to(GradualSuffix, OneOrMoreIntegers))
+```
+
+Gradual and top callable signatures accept a named positional prefix before an unpacked required
+suffix. Their synthetic keyword parameters do not represent concrete keyword arguments that can
+collide with the prefix.
+
+```py
+def named_prefix_and_suffix(name: int, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+
+static_assert(is_assignable_to(RegularCallableTypeOf[named_prefix_and_suffix], Callable[..., None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[named_prefix_and_suffix], Top[Callable[..., None]]))
+```
+
+A positional parameter cannot also be filled by a target keyword argument.
+
+```py
+def occupies_keyword(a: int, *args: int, **kwargs: int) -> None: ...
+def accepts_keyword(*args: *tuple[*tuple[int, ...], int], **kwargs: int) -> None: ...
+
+type OccupiesKeyword = RegularCallableTypeOf[occupies_keyword]
+type AcceptsKeyword = RegularCallableTypeOf[accepts_keyword]
+
+static_assert(not is_assignable_to(OccupiesKeyword, AcceptsKeyword))
+```
+
+An uninhabited keyword parameter cannot collide with an occupied positional parameter.
+
+```py
+type Bottom = Never
+
+def rejects_keywords(*args: *tuple[*tuple[int, ...], int], **kwargs: Bottom) -> None: ...
+def rejects_named_keyword(*args: *tuple[*tuple[int, ...], int], a: Never = cast(Never, 0)) -> None: ...
+
+static_assert(is_assignable_to(OccupiesKeyword, RegularCallableTypeOf[rejects_keywords]))
+static_assert(is_assignable_to(OccupiesKeyword, RegularCallableTypeOf[rejects_named_keyword]))
+```
+
+A suffix cannot be extended with elements that the source variadic parameter rejects.
+
+```py
+# error: [invalid-assignment]
+incompatible_suffix: Callable[[*tuple[int, ...], str, str], None] = requires_string_after_integers
+```
+
+### Gradual keyword collisions with unpacked positional parameters
+
+A gradual keyword type can materialize to `Never`, eliminating an otherwise possible collision.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
+
+def source(a: int, *args: *tuple[*tuple[int, ...], int], **kwargs: int) -> None: ...
+def target(x: int, /, *args: *tuple[*tuple[int, ...], int], **kwargs: Any) -> None: ...
+
+static_assert(is_assignable_to(RegularCallableTypeOf[source], RegularCallableTypeOf[target]))
+```
+
+A gradual source tail does not remove a real named prefix or permit a duplicate argument.
+
+```py
+def gradual_source(a: int, *args: Any, **kwargs: Any) -> None: ...
+def concrete_target(x: int, /, *args: *tuple[*tuple[int, ...], int], **kwargs: int) -> None: ...
+
+static_assert(not is_assignable_to(RegularCallableTypeOf[gradual_source], RegularCallableTypeOf[concrete_target]))
+```
+
+### Fixed-length unpacked positional parameters
+
+An unpacked fixed-length tuple accepts exactly its declared positional arguments, including when the
+tuple is empty. Equivalent unpacked source and target tuples are compatible.
+
+```py
+from typing import Callable, Unpack
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
+
+def accepts_no_arguments(*args: Unpack[tuple[()]]) -> None: ...
+def accepts_one_integer(*args: Unpack[tuple[int]]) -> None: ...
+def accepts_strings(*args: str) -> None: ...
+
+empty_callback: Callable[[Unpack[tuple[()]]], None] = accepts_no_arguments
+fixed_callback: Callable[[Unpack[tuple[int]]], None] = accepts_one_integer
+fixed_strings: Callable[[Unpack[tuple[str, str]]], None] = accepts_strings
+empty_strings: Callable[[Unpack[tuple[()]]], None] = accepts_strings
+
+static_assert(is_assignable_to(RegularCallableTypeOf[accepts_no_arguments], Callable[[Unpack[tuple[()]]], None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[accepts_one_integer], Callable[[Unpack[tuple[int]]], None]))
+```
+
+Empty and exhausted fixed-length source tuples cannot satisfy a target with additional positional
+arguments or an open-ended variadic parameter.
+
+```py
+# error: [invalid-assignment]
+empty_with_prefix: Callable[[int, Unpack[tuple[str, ...]], None], None] = accepts_no_arguments
+
+# error: [invalid-assignment]
+empty_with_suffix: Callable[[Unpack[tuple[str, ...]], None], None] = accepts_no_arguments
+
+# error: [invalid-assignment]
+exhausted_with_suffix: Callable[[int, Unpack[tuple[str, ...]], None], None] = accepts_one_integer
+
+# error: [invalid-assignment]
+callback: Callable[[Unpack[tuple[tuple[int], ...]], tuple[int]], None] = accepts_one_integer
+
+static_assert(
+    not is_assignable_to(
+        RegularCallableTypeOf[accepts_one_integer],
+        Callable[[Unpack[tuple[tuple[int], ...]], tuple[int]], None],
+    )
+)
 ```
 
 ### Function types
@@ -1076,11 +1733,38 @@ c: Callable[[Any], str] = A().f
 c: Callable[[Any], str] = A().g
 ```
 
+### Generic method types with gradual class return types
+
+A generic receiver makes signature comparison lazy without changing whether gradual class types are
+assignable.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable
+from ty_extensions._internal import Unknown
+
+class C:
+    def concrete[T](self: T) -> type[int]:
+        return int
+
+    def gradual[T](self: T) -> type[Any]:
+        return int
+
+accepts_any: Callable[[], type[Any]] = C().concrete
+accepts_unknown: Callable[[], type[Unknown]] = C().concrete
+accepts_concrete: Callable[[], type[int]] = C().gradual
+```
+
 ### Class literal types
 
 ```py
 from typing import Any, Callable
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 c: Callable[[object], type] = type
 c: Callable[[str], Any] = str
@@ -1171,7 +1855,8 @@ c: Callable[[int], str] = overloaded
 
 ```py
 from typing import Callable, Any
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 class TakesAny:
     def __call__(self, a: Any) -> str:
@@ -1202,7 +1887,8 @@ python-version = "3.12"
 
 ```py
 from typing_extensions import Callable, Any, Generic, TypeVar, ParamSpec
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 T = TypeVar("T")
 P = ParamSpec("P")
@@ -1219,20 +1905,20 @@ class Bar[T, **P]:
 class BarLegacy(Generic[T, P]):
     def __call__(self): ...
 
-static_assert(is_assignable_to(Foo, Callable[..., Any]))
-static_assert(is_assignable_to(FooLegacy, Callable[..., Any]))
-static_assert(is_assignable_to(Bar, Callable[..., Any]))
-static_assert(is_assignable_to(BarLegacy, Callable[..., Any]))
+static_assert(is_assignable_to(Foo, Callable[..., Any]))  # error: [missing-type-argument]
+static_assert(is_assignable_to(FooLegacy, Callable[..., Any]))  # error: [missing-type-argument]
+static_assert(is_assignable_to(Bar, Callable[..., Any]))  # error: [missing-type-argument]
+static_assert(is_assignable_to(BarLegacy, Callable[..., Any]))  # error: [missing-type-argument]
 
 class Spam[T]: ...
 class SpamLegacy(Generic[T]): ...
 class Eggs[T, **P]: ...
 class EggsLegacy(Generic[T, P]): ...
 
-static_assert(not is_assignable_to(Spam, Callable[..., Any]))
-static_assert(not is_assignable_to(SpamLegacy, Callable[..., Any]))
-static_assert(not is_assignable_to(Eggs, Callable[..., Any]))
-static_assert(not is_assignable_to(EggsLegacy, Callable[..., Any]))
+static_assert(not is_assignable_to(Spam, Callable[..., Any]))  # error: [missing-type-argument]
+static_assert(not is_assignable_to(SpamLegacy, Callable[..., Any]))  # error: [missing-type-argument]
+static_assert(not is_assignable_to(Eggs, Callable[..., Any]))  # error: [missing-type-argument]
+static_assert(not is_assignable_to(EggsLegacy, Callable[..., Any]))  # error: [missing-type-argument]
 ```
 
 ### Classes with `__call__` as attribute
@@ -1244,7 +1930,8 @@ callable `__call__` attribute.
 from __future__ import annotations
 
 from typing import Callable
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 def call_impl(a: A, x: int) -> str:
     return ""
@@ -1263,7 +1950,8 @@ reveal_type(A()(1))  # revealed: str
 
 ```py
 from typing import Callable
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 class A:
     def __init__(self, x: int) -> None: ...
@@ -1283,7 +1971,8 @@ static_assert(not is_assignable_to(type[B], Callable[[int], B]))
 
 ```py
 from typing import Callable, Any
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 static_assert(is_assignable_to(type, Callable[..., Any]))
 ```
@@ -1296,23 +1985,118 @@ specializations. That means that a generic callable is assignable to any particu
 the generic callable.)
 
 ```py
-from typing import Callable
-from ty_extensions import CallableTypeOf, TypeOf, is_assignable_to, static_assert
+from typing import Callable, Self
+from ty_extensions import static_assert
+from ty_extensions._internal import (
+    ConstraintSet,
+    RegularCallableTypeOf,
+    TypeOf,
+    is_assignable_to,
+    is_constraint_set_assignable_to,
+)
 
 def identity[T](t: T) -> T:
     return t
 
 static_assert(is_assignable_to(TypeOf[identity], Callable[[int], int]))
 static_assert(is_assignable_to(TypeOf[identity], Callable[[str], str]))
-# TODO: no error
+# TODO: This should not be assignable. A generic callable must use one coherent specialization.
 # error: [static-assert-error]
 static_assert(not is_assignable_to(TypeOf[identity], Callable[[str], int]))
 
-static_assert(is_assignable_to(CallableTypeOf[identity], Callable[[int], int]))
-static_assert(is_assignable_to(CallableTypeOf[identity], Callable[[str], str]))
-# TODO: no error
+static_assert(is_assignable_to(RegularCallableTypeOf[identity], Callable[[int], int]))
+static_assert(is_assignable_to(RegularCallableTypeOf[identity], Callable[[str], str]))
 # error: [static-assert-error]
-static_assert(not is_assignable_to(CallableTypeOf[identity], Callable[[str], int]))
+static_assert(not is_assignable_to(RegularCallableTypeOf[identity], Callable[[str], int]))
+
+def bounded[T_bound: object](t: T_bound) -> T_bound:
+    return t
+
+static_assert(is_assignable_to(TypeOf[bounded], Callable[[str], str]))
+# error: [static-assert-error]
+static_assert(not is_assignable_to(TypeOf[bounded], Callable[[str], int]))
+
+static_assert(is_assignable_to(RegularCallableTypeOf[bounded], Callable[[str], str]))
+# error: [static-assert-error]
+static_assert(not is_assignable_to(RegularCallableTypeOf[bounded], Callable[[str], int]))
+
+def constrained[T_constrained: (str, bytes)](t: T_constrained) -> T_constrained:
+    return t
+
+static_assert(is_assignable_to(TypeOf[constrained], Callable[[str], str]))
+static_assert(is_assignable_to(TypeOf[constrained], Callable[[bytes], bytes]))
+# error: [static-assert-error]
+static_assert(not is_assignable_to(TypeOf[constrained], Callable[[str], int]))
+
+static_assert(is_assignable_to(RegularCallableTypeOf[constrained], Callable[[str], str]))
+static_assert(is_assignable_to(RegularCallableTypeOf[constrained], Callable[[bytes], bytes]))
+# error: [static-assert-error]
+static_assert(not is_assignable_to(RegularCallableTypeOf[constrained], Callable[[str], int]))
+
+# This exercises the case where a method's inferable set includes an outer class typevar in
+# addition to the typevars directly bound by the method's own generic context.
+class MethodCarrier[A_method]:
+    def method[T_method: str](self: "MethodCarrier[A_method]", t: T_method) -> tuple[A_method, T_method]:
+        raise NotImplementedError
+
+static_assert(
+    is_assignable_to(
+        TypeOf[MethodCarrier.method],
+        Callable[[MethodCarrier[int], str], tuple[int, str]],
+    )
+)
+static_assert(
+    is_assignable_to(
+        RegularCallableTypeOf[MethodCarrier.method],
+        Callable[[MethodCarrier[int], str], tuple[int, str]],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        TypeOf[MethodCarrier.method],
+        Callable[[MethodCarrier[int], int], tuple[int, int]],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        RegularCallableTypeOf[MethodCarrier.method],
+        Callable[[MethodCarrier[int], int], tuple[int, int]],
+    )
+)
+
+class SelfCarrier[A_self]:
+    def method[T_self: str](self: Self, t: T_self) -> tuple[A_self, T_self]:
+        raise NotImplementedError
+
+# TODO: This should be assignable. The unbound method type currently loses the outer class type
+# argument carried through `Self`, so the return type degrades to `tuple[Unknown, T_self]` before
+# the generic-callable assignability logic runs.
+static_assert(
+    is_assignable_to(
+        TypeOf[SelfCarrier.method],
+        Callable[[SelfCarrier[int], str], tuple[int, str]],
+    )
+)
+static_assert(
+    is_assignable_to(
+        RegularCallableTypeOf[SelfCarrier.method],
+        Callable[[SelfCarrier[int], str], tuple[int, str]],
+    )
+)
+```
+
+A constraint-producing comparison must keep an enclosing class variable symbolic while solving the
+surrounding callable's return variable:
+
+```py
+class OuterCarrier[A_outer]:
+    def method(self) -> A_outer:
+        raise NotImplementedError
+
+    def check[R](self) -> None:
+        actual = is_constraint_set_assignable_to(RegularCallableTypeOf[OuterCarrier[A_outer].method], Callable[..., R])
+        expected = ConstraintSet.lower_bound(A_outer, R)
+        static_assert(actual == expected)
 ```
 
 The reverse is not true — if someone expects a generic function that can be called with any
@@ -1323,9 +2107,9 @@ static_assert(not is_assignable_to(Callable[[int], int], TypeOf[identity]))
 static_assert(not is_assignable_to(Callable[[str], str], TypeOf[identity]))
 static_assert(not is_assignable_to(Callable[[str], int], TypeOf[identity]))
 
-static_assert(not is_assignable_to(Callable[[int], int], CallableTypeOf[identity]))
-static_assert(not is_assignable_to(Callable[[str], str], CallableTypeOf[identity]))
-static_assert(not is_assignable_to(Callable[[str], int], CallableTypeOf[identity]))
+static_assert(not is_assignable_to(Callable[[int], int], RegularCallableTypeOf[identity]))
+static_assert(not is_assignable_to(Callable[[str], str], RegularCallableTypeOf[identity]))
+static_assert(not is_assignable_to(Callable[[str], int], RegularCallableTypeOf[identity]))
 ```
 
 ## Generics
@@ -1339,7 +2123,7 @@ This might appear to be the same principle as the "gradual equivalence" relation
 different. Two gradual types can be said to be "gradually equivalent" iff they have exactly the same
 sets of possible materializations -- if they represent the same sets of possible types (the same
 sets of sets of possible runtime objects). By this principle `int | Any` is gradually equivalent to
-`Unknown | int`, since they have exactly the same sets of posisble materializations. But
+`Unknown | int`, since they have exactly the same sets of possible materializations. But
 `bool | Any` is not equivalent to `int`, since there are many possible materializations of
 `bool | Any` that are not assignable to `int`. It is therefore _not_ necessary for `X` to be
 gradually equivalent to `Y` in order for `Foo[X]` to be assignable to `Foo[Y]`; it is _only_
@@ -1347,7 +2131,8 @@ necessary for `X` and `Y` to be mutually assignable.
 
 ```py
 from typing import Any, TypeVar, Generic
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 InvariantTypeVar = TypeVar("InvariantTypeVar")
 
@@ -1388,13 +2173,14 @@ def g3(obj: Foo[tuple[A]]):
 
 ```py
 from typing import final
-from ty_extensions import static_assert, is_assignable_to, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to
 
 class GenericClass[T]:
     x: T  # invariant
 
-static_assert(is_assignable_to(TypeOf[GenericClass], type[GenericClass]))
-static_assert(is_assignable_to(TypeOf[GenericClass[int]], type[GenericClass]))
+static_assert(is_assignable_to(TypeOf[GenericClass], type[GenericClass]))  # error: [missing-type-argument]
+static_assert(is_assignable_to(TypeOf[GenericClass[int]], type[GenericClass]))  # error: [missing-type-argument]
 static_assert(is_assignable_to(TypeOf[GenericClass], type[GenericClass[int]]))
 static_assert(is_assignable_to(TypeOf[GenericClass[int]], type[GenericClass[int]]))
 static_assert(not is_assignable_to(TypeOf[GenericClass[str]], type[GenericClass[int]]))
@@ -1402,8 +2188,8 @@ static_assert(not is_assignable_to(TypeOf[GenericClass[str]], type[GenericClass[
 class GenericClassIntBound[T: int]:
     x: T  # invariant
 
-static_assert(is_assignable_to(TypeOf[GenericClassIntBound], type[GenericClassIntBound]))
-static_assert(is_assignable_to(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound]))
+static_assert(is_assignable_to(TypeOf[GenericClassIntBound], type[GenericClassIntBound]))  # error: [missing-type-argument]
+static_assert(is_assignable_to(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound]))  # error: [missing-type-argument]
 static_assert(is_assignable_to(TypeOf[GenericClassIntBound], type[GenericClassIntBound[int]]))
 static_assert(is_assignable_to(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
 
@@ -1411,8 +2197,8 @@ static_assert(is_assignable_to(TypeOf[GenericClassIntBound[int]], type[GenericCl
 class GenericFinalClass[T]:
     x: T  # invariant
 
-static_assert(is_assignable_to(TypeOf[GenericFinalClass], type[GenericFinalClass]))
-static_assert(is_assignable_to(TypeOf[GenericFinalClass[int]], type[GenericFinalClass]))
+static_assert(is_assignable_to(TypeOf[GenericFinalClass], type[GenericFinalClass]))  # error: [missing-type-argument]
+static_assert(is_assignable_to(TypeOf[GenericFinalClass[int]], type[GenericFinalClass]))  # error: [missing-type-argument]
 static_assert(is_assignable_to(TypeOf[GenericFinalClass], type[GenericFinalClass[int]]))
 static_assert(is_assignable_to(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[int]]))
 static_assert(not is_assignable_to(TypeOf[GenericFinalClass[str]], type[GenericFinalClass[int]]))
@@ -1423,7 +2209,8 @@ static_assert(not is_assignable_to(TypeOf[GenericFinalClass[str]], type[GenericF
 `TypeGuard[...]` and `TypeIs[...]` are always assignable to `bool`.
 
 ```py
-from ty_extensions import Unknown, is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to
 from typing_extensions import Any, TypeGuard, TypeIs
 
 static_assert(is_assignable_to(TypeGuard[Unknown], bool))
@@ -1433,10 +2220,49 @@ static_assert(not is_assignable_to(TypeGuard[Unknown], str))
 static_assert(not is_assignable_to(TypeIs[Any], str))
 ```
 
+## `TypeIs` with gradual types
+
+`TypeIs` is invariant in its declared type. But gradual types are assignable to and from any type,
+so `TypeIs` annotations that differ only by `Any` are still compatible:
+
+```py
+from collections.abc import Sequence
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+from typing_extensions import Any, TypeIs
+
+static_assert(is_assignable_to(TypeIs[Sequence[int]], TypeIs[Sequence[Any]]))
+static_assert(is_assignable_to(TypeIs[Sequence[Any]], TypeIs[Sequence[int]]))
+static_assert(not is_assignable_to(TypeIs[Sequence[int]], TypeIs[Sequence[object]]))
+```
+
+## `callable` as a `TypeIs` predicate
+
+The runtime predicate type and the declared `TypeIs` type are related but distinct. The builtin
+`callable` predicate can be used where a predicate for `Callable[..., Any]` is expected:
+
+```py
+from collections.abc import Callable
+from typing import Any
+from typing_extensions import TypeIs
+
+Plugin = Callable[..., Any]
+IsPlugin = Callable[[object], TypeIs[Plugin]]
+
+def accepts_plugin_predicate(plugin_type: IsPlugin = callable) -> None:
+    pass
+
+def takes_plugin_predicate(plugin_type: IsPlugin) -> None:
+    pass
+
+takes_plugin_predicate(callable)
+```
+
 ## `ParamSpec`
 
 ```py
-from ty_extensions import TypeOf, static_assert, is_assignable_to, Unknown
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, TypeOf, is_assignable_to
 from typing import ParamSpec, Mapping, Callable, Any
 
 P = ParamSpec("P")
@@ -1463,6 +2289,214 @@ def f(func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
     static_assert(not is_assignable_to(dict[str, Any], TypeOf[kwargs]))
     static_assert(not is_assignable_to(dict[str, object], TypeOf[kwargs]))
     static_assert(not is_assignable_to(dict[str, Unknown], TypeOf[kwargs]))
+```
+
+## `Concatenate`
+
+### Self-assignability
+
+A `Callable` with `Concatenate` should be assignable to itself.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+from typing import Callable, Concatenate
+
+static_assert(is_assignable_to(Callable[Concatenate[int, ...], None], Callable[Concatenate[int, ...], None]))
+static_assert(is_assignable_to(Callable[Concatenate[int, str, ...], None], Callable[Concatenate[int, str, ...], None]))
+```
+
+### Assignable to gradual callable
+
+A callable with `Concatenate` parameters should be assignable to the gradual callable form, since
+the gradual form is consistent with any input signature.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+from typing import Callable, Concatenate
+
+static_assert(is_assignable_to(Callable[Concatenate[int, ...], None], Callable[..., None]))
+static_assert(is_assignable_to(Callable[Concatenate[int, str, ...], None], Callable[..., None]))
+```
+
+And the gradual callable should also be assignable to one with `Concatenate` parameters.
+
+```py
+static_assert(is_assignable_to(Callable[..., None], Callable[Concatenate[int, ...], None]))
+static_assert(is_assignable_to(Callable[..., None], Callable[Concatenate[int, str, ...], None]))
+```
+
+### Assignable from bottom callable
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
+from typing import Callable, Concatenate, Never
+
+def bottom(*args: object, **kwargs: object) -> Never:
+    raise NotImplementedError
+
+static_assert(is_assignable_to(RegularCallableTypeOf[bottom], Callable[Concatenate[int, ...], None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[bottom], Callable[Concatenate[int, str, ...], None]))
+
+static_assert(not is_assignable_to(Callable[Concatenate[int, ...], None], RegularCallableTypeOf[bottom]))
+static_assert(not is_assignable_to(Callable[Concatenate[int, str, ...], None], RegularCallableTypeOf[bottom]))
+```
+
+### Contravariance of parameters
+
+Callable parameters are contravariant: a callable accepting a wider type (`A`) is assignable to one
+expecting a narrower type (`B`), because any call valid for `B` is also valid for `A`.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+from typing import Callable, Concatenate
+
+class Parent: ...
+class Child(Parent): ...
+
+static_assert(is_assignable_to(Callable[Concatenate[Parent, ...], None], Callable[Concatenate[Child, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[Child, ...], None], Callable[Concatenate[Parent, ...], None]))
+```
+
+### Different parameter types
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+from typing import Callable, Concatenate, final
+
+class A: ...
+class B: ...
+
+static_assert(not is_assignable_to(Callable[Concatenate[A, ...], None], Callable[Concatenate[B, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[B, ...], None], Callable[Concatenate[A, ...], None]))
+```
+
+### Different number of prepended parameters
+
+Callables with different numbers of prepended parameters should be assignable.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+from typing import Callable, Concatenate
+
+static_assert(is_assignable_to(Callable[Concatenate[int, ...], None], Callable[Concatenate[int, str, ...], None]))
+static_assert(is_assignable_to(Callable[Concatenate[int, str, ...], None], Callable[Concatenate[int, ...], None]))
+```
+
+### `Concatenate` with ellipsis vs explicit parameter list
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+from typing import Callable, Concatenate
+
+static_assert(is_assignable_to(Callable[Concatenate[int, ...], None], Callable[[int], None]))
+static_assert(is_assignable_to(Callable[[int], None], Callable[Concatenate[int, ...], None]))
+
+static_assert(is_assignable_to(Callable[Concatenate[int, ...], None], Callable[[int, str], None]))
+static_assert(is_assignable_to(Callable[[int, str], None], Callable[Concatenate[int, ...], None]))
+```
+
+### `Concatenate` with `ParamSpec`
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+from typing import Callable, Concatenate
+
+class A: ...
+
+def with_paramspec[**P](_: Callable[P, None]):
+    static_assert(is_assignable_to(Callable[Concatenate[int, P], None], Callable[..., None]))
+    static_assert(is_assignable_to(Callable[..., None], Callable[Concatenate[int, P], None]))
+```
+
+### Gradual `Concatenate` with regular function
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
+from typing import Callable, Concatenate
+
+class A: ...
+class B: ...
+class C: ...
+```
+
+A `Concatenate` form that ends with `...` means that all of the parameters before `...` are
+positional-only.
+
+```py
+def positional_only(a: A, b: B, /) -> None: ...
+def with_default(a: A, b: B = B(), /) -> None: ...
+
+static_assert(is_assignable_to(RegularCallableTypeOf[positional_only], Callable[Concatenate[A, ...], None]))
+static_assert(is_assignable_to(Callable[Concatenate[A, ...], None], RegularCallableTypeOf[positional_only]))
+
+static_assert(is_assignable_to(RegularCallableTypeOf[positional_only], Callable[Concatenate[A, B, ...], None]))
+static_assert(is_assignable_to(Callable[Concatenate[A, B, ...], None], RegularCallableTypeOf[positional_only]))
+
+# Concatenate has an additional required positional-only parameter which isn't present in the
+# function definition, so they aren't assignable.
+static_assert(not is_assignable_to(RegularCallableTypeOf[positional_only], Callable[Concatenate[A, B, C, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, B, C, ...], None], RegularCallableTypeOf[positional_only]))
+
+static_assert(is_assignable_to(RegularCallableTypeOf[with_default], Callable[Concatenate[A, ...], None]))
+static_assert(is_assignable_to(Callable[Concatenate[A, ...], None], RegularCallableTypeOf[with_default]))
+
+# For an optional parameter (with default value), it is assignable to a non-optional parameter, but
+# the reverse is not true.
+static_assert(is_assignable_to(RegularCallableTypeOf[with_default], Callable[Concatenate[A, B, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, B, ...], None], RegularCallableTypeOf[with_default]))
+```
+
+But, a regular callable can contain a positional-or-keyword parameter which is sometimes compatible
+with the `Concatenate` with gradual form.
+
+```py
+def positional_or_keyword(a: A, b: B) -> None: ...
+
+static_assert(is_assignable_to(RegularCallableTypeOf[positional_or_keyword], Callable[Concatenate[A, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, ...], None], RegularCallableTypeOf[positional_or_keyword]))
+
+static_assert(is_assignable_to(RegularCallableTypeOf[positional_or_keyword], Callable[Concatenate[A, B, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, B, ...], None], RegularCallableTypeOf[positional_or_keyword]))
+```
+
+For variadic parameter, it is assignable only when the type of the variadic parameter is compatible
+with the type of all the prefix parameters in the `Concatenate` form.
+
+```py
+def variadic_a(*args: A) -> None: ...
+def variadic_b(*args: B) -> None: ...
+
+static_assert(is_assignable_to(RegularCallableTypeOf[variadic_a], Callable[Concatenate[A, ...], None]))
+static_assert(is_assignable_to(RegularCallableTypeOf[variadic_a], Callable[Concatenate[A, A, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, ...], None], RegularCallableTypeOf[variadic_a]))
+
+static_assert(not is_assignable_to(RegularCallableTypeOf[variadic_a], Callable[Concatenate[A, B, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, B, ...], None], RegularCallableTypeOf[variadic_a]))
+
+static_assert(not is_assignable_to(RegularCallableTypeOf[variadic_b], Callable[Concatenate[A, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, ...], None], RegularCallableTypeOf[variadic_b]))
+```
+
+For all the other parameter kinds, it is not assignable in either direction.
+
+```py
+def keyword_only(*, a: A, b: B) -> None: ...
+def keyword_variadic(**kwargs: A) -> None: ...
+
+static_assert(not is_assignable_to(RegularCallableTypeOf[keyword_only], Callable[Concatenate[A, B, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, B, ...], None], RegularCallableTypeOf[keyword_only]))
+
+static_assert(not is_assignable_to(RegularCallableTypeOf[keyword_variadic], Callable[Concatenate[A, ...], None]))
+static_assert(not is_assignable_to(Callable[Concatenate[A, ...], None], RegularCallableTypeOf[keyword_variadic]))
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

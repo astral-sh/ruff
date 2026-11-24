@@ -31,8 +31,6 @@ fn respect_type_ignore_comments_is_turned_off() -> anyhow::Result<()> {
       |
     2 | y = a + 5  # type: ignore
       |     ^
-      |
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -82,8 +80,6 @@ fn overrides_basic() -> anyhow::Result<()> {
       |
     2 | print(x)  # type: ignore  # ignore not-respected (override)
       |       ^
-      |
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -139,8 +135,6 @@ fn overrides_precedence() -> anyhow::Result<()> {
       |
     2 | print(y)  # type: ignore (should be an error, because type ignores are disabled)
       |       ^
-      |
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -192,21 +186,51 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
       |
     2 | print(y)  # type: ignore ignore not-respected (global)
       |       ^
-      |
-    info: rule `unresolved-reference` is enabled by default
 
     error[unresolved-reference]: Name `y` used when not defined
      --> tests/test_main.py:2:7
       |
     2 | print(y)  # type: ignore ignore respected (inherited from global)
       |       ^
-      |
-    info: rule `unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
     ");
 
+    Ok(())
+}
+
+#[test]
+fn overrides_report_each_invalid_module_glob_once() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "ty.toml",
+            r#"
+            [[overrides]]
+            include = ["*.py"]
+            [overrides.analysis]
+            allowed-unresolved-imports = ["foo**", "bar**"]
+
+            [[overrides]]
+            include = ["main.py"]
+            [overrides.analysis]
+            allowed-unresolved-imports = ["foo**"]
+            "#,
+        ),
+        ("main.py", "pass"),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().args(["--output-format=concise", "main.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    ty.toml:5:31: warning[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `foo**``
+    ty.toml:5:40: warning[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `bar**``
+    ty.toml:10:31: warning[invalid-glob] Invalid glob pattern ``**` can only appear as a complete component (e.g., `foo.**` or `**.bar`), not combined with other text like `foo**``
+    Found 3 diagnostics
+
+    ----- stderr -----
+    ");
     Ok(())
 }

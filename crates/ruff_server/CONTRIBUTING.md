@@ -29,4 +29,9 @@ If you want to test any changes you've made to `ruff server`, you can simply mod
 
 #### Testing In VS Code
 
-At the moment, the [pre-release version](https://github.com/astral-sh/ruff-vscode/tree/pre-release) of Ruff's new VS Code extension only has the option to use the bundled Ruff binary. Configuration to use a custom Ruff executable path will be ready soon.
+You can use a local build of Ruff in VS Code by setting the `Ruff: Path` user preference (or `ruff.path` in your JSON config)
+to the full path to your Ruff binary, like `<path to your ruff source>/target/debug/ruff`. Once you save your user preferences,
+the VS Code extension should automatically reload its server with the new binary.
+
+If you make changes to Ruff during development, you will need to rebuild your binary with `cargo build -p ruff`, and then execute
+the `Ruff: Restart Server` action to pick up any changes.

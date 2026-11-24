@@ -120,4 +120,3 @@ Module(
 1 | a: type X = int
 2 | lambda: type X = int
   |              ^ Syntax Error: Simple statements must be separated by newlines or semicolons
-  |

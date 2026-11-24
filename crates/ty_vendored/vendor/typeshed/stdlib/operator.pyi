@@ -208,6 +208,7 @@ class attrgetter(Generic[_T_co]):
     def __new__(cls, attr: str, attr2: str, attr3: str, attr4: str, /) -> attrgetter[tuple[Any, Any, Any, Any]]: ...
     @overload
     def __new__(cls, attr: str, /, *attrs: str) -> attrgetter[tuple[Any, ...]]: ...
+
     def __call__(self, obj: Any, /) -> _T_co:
         """Call self as a function."""
 
@@ -222,6 +223,7 @@ class itemgetter(Generic[_T_co]):
     def __new__(cls, item: _T, /) -> itemgetter[_T]: ...
     @overload
     def __new__(cls, item1: _T1, item2: _T2, /, *items: Unpack[_Ts]) -> itemgetter[tuple[_T1, _T2, Unpack[_Ts]]]: ...
+
     # __key: _KT_contra in SupportsGetItem seems to be causing variance issues, ie:
     # TypeVar "_KT_contra@SupportsGetItem" is contravariant
     #   "tuple[int, int]" is incompatible with protocol "SupportsIndex"

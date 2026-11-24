@@ -223,7 +223,7 @@ class NotBoolable:
 # TODO: This should emit an error that `NotBoolable` can't be converted to a bool but it currently doesn't
 #   because `Never` is assignable to `bool`. This probably requires dead code analysis to fix.
 if NotBoolable():
-    ...
+    pass
 ```
 
 ## Not callable `__bool__`
@@ -234,7 +234,7 @@ class NotBoolable:
 
 # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `NotBoolable`"
 if NotBoolable():
-    ...
+    pass
 ```
 
 ## Not-boolable union
@@ -246,19 +246,56 @@ def test(cond: bool):
 
     # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `NotBoolable`"
     if NotBoolable():
-        ...
+        pass
 ```
 
 ## Union with some variants implementing `__bool__` incorrectly
 
 ```py
-def test(cond: bool):
-    class NotBoolable:
-        __bool__: None = None
+from typing import Literal
 
-    a = 10 if cond else NotBoolable()
+class NotBoolable:
+    __bool__: None = None
 
+def test(a: Literal[10] | NotBoolable):
     # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `Literal[10] | NotBoolable`"
     if a:
-        ...
+        pass
+```
+
+## Uninhabited operands
+
+An operand of type `Never` cannot produce a value. Later operands contribute no result, but earlier
+operands can still produce a result by short-circuiting before reaching it.
+
+```py
+from typing_extensions import Never
+
+def _(value: Never):
+    reveal_type(value and True)  # revealed: Never
+
+def _(value: Never):
+    reveal_type(value or False)  # revealed: Never
+
+def _(value: Never):
+    reveal_type(True and value)  # revealed: Never
+
+def _(value: Never):
+    reveal_type(False or value)  # revealed: Never
+
+def _(value: Never):
+    reveal_type(False and value)  # revealed: Literal[False]
+    reveal_type(True or value)  # revealed: Literal[True]
+
+def _(value: Never, flag: bool):
+    reveal_type(flag and value)  # revealed: Literal[False]
+
+def _(value: Never, flag: bool):
+    reveal_type(flag or value)  # revealed: Literal[True]
+
+def _(value: Never, flag: bool):
+    reveal_type(flag and value and 1)  # revealed: Literal[False]
+
+def _(value: Never, flag: bool):
+    reveal_type(flag or value or 1)  # revealed: Literal[True]
 ```

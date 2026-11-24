@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad_start;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -41,7 +42,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: String and Bytes literals](https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.85")]
+#[violation_metadata(stable_since = "v0.0.85", category = Category::Correctness)]
 pub(crate) struct InvalidEscapeSequence {
     ch: char,
     fix_title: FixTitle,
@@ -67,25 +68,34 @@ pub(crate) fn invalid_escape_sequence(checker: &Checker, string_like: StringLike
     let locator = checker.locator();
 
     for part in string_like.parts() {
-        if part.flags().is_raw_string() {
+        let flags = part.flags();
+        if flags.is_raw_string() {
             continue;
         }
         let state = match part {
-            StringLikePart::String(_) | StringLikePart::Bytes(_) => {
-                analyze_escape_chars(locator, part.range(), part.flags())
+            // The parser accepts unknown escapes like `\q` and preserves their backslash.
+            // If a successfully decoded value has no backslash, its source had no unknown escapes.
+            StringLikePart::String(literal)
+                if !literal.flags.is_invalid() && !literal.value.as_bytes().contains(&b'\\') =>
+            {
+                continue;
             }
-            StringLikePart::FString(f_string) => analyze_escape_chars_in_interpolated_string(
-                AnyStringFlags::from(f_string.flags),
-                &f_string.elements,
-                locator,
-            ),
-            StringLikePart::TString(t_string) => analyze_escape_chars_in_interpolated_string(
-                AnyStringFlags::from(t_string.flags),
-                &t_string.elements,
-                locator,
-            ),
+            StringLikePart::Bytes(literal)
+                if !literal.flags.is_invalid() && !literal.value.contains(&b'\\') =>
+            {
+                continue;
+            }
+            StringLikePart::String(_) | StringLikePart::Bytes(_) => {
+                analyze_escape_chars(locator, part.range(), flags)
+            }
+            StringLikePart::FString(f_string) => {
+                analyze_escape_chars_in_interpolated_string(flags, &f_string.elements, locator)
+            }
+            StringLikePart::TString(t_string) => {
+                analyze_escape_chars_in_interpolated_string(flags, &t_string.elements, locator)
+            }
         };
-        check(checker, locator, part.start(), part.flags(), state);
+        check(checker, locator, part.start(), flags, state);
     }
 }
 
@@ -167,32 +177,32 @@ fn analyze_escape_chars(
 
         // If the next character is a valid escape sequence, skip.
         // See: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals.
+        //
+        // N.B. 'N', 'u' and 'U' are escape sequences only recognized in string literals
         if matches!(
             next_char,
-            '\n'
-            | '\\'
-            | '\''
-            | '"'
-            | 'a'
-            | 'b'
-            | 'f'
-            | 'n'
-            | 'r'
-            | 't'
-            | 'v'
-            | '0'
-            | '1'
-            | '2'
-            | '3'
-            | '4'
-            | '5'
-            | '6'
-            | '7'
-            | 'x'
-            // Escape sequences only recognized in string literals
-            | 'N'
-            | 'u'
-            | 'U'
+            '\n' | '\\'
+                | '\''
+                | '"'
+                | 'a'
+                | 'b'
+                | 'f'
+                | 'n'
+                | 'r'
+                | 't'
+                | 'v'
+                | '0'
+                | '1'
+                | '2'
+                | '3'
+                | '4'
+                | '5'
+                | '6'
+                | '7'
+                | 'x'
+                | 'N'
+                | 'u'
+                | 'U'
         ) {
             contains_valid_escape_sequence = true;
             continue;

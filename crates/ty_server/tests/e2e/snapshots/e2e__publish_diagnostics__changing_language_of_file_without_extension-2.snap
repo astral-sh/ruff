@@ -14,8 +14,6 @@ PublishDiagnosticsParams {
         query: None,
         fragment: None,
     },
+    version: None,
     diagnostics: [],
-    version: Some(
-        1,
-    ),
 }

@@ -117,3 +117,43 @@ from typing_extensions import get_type_hints
 from typing_extensions import is_typeddict
 # https://github.com/astral-sh/ruff/pull/15800#pullrequestreview-2580704217
 from typing_extensions import TypedDict
+
+# UP035 on py37+ only
+from typing.io import BinaryIO
+
+# UP035 on py37+ only
+from typing.io import IO
+
+# UP035 on py37+ only
+from typing.io import TextIO
+
+# UP035 on py37+ only
+from typing.re import Match
+
+# UP035 on py37+ only
+from typing.re import Pattern
+
+# `no_type_check_decorator` was removed from `typing` in Python 3.15.
+from typing_extensions import no_type_check_decorator
+from typing_extensions import no_type_check, no_type_check_decorator
+
+# UP035 (unsafe fix: the import contains comments)
+from typing import (  # noqa: F401
+    Awaitable as Awaitable,
+)
+
+# UP035 (unsafe fix: the import contains comments)
+from typing import (
+    Awaitable,  # keep me
+    Callable,
+)
+
+# UP035 (unsafe fix: the import contains comments)
+from typing import (
+    # keep me
+    Awaitable,
+    cast,
+)
+
+# UP035 (safe fix: the comment is outside of the import)
+from typing import Awaitable  # keep me

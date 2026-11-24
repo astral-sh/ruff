@@ -1,0 +1,260 @@
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{
+    ExprName, PySourceType, PythonVersion, Stmt, StmtImport, StmtImportFrom, helpers,
+    token::{TokenKind, Tokens},
+};
+use ruff_python_semantic::{GeneratorKind, ScopeKind, SemanticModel};
+use ruff_text_size::{Ranged, TextRange};
+
+use crate::checkers::ast::Checker;
+use crate::codes::Category;
+use crate::rules::flake8_tidy_imports::rules::BannedModuleImportPolicies;
+use crate::{Edit, Fix, FixAvailability, Violation};
+
+/// ## What it does
+/// Checks for lazy imports that are resolved immediately at module load time.
+///
+/// ## Why is this bad?
+/// Python 3.15 adds support for `lazy import` and `lazy from ... import ...`,
+/// which defer the actual import work until the imported name is first used.
+///
+/// When a lazily imported name is used immediately at module load time, the
+/// import is resolved eagerly, defeating the purpose of marking the import as
+/// lazy. This is commonly caused by using a lazily imported module in a module
+/// global or in a top-level class definition.
+///
+/// The rule also recognizes imports made lazy by a literal `__lazy_modules__`
+/// declaration, even when the target version is older than Python 3.15.
+/// Such imports remain eager on older Python versions. Dynamic assignments
+/// to `__lazy_modules__` (e.g. `__lazy_modules__ = non_literal()`) are ignored,
+/// as their effects cannot be determined statically.
+///
+/// ## Example
+/// ```python
+/// lazy import foo
+///
+///
+/// class Bar(foo.Foo): ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import foo
+///
+///
+/// class Bar(foo.Foo): ...
+/// ```
+///
+/// ## Known problems
+/// Ruff does not detect all cases where decorators evaluate annotations. For
+/// example, `@dataclasses.dataclass` can immediately resolve lazy imports used in
+/// field annotations without triggering this rule.
+///
+/// ## Fix availability
+/// The fix is only available when the lazy import statement imports a single
+/// member, since removing `lazy` from a multi-member import would make every
+/// imported member eager, including names that may not be resolved immediately.
+/// Fixes are unavailable for imports governed by a `__lazy_modules__` declaration.
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe because converting a lazy import to an
+/// eager import changes when the imported module is executed, which can change
+/// runtime behavior if the module has import-time side effects.
+///
+/// ## Options
+///
+/// The rule ignores imports required to be lazy by the following setting:
+///
+/// - [`lint.flake8-tidy-imports.require-lazy`]
+#[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.17.0", category = Category::Correctness)]
+pub(crate) struct LazyImportImmediatelyResolved {
+    name: String,
+    fixable: bool,
+}
+
+impl Violation for LazyImportImmediatelyResolved {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let LazyImportImmediatelyResolved { name, fixable: _ } = self;
+        format!("Lazy import `{name}` is resolved immediately")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        self.fixable
+            .then(|| "Convert to an eager import".to_string())
+    }
+}
+
+/// TID255
+/// Check whether a name load forces a lazy import during module import execution.
+pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: &ExprName) {
+    let semantic = checker.semantic();
+
+    if !is_immediate_resolution_context(semantic, checker.source_type) {
+        return;
+    }
+
+    let Some(binding_id) = semantic.resolve_name(name) else {
+        return;
+    };
+
+    let binding = semantic.binding(binding_id);
+    if !binding.is_lazy() {
+        return;
+    }
+    let Some(import) = binding.statement(semantic) else {
+        return;
+    };
+    if checker.target_version() < PythonVersion::PY315
+        && matches!(
+            import,
+            Stmt::Import(StmtImport { is_lazy: true, .. })
+                | Stmt::ImportFrom(StmtImportFrom { is_lazy: true, .. })
+        )
+    {
+        return;
+    }
+
+    // Ignore imports that are required to be lazy.
+    let require_lazy = &checker.settings().flake8_tidy_imports.require_lazy;
+    for (policy, node) in &BannedModuleImportPolicies::new(import, checker) {
+        // An `all` selector matches a `from` import's module, not its individual members.
+        if require_lazy.includes_all() && import.is_import_from_stmt() && node.is_alias() {
+            break;
+        }
+
+        if node.range().contains_range(binding.range()) && require_lazy.find(&policy).is_some() {
+            return;
+        }
+    }
+
+    let fix_range = if is_single_member_import(import) && semantic.lazy_modules.is_none() {
+        lazy_import_prefix_range(import, checker.source_tokens())
+    } else {
+        None
+    };
+
+    let mut diagnostic = checker.report_diagnostic(
+        LazyImportImmediatelyResolved {
+            name: name.id.to_string(),
+            fixable: fix_range.is_some(),
+        },
+        name.range(),
+    );
+    if let Some(fix_range) = fix_range {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(fix_range)));
+    }
+}
+
+/// Return `true` if changing `lazy` affects only one imported name.
+fn is_single_member_import(stmt: &Stmt) -> bool {
+    match stmt {
+        Stmt::Import(StmtImport { names, .. }) | Stmt::ImportFrom(StmtImportFrom { names, .. }) => {
+            names.len() == 1
+        }
+        _ => false,
+    }
+}
+
+/// Return the range from `lazy` through the whitespace before `import` or `from`.
+fn lazy_import_prefix_range(stmt: &Stmt, source_tokens: &Tokens) -> Option<TextRange> {
+    let mut tokens = source_tokens.after(stmt.start()).iter();
+    let lazy = tokens.find(|token| !token.kind().is_trivia())?;
+    if lazy.kind() != TokenKind::Lazy {
+        return None;
+    }
+
+    let import = tokens.find(|token| !token.kind().is_trivia())?;
+    matches!(import.kind(), TokenKind::Import | TokenKind::From)
+        .then(|| TextRange::new(lazy.start(), import.start()))
+}
+
+/// Return `true` if the current expression is evaluated during module import execution.
+fn is_immediate_resolution_context(semantic: &SemanticModel, source_type: PySourceType) -> bool {
+    if source_type.is_stub()
+        || !semantic.execution_context().is_runtime()
+        || semantic.in_deferred_type_definition()
+        || semantic.in_deferred_type_alias_value()
+    {
+        return false;
+    }
+
+    // Imports can only be lazy on Python 3.15+, where ordinary annotations are deferred, even if an
+    // older target version makes the model treat them as runtime-evaluated. For example, this
+    // import is runtime-evaluated on 3.9 in our semantic model but would be deferred on 3.15, where
+    // `__lazy_modules__` actually has an effect:
+    //
+    // ```toml
+    // target-version = "py39"
+    // ```
+    //
+    // ```
+    // __lazy_modules__ = ["pathlib"]
+    //
+    // from pathlib import Path
+    //
+    // class C:
+    //     path: Path
+    // ```
+    if semantic.in_runtime_evaluated_annotation() && !semantic.in_runtime_required_annotation() {
+        return false;
+    }
+
+    let mut parent_statements = semantic.current_statements().skip(1);
+    if semantic.in_exception_handler() || helpers::on_conditional_branch(&mut parent_statements) {
+        return false;
+    }
+
+    match semantic.current_scope().kind {
+        ScopeKind::Module => true,
+        ScopeKind::Class(_) | ScopeKind::Type => semantic
+            .first_non_type_parent_scope(semantic.current_scope())
+            .is_some_and(|scope| scope.kind.is_module()),
+        ScopeKind::Generator {
+            kind:
+                GeneratorKind::ListComprehension
+                | GeneratorKind::DictComprehension
+                | GeneratorKind::SetComprehension,
+            ..
+        } => in_immediate_eager_comprehension_context(semantic),
+        ScopeKind::Function(_)
+        | ScopeKind::Lambda(_)
+        | ScopeKind::Generator {
+            kind: GeneratorKind::Generator,
+            ..
+        }
+        | ScopeKind::DunderClassCell => false,
+    }
+}
+
+fn in_immediate_eager_comprehension_context(semantic: &SemanticModel) -> bool {
+    for scope in semantic.current_scopes().skip(1) {
+        match scope.kind {
+            ScopeKind::Type | ScopeKind::DunderClassCell => {}
+            ScopeKind::Generator {
+                kind:
+                    GeneratorKind::ListComprehension
+                    | GeneratorKind::DictComprehension
+                    | GeneratorKind::SetComprehension,
+                ..
+            } => {}
+            ScopeKind::Module => return true,
+            ScopeKind::Class(_) => {
+                return semantic
+                    .first_non_type_parent_scope(scope)
+                    .is_some_and(|scope| scope.kind.is_module());
+            }
+            ScopeKind::Function(_)
+            | ScopeKind::Lambda(_)
+            | ScopeKind::Generator {
+                kind: GeneratorKind::Generator,
+                ..
+            } => return false,
+        }
+    }
+
+    false
+}

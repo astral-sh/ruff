@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
-use ruff_python_ast::docstrings::{leading_space, leading_words};
+use ruff_python_ast::docstrings::leading_space;
 use ruff_python_semantic::Definition;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use strum_macros::EnumIter;
@@ -52,7 +52,12 @@ pub(crate) enum SectionKind {
 }
 
 impl SectionKind {
-    pub(crate) fn from_str(s: &str) -> Option<Self> {
+    fn from_str(s: &str) -> Option<Self> {
+        // Avoid allocating a lowercase copy of lines longer than the longest section name.
+        if s.len() > Self::KeywordArguments.as_str().len() {
+            return None;
+        }
+
         match s.to_ascii_lowercase().as_str() {
             "args" => Some(Self::Args),
             "arguments" => Some(Self::Arguments),
@@ -134,6 +139,10 @@ impl SectionKind {
             Self::Yields => "Yields",
         }
     }
+
+    fn text_len(self) -> TextSize {
+        self.as_str().text_len()
+    }
 }
 
 pub(crate) struct SectionContexts<'a> {
@@ -155,13 +164,32 @@ impl<'a> SectionContexts<'a> {
         // Skip the first line, which is the summary.
         let mut previous_line = lines.next();
 
-        while let Some(line) = lines.next() {
-            if let Some(section_kind) = suspected_as_section(&line, style) {
-                let indent = leading_space(&line);
-                let indent_size = indent.text_len();
+        // Track only the outermost RST directive. Nested directives remain in its body
+        // until a non-blank line dedents to the outermost indentation.
+        // See: https://github.com/astral-sh/ruff/issues/23562
+        let mut directive_indent = None;
 
-                let section_name = leading_words(&line);
-                let section_name_size = section_name.text_len();
+        while let Some(line) = lines.next() {
+            let indent = leading_space(&line);
+            let indent_size = indent.text_len();
+
+            if let Some(active_indent) = directive_indent
+                && (line.trim().is_empty() || indent_size > active_indent)
+            {
+                previous_line = Some(line);
+                continue;
+            }
+
+            directive_indent = None;
+
+            if line.trim_start().starts_with(".. ") {
+                directive_indent = Some(indent_size);
+                previous_line = Some(line);
+                continue;
+            }
+
+            if let Some(section_kind) = suspected_as_section(&line[indent.len()..], style) {
+                let section_name_size = section_kind.text_len();
 
                 if is_docstring_section(
                     &line,
@@ -411,13 +439,11 @@ impl Debug for SectionContext<'_> {
     }
 }
 
-fn suspected_as_section(line: &str, style: SectionStyle) -> Option<SectionKind> {
-    if let Some(kind) = SectionKind::from_str(leading_words(line)) {
-        if style.sections().contains(&kind) {
-            return Some(kind);
-        }
-    }
-    None
+fn suspected_as_section(unindented: &str, style: SectionStyle) -> Option<SectionKind> {
+    let title = unindented.trim_end();
+    let name = title.strip_suffix(':').unwrap_or(title);
+    let kind = SectionKind::from_str(name)?;
+    style.sections().contains(&kind).then_some(kind)
 }
 
 /// Check if the suspected context is really a section header.
@@ -432,15 +458,6 @@ fn is_docstring_section(
     next_line: Option<&Line>,
     definition: &Definition<'_>,
 ) -> bool {
-    // for function definitions, track the known argument names for more accurate section detection.
-    // Determine whether the current line looks like a section header, e.g., "Args:".
-    let section_name_suffix = line[usize::from(indent_size + section_name_size)..].trim();
-    let this_looks_like_a_section_name =
-        section_name_suffix == ":" || section_name_suffix.is_empty();
-    if !this_looks_like_a_section_name {
-        return false;
-    }
-
     // Determine whether the next line is an underline, e.g., "-----".
     let next_line_is_underline = next_line.is_some_and(|next_line| {
         let next_line = next_line.trim();
@@ -564,4 +581,18 @@ fn has_parameter(definition: &Definition, section_name: &str) -> bool {
             .iter()
             .any(|param| param.name() == section_name)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use strum::IntoEnumIterator;
+
+    use super::SectionKind;
+
+    #[test]
+    fn section_names_round_trip() {
+        for kind in SectionKind::iter() {
+            assert_eq!(SectionKind::from_str(kind.as_str()), Some(kind));
+        }
+    }
 }

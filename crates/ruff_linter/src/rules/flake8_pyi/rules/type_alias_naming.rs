@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for type aliases that do not use the CamelCase naming convention.
@@ -26,7 +27,7 @@ use crate::checkers::ast::Checker;
 /// TypeAliasName: TypeAlias = int
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.265")]
+#[violation_metadata(stable_since = "v0.0.265", category = Category::Style)]
 pub(crate) struct SnakeCaseTypeAlias {
     name: String,
 }
@@ -66,7 +67,7 @@ impl Violation for SnakeCaseTypeAlias {
 /// ## References
 /// - [PEP 484: Type Aliases](https://peps.python.org/pep-0484/#type-aliases)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.265")]
+#[violation_metadata(stable_since = "v0.0.265", category = Category::Style)]
 pub(crate) struct TSuffixedTypeAlias {
     name: String,
 }

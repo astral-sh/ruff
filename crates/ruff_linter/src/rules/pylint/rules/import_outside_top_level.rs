@@ -3,6 +3,7 @@ use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
+use crate::codes::Category;
 use crate::rules::flake8_tidy_imports::rules::BannedModuleImportPolicies;
 use crate::{
     checkers::ast::Checker, codes::Rule, rules::flake8_tidy_imports::matchers::NameMatchPolicy,
@@ -53,7 +54,7 @@ use crate::{
 /// [TID253]: https://docs.astral.sh/ruff/rules/banned-module-level-imports/
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Pedantic)]
 pub(crate) struct ImportOutsideTopLevel;
 
 impl Violation for ImportOutsideTopLevel {

@@ -118,4 +118,3 @@ Module(
 2 | raise yield x
 3 | raise x := 1
   |         ^^ Syntax Error: Expected a statement
-  |

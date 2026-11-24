@@ -8,6 +8,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -50,7 +51,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// [PEP 709]: https://peps.python.org/pep-0709/
 /// [#7771]: https://github.com/astral-sh/ruff/issues/7771
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.291")]
+#[violation_metadata(preview_since = "v0.0.291", category = Category::Pedantic)]
 pub(crate) struct ReimplementedStarmap;
 
 impl Violation for ReimplementedStarmap {
@@ -112,7 +113,7 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
             }
 
             // If the argument is used outside the function call, we can't replace it.
-            if any_over_expr(func, &|expr| {
+            if any_over_expr(func, |expr| {
                 expr.as_name_expr().is_some_and(|expr| expr.id == name.id)
             }) {
                 return;
@@ -128,7 +129,7 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
             }
 
             // If any of the members are used outside the function call, we can't replace it.
-            if any_over_expr(func, &|expr| {
+            if any_over_expr(func, |expr| {
                 tuple
                     .iter()
                     .any(|elem| ComparableExpr::from(expr) == ComparableExpr::from(elem))
@@ -212,7 +213,7 @@ impl Ranged for StarmapCandidate<'_> {
 
 impl StarmapCandidate<'_> {
     /// Return the generated element for the candidate.
-    pub(crate) fn element(&self) -> &Expr {
+    fn element(&self) -> &Expr {
         match self {
             Self::Generator(generator) => generator.elt.as_ref(),
             Self::ListComp(list_comp) => list_comp.elt.as_ref(),
@@ -221,7 +222,7 @@ impl StarmapCandidate<'_> {
     }
 
     /// Return the generator comprehensions for the candidate.
-    pub(crate) fn generators(&self) -> &[ast::Comprehension] {
+    fn generators(&self) -> &[ast::Comprehension] {
         match self {
             Self::Generator(generator) => generator.generators.as_slice(),
             Self::ListComp(list_comp) => list_comp.generators.as_slice(),
@@ -230,7 +231,7 @@ impl StarmapCandidate<'_> {
     }
 
     /// Try to produce a fix suggestion transforming this node into a call to `starmap`.
-    pub(crate) fn try_make_suggestion(
+    fn try_make_suggestion(
         &self,
         name: Name,
         iter: &Expr,
@@ -319,12 +320,12 @@ fn construct_starmap_call(starmap_binding: Name, iter: &Expr, func: &Expr) -> as
     ast::ExprCall {
         func: Box::new(starmap.into()),
         arguments: ast::Arguments {
-            args: Box::from([func.clone(), iter.clone()]),
-            keywords: Box::from([]),
+            args: [func.clone(), iter.clone()].into(),
+            keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
 }
@@ -340,12 +341,12 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
     ast::ExprCall {
         func: Box::new(name.into()),
         arguments: ast::Arguments {
-            args: Box::from([call.into()]),
-            keywords: Box::from([]),
+            args: [call.into()].into(),
+            keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     }
 }

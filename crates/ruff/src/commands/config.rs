@@ -16,7 +16,7 @@ pub(crate) fn config(key: Option<&str>, format: HelpFormat) -> Result<()> {
                 }
 
                 HelpFormat::Json => {
-                    println!("{}", &serde_json::to_string_pretty(&metadata)?);
+                    println!("{}", serde_json::to_string_pretty(&metadata)?);
                 }
             }
         }
@@ -30,7 +30,7 @@ pub(crate) fn config(key: Option<&str>, format: HelpFormat) -> Result<()> {
                 }
 
                 HelpFormat::Json => {
-                    println!("{}", &serde_json::to_string_pretty(&entry)?);
+                    println!("{}", serde_json::to_string_pretty(&entry)?);
                 }
             },
         },

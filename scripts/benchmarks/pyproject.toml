@@ -1,6 +1,6 @@
 [project]
 name = "scripts"
-version = "0.14.14"
+version = "0.17.6"
 description = ""
 authors = ["Charles Marsh <charlie.r.marsh@gmail.com>"]
 
@@ -24,3 +24,8 @@ linter = [
     "isort",
 ]
 
+[tool.uv]
+no-build = true
+require-build-hashes = true
+exclude-newer = "P7D"
+preview-features = ["build-dependency-hashes"]

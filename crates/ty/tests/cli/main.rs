@@ -1,21 +1,25 @@
 mod analysis_options;
+mod baseline;
 mod config_option;
 mod exit_code;
 mod file_selection;
 mod fixes;
 mod python_environment;
+mod rule;
 mod rule_selection;
+mod scripts;
+mod server;
+mod uv_workspace;
 
-use anyhow::Context as _;
-use insta::Settings;
-use insta::internals::SettingsBindDropGuard;
-use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
-use std::{
-    fmt::Write,
-    path::{Path, PathBuf},
-    process::Command,
-};
-use tempfile::TempDir;
+#[path = "../common/mod.rs"]
+pub mod common;
+
+use std::fmt::Write;
+
+use insta_cmd::assert_cmd_snapshot;
+use test_case::test_case;
+
+use common::{CliTest, user_config_directory_env_var};
 
 #[test]
 fn test_quiet_output() -> anyhow::Result<()> {
@@ -48,14 +52,12 @@ fn test_quiet_output() -> anyhow::Result<()> {
     exit_code: 1
     ----- stdout -----
     error[invalid-assignment]: Object of type `Literal["foo"]` is not assignable to `int`
-     --> test.py:1:4
+     --> test.py:1:10
       |
     1 | x: int = 'foo'
       |    ---   ^^^^^ Incompatible value of type `Literal["foo"]`
       |    |
       |    Declared type
-      |
-    info: rule `invalid-assignment` is enabled by default
 
     Found 1 diagnostic
 
@@ -95,6 +97,31 @@ fn test_quiet_output() -> anyhow::Result<()> {
 }
 
 #[test]
+fn test_output_format_env() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [not-subscriptable]
+        from typing_extensions import reveal_type
+        reveal_type('str'.lower())  # [revealed-type]
+        "#,
+    )?
+    .with_filter(r",file=[^,\n]+[\\/]", ",file=<temp_dir>/");
+    assert_cmd_snapshot!(case.command().env("TY_OUTPUT_FORMAT", "github").arg("--warn").arg("unresolved-reference"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
+    ::error title=ty (not-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    ::notice title=ty (revealed-type),file=<temp_dir>/test.py,line=5,col=13,endLine=5,endColumn=26::test.py:5:13: revealed-type: Revealed type: `LiteralString`
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
 fn test_run_in_sub_directory() -> anyhow::Result<()> {
     let case = CliTest::with_files([("test.py", "~"), ("subdir/nothing", "")])?;
     assert_cmd_snapshot!(case.command().current_dir(case.root().join("subdir")).arg(".."), @"
@@ -106,7 +133,6 @@ fn test_run_in_sub_directory() -> anyhow::Result<()> {
       |
     1 | ~
       |  ^
-      |
 
     Found 1 diagnostic
 
@@ -127,7 +153,6 @@ fn test_include_hidden_files_by_default() -> anyhow::Result<()> {
       |
     1 | ~
       |  ^
-      |
 
     Found 1 diagnostic
 
@@ -160,7 +185,6 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
       |
     1 | ~
       |  ^
-      |
 
     Found 1 diagnostic
 
@@ -178,7 +202,6 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
       |
     1 | ~
       |  ^
-      |
 
     Found 1 diagnostic
 
@@ -196,7 +219,6 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
       |
     1 | ~
       |  ^
-      |
 
     Found 1 diagnostic
 
@@ -252,19 +274,15 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `utils`
+    error[import-not-found]: Cannot resolve imported module `utils`
      --> test.py:2:6
       |
     2 | from utils import add
       |      ^^^^^
-    3 |
-    4 | stat = add(10, 15)
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -359,15 +377,11 @@ fn user_configuration() -> anyhow::Result<()> {
         ),
     ])?;
 
-    let config_directory = case.root().join("home/.config");
-    let config_env_var = if cfg!(windows) {
-        "APPDATA"
-    } else {
-        "XDG_CONFIG_HOME"
-    };
+    let config_directory = case.user_config_directory();
+    let config_env_var = user_config_directory_env_var();
 
     assert_cmd_snapshot!(
-        case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
+        case.command().arg("--verbose").current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
         @"
     success: false
     exit_code: 1
@@ -377,24 +391,19 @@ fn user_configuration() -> anyhow::Result<()> {
       |
     2 | y = 4 / 0
       |     ^^^^^
-    3 |
-    4 | for a in range(0, int(y)):
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> main.py:7:1
       |
-    5 |     x = a
-    6 |
     7 | prin(x)
       | ^^^^
-      |
     info: rule `unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
+    INFO Indexed 1 file(s) in 0.000s
     "
     );
 
@@ -411,34 +420,29 @@ fn user_configuration() -> anyhow::Result<()> {
     )?;
 
     assert_cmd_snapshot!(
-        case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
+        case.command().arg("--verbose").current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
         @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> main.py:2:5
       |
     2 | y = 4 / 0
       |     ^^^^^
-    3 |
-    4 | for a in range(0, int(y)):
-      |
     info: rule `division-by-zero` was selected in the configuration file
 
     warning[unresolved-reference]: Name `prin` used when not defined
      --> main.py:7:1
       |
-    5 |     x = a
-    6 |
     7 | prin(x)
       | ^^^^
-      |
     info: rule `unresolved-reference` was selected in the configuration file
 
     Found 2 diagnostics
 
     ----- stderr -----
+    INFO Indexed 1 file(s) in 0.000s
     "
     );
 
@@ -457,13 +461,13 @@ fn check_specific_paths() -> anyhow::Result<()> {
         (
             "project/tests/test_main.py",
             r#"
-            import does_not_exist  # error: unresolved-import
+            import does_not_exist  # error: import-not-found
             "#,
         ),
         (
             "project/other.py",
             r#"
-            from main2 import z  # error: unresolved-import
+            from main2 import z  # error: import-not-found
 
             print(z)
             "#,
@@ -476,31 +480,25 @@ fn check_specific_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `main2`
+    error[import-not-found]: Cannot resolve imported module `main2`
      --> project/other.py:2:6
       |
-    2 | from main2 import z  # error: unresolved-import
+    2 | from main2 import z  # error: import-not-found
       |      ^^^^^
-    3 |
-    4 | print(z)
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
-    error[unresolved-import]: Cannot resolve imported module `does_not_exist`
+    error[import-not-found]: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
       |
-    2 | import does_not_exist  # error: unresolved-import
+    2 | import does_not_exist  # error: import-not-found
       |        ^^^^^^^^^^^^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
@@ -516,31 +514,25 @@ fn check_specific_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `main2`
+    error[import-not-found]: Cannot resolve imported module `main2`
      --> project/other.py:2:6
       |
-    2 | from main2 import z  # error: unresolved-import
+    2 | from main2 import z  # error: import-not-found
       |      ^^^^^
-    3 |
-    4 | print(z)
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
-    error[unresolved-import]: Cannot resolve imported module `does_not_exist`
+    error[import-not-found]: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
       |
-    2 | import does_not_exist  # error: unresolved-import
+    2 | import does_not_exist  # error: import-not-found
       |        ^^^^^^^^^^^^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
@@ -597,8 +589,6 @@ fn check_file_without_extension() -> anyhow::Result<()> {
       |
     1 | a = b
       |     ^
-      |
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -651,6 +641,38 @@ fn concise_diagnostics() -> anyhow::Result<()> {
     ");
 
     Ok(())
+}
+
+/// Check which CLI and environment settings force ANSI styling in a piped diagnostic.
+#[test_case(None,           &[]                                             => false; "automatic detection")]
+#[test_case(None,           &[("FORCE_COLOR", "0")]                         => true;  "force color")]
+#[test_case(None,           &[("FORCE_COLOR", ""), ("CLICOLOR_FORCE", "0")] => true;  "empty force color defers")]
+#[test_case(None,           &[("CLICOLOR_FORCE", "")]                       => false; "empty clicolor force")]
+#[test_case(None,           &[("CLICOLOR", "1")]                            => false; "clicolor requires a terminal")]
+#[test_case(None,           &[("NO_COLOR", "0"), ("CLICOLOR_FORCE", "1")]   => false; "no color beats clicolor force")]
+#[test_case(None,           &[("NO_COLOR", "0"), ("FORCE_COLOR", "0")]      => false; "no color wins")]
+#[test_case(Some("auto"),   &[("NO_COLOR", ""), ("FORCE_COLOR", "0")]       => true;  "empty no color")]
+#[test_case(Some("always"), &[("NO_COLOR", "0")]                            => true;  "explicit always")]
+#[test_case(Some("never"),  &[("FORCE_COLOR", "0")]                         => false; "explicit never")]
+fn color_in_piped_diagnostics(flag: Option<&str>, env: &[(&str, &str)]) -> bool {
+    let case = CliTest::with_file("test.py", "x: int = 'wrong'").unwrap();
+    let mut command = case.command();
+    if let Some(flag) = flag {
+        command.args(["--color", flag]);
+    }
+    let output = command
+        .arg("--output-format=concise")
+        .envs(env.iter().copied())
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(1));
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let diagnostic = stdout
+        .lines()
+        .find(|line| line.contains("invalid-assignment"))
+        .unwrap();
+    diagnostic.contains("\x1b[")
 }
 
 #[test]
@@ -740,6 +762,21 @@ fn gitlab_diagnostics() -> anyhow::Result<()> {
 }
 
 #[test]
+fn gitlab_empty_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_file("test.py", "1")?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=gitlab"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    []
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn github_diagnostics() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "test.py",
@@ -749,7 +786,8 @@ fn github_diagnostics() -> anyhow::Result<()> {
         from typing_extensions import reveal_type
         reveal_type('str'.lower())  # [revealed-type]
         "#,
-    )?;
+    )?
+    .with_filter(r",file=[^,\n]+[\\/]", ",file=<temp_dir>/");
 
     assert_cmd_snapshot!(case.command().arg("--output-format=github").arg("--warn").arg("unresolved-reference"), @"
     success: false
@@ -761,6 +799,248 @@ fn github_diagnostics() -> anyhow::Result<()> {
 
     ----- stderr -----
     ");
+
+    Ok(())
+}
+
+#[test]
+fn sarif_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "ty.toml",
+            r#"
+            [rules]
+            division-by-zero = "warn"
+            unused-ignore-comment = "error"
+
+            [[overrides]]
+            include = ["a.py"]
+
+            [overrides.rules]
+            unresolved-reference = "warn"
+            "#,
+        ),
+        ("a.py", "print(x)"),
+        (
+            "b.py",
+            r#"
+            print(x)
+            1 / 0  # ty: ignore[unresolved-reference]
+            "#,
+        ),
+    ])?
+    .with_filter(
+        r#"("fullDescription": \{\s*"text": ")[^\n]*(")"#,
+        "$1[DESCRIPTION]$2",
+    )
+    .with_filter(r#"(?m)^(\s{10}"version": ")[^"]+"#, "$1[VERSION]")
+    .with_filter(r#"file://[^"]*/project/"#, "file://<temp_dir>/");
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=sarif"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    {
+      "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+      "runs": [
+        {
+          "results": [
+            {
+              "level": "warning",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/a.py"
+                    },
+                    "region": {
+                      "endColumn": 8,
+                      "endLine": 1,
+                      "startColumn": 7,
+                      "startLine": 1
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Name `x` used when not defined"
+              },
+              "ruleId": "unresolved-reference"
+            },
+            {
+              "level": "error",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/b.py"
+                    },
+                    "region": {
+                      "endColumn": 8,
+                      "endLine": 2,
+                      "startColumn": 7,
+                      "startLine": 2
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Name `x` used when not defined"
+              },
+              "ruleId": "unresolved-reference"
+            },
+            {
+              "level": "warning",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/b.py"
+                    },
+                    "region": {
+                      "endColumn": 6,
+                      "endLine": 3,
+                      "startColumn": 1,
+                      "startLine": 3
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Cannot divide object of type `Literal[1]` by zero"
+              },
+              "ruleId": "division-by-zero"
+            },
+            {
+              "fixes": [
+                {
+                  "artifactChanges": [
+                    {
+                      "artifactLocation": {
+                        "uri": "file://<temp_dir>/b.py"
+                      },
+                      "replacements": [
+                        {
+                          "deletedRegion": {
+                            "endColumn": 42,
+                            "endLine": 3,
+                            "startColumn": 6,
+                            "startLine": 3
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "description": {
+                    "text": "Remove the unused suppression comment"
+                  }
+                }
+              ],
+              "level": "error",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/b.py"
+                    },
+                    "region": {
+                      "endColumn": 42,
+                      "endLine": 3,
+                      "startColumn": 8,
+                      "startLine": 3
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Unused `ty: ignore` directive"
+              },
+              "ruleId": "unused-ignore-comment"
+            }
+          ],
+          "tool": {
+            "driver": {
+              "informationUri": "https://github.com/astral-sh/ty",
+              "name": "ty",
+              "rules": [
+                {
+                  "defaultConfiguration": {
+                    "enabled": false
+                  },
+                  "fullDescription": {
+                    "text": "[DESCRIPTION]"
+                  },
+                  "help": {
+                    "text": "detects division by zero"
+                  },
+                  "helpUri": "https://ty.dev/rules#division-by-zero",
+                  "id": "division-by-zero",
+                  "properties": {
+                    "id": "division-by-zero",
+                    "kind": null,
+                    "name": "division-by-zero",
+                    "problem.severity": "warning"
+                  },
+                  "shortDescription": {
+                    "text": "detects division by zero"
+                  }
+                },
+                {
+                  "defaultConfiguration": {
+                    "enabled": true,
+                    "level": "error"
+                  },
+                  "fullDescription": {
+                    "text": "[DESCRIPTION]"
+                  },
+                  "help": {
+                    "text": "detects references to names that are not defined"
+                  },
+                  "helpUri": "https://ty.dev/rules#unresolved-reference",
+                  "id": "unresolved-reference",
+                  "properties": {
+                    "id": "unresolved-reference",
+                    "kind": null,
+                    "name": "unresolved-reference",
+                    "problem.severity": "error"
+                  },
+                  "shortDescription": {
+                    "text": "detects references to names that are not defined"
+                  }
+                },
+                {
+                  "defaultConfiguration": {
+                    "enabled": true,
+                    "level": "warning"
+                  },
+                  "fullDescription": {
+                    "text": "[DESCRIPTION]"
+                  },
+                  "help": {
+                    "text": "detects unused `ty: ignore` comments"
+                  },
+                  "helpUri": "https://ty.dev/rules#unused-ignore-comment",
+                  "id": "unused-ignore-comment",
+                  "properties": {
+                    "id": "unused-ignore-comment",
+                    "kind": null,
+                    "name": "unused-ignore-comment",
+                    "problem.severity": "error"
+                  },
+                  "shortDescription": {
+                    "text": "detects unused `ty: ignore` comments"
+                  }
+                }
+              ],
+              "version": "[VERSION]"
+            }
+          }
+        }
+      ],
+      "version": "2.1.0"
+    }
+    ----- stderr -----
+    "#);
 
     Ok(())
 }
@@ -820,11 +1100,8 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
     info[revealed-type]: Revealed type
      --> test.py:4:13
       |
-    2 | from typing_extensions import reveal_type
-    3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +…
     4 | reveal_type(total)
       |             ^^^^^ `Literal[2000]`
-      |
 
     Found 1 diagnostic
 
@@ -832,164 +1109,4 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
     ");
 
     Ok(())
-}
-
-pub(crate) struct CliTest {
-    _temp_dir: TempDir,
-    settings: Settings,
-    settings_scope: Option<SettingsBindDropGuard>,
-    project_dir: PathBuf,
-    ty_binary_path: PathBuf,
-}
-
-impl CliTest {
-    pub(crate) fn new() -> anyhow::Result<Self> {
-        let temp_dir = TempDir::new()?;
-
-        // Canonicalize the tempdir path because macos uses symlinks for tempdirs
-        // and that doesn't play well with our snapshot filtering.
-        // Simplify with dunce because otherwise we get UNC paths on Windows.
-        let project_dir = dunce::simplified(
-            &temp_dir
-                .path()
-                .canonicalize()
-                .context("Failed to canonicalize project path")?,
-        )
-        .to_path_buf();
-
-        let mut settings = insta::Settings::clone_current();
-        settings.add_filter(&tempdir_filter(&project_dir), "<temp_dir>/");
-        settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
-        // 0.003s
-        settings.add_filter(r"\d.\d\d\ds", "0.000s");
-        settings.add_filter(
-            r#"The system cannot find the file specified."#,
-            "No such file or directory",
-        );
-
-        let settings_scope = settings.bind_to_scope();
-
-        Ok(Self {
-            project_dir,
-            _temp_dir: temp_dir,
-            settings,
-            settings_scope: Some(settings_scope),
-            ty_binary_path: get_cargo_bin("ty"),
-        })
-    }
-
-    pub(crate) fn with_files<'a>(
-        files: impl IntoIterator<Item = (&'a str, &'a str)>,
-    ) -> anyhow::Result<Self> {
-        let case = Self::new()?;
-        case.write_files(files)?;
-        Ok(case)
-    }
-
-    pub(crate) fn with_file(path: impl AsRef<Path>, content: &str) -> anyhow::Result<Self> {
-        let case = Self::new()?;
-        case.write_file(path, content)?;
-        Ok(case)
-    }
-
-    pub(crate) fn write_files<'a>(
-        &self,
-        files: impl IntoIterator<Item = (&'a str, &'a str)>,
-    ) -> anyhow::Result<()> {
-        for (path, content) in files {
-            self.write_file(path, content)?;
-        }
-
-        Ok(())
-    }
-
-    /// Return [`Self`] with the ty binary copied to the specified path instead.
-    pub(crate) fn with_ty_at(mut self, dest_path: impl AsRef<Path>) -> anyhow::Result<Self> {
-        let dest_path = dest_path.as_ref();
-        let dest_path = self.project_dir.join(dest_path);
-
-        Self::ensure_parent_directory(&dest_path)?;
-        std::fs::copy(&self.ty_binary_path, &dest_path)
-            .with_context(|| format!("Failed to copy ty binary to `{}`", dest_path.display()))?;
-
-        self.ty_binary_path = dest_path;
-        Ok(self)
-    }
-
-    /// Add a filter to the settings and rebind them.
-    pub(crate) fn with_filter(mut self, pattern: &str, replacement: &str) -> Self {
-        self.settings.add_filter(pattern, replacement);
-        // Drop the old scope before binding a new one, otherwise the old scope is dropped _after_
-        // binding and assigning the new one, restoring the settings to their state before the old
-        // scope was bound.
-        drop(self.settings_scope.take());
-        self.settings_scope = Some(self.settings.bind_to_scope());
-        self
-    }
-
-    fn ensure_parent_directory(path: &Path) -> anyhow::Result<()> {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create directory `{}`", parent.display()))?;
-        }
-        Ok(())
-    }
-
-    pub(crate) fn write_file(&self, path: impl AsRef<Path>, content: &str) -> anyhow::Result<()> {
-        let path = path.as_ref();
-        let path = self.project_dir.join(path);
-
-        Self::ensure_parent_directory(&path)?;
-
-        std::fs::write(&path, &*ruff_python_trivia::textwrap::dedent(content))
-            .with_context(|| format!("Failed to write file `{path}`", path = path.display()))?;
-
-        Ok(())
-    }
-
-    #[cfg(unix)]
-    pub(crate) fn write_symlink(
-        &self,
-        original: impl AsRef<Path>,
-        link: impl AsRef<Path>,
-    ) -> anyhow::Result<()> {
-        let link = link.as_ref();
-        let link = self.project_dir.join(link);
-
-        let original = original.as_ref();
-        let original = self.project_dir.join(original);
-
-        Self::ensure_parent_directory(&link)?;
-
-        std::os::unix::fs::symlink(original, &link)
-            .with_context(|| format!("Failed to write symlink `{link}`", link = link.display()))?;
-
-        Ok(())
-    }
-
-    pub(crate) fn root(&self) -> &Path {
-        &self.project_dir
-    }
-
-    pub(crate) fn command(&self) -> Command {
-        let mut command = Command::new(&self.ty_binary_path);
-        command.current_dir(&self.project_dir).arg("check");
-
-        // Unset all environment variables because they can affect test behavior.
-        command.env_clear();
-
-        command
-    }
-}
-
-fn tempdir_filter(path: &Path) -> String {
-    format!(r"{}\\?/?", regex::escape(path.to_str().unwrap()))
-}
-
-fn site_packages_filter(python_version: &str) -> String {
-    if cfg!(windows) {
-        "Lib/site-packages".to_string()
-    } else {
-        format!("lib/python{}/site-packages", regex::escape(python_version))
-    }
 }

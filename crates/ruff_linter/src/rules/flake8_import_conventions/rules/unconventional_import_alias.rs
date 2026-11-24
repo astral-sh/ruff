@@ -5,9 +5,10 @@ use ruff_python_semantic::{Binding, Imported};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Fix, FixAvailability, Violation};
 
-use crate::renamer::Renamer;
+use crate::renamer::{Renamer, ShadowedKind};
 
 /// ## What it does
 /// Checks for imports that are typically imported using a common convention,
@@ -35,7 +36,7 @@ use crate::renamer::Renamer;
 /// - `lint.flake8-import-conventions.aliases`
 /// - `lint.flake8-import-conventions.extend-aliases`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.166")]
+#[violation_metadata(stable_since = "v0.0.166", category = Category::Pedantic)]
 pub(crate) struct UnconventionalImportAlias {
     name: String,
     asname: String,
@@ -83,7 +84,7 @@ pub(crate) fn unconventional_import_alias(
         binding.range(),
     );
     if !import.is_submodule_import() {
-        if checker.semantic().is_available(expected_alias) {
+        if !ShadowedKind::new(binding, expected_alias, checker).shadows_any() {
             diagnostic.try_set_fix(|| {
                 let scope = &checker.semantic().scopes[binding.scope];
                 let (edit, rest) = Renamer::rename(

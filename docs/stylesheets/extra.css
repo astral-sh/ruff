@@ -102,7 +102,8 @@
 }
 
 /* See: https://github.com/astral-sh/ruff/issues/9046 */
-[data-md-color-scheme="astral-dark"] div.admonition {
+[data-md-color-scheme="astral-dark"] div.admonition,
+[data-md-color-scheme="astral-dark"] .md-typeset details {
   color: var(--md-code-fg-color);
   background-color: var(--md-code-bg-color);
 }
@@ -123,3 +124,15 @@
   color: var(--md-accent-fg-color) !important;
 }
 
+/* Visually hidden but accessible to screen readers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border-width: 0;
+}

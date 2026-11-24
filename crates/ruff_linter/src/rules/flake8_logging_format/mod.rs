@@ -36,13 +36,13 @@ mod tests {
             &settings::LinterSettings {
                 logger_objects: vec!["logging_setup.logger".to_string()],
                 ..settings::LinterSettings::for_rules(vec![
-                    Rule::LoggingStringFormat,
+                    Rule::LoggingStrFormat,
                     Rule::LoggingPercentFormat,
                     Rule::LoggingStringConcat,
                     Rule::LoggingFString,
                     Rule::LoggingWarn,
                     Rule::LoggingExtraAttrClash,
-                    Rule::LoggingExcInfo,
+                    Rule::LoggingErrorWithExcInfo,
                     Rule::LoggingRedundantExcInfo,
                 ])
             },
@@ -55,11 +55,7 @@ mod tests {
     #[test_case(Rule::LoggingFString, Path::new("G004_arg_order.py"))]
     #[test_case(Rule::LoggingFString, Path::new("G004_implicit_concat.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_logging_format").join(path).as_path(),
             &settings::LinterSettings {

@@ -1,7 +1,7 @@
 use insta_cmd::assert_cmd_snapshot;
 use ruff_python_ast::PythonVersion;
 
-use crate::{CliTest, site_packages_filter};
+use crate::CliTest;
 
 /// Specifying an option on the CLI should take precedence over the same setting in the
 /// project's configuration. Here, this is tested for the Python version.
@@ -30,22 +30,17 @@ fn config_override_python_version() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-attribute]: Module `sys` has no member `last_exc`
+    error[missing-attribute]: Module `sys` has no member `last_exc`
      --> test.py:5:7
       |
-    4 | # Access `sys.last_exc` that was only added in Python 3.12
     5 | print(sys.last_exc)
       |       ^^^^^^^^^^^^
-      |
     info: The member may be available on other Python versions or platforms
     info: Python 3.11 was assumed when resolving the `last_exc` attribute
      --> pyproject.toml:3:18
       |
-    2 | [tool.ty.environment]
     3 | python-version = "3.11"
       |                  ^^^^^^ Python version configuration
-      |
-    info: rule `unresolved-attribute` is enabled by default
 
     Found 1 diagnostic
 
@@ -93,11 +88,8 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     info[revealed-type]: Revealed type
      --> test.py:5:13
       |
-    3 | from typing_extensions import reveal_type
-    4 |
     5 | reveal_type(sys.platform)
       |             ^^^^^^^^^^^^ `Literal["linux"]`
-      |
 
     Found 1 diagnostic
 
@@ -111,11 +103,8 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     info[revealed-type]: Revealed type
      --> test.py:5:13
       |
-    3 | from typing_extensions import reveal_type
-    4 |
     5 | reveal_type(sys.platform)
       |             ^^^^^^^^^^^^ `LiteralString`
-      |
 
     Found 1 diagnostic
 
@@ -132,13 +121,13 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
             "pyproject.toml",
             r#"
             [tool.ty.environment]
-            python-version = "3.8"
+            python-version = "3.12"
             "#,
         ),
         (
             "test.py",
             r#"
-            aiter
+            PythonFinalizationError
             "#,
         ),
     ])?;
@@ -147,40 +136,34 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-reference]: Name `aiter` used when not defined
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
      --> test.py:2:1
       |
-    2 | aiter
-      | ^^^^^
-      |
-    info: `aiter` was added as a builtin in Python 3.10
-    info: Python 3.8 was assumed when resolving types
+    2 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types
      --> pyproject.toml:3:18
       |
-    2 | [tool.ty.environment]
-    3 | python-version = "3.8"
-      |                  ^^^^^ Python version configuration
-      |
-    info: rule `unresolved-reference` is enabled by default
+    3 | python-version = "3.12"
+      |                  ^^^^^^ Python version configuration
 
     Found 1 diagnostic
 
     ----- stderr -----
     "#);
 
-    assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @"
+    assert_cmd_snapshot!(case.command().arg("--python-version=3.12"), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-reference]: Name `aiter` used when not defined
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
      --> test.py:2:1
       |
-    2 | aiter
-      | ^^^^^
-      |
-    info: `aiter` was added as a builtin in Python 3.10
-    info: Python 3.9 was assumed when resolving types because it was specified on the command line
-    info: rule `unresolved-reference` is enabled by default
+    2 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types because it was specified on the command line
 
     Found 1 diagnostic
 
@@ -207,15 +190,38 @@ fn src_subdirectory_takes_precedence_over_repo_root() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package` has no member `nonexistent_submodule`
+    error[missing-module-member]: Module `package` has no member `nonexistent_submodule`
      --> src/package/__init__.py:1:15
       |
     1 | from . import nonexistent_submodule
       |               ^^^^^^^^^^^^^^^^^^^^^
-      |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// If there is an `src/__init__.py(i)` file, don't add `./src` as a root.
+/// This is an antipattern (you're meant to have a top-level package directory
+/// *inside* `src/`), but it's a mistake that a surprising number of people make,
+/// and the diagnostic issued by ty is confusing if imports don't work.
+#[test]
+fn src_subdirectory_not_added_as_root_if_src_package_exists() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("src/__init__.py", ""),
+        ("src/box.py", "class Box: ..."),
+        ("src/test_box.py", "from .box import Box"),
+    ])?;
+
+    // The import is only resolvable because `src` was *not* added as a root.
+    assert_cmd_snapshot!(case.command(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     ");
@@ -238,26 +244,24 @@ fn src_subdirectory_takes_precedence_over_repo_root() -> anyhow::Result<()> {
 #[test]
 fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     let cpython_case = CliTest::with_files([
-        ("pythons/Python3.8/bin/python", ""),
-        ("pythons/Python3.8/lib/python3.8/site-packages/foo.py", ""),
-        ("test.py", "aiter"),
+        ("pythons/Python3.12/bin/python", ""),
+        ("pythons/Python3.12/lib/python3.12/site-packages/foo.py", ""),
+        ("test.py", "PythonFinalizationError"),
     ])?;
 
-    assert_cmd_snapshot!(cpython_case.command().arg("--python").arg("pythons/Python3.8/bin/python"), @"
+    assert_cmd_snapshot!(cpython_case.command().arg("--python").arg("pythons/Python3.12/bin/python"), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-reference]: Name `aiter` used when not defined
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
      --> test.py:1:1
       |
-    1 | aiter
-      | ^^^^^
-      |
-    info: `aiter` was added as a builtin in Python 3.10
-    info: Python 3.8 was assumed when resolving types because of the layout of your Python installation
-    info: The primary `site-packages` directory of your installation was found at `lib/python3.8/site-packages/`
+    1 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types because of the layout of your Python installation
+    info: The primary `site-packages` directory of your installation was found at `lib/python3.12/site-packages/`
     info: No Python version was specified on the command line or in a configuration file
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -265,26 +269,24 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     ");
 
     let pypy_case = CliTest::with_files([
-        ("pythons/pypy3.8/bin/python", ""),
-        ("pythons/pypy3.8/lib/pypy3.8/site-packages/foo.py", ""),
-        ("test.py", "aiter"),
+        ("pythons/pypy3.12/bin/python", ""),
+        ("pythons/pypy3.12/lib/pypy3.12/site-packages/foo.py", ""),
+        ("test.py", "PythonFinalizationError"),
     ])?;
 
-    assert_cmd_snapshot!(pypy_case.command().arg("--python").arg("pythons/pypy3.8/bin/python"), @"
+    assert_cmd_snapshot!(pypy_case.command().arg("--python").arg("pythons/pypy3.12/bin/python"), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-reference]: Name `aiter` used when not defined
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
      --> test.py:1:1
       |
-    1 | aiter
-      | ^^^^^
-      |
-    info: `aiter` was added as a builtin in Python 3.10
-    info: Python 3.8 was assumed when resolving types because of the layout of your Python installation
-    info: The primary `site-packages` directory of your installation was found at `lib/pypy3.8/site-packages/`
+    1 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types because of the layout of your Python installation
+    info: The primary `site-packages` directory of your installation was found at `lib/pypy3.12/site-packages/`
     info: No Python version was specified on the command line or in a configuration file
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -304,17 +306,15 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `string.templatelib`
+    error[import-not-found]: Cannot resolve imported module `string.templatelib`
      --> test.py:1:8
       |
     1 | import string.templatelib
       |        ^^^^^^^^^^^^^^^^^^
-      |
     info: The stdlib module `string.templatelib` is only available on Python 3.14+
     info: Python 3.13 was assumed when resolving modules because of the layout of your Python installation
     info: The primary `site-packages` directory of your installation was found at `lib/python3.13t/site-packages/`
     info: No Python version was specified on the command line or in a configuration file
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -388,35 +388,27 @@ import colorama
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `foo`
+    error[import-not-found]: Cannot resolve imported module `foo`
      --> test.py:1:8
       |
     1 | import foo
       |        ^^^
-    2 | import bar
-    3 | import colorama
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/opt/homebrew/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
-    error[unresolved-import]: Cannot resolve imported module `colorama`
+    error[import-not-found]: Cannot resolve imported module `colorama`
      --> test.py:3:8
       |
-    1 | import foo
-    2 | import bar
     3 | import colorama
       |        ^^^^^^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/opt/homebrew/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
@@ -429,35 +421,27 @@ import colorama
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> test.py:2:8
       |
-    1 | import foo
     2 | import bar
       |        ^^^
-    3 | import colorama
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
-    error[unresolved-import]: Cannot resolve imported module `colorama`
+    error[import-not-found]: Cannot resolve imported module `colorama`
      --> test.py:3:8
       |
-    1 | import foo
-    2 | import bar
     3 | import colorama
       |        ^^^^^^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
@@ -470,35 +454,27 @@ import colorama
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> test.py:2:8
       |
-    1 | import foo
     2 | import bar
       |        ^^^
-    3 | import colorama
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
-    error[unresolved-import]: Cannot resolve imported module `colorama`
+    error[import-not-found]: Cannot resolve imported module `colorama`
      --> test.py:3:8
       |
-    1 | import foo
-    2 | import bar
     3 | import colorama
       |        ^^^^^^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
@@ -511,35 +487,27 @@ import colorama
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> test.py:2:8
       |
-    1 | import foo
     2 | import bar
       |        ^^^
-    3 | import colorama
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
-    error[unresolved-import]: Cannot resolve imported module `colorama`
+    error[import-not-found]: Cannot resolve imported module `colorama`
      --> test.py:3:8
       |
-    1 | import foo
-    2 | import bar
     3 | import colorama
       |        ^^^^^^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
@@ -583,19 +551,16 @@ import bar",
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `foo`
+    error[import-not-found]: Cannot resolve imported module `foo`
      --> test.py:1:8
       |
     1 | import foo
       |        ^^^
-    2 | import bar
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/strange-venv-location/lib/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -632,19 +597,17 @@ fn lib64_site_packages_directory_on_unix() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> test.py:1:18
       |
     1 | import foo, bar, baz
       |                  ^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info:   3. <temp_dir>/.venv/lib/python3.13/site-packages (site-packages)
     info:   4. <temp_dir>/.venv/lib64/python3.13/site-packages (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -677,12 +640,11 @@ fn many_search_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> test.py:1:14
       |
     1 | import foo1, baz
       |              ^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/extra1 (extra search path specified on the CLI or in your config file)
     info:   2. <temp_dir>/extra2 (extra search path specified on the CLI or in your config file)
@@ -691,7 +653,6 @@ fn many_search_paths() -> anyhow::Result<()> {
     info:   5. <temp_dir>/ (first-party code)
     info:   6. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -711,12 +672,11 @@ fn many_search_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> test.py:1:14
       |
     1 | import foo1, baz
       |              ^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/extra1 (extra search path specified on the CLI or in your config file)
     info:   2. <temp_dir>/extra2 (extra search path specified on the CLI or in your config file)
@@ -725,7 +685,6 @@ fn many_search_paths() -> anyhow::Result<()> {
     info:   5. <temp_dir>/extra5 (extra search path specified on the CLI or in your config file)
     info:   ... and 3 more paths. Run with `-v` to see all paths.
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -747,12 +706,11 @@ fn many_search_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> test.py:1:14
       |
     1 | import foo1, baz
       |              ^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/extra1 (extra search path specified on the CLI or in your config file)
     info:   2. <temp_dir>/extra2 (extra search path specified on the CLI or in your config file)
@@ -763,12 +721,11 @@ fn many_search_paths() -> anyhow::Result<()> {
     info:   7. <temp_dir>/ (first-party code)
     info:   8. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
+    info: rule `import-not-found` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    INFO Python version: Python 3.14, platform: linux
     INFO Indexed 7 file(s) in 0.000s
     ");
     Ok(())
@@ -787,7 +744,7 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
         (
             "venv/pyvenv.cfg",
             r#"
-            version = 3.8
+            version = 3.12
             home = foo/bar/bin
             "#,
         ),
@@ -799,31 +756,27 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
         if cfg!(target_os = "windows") {
             ("venv/Lib/site-packages/foo.py", "")
         } else {
-            ("venv/lib/python3.8/site-packages/foo.py", "")
+            ("venv/lib/python3.12/site-packages/foo.py", "")
         },
-        ("test.py", "aiter"),
+        ("test.py", "PythonFinalizationError"),
     ])?;
 
     assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-reference]: Name `aiter` used when not defined
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
      --> test.py:1:1
       |
-    1 | aiter
-      | ^^^^^
-      |
-    info: `aiter` was added as a builtin in Python 3.10
-    info: Python 3.8 was assumed when resolving types because of your virtual environment
+    1 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types because of your virtual environment
      --> venv/pyvenv.cfg:2:11
       |
-    2 | version = 3.8
-      |           ^^^ Virtual environment metadata
-    3 | home = foo/bar/bin
-      |
+    2 | version = 3.12
+      |           ^^^^ Virtual environment metadata
     info: No Python version was specified on the command line or in a configuration file
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -847,8 +800,7 @@ fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
             "venv/pyvenv.cfg",
             r#"home = foo/bar/bin
 
-
-            version = 3.8"#,
+            version = 3.12"#,
         ),
         if cfg!(target_os = "windows") {
             ("foo/bar/bin/python.exe", "")
@@ -858,30 +810,27 @@ fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
         if cfg!(target_os = "windows") {
             ("venv/Lib/site-packages/foo.py", "")
         } else {
-            ("venv/lib/python3.8/site-packages/foo.py", "")
+            ("venv/lib/python3.12/site-packages/foo.py", "")
         },
-        ("test.py", "aiter"),
+        ("test.py", "PythonFinalizationError"),
     ])?;
 
     assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-reference]: Name `aiter` used when not defined
+    error[unresolved-reference]: Name `PythonFinalizationError` used when not defined
      --> test.py:1:1
       |
-    1 | aiter
-      | ^^^^^
+    1 | PythonFinalizationError
+      | ^^^^^^^^^^^^^^^^^^^^^^^
+    info: `PythonFinalizationError` was added as a builtin in Python 3.13
+    info: Python 3.12 was assumed when resolving types because of your virtual environment
+     --> venv/pyvenv.cfg:3:23
       |
-    info: `aiter` was added as a builtin in Python 3.10
-    info: Python 3.8 was assumed when resolving types because of your virtual environment
-     --> venv/pyvenv.cfg:4:23
-      |
-    4 |             version = 3.8
-      |                       ^^^ Virtual environment metadata
-      |
+    3 |             version = 3.12
+      |                       ^^^^ Virtual environment metadata
     info: No Python version was specified on the command line or in a configuration file
-    info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -922,16 +871,11 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
       |
     2 | match object():
       | ^^^^^
-    3 |     case int():
-    4 |         pass
-      |
     info: Python 3.8 was assumed when parsing syntax
      --> pyproject.toml:3:19
       |
-    2 | [project]
     3 | requires-python = ">=3.8"
       |                   ^^^^^^^ Python version configuration
-      |
 
     Found 1 diagnostic
 
@@ -947,9 +891,6 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
       |
     2 | match object():
       | ^^^^^
-    3 |     case int():
-    4 |         pass
-      |
     info: Python 3.9 was assumed when parsing syntax because it was specified on the command line
 
     Found 1 diagnostic
@@ -1110,10 +1051,61 @@ fn config_file_broken_python_setting() -> anyhow::Result<()> {
     10 | [tool.ty.environment]
     11 | python = "not-a-directory-or-executable"
        |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ does not point to a Python executable or a directory on disk
-       |
 
       Cause: No such file or directory (os error 2)
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn config_file_unsupported_python_version() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            python-version = "2.7"
+            "#,
+        ),
+        ("test.py", ""),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ty failed
+      Cause: <temp_dir>/pyproject.toml is not a valid `pyproject.toml`
+      Cause: TOML parse error at line 3, column 18
+      |
+    3 | python-version = "2.7"
+      |                  ^^^^^
+    unknown variant `2.7`, expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn cli_unsupported_python_version() -> anyhow::Result<()> {
+    let case = CliTest::with_file("test.py", "")?;
+
+    assert_cmd_snapshot!(case.command().arg("--python-version=2.7"), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value '2.7' for '--python-version <VERSION>'
+      [possible values: 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.15]
+
+      tip: a similar value exists: '3.7'
+
+    For more information, try '--help'.
+    ");
 
     Ok(())
 }
@@ -1148,8 +1140,58 @@ fn config_file_python_setting_directory_with_no_site_packages() -> anyhow::Resul
     2 | [tool.ty.environment]
     3 | python = "directory-but-no-site-packages"
       |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Could not find a `site-packages` directory for this Python installation/executable
-      |
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn config_file_python_setting_directory_with_unsupported_python_version() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            python = "venv"
+            "#,
+        ),
+        (
+            "venv/pyvenv.cfg",
+            r#"
+            version_info = 3.16.0
+            home = base/bin
+            "#,
+        ),
+        if cfg!(target_os = "windows") {
+            ("base/bin/python.exe", "")
+        } else {
+            ("base/bin/python", "")
+        },
+        if cfg!(target_os = "windows") {
+            ("venv/Lib/site-packages/foo.py", "")
+        } else {
+            ("venv/lib/python3.16/site-packages/foo.py", "")
+        },
+        ("test.py", ""),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unsupported-python-version]: Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.15 instead.
+     --> venv/pyvenv.cfg:2:16
+      |
+    2 | version_info = 3.16.0
+      |                ^^^^^^
+    info: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.
+    info: Set `environment.python-version` explicitly to override the inferred version.
+    info: The version was inferred from your virtual environment metadata.
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -1186,7 +1228,6 @@ fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
     2 | [tool.ty.environment]
     3 | python = "directory-but-no-site-packages"
       |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-      |
     "#);
 
     Ok(())
@@ -1213,7 +1254,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
 
             os.grantpt(1) # only available on unix, Python 3.13 or newer
 
-            from typing import LiteralString  # added in Python 3.11
+            from typing import TypeAliasType  # added in Python 3.12
             "#,
         ),
     ])?;
@@ -1222,45 +1263,29 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-attribute]: Module `os` has no member `grantpt`
+    error[missing-attribute]: Module `os` has no member `grantpt`
      --> main.py:4:1
       |
-    2 | import os
-    3 |
     4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
       | ^^^^^^^^^^
-    5 |
-    6 | from typing import LiteralString  # added in Python 3.11
-      |
     info: The member may be available on other Python versions or platforms
-    info: Python 3.10 was assumed when resolving the `grantpt` attribute
+    info: Python 3.11 was assumed when resolving the `grantpt` attribute
      --> ty.toml:3:18
       |
-    2 | [environment]
-    3 | python-version = "3.10"
+    3 | python-version = "3.11"
       |                  ^^^^^^ Python version configuration
-    4 | python-platform = "linux"
-      |
-    info: rule `unresolved-attribute` is enabled by default
 
-    error[unresolved-import]: Module `typing` has no member `LiteralString`
+    error[missing-module-member]: Module `typing` has no member `TypeAliasType`
      --> main.py:6:20
       |
-    4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
-    5 |
-    6 | from typing import LiteralString  # added in Python 3.11
+    6 | from typing import TypeAliasType  # added in Python 3.12
       |                    ^^^^^^^^^^^^^
-      |
     info: The member may be available on other Python versions or platforms
-    info: Python 3.10 was assumed when resolving imports
+    info: Python 3.11 was assumed when resolving imports
      --> ty.toml:3:18
       |
-    2 | [environment]
-    3 | python-version = "3.10"
+    3 | python-version = "3.11"
       |                  ^^^^^^ Python version configuration
-    4 | python-platform = "linux"
-      |
-    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
@@ -1300,14 +1325,27 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// The `site-packages` directory is used by ty for external import.
-/// Ty does the following checks to discover the `site-packages` directory in the order:
-/// 1) If `VIRTUAL_ENV` environment variable is set
-/// 2) If `CONDA_PREFIX` environment variable is set (and .filename == `CONDA_DEFAULT_ENV`)
+fn write_conda_interpreters(case: &CliTest) -> anyhow::Result<()> {
+    let python = if cfg!(windows) {
+        "python.exe"
+    } else {
+        "bin/python"
+    };
+    for prefix in ["conda", "conda/envs/conda-env"] {
+        case.write_file(format!("{prefix}/{python}"), "")?;
+    }
+    Ok(())
+}
+
+/// The `site-packages` directory is used by ty for external imports.
+/// ty does the following checks to discover the `site-packages` directory in the order:
+/// 1) If the `VIRTUAL_ENV` environment variable is set to a non-empty value
+/// 2) If `CONDA_PREFIX` points to a child environment (e.g. its directory name matches
+///    `CONDA_DEFAULT_ENV`)
 /// 3) If a `.venv` directory exists at the project root
-/// 4) If `CONDA_PREFIX` environment variable is set (and .filename != `CONDA_DEFAULT_ENV`)
-///    or if `_CONDA_ROOT` is set (and `_CONDA_ROOT` == `CONDA_PREFIX`)
+/// 4) If `CONDA_PREFIX` points to the base environment (e.g. `_CONDA_ROOT` == `CONDA_PREFIX`)
 ///
+/// A Conda environment is considered only if it contains a Python interpreter.
 /// This test (and the next one) is aiming at validating the logic around these cases.
 ///
 /// To do this we create a program that has these 4 imports:
@@ -1348,6 +1386,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
 /// │               └── package1
 /// │                   └── __init__.py
 /// └── conda
+///     ├── bin/python
 ///     ├── lib
 ///     │   └── python3.13
 ///     │       └── site-packages
@@ -1355,6 +1394,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
 ///     │               └── __init__.py
 ///     └── envs
 ///         └── conda-env
+///             ├── bin/python
 ///             └── lib
 ///                 └── python3.13
 ///                     └── site-packages
@@ -1362,7 +1402,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
 ///                             └── __init__.py
 ///
 /// test.py imports package1
-/// And the command is run in the `child` directory.
+/// And the command is run in the `project` directory.
 #[test]
 fn check_venv_resolution_with_working_venv() -> anyhow::Result<()> {
     let child_conda_package1_path = if cfg!(windows) {
@@ -1447,22 +1487,37 @@ home = ./
         ),
     ])?;
 
+    write_conda_interpreters(&case)?;
+
     // Run with nothing set, should find the working venv
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `WorkingVenv`
+    error[missing-module-member]: Module `package1` has no member `WorkingVenv`
      --> test.py:4:22
       |
-    2 | from package1 import ActiveVenv
-    3 | from package1 import ChildConda
     4 | from package1 import WorkingVenv
       |                      ^^^^^^^^^^^
-    5 | from package1 import BaseConda
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // An empty VIRTUAL_ENV does not hide the working venv.
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("VIRTUAL_ENV", ""), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[missing-module-member]: Module `package1` has no member `WorkingVenv`
+     --> test.py:4:22
       |
-    info: rule `unresolved-import` is enabled by default
+    4 | from package1 import WorkingVenv
+      |                      ^^^^^^^^^^^
 
     Found 1 diagnostic
 
@@ -1476,15 +1531,11 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+    error[missing-module-member]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
       |                      ^^^^^^^^^^
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
-      |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1498,16 +1549,11 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ChildConda`
+    error[missing-module-member]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
-    2 | from package1 import ActiveVenv
     3 | from package1 import ChildConda
       |                      ^^^^^^^^^^
-    4 | from package1 import WorkingVenv
-    5 | from package1 import BaseConda
-      |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1522,16 +1568,11 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `WorkingVenv`
+    error[missing-module-member]: Module `package1` has no member `WorkingVenv`
      --> test.py:4:22
       |
-    2 | from package1 import ActiveVenv
-    3 | from package1 import ChildConda
     4 | from package1 import WorkingVenv
       |                      ^^^^^^^^^^^
-    5 | from package1 import BaseConda
-      |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1548,22 +1589,18 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+    error[missing-module-member]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
       |                      ^^^^^^^^^^
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
-      |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
     ");
 
-    // run with CONDA_PREFIX and CONDA_DEFAULT_ENV (equal!) set, should find ChildConda
+    // run with CONDA_DEFAULT_ENV set to the directory name of CONDA_PREFIX, should find ChildConda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
@@ -1571,16 +1608,11 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ChildConda`
+    error[missing-module-member]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
-    2 | from package1 import ActiveVenv
     3 | from package1 import ChildConda
       |                      ^^^^^^^^^^
-    4 | from package1 import WorkingVenv
-    5 | from package1 import BaseConda
-      |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1591,43 +1623,34 @@ home = ./
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
-        .env("_CONDA_ROOT", "conda"), @"
+        .env("_CONDA_ROOT", case.root().join("conda")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ChildConda`
+    error[missing-module-member]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
-    2 | from package1 import ActiveVenv
     3 | from package1 import ChildConda
       |                      ^^^^^^^^^^
-    4 | from package1 import WorkingVenv
-    5 | from package1 import BaseConda
-      |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
     ");
 
-    // run with _CONDA_ROOT and CONDA_PREFIX (equal!) set, should find BaseConda
+    // run with _CONDA_ROOT and CONDA_PREFIX (equal!) set, should find WorkingVenv
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("_CONDA_ROOT", "conda"), @"
+        .env("_CONDA_ROOT", case.root().join("conda")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `BaseConda`
-     --> test.py:5:22
+    error[missing-module-member]: Module `package1` has no member `WorkingVenv`
+     --> test.py:4:22
       |
-    3 | from package1 import ChildConda
     4 | from package1 import WorkingVenv
-    5 | from package1 import BaseConda
-      |                      ^^^^^^^^^
-      |
-    info: rule `unresolved-import` is enabled by default
+      |                      ^^^^^^^^^^^
 
     Found 1 diagnostic
 
@@ -1703,69 +1726,53 @@ home = ./
         ),
     ])?;
 
+    write_conda_interpreters(&case)?;
+
     // Run with nothing set, should fail to find anything
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `package1`
+    error[import-not-found]: Cannot resolve imported module `package1`
      --> test.py:2:6
       |
     2 | from package1 import ActiveVenv
       |      ^^^^^^^^
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
-    error[unresolved-import]: Cannot resolve imported module `package1`
+    error[import-not-found]: Cannot resolve imported module `package1`
      --> test.py:3:6
       |
-    2 | from package1 import ActiveVenv
     3 | from package1 import ChildConda
       |      ^^^^^^^^
-    4 | from package1 import WorkingVenv
-    5 | from package1 import BaseConda
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
-    error[unresolved-import]: Cannot resolve imported module `package1`
+    error[import-not-found]: Cannot resolve imported module `package1`
      --> test.py:4:6
       |
-    2 | from package1 import ActiveVenv
-    3 | from package1 import ChildConda
     4 | from package1 import WorkingVenv
       |      ^^^^^^^^
-    5 | from package1 import BaseConda
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
-    error[unresolved-import]: Cannot resolve imported module `package1`
+    error[import-not-found]: Cannot resolve imported module `package1`
      --> test.py:5:6
       |
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
     5 | from package1 import BaseConda
       |      ^^^^^^^^
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 4 diagnostics
 
@@ -1779,15 +1786,11 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+    error[missing-module-member]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
       |                      ^^^^^^^^^^
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
-      |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1801,16 +1804,11 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ChildConda`
+    error[missing-module-member]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
-    2 | from package1 import ActiveVenv
     3 | from package1 import ChildConda
       |                      ^^^^^^^^^^
-    4 | from package1 import WorkingVenv
-    5 | from package1 import BaseConda
-      |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1825,15 +1823,11 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `BaseConda`
+    error[missing-module-member]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
     5 | from package1 import BaseConda
       |                      ^^^^^^^^^
-      |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1850,15 +1844,11 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+    error[missing-module-member]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
       |                      ^^^^^^^^^^
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
-      |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1873,15 +1863,11 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `BaseConda`
+    error[missing-module-member]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
     5 | from package1 import BaseConda
       |                      ^^^^^^^^^
-      |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1892,20 +1878,15 @@ home = ./
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
-        .env("_CONDA_ROOT", "conda"), @"
+        .env("_CONDA_ROOT", case.root().join("conda")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `ChildConda`
+    error[missing-module-member]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
-    2 | from package1 import ActiveVenv
     3 | from package1 import ChildConda
       |                      ^^^^^^^^^^
-    4 | from package1 import WorkingVenv
-    5 | from package1 import BaseConda
-      |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -1916,413 +1897,20 @@ home = ./
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("_CONDA_ROOT", "conda"), @"
+        .env("_CONDA_ROOT", case.root().join("conda")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `BaseConda`
+    error[missing-module-member]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
-    3 | from package1 import ChildConda
-    4 | from package1 import WorkingVenv
     5 | from package1 import BaseConda
       |                      ^^^^^^^^^
-      |
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
     ");
-
-    Ok(())
-}
-
-/// ty should include site packages from its own environment when no other environment is found.
-#[test]
-fn ty_environment_is_only_environment() -> anyhow::Result<()> {
-    let ty_venv_site_packages = if cfg!(windows) {
-        "ty-venv/Lib/site-packages"
-    } else {
-        "ty-venv/lib/python3.13/site-packages"
-    };
-
-    let ty_executable_path = if cfg!(windows) {
-        "ty-venv/Scripts/ty.exe"
-    } else {
-        "ty-venv/bin/ty"
-    };
-
-    let ty_package_path = format!("{ty_venv_site_packages}/ty_package/__init__.py");
-
-    let case = CliTest::with_files([
-        (ty_package_path.as_str(), "class TyEnvClass: ..."),
-        (
-            "ty-venv/pyvenv.cfg",
-            r"
-            home = ./
-            version = 3.13
-            ",
-        ),
-        (
-            "test.py",
-            r"
-            from ty_package import TyEnvClass
-            ",
-        ),
-    ])?;
-
-    let case = case.with_ty_at(ty_executable_path)?;
-    assert_cmd_snapshot!(case.command(), @"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    All checks passed!
-
-    ----- stderr -----
-    ");
-
-    Ok(())
-}
-
-/// ty should include site packages from both its own environment and a local `.venv`. The packages
-/// from ty's environment should take precedence.
-#[test]
-fn ty_environment_and_discovered_venv() -> anyhow::Result<()> {
-    let ty_venv_site_packages = if cfg!(windows) {
-        "ty-venv/Lib/site-packages"
-    } else {
-        "ty-venv/lib/python3.13/site-packages"
-    };
-
-    let ty_executable_path = if cfg!(windows) {
-        "ty-venv/Scripts/ty.exe"
-    } else {
-        "ty-venv/bin/ty"
-    };
-
-    let local_venv_site_packages = if cfg!(windows) {
-        ".venv/Lib/site-packages"
-    } else {
-        ".venv/lib/python3.13/site-packages"
-    };
-
-    let ty_unique_package = format!("{ty_venv_site_packages}/ty_package/__init__.py");
-    let local_unique_package = format!("{local_venv_site_packages}/local_package/__init__.py");
-    let ty_conflicting_package = format!("{ty_venv_site_packages}/shared_package/__init__.py");
-    let local_conflicting_package =
-        format!("{local_venv_site_packages}/shared_package/__init__.py");
-
-    let case = CliTest::with_files([
-        (ty_unique_package.as_str(), "class TyEnvClass: ..."),
-        (local_unique_package.as_str(), "class LocalClass: ..."),
-        (ty_conflicting_package.as_str(), "class FromTyEnv: ..."),
-        (
-            local_conflicting_package.as_str(),
-            "class FromLocalVenv: ...",
-        ),
-        (
-            "ty-venv/pyvenv.cfg",
-            r"
-            home = ./
-            version = 3.13
-            ",
-        ),
-        (
-            ".venv/pyvenv.cfg",
-            r"
-            home = ./
-            version = 3.13
-            ",
-        ),
-        (
-            "test.py",
-            r"
-            # Should resolve from ty's environment
-            from ty_package import TyEnvClass
-            # Should resolve from local .venv
-            from local_package import LocalClass
-            # Should resolve from ty's environment (takes precedence)
-            from shared_package import FromTyEnv
-            # Should NOT resolve (shadowed by ty's environment version)
-            from shared_package import FromLocalVenv
-            ",
-        ),
-    ])?
-    .with_ty_at(ty_executable_path)?;
-
-    assert_cmd_snapshot!(case.command(), @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    error[unresolved-import]: Module `shared_package` has no member `FromLocalVenv`
-     --> test.py:9:28
-      |
-    7 | from shared_package import FromTyEnv
-    8 | # Should NOT resolve (shadowed by ty's environment version)
-    9 | from shared_package import FromLocalVenv
-      |                            ^^^^^^^^^^^^^
-      |
-    info: rule `unresolved-import` is enabled by default
-
-    Found 1 diagnostic
-
-    ----- stderr -----
-    ");
-
-    Ok(())
-}
-
-/// When `VIRTUAL_ENV` is set, ty should *not* discover its own environment's site-packages.
-#[test]
-fn ty_environment_and_active_environment() -> anyhow::Result<()> {
-    let ty_venv_site_packages = if cfg!(windows) {
-        "ty-venv/Lib/site-packages"
-    } else {
-        "ty-venv/lib/python3.13/site-packages"
-    };
-
-    let ty_executable_path = if cfg!(windows) {
-        "ty-venv/Scripts/ty.exe"
-    } else {
-        "ty-venv/bin/ty"
-    };
-
-    let active_venv_site_packages = if cfg!(windows) {
-        "active-venv/Lib/site-packages"
-    } else {
-        "active-venv/lib/python3.13/site-packages"
-    };
-
-    let ty_package_path = format!("{ty_venv_site_packages}/ty_package/__init__.py");
-    let active_package_path = format!("{active_venv_site_packages}/active_package/__init__.py");
-
-    let case = CliTest::with_files([
-        (ty_package_path.as_str(), "class TyEnvClass: ..."),
-        (
-            "ty-venv/pyvenv.cfg",
-            r"
-            home = ./
-            version = 3.13
-            ",
-        ),
-        (active_package_path.as_str(), "class ActiveClass: ..."),
-        (
-            "active-venv/pyvenv.cfg",
-            r"
-            home = ./
-            version = 3.13
-            ",
-        ),
-        (
-            "test.py",
-            r"
-            from ty_package import TyEnvClass
-            from active_package import ActiveClass
-            ",
-        ),
-    ])?
-    .with_ty_at(ty_executable_path)?
-    .with_filter(&site_packages_filter("3.13"), "<site-packages>");
-
-    assert_cmd_snapshot!(
-        case.command()
-            .env("VIRTUAL_ENV", case.root().join("active-venv")),
-        @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `ty_package`
-     --> test.py:2:6
-      |
-    2 | from ty_package import TyEnvClass
-      |      ^^^^^^^^^^
-    3 | from active_package import ActiveClass
-      |
-    info: Searched in the following paths during module resolution:
-    info:   1. <temp_dir>/ (first-party code)
-    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info:   3. <temp_dir>/active-venv/<site-packages> (site-packages)
-    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
-
-    Found 1 diagnostic
-
-    ----- stderr -----
-    "
-    );
-
-    Ok(())
-}
-
-/// When ty is installed in a system environment rather than a virtual environment, it should
-/// not include the environment's site-packages in its search path.
-#[test]
-fn ty_environment_is_system_not_virtual() -> anyhow::Result<()> {
-    let ty_system_site_packages = if cfg!(windows) {
-        "system-python/Lib/site-packages"
-    } else {
-        "system-python/lib/python3.13/site-packages"
-    };
-
-    let ty_executable_path = if cfg!(windows) {
-        "system-python/Scripts/ty.exe"
-    } else {
-        "system-python/bin/ty"
-    };
-
-    let ty_package_path = format!("{ty_system_site_packages}/system_package/__init__.py");
-
-    let case = CliTest::with_files([
-        // Package in system Python installation (should NOT be discovered)
-        (ty_package_path.as_str(), "class SystemClass: ..."),
-        // Note: NO pyvenv.cfg - this is a system installation, not a venv
-        (
-            "test.py",
-            r"
-            from system_package import SystemClass
-            ",
-        ),
-    ])?
-    .with_ty_at(ty_executable_path)?;
-
-    assert_cmd_snapshot!(case.command(), @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `system_package`
-     --> test.py:2:6
-      |
-    2 | from system_package import SystemClass
-      |      ^^^^^^^^^^^^^^
-      |
-    info: Searched in the following paths during module resolution:
-    info:   1. <temp_dir>/ (first-party code)
-    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
-    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
-
-    Found 1 diagnostic
-
-    ----- stderr -----
-    ");
-
-    Ok(())
-}
-
-#[test]
-fn src_root_deprecation_warning() -> anyhow::Result<()> {
-    let case = CliTest::with_files([
-        (
-            "pyproject.toml",
-            r#"
-            [tool.ty.src]
-            root = "./src"
-            "#,
-        ),
-        ("src/test.py", ""),
-    ])?;
-
-    assert_cmd_snapshot!(case.command(), @r#"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    warning[deprecated-setting]: The `src.root` setting is deprecated. Use `environment.root` instead.
-     --> pyproject.toml:3:8
-      |
-    2 | [tool.ty.src]
-    3 | root = "./src"
-      |        ^^^^^^^
-      |
-
-    Found 1 diagnostic
-
-    ----- stderr -----
-    "#);
-
-    Ok(())
-}
-
-#[test]
-fn src_root_deprecation_warning_with_environment_root() -> anyhow::Result<()> {
-    let case = CliTest::with_files([
-        (
-            "pyproject.toml",
-            r#"
-            [tool.ty.src]
-            root = "./src"
-
-            [tool.ty.environment]
-            root = ["./app"]
-            "#,
-        ),
-        ("app/test.py", ""),
-    ])?;
-
-    assert_cmd_snapshot!(case.command(), @r#"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    warning[deprecated-setting]: The `src.root` setting is deprecated. Use `environment.root` instead.
-     --> pyproject.toml:3:8
-      |
-    2 | [tool.ty.src]
-    3 | root = "./src"
-      |        ^^^^^^^
-    4 |
-    5 | [tool.ty.environment]
-      |
-    info: The `src.root` setting was ignored in favor of the `environment.root` setting
-
-    Found 1 diagnostic
-
-    ----- stderr -----
-    "#);
-
-    Ok(())
-}
-
-#[test]
-fn environment_root_takes_precedence_over_src_root() -> anyhow::Result<()> {
-    let case = CliTest::with_files([
-        (
-            "pyproject.toml",
-            r#"
-            [tool.ty.src]
-            root = "./src"
-
-            [tool.ty.environment]
-            root = ["./app"]
-            "#,
-        ),
-        ("src/test.py", "import my_module"),
-        (
-            "app/my_module.py",
-            "# This module exists in app/ but not src/",
-        ),
-    ])?;
-
-    // The test should pass because environment.root points to ./app where my_module.py exists
-    // If src.root took precedence, it would fail because my_module.py doesn't exist in ./src
-    assert_cmd_snapshot!(case.command(), @r#"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    warning[deprecated-setting]: The `src.root` setting is deprecated. Use `environment.root` instead.
-     --> pyproject.toml:3:8
-      |
-    2 | [tool.ty.src]
-    3 | root = "./src"
-      |        ^^^^^^^
-    4 |
-    5 | [tool.ty.environment]
-      |
-    info: The `src.root` setting was ignored in favor of the `environment.root` setting
-
-    Found 1 diagnostic
-
-    ----- stderr -----
-    "#);
 
     Ok(())
 }
@@ -2376,6 +1964,38 @@ fn default_root_project_name_folder() -> anyhow::Result<()> {
             print(f"{foo} {bar}")
             "#,
         ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// This is the "flat layout", but it looks *nearly* like the "src variant" layout.
+/// If `psycopg/__init__.py` didn't exist, we'd add `psycopg/` as a search path --
+/// but because it *does*, we can see that this is clearly meant to be the flat layout.
+#[test]
+fn default_root_flat_layout_variant() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            name = "psycopg"
+            "#,
+        ),
+        ("psycopg/__init__.py", ""),
+        ("psycopg/box.py", "class Box: ..."),
+        // This import only resolves because of the fact that
+        // `./psycopg` was *not* added as a search path.
+        ("psycopg/psycopg/__init__.py", "from psycopg.box import Box"),
     ])?;
 
     assert_cmd_snapshot!(case.command(), @"
@@ -2464,30 +2084,25 @@ fn default_root_tests_package() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> tests/test_bar.py:3:6
       |
-    2 | from foo import foo
     3 | from bar import bar  # expected unresolved import
       |      ^^^
-    4 |
-    5 | print(f"{foo} {bar}")
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
     info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "#);
+    ");
 
     Ok(())
 }
@@ -2538,30 +2153,25 @@ fn default_root_python_package() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> python/test_bar.py:3:6
       |
-    2 | from foo import foo
     3 | from bar import bar  # expected unresolved import
       |      ^^^
-    4 |
-    5 | print(f"{foo} {bar}")
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
     info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "#);
+    ");
 
     Ok(())
 }
@@ -2584,30 +2194,25 @@ fn default_root_python_package_pyi() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `bar`
+    error[import-not-found]: Cannot resolve imported module `bar`
      --> python/test_bar.py:3:6
       |
-    2 | from foo import foo
     3 | from bar import bar  # expected unresolved import
       |      ^^^
-    4 |
-    5 | print(f"{foo} {bar}")
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
     info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "#);
+    ");
 
     Ok(())
 }
@@ -2626,28 +2231,25 @@ fn pythonpath_is_respected() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command(),
-        @r#"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> src/foo.py:2:8
       |
     2 | import baz
       |        ^^^
-    3 | print(f"{baz.it}")
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
     info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "#);
+    ");
 
     assert_cmd_snapshot!(case.command()
         .env("PYTHONPATH", case.root().join("baz-dir")),
@@ -2681,44 +2283,36 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command(),
-        @r#"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `baz`
+    error[import-not-found]: Cannot resolve imported module `baz`
      --> src/main.py:2:8
       |
     2 | import baz
       |        ^^^
-    3 | import foo
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
     info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
-    error[unresolved-import]: Cannot resolve imported module `foo`
+    error[import-not-found]: Cannot resolve imported module `foo`
      --> src/main.py:3:8
       |
-    2 | import baz
     3 | import foo
       |        ^^^
-    4 |
-    5 | print(f"{baz.it}")
-      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
     info:   2. <temp_dir>/ (first-party code)
     info:   3. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-    info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
-    "#);
+    ");
 
     let pythonpath =
         std::env::join_paths([case.root().join("baz-dir"), case.root().join("foo-dir")])?;

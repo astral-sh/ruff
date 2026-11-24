@@ -1,7 +1,7 @@
 use std::fmt::Debug;
-use std::fs::{self, File};
+use std::fs;
 use std::hash::Hasher;
-use std::io::{self, BufReader, Write};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -18,15 +18,56 @@ use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_linter::package::PackageRoot;
+use ruff_linter::settings::types::PreviewMode;
 use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
+use ruff_python_ast::SourceType;
 use ruff_workspace::Settings;
 use ruff_workspace::resolver::Resolver;
+use ruff_workspace::script::{Script, should_read_script_metadata};
+
+use crate::args::ConfigArguments;
 
 /// [`Path`] that is relative to the package root in [`PackageCache`].
 pub(crate) type RelativePath = Path;
 /// [`PathBuf`] that is relative to the package root in [`PackageCache`].
 pub(crate) type RelativePathBuf = PathBuf;
+
+/// Part of the file key because an explicit Python target can override a script's
+/// requirement while leaving the project's target and package cache key unchanged.
+#[derive(Clone, Copy, CacheKey)]
+pub(crate) enum ScriptCacheMode {
+    /// Script metadata is disabled for this file.
+    MetadataDisabled,
+    /// Cache only scripts with no Ruff settings or Python requirement.
+    ProjectOnly,
+    /// A Python requirement is cacheable because it changes with the source.
+    AllowRequirements,
+}
+
+impl ScriptCacheMode {
+    pub(crate) fn new(
+        preview: PreviewMode,
+        source_type: SourceType,
+        overrides: &ConfigArguments,
+    ) -> Self {
+        if !should_read_script_metadata(preview, source_type) {
+            Self::MetadataDisabled
+        } else if overrides.overrides_script_target() {
+            Self::ProjectOnly
+        } else {
+            Self::AllowRequirements
+        }
+    }
+
+    pub(crate) fn allows(self, script: Option<&Script>) -> bool {
+        match (self, script) {
+            (Self::MetadataDisabled, _) | (_, None) => true,
+            (Self::ProjectOnly, Some(script)) => !script.declares_settings(),
+            (Self::AllowRequirements, Some(script)) => !script.has_ruff_table(),
+        }
+    }
+}
 
 #[derive(CacheKey)]
 pub(crate) struct FileCacheKey {
@@ -34,10 +75,12 @@ pub(crate) struct FileCacheKey {
     file_last_modified: FileTime,
     /// Permissions of the file before the (cached) check.
     file_permissions_mode: u32,
+    /// Files with nested configurations can share a package cache with a different preview mode.
+    script_mode: ScriptCacheMode,
 }
 
 impl FileCacheKey {
-    pub(crate) fn from_path(path: &Path) -> io::Result<FileCacheKey> {
+    pub(crate) fn from_path(path: &Path, script_mode: ScriptCacheMode) -> io::Result<FileCacheKey> {
         // Construct a cache key for the file
         let metadata = path.metadata()?;
 
@@ -52,6 +95,7 @@ impl FileCacheKey {
         Ok(FileCacheKey {
             file_last_modified: FileTime::from_last_modification_time(&metadata),
             file_permissions_mode: permissions,
+            script_mode,
         })
     }
 }
@@ -91,14 +135,14 @@ impl Cache {
     ///
     /// Finally `settings` is used to ensure we don't open a cache for different
     /// settings. It also defines the directory where to store the cache.
-    pub(crate) fn open(package_root: PathBuf, settings: &Settings) -> Self {
+    fn open(package_root: PathBuf, settings: &Settings) -> Self {
         debug_assert!(package_root.is_absolute(), "package root not canonicalized");
 
         let key = format!("{}", cache_key(&package_root, settings));
         let path = PathBuf::from_iter([&settings.cache_dir, Path::new(VERSION), Path::new(&key)]);
 
-        let file = match File::open(&path) {
-            Ok(file) => file,
+        let serialized = match fs::read(&path) {
+            Ok(serialized) => serialized,
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 // No cache exist yet, return an empty cache.
                 return Cache::empty(path, package_root);
@@ -109,8 +153,10 @@ impl Cache {
             }
         };
 
-        let mut package: PackageCache =
-            match bincode::decode_from_reader(BufReader::new(file), bincode::config::standard()) {
+        let mut package =
+            match rkyv::access::<ArchivedPackageCache, rkyv::rancor::Error>(&serialized)
+                .and_then(rkyv::deserialize::<PackageCache, rkyv::rancor::Error>)
+            {
                 Ok(package) => package,
                 Err(err) => {
                     warn_user!("Failed parse cache file `{}`: {err}", path.display());
@@ -152,7 +198,7 @@ impl Cache {
     }
 
     /// Applies the pending changes and persists the cache to disk, if it has been changed.
-    pub(crate) fn persist(mut self) -> Result<()> {
+    fn persist(mut self) -> Result<()> {
         if !self.save() {
             // No changes made, no need to write the same cache file back to
             // disk.
@@ -162,13 +208,12 @@ impl Cache {
         // Write the cache to a temporary file first and then rename it for an "atomic" write.
         // Protects against data loss if the process is killed during the write and races between different ruff
         // processes, resulting in a corrupted cache file. https://github.com/astral-sh/ruff/issues/8147#issuecomment-1943345964
-        let mut temp_file =
-            NamedTempFile::new_in(self.path.parent().expect("Write path must have a parent"))
-                .context("Failed to create temporary file")?;
+        let mut temp_file = tempfile_in(self.path.parent().expect("Write path must have a parent"))
+            .context("Failed to create temporary file")?;
 
         // Serialize to in-memory buffer because hyperfine benchmark showed that it's faster than
         // using a `BufWriter` and our cache files are small enough that streaming isn't necessary.
-        let serialized = bincode::encode_to_vec(&self.package, bincode::config::standard())
+        let serialized = rkyv::to_bytes::<rkyv::rancor::Error>(&self.package)
             .context("Failed to serialize cache data")?;
         temp_file
             .write_all(&serialized)
@@ -198,9 +243,9 @@ impl Cache {
 
     /// Applies the pending changes without storing the cache to disk.
     #[expect(clippy::cast_possible_truncation)]
-    pub(crate) fn save(&mut self) -> bool {
+    fn save(&mut self) -> bool {
         /// Maximum duration for which we keep a file in cache that hasn't been seen.
-        const MAX_LAST_SEEN: Duration = Duration::from_secs(30 * 24 * 60 * 60); // 30 days.
+        const MAX_LAST_SEEN: Duration = Duration::from_hours(720); // 30 days.
 
         let changes = std::mem::take(self.changes.get_mut().unwrap());
         if changes.is_empty() {
@@ -298,20 +343,41 @@ impl Cache {
     }
 }
 
+/// Return a [`NamedTempFile`] in the specified directory.
+///
+/// Sets the permissions of the temporary file to `0o666`, to match the non-temporary file
+/// default. ([`NamedTempFile`] defaults to `0o600`.)
+#[cfg(unix)]
+fn tempfile_in(path: &Path) -> io::Result<NamedTempFile> {
+    use std::os::unix::fs::PermissionsExt;
+
+    tempfile::Builder::new()
+        .permissions(fs::Permissions::from_mode(0o666))
+        .tempfile_in(path)
+}
+
+/// Return a [`NamedTempFile`] in the specified directory.
+#[cfg(not(unix))]
+fn tempfile_in(path: &Path) -> io::Result<NamedTempFile> {
+    tempfile::Builder::new().tempfile_in(path)
+}
+
 /// On disk representation of a cache of a package.
-#[derive(bincode::Encode, Debug, bincode::Decode)]
+#[derive(rkyv::Archive, Debug, rkyv::Deserialize, rkyv::Serialize)]
 struct PackageCache {
     /// Path to the root of the package.
     ///
     /// Usually this is a directory, but it can also be a single file in case of
     /// single file "packages", e.g. scripts.
+    #[rkyv(with = rkyv::with::AsString)]
     package_root: PathBuf,
     /// Mapping of source file path to it's cached data.
+    #[rkyv(with = rkyv::with::MapKV<rkyv::with::AsString, rkyv::with::Identity>)]
     files: FxHashMap<RelativePathBuf, FileCache>,
 }
 
 /// On disk representation of the cache per source file.
-#[derive(bincode::Decode, Debug, bincode::Encode)]
+#[derive(rkyv::Deserialize, rkyv::Serialize, Debug, rkyv::Archive)]
 pub(crate) struct FileCache {
     /// Key that determines if the cached item is still valid.
     key: u64,
@@ -319,6 +385,7 @@ pub(crate) struct FileCache {
     ///
     /// Represented as the number of milliseconds since Unix epoch. This will
     /// break in 1970 + ~584 years (~2554).
+    #[rkyv(with = rkyv::with::AtomicLoad<rkyv::with::Relaxed>)]
     last_seen: AtomicU64,
 
     data: FileCacheData,
@@ -331,7 +398,7 @@ impl FileCache {
     }
 }
 
-#[derive(Debug, Default, bincode::Decode, bincode::Encode)]
+#[derive(Debug, Default, rkyv::Deserialize, rkyv::Serialize, rkyv::Archive)]
 struct FileCacheData {
     linted: bool,
     formatted: bool,
@@ -348,7 +415,7 @@ fn cache_key(package_root: &Path, settings: &Settings) -> u64 {
 }
 
 /// Initialize the cache at the specified `Path`.
-pub(crate) fn init(path: &Path) -> Result<()> {
+fn init(path: &Path) -> Result<()> {
     // Create the cache directories.
     fs::create_dir_all(path.join(VERSION))?;
 
@@ -485,21 +552,41 @@ mod tests {
 
     use anyhow::Result;
     use filetime::{FileTime, set_file_mtime};
+    use indoc::indoc;
     use itertools::Itertools;
+    use ruff_python_ast::SourceType;
+    use rustc_hash::FxHashMap;
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
+    use ruff_linter::UnresolvedRuleSelector;
     use ruff_linter::package::PackageRoot;
-    use ruff_linter::settings::LinterSettings;
     use ruff_linter::settings::flags;
-    use ruff_linter::settings::types::UnsafeFixes;
-    use ruff_python_ast::{PySourceType, PythonVersion};
-    use ruff_workspace::Settings;
+    use ruff_linter::settings::types::{PreviewMode, UnsafeFixes};
+    use ruff_python_ast::PySourceType;
+    use ruff_python_ast::PythonVersion;
+    use ruff_workspace::configuration::{Configuration, RuleSelection};
+    use ruff_workspace::resolver::Project;
+
+    use crate::args::ConfigArguments;
 
     use crate::cache::{self, ChangeData, FileCache, FileCacheData, FileCacheKey};
-    use crate::cache::{Cache, RelativePathBuf};
+    use crate::cache::{Cache, RelativePathBuf, ScriptCacheMode};
     use crate::commands::format::{FormatCommandError, FormatMode, FormatResult, format_path};
     use crate::diagnostics::{Diagnostics, lint_path};
+
+    fn test_project(root: &Path, cache_dir: PathBuf, rule: &str) -> Project {
+        let mut configuration = Configuration {
+            cache_dir: Some(cache_dir),
+            target_version: Some(PythonVersion::latest()),
+            ..Configuration::default()
+        };
+        configuration.lint.rule_selections.push(RuleSelection {
+            select: Some(vec![UnresolvedRuleSelector::cli(rule)]),
+            ..RuleSelection::default()
+        });
+        Project::resolve(configuration, root, &ConfigArguments::default()).unwrap()
+    }
 
     #[test_case("../ruff_linter/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_linter"; "ruff_linter_fixtures")]
     #[test_case("../ruff_notebook/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_notebook"; "ruff_notebook_fixtures")]
@@ -509,17 +596,10 @@ mod tests {
         let _ = fs::remove_dir_all(&cache_dir);
         cache::init(&cache_dir).unwrap();
 
-        let settings = Settings {
-            cache_dir,
-            linter: LinterSettings {
-                unresolved_target_version: PythonVersion::latest().into(),
-                ..Default::default()
-            },
-            ..Settings::default()
-        };
-
+        let overrides = ConfigArguments::default();
         let package_root = fs::canonicalize(package_root).unwrap();
-        let cache = Cache::open(package_root.clone(), &settings);
+        let project = test_project(&package_root, cache_dir, "F841");
+        let cache = Cache::open(package_root.clone(), &project.settings);
         assert_eq!(cache.changes.lock().unwrap().len(), 0);
 
         let mut paths = Vec::new();
@@ -550,7 +630,9 @@ mod tests {
                 let mut diagnostics = lint_path(
                     &path,
                     Some(PackageRoot::root(&package_root)),
-                    &settings.linter,
+                    &FxHashMap::default(),
+                    &project,
+                    &overrides,
                     Some(&cache),
                     flags::Noqa::Enabled,
                     flags::FixMode::Generate,
@@ -575,7 +657,7 @@ mod tests {
 
         cache.persist().unwrap();
 
-        let cache = Cache::open(package_root.clone(), &settings);
+        let cache = Cache::open(package_root.clone(), &project.settings);
         assert_ne!(cache.package.files.len(), 0);
 
         paths_with_diagnostics.sort();
@@ -599,7 +681,9 @@ mod tests {
             got_diagnostics += lint_path(
                 &path,
                 Some(PackageRoot::root(&package_root)),
-                &settings.linter,
+                &FxHashMap::default(),
+                &project,
+                &overrides,
                 Some(&cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
@@ -612,6 +696,58 @@ mod tests {
             expected_diagnostics, got_diagnostics,
             "left == {expected_diagnostics:#?}, right == {got_diagnostics:#?}",
         );
+    }
+
+    #[test]
+    fn cache_skips_only_scripts_with_ruff_tables() -> Result<()> {
+        let mut test = TestCache::new("cache_skips_only_scripts_with_ruff_tables");
+        test.project.settings.preview = PreviewMode::Enabled;
+        let cache = test.open();
+        let check = |name: &str, source: &str| -> Result<()> {
+            test.write_source_file(name, source.as_bytes());
+            assert!(test.lint_file_with_cache(name, &cache)?.inner.is_empty());
+            test.format_file_with_cache(name, &cache).unwrap();
+            Ok(())
+        };
+        check(
+            "version.py",
+            indoc! {r#"
+                # /// script
+                # requires-python = ">=3.12"
+                # ///
+                x = 1
+            "#},
+        )?;
+        check(
+            "inline.py",
+            indoc! {r#"
+                # /// script
+                # [tool.ruff]
+                # ///
+                x = 1
+            "#},
+        )?;
+        check(
+            "dependencies.py",
+            indoc! {r#"
+                # /// script
+                # dependencies = []
+                # ///
+                x = 1
+            "#},
+        )?;
+        check("ordinary.py", "")?;
+
+        cache.persist()?;
+        let files = test.open().package.files;
+        assert!(files[Path::new("version.py")].linted());
+        assert!(files[Path::new("version.py")].data.formatted);
+        assert!(!files.contains_key(Path::new("inline.py")));
+        assert!(files[Path::new("dependencies.py")].linted());
+        assert!(files[Path::new("dependencies.py")].data.formatted);
+        assert!(files[Path::new("ordinary.py")].linted());
+        assert!(files[Path::new("ordinary.py")].data.formatted);
+        Ok(())
     }
 
     #[test]
@@ -860,6 +996,40 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn cache_file_permissions_match_default_file_permissions() {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
+
+        let test_cache = TestCache::new("cache_file_permissions_match_default_file_permissions");
+        let cache = test_cache.open();
+        let cache_path = cache.path.clone();
+        test_cache.write_source_file("source.py", source);
+
+        test_cache
+            .lint_file_with_cache("source.py", &cache)
+            .expect("Failed to lint test file");
+        cache.persist().unwrap();
+
+        let control_path = cache_path.with_extension("control");
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o666)
+            .open(&control_path)
+            .unwrap();
+
+        let cache_mode = fs::metadata(&cache_path).unwrap().permissions().mode() & 0o777;
+        let control_mode = fs::metadata(&control_path).unwrap().permissions().mode() & 0o777;
+
+        assert_eq!(
+            cache_mode, control_mode,
+            "Cache files should respect the same default permissions as regular files"
+        );
+    }
+
     #[test]
     fn format_updates_cache_entry() {
         let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
@@ -891,7 +1061,11 @@ mod tests {
 
         let Some(file_cache) = cache.get(
             Path::new("source.py"),
-            &FileCacheKey::from_path(&test_cache.package_root.join("source.py")).unwrap(),
+            &FileCacheKey::from_path(
+                &test_cache.package_root.join("source.py"),
+                ScriptCacheMode::MetadataDisabled,
+            )
+            .unwrap(),
         ) else {
             panic!("Cache entry for `source.py` is missing.");
         };
@@ -941,7 +1115,7 @@ mod tests {
 
         let Some(file_cache) = cache.get(
             Path::new("source.py"),
-            &FileCacheKey::from_path(&source_path).unwrap(),
+            &FileCacheKey::from_path(&source_path, ScriptCacheMode::MetadataDisabled).unwrap(),
         ) else {
             panic!("Cache entry for `source.py` is missing.");
         };
@@ -952,7 +1126,7 @@ mod tests {
 
     struct TestCache {
         package_root: PathBuf,
-        settings: Settings,
+        project: Project,
     }
 
     impl TestCache {
@@ -971,14 +1145,10 @@ mod tests {
             cache::init(&cache_dir).unwrap();
             fs::create_dir(package_root.clone()).unwrap();
 
-            let settings = Settings {
-                cache_dir,
-                ..Settings::default()
-            };
-
+            let project = test_project(&package_root, cache_dir, "F822");
             Self {
                 package_root,
-                settings,
+                project,
             }
         }
 
@@ -996,7 +1166,7 @@ mod tests {
         }
 
         fn open(&self) -> Cache {
-            Cache::open(self.package_root.clone(), &self.settings)
+            Cache::open(self.package_root.clone(), &self.project.settings)
         }
 
         fn lint_file_with_cache(
@@ -1007,7 +1177,9 @@ mod tests {
             lint_path(
                 &self.package_root.join(path),
                 Some(PackageRoot::root(&self.package_root)),
-                &self.settings.linter,
+                &FxHashMap::default(),
+                &self.project,
+                &ConfigArguments::default(),
                 Some(cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
@@ -1023,8 +1195,9 @@ mod tests {
             let file_path = self.package_root.join(path);
             format_path(
                 &file_path,
-                &self.settings.formatter,
-                PySourceType::Python,
+                &self.project,
+                &ConfigArguments::default(),
+                SourceType::Python(PySourceType::Python),
                 FormatMode::Write,
                 None,
                 Some(cache),
@@ -1034,7 +1207,7 @@ mod tests {
 
     impl Drop for TestCache {
         fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.settings.cache_dir);
+            let _ = fs::remove_dir_all(&self.project.settings.cache_dir);
         }
     }
 }

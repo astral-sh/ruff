@@ -1,0 +1,213 @@
+#!/usr/bin/env -S uv run --script
+#
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["mypy-primer"]
+#
+# [tool.uv]
+# no-build = true
+# no-binary-package = ["mypy-primer"]
+# build-constraint-dependencies = [
+#     { requirement = "setuptools==84.0.0", hashes = [
+#         "sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670",
+#         "sha256:f4695c21257f0d9b537ec2692c941d02ee143b7cc1276941349a546573b2ef73",
+#     ] },
+# ]
+# # This is the default for ad hoc use. Historical ecosystem reproduction must
+# # bypass the adjacent lock and select ecosystem-analyzer's exact mypy-primer
+# # revision and project Python version, as shown in the module docstring.
+# # `exclude-newer` still constrains mypy-primer's registry dependencies.
+# exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
+#
+# [tool.uv.sources]
+# # Keep the script's lockfile in sync with the mypy-primer pin in the project's uv.lock file
+# # so memory reports and ecosystem jobs use the same project definitions.
+# mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer" }
+# ///
+
+"""Clone a mypy-primer project and set up a virtualenv with its dependencies installed.
+
+For ecosystem-report reproduction, always select the project's ecosystem-analyzer Python version and bypass the adjacent lock with the exact mypy-primer revision pinned by ecosystem-analyzer:
+
+uv run --python <version> --with "mypy-primer @ git+https://github.com/hauntsaninja/mypy_primer@<mypy-primer-revision>" --no-project python scripts/setup_primer_project.py <project-name> [directory] [options]
+"""
+
+from __future__ import annotations
+
+import argparse
+import shlex
+import subprocess
+import sys
+from pathlib import Path
+from typing import NoReturn
+
+from mypy_primer.model import Project
+from mypy_primer.projects import get_projects
+
+
+def find_project(name: str) -> Project:
+    projects = get_projects()
+    for p in projects:
+        if p.name == name:
+            return p
+    _project_not_found(name, projects)
+
+
+def _project_not_found(name: str, projects: list[Project]) -> NoReturn:
+    print(f"error: project {name!r} not found", file=sys.stderr)
+    print("available projects:", file=sys.stderr)
+    for p in sorted(projects, key=lambda p: p.name):
+        print(f"  {p.name}", file=sys.stderr)
+    sys.exit(1)
+
+
+class _FormatMap:
+    def __init__(self, **values: str | list[str] | None) -> None:
+        self.values = values
+
+    def __getitem__(self, key: str) -> str:
+        if key not in self.values:
+            raise KeyError(key)
+        value = self.values[key]
+        if value is None:
+            raise ValueError(f"Required {key} to be specified")
+        if isinstance(value, list):
+            return " ".join(value)
+        return value
+
+
+def get_ty_command(project: Project, *, ty_binary: str, venv_dir: Path) -> str:
+    ty_cmd = project.ty_cmd
+    if ty_cmd is None:
+        ty_cmd = "{ty} check {paths}" if project.paths is not None else "{ty} check"
+    assert "{ty}" in ty_cmd
+    ty_cmd = ty_cmd.format_map(_FormatMap(ty=ty_binary, paths=project.paths))
+    return f"{ty_cmd} --python {shlex.quote(str(venv_dir))} --output-format concise"
+
+
+def run(*args: str, cwd: Path | None = None) -> None:
+    subprocess.run(args, cwd=cwd, check=True)
+
+
+def clone_project(
+    location: str, target_dir: Path, revision: str | None, *, full_history: bool
+) -> None:
+    depth = [] if full_history else ["--depth", "1"]
+    if revision is not None and not full_history:
+        # Fetch the requested commit without first downloading the default branch.
+        run("git", "init", str(target_dir))
+        run("git", "remote", "add", "origin", location, cwd=target_dir)
+        run("git", "fetch", *depth, "origin", revision, cwd=target_dir)
+        checkout = "FETCH_HEAD"
+    else:
+        run("git", "clone", *depth, location, str(target_dir))
+        checkout = revision
+
+    if checkout is not None:
+        run("git", "checkout", checkout, "--", cwd=target_dir)
+
+    # Initialize only the selected revision's submodules. Force checkout so that
+    # configured merge/rebase strategies cannot override the recorded gitlinks.
+    run(
+        "git",
+        "submodule",
+        "update",
+        "--init",
+        "--recursive",
+        "--checkout",
+        *(depth or ["--no-recommend-shallow"]),
+        cwd=target_dir,
+    )
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("project", help="Name of a mypy-primer project")
+    parser.add_argument(
+        "directory",
+        nargs="?",
+        help="Directory to clone into (default: project name)",
+    )
+    parser.add_argument(
+        "--revision",
+        help="Git revision to check out before installing dependencies",
+    )
+    parser.add_argument(
+        "--full-history",
+        action="store_true",
+        help="Clone full history and tags if setup requires them or shallow fetches fail",
+    )
+    parser.add_argument(
+        "--exclude-newer",
+        help="Limit dependency resolution to packages uploaded before this timestamp",
+    )
+    parser.add_argument(
+        "--print-ty-command",
+        action="store_true",
+        help="Print the project-specific ty command without setting up the project",
+    )
+    args = parser.parse_args()
+
+    project = find_project(args.project)
+    revision = args.revision or project.revision
+
+    target_dir = Path(args.directory or project.name).resolve()
+    if args.print_ty_command:
+        print(get_ty_command(project, ty_binary="{ty}", venv_dir=target_dir / ".venv"))
+        return
+
+    if target_dir.exists() and (not target_dir.is_dir() or any(target_dir.iterdir())):
+        parser.error(
+            f"destination {target_dir} already exists and is not an empty directory"
+        )
+
+    print(f"Cloning {project.location} into {target_dir}...")
+    try:
+        clone_project(
+            project.location, target_dir, revision, full_history=args.full_history
+        )
+    except subprocess.CalledProcessError as error:
+        message = f"Git checkout failed: {error}.\n"
+        if not args.full_history:
+            message += "If the server rejects shallow fetches, retry in a fresh directory with --full-history.\n"
+        parser.exit(1, message)
+
+    # Create venv (matching primer's Venv.make_venv())
+    venv_dir = target_dir / ".venv"
+    print(f"Creating virtualenv at {venv_dir}...")
+    subprocess.run(
+        ["uv", "venv", str(venv_dir), "--python", sys.executable, "--seed", "--clear"],
+        check=True,
+    )
+
+    venv_python = venv_dir / "bin" / "python"
+    install_base = f"uv pip install --python {shlex.quote(str(venv_python))}"
+    if args.exclude_newer:
+        install_base += f" --exclude-newer {shlex.quote(args.exclude_newer)}"
+
+    # Run custom install command if the project defines one (matching primer's setup())
+    if project.install_cmd is not None:
+        assert "{install}" in project.install_cmd
+        install_cmd = project.install_cmd.format(install=install_base)
+        print(f"Running install command: {install_cmd}")
+        # Primer install commands are trusted project metadata and may use shell syntax.
+        subprocess.run(install_cmd, cwd=target_dir, shell=True, check=True)  # ruff: ignore[subprocess-popen-with-shell-equals-true]
+
+    # Install listed dependencies (matching primer's setup())
+    if project.deps is not None:
+        deps_cmd_parts = shlex.split(install_base) + project.deps
+        print(f"Installing dependencies: {', '.join(project.deps)}")
+        subprocess.run(deps_cmd_parts, cwd=target_dir, check=True)
+
+    print(f"\nDone! Project set up at {target_dir}")
+    print(f"Activate the venv with: source {venv_dir}/bin/activate")
+    print("\nProject-specific ty command:")
+    print("  ty_binary=/path/to/ty")
+    ty_command = get_ty_command(project, ty_binary='"$ty_binary"', venv_dir=venv_dir)
+    print(f"  {ty_command}")
+
+
+if __name__ == "__main__":
+    main()

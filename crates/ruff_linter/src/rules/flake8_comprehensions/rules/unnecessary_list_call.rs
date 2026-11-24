@@ -4,8 +4,9 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_comprehensions::fixes;
-use crate::{AlwaysFixableViolation, Fix};
+use crate::{Fix, FixAvailability, Violation};
 
 use crate::rules::flake8_comprehensions::helpers;
 
@@ -29,17 +30,19 @@ use crate::rules::flake8_comprehensions::helpers;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.73")]
+#[violation_metadata(stable_since = "v0.0.73", category = Category::Complexity)]
 pub(crate) struct UnnecessaryListCall;
 
-impl AlwaysFixableViolation for UnnecessaryListCall {
+impl Violation for UnnecessaryListCall {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Unnecessary `list()` call (remove the outer call to `list()`)".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Remove outer `list()` call".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Remove outer `list()` call".to_string())
     }
 }
 
@@ -48,7 +51,7 @@ pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprC
     let ExprCall {
         func,
         arguments,
-        range: _,
+        range_start: _,
         node_index: _,
     } = call;
 

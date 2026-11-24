@@ -17,9 +17,9 @@ expression: diagnostics
         }
       },
       "severity": 1,
-      "code": "invalid-return-type",
+      "code": "invalid-implicit-return",
       "codeDescription": {
-        "href": "https://ty.dev/rules#invalid-return-type"
+        "href": "https://ty.dev/rules#invalid-implicit-return"
       },
       "source": "ty",
       "message": "Function can implicitly return `None`, which is not assignable to return type `str`"
@@ -40,7 +40,7 @@ expression: diagnostics
       "severity": 1,
       "code": "invalid-syntax",
       "source": "ty",
-      "message": "Expected `,`, found name"
+      "message": "Expected `,`, found identifier"
     },
     {
       "range": {
@@ -94,7 +94,7 @@ expression: diagnostics
         "href": "https://ty.dev/rules#invalid-argument-type"
       },
       "source": "ty",
-      "message": "Argument to function `with_style` is incorrect: Expected `Style`, found `Literal[/", /"]`"
+      "message": "Argument to function `with_style` is incorrect: Expected `Style`, found `Literal[\", \"]`"
     },
     {
       "range": {
@@ -110,26 +110,7 @@ expression: diagnostics
       "severity": 1,
       "code": "invalid-syntax",
       "source": "ty",
-      "message": "Expected `,`, found name"
-    },
-    {
-      "range": {
-        "start": {
-          "line": 0,
-          "character": 27
-        },
-        "end": {
-          "line": 0,
-          "character": 36
-        }
-      },
-      "severity": 1,
-      "code": "unresolved-reference",
-      "codeDescription": {
-        "href": "https://ty.dev/rules#unresolved-reference"
-      },
-      "source": "ty",
-      "message": "Name `underline` used when not defined"
+      "message": "Expected `,`, found identifier"
     },
     {
       "range": {
@@ -149,6 +130,25 @@ expression: diagnostics
       },
       "source": "ty",
       "message": "Too many positional arguments to function `with_style`: expected 3, got 6"
+    },
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 27
+        },
+        "end": {
+          "line": 0,
+          "character": 36
+        }
+      },
+      "severity": 1,
+      "code": "unresolved-reference",
+      "codeDescription": {
+        "href": "https://ty.dev/rules#unresolved-reference"
+      },
+      "source": "ty",
+      "message": "Name `underline` used when not defined"
     },
     {
       "range": {
@@ -180,17 +180,17 @@ expression: diagnostics
       "severity": 1,
       "code": "invalid-syntax",
       "source": "ty",
-      "message": "Expected `,`, found name"
+      "message": "Expected `,`, found identifier"
     },
     {
       "range": {
         "start": {
-          "line": 3,
-          "character": 0
+          "line": 2,
+          "character": 7
         },
         "end": {
-          "line": 3,
-          "character": 0
+          "line": 2,
+          "character": 7
         }
       },
       "severity": 1,

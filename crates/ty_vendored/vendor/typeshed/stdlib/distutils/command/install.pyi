@@ -3,7 +3,6 @@
 Implements the Distutils 'install' command.
 """
 
-import sys
 from _typeshed import Incomplete
 from collections.abc import Callable
 from typing import Any, ClassVar, Final, Literal
@@ -14,9 +13,6 @@ HAS_USER_SITE: Final[bool]
 
 SCHEME_KEYS: Final[tuple[Literal["purelib"], Literal["platlib"], Literal["headers"], Literal["scripts"], Literal["data"]]]
 INSTALL_SCHEMES: Final[dict[str, dict[str, str]]]
-
-if sys.version_info < (3, 10):
-    WINDOWS_SCHEME: Final[dict[str, str]]
 
 class install(Command):
     description: str
@@ -50,6 +46,7 @@ class install(Command):
     record: Incomplete
     def initialize_options(self) -> None:
         """Initializes options."""
+
     config_vars: Incomplete
     install_libbase: Incomplete
     def finalize_options(self) -> None:
@@ -77,6 +74,7 @@ class install(Command):
 
     def convert_paths(self, *names) -> None:
         """Call `convert_path` over `names`."""
+
     path_file: Incomplete
     extra_dirs: Incomplete
     def handle_extra_path(self) -> None:
@@ -119,5 +117,6 @@ class install(Command):
         """Returns true if the current distribution has any data to.
         install.
         """
+
     # Any to work around variance issues
     sub_commands: ClassVar[list[tuple[str, Callable[[Any], bool] | None]]]

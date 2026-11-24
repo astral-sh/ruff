@@ -7,7 +7,10 @@ expression: initialization_result
     "positionEncoding": "utf-16",
     "textDocumentSync": {
       "openClose": true,
-      "change": 2
+      "change": 2,
+      "save": {
+        "includeText": false
+      }
     },
     "notebookDocumentSync": {
       "notebookSelector": [
@@ -21,13 +24,14 @@ expression: initialization_result
       ],
       "save": false
     },
-    "selectionRangeProvider": true,
-    "hoverProvider": true,
     "completionProvider": {
       "triggerCharacters": [
-        "."
+        ".",
+        "\"",
+        "'"
       ]
     },
+    "hoverProvider": true,
     "signatureHelpProvider": {
       "triggerCharacters": [
         "(",
@@ -37,27 +41,31 @@ expression: initialization_result
         ")"
       ]
     },
+    "declarationProvider": true,
     "definitionProvider": true,
     "typeDefinitionProvider": true,
+    "implementationProvider": true,
     "referencesProvider": true,
     "documentHighlightProvider": true,
     "documentSymbolProvider": true,
-    "workspaceSymbolProvider": true,
     "codeActionProvider": {
       "codeActionKinds": [
         "quickfix"
       ]
     },
+    "workspaceSymbolProvider": true,
     "renameProvider": {
       "prepareProvider": true
     },
-    "declarationProvider": true,
+    "foldingRangeProvider": true,
+    "selectionRangeProvider": true,
     "executeCommandProvider": {
       "commands": [
         "ty.printDebugInformation"
       ],
       "workDoneProgress": false
     },
+    "callHierarchyProvider": true,
     "semanticTokensProvider": {
       "legend": {
         "tokenTypes": [
@@ -75,7 +83,9 @@ expression: initialization_result
           "number",
           "decorator",
           "builtinConstant",
-          "typeParameter"
+          "typeParameter",
+          "operator",
+          "regexp"
         ],
         "tokenModifiers": [
           "definition",
@@ -87,12 +97,39 @@ expression: initialization_result
       "range": true,
       "full": true
     },
+    "typeHierarchyProvider": true,
     "inlayHintProvider": {},
     "diagnosticProvider": {
       "identifier": "ty",
       "interFileDependencies": true,
       "workspaceDiagnostics": true,
       "workDoneProgress": true
+    },
+    "workspace": {
+      "workspaceFolders": {
+        "supported": true,
+        "changeNotifications": true
+      },
+      "fileOperations": {
+        "willRename": {
+          "filters": [
+            {
+              "scheme": "file",
+              "pattern": {
+                "glob": "**/*.{py,pyi}",
+                "matches": "file"
+              }
+            },
+            {
+              "scheme": "file",
+              "pattern": {
+                "glob": "**/*",
+                "matches": "folder"
+              }
+            }
+          ]
+        }
+      }
     }
   },
   "serverInfo": {

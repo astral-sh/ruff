@@ -1,4 +1,7 @@
-use lsp_types::{TextDocumentContentChangeEvent, Url};
+use lsp_types::{
+    LanguageKind, TextDocumentContentChangeEvent, TextDocumentContentChangePartial,
+    TextDocumentContentChangeWholeDocument, Uri,
+};
 use ruff_source_file::LineIndex;
 
 use crate::PositionEncoding;
@@ -13,8 +16,8 @@ pub(crate) type DocumentVersion = i32;
 /// with changes made by the user, including unsaved changes.
 #[derive(Debug, Clone)]
 pub struct TextDocument {
-    /// The URL as sent by the client
-    url: Url,
+    /// The URI as sent by the client
+    uri: Uri,
 
     /// The string contents of the document.
     contents: String,
@@ -24,42 +27,41 @@ pub struct TextDocument {
     version: DocumentVersion,
 
     /// The language ID of the document as provided by the client.
-    language_id: Option<LanguageId>,
+    language_id: LanguageId,
 
     /// For cells, the path to the notebook document.
     notebook: Option<AnySystemPath>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum LanguageId {
+pub(crate) enum LanguageId {
     Python,
     Other,
 }
 
-impl From<&str> for LanguageId {
-    fn from(language_id: &str) -> Self {
+impl From<LanguageKind> for LanguageId {
+    fn from(language_id: LanguageKind) -> Self {
         match language_id {
-            "python" => Self::Python,
+            LanguageKind::Python => Self::Python,
             _ => Self::Other,
         }
     }
 }
 
 impl TextDocument {
-    pub fn new(url: Url, contents: String, version: DocumentVersion) -> Self {
+    pub(crate) fn new(
+        uri: Uri,
+        contents: String,
+        version: DocumentVersion,
+        language_id: LanguageKind,
+    ) -> Self {
         Self {
-            url,
+            uri,
             contents,
             version,
-            language_id: None,
+            language_id: LanguageId::from(language_id),
             notebook: None,
         }
-    }
-
-    #[must_use]
-    pub fn with_language_id(mut self, language_id: &str) -> Self {
-        self.language_id = Some(LanguageId::from(language_id));
-        self
     }
 
     #[must_use]
@@ -68,23 +70,19 @@ impl TextDocument {
         self
     }
 
-    pub fn into_contents(self) -> String {
-        self.contents
+    pub(crate) fn uri(&self) -> &Uri {
+        &self.uri
     }
 
-    pub(crate) fn url(&self) -> &Url {
-        &self.url
-    }
-
-    pub fn contents(&self) -> &str {
+    pub(crate) fn contents(&self) -> &str {
         &self.contents
     }
 
-    pub fn version(&self) -> DocumentVersion {
+    pub(crate) fn version(&self) -> DocumentVersion {
         self.version
     }
 
-    pub fn language_id(&self) -> Option<LanguageId> {
+    pub(crate) fn language_id(&self) -> LanguageId {
         self.language_id
     }
 
@@ -92,16 +90,16 @@ impl TextDocument {
         self.notebook.as_ref()
     }
 
-    pub fn apply_changes(
+    pub(crate) fn apply_changes(
         &mut self,
         changes: Vec<lsp_types::TextDocumentContentChangeEvent>,
         new_version: DocumentVersion,
         encoding: PositionEncoding,
     ) {
         if let [
-            lsp_types::TextDocumentContentChangeEvent {
-                range: None, text, ..
-            },
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument { text },
+            ),
         ] = changes.as_slice()
         {
             tracing::debug!("Fast path - replacing entire document");
@@ -115,21 +113,22 @@ impl TextDocument {
         let mut new_contents = self.contents().to_string();
         let mut active_index = LineIndex::from_source_text(&new_contents);
 
-        for TextDocumentContentChangeEvent {
-            range,
-            text: change,
-            ..
-        } in changes
-        {
-            if let Some(range) = range {
-                let range = lsp_range_to_text_range(range, &new_contents, &active_index, encoding);
+        for change in changes {
+            match change {
+                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                    TextDocumentContentChangePartial { range, text, .. },
+                ) => {
+                    let range =
+                        lsp_range_to_text_range(range, &new_contents, &active_index, encoding);
 
-                new_contents.replace_range(
-                    usize::from(range.start())..usize::from(range.end()),
-                    &change,
-                );
-            } else {
-                new_contents = change;
+                    new_contents
+                        .replace_range(usize::from(range.start())..usize::from(range.end()), &text);
+                }
+                TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                    TextDocumentContentChangeWholeDocument { text },
+                ) => {
+                    new_contents = text;
+                }
             }
 
             active_index = LineIndex::from_source_text(&new_contents);
@@ -141,7 +140,7 @@ impl TextDocument {
         });
     }
 
-    pub fn update_version(&mut self, new_version: DocumentVersion) {
+    pub(crate) fn update_version(&mut self, new_version: DocumentVersion) {
         self.modify(|_, version| {
             *version = new_version;
         });
@@ -158,12 +157,15 @@ impl TextDocument {
 #[cfg(test)]
 mod tests {
     use crate::{PositionEncoding, TextDocument};
-    use lsp_types::{Position, TextDocumentContentChangeEvent, Url};
+    use lsp_types::{
+        LanguageKind, Position, TextDocumentContentChangeEvent, TextDocumentContentChangePartial,
+        Uri,
+    };
 
     #[test]
     fn redo_edit() {
         let mut document = TextDocument::new(
-            Url::parse("file:///test").unwrap(),
+            Uri::parse("file:///test").unwrap(),
             r#""""
 测试comment
 一些测试内容
@@ -177,35 +179,33 @@ def interface():
 "#
             .to_string(),
             0,
+            LanguageKind::Python,
         );
 
         // Add an `s`, remove it again (back to the original code), and then re-add the `s`
         document.apply_changes(
             vec![
-                TextDocumentContentChangeEvent {
-                    range: Some(lsp_types::Range::new(
-                        Position::new(9, 7),
-                        Position::new(9, 7),
-                    )),
-                    range_length: Some(0),
-                    text: "s".to_string(),
-                },
-                TextDocumentContentChangeEvent {
-                    range: Some(lsp_types::Range::new(
-                        Position::new(9, 7),
-                        Position::new(9, 8),
-                    )),
-                    range_length: Some(1),
-                    text: String::new(),
-                },
-                TextDocumentContentChangeEvent {
-                    range: Some(lsp_types::Range::new(
-                        Position::new(9, 7),
-                        Position::new(9, 7),
-                    )),
-                    range_length: Some(0),
-                    text: "s".to_string(),
-                },
+                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                    TextDocumentContentChangePartial {
+                        range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 7)),
+                        text: "s".to_string(),
+                        ..Default::default()
+                    },
+                ),
+                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                    TextDocumentContentChangePartial {
+                        range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 8)),
+                        text: String::new(),
+                        ..Default::default()
+                    },
+                ),
+                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                    TextDocumentContentChangePartial {
+                        range: lsp_types::Range::new(Position::new(9, 7), Position::new(9, 7)),
+                        text: "s".to_string(),
+                        ..Default::default()
+                    },
+                ),
             ],
             1,
             PositionEncoding::UTF16,

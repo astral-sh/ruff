@@ -1,10 +1,28 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["stdlibs"]
+#
+# [tool.uv]
+# no-build = true
+# exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
+# ///
+
 from __future__ import annotations
 
 from pathlib import Path
 
 from stdlibs import stdlib_module_names
 
-PATH = Path("crates") / "ruff_python_stdlib" / "src" / "sys" / "known_stdlib.rs"
+PATH = (
+    Path(__file__).parents[1]
+    / "crates"
+    / "ruff_python_stdlib"
+    / "src"
+    / "sys"
+    / "known_stdlib.rs"
+)
 VERSIONS: list[tuple[int, int]] = [
     (3, 7),
     (3, 8),
@@ -14,6 +32,7 @@ VERSIONS: list[tuple[int, int]] = [
     (3, 12),
     (3, 13),
     (3, 14),
+    (3, 15),
 ]
 
 with PATH.open("w") as f:

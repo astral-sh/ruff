@@ -2,7 +2,7 @@
 
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
+use ruff_python_ast::{ModModule, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::Parsed;
@@ -13,7 +13,7 @@ use crate::package::PackageRoot;
 use crate::registry::Rule;
 use crate::rules::isort;
 use crate::rules::isort::block::{Block, BlockBuilder};
-use crate::settings::LinterSettings;
+use crate::settings::{LinterSettings, TargetVersion};
 
 use super::ast::LintContext;
 
@@ -28,7 +28,7 @@ pub(crate) fn check_imports(
     package: Option<PackageRoot<'_>>,
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
-    target_version: PythonVersion,
+    target_version: TargetVersion,
     context: &LintContext,
 ) {
     // Extract all import blocks from the AST.
@@ -54,7 +54,7 @@ pub(crate) fn check_imports(
                     package,
                     source_type,
                     parsed.tokens(),
-                    target_version,
+                    target_version.linter_version(),
                     context,
                 );
             }
@@ -66,6 +66,7 @@ pub(crate) fn check_imports(
             locator,
             stylist,
             settings,
+            target_version.parser_version(),
             source_type,
             context,
         );

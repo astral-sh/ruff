@@ -1,11 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_compound_statement;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Stmt, WithItem};
-use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::registry::Rule;
 
 use crate::rules::flake8_pytest_style::helpers::is_empty_or_null_string;
@@ -51,7 +52,7 @@ use crate::rules::flake8_pytest_style::helpers::is_empty_or_null_string;
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Suspicious)]
 pub(crate) struct PytestRaisesWithMultipleStatements;
 
 impl Violation for PytestRaisesWithMultipleStatements {
@@ -114,7 +115,7 @@ impl Violation for PytestRaisesWithMultipleStatements {
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestRaisesTooBroad {
     exception: String,
 }
@@ -163,7 +164,7 @@ impl Violation for PytestRaisesTooBroad {
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Correctness)]
 pub(crate) struct PytestRaisesWithoutException;
 
 impl Violation for PytestRaisesWithoutException {
@@ -173,10 +174,8 @@ impl Violation for PytestRaisesWithoutException {
     }
 }
 
-pub(crate) fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "raises"]))
+pub(crate) fn is_pytest_raises(qualified_name: &QualifiedName) -> bool {
+    matches!(qualified_name.segments(), ["pytest", "raises"])
 }
 
 const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
@@ -188,8 +187,8 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 }
 
 /// PT010
-pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
-    if is_pytest_raises(&call.func, checker.semantic()) {
+pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall, qualified_name: &QualifiedName) {
+    if is_pytest_raises(qualified_name) {
         if checker.is_rule_enabled(Rule::PytestRaisesWithoutException) {
             if call
                 .arguments
@@ -232,7 +231,9 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
 /// PT012
 pub(crate) fn complex_raises(checker: &Checker, stmt: &Stmt, items: &[WithItem], body: &[Stmt]) {
     let raises_called = items.iter().any(|item| match &item.context_expr {
-        Expr::Call(ast::ExprCall { func, .. }) => is_pytest_raises(func, checker.semantic()),
+        Expr::Call(ast::ExprCall { func, .. }) => checker
+            .semantic()
+            .matches_qualified_name(func, &["pytest", "raises"]),
         _ => false,
     });
 

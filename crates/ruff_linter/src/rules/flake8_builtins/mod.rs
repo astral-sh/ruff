@@ -13,13 +13,12 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::flake8_builtins;
     use crate::settings::LinterSettings;
-    use crate::settings::types::PreviewMode;
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_diagnostics, assert_diagnostics_diff};
     use ruff_python_ast::PythonVersion;
 
     #[test_case(Rule::BuiltinVariableShadowing, Path::new("A001.py"))]
-    #[test_case(Rule::BuiltinArgumentShadowing, Path::new("A002.py"))]
+    #[test_case(Rule::BuiltinParameterShadowing, Path::new("A002.py"))]
     #[test_case(Rule::BuiltinAttributeShadowing, Path::new("A003.py"))]
     #[test_case(Rule::BuiltinImportShadowing, Path::new("A004.py"))]
     #[test_case(
@@ -47,9 +46,9 @@ mod tests {
         Path::new("A005/modules/_abc/__init__.py")
     )]
     #[test_case(Rule::StdlibModuleShadowing, Path::new("A005/modules/package/xml.py"))]
-    #[test_case(Rule::BuiltinLambdaArgumentShadowing, Path::new("A006.py"))]
+    #[test_case(Rule::BuiltinLambdaParameterShadowing, Path::new("A006.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
@@ -74,37 +73,9 @@ mod tests {
         assert_diagnostics_diff!(
             snapshot,
             Path::new("flake8_builtins").join(path).as_path(),
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
-                ..LinterSettings::for_rule(rule_code)
-            },
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY314.into(),
-                ..LinterSettings::for_rule(rule_code)
-            },
+            &LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY313),
+            &LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY314),
         );
-        Ok(())
-    }
-
-    #[test_case(Rule::BuiltinAttributeShadowing, Path::new("A003.py"))]
-    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
-        let diagnostics = test_path(
-            Path::new("flake8_builtins").join(path).as_path(),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                flake8_builtins: flake8_builtins::settings::Settings {
-                    strict_checking: true,
-                    ..Default::default()
-                },
-                ..LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -119,11 +90,7 @@ mod tests {
         false
     )]
     fn non_strict_checking(rule_code: Rule, path: &Path, strict: bool) -> Result<()> {
-        let snapshot = format!(
-            "{}_{}_{strict}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("{}_{}_{strict}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
@@ -144,7 +111,7 @@ mod tests {
         Path::new("A005/modules/utils/logging.py")
     )]
     fn non_strict_checking_src(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}_src", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}_src", rule_code.name(), path.to_string_lossy());
         let src = Path::new("fixtures/flake8_builtins");
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
@@ -168,7 +135,7 @@ mod tests {
         Path::new("A005/modules/utils/logging.py")
     )]
     fn non_strict_checking_root(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}_root", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}_root", rule_code.name(), path.to_string_lossy());
         let src = Path::new("fixtures/flake8_builtins");
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
@@ -186,14 +153,14 @@ mod tests {
     }
 
     #[test_case(Rule::BuiltinVariableShadowing, Path::new("A001.py"))]
-    #[test_case(Rule::BuiltinArgumentShadowing, Path::new("A002.py"))]
+    #[test_case(Rule::BuiltinParameterShadowing, Path::new("A002.py"))]
     #[test_case(Rule::BuiltinAttributeShadowing, Path::new("A003.py"))]
     #[test_case(Rule::BuiltinImportShadowing, Path::new("A004.py"))]
-    #[test_case(Rule::BuiltinLambdaArgumentShadowing, Path::new("A006.py"))]
+    #[test_case(Rule::BuiltinLambdaParameterShadowing, Path::new("A006.py"))]
     fn builtins_ignorelist(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "{}_{}_builtins_ignorelist",
-            rule_code.noqa_code(),
+            rule_code.name(),
             path.to_string_lossy()
         );
 
@@ -236,7 +203,7 @@ mod tests {
     fn builtins_allowed_modules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "{}_{}_builtins_allowed_modules",
-            rule_code.noqa_code(),
+            rule_code.name(),
             path.to_string_lossy()
         );
 
@@ -258,13 +225,10 @@ mod tests {
 
     #[test_case(Rule::BuiltinImportShadowing, Path::new("A004.py"))]
     fn rules_py312(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}_py38", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}_py38", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY38.into(),
-                ..LinterSettings::for_rule(rule_code)
-            },
+            &LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY38),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())

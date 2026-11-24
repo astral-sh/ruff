@@ -14,6 +14,7 @@ use ruff_python_semantic::{
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::preview::{
     is_dunder_init_fix_unused_import_enabled, is_refined_submodule_import_match_enabled,
@@ -78,9 +79,8 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// a.b.foo()
 /// ```
 ///
-/// then a diagnostic will only be emitted for the first line under [preview],
-/// whereas a diagnostic would only be emitted for the second line under
-/// stable behavior.
+/// then a diagnostic will be emitted for the second line under [preview],
+/// whereas no diagnostic is emitted under stable behavior.
 ///
 /// Note that this behavior is somewhat subjective and is designed
 /// to conform to the developer's intuition rather than Python's actual
@@ -143,7 +143,7 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.18")]
+#[violation_metadata(stable_since = "v0.0.18", category = Category::Suspicious)]
 pub(crate) struct UnusedImport {
     /// Qualified name of the import
     name: String,
@@ -165,12 +165,14 @@ impl Violation for UnusedImport {
         match context {
             UnusedImportContext::ExceptHandler => {
                 format!(
-                    "`{name}` imported but unused; consider using `importlib.util.find_spec` to test for availability"
+                    "`{name}` imported but unused; \
+                    consider using `importlib.util.find_spec` to test for availability"
                 )
             }
             UnusedImportContext::DunderInitFirstParty { .. } => {
                 format!(
-                    "`{name}` imported but unused; consider removing, adding to `__all__`, or using a redundant alias"
+                    "`{name}` imported but unused; \
+                    consider removing, adding to `__all__`, or using a redundant alias"
                 )
             }
             UnusedImportContext::Other => format!("`{name}` imported but unused"),
@@ -197,7 +199,8 @@ impl Violation for UnusedImport {
                     submodule_import: true,
                 } => {
                     return Some(format!(
-                        "Use an explicit re-export: `import {parent} as {parent}; import {binding}`",
+                        "Use an explicit re-export: \
+                        `import {parent} as {parent}; import {binding}`",
                         parent = binding
                             .split('.')
                             .next()
@@ -410,6 +413,22 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                 } else if in_init
                     && binding.scope.is_global()
                     && is_first_party(&binding.import, checker)
+                    && (
+                        // In the situation where we have
+                        // ```
+                        // import a.b # <-- at this binding
+                        // import a.c
+                        //
+                        // __all__ = ["a"]
+                        // ```
+                        // we should not recommend that we re-export the
+                        // symbol `a` or add it to `__all__`.
+                        //
+                        // So we look up the name `a` and see if it has
+                        // a reference in `__all__`.
+                        !is_refined_submodule_import_match_enabled(checker.settings())
+                            || !symbol_used_in_dunder_all(checker.semantic(), &binding)
+                    )
                 {
                     UnusedImportContext::DunderInitFirstParty {
                         dunder_all_count: DunderAllCount::from(dunder_all_exprs.len()),
@@ -655,12 +674,16 @@ fn unused_imports_in_scope<'a, 'b>(
         .filter(|(_, bdg)| !bdg.is_global() && !bdg.is_nonlocal() && !bdg.is_explicit_export())
         .flat_map(|(id, bdg)| {
             if is_refined_submodule_import_match_enabled(settings)
-                // No need to apply refined logic if there is only a single binding
-                && scope.shadowed_bindings(id).nth(1).is_some()
-                // Only apply the new logic in certain situations to avoid
-                // complexity, false positives, and intersection with
-                // `redefined-while-unused` (`F811`).
-                && has_simple_shadowed_bindings(scope, id, semantic)
+                && (
+                    // No need to apply refined logic if there is only a single binding
+                    scope.shadowed_bindings(id).nth(1).is_some()
+                )
+                && (
+                    // Only apply the new logic in certain situations to avoid
+                    // complexity, false positives, and intersection with
+                    // `redefined-while-unused` (`F811`).
+                    has_simple_shadowed_bindings(scope, id, semantic)
+                )
             {
                 unused_imports_from_binding(semantic, id, scope)
             } else if bdg.is_used() {
@@ -731,11 +754,14 @@ fn unused_imports_from_binding<'a, 'b>(
     for ref_id in binding.references() {
         let resolved_reference = semantic.reference(ref_id);
         if !marked_dunder_all && resolved_reference.in_dunder_all_definition() {
-            let first = *binding
-                                .as_any_import()
-                                .expect("binding to be import binding since current function called after restricting to these in `unused_imports_in_scope`")
-                                .qualified_name()
-                                .segments().first().expect("import binding to have nonempty qualified name");
+            let first = binding
+                .as_any_import()
+                .expect(
+                    "The binding should be an import binding since current function \
+                    called after restricting to these in `unused_imports_in_scope`",
+                )
+                .qualified_name()
+                .segments()[0];
             mark_uses_of_qualified_name(&mut marked, &QualifiedName::user_defined(first));
             marked_dunder_all = true;
             continue;
@@ -949,4 +975,16 @@ fn has_simple_shadowed_bindings(scope: &Scope, id: BindingId, semantic: &Semanti
             BindingKind::Import(_) | BindingKind::SubmoduleImport(_)
         ) && !shadowed_binding.flags.contains(BindingFlags::ALIAS)
     })
+}
+
+fn symbol_used_in_dunder_all(semantic: &SemanticModel<'_>, binding: &ImportBinding) -> bool {
+    semantic
+        .lookup_symbol_in_scope(binding.symbol_stored_in_outer_scope(), binding.scope, false)
+        .binding_id()
+        .is_some_and(|bdg| {
+            semantic
+                .binding(bdg)
+                .references()
+                .any(|refid| semantic.reference(refid).in_dunder_all_definition())
+        })
 }

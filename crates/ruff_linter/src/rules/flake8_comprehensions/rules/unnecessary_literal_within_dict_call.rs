@@ -6,7 +6,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Edit, Fix};
+use crate::codes::Category;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::flake8_comprehensions::helpers;
 
@@ -35,20 +36,22 @@ use crate::rules::flake8_comprehensions::helpers;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Complexity)]
 pub(crate) struct UnnecessaryLiteralWithinDictCall {
     kind: DictKind,
 }
 
-impl AlwaysFixableViolation for UnnecessaryLiteralWithinDictCall {
+impl Violation for UnnecessaryLiteralWithinDictCall {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryLiteralWithinDictCall { kind } = self;
         format!("Unnecessary dict {kind} passed to `dict()` (remove the outer call to `dict()`)")
     }
 
-    fn fix_title(&self) -> String {
-        "Remove outer `dict()` call".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Remove outer `dict()` call".to_string())
     }
 }
 

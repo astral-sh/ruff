@@ -7,8 +7,10 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_fix_manual_dict_comprehension_enabled;
 use crate::rules::perflint::helpers::{comment_strings_in_range, statement_deletion_range};
+use crate::rules::refurb::helpers::{IterLocation, parenthesize_loop_iter_if_necessary};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -46,7 +48,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// result.update({x: y for x, y in pairs if y % 2})
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Pedantic)]
 pub(crate) struct ManualDictComprehension {
     fix_type: DictComprehensionType,
     is_async: bool,
@@ -83,7 +85,10 @@ impl Violation for ManualDictComprehension {
 
 /// PERF403
 pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtFor) {
-    let ast::StmtFor { body, target, .. } = for_stmt;
+    let ast::StmtFor {
+        body, target, iter, ..
+    } = for_stmt;
+
     let body = body.as_slice();
     let target = target.as_ref();
     let (stmt, if_test) = match body {
@@ -138,6 +143,12 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     else {
         return;
     };
+
+    // An assignment expression is a syntax error anywhere in a comprehension's iterable, even
+    // when parenthesized (e.g., `{k: v for k, v in (y := z)}`), so the loop can't be converted.
+    if any_over_expr(iter, &Expr::is_named_expr) {
+        return;
+    }
 
     // If any references to a target variable are after the loop,
     // then removing the loop would cause a NameError. Make sure none
@@ -202,7 +213,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     // filtered = {x: y for x in y if x in filtered}
     // ```
     if if_test.is_some_and(|test| {
-        any_over_expr(test, &|expr| {
+        any_over_expr(test, |expr| {
             ComparableExpr::from(expr) == ComparableExpr::from(name)
         })
     }) {
@@ -331,22 +342,8 @@ fn convert_to_dict_comprehension(
         None => String::new(),
     };
 
-    // if the loop target was an implicit tuple, add parentheses around it
-    // ```python
-    //  for i in a, b:
-    //      ...
-    // ```
-    // becomes
-    // {... for i in (a, b)}
-    let iter_str = if let Expr::Tuple(ast::ExprTuple {
-        parenthesized: false,
-        ..
-    }) = &*for_stmt.iter
-    {
-        format!("({})", locator.slice(for_stmt.iter.range()))
-    } else {
-        locator.slice(for_stmt.iter.range()).to_string()
-    };
+    let (iter_str, iter_range) =
+        parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension);
 
     let target_str = locator.slice(for_stmt.target.range());
     let for_type = if for_stmt.is_async {
@@ -387,11 +384,17 @@ fn convert_to_dict_comprehension(
     let comprehension_str =
         format!("{{{key_str}: {value_str} {for_type} {target_str} in {iter_str}{if_str}}}");
 
-    let for_loop_inline_comments = comment_strings_in_range(
-        checker,
-        for_stmt.range,
-        &[key.range(), value.range(), for_stmt.iter.range()],
-    );
+    let mut ranges_to_ignore = vec![
+        key.range(),
+        value.range(),
+        iter_range,
+        for_stmt.target.range(),
+    ];
+    if let Some(test) = if_test {
+        ranges_to_ignore.push(test.range());
+    }
+    let for_loop_inline_comments =
+        comment_strings_in_range(checker, for_stmt.range, &ranges_to_ignore);
 
     let newline = checker.stylist().line_ending().as_str();
 
@@ -474,7 +477,7 @@ enum DictComprehensionType {
 }
 
 fn has_post_loop_references(checker: &Checker, expr: &Expr, loop_end: TextSize) -> bool {
-    any_over_expr(expr, &|expr| match expr {
+    any_over_expr(expr, |expr| match expr {
         Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
             .iter()
             .any(|expr| has_post_loop_references(checker, expr, loop_end)),

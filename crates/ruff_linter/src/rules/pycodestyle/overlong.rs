@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use ruff_python_trivia::{CommentRanges, is_pragma_comment};
+use ruff_python_trivia::{CommentRanges, find_trailing_pragma_offset};
 use ruff_source_file::Line;
 use ruff_text_size::{TextLen, TextRange};
 
@@ -22,11 +22,9 @@ impl Overlong {
         task_tags: &[String],
         tab_size: IndentWidth,
     ) -> Option<Self> {
-        // The maximum width of the line is the number of bytes multiplied by the tab size (the
-        // worst-case scenario is that the line is all tabs). If the maximum width is less than the
-        // limit, then the line is not overlong.
-        let max_width = line.len() * tab_size.as_usize();
-        if max_width < limit.value() as usize {
+        // A tab can span several columns. For a line without tabs, the byte length
+        // alone bounds its display width.
+        if line.len() <= usize::from(limit.value()) && !line.as_bytes().contains(&b'\t') {
             return None;
         }
 
@@ -125,10 +123,11 @@ impl<'a> StrippedLine<'a> {
         let comment_range = comment_range - line.start();
         let comment = &line.as_str()[comment_range];
 
-        // Ex) `# type: ignore`
-        if is_pragma_comment(comment) {
-            // Remove the pragma from the line.
-            let prefix = &line.as_str()[..usize::from(comment_range.start())].trim_end();
+        // Ex) `# type: ignore` or `# some comment # noqa: F401`
+        if let Some(offset) = find_trailing_pragma_offset(comment) {
+            // Strip the pragma from the line, preserving any preceding non-pragma comment text.
+            let pragma_start = usize::from(comment_range.start()) + offset;
+            let prefix = line[..pragma_start].trim_end();
             return Self::WithoutPragma(Line::new(prefix, line.start()));
         }
 

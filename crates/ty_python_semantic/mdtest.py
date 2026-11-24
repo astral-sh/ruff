@@ -3,8 +3,13 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #     "rich",
-#     "watchfiles",
+#     "watchfiles>=1.1.0",
 # ]
+#
+# [tool.uv]
+# exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
 # ///
 
 from __future__ import annotations
@@ -28,8 +33,15 @@ DIRS_TO_WATCH: Final = (
     CRATE_ROOT,
     TY_VENDORED,
     CRATE_ROOT.parent / "ty_test/src",
+    CRATE_ROOT.parent / "mdtest/src",
 )
 MDTEST_DIR: Final = CRATE_ROOT / "resources" / "mdtest"
+LINT_DOCS_DIR: Final = CRATE_ROOT / "resources" / "lint_docs"
+MDTEST_SUITES: Final = (
+    ("mdtest", MDTEST_DIR),
+    ("lint_doc", LINT_DOCS_DIR),
+)
+SNAPSHOTS_DIR: Final = MDTEST_DIR / "snapshots"
 MDTEST_README: Final = CRATE_ROOT / "resources" / "README.md"
 
 
@@ -39,21 +51,21 @@ class MDTestRunner:
     filters: list[str]
     enable_external: bool
     upgrade_lockfiles: bool
+    update_snapshots: bool
 
     def __init__(
         self,
         filters: list[str] | None,
         enable_external: bool,
         upgrade_lockfiles: bool,
+        update_snapshots: bool,
     ) -> None:
         self.mdtest_executable = None
         self.console = Console()
-        self.filters = [
-            f.removesuffix(".md").replace("/", "_").replace("-", "_")
-            for f in (filters or [])
-        ]
+        self.filters = [f.removesuffix(".md") for f in (filters or [])]
         self.enable_external = enable_external
         self.upgrade_lockfiles = upgrade_lockfiles
+        self.update_snapshots = update_snapshots
 
     def _run_cargo_test(self, *, message_format: Literal["human", "json"]) -> str:
         return subprocess.check_output(
@@ -69,7 +81,12 @@ class MDTestRunner:
                 message_format,
             ],
             cwd=CRATE_ROOT,
-            env=dict(os.environ, CLI_COLOR="1"),
+            env=dict(
+                os.environ,
+                CLI_COLOR="1",
+                CARGO_PROFILE_DEV_OPT_LEVEL="0" if self.filters else "1",
+                CARGO_PROFILE_DEV_DEBUG="line-tables-only",
+            ),
             stderr=subprocess.STDOUT,
             text=True,
         )
@@ -102,12 +119,12 @@ class MDTestRunner:
         return True
 
     def _get_executable_path_from_json(self, json_output: str) -> None:
-        for json_line in json_output.splitlines():
+        for json_line in json_output.splitlines()[::-1]:
             try:
                 data = json.loads(json_line)
             except json.JSONDecodeError:
                 continue
-            if data.get("target", {}).get("name") == "mdtest":
+            if data.get("target", {}).get("name") == "mdtest" and data["executable"]:
                 self.mdtest_executable = Path(data["executable"])
                 break
         else:
@@ -117,7 +134,7 @@ class MDTestRunner:
 
     def _run_mdtest(
         self, arguments: list[str] | None = None, *, capture_output: bool = False
-    ) -> subprocess.CompletedProcess:
+    ) -> subprocess.CompletedProcess[str]:
         assert self.mdtest_executable is not None
 
         arguments = arguments or []
@@ -131,14 +148,48 @@ class MDTestRunner:
                 INSTA_OUTPUT="none",
                 MDTEST_EXTERNAL="1" if self.enable_external else "0",
                 MDTEST_UPGRADE_LOCKFILES="1" if self.upgrade_lockfiles else "0",
+                MDTEST_UPDATE_SNAPSHOTS="1" if self.update_snapshots else "0",
             ),
             capture_output=capture_output,
             text=True,
             check=False,
         )
 
-    def _run_mdtests_for_file(self, markdown_file: Path) -> None:
-        test_name = f"mdtest::{markdown_file}"
+    @staticmethod
+    def _md_file_for_snapshot(snapshot_path: Path) -> tuple[str, Path] | None:
+        """Given a deleted .snap.new path, find the source .md file it belongs to.
+
+        Snapshot filenames follow the pattern:
+            <md_filename>_-_<Section_title>_-_…_(<hash>).snap.new
+        where <md_filename> may be truncated to 20 characters with a trailing
+        Unicode ellipsis (U+2026).
+        """
+        snapshot_name = snapshot_path.name.removesuffix(".new").removesuffix(".snap")
+
+        md_filename = snapshot_name.split("_-_", 1)[0]
+
+        is_truncated = md_filename.endswith("\u2026")
+        if is_truncated:
+            md_filename = md_filename[:-1]
+
+        for test_function, mdtest_dir in MDTEST_SUITES:
+            for md_file in mdtest_dir.rglob("*.md"):
+                if is_truncated:
+                    if md_file.name.startswith(md_filename):
+                        return test_function, md_file.relative_to(mdtest_dir)
+                elif md_file.name == md_filename:
+                    return test_function, md_file.relative_to(mdtest_dir)
+        return None
+
+    @staticmethod
+    def _mdtest_for_path(path: Path) -> tuple[str, Path] | None:
+        for test_function, mdtest_dir in MDTEST_SUITES:
+            if path.is_relative_to(mdtest_dir):
+                return test_function, path.relative_to(mdtest_dir)
+        return None
+
+    def _run_mdtests_for_file(self, test_function: str, markdown_file: Path) -> None:
+        test_name = f"{test_function}::{markdown_file}"
 
         output = self._run_mdtest(["--exact", test_name], capture_output=True)
 
@@ -195,8 +246,9 @@ class MDTestRunner:
         self.console.print("[dim]Ready to watch for changes...[/dim]")
 
         for changes in watch(*DIRS_TO_WATCH):
-            new_md_files = set()
-            changed_md_files = set()
+            new_mdtests: set[tuple[str, Path]] = set()
+            changed_mdtests: set[tuple[str, Path]] = set()
+            rejected_snapshot_mdtests: set[tuple[str, Path]] = set()
             rust_code_has_changed = False
             vendored_typeshed_has_changed = False
 
@@ -206,6 +258,22 @@ class MDTestRunner:
                 # See above: `README.md` changes trigger a full re-run of all tests
                 if path == MDTEST_README:
                     self._run_mdtest(self.filters)
+                    continue
+
+                # When a pending snapshot (.snap.new) is rejected in a separate
+                # process (e.g. `cargo insta review`), the file is deleted.
+                # A common reason for rejecting a snapshot is that it was stale
+                # (produced by an earlier test run and now outdated). Re-run the
+                # relevant tests so the snapshot is regenerated from the current
+                # state of the code.
+                if (
+                    change == Change.deleted
+                    and path.name.endswith(".snap.new")
+                    and path.is_relative_to(SNAPSHOTS_DIR)
+                ):
+                    md_file = self._md_file_for_snapshot(path)
+                    if md_file is not None:
+                        rejected_snapshot_mdtests.add(md_file)
                     continue
 
                 match path.suffix:
@@ -218,9 +286,8 @@ class MDTestRunner:
                     case _:
                         continue
 
-                try:
-                    relative_path = Path(path).relative_to(MDTEST_DIR)
-                except ValueError:
+                mdtest = self._mdtest_for_path(path)
+                if mdtest is None:
                     continue
 
                 match change:
@@ -230,11 +297,11 @@ class MDTestRunner:
                         # it to the final name. This creates a `deleted` and `added` change.
                         # We treat those files as `changed` here.
                         if (Change.deleted, path_str) in changes:
-                            changed_md_files.add(relative_path)
+                            changed_mdtests.add(mdtest)
                         else:
-                            new_md_files.add(relative_path)
+                            new_mdtests.add(mdtest)
                     case Change.modified:
-                        changed_md_files.add(relative_path)
+                        changed_mdtests.add(mdtest)
                     case Change.deleted:
                         # No need to do anything when a Markdown test is deleted
                         pass
@@ -249,8 +316,10 @@ class MDTestRunner:
             ):
                 self._run_mdtest(self.filters)
 
-            for path in new_md_files | changed_md_files:
-                self._run_mdtests_for_file(path)
+            for test_function, path in (
+                new_mdtests | changed_mdtests | rejected_snapshot_mdtests
+            ):
+                self._run_mdtests_for_file(test_function, path)
 
 
 def main() -> None:
@@ -260,7 +329,7 @@ def main() -> None:
     parser.add_argument(
         "filters",
         nargs="*",
-        help="Partial paths or mangled names, e.g., 'loops/for.md' or 'loops_for'",
+        help="Partial paths, e.g., 'loops/for.md' or 'invalid-argument-type.md'",
     )
     parser.add_argument(
         "--enable-external",
@@ -274,6 +343,11 @@ def main() -> None:
         help="By default, lockfiles will be upgraded when dependency requirements in the Markdown test change."
         + " Set this flag to never upgrade any lockfiles.",
     )
+    parser.add_argument(
+        "--no-snapshot-updates",
+        action="store_true",
+        help="By default, inline snapshots will be updated automatically when they are stale. Set this flag to disable this.",
+    )
 
     args = parser.parse_args()
 
@@ -282,6 +356,7 @@ def main() -> None:
             filters=args.filters,
             enable_external=args.enable_external,
             upgrade_lockfiles=not args.no_lockfile_upgrades,
+            update_snapshots=not args.no_snapshot_updates,
         )
         runner.watch()
     except KeyboardInterrupt:

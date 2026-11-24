@@ -25,32 +25,26 @@ that are ready for contributions.
 ty is written in Rust. You'll need to install the
 [Rust toolchain](https://www.rust-lang.org/tools/install) for development.
 
-You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
+You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) to
+run Python utility commands. uv also manages our development toolchain.
+
+We use [Insta](https://insta.rs/docs/) to update snapshot tests. It's already part
+of the development toolchain:
 
 ```shell
-cargo install cargo-insta
+uv run --only-dev cargo insta --version
 ```
-
-You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
-run Python utility commands.
 
 You can optionally install hooks to automatically run the validation checks
 when making a commit:
 
 ```shell
-uv tool install prek
-prek install
+uv run --only-dev --locked prek install
 ```
 
-We recommend [nextest](https://nexte.st/) to run ty's test suite (via `cargo nextest run`),
-though it's not strictly necessary:
-
-```shell
-cargo install cargo-nextest --locked
-```
-
-Throughout this guide, any usages of `cargo test` can be replaced with `cargo nextest run`,
-if you choose to install `nextest`.
+We recommend [nextest](https://nexte.st/) to run ty's test suite (via `uv run --only-dev cargo nextest run`),
+though it's not strictly necessary. Throughout this guide, any usages of `cargo test` can be
+replaced with `uv run --only-dev cargo nextest run`.
 
 ### Development
 
@@ -64,9 +58,9 @@ Prior to opening a pull request, ensure that your code has been auto-formatted,
 and that it passes both the lint and test validation checks:
 
 ```shell
-cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
+CARGO_BUILD_WARNINGS=deny cargo clippy --workspace --all-targets --all-features  # Rust linting
 cargo test  # Rust testing
-uvx prek run -a  # Rust and Python formatting, Markdown and Python linting, etc.
+uv run --only-dev --locked prek run --all-files  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your pull request, but running them locally
@@ -78,7 +72,7 @@ Note that many code changes also require updating the snapshot tests, which is d
 after running `cargo test` like so:
 
 ```shell
-cargo insta review
+uv run --only-dev cargo insta review
 ```
 
 Include the text `[ty]` at the beginning of your pull request title, to distinguish ty pull requests
@@ -142,17 +136,39 @@ The property tests do not run in CI on every PR, just once daily. It is advisabl
 locally after modifying core type relation methods (`is_subtype_of`, `is_equivalent_to`, etc.) to
 ensure that the changes do not break any of the properties.
 
-## Ecosystem CI (mypy-primer)
+## Ecosystem CI (`ecosystem-analyzer`)
 
-GitHub Actions will run your changes against a number of real-world projects from GitHub and
-report on any linter or formatter differences. See [`crates/ty/docs/mypy_primer.md`](./docs/mypy_primer.md)
-for instructions on running these checks locally.
+GitHub Actions will run your changes against a number of real-world projects from GitHub and report
+any differences in ty's diagnostic output. You can use [`setup_primer_project.py`](../../scripts/setup_primer_project.py)
+to reproduce the same testing conditions locally.
 
 ## Coding guidelines
 
 We use the [Salsa](https://github.com/salsa-rs/salsa) library for incremental computation. Many
 methods take a Salsa database (usually `db: &'db dyn Db`) as an argument. This should always be the
 first argument (or second after `self`).
+
+### Deciding when to use a separate rule
+
+Avoid broad rules that catch many different kinds of errors. When deciding whether to reuse a
+rule for a new diagnostic or split an existing rule, consider whether users would benefit from
+enabling or disabling the cases independently. If several other Python type checkers give
+users separate controls for the same cases, that may be a signal that the distinction is useful.
+
+### Adding a rule
+
+Follow [Ruff's rule naming convention](../../docs/rule-proposals.md#rule-naming-convention).
+Name the pattern the rule reports so that its name reads naturally in a suppression such as
+`# ty: ignore[invalid-assignment]`.
+
+Use [Ruff's rule categorization guidelines](../../docs/rule-proposals.md#rule-categorization-guidelines)
+to choose the default severity for a new ty rule:
+
+- Use `error` for correctness issues, such as assigning a value of an incompatible type (`invalid-assignment`).
+- Use `warn` for suspicious patterns that are usually mistakes but can be intentional (`single-overload`),
+    or for uses of deprecated APIs (`deprecated`).
+- Use `ignore` for pedantic or restrictive checks that projects can opt into for stricter typing,
+    such as requiring explicit type arguments (`missing-type-argument`).
 
 [mdtest-readme]: ../ty_test/README.md
 [resources-mdtest]: ../ty_python_semantic/resources/mdtest

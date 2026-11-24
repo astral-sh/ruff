@@ -1,0 +1,23 @@
+#:schema ../ty.schema.json
+# Configuration overrides for ty ecosystem analysis
+
+# Enable off-by-default rules.
+[rules]
+blanket-ignore-comment = "warn"
+disjoint-cast = "warn"
+division-by-zero = "warn"
+dynamic-function-decorator-return = "warn"
+truthiness-test-of-none-union = "warn"
+invalid-legacy-positional-parameter = "warn"
+mismatched-enum-name = "warn"
+mismatched-namedtuple-name = "warn"
+mismatched-sentinel-name = "warn"
+missing-type-argument = "warn"
+possibly-missing-attribute = "warn"
+possibly-missing-import = "warn"
+possibly-unresolved-reference = "warn"
+unsound-assignment = "warn"
+unsound-return = "warn"
+unsound-yield = "warn"
+unsupported-dynamic-base = "warn"
+redundant-condition-strict = "warn"

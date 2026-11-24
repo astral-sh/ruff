@@ -4,6 +4,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -43,7 +44,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [BPO 15373]: https://bugs.python.org/issue15373
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Correctness)]
 pub(crate) struct ShallowCopyEnviron;
 
 impl AlwaysFixableViolation for ShallowCopyEnviron {
@@ -67,8 +68,7 @@ pub(crate) fn shallow_copy_environ(checker: &Checker, call: &ast::ExprCall) {
 
     if !checker
         .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["copy", "copy"]))
+        .matches_qualified_name(&call.func, &["copy", "copy"])
     {
         return;
     }
@@ -83,8 +83,7 @@ pub(crate) fn shallow_copy_environ(checker: &Checker, call: &ast::ExprCall) {
 
     if !checker
         .semantic()
-        .resolve_qualified_name(arg)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "environ"]))
+        .matches_qualified_name(arg, &["os", "environ"])
     {
         return;
     }

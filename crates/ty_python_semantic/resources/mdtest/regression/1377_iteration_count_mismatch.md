@@ -18,7 +18,7 @@ from typing import TypeAlias
 
 from steam.message import Message
 
-TestAlias: TypeAlias = tuple[Message]
+TestAlias: TypeAlias = tuple[Message]  # error: [missing-type-argument]
 ```
 
 `/packages/steam/__init__.py`:

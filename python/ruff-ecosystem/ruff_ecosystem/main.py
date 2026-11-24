@@ -1,9 +1,10 @@
 import asyncio
 import dataclasses
 import json
+from collections.abc import Awaitable
 from enum import Enum
 from pathlib import Path
-from typing import Awaitable, TypeVar
+from typing import TypeVar
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.check import compare_check, markdown_check_result
@@ -12,6 +13,7 @@ from ruff_ecosystem.format import (
     compare_format,
     markdown_format_result,
 )
+from ruff_ecosystem.html import render_html
 from ruff_ecosystem.projects import (
     Project,
     RuffCommand,
@@ -37,6 +39,8 @@ async def main(
     format_comparison: FormatComparison | None,
     max_parallelism: int = 50,
     raise_on_failure: bool = False,
+    html_output: Path | None = None,
+    html_title: str = "Ruff ecosystem report",
 ) -> None:
     logger.debug("Using command %s", command.value)
     logger.debug("Using baseline executable at %s", baseline_executable)
@@ -82,6 +86,12 @@ async def main(
 
     result = Result(completed=completed, errored=errored)
 
+    if html_output is not None:
+        html_output.parent.mkdir(parents=True, exist_ok=True)
+        html_output.write_text(
+            render_html(result, command, html_title), encoding="utf-8"
+        )
+
     match format:
         case OutputFormat.json:
             print(json.dumps(result, indent=4, cls=JSONEncoder))
@@ -95,8 +105,6 @@ async def main(
                     raise ValueError(f"Unknown target Ruff command {command}")
         case _:
             raise ValueError(f"Unknown output format {format}")
-
-    return None
 
 
 async def clone_and_compare(

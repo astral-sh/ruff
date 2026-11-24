@@ -11,29 +11,28 @@ At its simplest, to define a type alias using PEP 695 syntax, you add a list of 
 `ParamSpec`s or `TypeVarTuple`s after the alias name.
 
 ```py
-from ty_extensions import generic_context
+from typing import Callable
+from ty_extensions._internal import generic_context
 
-type SingleTypevar[T] = ...
-type MultipleTypevars[T, S] = ...
-type SingleParamSpec[**P] = ...
-type TypeVarAndParamSpec[T, **P] = ...
-type SingleTypeVarTuple[*Ts] = ...
-type TypeVarAndTypeVarTuple[T, *Ts] = ...
+type SingleTypevar[T] = list[T]
+type MultipleTypevars[T, S] = tuple[T, S]
+type SingleParamSpec[**P] = Callable[P, int]
+type TypeVarAndParamSpec[T, **P] = Callable[P, T]
+type SingleTypeVarTuple[*Ts] = tuple[*Ts]
+type TypeVarAndTypeVarTuple[T, *Ts] = tuple[T, *Ts]
 
-# revealed: ty_extensions.GenericContext[T@SingleTypevar]
+# revealed: ty_extensions._internal.GenericContext[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
-# revealed: ty_extensions.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
+# revealed: ty_extensions._internal.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
 
-# TODO: support `TypeVarTuple` properly
-# (these should include the `TypeVarTuple`s in their generic contexts)
-# revealed: ty_extensions.GenericContext[P@SingleParamSpec]
+# revealed: ty_extensions._internal.GenericContext[P@SingleParamSpec]
 reveal_type(generic_context(SingleParamSpec))
-# revealed: ty_extensions.GenericContext[T@TypeVarAndParamSpec, P@TypeVarAndParamSpec]
+# revealed: ty_extensions._internal.GenericContext[T@TypeVarAndParamSpec, P@TypeVarAndParamSpec]
 reveal_type(generic_context(TypeVarAndParamSpec))
-# revealed: ty_extensions.GenericContext[]
+# revealed: ty_extensions._internal.GenericContext[Ts@SingleTypeVarTuple]
 reveal_type(generic_context(SingleTypeVarTuple))
-# revealed: ty_extensions.GenericContext[T@TypeVarAndTypeVarTuple]
+# revealed: ty_extensions._internal.GenericContext[T@TypeVarAndTypeVarTuple, Ts@TypeVarAndTypeVarTuple]
 reveal_type(generic_context(TypeVarAndTypeVarTuple))
 ```
 
@@ -41,7 +40,18 @@ You cannot use the same typevar more than once.
 
 ```py
 # error: [invalid-syntax] "duplicate type parameter"
-type RepeatedTypevar[T, T] = ...
+type RepeatedTypevar[T, T] = tuple[T, T]
+```
+
+Legacy type variables cannot be used:
+
+```py
+from typing import TypeVar
+
+V = TypeVar("V")
+
+# error: [unbound-type-variable]
+type TA1[K] = dict[K, V]
 ```
 
 ## Specializing type aliases explicitly
@@ -70,34 +80,42 @@ And non-generic types cannot be specialized:
 ```py
 from typing import TypeVar, Protocol, TypedDict
 
-type B = ...
+type B = int
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias"
+# error: [not-subscriptable] "Cannot subscript non-generic type alias `B`"
 reveal_type(B[int])  # revealed: Unknown
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `B`"
 def _(b: B[int]):
     reveal_type(b)  # revealed: Unknown
 
 type IntOrStr = int | str
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `IntOrStr`"
 def _(c: IntOrStr[int]):
     reveal_type(c)  # revealed: Unknown
 
 type ListOfInts = list[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias: `list[int]` is already specialized"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `ListOfInts`"
 def _(l: ListOfInts[int]):
     reveal_type(l)  # revealed: Unknown
 
 type List[T] = list[T]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias: Double specialization is not allowed"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias: Double specialization is not allowed"
+reveal_type(List[int][str])  # revealed: Unknown
+
+SpecializedList = List[int]
+
+# error: [not-subscriptable] "Cannot specialize non-generic type alias: Double specialization is not allowed"
+reveal_type(SpecializedList[str])  # revealed: Unknown
+
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in parameter annotations"
 def _(l: List[int][int]):
     reveal_type(l)  # revealed: Unknown
 
-# error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'list[T@DoubleSpecialization]'>` is already specialized"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type alias definitions"
 type DoubleSpecialization[T] = list[T][T]
 
 def _(d: DoubleSpecialization[int]):
@@ -105,18 +123,19 @@ def _(d: DoubleSpecialization[int]):
 
 type Tuple = tuple[int, str]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias: `tuple[int, str]` is already specialized"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `Tuple`"
 def _(doubly_specialized: Tuple[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
-class LegacyProto(Protocol[T]):
+class LegacyProto(Protocol[T_co]):
     pass
 
 type LegacyProtoInt = LegacyProto[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias: `LegacyProto[int]` is already specialized"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `LegacyProtoInt`"
 def _(x: LegacyProtoInt[int]):
     reveal_type(x)  # revealed: Unknown
 
@@ -125,17 +144,19 @@ class Proto[T](Protocol):
 
 type ProtoInt = Proto[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias: `Proto[int]` is already specialized"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `ProtoInt`"
 def _(x: ProtoInt[int]):
     reveal_type(x)  # revealed: Unknown
 
 # TODO: TypedDict is just a function object at runtime, we should emit an error
 class LegacyDict(TypedDict[T]):
+    # error: [unbound-type-variable]
     x: T
 
+# error: [invalid-type-form] "Non-generic class `LegacyDict` cannot be specialized in a type expression"
 type LegacyDictInt = LegacyDict[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `LegacyDictInt`"
 def _(x: LegacyDictInt[int]):
     reveal_type(x)  # revealed: Unknown
 
@@ -144,13 +165,13 @@ class Dict[T](TypedDict):
 
 type DictInt = Dict[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias: `Dict[int]` is already specialized"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `DictInt`"
 def _(x: DictInt[int]):
     reveal_type(x)  # revealed: Unknown
 
 type Union = list[str] | list[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type alias: `list[str] | list[int]` is already specialized"
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `Union`"
 def _(x: Union[int]):
     reveal_type(x)  # revealed: Unknown
 ```
@@ -158,8 +179,8 @@ def _(x: Union[int]):
 If the type variable has an upper bound, the specialized type must satisfy that bound:
 
 ```py
-type Bounded[T: int] = ...
-type BoundedByUnion[T: int | str] = ...
+type Bounded[T: int] = list[T]
+type BoundedByUnion[T: int | str] = list[T]
 
 class IntSubclass(int): ...
 
@@ -190,7 +211,7 @@ def _(x: TupleOfIntAndStr[int, int]):
 If the type variable is constrained, the specialized type must satisfy those constraints:
 
 ```py
-type Constrained[T: (int, str)] = ...
+type Constrained[T: (int, str)] = list[T]
 
 reveal_type(Constrained[int])  # revealed: <type alias 'Constrained[int]'>
 
@@ -220,7 +241,7 @@ def _(x: TupleOfIntOrStr[int, object]):
 If the type variable has a default, it can be omitted:
 
 ```py
-type WithDefault[T, U = int] = ...
+type WithDefault[T, U = int] = dict[T, U]
 
 reveal_type(WithDefault[str, str])  # revealed: <type alias 'WithDefault[str, str]'>
 reveal_type(WithDefault[str])  # revealed: <type alias 'WithDefault[str, int]'>
@@ -244,16 +265,142 @@ def _(g: G):
     reveal_type(g)  # revealed: list[int]
 ```
 
+Bare generic aliases used inside another specialized alias are also specialized with their defaults:
+
+```py
+type Defaulted[T = int] = T
+type Outer[U] = Defaulted
+
+def _(x: Outer[str]):
+    reveal_type(x)  # revealed: int
+    y: int = x
+```
+
+Self-referential defaults should not crash type inference:
+
+```py
+# error: [cyclic-type-alias-definition] "Type alias `A` has a circular definition"
+type A[T = A] = A[int]
+```
+
+An explicit alias specialization overrides the alias type parameter's default:
+
+```py
+type ExplicitAlias[
+    FirstT = ExplicitAlias[int, str],
+    SecondT = FirstT,
+] = list[SecondT]
+
+def explicit_alias_default(x: ExplicitAlias):
+    reveal_type(x)  # revealed: list[ExplicitAlias[int, str]]
+```
+
+A self-referential default that does not reference itself in the alias body should also not crash,
+even when the default is evaluated (e.g., by omitting the type argument):
+
+```py
+type B[T = B] = list[T]
+
+def _(x: B) -> None:
+    pass
+```
+
+Mutually-referential defaults (where two type aliases reference each other via their typevar
+defaults) should also not crash:
+
+```py
+type X[T = Y] = list[T]
+type Y[U = X] = list[U]
+
+def _(x: X, y: Y) -> None:
+    pass
+```
+
+Indirect self-references through a chain of type aliases should also not crash:
+
+```py
+type P[T = R] = list[T]
+type Q[T = P] = list[T]
+type R[T = Q] = list[T]
+
+def _(p: P) -> None:
+    pass
+```
+
+## Recursive TypeVarTuple alias defaults
+
+Recursive aliases that extend a `TypeVarTuple` specialization must not recursively expand while
+checking their defaults.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+# error: [invalid-legacy-type-variable]
+# error: [invalid-type-form]
+type Nested[*Ts = Nested[*Ts]] = tuple[Nested[*Ts, Nested[*Ts]]]
+
+# error: [invalid-legacy-type-variable]
+# error: [invalid-type-form]
+type Suffix[*Ts = Suffix[*Ts]] = list[Suffix[*Ts, int]]
+
+# error: [invalid-legacy-type-variable]
+# error: [invalid-type-form]
+type Prefix[*Ts = Prefix[*Ts]] = tuple[Prefix[int, *Ts]]
+
+type ValidDefault[*Ts = *tuple[ValidDefault[int]]] = tuple[ValidDefault[*Ts, int]]
+```
+
+## Snapshots of verbose diagnostics
+
+```py
+class A: ...
+class B[T]: ...
+
+type AliasA = A
+type AliasB = B[int]
+
+# snapshot: not-subscriptable
+def _(a: AliasA[int]): ...
+```
+
+```snapshot
+error[not-subscriptable]: Cannot specialize non-generic type alias `AliasA`
+ --> src/mdtest_snippet.py:8:10
+  |
+8 | def _(a: AliasA[int]): ...
+  |          ------^^^^^
+  |          |
+  |          Alias to `A`, which is not generic
+```
+
+```py
+# snapshot: not-subscriptable
+def _(b: AliasB[int]): ...
+```
+
+```snapshot
+error[not-subscriptable]: Cannot specialize non-generic type alias `AliasB`
+  --> src/mdtest_snippet.py:10:10
+   |
+10 | def _(b: AliasB[int]): ...
+   |          ------^^^^^
+   |          |
+   |          Alias to `B[int]`, which is already specialized
+```
+
 ## Aliases are not callable
 
 ```py
 type A = int
 type B[T] = T
 
-# error: [call-non-callable] "Object of type `TypeAliasType` is not callable"
+# error: [not-callable] "Object of type `TypeAliasType` is not callable"
 reveal_type(A())  # revealed: Unknown
 
-# error: [call-non-callable] "Object of type `GenericAlias` is not callable"
+# error: [not-callable] "Object of type `GenericAlias` is not callable"
 reveal_type(B[int]())  # revealed: Unknown
 ```
 
@@ -279,16 +426,14 @@ r2: RecursiveList[int] = [1, [1, 2, 3]]
 r3: RecursiveList[int] = "a"
 # error: [invalid-assignment]
 r4: RecursiveList[int] = ["a"]
-# TODO: this should be an error
+# error: [invalid-assignment] "Object of type `list[int | list[str]]` is not assignable to `RecursiveList[int]`"
 r5: RecursiveList[int] = [1, ["a"]]
 
 def _(x: RecursiveList[int]):
     if isinstance(x, list):
-        # TODO: should be `list[RecursiveList[int]]
-        reveal_type(x[0])  # revealed: int | list[Any]
+        reveal_type(x[0])  # revealed: int | list[RecursiveList[int]]
     if isinstance(x, list) and isinstance(x[0], list):
-        # TODO: should be `list[RecursiveList[int]]`
-        reveal_type(x[0])  # revealed: list[Any]
+        reveal_type(x[0])  # revealed: list[RecursiveList[int]]
 ```
 
 Assignment checks respect structural subtyping, i.e. type aliases with the same structure are
@@ -321,12 +466,165 @@ d1: DivergentList[int] = []
 d2: DivergentList[int] = [1]
 # error: [invalid-assignment]
 d3: DivergentList[int] = ["a"]
-# TODO: this should be an error
+# error: [invalid-assignment] "Object of type `list[list[int]]` is not assignable to `DivergentList[int]`"
 d4: DivergentList[int] = [[1]]
 
 def _(x: DivergentList[int]):
     d1: DivergentList[int] = [x]
     d2: DivergentList[int] = x[0]
+```
+
+## Ambiguous overload returns through generic aliases
+
+Aliases are expanded when comparing the structure of ambiguous return types. Recursive aliases
+retain their outer structure, but recursive references fall back to `Unknown`, even when each
+reference changes the alias's type arguments.
+
+```py
+from typing import Any, overload
+
+type Wrapped[T] = dict[str, list[T]]
+type Growing[T] = tuple[T, list[Growing[list[T]]]]
+
+@overload
+def wrapped(value: int) -> Wrapped[int]: ...
+@overload
+def wrapped(value: str) -> Wrapped[str]: ...
+def wrapped(value): ...
+@overload
+def growing(value: int) -> Growing[int]: ...
+@overload
+def growing(value: str) -> Growing[str]: ...
+def growing(value): ...
+def _(value: Any):
+    reveal_type(wrapped(value))  # revealed: dict[str, list[Unknown]]
+    reveal_type(growing(value))  # revealed: tuple[Unknown, list[Unknown]]
+```
+
+## Recursive calls returning a generic alias
+
+```py
+type Chain[T] = tuple[T, Chain[T] | None]
+
+def chain[T](value: T, recurse: bool) -> Chain[T]:
+    if recurse:
+        _, tail = chain(1, False)
+        if tail is not None:
+            # revealed: Literal[1]
+            reveal_type(tail[0])
+    return value, (value, None)
+```
+
+## Negation after specializing a recursive alias
+
+Substituting `object` for `T` makes `A[T]` equal to `object`, even though its definition is
+recursive. Its negation is therefore `Never`.
+
+```py
+from typing import Never, assert_type
+from ty_extensions import Not
+
+type A[T] = T | list[A[T]]
+
+def f(x: Not[A[object]]):
+    assert_type(x, Never)
+```
+
+Specialization can also expose two negations. They cancel, leaving the specialized list or `int`.
+
+```py
+type B[T] = Not[list[B[T]] | T]
+
+def g(x: Not[B[int]]):
+    assert_type(x, list[B[int]] | int)
+```
+
+## Excluding a recursive alias from a list
+
+`Without[A]` describes a list that is not an `A`. Since `list[Any]` is gradual, its `Any` can stand
+for a different type in each union member. The exclusion still matters: the element type does not
+simplify to `list[Any]`.
+
+```py
+from typing import Any
+from ty_extensions import Intersection, Not
+
+type Without[T] = Intersection[list[Any], Not[T]]
+type A = list[Without[A] | A]
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: (list[Any] & ~A) | list[Without[A] | A]
+```
+
+## Excluding a recursive alias from `object`
+
+Here, specializing `Without` with `object` leaves just `Not[A]`. The alias `A` contains no gradual
+types, so `Without[object, A] | A` covers every object.
+
+```py
+from typing import assert_type
+from ty_extensions import Intersection, Not
+
+type Without[T, U] = Intersection[T, Not[U]]
+type A = list[Without[object, A] | A]
+
+def f(x: A):
+    assert_type(x[0], object)
+```
+
+## Recursive tuple elements in a protocol
+
+Each element of `A` must be both another `A` and an `Items`. We can inspect an element without
+expanding the tuple indefinitely, and an integer still fails that requirement.
+
+```py
+from collections.abc import Iterator
+from typing import Any, Protocol, assert_type
+from ty_extensions import Intersection
+
+class Items(Protocol):
+    def __iter__(self) -> Iterator[Any]: ...
+
+type WithItems[T] = Intersection[Items, T]
+type A = tuple[WithItems[A], ...]
+
+def f(x: A):
+    assert_type(x[0], WithItems[A])
+    y: int = x[0]  # error: [invalid-assignment]
+```
+
+## Recursive tuple elements in `Iterable`
+
+We use the element type of `Iterable` when simplifying its intersection with a tuple. That
+simplification also preserves a recursive element type.
+
+```py
+from collections.abc import Iterable
+from typing import Any, assert_type
+from ty_extensions import Intersection
+
+type WithIterable[T] = Intersection[Iterable[Any], T]
+type A = tuple[WithIterable[A], ...]
+
+def f(x: A):
+    assert_type(x[0], WithIterable[A])
+```
+
+## Boolean aliases after substitution
+
+Subtracting `True` from `bool` leaves only `False`. Using aliases for the arguments to `Minus` does
+not prevent that simplification.
+
+```py
+from typing import Literal
+from ty_extensions import Intersection, Not
+
+type Minus[T, U] = Intersection[T, Not[U]]
+type Boolean = bool
+type TrueLiteral = Literal[True]
+
+def f(x: Minus[Boolean, TrueLiteral]):
+    reveal_type(x)  # revealed: Literal[False]
 ```
 
 ## Solving generics with type alias parameters
@@ -361,4 +659,318 @@ def head[T](l: list[T]) -> T:
 
 def _(x: MyList[int]):
     reveal_type(head(x))  # revealed: int
+```
+
+## Bidirectional type inference with union type aliases
+
+When a PEP 695 type alias expands to a union, bidirectional type inference should still work
+correctly. The type alias should be expanded to its value type when determining the expected type
+for specialization inference.
+
+```py
+type MaybeList[T] = list[T] | T
+
+def test[X: int](items: list[X]) -> list[X]:
+    # The annotation MaybeList[str | int] expands to `list[str | int] | str | int`.
+    # Bidirectional inference should infer list[str | int] from the list() call.
+    a: MaybeList[str | int] = list(items)
+    # The revealed type is list[int | str] because that's what list() returns.
+    reveal_type(a)  # revealed: list[int | str]
+    return items
+```
+
+This also works for more complex cases with multiple generic functions:
+
+```py
+type OptionalList[T] = list[T] | None
+
+def copy_list[T](items: list[T]) -> list[T]:
+    return list(items)
+
+def _(values: list[int]) -> OptionalList[int]:
+    result: OptionalList[int] = copy_list(values)
+    # The revealed type is list[int] because that's what copy_list returns.
+    reveal_type(result)  # revealed: list[int]
+    return result
+```
+
+Union type aliases also work correctly with TypedDict dict literal inference:
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+    age: int
+
+type MaybePerson = Person | None
+
+def _(p: MaybePerson):
+    # Dict literal should be inferred as Person, not dict[str, str | int]
+    x: MaybePerson = {"name": "Alice", "age": 30}
+    reveal_type(x)  # revealed: Person
+```
+
+And with `dict()` calls in TypedDict context:
+
+```py
+from typing import TypedDict
+
+class Dog(TypedDict):
+    name: str
+    breed: str
+
+type MaybeDog = Dog | None
+
+def _():
+    # dict() call with keyword args should be inferred as Dog
+    animal: MaybeDog = dict(name="Buddy", breed="Labrador")
+    reveal_type(animal)  # revealed: Dog
+```
+
+And with set literal inference:
+
+```py
+type MaybeSet[T] = set[T] | T
+
+def _():
+    # Set literal should be inferred as set[int]
+    x: MaybeSet[int] = {1, 2, 3}
+    reveal_type(x)  # revealed: set[int]
+```
+
+## Fully qualified type alias names in error messages
+
+When two type aliases have the same name but are in different scopes, they should be fully qualified
+in error messages to distinguish them:
+
+```py
+class A:
+    class B[T]:
+        pass
+
+    type D = list[int]
+
+class C:
+    class B[T]:
+        pass
+
+    type D = list[str]
+
+def f(b: C.B[C.D]) -> None:
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.C.B[mdtest_snippet.C.D]` is not assignable to `mdtest_snippet.A.B[mdtest_snippet.A.D]`"
+    a: A.B[A.D] = b
+```
+
+## Fully qualified type alias names in nested classes
+
+Type aliases in nested classes should include the full class path:
+
+```py
+class Outer1:
+    class Inner:
+        type Alias = int
+
+class Outer2:
+    class Inner:
+        type Alias = str
+
+def g(x: Outer1.Inner.Alias, y: Outer2.Inner.Alias) -> None:
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.Outer2.Inner.Alias` is not assignable to `mdtest_snippet.Outer1.Inner.Alias`"
+    a: Outer1.Inner.Alias = y
+```
+
+## Fully qualified generic type aliases
+
+Ambiguous generic type aliases should also be fully qualified:
+
+```py
+class X:
+    type GenAlias[T] = list[T]
+
+class Y:
+    type GenAlias[T] = dict[str, T]
+
+def h(x: X.GenAlias[int], y: Y.GenAlias[int]) -> None:
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.Y.GenAlias[int]` is not assignable to `mdtest_snippet.X.GenAlias[int]`"
+    a: X.GenAlias[int] = y
+```
+
+## Different specializations of the same generic type alias
+
+Different specializations of the same generic type alias refer to the same definition, so they
+should not be qualified:
+
+```py
+class Box[T]:
+    item: T
+
+type RefBox[T] = Box[T]
+
+def transmute_inner[T, V](x: RefBox[T]) -> RefBox[V]:
+    # error: [invalid-explicit-return] "Return type does not match returned value: expected `RefBox[V@transmute_inner]`, found `RefBox[T@transmute_inner]`"
+    return x
+```
+
+## Non-ambiguous type aliases should not be qualified
+
+Type aliases with unique names should NOT be qualified:
+
+```py
+class P:
+    type UniqueAlias1 = int
+
+class Q:
+    type UniqueAlias2 = str
+
+def i(x: P.UniqueAlias1, y: Q.UniqueAlias2) -> None:
+    # error: [invalid-assignment] "Object of type `UniqueAlias2` is not assignable to `UniqueAlias1`"
+    a: P.UniqueAlias1 = y
+```
+
+## Class and type alias with same name
+
+When a class and a type alias have the same name in different scopes, both should be fully qualified
+to distinguish them in error messages:
+
+```py
+class Container1:
+    class Item:
+        pass
+
+class Container2:
+    type Item = str
+
+def j(x: Container1.Item, y: Container2.Item) -> None:
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.Container2.Item` is not assignable to `mdtest_snippet.Container1.Item`"
+    a: Container1.Item = y
+```
+
+## Capturing an enclosing type parameter
+
+An alias defined inside a generic function refers to that function's type parameter.
+
+```py
+def outer[T](value: T) -> T:
+    type Captured = T
+
+    def identity(other: Captured) -> Captured:
+        return other
+
+    return identity(value)  # ok
+```
+
+The alias can also have its own parameters. Specializing them preserves the captured parameter.
+
+```py
+def generic_outer[T](value: T) -> tuple[T, int]:
+    type Pair[U] = tuple[T, U]
+
+    def integers(other: Pair[int]) -> Pair[int]:
+        return other
+
+    def strings(other: Pair[str]) -> Pair[str]:
+        return other
+
+    strings((value, "text"))  # ok
+    integers((value, "text"))  # error: [invalid-argument-type]
+    return integers((value, 1))  # ok
+```
+
+## Constructor inference through captured alias parameters
+
+A class-local alias captures its class's type parameter. Constructing another instance inside the
+class infers a new specialization without constraining the enclosing instance's type parameter.
+
+```py
+class Box[T]:
+    type Items = list[T]
+
+    def __init__(self, value: Items) -> None: ...
+    def copy(self, value: list[T]) -> None:
+        # revealed: Box[T@Box]
+        reveal_type(Box(value))
+        # revealed: Box[int]
+        reveal_type(Box([1]))
+```
+
+The alias's own parameters retain their specialization while its captured class parameter is
+inferred for the new instance.
+
+```py
+class PairBox[T]:
+    type Pair[U] = tuple[T, U]
+
+    def __init__(self, value: Pair[int]) -> None: ...
+    def copy(self, value: T) -> None:
+        # revealed: PairBox[T@PairBox]
+        reveal_type(PairBox((value, 1)))
+        # revealed: PairBox[str]
+        reveal_type(PairBox(("text", 1)))
+        PairBox((value, "wrong"))  # error: [invalid-argument-type]
+```
+
+## Default type parameter after `TypeVarTuple`
+
+A `TypeVar` with a default cannot follow a `TypeVarTuple` in a type alias. Its default would make it
+ambiguous how many arguments belong to the pack.
+
+```py
+# snapshot: invalid-type-variable-default
+type Alias1[*Ts, T = int] = tuple[*Ts, T]
+```
+
+```snapshot
+error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
+ --> src/mdtest_snippet.py:2:18
+  |
+2 | type Alias1[*Ts, T = int] = tuple[*Ts, T]
+  |             ---  ^^^^^^^ `T` has a default
+  |             |
+  |             `Ts` is a TypeVarTuple
+info: Using the default would let the TypeVarTuple consume an extra positional type argument
+```
+
+```py
+# snapshot: invalid-type-variable-default
+type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
+```
+
+```snapshot
+error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
+ --> src/mdtest_snippet.py:4:22
+  |
+4 | type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
+  |                 ---  ^^^^^^^^ `T2` has a default
+  |                 |
+  |                 `Ts` is a TypeVarTuple
+info: Using the default would let the TypeVarTuple consume an extra positional type argument
+```
+
+```py
+# snapshot: invalid-type-variable-default
+type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
+```
+
+```snapshot
+error[invalid-type-variable-default]: TypeVars with defaults cannot follow a TypeVarTuple
+ --> src/mdtest_snippet.py:6:18
+  |
+6 | type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
+  |             ---  ^^^^^^^^  -------- `T2` also has a default
+  |             |    |
+  |             |    `T1` has a default
+  |             `Ts` is a TypeVarTuple
+info: Using the default would let the TypeVarTuple consume an extra positional type argument
+```
+
+```py
+# error: [invalid-type-form] "Type alias `Alias4` cannot have multiple `TypeVarTuple` type parameters"
+# error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
+type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
+```
+
+```py
+# These are fine:
+type Ok1[T, *Ts] = tuple[T, *Ts]
 ```

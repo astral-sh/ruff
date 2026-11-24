@@ -3,25 +3,23 @@ use crate::diagnostic::{
     stylesheet::{DiagnosticStylesheet, fmt_styled, fmt_with_hyperlink},
 };
 
-use super::FileResolver;
+use super::{FileResolver, Renderer};
 
-pub(super) struct ConciseRenderer<'a> {
+pub struct ConciseRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> ConciseRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+    pub fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
         Self { resolver, config }
     }
+}
 
-    pub(super) fn render(
-        &self,
-        f: &mut std::fmt::Formatter,
-        diagnostics: &[Diagnostic],
-    ) -> std::fmt::Result {
+impl Renderer for ConciseRenderer<'_> {
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         let stylesheet = if self.config.color {
-            DiagnosticStylesheet::styled()
+            DiagnosticStylesheet::styled().hyperlinks(self.config.hyperlinks)
         } else {
             DiagnosticStylesheet::plain()
         };
@@ -67,8 +65,9 @@ impl<'a> ConciseRenderer<'a> {
                 write!(f, "{sep} ")?;
             }
 
+            let use_name = self.config.preview && !self.config.prefer_rule_codes;
             if self.config.hide_severity {
-                if let Some(code) = diag.secondary_code() {
+                if !use_name && let Some(code) = diag.secondary_code() {
                     write!(
                         f,
                         "{code} ",
@@ -91,28 +90,34 @@ impl<'a> ConciseRenderer<'a> {
                         )
                     )?;
                 }
-                if self.config.show_fix_status {
-                    // Do not display an indicator for inapplicable fixes
-                    if diag.has_applicable_fix(self.config) {
-                        write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
-                    }
-                }
             } else {
                 let (severity, severity_style) = match diag.severity() {
+                    Severity::Hint => ("hint", stylesheet.info),
                     Severity::Info => ("info", stylesheet.info),
                     Severity::Warning => ("warning", stylesheet.warning),
                     Severity::Error => ("error", stylesheet.error),
                     Severity::Fatal => ("fatal", stylesheet.error),
+                };
+                let id = if use_name {
+                    diag.id().as_str()
+                } else {
+                    diag.secondary_code_or_id()
                 };
                 write!(
                     f,
                     "{severity}[{id}] ",
                     severity = fmt_styled(severity, severity_style),
                     id = fmt_styled(
-                        fmt_with_hyperlink(&diag.id(), diag.documentation_url(), &stylesheet),
+                        fmt_with_hyperlink(id, diag.documentation_url(), &stylesheet),
                         stylesheet.emphasis
                     )
                 )?;
+            }
+            if self.config.show_fix_status {
+                // Do not display an indicator for inapplicable fixes
+                if diag.has_applicable_fix(self.config.fix_applicability) {
+                    write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
+                }
             }
 
             writeln!(f, "{message}", message = diag.concise_message())?;
@@ -126,21 +131,19 @@ impl<'a> ConciseRenderer<'a> {
 mod tests {
     use ruff_diagnostics::Applicability;
 
-    use crate::diagnostic::{
-        DiagnosticFormat,
-        render::tests::{
-            TestEnvironment, create_diagnostics, create_notebook_diagnostics,
-            create_syntax_error_diagnostics,
-        },
+    use crate::diagnostic::render::tests::{
+        DiagnosticFormat, TestEnvironment, create_diagnostics, create_notebook_diagnostics,
+        create_syntax_error_diagnostics,
     };
 
     #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Concise);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
-        fib.py:1:8: error[unused-import] `os` imported but unused
-        fib.py:6:5: error[unused-variable] Local variable `x` is assigned to but never used
-        undef.py:1:4: error[undefined-name] Undefined name `a`
+        fib.py:1:8: error[F401] `os` imported but unused
+        fib.py:6:5: error[F841] Local variable `x` is assigned to but never used
+        undef.py:1:4: error[F821] Undefined name `a`
+        fib.py:12:16: error[F821] Undefined name `fibonaccii`
         ");
     }
 
@@ -154,6 +157,7 @@ mod tests {
         fib.py:1:8: F401 [*] `os` imported but unused
         fib.py:6:5: F841 [*] Local variable `x` is assigned to but never used
         undef.py:1:4: F821 Undefined name `a`
+        fib.py:12:16: F821 Undefined name `fibonaccii`
         ");
     }
 
@@ -165,9 +169,10 @@ mod tests {
         env.fix_applicability(Applicability::DisplayOnly);
         env.preview(true);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
-        fib.py:1:8: F401 [*] `os` imported but unused
-        fib.py:6:5: F841 [*] Local variable `x` is assigned to but never used
-        undef.py:1:4: F821 Undefined name `a`
+        fib.py:1:8: unused-import: [*] `os` imported but unused
+        fib.py:6:5: unused-variable: [*] Local variable `x` is assigned to but never used
+        undef.py:1:4: undefined-name: Undefined name `a`
+        fib.py:12:16: undefined-name: Undefined name `fibonaccii`
         ");
     }
 
@@ -196,9 +201,9 @@ mod tests {
     fn notebook_output() {
         let (env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Concise);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
-        notebook.ipynb:cell 1:2:8: error[unused-import] `os` imported but unused
-        notebook.ipynb:cell 2:2:8: error[unused-import] `math` imported but unused
-        notebook.ipynb:cell 3:4:5: error[unused-variable] Local variable `x` is assigned to but never used
+        notebook.ipynb:cell 1:2:8: error[F401] `os` imported but unused
+        notebook.ipynb:cell 2:2:8: error[F401] `math` imported but unused
+        notebook.ipynb:cell 3:4:5: error[F841] Local variable `x` is assigned to but never used
         ");
     }
 

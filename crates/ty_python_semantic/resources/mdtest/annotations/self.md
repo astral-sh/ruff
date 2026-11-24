@@ -46,6 +46,73 @@ class Outer:
         def foo(self: Self) -> Self:
             reveal_type(self)  # revealed: Self@foo
             return self
+
+class OuterWithMethod:
+    def method(self) -> None:
+        class Inner:
+            def get(self) -> Self:
+                reveal_type(self)  # revealed: Self@get
+                return self
+
+            def explicit(self: Self) -> Self:
+                reveal_type(self)  # revealed: Self@explicit
+                return self
+
+            @classmethod
+            def create(cls) -> Self:
+                reveal_type(cls)  # revealed: type[Self@create]
+                return cls()
+
+            def generic[T](self, x: T) -> Self:
+                reveal_type(self)  # revealed: Self@generic
+                return self
+
+            def with_nested_function(self) -> Self:
+                def helper() -> Self:
+                    reveal_type(self)  # revealed: Self@with_nested_function
+                    return self
+                return helper()
+
+        reveal_type(Inner().get())  # revealed: Inner
+        reveal_type(Inner.create())  # revealed: Inner
+
+class DoublyNested:
+    def outer_method(self) -> None:
+        class Middle:
+            def middle_method(self) -> None:
+                class Innermost:
+                    def get(self) -> Self:
+                        reveal_type(self)  # revealed: Self@get
+                        return self
+
+def free_function() -> None:
+    class Inner:
+        def get(self) -> Self:
+            reveal_type(self)  # revealed: Self@get
+            return self
+
+class OuterWithClassmethod:
+    @classmethod
+    def factory(cls) -> None:
+        class Inner:
+            def get(self) -> Self:
+                reveal_type(self)  # revealed: Self@get
+                return self
+
+            @classmethod
+            def create(cls) -> Self:
+                reveal_type(cls)  # revealed: type[Self@create]
+                return cls()
+
+        reveal_type(Inner().get())  # revealed: Inner
+        reveal_type(Inner.create())  # revealed: Inner
+
+class NestedClassExplicitSelf:
+    class Bar:
+        def method_a(self) -> None:
+            def first_param_is_explicit_self(this: Self) -> None:
+                reveal_type(this)  # revealed: Self@method_a
+                reveal_type(self)  # revealed: Self@method_a
 ```
 
 ## Type of (unannotated) `self` parameters
@@ -114,7 +181,7 @@ Calling an instance method explicitly verifies the first argument:
 ```py
 A.implicit_self(a)
 
-# error: [invalid-argument-type] "Argument to function `implicit_self` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `A` of type variable `Self`"
+# error: [invalid-argument-type] "Argument to function `A.implicit_self` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `A` of type variable `Self`"
 A.implicit_self(1)
 ```
 
@@ -126,7 +193,7 @@ from typing import Never, Callable
 class Strange:
     def can_not_be_called(self: Never) -> None: ...
 
-# error: [invalid-argument-type] "Argument to bound method `can_not_be_called` is incorrect: Expected `Never`, found `Strange`"
+# error: [invalid-argument-type] "Argument to bound method `Strange.can_not_be_called` is incorrect: Expected `Never`, found `Strange`"
 Strange().can_not_be_called()
 ```
 
@@ -242,7 +309,7 @@ Here, both `Foo.foo` and `Bar.bar` use `Self`. When accessing a bound method, we
 occurrences of `Self` with the bound `self` type. In this example, when we access `x.foo`, we only
 want to substitute the occurrences of `Self` in `Foo.foo` — that is, occurrences of `Self@foo`. The
 fact that `x` is an instance of `Foo[Self@bar]` (a completely different `Self` type) should not
-affect that subtitution. If we blindly substitute all occurrences of `Self`, we would get
+affect that substitution. If we blindly substitute all occurrences of `Self`, we would get
 `Foo[Self@bar]` as the return type of the bound method.
 
 ```py
@@ -256,10 +323,12 @@ class Bar:
     def bar(self: Self, x: Foo[Self]):
         # revealed: bound method Foo[Self@bar].foo() -> Self@bar
         reveal_type(x.foo)
+        reveal_type(x.foo())  # revealed: Self@bar
 
 def f[U: Bar](x: Foo[U]):
     # revealed: bound method Foo[U@f].foo() -> U@f
     reveal_type(x.foo)
+    reveal_type(x.foo())  # revealed: U@f
 ```
 
 ## typing_extensions
@@ -344,6 +413,7 @@ class GenericShape[T]:
     @classmethod
     def baz[U](cls, u: U) -> "GenericShape[U]":
         reveal_type(cls)  # revealed: type[Self@baz]
+        # error: [invalid-explicit-return]
         return cls()
 
 class GenericCircle[T](GenericShape[T]): ...
@@ -357,6 +427,42 @@ reveal_type(GenericCircle().foo())  # revealed: GenericCircle[Unknown]
 reveal_type(GenericCircle.bar())  # revealed: GenericCircle[Unknown]
 reveal_type(GenericCircle[int].bar())  # revealed: GenericCircle[int]
 reveal_type(GenericCircle.baz(1))  # revealed: GenericShape[Literal[1]]
+```
+
+### Union arguments containing `Self`
+
+The receiver and argument jointly determine `Self`. An argument member matching `int` contributes no
+evidence for `Self` and does not need to satisfy its bound.
+
+```py
+from typing import Self
+
+class Shape:
+    @classmethod
+    def ensure(cls, value: Self | int) -> Self:
+        raise NotImplementedError
+
+class Circle(Shape): ...
+
+def check(value: Circle | int):
+    reveal_type(Circle.ensure(value))  # revealed: Circle
+```
+
+An inherited method can infer the base class from another argument. `Self = Shape` satisfies the
+declared bound and accepts both the subclass receiver and a base-class argument:
+
+```py
+reveal_type(Circle.ensure(Shape()))  # revealed: Shape
+
+def base_argument(value: Shape | int):
+    reveal_type(Circle.ensure(value))  # revealed: Shape
+```
+
+We also reject a union containing an unrelated type:
+
+```py
+def invalid_member(value: Circle | str):
+    Circle.ensure(value)  # error: [invalid-argument-type]
 ```
 
 ### Calling `super()` in overridden methods with `Self` return type
@@ -404,10 +510,52 @@ class Child(Parent):
 reveal_type(Child.create())  # revealed: Child
 ```
 
-## Attributes
+An inherited classmethod should also preserve the method's `Self` type when accessed through `self`.
 
-TODO: The use of `Self` to annotate the `next_node` attribute should be
-[modeled as a property][self attribute], using `Self` in its parameter and return type.
+```py
+from typing import Self, assert_type
+
+class Parent:
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class Child(Parent):
+    def method(self) -> None:
+        assert_type(self.create(), Self)
+```
+
+Truthiness narrowing must also preserve `Self` when an instance accesses a class method.
+
+```py
+from typing import Self, assert_type
+
+class MaybeEmpty:
+    @classmethod
+    def create(cls, other: Self) -> Self:
+        return cls()
+
+    def copy_if_empty(self, other: Self) -> Self:
+        if not self:
+            assert_type(self.create(other), Self)
+            return self.create(other)
+        return self
+```
+
+A mixin narrowed to an unrelated class can also call that class's class methods.
+
+```py
+class Base:
+    @classmethod
+    def warn(cls) -> None: ...
+
+class Mixin:
+    def method(self) -> None:
+        assert isinstance(self, Base)
+        self.warn()
+```
+
+## Attributes
 
 ```py
 from typing import Self
@@ -418,11 +566,114 @@ class LinkedList:
 
     def next(self: Self) -> Self:
         reveal_type(self.value)  # revealed: int
-        # TODO: no error
-        # error: [invalid-return-type]
         return self.next_node
 
 reveal_type(LinkedList().next())  # revealed: LinkedList
+```
+
+Dataclass fields can also use `Self` in their annotations. The generated methods infer `Self` from
+their arguments, just like handwritten methods. A base-class argument can widen the inferred type:
+
+```py
+from dataclasses import dataclass
+from typing import Self
+
+@dataclass
+class Node:
+    parent: Self | None = None
+
+class Child(Node): ...
+
+Node(Node())  # ok
+Child(Child())  # ok
+Child(Node())  # ok
+Child().__replace__(parent=Child())  # ok
+Child().__replace__(parent=Node())  # ok
+```
+
+`Child` is not itself decorated with `@dataclass`, so it inherits `Node.__init__`. That method's
+`Self` is a method-scoped type variable whose upper bound remains `Node`, allowing `Child(Node())`
+just as a handwritten initializer would. This is unsound for `Child.parent`, but reflects the
+existing unsoundness of mutable `Self` attributes: assigning `node.parent = Node()` through a `Node`
+reference also permits a `Node` parent on a `Child` instance.
+
+Attributes annotated with `Self` can be assigned on instances:
+
+```py
+from typing import Self
+
+class MyClass:
+    field: Self | None = None
+
+def _(c: MyClass):
+    c.field = c
+```
+
+A generic type alias preserves `Self` when it is used in an attribute annotation:
+
+```py
+type Identity[T] = T
+
+class AliasedNode:
+    parent: Identity[Self]
+
+    def __init__(self) -> None:
+        self.parent = self
+
+reveal_type(AliasedNode().parent)  # revealed: AliasedNode
+```
+
+Self from class body annotations and method signatures represent the same logical type variable.
+When a method returns an attribute annotated with `Self` in the class body, the class-body `Self`
+and the method's `Self` should be considered the same type, even though they have different binding
+contexts internally:
+
+```py
+from typing import Self
+
+class Chain:
+    next: Self
+    value: int
+
+    def advance(self: Self) -> Self:
+        return self.next
+
+    def advance_twice(self: Self) -> Self:
+        return self.advance().advance()
+
+class SubChain(Chain):
+    extra: str
+
+reveal_type(SubChain().advance())  # revealed: SubChain
+reveal_type(SubChain().advance_twice())  # revealed: SubChain
+```
+
+Self-typed attributes that flow through generic containers should also work:
+
+```py
+from typing import Self
+
+class TreeNode:
+    children: list[Self]
+    parent: Self | None
+
+    def first_child(self) -> Self | None:
+        if self.children:
+            return self.children[0]
+        return None
+
+    def all_descendants(self) -> list[Self]:
+        result: list[Self] = []
+        for child in self.children:
+            result.append(child)
+            result.extend(child.all_descendants())
+        return result
+
+    def root(self) -> Self:
+        node = self
+        while node.parent is not None:
+            node = node.parent
+        return node
 ```
 
 Attributes can also refer to a generic parameter:
@@ -437,6 +688,60 @@ class C(Generic[T]):
     def method(self) -> None:
         reveal_type(self)  # revealed: Self@method
         reveal_type(self.foo)  # revealed: T@C
+```
+
+## Callable attributes that return `Self`
+
+Attributes annotated as callables returning `Self` should bind to the concrete class.
+
+```py
+from typing import Callable, Self
+
+class Factory:
+    maker: Callable[[], Self]
+
+    def __init__(self) -> None:
+        self.maker = lambda: self
+
+class Sub(Factory):
+    pass
+
+def _(s: Sub):
+    reveal_type(s.maker())  # revealed: Sub
+```
+
+## Passing `self` as a callable
+
+When `self` is passed to a generic function expecting a callable type, the parameter and return
+types of the callable are inferred from the class's `__call__` method:
+
+```py
+from typing import Callable
+
+def apply[T](callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+class Printer:
+    def __call__(self, value: int) -> str:
+        return str(value)
+
+    def format(self, values: list[int]) -> str:
+        reveal_type(apply(self))  # revealed: str
+        return ", ".join(map(self, values))
+```
+
+If `__call__` returns `Self`, the class's `Self` type is preserved as the inferred return type:
+
+```py
+from typing import Self
+
+class Clone:
+    def __call__(self, value: int) -> Self:
+        return self
+
+    def clone(self) -> Self:
+        reveal_type(apply(self))  # revealed: Self@clone
+        return apply(self)
 ```
 
 ## Generic Classes
@@ -454,6 +759,25 @@ class Container(Generic[T]):
 int_container: Container[int] = Container[int]()
 reveal_type(int_container)  # revealed: Container[int]
 reveal_type(int_container.set_value(1))  # revealed: Container[int]
+```
+
+## Unbound inherited methods on generic classes
+
+When an inherited method returns `Self`, its return type is the type of the instance passed to it.
+This includes the subclass and its type arguments, even when the call uses `Child` rather than
+`Child[int]`.
+
+```py
+from typing import Self
+
+class Parent[T]:
+    def get_self(self) -> Self:
+        return self
+
+class Child[U](Parent[U]): ...
+
+def _(child: Child[int]):
+    reveal_type(Child.get_self(child))  # revealed: Child[int]
 ```
 
 ## Generic class with bounded type variable
@@ -477,8 +801,13 @@ class C[T: Base]:
 # Calling a method on a specialized instance should not produce an error
 C[Base]().g()
 
+BaseNewType = NewType("BaseNewType", Base)
+
+C[BaseNewType]().g()
+
 # Test with a NewType bound
 K = NewType("K", int)
+K2 = NewType("K2", K)
 
 class D[T: K]:
     x: T
@@ -488,11 +817,66 @@ class D[T: K]:
 
 # Calling a method on a specialized instance should not produce an error
 D[K]().h()
+D[K2]().h()
+
+# Test with a union-NewType bound
+K3 = NewType("K3", float)
+K4 = NewType("K4", K3)
+
+class D2[T: K3]:
+    x: T
+
+    def h(self) -> None:
+        pass
+
+# Calling a method on a specialized instance should not produce an error
+D2[K3]().h()
+D2[K4]().h()
+
+class D3[T: float]:
+    x: T
+
+    def h(self) -> None:
+        pass
+
+D3[K3]().h()
+D3[K4]().h()
 ```
 
 ## Protocols
 
-TODO: <https://typing.python.org/en/latest/spec/generics.html#use-in-protocols>
+See also: <https://typing.python.org/en/latest/spec/generics.html#use-in-protocols>
+
+```py
+from typing import Self, Protocol
+
+class Copyable(Protocol):
+    def copy(self) -> Self: ...
+
+class Linkable(Protocol):
+    next_node: Self
+
+    def advance(self) -> Self:
+        return self.next_node
+
+def _(l: Linkable) -> None:
+    reveal_type(l.next_node)  # revealed: Linkable
+
+class CopyableImpl:
+    def copy(self) -> Self:
+        return self
+
+class SubCopyable(CopyableImpl): ...
+
+def copy_it(x: Copyable) -> None:
+    reveal_type(x.copy())  # revealed: Copyable
+
+def copy_concrete(x: CopyableImpl) -> None:
+    reveal_type(x.copy())  # revealed: CopyableImpl
+
+def copy_sub(x: SubCopyable) -> None:
+    reveal_type(x.copy())  # revealed: SubCopyable
+```
 
 ## Annotations
 
@@ -561,32 +945,510 @@ def x(s: Self): ...
 # error: [invalid-type-form]
 b: Self
 
-# TODO: "Self" cannot be used in a function with a `self` or `cls` parameter that has a type annotation other than "Self"
 class Foo:
-    # TODO: This `self: T` annotation should be rejected because `T` is not `Self`
-    def has_existing_self_annotation(self: T) -> Self:
-        return self  # error: [invalid-return-type]
-
     def return_concrete_type(self) -> Self:
         # TODO: We could emit a hint that suggests annotating with `Foo` instead of `Self`
-        # error: [invalid-return-type]
+        # error: [invalid-explicit-return]
         return Foo()
 
     @staticmethod
-    # TODO: The usage of `Self` here should be rejected because this is a static method
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
     def make() -> Self:
-        # error: [invalid-return-type]
         return Foo()
 
 class Bar(Generic[T]): ...
 
 # error: [invalid-type-form]
 class Baz(Bar[Self]): ...
+```
+
+## Explicit instance-method receivers with `Self`
+
+An instance method can use `Self` when its first parameter is unannotated or annotated as `Self`:
+
+```py
+from __future__ import annotations
+
+from typing import Self, TypeVar
+
+T = TypeVar("T")
+
+class Valid:
+    def implicit(self) -> Self:
+        return self
+
+    def explicit(self: Self) -> Self:
+        return self
+```
+
+A different receiver annotation is valid when the method's signature does not use `Self`:
+
+```py
+class WithoutSelf:
+    def method(self: T) -> T:
+        return self
+```
+
+Any other annotation for the first parameter is incompatible with `Self`, even an annotation that
+names the class itself:
+
+```py
+class Invalid:
+    def type_variable(self: T) -> Self:  # error: [invalid-type-form]
+        raise NotImplementedError
+
+    def concrete(self: Invalid) -> Self:  # error: [invalid-type-form]
+        raise NotImplementedError
+
+    def union(self: T | None) -> Self:  # error: [invalid-type-form]
+        raise NotImplementedError
+
+    def class_object(self: type[Self]) -> Self:  # error: [invalid-type-form]
+        raise NotImplementedError
+```
+
+The invalid receiver does not change the inferred return type of the bound method:
+
+```py
+reveal_type(Invalid().concrete)  # revealed: bound method Invalid.concrete() -> Invalid
+```
+
+## Explicit classmethod receivers with `Self`
+
+A class method receives the class as its first argument. When the method uses `Self`, that argument
+can be unannotated or annotated as `type[Self]`:
+
+```py
+from __future__ import annotations
+
+from typing import Self, TypeVar
+
+T = TypeVar("T")
+
+class Valid:
+    @classmethod
+    def implicit(cls) -> Self:
+        return cls()
+
+    @classmethod
+    def explicit(cls: type[Self]) -> Self:
+        return cls()
+```
+
+A class method can also use a different receiver annotation when its signature does not use `Self`:
+
+```py
+class WithoutSelf:
+    @classmethod
+    def method(cls: type[T]) -> T:
+        return cls()
+```
+
+Other annotations are incompatible with `Self`, including `Self` without the enclosing `type`:
+
+```py
+class Invalid:
+    @classmethod
+    def type_variable(cls: type[T]) -> Self:  # error: [invalid-type-form]
+        raise NotImplementedError
+
+    @classmethod
+    def concrete(cls: type[Invalid]) -> Self:  # error: [invalid-type-form]
+        raise NotImplementedError
+
+    @classmethod
+    def instance(cls: Self) -> Self:  # error: [invalid-type-form]
+        raise NotImplementedError
+```
+
+## `Self` in unions with explicit receivers
+
+An incompatible receiver makes `Self` invalid even when the surrounding union simplifies to
+`object`. This applies to both return and parameter annotations:
+
+```py
+from typing import Self
+
+class Example:
+    def return_type(self: object) -> Self | object: ...  # error: [invalid-type-form]
+    def parameter(self: object, value: Self | object) -> None: ...  # error: [invalid-type-form]
+```
+
+## `Self` in type aliases with explicit receivers
+
+An incompatible receiver also makes `Self` invalid when it appears as an argument to a generic type
+alias, whether the alias is used in a return or parameter annotation:
+
+```py
+from typing import Self
+
+type Identity[T] = T
+
+class Example:
+    def return_type(self: object) -> Identity[Self]:  # error: [invalid-type-form]
+        raise NotImplementedError
+
+    def parameter(self: object, value: Identity[Self]) -> None: ...  # error: [invalid-type-form]
+```
+
+## Multiple `Self` annotations with explicit receivers
+
+An incompatible receiver produces a separate error for each `Self` annotation:
+
+```py
+from typing import Self, Union
+
+class Multiple:
+    def method(
+        self: object,
+        other: Self,  # error: [invalid-type-form]
+    ) -> Self:  # error: [invalid-type-form]
+        raise NotImplementedError
+```
+
+Two occurrences in the same annotation also produce separate errors, each pointing at its own
+`Self`:
+
+```py
+class Repeated:
+    # snapshot: invalid-type-form
+    # snapshot: invalid-type-form
+    def method(self: object, other: Union[Self, Self]) -> None: ...
+```
+
+```snapshot
+error[invalid-type-form]: `Self` requires `self: Self` or `cls: type[Self]` for annotated receivers
+  --> src/mdtest_snippet.py:12:43
+   |
+12 |     def method(self: object, other: Union[Self, Self]) -> None: ...
+   |                                           ^^^^
+
+
+error[invalid-type-form]: `Self` requires `self: Self` or `cls: type[Self]` for annotated receivers
+  --> src/mdtest_snippet.py:12:49
+   |
+12 |     def method(self: object, other: Union[Self, Self]) -> None: ...
+   |                                                 ^^^^
+```
+
+Suppressing the error on the return annotation does not suppress the error on a parameter
+annotation:
+
+```py
+class SuppressedReturn:
+    def method(
+        self: object,
+        other: Self,  # error: [invalid-type-form]
+    ) -> Self:  # ty: ignore[invalid-type-form]
+        raise NotImplementedError
+```
+
+## Generic methods with explicit receiver annotations
+
+Methods with their own type parameters follow the same rules for `Self` in both instance methods and
+class methods:
+
+```py
+from typing import Self
+
+class Valid:
+    def instance[T](self: Self, value: T) -> Self:
+        return self
+
+    @classmethod
+    def class_method[T](cls: type[Self], value: T) -> Self:
+        return cls()
+```
+
+A method's own type parameter cannot replace `Self` in its receiver annotation:
+
+```py
+class Invalid:
+    def instance[T](self: T) -> Self:  # error: [invalid-type-form]
+        raise NotImplementedError
+
+    @classmethod
+    def class_method[T](cls: type[T]) -> Self:  # error: [invalid-type-form]
+        raise NotImplementedError
+```
+
+## Quoted `Self` with explicit receiver annotations
+
+A receiver annotation and a `Self` return annotation can both be quoted:
+
+```py
+from typing import Self
+
+class Valid:
+    def instance(self: "Self") -> "Self":
+        return self
+
+    @classmethod
+    def class_method(cls: "type[Self]") -> "Self":
+        return cls()
+```
+
+An incompatible receiver makes a quoted `Self` invalid, including when the quoted union simplifies
+to `object`:
+
+```py
+class InvalidReturn:
+    def simple(self: object) -> "Self":  # error: [invalid-type-form]
+        raise NotImplementedError
+
+    # snapshot: invalid-type-form
+    def union(self: object) -> "Self | object": ...
+```
+
+```snapshot
+error[invalid-type-form]: `Self` requires `self: Self` or `cls: type[Self]` for annotated receivers
+  --> src/mdtest_snippet.py:15:33
+   |
+15 |     def union(self: object) -> "Self | object": ...
+   |                                 ^^^^
+```
+
+A quoted parameter annotation is also invalid when it passes `Self` to a type alias:
+
+```py
+type Identity[T] = T
+
+class InvalidParameter:
+    def method(self: object, value: "Identity[Self]") -> None: ...  # error: [invalid-type-form]
+```
+
+## Self usage in static methods
+
+`Self` cannot be used anywhere in a static method, including parameters, return types, nested
+functions, and default argument values.
+
+```py
+from typing import Self
+
+class StaticMethodTests:
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def with_self_return() -> Self:
+        pass
+
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def with_self_param(x: Self) -> None:
+        pass
+
+    @staticmethod
+    def with_nested_function() -> None:
+        # `Self` in nested function inside static method is also invalid
+        # because `Self` binds to the outermost method (the static method).
+        # error: [invalid-type-form] "`Self` cannot be used in a static method"
+        def inner() -> Self:
+            pass
+
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def with_self_default(x: int = 0, y: "Self | None" = None) -> None:
+        pass
+```
+
+## Aliased staticmethod decorator
+
+Using an aliased `staticmethod` decorator should still be detected:
+
+```py
+from typing import Self
+
+sm = staticmethod
+
+class AliasedStaticMethod:
+    @sm
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def aliased_static() -> Self:
+        pass
+```
+
+## `__new__` allows `Self`
+
+`__new__` is a static method even without an explicit `@staticmethod` decorator, but at runtime it
+is heavily special-cased by the interpreter to behave more like a classmethod. It always receives a
+`cls` parameter with type `type[Self]` and typically returns an object of type `Self`, so `Self` is
+permitted in `__new__`:
+
+```py
+from typing import Self
+
+class WithNew:
+    def __new__(cls) -> Self:
+        instance = object.__new__(cls)
+        return instance
+
+reveal_type(WithNew())  # revealed: WithNew
+
+class SubclassWithNew(WithNew):
+    def __new__(cls) -> Self:
+        return super().__new__(cls)
+
+reveal_type(SubclassWithNew())  # revealed: SubclassWithNew
+```
+
+## Stacked decorators with staticmethod
+
+When `@staticmethod` is stacked with other decorators, `Self` should still be invalid:
+
+```py
+from typing import Self, Callable
+
+def identity[**P, R](f: Callable[P, R]) -> Callable[P, R]:
+    return f
+
+class StackedDecorators:
+    @staticmethod
+    @identity
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def static_then_identity() -> Self:
+        pass
+    # TODO: On Python <3.10, this should ideally be rejected, because `staticmethod` objects were not callable.
+    @identity
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def identity_then_static() -> Self:
+        pass
+```
+
+## Self usage in metaclasses
+
+The spec [prohibits the use of `Self` in metaclasses][spec], so we emit a diagnostic for this.
+
+```py
+from typing import Self
 
 class MyMetaclass(type):
-    # TODO: reject the Self usage. because self cannot be used within a metaclass.
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    registry: list[Self]
+
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
     def __new__(cls, name, bases, dct) -> Self:
         return cls(name, bases, dct)
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def instance_method(self) -> Self:
+        return self
+
+    @classmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def metaclass_classmethod(cls) -> Self:
+        return cls("", (), {})
+    # Note: static methods in metaclasses get the static method error, not metaclass error
+    @staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def metaclass_staticmethod() -> Self:
+        pass
+```
+
+## Runtime use of `self` parameter in metaclass
+
+Using the `self` parameter as a runtime value should not be flagged, even in a metaclass. Only the
+literal `Self` type form should be disallowed.
+
+```py
+class AnnotableMeta(type):
+    def __or__(self, other):
+        return self  # No error: runtime use of `self`, not the `Self` type form
+```
+
+## Indirect metaclass inheritance
+
+Classes that inherit from `type` indirectly (through another metaclass) are also metaclasses:
+
+```py
+from typing import Self
+from abc import ABCMeta
+
+class IndirectMetaclass(ABCMeta):
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def method(self) -> Self:
+        return self
+
+class MultiLevelMeta(IndirectMetaclass):
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def another_method(self) -> Self:
+        return self
+```
+
+## Classes using a metaclass are not metaclasses
+
+A class that uses a metaclass (via `metaclass=...`) is _not_ itself a metaclass. `Self` should be
+valid in such classes:
+
+```py
+from typing import Self
+
+class SomeMeta(type):
+    pass
+
+class UsesMetaclass(metaclass=SomeMeta):
+    def method(self) -> Self:
+        reveal_type(self)  # revealed: Self@method
+        return self
+
+reveal_type(UsesMetaclass().method())  # revealed: UsesMetaclass
+
+class SubclassOfMetaclassUser(UsesMetaclass):
+    def another(self) -> Self:
+        return self
+
+reveal_type(SubclassOfMetaclassUser().another())  # revealed: SubclassOfMetaclassUser
+```
+
+## Nested class inside a metaclass
+
+A nested class inside a metaclass is _not_ a metaclass (unless it also inherits from `type`):
+
+```py
+from typing import Self
+
+class OuterMeta(type):
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def meta_method(self) -> Self:
+        return self
+
+    class NestedRegularClass:
+        # This is fine - NestedRegularClass is not a metaclass
+        def method(self) -> Self:
+            reveal_type(self)  # revealed: Self@method
+            return self
+
+    class NestedMetaclass(type):
+        # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+        def nested_meta_method(self) -> Self:
+            return self
+```
+
+## `builtins.staticmethod`
+
+Using the fully qualified `builtins.staticmethod` should also be detected:
+
+```py
+from typing import Self
+import builtins
+
+class BuiltinsStaticMethod:
+    @builtins.staticmethod
+    # error: [invalid-type-form] "`Self` cannot be used in a static method"
+    def method() -> Self:
+        pass
+```
+
+## EnumMeta is a metaclass
+
+`enum.EnumMeta` (or `enum.EnumType` in Python 3.11+) is a metaclass, so `Self` should be invalid:
+
+```py
+from typing import Self
+from enum import EnumMeta
+
+class CustomEnumMeta(EnumMeta):
+    # error: [invalid-type-form] "`Self` cannot be used in a metaclass"
+    def custom_method(self) -> Self:
+        return self
 ```
 
 ## Explicit annotations override implicit `Self`
@@ -615,7 +1477,7 @@ class Explicit:
     def forward(self: Explicit) -> None:
         reveal_type(self)  # revealed: Explicit
 
-# error: [invalid-argument-type] "Argument to bound method `bad` is incorrect: Expected `Disjoint`, found `Explicit`"
+# error: [invalid-argument-type] "Argument to bound method `Explicit.bad` is incorrect: Expected `Disjoint`, found `Explicit`"
 Explicit().bad()
 
 Explicit().forward()
@@ -626,7 +1488,7 @@ class ExplicitGeneric[T]:
 
 ExplicitGeneric[int]().special()
 
-# TODO: this should be an `invalid-argument-type` error
+# error: [invalid-argument-type] "Argument to bound method `ExplicitGeneric.special` is incorrect: Expected `ExplicitGeneric[int]`, found `ExplicitGeneric[str]`"
 ExplicitGeneric[str]().special()
 ```
 
@@ -659,21 +1521,63 @@ reveal_type(D().instance_method)
 reveal_type(D.class_method)
 ```
 
+A generic type alias does not prevent binding `Self` in the method signature:
+
+```py
+from typing import Self
+
+type Identity[T] = T
+
+class Aliased:
+    def copy(self, other: Identity[Self]) -> Identity[Self]:
+        return other
+
+# revealed: bound method Aliased.copy(other: Aliased) -> Aliased
+reveal_type(Aliased().copy)
+```
+
+`Self` also binds in a parameter annotation when the return type does not contain `Self`:
+
+```py
+class ParameterOnly:
+    def consume(self, other: Identity[Self]) -> None: ...
+
+# revealed: bound method ParameterOnly.consume(other: ParameterOnly) -> None
+reveal_type(ParameterOnly().consume)
+
+ParameterOnly().consume(ParameterOnly())
+ParameterOnly().consume(object())  # error: [invalid-argument-type]
+```
+
+Nested uses of the same alias still bind `Self` to the concrete receiver, including when a subclass
+inherits the method:
+
+```py
+class NestedAlias:
+    def copy(self, other: Identity[Identity[Self]]) -> Identity[Identity[Self]]:
+        return other
+
+class NestedChild(NestedAlias): ...
+
+# revealed: bound method NestedChild.copy(other: NestedChild) -> NestedChild
+reveal_type(NestedChild().copy)
+```
+
 In nested functions `self` binds to the method. So in the following example the `self` in `C.b` is
 bound at `C.f`.
 
 ```py
 from typing import Self
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
-class C[T]():
+class C[T]():  # fmt:skip
     def f(self: Self):
         def b(x: Self):
             reveal_type(x)  # revealed: Self@f
         # revealed: None
         reveal_type(generic_context(b))
 
-# revealed: ty_extensions.GenericContext[Self@f]
+# revealed: ty_extensions._internal.GenericContext[Self@f]
 reveal_type(generic_context(C.f))
 ```
 
@@ -682,7 +1586,7 @@ Even if the `Self` annotation appears first in the nested function, it is the me
 
 ```py
 from typing import Self
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 class C:
     def f(self: "C"):
@@ -700,13 +1604,88 @@ reveal_type(generic_context(C.f))
 This makes sure that we don't bind `self` if it's not a positional parameter:
 
 ```py
-from ty_extensions import CallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 class C:
     def method(*args, **kwargs) -> None: ...
 
-def _(c: CallableTypeOf[C().method]):
+def _(c: RegularCallableTypeOf[C().method]):
     reveal_type(c)  # revealed: (...) -> None
 ```
 
-[self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations
+## Bound methods stored as instance attributes
+
+Bound methods from other objects stored as instance attributes should not have their signatures
+affected by `Self` type binding. This is a regression test for false positives in projects like
+jinja's `LRUCache`.
+
+```py
+from collections import deque
+
+class MyClass:
+    def __init__(self) -> None:
+        self._queue: deque[int] = deque()
+        self._append = self._queue.append
+
+    def add(self, value: int) -> None:
+        self._append(value)
+```
+
+## Self in class attributes with generic classes
+
+Django-like patterns where a class attribute uses `Self` as a type argument to a generic class. Both
+class access (`Confirmation.objects`) and instance access (`instance.objects`) should properly bind
+`Self` to the concrete class.
+
+```py
+from typing import Self, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Manager(Generic[T]):
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Model:
+    objects: Manager[Self]
+
+class Confirmation(Model):
+    expiry_date: int
+
+def test() -> None:
+    # Class access: Self is bound to Confirmation
+    confirmation = Confirmation.objects.get()
+    reveal_type(confirmation)  # revealed: Confirmation
+    x = confirmation.expiry_date  # Should work - Confirmation has expiry_date
+
+    # Instance access: Self should also be bound to Confirmation
+    instance = Confirmation()
+    reveal_type(instance.objects)  # revealed: Manager[Confirmation]
+    instance_result = instance.objects.get()
+    reveal_type(instance_result)  # revealed: Confirmation
+```
+
+## Self in class attributes with descriptors
+
+`Self` binding should also work when the attribute type involves a descriptor.
+
+```py
+from typing import Self, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    def __get__(self, instance, owner) -> T:
+        raise NotImplementedError
+
+class Base:
+    attr: Descriptor[Self] = Descriptor()
+
+class Child(Base):
+    pass
+
+reveal_type(Child.attr)  # revealed: Child
+reveal_type(Child().attr)  # revealed: Child
+```
+
+[spec]: https://typing.python.org/en/latest/spec/generics.html#valid-locations-for-self

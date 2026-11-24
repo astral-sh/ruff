@@ -13,6 +13,7 @@ use std::process::ExitCode;
 mod format_dev;
 mod generate_all;
 mod generate_cli_help;
+mod generate_default_rules;
 mod generate_docs;
 mod generate_json_schema;
 mod generate_options;
@@ -50,6 +51,10 @@ enum Command {
     GenerateTySchema(generate_ty_schema::Args),
     /// Generate a Markdown-compatible table of supported lint rules.
     GenerateRulesTable,
+    /// Generate the JSON redirect map for rule documentation.
+    GenerateRuleRedirects,
+    /// Generate a Markdown-compatible listing of default lint rules.
+    GenerateDefaultRules,
     GenerateTyRules(generate_ty_rules::Args),
     /// Generate a Markdown-compatible listing of configuration options.
     GenerateOptions,
@@ -98,6 +103,13 @@ fn main() -> Result<ExitCode> {
         Command::GenerateJSONSchema(args) => generate_json_schema::main(&args)?,
         Command::GenerateTySchema(args) => generate_ty_schema::main(&args)?,
         Command::GenerateRulesTable => println!("{}", generate_rules_table::generate()),
+        Command::GenerateRuleRedirects => {
+            println!(
+                "{}",
+                serde_json::to_string(&generate_docs::rule_redirects())?
+            );
+        }
+        Command::GenerateDefaultRules => println!("{}", generate_default_rules::generate()),
         Command::GenerateTyRules(args) => generate_ty_rules::main(&args)?,
         Command::GenerateOptions => println!("{}", generate_options::generate()),
         Command::GenerateTyOptions(args) => generate_ty_options::main(&args)?,

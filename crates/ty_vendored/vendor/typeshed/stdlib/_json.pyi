@@ -1,5 +1,6 @@
 """json speedups"""
 
+import sys
 from collections.abc import Callable
 from typing import Any, final
 from typing_extensions import Self
@@ -59,6 +60,8 @@ class make_encoder:
 class make_scanner:
     """JSON scanner object"""
 
+    if sys.version_info >= (3, 15):
+        array_hook: Any
     object_hook: Any
     """object_hook"""
 
@@ -81,26 +84,34 @@ class make_scanner:
         """Call self as a function."""
 
 def encode_basestring(s: str, /) -> str:
-    """encode_basestring(string) -> string
-
-    Return a JSON representation of a Python string
-    """
+    """Return a JSON representation of a Python string"""
 
 def encode_basestring_ascii(s: str, /) -> str:
-    """encode_basestring_ascii(string) -> string
+    """Return an ASCII-only JSON representation of a Python string"""
 
-    Return an ASCII-only JSON representation of a Python string
-    """
+if sys.version_info >= (3, 15):
+    def scanstring(pystr: str, end: int, strict: bool = True, /) -> tuple[str, int]:
+        """Scan the string s for a JSON string.
 
-def scanstring(string: str, end: int, strict: bool = True) -> tuple[str, int]:
-    """scanstring(string, end, strict=True) -> (string, end)
+        End is the index of the character in s after the quote that started the
+        JSON string. Unescapes all valid JSON string escape sequences and raises
+        ValueError on attempt to decode an invalid string. If strict is False
+        then literal control characters are allowed in the string.
 
-    Scan the string s for a JSON string. End is the index of the
-    character in s after the quote that started the JSON string.
-    Unescapes all valid JSON string escape sequences and raises ValueError
-    on attempt to decode an invalid string. If strict is False then literal
-    control characters are allowed in the string.
+        Returns a tuple of the decoded string and the index of the character in
+        s after the end quote.
+        """
 
-    Returns a tuple of the decoded string and the index of the character in s
-    after the end quote.
-    """
+else:
+    def scanstring(string: str, end: int, strict: bool = True) -> tuple[str, int]:
+        """scanstring(string, end, strict=True) -> (string, end)
+
+        Scan the string s for a JSON string. End is the index of the
+        character in s after the quote that started the JSON string.
+        Unescapes all valid JSON string escape sequences and raises ValueError
+        on attempt to decode an invalid string. If strict is False then literal
+        control characters are allowed in the string.
+
+        Returns a tuple of the decoded string and the index of the character in s
+        after the end quote.
+        """

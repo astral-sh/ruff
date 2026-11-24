@@ -58,3 +58,19 @@ def model_assign() -> None:
 
     Address: Type = apps.get_model("zerver", variable)  # OK
     ValidationError = import_string(variable)  # N806
+
+
+def match_case_names(x):
+    match x:
+        case BadName:  # N806
+            ...
+        case int(GoodName):  # N806 (capture in class pattern)
+            ...
+        case [*Rest]:  # N806 (star pattern)
+            ...
+        case {"key": Val} as Alias:  # N806 (mapping value + as pattern)
+            ...
+        case ok_name:  # OK
+            ...
+        case _:  # OK
+            ...

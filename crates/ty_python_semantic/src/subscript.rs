@@ -2,9 +2,10 @@
 //! operations (`PySlice`) on iterators, following the semantics of equivalent
 //! operations in Python.
 
-use itertools::Either;
+use std::num::NonZeroI32;
 
-use crate::Db;
+use crate::{Db, ProgramEnvironment};
+use itertools::Either;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct OutOfBoundsError;
@@ -12,7 +13,12 @@ pub(crate) struct OutOfBoundsError;
 pub(crate) trait PyIndex<'db> {
     type Item: 'db;
 
-    fn py_index(self, db: &'db dyn Db, index: i32) -> Result<Self::Item, OutOfBoundsError>;
+    fn py_index(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        index: i32,
+    ) -> Result<Self::Item, OutOfBoundsError>;
 }
 
 fn from_nonnegative_i32(index: i32) -> usize {
@@ -80,7 +86,12 @@ impl Nth {
 impl<'db, T> PyIndex<'db> for &'db [T] {
     type Item = &'db T;
 
-    fn py_index(self, _db: &'db dyn Db, index: i32) -> Result<&'db T, OutOfBoundsError> {
+    fn py_index(
+        self,
+        _db: &'db dyn Db,
+        _ctx: &ProgramEnvironment<'db>,
+        index: i32,
+    ) -> Result<&'db T, OutOfBoundsError> {
         match Nth::from_index(index) {
             Nth::FromStart(nth) => self.get(nth).ok_or(OutOfBoundsError),
             Nth::FromEnd(nth_rev) => (self.len().checked_sub(nth_rev + 1))
@@ -96,7 +107,12 @@ where
 {
     type Item = I;
 
-    fn py_index(self, _db: &'db dyn Db, index: i32) -> Result<I, OutOfBoundsError> {
+    fn py_index(
+        self,
+        _db: &'db dyn Db,
+        _ctx: &ProgramEnvironment<'db>,
+        index: i32,
+    ) -> Result<I, OutOfBoundsError> {
         match Nth::from_index(index) {
             Nth::FromStart(nth) => self.nth(nth).ok_or(OutOfBoundsError),
             Nth::FromEnd(nth_rev) => self.nth_back(nth_rev).ok_or(OutOfBoundsError),
@@ -119,6 +135,82 @@ pub(crate) trait PySlice<'db> {
     ) -> Result<impl Iterator<Item = Self::Item>, StepSizeZeroError>;
 }
 
+/// Returns a static Python slice for a known non-zero step.
+pub(crate) fn py_slice_with_step<T>(
+    elements: &[T],
+    start: Option<i32>,
+    stop: Option<i32>,
+    step_int: NonZeroI32,
+) -> impl Iterator<Item = T> + '_
+where
+    T: Copy,
+{
+    let len = elements.len();
+    if len == 0 {
+        // The iterator needs to have the same type as the step>0 case below,
+        // so we need to use `.skip(0)`.
+        #[expect(clippy::iter_skip_zero)]
+        return Either::Left(elements.iter().skip(0).take(0).step_by(1)).copied();
+    }
+
+    let to_position = |index| Nth::from_index(index).to_position(len);
+    let step_int = step_int.get();
+
+    let iter = if step_int.is_positive() {
+        let step = from_nonnegative_i32(step_int);
+
+        let start = start.map(to_position).unwrap_or(Position::BeforeStart);
+        let stop = stop.map(to_position).unwrap_or(Position::AfterEnd);
+
+        let (skip, take, step) = if start < stop {
+            let skip = match start {
+                Position::BeforeStart => 0,
+                Position::AtIndex(start_index) => start_index,
+                Position::AfterEnd => len,
+            };
+
+            let take = match stop {
+                Position::BeforeStart => 0,
+                Position::AtIndex(stop_index) => stop_index - skip,
+                Position::AfterEnd => len - skip,
+            };
+
+            (skip, take, step)
+        } else {
+            (0, 0, step)
+        };
+
+        Either::Left(elements.iter().skip(skip).take(take).step_by(step))
+    } else {
+        let step = from_negative_i32(step_int);
+
+        let start = start.map(to_position).unwrap_or(Position::AfterEnd);
+        let stop = stop.map(to_position).unwrap_or(Position::BeforeStart);
+
+        let (skip, take, step) = if start <= stop {
+            (0, 0, step)
+        } else {
+            let skip = match start {
+                Position::BeforeStart => len,
+                Position::AtIndex(start_index) => len - 1 - start_index,
+                Position::AfterEnd => 0,
+            };
+
+            let take = match stop {
+                Position::BeforeStart => len - skip,
+                Position::AtIndex(stop_index) => (len - 1) - skip - stop_index,
+                Position::AfterEnd => 0,
+            };
+
+            (skip, take, step)
+        };
+
+        Either::Right(elements.iter().rev().skip(skip).take(take).step_by(step))
+    };
+
+    iter.copied()
+}
+
 impl<'db, T> PySlice<'db> for [T]
 where
     T: Copy + 'db,
@@ -133,73 +225,11 @@ where
         step_int: Option<i32>,
     ) -> Result<impl Iterator<Item = Self::Item>, StepSizeZeroError> {
         let step_int = step_int.unwrap_or(1);
-        if step_int == 0 {
+        let Some(step_int) = NonZeroI32::new(step_int) else {
             return Err(StepSizeZeroError);
-        }
-
-        let len = self.len();
-        if len == 0 {
-            // The iterator needs to have the same type as the step>0 case below,
-            // so we need to use `.skip(0)`.
-            #[expect(clippy::iter_skip_zero)]
-            return Ok(Either::Left(self.iter().skip(0).take(0).step_by(1)).copied());
-        }
-
-        let to_position = |index| Nth::from_index(index).to_position(len);
-
-        let iter = if step_int.is_positive() {
-            let step = from_nonnegative_i32(step_int);
-
-            let start = start.map(to_position).unwrap_or(Position::BeforeStart);
-            let stop = stop.map(to_position).unwrap_or(Position::AfterEnd);
-
-            let (skip, take, step) = if start < stop {
-                let skip = match start {
-                    Position::BeforeStart => 0,
-                    Position::AtIndex(start_index) => start_index,
-                    Position::AfterEnd => len,
-                };
-
-                let take = match stop {
-                    Position::BeforeStart => 0,
-                    Position::AtIndex(stop_index) => stop_index - skip,
-                    Position::AfterEnd => len - skip,
-                };
-
-                (skip, take, step)
-            } else {
-                (0, 0, step)
-            };
-
-            Either::Left(self.iter().skip(skip).take(take).step_by(step))
-        } else {
-            let step = from_negative_i32(step_int);
-
-            let start = start.map(to_position).unwrap_or(Position::AfterEnd);
-            let stop = stop.map(to_position).unwrap_or(Position::BeforeStart);
-
-            let (skip, take, step) = if start <= stop {
-                (0, 0, step)
-            } else {
-                let skip = match start {
-                    Position::BeforeStart => len,
-                    Position::AtIndex(start_index) => len - 1 - start_index,
-                    Position::AfterEnd => 0,
-                };
-
-                let take = match stop {
-                    Position::BeforeStart => len - skip,
-                    Position::AtIndex(stop_index) => (len - 1) - skip - stop_index,
-                    Position::AfterEnd => 0,
-                };
-
-                (skip, take, step)
-            };
-
-            Either::Right(self.iter().rev().skip(skip).take(take).step_by(step))
         };
 
-        Ok(iter.copied())
+        Ok(py_slice_with_step(self, start, stop, step_int))
     }
 }
 
@@ -216,55 +246,72 @@ mod tests {
     #[test]
     fn py_index_empty() {
         let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
         let iter = std::iter::empty::<char>();
 
-        assert_eq!(iter.clone().py_index(&db, 0), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(&db, 1), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(&db, -1), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(&db, i32::MIN), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(&db, i32::MAX), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(db, &env, 0), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(db, &env, 1), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(db, &env, -1), Err(OutOfBoundsError));
+        assert_eq!(
+            iter.clone().py_index(db, &env, i32::MIN),
+            Err(OutOfBoundsError)
+        );
+        assert_eq!(
+            iter.clone().py_index(db, &env, i32::MAX),
+            Err(OutOfBoundsError)
+        );
     }
 
     #[test]
     fn py_index_single_element() {
         let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
         let iter = ['a'].into_iter();
 
-        assert_eq!(iter.clone().py_index(&db, 0), Ok('a'));
-        assert_eq!(iter.clone().py_index(&db, 1), Err(OutOfBoundsError));
-        assert_eq!(iter.clone().py_index(&db, -1), Ok('a'));
-        assert_eq!(iter.clone().py_index(&db, -2), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(db, &env, 0), Ok('a'));
+        assert_eq!(iter.clone().py_index(db, &env, 1), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(db, &env, -1), Ok('a'));
+        assert_eq!(iter.clone().py_index(db, &env, -2), Err(OutOfBoundsError));
     }
 
     #[test]
     fn py_index_more_elements() {
         let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
         let iter = ['a', 'b', 'c', 'd', 'e'].into_iter();
 
-        assert_eq!(iter.clone().py_index(&db, 0), Ok('a'));
-        assert_eq!(iter.clone().py_index(&db, 1), Ok('b'));
-        assert_eq!(iter.clone().py_index(&db, 4), Ok('e'));
-        assert_eq!(iter.clone().py_index(&db, 5), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(db, &env, 0), Ok('a'));
+        assert_eq!(iter.clone().py_index(db, &env, 1), Ok('b'));
+        assert_eq!(iter.clone().py_index(db, &env, 4), Ok('e'));
+        assert_eq!(iter.clone().py_index(db, &env, 5), Err(OutOfBoundsError));
 
-        assert_eq!(iter.clone().py_index(&db, -1), Ok('e'));
-        assert_eq!(iter.clone().py_index(&db, -2), Ok('d'));
-        assert_eq!(iter.clone().py_index(&db, -5), Ok('a'));
-        assert_eq!(iter.clone().py_index(&db, -6), Err(OutOfBoundsError));
+        assert_eq!(iter.clone().py_index(db, &env, -1), Ok('e'));
+        assert_eq!(iter.clone().py_index(db, &env, -2), Ok('d'));
+        assert_eq!(iter.clone().py_index(db, &env, -5), Ok('a'));
+        assert_eq!(iter.clone().py_index(db, &env, -6), Err(OutOfBoundsError));
     }
 
     #[test]
     fn py_index_uses_full_index_range() {
         let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
         let iter = 0..=u32::MAX;
 
         // u32::MAX - |i32::MIN| + 1 = 2^32 - 1 - 2^31 + 1 = 2^31
-        assert_eq!(iter.clone().py_index(&db, i32::MIN), Ok(2u32.pow(31)));
-        assert_eq!(iter.clone().py_index(&db, -2), Ok(u32::MAX - 2 + 1));
-        assert_eq!(iter.clone().py_index(&db, -1), Ok(u32::MAX - 1 + 1));
+        assert_eq!(iter.clone().py_index(db, &env, i32::MIN), Ok(2u32.pow(31)));
+        assert_eq!(iter.clone().py_index(db, &env, -2), Ok(u32::MAX - 2 + 1));
+        assert_eq!(iter.clone().py_index(db, &env, -1), Ok(u32::MAX - 1 + 1));
 
-        assert_eq!(iter.clone().py_index(&db, 0), Ok(0));
-        assert_eq!(iter.clone().py_index(&db, 1), Ok(1));
-        assert_eq!(iter.clone().py_index(&db, i32::MAX), Ok(i32::MAX as u32));
+        assert_eq!(iter.clone().py_index(db, &env, 0), Ok(0));
+        assert_eq!(iter.clone().py_index(db, &env, 1), Ok(1));
+        assert_eq!(
+            iter.clone().py_index(db, &env, i32::MAX),
+            Ok(i32::MAX as u32)
+        );
     }
 
     #[track_caller]

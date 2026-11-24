@@ -254,7 +254,6 @@ Module(
 3 | del {'x', 'y'}
 4 | del None, True, False, 1, 1.0, "abc"
   |     ^^^^ Syntax Error: Invalid delete target
-  |
 
 
   |
@@ -262,7 +261,6 @@ Module(
 3 | del {'x', 'y'}
 4 | del None, True, False, 1, 1.0, "abc"
   |           ^^^^ Syntax Error: Invalid delete target
-  |
 
 
   |
@@ -270,7 +268,6 @@ Module(
 3 | del {'x', 'y'}
 4 | del None, True, False, 1, 1.0, "abc"
   |                 ^^^^^ Syntax Error: Invalid delete target
-  |
 
 
   |
@@ -278,7 +275,6 @@ Module(
 3 | del {'x', 'y'}
 4 | del None, True, False, 1, 1.0, "abc"
   |                        ^ Syntax Error: Invalid delete target
-  |
 
 
   |
@@ -286,7 +282,6 @@ Module(
 3 | del {'x', 'y'}
 4 | del None, True, False, 1, 1.0, "abc"
   |                           ^^^ Syntax Error: Invalid delete target
-  |
 
 
   |
@@ -294,4 +289,3 @@ Module(
 3 | del {'x', 'y'}
 4 | del None, True, False, 1, 1.0, "abc"
   |                                ^^^^^ Syntax Error: Invalid delete target
-  |

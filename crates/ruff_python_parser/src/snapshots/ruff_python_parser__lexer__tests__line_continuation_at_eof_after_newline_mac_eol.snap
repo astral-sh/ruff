@@ -5,10 +5,7 @@ expression: line_continuation_at_eof_after_newline(MAC_EOL)
 ## Tokens
 ```
 [
-    (
-        Unknown,
-        0..2,
-    ),
+    Unknown 0..2,
 ]
 ```
 ## Errors

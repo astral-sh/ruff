@@ -5,6 +5,7 @@ use ruff_python_stdlib::builtins;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_custom_exception_checking_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
@@ -40,7 +41,7 @@ use ruff_python_ast::PythonVersion;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Correctness)]
 pub(crate) struct UselessExceptionStatement;
 
 impl Violation for UselessExceptionStatement {
@@ -100,7 +101,7 @@ fn is_custom_exception(
     let Some(symbol) = qualified_name.segments().last() else {
         return false;
     };
-    let Some(binding_id) = semantic.lookup_symbol(symbol) else {
+    let Some(binding_id) = semantic.lookup_symbol(symbol).binding_id() else {
         return false;
     };
     let binding = semantic.binding(binding_id);
@@ -109,7 +110,7 @@ fn is_custom_exception(
     };
     let statement = semantic.statement(source);
     if let ast::Stmt::ClassDef(class_def) = statement {
-        return analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+        return analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
             if let ["" | "builtins", name] = qualified_name.segments() {
                 return builtins::is_exception(name, target_version.minor);
             }

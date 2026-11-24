@@ -7,8 +7,8 @@ mod text_document;
 
 use std::collections::HashMap;
 
-use lsp_types::{PositionEncodingKind, Url};
-pub use notebook::NotebookDocument;
+use lsp_types::{DocumentChange, PositionEncodingKind, TextDocumentIdentifier, Uri};
+pub(crate) use notebook::NotebookDocument;
 pub(crate) use range::{NotebookRange, RangeExt, ToRangeExt};
 pub(crate) use replacement::Replacement;
 pub use text_document::TextDocument;
@@ -41,22 +41,22 @@ impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
     }
 }
 
-/// A unique document ID, derived from a URL passed as part of an LSP request.
+/// A unique document ID, derived from a URI passed as part of an LSP request.
 /// This document ID can point to either be a standalone Python file, a full notebook, or a cell within a notebook.
 #[derive(Clone, Debug)]
-pub enum DocumentKey {
-    Notebook(Url),
-    NotebookCell(Url),
-    Text(Url),
+pub(crate) enum DocumentKey {
+    Notebook(Uri),
+    NotebookCell(Uri),
+    Text(Uri),
 }
 
 impl DocumentKey {
-    /// Converts the key back into its original URL.
-    pub(crate) fn into_url(self) -> Url {
+    /// Converts the key back into its original URI.
+    pub(crate) fn into_uri(self) -> Uri {
         match self {
-            DocumentKey::NotebookCell(url)
-            | DocumentKey::Notebook(url)
-            | DocumentKey::Text(url) => url,
+            DocumentKey::NotebookCell(uri)
+            | DocumentKey::Notebook(uri)
+            | DocumentKey::Text(uri) => uri,
         }
     }
 }
@@ -64,7 +64,7 @@ impl DocumentKey {
 impl std::fmt::Display for DocumentKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NotebookCell(url) | Self::Notebook(url) | Self::Text(url) => url.fmt(f),
+            Self::NotebookCell(uri) | Self::Notebook(uri) | Self::Text(uri) => uri.fmt(f),
         }
     }
 }
@@ -74,7 +74,7 @@ impl std::fmt::Display for DocumentKey {
 #[derive(Debug)]
 pub(crate) enum WorkspaceEditTracker {
     DocumentChanges(Vec<lsp_types::TextDocumentEdit>),
-    Changes(HashMap<Url, Vec<lsp_types::TextEdit>>),
+    Changes(HashMap<Uri, Vec<lsp_types::TextEdit>>),
 }
 
 impl From<PositionEncoding> for lsp_types::PositionEncodingKind {
@@ -118,6 +118,10 @@ impl WorkspaceEditTracker {
         fixes: Fixes,
         version: DocumentVersion,
     ) -> crate::Result<()> {
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "edits for distinct document URIs are independent"
+        )]
         for (uri, edits) in fixes {
             self.set_edits_for_document(uri, version, edits)?;
         }
@@ -129,7 +133,7 @@ impl WorkspaceEditTracker {
     /// multiple times.
     pub(crate) fn set_edits_for_document(
         &mut self,
-        uri: Url,
+        uri: Uri,
         _version: DocumentVersion,
         edits: Vec<lsp_types::TextEdit>,
     ) -> crate::Result<()> {
@@ -137,7 +141,7 @@ impl WorkspaceEditTracker {
             Self::DocumentChanges(document_edits) => {
                 if document_edits
                     .iter()
-                    .any(|document| document.text_document.uri == uri)
+                    .any(|document| document.text_document.text_document_identifier.uri == uri)
                 {
                     return Err(anyhow::anyhow!(
                         "Attempted to add edits for a document that was already edited"
@@ -145,11 +149,11 @@ impl WorkspaceEditTracker {
                 }
                 document_edits.push(lsp_types::TextDocumentEdit {
                     text_document: lsp_types::OptionalVersionedTextDocumentIdentifier {
-                        uri,
+                        text_document_identifier: TextDocumentIdentifier { uri },
                         // TODO(jane): Re-enable versioned edits after investigating whether it could work with notebook cells
                         version: None,
                     },
-                    edits: edits.into_iter().map(lsp_types::OneOf::Left).collect(),
+                    edits: edits.into_iter().map(lsp_types::Edit::TextEdit).collect(),
                 });
                 Ok(())
             }
@@ -175,10 +179,15 @@ impl WorkspaceEditTracker {
     pub(crate) fn into_workspace_edit(self) -> lsp_types::WorkspaceEdit {
         match self {
             Self::DocumentChanges(document_edits) => lsp_types::WorkspaceEdit {
-                document_changes: Some(lsp_types::DocumentChanges::Edits(document_edits)),
+                document_changes: Some(
+                    document_edits
+                        .into_iter()
+                        .map(DocumentChange::TextDocumentEdit)
+                        .collect(),
+                ),
                 ..Default::default()
             },
-            Self::Changes(changes) => lsp_types::WorkspaceEdit::new(changes),
+            Self::Changes(changes) => lsp_types::WorkspaceEdit::new(Some(changes), None, None),
         }
     }
 }

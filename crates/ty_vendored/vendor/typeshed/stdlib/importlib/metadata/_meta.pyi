@@ -22,14 +22,13 @@ class PackageMetadata(Protocol):
     @overload
     def get_all(self, name: str, failobj: None = None) -> list[Any] | None:
         """Helper for @overload to raise when called."""
-
     @overload
     def get_all(self, name: str, failobj: _T) -> list[Any] | _T: ...
+
     if sys.version_info >= (3, 12):
         @overload
         def get(self, name: str, failobj: None = None) -> str | None:
             """Helper for @overload to raise when called."""
-
         @overload
         def get(self, name: str, failobj: _T) -> _T | str: ...
 

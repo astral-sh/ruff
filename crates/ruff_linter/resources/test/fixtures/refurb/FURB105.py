@@ -22,6 +22,10 @@ print(sep=print(1))
 print(f"")
 print(f"", sep=",")
 print(f"", end="bar")
+print(1, sep=None)
+
+def p(sep):
+    print(1, sep=sep)
 
 # OK.
 

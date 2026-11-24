@@ -31,9 +31,9 @@ def http_status(status):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,19 +1,13 @@
+@@ -1,19 +1,14 @@
  def http_status(status):
--
+ 
      match status:
 -
          case 400:
@@ -57,6 +57,7 @@ def http_status(status):
 
 ```python
 def http_status(status):
+
     match status:
         case 400:
             return "Bad request"

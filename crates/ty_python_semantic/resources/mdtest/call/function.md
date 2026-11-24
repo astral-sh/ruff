@@ -9,6 +9,69 @@ def get_int() -> int:
 reveal_type(get_int())  # revealed: int
 ```
 
+## Gradual variadic parameters
+
+```py
+from typing import Any, TypeVar
+
+T = TypeVar("T")
+
+def accepts_anything(first: int, *args: Any, **kwargs: Any) -> None: ...
+def accepts_only_gradual(*args: Any, **kwargs: Any) -> None: ...
+def preserves_first(first: T, *args: Any, **kwargs: Any) -> T:
+    return first
+
+accepts_anything(1, "one", object(), keyword=object())
+accepts_anything("not an int")  # error: [invalid-argument-type]
+accepts_only_gradual(1, "one", keyword=object())
+accepts_only_gradual(**{1: "one"})  # error: [invalid-argument-type]
+
+reveal_type(preserves_first(1, "other", keyword=object()))  # revealed: Literal[1]
+```
+
+## Object variadic parameters
+
+`*args: object` and `**kwargs: object` can receive many unrelated argument types. Call binding
+should not build large unions to remember the exact values that were supplied to these broad sinks.
+
+```py
+class C0: ...
+class C1: ...
+class C2: ...
+class C3: ...
+class C4: ...
+class C5: ...
+class C6: ...
+class C7: ...
+class C8: ...
+class C9: ...
+
+def accepts_objects(*args: object, **kwargs: object) -> None: ...
+
+accepts_objects(
+    C0(),
+    C1(),
+    C2(),
+    C3(),
+    C4(),
+    C5(),
+    C6(),
+    C7(),
+    C8(),
+    C9(),
+    k0=C0(),
+    k1=C1(),
+    k2=C2(),
+    k3=C3(),
+    k4=C4(),
+    k5=C5(),
+    k6=C6(),
+    k7=C7(),
+    k8=C8(),
+    k9=C9(),
+)
+```
+
 ## Async
 
 ```py
@@ -30,6 +93,116 @@ def get_int[T]() -> int:
     return 42
 
 reveal_type(get_int())  # revealed: int
+```
+
+## Generic call with independent and dependent arguments
+
+Concrete arguments must not erase a type variable inferred from another argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+class Invariant[T]:
+    item: T
+
+class Bounded[T: int]:
+    item: T
+
+def combine[A, B, U](first: Invariant[A], second: Invariant[B], dependent: Invariant[U]) -> tuple[A, B, U]:
+    raise NotImplementedError
+
+class Constructed[T]:
+    def __new__[A, B, U](cls, first: Invariant[A], second: Invariant[B], dependent: Invariant[U]) -> Constructed[tuple[A, B, U]]:
+        raise NotImplementedError
+
+def infer[T](dependent: Invariant[T]) -> None:
+    concrete = Invariant[int]()
+    reveal_type(combine(concrete, concrete, dependent))  # revealed: tuple[int, int, T@infer]
+    reveal_type(Constructed(concrete, concrete, dependent))  # revealed: Constructed[tuple[int, int, T@infer]]
+
+    bounded = Invariant[Bounded[int]]()
+    reveal_type(combine(bounded, bounded, dependent))  # revealed: tuple[Bounded[int], Bounded[int], T@infer]
+    reveal_type(Constructed(bounded, bounded, dependent))  # revealed: Constructed[tuple[Bounded[int], Bounded[int], T@infer]]
+```
+
+## Generic callable chains
+
+Inferring a chain of generic callable parameters should discard internal typevar artifacts from
+transitive constraints instead of expanding them recursively.
+
+```py
+from typing import Callable, TypeVar
+
+_A = TypeVar("_A")
+_B = TypeVar("_B")
+_C = TypeVar("_C")
+_D = TypeVar("_D")
+_E = TypeVar("_E")
+_F = TypeVar("_F")
+_G = TypeVar("_G")
+_H = TypeVar("_H")
+
+def compose(
+    fn1: Callable[[_A], _B],
+    fn2: Callable[[_B], _C],
+    fn3: Callable[[_C], _D],
+    fn4: Callable[[_D], _E],
+    fn5: Callable[[_E], _F],
+    fn6: Callable[[_F], _G],
+    fn7: Callable[[_G], _H],
+) -> Callable[[_A], _H]:
+    raise NotImplementedError
+
+Func = Callable[[int], int]
+fn: Func = lambda x: x + 42
+
+cn = compose(fn, fn, fn, fn, fn, fn, fn)
+reveal_type(cn)  # revealed: (int, /) -> int
+```
+
+## Recursive callable constraints in constructors
+
+When inferring the generic constructor for `map`, an overloaded callable together with a gradual
+iterable can produce expanding recursive constraints. We should fall back rather than repeatedly
+substituting those constraints.
+
+```py
+import operator
+from typing import Any
+
+ints: list[int] = []
+dynamic: Any = []
+
+reveal_type(map(operator.add, ints, dynamic))  # revealed: map[Unknown]
+```
+
+## Generic overloaded callable constraints in constructors
+
+An overloaded callback can have a type variable of its own. An overload rejected by the constructor
+must not leave a mapping for that variable that causes the accepted overload to be rejected.
+
+```py
+from typing import Generic, TypeVar, overload
+
+T = TypeVar("T", str, bytes)
+
+class Result(Generic[T]): ...
+
+@overload
+def convert(value: T) -> Result[T]: ...
+@overload
+def convert(value: Result[T]) -> Result[T]: ...
+def convert(value: T | Result[T]) -> Result[T]:
+    raise NotImplementedError
+
+# TODO: Preserve correlated overloaded-callback solutions (astral-sh/ty#2799) to infer
+# `map[Result[str]]`.
+reveal_type(map(convert, ["a"]))  # revealed: map[Unknown]
 ```
 
 ## Decorated
@@ -70,6 +243,8 @@ def _(flag: bool):
 
 ## PEP-484 convention for positional-only parameters
 
+<!-- snapshot-diagnostics -->
+
 PEP 570, introduced in Python 3.8, added dedicated Python syntax for denoting positional-only
 parameters (the `/` in a function signature). However, functions implemented in C were able to have
 positional-only parameters prior to Python 3.8 (there was just no syntax for expressing this at the
@@ -94,15 +269,55 @@ f(1)
 f(__x=1)
 ```
 
-But not if they follow a non-positional-only parameter:
+But not if they follow a non-positional-only parameter. When enabled,
+`invalid-legacy-positional-parameter` flags this as an incorrect use of the legacy convention:
 
 ```py
+from typing import overload
+
+# error: [invalid-legacy-positional-parameter]
 def g(x: int, __y: str): ...
 
 g(x=1, __y="foo")
+
+# The earlier `g` definition is shadowed here,
+# but we still emit a diagnostic on the earlier definition
+def g(): ...
 ```
 
-And also not if they both start and end with `__`:
+Because the lint is a syntactic check, we emit it for each overload if multiple overloads violate
+the lint:
+
+```py
+import tkinter
+from typing import Callable, TypeVar, Any
+
+@overload
+def g2(x: int, __y: str): ...  # error: [invalid-legacy-positional-parameter]
+@overload
+def g2(x: str, __y: int): ...  # error: [invalid-legacy-positional-parameter]
+def g2(x: str | int, __y: int | str): ...  # error: [invalid-legacy-positional-parameter]
+
+T = TypeVar("T")
+
+def copy_type(f: T) -> Callable[[Any], T]:
+    return lambda x: x
+
+# Naively iterating over the overloads using `.iter_overloads_and_implementation()` and/or
+# using `.signature()` would cause us to panic on this function, because the overloads
+# of this function's public signature are defined in `stdlib/tkinter/__init__.pyi` due to
+# the decorator.
+@copy_type(tkinter.Text.__init__)
+def g3(x, *args: Any, **kwargs: Any) -> None: ...
+def new_signature(): ...
+
+# The check is able to "see through" the decorators and examines the original function's
+# signature:
+@copy_type(new_signature)
+def g4(a, __b): ...  # error: [invalid-legacy-positional-parameter]
+```
+
+Parameters are also not understood as positional-only if they both start and end with `__`:
 
 ```py
 def h(__x__: str): ...
@@ -128,10 +343,16 @@ class C:
     # (the name of the first parameter is irrelevant;
     # a staticmethod works the same as a free function in the global scope)
     @staticmethod
-    def static_method(self, __x: int): ...
+    def static_method(self, __x: int): ...  # error: [invalid-legacy-positional-parameter]
+    # `__new__` is a staticmethod, but the `cls` parameter works in the same way as the `cls`
+    # parameter in a classmethod, and is always passed positionally at runtime,
+    # We therefore understand both `cls` and `__x` here as positional-only; we do not
+    # emit `[invalid-legacy-positional-parameter]` on the method.
+    def __new__(cls, __x: int):
+        return super().__new__(cls)
 
 # error: [positional-only-parameter-as-kwarg]
-C().method(__x=1)
+C(42).method(__x=1)
 # error: [positional-only-parameter-as-kwarg]
 C.class_method(__x="1")
 C.static_method("x", __x=42)  # fine
@@ -233,6 +454,197 @@ def _(args: tuple[int, str]) -> None:
     takes_at_least_one(*args)
     takes_at_least_two(*args)  # error: [invalid-argument-type]
     takes_at_least_two_positional_only(*args)  # error: [invalid-argument-type]
+```
+
+### Excess elements in unpacked tuples
+
+The diagnostic counts every element, including those after the first excess argument.
+
+```py
+def pair(x: int, y: str) -> None: ...
+
+pair(*(1, "two", 3, 4))  # error: [too-many-positional-arguments] "expected 2, got 4"
+```
+
+### Literal promotion in unpacked tuples
+
+Call unpacking uses the tuple's inferred element types. Tuples with more than 64 elements promote
+integer literals to `int`, so only the shorter tuple can satisfy `Literal[0]`.
+
+```py
+from typing import Literal
+
+def first_zero(first: Literal[0], *rest: int) -> None: ...
+
+# fmt: off
+first_zero(*(
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+))
+
+# error: [invalid-argument-type]
+first_zero(*(
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0,
+))
+# fmt: on
+```
+
+### Immediate list arguments
+
+Unpacking a list constructed in the call preserves its exact length and each element's type. The
+list's homogeneous element type does not describe these argument positions precisely enough.
+
+```py
+def pair(x: int, y: str) -> None: ...
+
+pair(*[1, "two"])
+pair(*[1], *["two"])
+```
+
+Missing arguments, extra arguments, and incompatible element types are rejected. These diagnostics
+currently highlight the call or unpacked list rather than individual list elements.
+
+```py
+# snapshot: missing-argument
+pair(*[])
+```
+
+```snapshot
+error[missing-argument]: No arguments provided for required parameters `x`, `y` of function `pair`
+ --> src/mdtest_snippet.py:6:1
+  |
+6 | pair(*[])
+  | ^^^^^^^^^
+info: Parameters declared here
+ --> src/mdtest_snippet.py:1:9
+  |
+1 | def pair(x: int, y: str) -> None: ...
+  |         ^^^^^^^^^^^^^^^^
+```
+
+```py
+# snapshot: missing-argument
+pair(*[1])
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `y` of function `pair`
+ --> src/mdtest_snippet.py:8:1
+  |
+8 | pair(*[1])
+  | ^^^^^^^^^^
+info: Parameter declared here
+ --> src/mdtest_snippet.py:1:18
+  |
+1 | def pair(x: int, y: str) -> None: ...
+  |                  ^^^^^^
+```
+
+```py
+# snapshot: too-many-positional-arguments
+pair(*[1, "two", 3, 4])
+```
+
+```snapshot
+error[too-many-positional-arguments]: Too many positional arguments to function `pair`: expected 2, got 4
+  --> src/mdtest_snippet.py:10:6
+   |
+10 | pair(*[1, "two", 3, 4])
+   |      ^^^^^^^^^^^^^^^^^
+info: Function signature here
+ --> src/mdtest_snippet.py:1:5
+  |
+1 | def pair(x: int, y: str) -> None: ...
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+```py
+# snapshot: invalid-argument-type
+pair(*["one", "two"])
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `pair` is incorrect
+  --> src/mdtest_snippet.py:12:6
+   |
+12 | pair(*["one", "two"])
+   |      ^^^^^^^^^^^^^^^ Expected `int`, found `Literal["one"]`
+info: Function defined here
+ --> src/mdtest_snippet.py:1:5
+  |
+1 | def pair(x: int, y: str) -> None: ...
+  |     ^^^^ ------ Parameter declared here
+```
+
+An exact positional unpack still supplies a parameter that also has an explicit keyword, whether
+that keyword precedes or follows the unpack in the source.
+
+```py
+def f(x: int, *, y: int = 0) -> None: ...
+
+f(x=1, *[2])  # error: [parameter-already-assigned]
+f(*[2], x=1)  # error: [parameter-already-assigned]
+```
+
+### Immediate dictionary arguments
+
+A dictionary constructed directly in the call preserves each string key and its value type. A
+repeated key replaces the earlier value, as it does at runtime.
+
+```py
+def pair(x: int, *, y: str) -> None: ...
+
+pair(**{"y": "two", "x": 1})
+pair(**{})  # error: [missing-argument]
+pair(**{"y": "two"})  # error: [missing-argument]
+pair(**{"x": "one", "x": 1, "y": "two"})
+pair(**{"x": 1, "y": 2})  # error: [invalid-argument-type]
+pair(x=1, **{"x": 2, "y": "two"})  # error: [parameter-already-assigned]
+pair(**{"x": 1}, **{"x": 2, "y": "two"})  # error: [parameter-already-assigned]
+pair(**{"z": 3, "x": 1, "y": "two"})  # error: [unknown-argument]
+```
+
+### Aliased list arguments
+
+Assigning a list literal to a variable loses the per-position types used for immediate unpacking.
+This call is valid at runtime, but ty currently reports errors because `args` has type
+`list[int | str]`.
+
+```py
+def pair(x: int, y: str) -> None: ...
+
+args = [1, "two"]
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+pair(*args)
+```
+
+### Mutated list arguments
+
+After a list is mutated, its original literal contents may no longer describe the arguments. This
+call raises `TypeError` at runtime because `clear()` empties the list. ty does not report this error
+because it treats `values` as a variable-length `list[int]`.
+
+```py
+def pair(x: int, y: int) -> None: ...
+
+values = [1]
+values.clear()
+pair(*values)
 ```
 
 ### Subclass of fixed-length tuple argument
@@ -684,11 +1096,8 @@ def _(
     f1(*args6)
     f1(*args7)  # error: [invalid-argument-type]
 
-    # The reason for two errors here is because of the two fixed elements in the tuple of `args8`
-    # which are both `int`
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    f1(*args8)
+    # Both fixed elements have the same incompatible type, so we report the error once.
+    f1(*args8)  # error: [invalid-argument-type]
 
     f1(*args9)  # error: [invalid-argument-type]
     f1(*args10)  # error: [invalid-argument-type]
@@ -739,6 +1148,115 @@ for tup in my_other_args:
     f4(*tup, e=None)
 ```
 
+Regression test for <https://github.com/astral-sh/ty/issues/2734>.
+
+```py
+def f5(x: int | None = None, y: str = "") -> None: ...
+def f6(args: tuple[()] | tuple[int]) -> None:
+    f5(*args)
+
+def f7(x: int | None = None, y: str = "") -> None: ...
+def f8(args: tuple[()] | tuple[str]) -> None:
+    f7(*args)  # error: [invalid-argument-type]
+
+def f11(*args: int) -> None: ...
+def f12(args: tuple[int] | int) -> None:
+    f11(*args)  # error: [not-iterable]
+
+def f13(a: int, b: int, c: str) -> None: ...
+def f14(a: int, b: int, c: str, d: list[float], e: list[float]) -> None: ...
+def f15(profile: bool, line: str) -> None:
+    matcher = f13
+    timings = []
+    if profile:
+        matcher = f14
+        timings = [[0.0], [1.0], [2.0], [3.0]]
+    matcher(1, 2, line, *timings[:2])
+
+def f9(x: int = 0, y: str = "") -> None: ...
+def f10(args: tuple[int, ...] | tuple[int, str]) -> None:
+    # The variable-length element `int` from `tuple[int, ...]` unions with `str`
+    # from `tuple[int, str]` at position 1, giving `int | str` for `y: str`.
+    f9(*args)  # error: [invalid-argument-type]
+
+def f18(x: int = 0, y: int = 0) -> None: ...
+def f19(args: tuple[int, ...] | tuple[int, int]) -> None:
+    f18(*args)
+
+# Union variadic unpacking also works when the non-defaulted parameters are covered by
+# the shortest union element, even if not all remaining parameters are defaulted.
+def f16(a: int, b: int = 0, c: str = "") -> None: ...
+def f17(x: tuple[int] | tuple[int, int]) -> None:
+    f16(*x)
+
+# Longer union elements must still be rejected when they would contribute
+# extra positional arguments.
+def f20(a: int, b: int) -> None: ...
+def f21(x: tuple[int, int] | tuple[int, int, int]) -> None:
+    f20(*x)  # error: [too-many-positional-arguments]
+
+# Shorter union elements must also be rejected when they cannot provide a required
+# positional argument.
+def f22(a: int, b: int, c: int) -> None: ...
+def f23(x: tuple[int, int] | tuple[int, int, int]) -> None:
+    f22(*x)  # error: [missing-argument]
+```
+
+### Tuple unions followed by positional arguments
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A tuple union retains its minimum length when followed by another positional argument. Both members
+here supply at least one element, so the call always has too many arguments:
+
+```py
+def one(a: int) -> None: ...
+def _(args: tuple[int] | tuple[int, int]) -> None:
+    one(*args, 1)  # error: [too-many-positional-arguments] "expected 1, got 2"
+```
+
+The minimum can include several required elements:
+
+```py
+def two(a: int, b: int) -> None: ...
+def _(args: tuple[int, int] | tuple[int, int, int]) -> None:
+    two(*args, 1)  # error: [too-many-positional-arguments] "expected 2, got 3"
+```
+
+Type aliases preserve the same minimum:
+
+```py
+type Nonempty = tuple[int] | tuple[int, int]
+
+def _(args: Nonempty) -> None:
+    one(*args, 1)  # error: [too-many-positional-arguments] "expected 1, got 2"
+```
+
+An empty tuple member or an iterable of unknown length can leave room for the later argument:
+
+```py
+def optional(a: int, b: int = 0) -> None: ...
+def _(args: tuple[()] | tuple[int]) -> None:
+    optional(*args, 1)  # ok
+
+def _(args: list[int] | tuple[int]) -> None:
+    one(*args, 1)  # ok
+```
+
+When a tuple union is followed by another positional argument, we currently combine its element
+types before checking the call. Here, we treat the tuple as an iterable of `int | str`. This reports
+an error for both `a` and `b`, even though only `b` can receive a `str`:
+
+```py
+def f(a: int, b: int, c: int = 0) -> None: ...
+def _(args: tuple[int] | tuple[int, str]) -> None:
+    # error: [invalid-argument-type]
+    f(*args, 1)  # error: [invalid-argument-type]
+```
+
 ### Mixed argument and parameter containing variadic
 
 ```toml
@@ -777,6 +1295,225 @@ def _(
 
     # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `int`"
     reveal_type(f(*args6))  # revealed: int
+```
+
+### Variable-length unpacking with explicit keyword arguments
+
+When a variable-length iterable (like a list) is unpacked and followed by explicit keyword
+arguments, the variadic unpacking should not greedily consume parameters that have explicit keyword
+bindings. This prevents false positive "parameter already assigned" errors.
+
+Regression test for <https://github.com/astral-sh/ty/issues/1584>.
+
+```py
+from typing import TypedDict
+
+def f(a: str, b: str, c: float) -> None: ...
+
+# Explicit keyword argument takes precedence over variable-length variadic expansion.
+# The list unpacking should only fill `a` and `b`, leaving `c` for the keyword argument.
+def _(args: list[str]) -> None:
+    f(*args, c=1.0)
+
+# Fixed-length tuple unpacking with keyword argument also works correctly.
+def _(args: tuple[str, str]) -> None:
+    f(*args, c=1.0)
+
+# But, with a fixed-length tuple that is too long, we get the expected error.
+def _(args: tuple[str, str, str]) -> None:
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `float`, found `str`"
+    # error: [parameter-already-assigned] "Multiple values provided for parameter `c` of function `f`"
+    f(*args, c=1.0)
+```
+
+If no later argument is known to supply a positional value, we still assume that the first iterable
+fills every remaining positional parameter:
+
+```py
+# Multiple variable-length variadics are ambiguous
+def _(args1: list[str], args2: list[float]) -> None:
+    # error: [invalid-argument-type]
+    f(*args1, *args2)
+
+# Keyword variadic (**dict) with unknown keys is also ambiguous
+def _(args: list[str], kwargs: dict[str, float]) -> None:
+    # error: [invalid-argument-type]
+    f(*args, **kwargs)
+
+# Keyword variadic with TypedDict has known keys but is still handled conservatively
+# but we could possibly improve this in the future.
+class CKwargs(TypedDict):
+    c: float
+
+def _(args: list[str]) -> None:
+    # error: [invalid-argument-type]
+    # error: [parameter-already-assigned]
+    f(*args, **CKwargs(c=1.0))
+```
+
+### Variable-length unpacking with later positional arguments
+
+For a callable without `*args`, we leave enough parameters for later positional arguments. The
+unpacked iterable may be short enough for the call to succeed.
+
+Regression test for <https://github.com/astral-sh/ty/issues/3649>.
+
+```py
+def f(a: str, b: str, c: float) -> None: ...
+def _(args: list[str]) -> None:
+    f(*args, 1.0)  # ok
+```
+
+Arguments on either side of the iterable reduce the number of parameters it can fill:
+
+```py
+def _(args: list[str]) -> None:
+    f(*args, "b", 1.0)  # ok
+    f("a", *args, 1.0)  # ok
+```
+
+The later argument must match the type of its parameter:
+
+```py
+def _(args: list[str]) -> None:
+    # error: [invalid-argument-type] "Expected `float`, found `Literal["c"]`"
+    f(*args, "c")
+```
+
+Even an empty iterable cannot make room for more arguments than the callable accepts:
+
+```py
+def _(args: list[str]) -> None:
+    # error: [too-many-positional-arguments] "expected 3, got 4"
+    f(*args, "a", "b", 1.0, 2.0)
+```
+
+### Variable-length unpacking with positional and keyword arguments
+
+Both positional and keyword arguments leave fewer parameters for the unpacked iterable:
+
+```py
+def f(a: str, b: float, c: int) -> None: ...
+def _(args: list[str]) -> None:
+    f(*args, 1.0, c=1)  # ok
+```
+
+Unpacking a dictionary afterwards does not prevent the positional argument from filling `b`:
+
+```py
+def g(a: str, b: float) -> None: ...
+def _(args: list[str], kwargs: dict[str, int]) -> None:
+    g(*args, 1.0, **kwargs)  # ok
+```
+
+### Variable-length unpacking followed by another unpacked argument
+
+A later unpacked tuple also needs room for its elements:
+
+```py
+def f(a: str, b: str, c: float) -> None: ...
+def _(args: list[str]) -> None:
+    f(*args, *(1.0,))  # ok
+```
+
+If the tuple fills every parameter, the earlier iterable must be empty:
+
+```py
+def _(args: list[str], tail: tuple[str, str, float]) -> None:
+    f(*args, *tail)  # ok
+```
+
+A variable-length tuple needs room for at least its required elements:
+
+```py
+def _(args: list[str], more: tuple[float, *tuple[float, ...]]) -> None:
+    f(*args, *more)  # ok
+```
+
+A later iterable with no required elements can be empty. Only the explicit `1.0` needs room here:
+
+```py
+def _(args: list[str], more: list[float]) -> None:
+    f(*args, *more, 1.0)  # ok
+```
+
+### Required tuple elements before a later positional argument
+
+The variable-length part of a tuple can be empty, leaving only its required final element:
+
+```py
+def f(a: str, b: float) -> None: ...
+def _(args: tuple[*tuple[bytes, ...], str]) -> None:
+    f(*args, 1.0)  # ok
+```
+
+That final element cannot be omitted when its type is incompatible:
+
+```py
+def _(args: tuple[*tuple[str, ...], bytes]) -> None:
+    # error: [invalid-argument-type] "Expected `str`, found `bytes`"
+    f(*args, 1.0)
+```
+
+Required elements at both ends of the tuple keep their order when the variable-length part is empty:
+
+```py
+def g(a: str, b: bytes, c: float) -> None: ...
+def _(args: tuple[str, *tuple[int, ...], bytes]) -> None:
+    g(*args, 1.0)  # ok
+```
+
+When the variable-length part supplies one element, both required final elements still follow it:
+
+```py
+def h(a: str, b: bytes, c: int, d: float) -> None: ...
+def _(args: tuple[*tuple[str, ...], bytes, int]) -> None:
+    h(*args, 1.0)  # ok
+```
+
+We still report excess arguments when the tuple's required elements cannot all fit:
+
+```py
+def _(args: tuple[str, *tuple[str, ...], float, float]) -> None:
+    # error: [too-many-positional-arguments] "expected 2, got 4"
+    f(*args, 1.0)
+```
+
+### Later positional arguments and variadic parameters
+
+When the callable has a variadic parameter, we still assume the unpacked iterable fills the named
+positional parameters. Later arguments then go to the variadic parameter:
+
+```py
+def log(fmt: str, *args: object) -> None: ...
+def _(parts: list[str]) -> None:
+    log(*parts, 1)  # ok
+```
+
+This remains a limitation: we reject calls that would succeed if the iterable were shorter. With two
+strings in `args`, `1.0` would fill `c`:
+
+```py
+def v(a: str, b: str, c: float, *rest: str) -> None: ...
+def _(args: list[str]) -> None:
+    # TODO: Accept this call.
+    # error: [invalid-argument-type] "Expected `float`, found `str`"
+    # error: [invalid-argument-type] "Expected `str`"
+    v(*args, 1.0)
+```
+
+### Positional argument between unpacked iterables
+
+We also reject the middle-argument example from <https://github.com/astral-sh/ty/issues/3649>. The
+first iterable fills four parameters, leaving `text` to fill `e`. The call would succeed if each
+iterable supplied two integers instead:
+
+```py
+def f(a: int, b: int, c: str, d: int, e: int) -> None: ...
+def _(before, text: str, after) -> None:
+    # TODO: Accept this call.
+    # error: [invalid-argument-type] "Expected `int`, found `str`"
+    f(*before, text, *after)
 ```
 
 ### Keyword argument, positional-or-keyword parameter
@@ -934,6 +1671,193 @@ def f(*args: int) -> int:
 reveal_type(f())  # revealed: int
 ```
 
+### Unpacked variadic arguments can require positional arguments
+
+An unpacked tuple can require arguments even though an ordinary variadic parameter can be empty.
+Fixed tuples also reject positional arguments beyond their declared length.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+def at_least_one(*args: *tuple[*tuple[int, ...], int]) -> None: ...
+def exactly_two(*args: *tuple[int, str]) -> None: ...
+def exactly_zero(*args: *tuple[()]) -> None: ...
+
+at_least_one()  # error: [missing-argument]
+at_least_one(1)
+at_least_one(1, 2)
+at_least_one("wrong")  # error: [invalid-argument-type]
+at_least_one(1, "wrong")  # error: [invalid-argument-type]
+
+exactly_two()  # error: [missing-argument]
+exactly_two(1)  # error: [missing-argument]
+exactly_two(1, "two")
+exactly_two("one", "two")  # error: [invalid-argument-type]
+exactly_two(1, 2)  # error: [invalid-argument-type]
+exactly_two(1, "two", 3)  # error: [too-many-positional-arguments]
+
+exactly_zero()
+exactly_zero(1)  # error: [too-many-positional-arguments]
+```
+
+### Unpacked variadic arity errors preserve element diagnostics
+
+Matched tuple elements should still be checked when a call has the wrong arity.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+def exactly_two(*args: *tuple[int, str]) -> None: ...
+
+exactly_two(1, "valid")
+exactly_two("wrong", "valid")  # error: [invalid-argument-type]
+
+# TODO: error: [invalid-argument-type]
+# error: [missing-argument]
+exactly_two("wrong")
+
+# TODO: error: [invalid-argument-type]
+# error: [too-many-positional-arguments]
+exactly_two("wrong", "valid", 3)
+
+# TODO: error: [invalid-argument-type]
+# TODO: error: [invalid-argument-type]
+# error: [too-many-positional-arguments]
+exactly_two("wrong", 2, 3)
+```
+
+The same recovery should validate fixed prefixes when a required suffix is missing.
+
+```py
+def with_suffix(*args: *tuple[int, *tuple[str, ...], bytes]) -> None: ...
+
+# TODO: error: [invalid-argument-type]
+# error: [missing-argument]
+with_suffix("wrong")
+```
+
+Forwarding a fixed-length tuple should preserve the same element and arity diagnostics.
+
+```py
+def forward(values: tuple[str]) -> None:
+    # TODO: error: [invalid-argument-type]
+    # error: [missing-argument]
+    exactly_two(*values)
+```
+
+Callable protocols should use the same recovery as ordinary functions.
+
+```py
+from typing import Protocol
+
+class ExactlyTwo(Protocol):
+    def __call__(self, *args: *tuple[int, str]) -> None: ...
+
+def call(callback: ExactlyTwo) -> None:
+    # TODO: error: [invalid-argument-type]
+    # error: [missing-argument]
+    callback("wrong")
+```
+
+### Unpacked variadic arguments preserve element positions
+
+Fixed prefixes, a homogeneous variadic segment, and fixed suffixes each retain their own argument
+types. A required suffix also requires any preceding defaulted positional parameter to be filled.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+def mixed(*args: *tuple[int, *tuple[str, ...], bytes]) -> None: ...
+def with_default(first: int = 0, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+
+mixed(1, b"last")
+mixed(1, "middle", b"last")
+mixed("first", b"last")  # error: [invalid-argument-type]
+mixed(1, 2, b"last")  # error: [invalid-argument-type]
+mixed(1, "middle", "last")  # error: [invalid-argument-type]
+
+with_default()  # error: [missing-argument]
+with_default(first=1)  # error: [missing-argument]
+with_default(1)  # error: [missing-argument]
+with_default(1, 2)
+```
+
+### Unpacked variadic elements preserve generic bounds
+
+Ordinary type variables are inferred from individual unpacked elements in homogeneous or
+heterogeneous tuples, even beside an unresolved type-variable tuple. Their upper bounds remain
+enforced.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+def fixed[T: str](*args: *tuple[T]) -> T:
+    return args[0]
+
+def suffix[T: str, *Ts](*args: *tuple[*Ts, T]) -> T:
+    return args[-1]
+
+reveal_type(fixed("valid"))  # revealed: Literal["valid"]
+fixed(1)  # error: [invalid-argument-type]
+
+reveal_type(suffix("prefix", "valid"))  # revealed: Literal["valid"]
+suffix("prefix", 1)  # error: [invalid-argument-type]
+
+def homogeneous[T: str](*args: *tuple[T, ...]) -> T:
+    return args[0]
+
+reveal_type(homogeneous("first", "second"))  # revealed: Literal["first", "second"]
+homogeneous("valid", 1)  # error: [invalid-argument-type]
+
+def heterogeneous[T: str](*args: *tuple[int, T]) -> T:
+    return args[1]
+
+def _(valid: tuple[int, str], invalid: tuple[int, int]) -> None:
+    reveal_type(heterogeneous(*valid))  # revealed: str
+    heterogeneous(*invalid)  # error: [invalid-argument-type]
+```
+
+### Callable protocols enforce unpacked variadic requirements
+
+Calling a callable protocol uses the same tuple element types and argument-count bounds as calling
+an ordinary function.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Protocol
+
+class AtLeastOne(Protocol):
+    def __call__(self, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+
+class ExactlyOne(Protocol):
+    def __call__(self, *args: *tuple[int]) -> None: ...
+
+def call(at_least_one: AtLeastOne, exactly_one: ExactlyOne) -> None:
+    at_least_one()  # error: [missing-argument]
+    at_least_one(1)
+    at_least_one("wrong")  # error: [invalid-argument-type]
+
+    exactly_one(1)
+    exactly_one()  # error: [missing-argument]
+    exactly_one(1, 2)  # error: [too-many-positional-arguments]
+```
+
 ### Keywords argument is not required
 
 ```py
@@ -998,6 +1922,13 @@ from ty_extensions import static_assert
 # error: [missing-argument] "No argument provided for required parameter `condition` of function `static_assert`"
 static_assert()
 
+# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
+static_assert(condition=False)
+
+# error: [static-assert-error] "Static assertion error: argument of type `Unknown` has an ambiguous static truthiness"
+# error: [invalid-syntax]
+static_assert(**)
+
 # error: [too-many-positional-arguments] "Too many positional arguments to function `static_assert`: expected 2, got 3"
 # error: [invalid-argument-type] "Argument to function `static_assert` is incorrect: Expected `LiteralString | None`, found `Literal[2]`"
 static_assert(True, 2, 3)
@@ -1016,7 +1947,7 @@ len([], 1)
 ### Type property predicates
 
 ```py
-from ty_extensions import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 # error: [missing-argument]
 is_subtype_of()
@@ -1064,6 +1995,7 @@ def _(kwargs: dict[str, int]) -> None:
 
 f(**{"foo": 1})
 f(**dict(foo=1))
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Possible extra items in unpacked open `TypedDict` have type `object`, expected `int`"
 f(**Foo(a=1, b=2))
 ```
 
@@ -1098,6 +2030,29 @@ f(**dict(a=1, b=2))
 f(**Foo(a=1, b=2))
 ```
 
+### Unpacked keyword values retain their individual generic types
+
+Each named value in an unpacked `TypedDict` must be related to its own generic parameter instead of
+using the type of the complete mapping.
+
+```py
+from typing_extensions import TypedDict, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Values(TypedDict, closed=True):
+    first: int
+    second: str
+
+def combine(*, first: T, second: U) -> tuple[T, U]:
+    return first, second
+
+values: Values = {"first": 1, "second": "value"}
+
+reveal_type(combine(**values))  # revealed: tuple[int, str]
+```
+
 ### Keyword-only parameters
 
 ```py
@@ -1120,13 +2075,13 @@ f(**Foo(a=1, b=2))
 
 ```py
 def f(**kwargs: int) -> None: ...
-def _(kwargs1: dict[str, int], kwargs2: dict[str, int], kwargs3: dict[str, str], kwargs4: dict[int, list]) -> None:
+def _(kwargs1: dict[str, int], kwargs2: dict[str, int], kwargs3: dict[str, str], kwargs4: dict[int, list[int]]) -> None:
     f(**kwargs1, **kwargs2)
     # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
     f(**kwargs1, **kwargs3)
     # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
     # error: [invalid-argument-type] "Argument expression after ** must be a mapping with `str` key type: Found `int`"
-    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `list[Unknown]`"
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `list[int]`"
     f(**kwargs3, **kwargs4)
 ```
 
@@ -1170,23 +2125,86 @@ class Foo2(TypedDict):
 
 def f(**kwargs: int) -> None: ...
 
-# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
+# snapshot: invalid-argument-type
+# snapshot: invalid-argument-type
 f(**Foo1(a=1, b="b"))
 # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Possible extra items in unpacked open `TypedDict` have type `object`, expected `int`"
 f(**Foo2(a=1))
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:15:3
+   |
+15 | f(**Foo1(a=1, b="b"))
+   |   ^^^^^^^^^^^^^^^^^^ Expected `int`, found `str`
+info: Function defined here
+  --> src/mdtest_snippet.py:11:5
+   |
+11 | def f(**kwargs: int) -> None: ...
+   |     ^ ------------- Parameter declared here
+
+
+error[invalid-argument-type]: Argument to function `f` is incorrect
+  --> src/mdtest_snippet.py:15:3
+   |
+15 | f(**Foo1(a=1, b="b"))
+   |   ^^^^^^^^^^^^^^^^^^ Possible extra items in unpacked open `TypedDict` have type `object`, expected `int`
+info: Function defined here
+  --> src/mdtest_snippet.py:11:5
+   |
+11 | def f(**kwargs: int) -> None: ...
+   |     ^ ------------- Parameter declared here
+```
+
+### TypedDict union
+
+```py
+from typing_extensions import TypedDict
+
+class GoodA(TypedDict):
+    a: int
+    b: int
+
+class GoodB(TypedDict):
+    a: int
+    b: int
+
+class BadA(TypedDict):
+    a: int
+    b: str
+
+class BadB(TypedDict):
+    a: int
+    b: str
+
+def needs_known_keys(*, a: int, b: int, c: int) -> None: ...
+def takes_int_kwargs(**kwargs: int) -> None: ...
+def _(good: GoodA | GoodB, bad: BadA | BadB) -> None:
+    # error: [missing-argument] "No argument provided for required parameter `c` of function `needs_known_keys`"
+    needs_known_keys(**good)
+
+    # error: [invalid-argument-type] "Argument to function `takes_int_kwargs` is incorrect: Expected `int`, found `str`"
+    # error: [invalid-argument-type] "Argument to function `takes_int_kwargs` is incorrect: Possible extra items in unpacked open `TypedDict` have type `object`, expected `int`"
+    takes_int_kwargs(**bad)
 ```
 
 ### Keys must be strings
 
 The keys of the mapping passed to a double-starred argument must be strings.
 
-```py
+```pyi
 from collections.abc import Mapping
 
 def f(**kwargs: int) -> None: ...
 
 class DictSubclass(dict[int, int]): ...
-class MappingSubclass(Mapping[int, int]): ...
+
+class MappingSubclass(Mapping[int, int]):
+    def __iter__(self): ...
+    def __len__(self): ...
+    def __getitem__(self, key): ...
 
 class MappingProtocol:
     def keys(self) -> list[int]:
@@ -1209,7 +2227,7 @@ f(**MappingProtocol())
 
 The key can also be a custom type that inherits from `str`.
 
-```py
+```pyi
 class SubStr(str): ...
 class SubInt(int): ...
 
@@ -1221,9 +2239,9 @@ def _(kwargs1: dict[SubStr, int], kwargs2: dict[SubInt, int]) -> None:
 
 Or, it can be a type that is assignable to `str`.
 
-```py
+```pyi
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(kwargs1: dict[Any, int], kwargs2: dict[Unknown, int]) -> None:
     f(**kwargs1)
@@ -1238,7 +2256,12 @@ from collections.abc import Mapping
 def f(**kwargs: str) -> None: ...
 
 class DictSubclass(dict[str, int]): ...
-class MappingSubclass(Mapping[str, int]): ...
+
+class MappingSubclass(Mapping[str, int]):
+    def __iter__(self): ...
+    def __len__(self): ...
+    def __getitem__(self, key) -> int:
+        return 42
 
 class MappingProtocol:
     def keys(self) -> list[str]:
@@ -1261,7 +2284,7 @@ def _(kwargs: dict[str, int]) -> None:
 ### `Unknown` type
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def f(**kwargs: int) -> None: ...
 def _(kwargs: Unknown):
@@ -1289,6 +2312,33 @@ def _(kwargs: dict[str, int] | int):
     f(**InvalidMapping())
 ```
 
+### Not a mapping with overloaded function
+
+When `**kwargs` with a non-mapping type is passed to an overloaded function, the error should report
+the specific mapping type error.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int, **kwargs: int) -> int: ...
+@overload
+def f(x: str, **kwargs: str) -> str: ...
+```
+
+```py
+from overloaded import f
+
+# error: [invalid-argument-type] "Argument expression after ** must be a mapping type: Found `None`"
+f(1, **None)
+
+def _(kwargs: dict[str, int] | int):
+    # error: [invalid-argument-type] "Argument expression after ** must be a mapping type: Found `dict[str, int] | int`"
+    f(1, **kwargs)
+```
+
 ### Generic
 
 For a generic keywords parameter, the type variable should be specialized to the value type of the
@@ -1297,16 +2347,16 @@ mapping.
 ```py
 from typing import TypeVar
 
-_T = TypeVar("_T")
+_MappingT = TypeVar("_MappingT")
 
-def f(**kwargs: _T) -> _T:
+def f(**kwargs: _MappingT) -> _MappingT:
     return kwargs["a"]
 
 def _(kwargs: dict[str, int]) -> None:
     reveal_type(f(**kwargs))  # revealed: int
 ```
 
-For a `TypedDict`, the type variable should be specialized to the union of all value types.
+For an open `TypedDict`, the type variable must also account for hidden values of type `object`.
 
 ```py
 from typing import TypeVar
@@ -1321,5 +2371,93 @@ class Foo(TypedDict):
 def f(**kwargs: _T) -> _T:
     return kwargs["a"]
 
-reveal_type(f(**Foo(a=1, b="b")))  # revealed: int | str
+reveal_type(f(**Foo(a=1, b="b")))  # revealed: object
+```
+
+## Non-iterable variadic argument
+
+A starred argument must be iterable. If it is not, an error should be reported.
+
+```py
+def some_fn(a: int):
+    pass
+
+# error: [not-iterable] "Object of type `None` is not iterable"
+some_fn(*None)
+```
+
+This also applies when the type might not be iterable:
+
+```py
+def f(*args: int) -> int:
+    return 1
+
+def _(x: int | list[int]):
+    # error: [not-iterable] "Object of type `int | list[int]` may not be iterable"
+    f(*x)
+```
+
+## Non-iterable variadic argument with overloaded functions
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def foo(a: int) -> tuple[int]: ...
+@overload
+def foo(a: int, b: int) -> tuple[int, int]: ...
+```
+
+```py
+from overloaded import foo
+
+# error: [not-iterable] "Object of type `None` is not iterable"
+foo(*None)
+
+def _(arg: int):
+    # error: [not-iterable] "Object of type `int` is not iterable"
+    foo(*arg)
+```
+
+## Union variadic unpacking with explicit keyword arguments
+
+When a union type containing variable-length elements (like `Unknown`) is unpacked as `*args`, the
+variadic expansion should not greedily consume optional positional parameters that are also provided
+as explicit keyword arguments.
+
+```py
+from ty_extensions._internal import Unknown
+
+def f(a: int = 0, b: int = 0, c: int = 0, fmt: str | None = None) -> None: ...
+def _(args: "Unknown | tuple[int, int, int]"):
+    f(*args, fmt="{key}")  # fine
+
+def g(a: int, b: int = 0, c: int = 0) -> None: ...
+def _(args: tuple[int, int] | tuple[int, int, int]):
+    g(*args, c=1)  # error: [parameter-already-assigned]
+```
+
+## Variadic unpacking should stop at max known arity
+
+When unpacking (a union of) fixed-length tuples, variadic matching should stop once the known
+positions are exhausted. Otherwise, optional positional parameters can be incorrectly treated as
+already assigned, causing false positives for `**kwargs`.
+
+(This test uses `**kwargs` unpacking of a `TypedDict` instead of the simpler `c=1` keyword argument,
+because `c=1` is a known keyword argument and we always prevent unpacking `*args` over an
+explicitly-provided keyword argument. The case shown here, without the explicit keyword argument,
+requires instead that we use our knowledge of the tuple length to prevent over-unpacking.)
+
+```py
+from typing import TypedDict
+
+class CKwargs(TypedDict):
+    c: int
+
+def f(a: int = 0, b: int = 0, c: int = 0) -> None: ...
+def _(args_tuple: tuple[int, int], args_union: tuple[int] | tuple[int, int], kwargs: CKwargs) -> None:
+    f(*args_tuple, **kwargs)  # fine
+    f(*args_union, **kwargs)  # fine
 ```

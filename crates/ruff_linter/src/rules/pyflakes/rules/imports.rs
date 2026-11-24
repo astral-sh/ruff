@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for import bindings that are shadowed by loop variables.
@@ -34,10 +35,10 @@ use crate::checkers::ast::Checker;
 ///     print(filename)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.44")]
+#[violation_metadata(stable_since = "v0.0.44", category = Category::Suspicious)]
 pub(crate) struct ImportShadowedByLoopVar {
-    pub(crate) name: String,
-    pub(crate) row: SourceRow,
+    name: String,
+    row: SourceRow,
 }
 
 impl Violation for ImportShadowedByLoopVar {
@@ -118,15 +119,15 @@ pub(crate) fn import_shadowed_by_loop_var(checker: &Checker, scope_id: ScopeId, 
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.18")]
-pub(crate) struct UndefinedLocalWithImportStar {
+#[violation_metadata(stable_since = "v0.0.18", category = Category::Restriction)]
+pub(crate) struct StarImport {
     pub(crate) name: String,
 }
 
-impl Violation for UndefinedLocalWithImportStar {
+impl Violation for StarImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedLocalWithImportStar { name } = self;
+        let StarImport { name } = self;
         format!("`from {name} import *` used; unable to detect undefined names")
     }
 }
@@ -157,7 +158,7 @@ impl Violation for UndefinedLocalWithImportStar {
 /// ## References
 /// - [Python documentation: Future statements](https://docs.python.org/3/reference/simple_stmts.html#future)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.34")]
+#[violation_metadata(stable_since = "v0.0.34", category = Category::Correctness)]
 pub(crate) struct LateFutureImport;
 
 impl Violation for LateFutureImport {
@@ -202,15 +203,15 @@ impl Violation for LateFutureImport {
 ///     return pi * radius**2
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.44")]
-pub(crate) struct UndefinedLocalWithImportStarUsage {
+#[violation_metadata(stable_since = "v0.0.44", category = Category::Restriction)]
+pub(crate) struct PossiblyUndefinedNameWithStarImport {
     pub(crate) name: String,
 }
 
-impl Violation for UndefinedLocalWithImportStarUsage {
+impl Violation for PossiblyUndefinedNameWithStarImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedLocalWithImportStarUsage { name } = self;
+        let PossiblyUndefinedNameWithStarImport { name } = self;
         format!("`{name}` may be undefined, or defined from star imports")
     }
 }
@@ -244,15 +245,15 @@ impl Violation for UndefinedLocalWithImportStarUsage {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.37")]
-pub(crate) struct UndefinedLocalWithNestedImportStarUsage {
+#[violation_metadata(stable_since = "v0.0.37", category = Category::Correctness)]
+pub(crate) struct NonModuleLevelStarImport {
     pub(crate) name: String,
 }
 
-impl Violation for UndefinedLocalWithNestedImportStarUsage {
+impl Violation for NonModuleLevelStarImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedLocalWithNestedImportStarUsage { name } = self;
+        let NonModuleLevelStarImport { name } = self;
         format!("`from {name} import *` only allowed at module level")
     }
 }

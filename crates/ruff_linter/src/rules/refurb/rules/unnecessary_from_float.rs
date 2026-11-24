@@ -5,6 +5,7 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::linter::float::as_non_finite_float_string_literal;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
@@ -61,7 +62,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
 /// - [Python documentation: `fractions`](https://docs.python.org/3/library/fractions.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.5")]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Pedantic)]
 pub(crate) struct UnnecessaryFromFloat {
     method_name: MethodName,
     constructor: Constructor,
@@ -76,7 +77,7 @@ impl Violation for UnnecessaryFromFloat {
             method_name,
             constructor,
         } = self;
-        format!("Verbose method `{method_name}` in `{constructor}` construction",)
+        format!("Verbose method `{method_name}` in `{constructor}` construction")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -134,6 +135,7 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
     };
 
     let constructor_name = checker.locator().slice(&**value).to_string();
+    let has_comments = checker.comment_ranges().intersects(call.range());
 
     // Special case for non-finite float literals: Decimal.from_float(float("inf")) -> Decimal("inf")
     if let Some(replacement) = handle_non_finite_float_special_case(
@@ -144,7 +146,14 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
         &constructor_name,
         checker,
     ) {
-        diagnostic.set_fix(Fix::safe_edit(replacement));
+        diagnostic.set_fix(Fix::applicable_edit(
+            replacement,
+            if has_comments {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        ));
         return;
     }
 
@@ -152,7 +161,7 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
     let is_type_safe = is_valid_argument_type(arg_value, method_name, constructor, checker);
 
     // Determine fix safety
-    let applicability = if is_type_safe && !checker.comment_ranges().intersects(call.range()) {
+    let applicability = if is_type_safe && !has_comments {
         Applicability::Safe
     } else {
         Applicability::Unsafe
@@ -212,12 +221,9 @@ fn is_valid_argument_type(
         // Fraction.from_decimal accepts int, bool, Decimal
         (MethodName::FromDecimal, Constructor::Fraction) => {
             // First check if it's a Decimal constructor call
-            let is_decimal_call = arg_expr
-                .as_call_expr()
-                .and_then(|call| semantic.resolve_qualified_name(&call.func))
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["decimal", "Decimal"])
-                });
+            let is_decimal_call = arg_expr.as_call_expr().is_some_and(|call| {
+                semantic.matches_qualified_name(&call.func, &["decimal", "Decimal"])
+            });
 
             if is_decimal_call {
                 return true;

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/decorator_unexpected_token.py
 ---
 ## AST
 
@@ -166,4 +167,3 @@ Module(
 3 | @foo
 4 | x = 1
   | ^ Syntax Error: Expected class, function definition or async function definition after decorator
-  |

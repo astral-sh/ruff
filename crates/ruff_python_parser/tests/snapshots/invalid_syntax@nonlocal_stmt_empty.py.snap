@@ -53,4 +53,3 @@ Module(
 1 | def _():
 2 |     nonlocal
   |             ^ Syntax Error: Nonlocal statement must have at least one name
-  |

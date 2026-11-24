@@ -62,3 +62,6 @@ class GoodMetaclass(type):
 class GoodMetaclass2(type):
     @classmethod
     def __new__(metacls, name: str, bases: tuple[type, ...], namespace: dict, /, **kwds) -> Self: ...
+
+class NewMethod:
+    def __new__(cls, __name: str, __later: str) -> Self: ...  # PYI063

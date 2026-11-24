@@ -7,26 +7,28 @@ use ruff_db::files::{File, FilePath, FileRange, system_path_to_file, vendored_pa
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
+    DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
+    SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
 use ruff_db::vendored::VendoredPath;
 use ruff_diagnostics::{Applicability, Edit};
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
+use ruff_ranged_value::ValueSource;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
-    InlayHintSettings, MarkupKind, RangedValue, document_highlights, find_references,
-    goto_declaration, goto_definition, goto_type_definition, hover, inlay_hints,
+    CompletionCapabilities, Hint as IdeHint, InlayHintSettings, MarkupKind, RangedValue,
+    can_rename, document_highlights, find_references, goto_declaration, goto_definition,
+    goto_type_definition, hover, inlay_hints, rename,
 };
-use ty_ide::{NavigationTarget, NavigationTargets, signature_help};
+use ty_ide::{NavigationTarget, NavigationTargets, hints, signature_help};
 use ty_project::metadata::options::Options;
-use ty_project::metadata::value::ValueSource;
-use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
+use ty_project::watch::{ChangeEvent, ChangedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
-use ty_project::{Db, ProjectDatabase};
-use ty_python_semantic::{MisconfigurationMode, Program};
+use ty_project::{Db, ProjectDatabase, SemanticDb as _};
+use ty_python_core::program::FallibleStrategy;
+use ty_python_semantic::ProgramEnvironment;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -113,6 +115,7 @@ pub struct Workspace {
 
 #[wasm_bindgen]
 impl Workspace {
+    /// Creates a workspace with options that take precedence over configuration files.
     #[wasm_bindgen(constructor)]
     pub fn new(
         root: &str,
@@ -122,20 +125,17 @@ impl Workspace {
         let options = Options::deserialize_with(
             ValueSource::Cli,
             serde_wasm_bindgen::Deserializer::from(options),
+            ty_python_semantic::default_lint_registry(),
         )
         .map_err(into_error)?;
 
-        let system = WasmSystem::new(SystemPath::new(root));
+        let root = SystemPath::new(root);
+        let system = WasmSystem::new(root);
+        let mut project =
+            ProjectMetadata::new(root.file_name().unwrap_or("root"), root.to_path_buf());
+        project.set_override_options(options);
 
-        let project = ProjectMetadata::from_options(
-            options,
-            SystemPathBuf::from(root),
-            None,
-            MisconfigurationMode::Fail,
-        )
-        .map_err(into_error)?;
-
-        let mut db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
+        let mut db = ProjectDatabase::fallible(project, system.clone()).map_err(into_error)?;
 
         // By default, it will check all files in the project but we only want to check the open
         // files in the playground.
@@ -148,28 +148,39 @@ impl Workspace {
         })
     }
 
+    /// Replaces the options set at construction, taking precedence over configuration files.
     #[wasm_bindgen(js_name = "updateOptions")]
     pub fn update_options(&mut self, options: JsValue) -> Result<(), Error> {
         let options = Options::deserialize_with(
             ValueSource::Cli,
             serde_wasm_bindgen::Deserializer::from(options),
+            self.db.lint_registry(),
         )
         .map_err(into_error)?;
 
-        let project = ProjectMetadata::from_options(
-            options,
-            self.db.project().root(&self.db).to_path_buf(),
-            None,
-            MisconfigurationMode::Fail,
-        )
-        .map_err(into_error)?;
+        let mut project = self.db.project().metadata(&self.db).clone();
+        project.set_override_options(options);
 
-        let program_settings = project
-            .to_program_settings(&self.system, self.db.vendored())
+        let merged_options = project.to_merged_options();
+        let (program_settings, program_settings_diagnostics) = merged_options
+            .to_program_settings(&self.system, self.db.vendored(), &FallibleStrategy)
             .map_err(into_error)?;
-        Program::get(&self.db).update_from_settings(&mut self.db, program_settings);
+        self.db
+            .project()
+            .update_program(&mut self.db, program_settings);
 
-        self.db.project().reload(&mut self.db, project);
+        let (settings, mut settings_diagnostics) = merged_options
+            .to_settings(&self.db, &FallibleStrategy)
+            .map_err(into_error)?;
+        settings_diagnostics.extend(
+            program_settings_diagnostics
+                .into_iter()
+                .map(|diagnostic| diagnostic.into_diagnostic(&self.db)),
+        );
+
+        self.db
+            .project()
+            .reload(&mut self.db, project, Some(settings), settings_diagnostics);
 
         Ok(())
     }
@@ -183,13 +194,7 @@ impl Workspace {
             .write_file_all(&path, contents)
             .map_err(into_error)?;
 
-        self.db.apply_changes(
-            vec![ChangeEvent::Created {
-                path: path.clone(),
-                kind: CreatedKind::File,
-            }],
-            None,
-        );
+        self.db.apply_changes(&[ChangeEvent::Opened(path.clone())]);
 
         let file = system_path_to_file(&self.db, &path).expect("File to exist");
 
@@ -216,19 +221,16 @@ impl Workspace {
             .write_file(system_path, contents)
             .map_err(into_error)?;
 
-        self.db.apply_changes(
-            vec![
-                ChangeEvent::Changed {
-                    path: system_path.to_path_buf(),
-                    kind: ChangedKind::FileContent,
-                },
-                ChangeEvent::Changed {
-                    path: system_path.to_path_buf(),
-                    kind: ChangedKind::FileMetadata,
-                },
-            ],
-            None,
-        );
+        self.db.apply_changes(&[
+            ChangeEvent::Changed {
+                path: system_path.to_path_buf(),
+                kind: ChangedKind::FileContent,
+            },
+            ChangeEvent::Changed {
+                path: system_path.to_path_buf(),
+                kind: ChangedKind::FileMetadata,
+            },
+        ]);
 
         Ok(())
     }
@@ -250,13 +252,10 @@ impl Workspace {
                 .remove_file(system_path)
                 .map_err(into_error)?;
 
-            self.db.apply_changes(
-                vec![ChangeEvent::Deleted {
-                    path: system_path.to_path_buf(),
-                    kind: DeletedKind::File,
-                }],
-                None,
-            );
+            self.db.apply_changes(&[ChangeEvent::Deleted {
+                path: system_path.to_path_buf(),
+                kind: DeletedKind::File,
+            }]);
         }
 
         Ok(())
@@ -270,6 +269,14 @@ impl Workspace {
         Ok(result.into_iter().map(Diagnostic::wrap).collect())
     }
 
+    #[wasm_bindgen(js_name = "hints")]
+    pub fn hints(&self, file_id: &FileHandle) -> Result<Vec<Hint>, Error> {
+        Ok(hints(&self.db, file_id.file)
+            .into_iter()
+            .map(|hint| Hint::from_ide_hint(&self.db, file_id.file, self.position_encoding, &hint))
+            .collect())
+    }
+
     /// Checks all open files
     pub fn check(&self) -> Result<Vec<Diagnostic>, Error> {
         let result = self.db.check();
@@ -279,7 +286,11 @@ impl Workspace {
 
     /// Returns the parsed AST for `path`
     pub fn parsed(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
+        let parsed = ruff_db::parsed::parsed_module(
+            &self.db,
+            self.db.program_file(file_id.file).python_file(&self.db),
+        )
+        .load(&self.db);
 
         Ok(format!("{:#?}", parsed.syntax()))
     }
@@ -290,7 +301,11 @@ impl Workspace {
 
     /// Returns the token stream for `path` serialized as a string.
     pub fn tokens(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
+        let parsed = ruff_db::parsed::parsed_module(
+            &self.db,
+            self.db.program_file(file_id.file).python_file(&self.db),
+        )
+        .load(&self.db);
 
         Ok(format!("{:#?}", parsed.tokens()))
     }
@@ -313,7 +328,9 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = goto_type_definition(&self.db, file_id.file, offset) else {
+        let Some(targets) =
+            goto_type_definition(&self.db, self.db.program_file(file_id.file), offset)
+        else {
             return Ok(Vec::new());
         };
 
@@ -337,7 +354,8 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = goto_declaration(&self.db, file_id.file, offset) else {
+        let Some(targets) = goto_declaration(&self.db, self.db.program_file(file_id.file), offset)
+        else {
             return Ok(Vec::new());
         };
 
@@ -361,7 +379,8 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = goto_definition(&self.db, file_id.file, offset) else {
+        let Some(targets) = goto_definition(&self.db, self.db.program_file(file_id.file), offset)
+        else {
             return Ok(Vec::new());
         };
 
@@ -385,7 +404,9 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = find_references(&self.db, file_id.file, offset, true) else {
+        let Some(targets) =
+            find_references(&self.db, self.db.program_file(file_id.file), offset, true)
+        else {
             return Ok(Vec::new());
         };
 
@@ -413,6 +434,64 @@ impl Workspace {
             .collect())
     }
 
+    #[wasm_bindgen(js_name = "prepareRename")]
+    pub fn prepare_rename(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Option<Range>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(range) = can_rename(&self.db, self.db.program_file(file_id.file), offset) else {
+            return Ok(None);
+        };
+
+        Ok(Some(Range::from_text_range(
+            range,
+            &index,
+            &source,
+            self.position_encoding,
+        )))
+    }
+
+    #[wasm_bindgen]
+    pub fn rename(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+        new_name: &str,
+    ) -> Result<Vec<RenameEdit>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+        let program_file = self.db.program_file(file_id.file);
+
+        if can_rename(&self.db, program_file, offset).is_none() {
+            return Ok(Vec::new());
+        }
+
+        let Some(rename_results) = rename(&self.db, program_file, offset, new_name) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(rename_results
+            .into_iter()
+            .map(|target| RenameEdit {
+                path: target.file().path(&self.db).to_string(),
+                range: Range::from_file_range(
+                    &self.db,
+                    target.file_range(),
+                    self.position_encoding,
+                ),
+                new_text: new_name.to_string(),
+            })
+            .collect())
+    }
+
     #[wasm_bindgen]
     pub fn hover(&self, file_id: &FileHandle, position: Position) -> Result<Option<Hover>, Error> {
         let source = source_text(&self.db, file_id.file);
@@ -420,7 +499,7 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(range_info) = hover(&self.db, file_id.file, offset) else {
+        let Some(range_info) = hover(&self.db, self.db.program_file(file_id.file), offset) else {
             return Ok(None);
         };
 
@@ -450,15 +529,23 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let settings = ty_ide::CompletionSettings { auto_import: true };
-        let completions = ty_ide::completion(&self.db, &settings, file_id.file, offset);
+        let settings = ty_ide::CompletionSettings::default();
+        let program_file = self.db.program_file(file_id.file);
+        let env = ProgramEnvironment::from_file(program_file);
+        let completions = ty_ide::completion(
+            &self.db,
+            &settings,
+            CompletionCapabilities::default(),
+            program_file,
+            offset,
+        );
 
         Ok(completions
             .into_iter()
             .map(|comp| {
-                let name = comp.insert.as_deref().unwrap_or(&comp.name).to_string();
+                let name = comp.label().to_string();
                 let kind = comp.kind.map(CompletionKind::from);
-                let type_display = comp.ty.map(|ty| ty.display(&self.db).to_string());
+                let type_display = comp.ty.map(|ty| ty.display(&self.db, &env).to_string());
                 let import_edit = comp.import.as_ref().map(|edit| {
                     let range = Range::from_text_range(
                         edit.range(),
@@ -468,7 +555,7 @@ impl Workspace {
                     );
                     TextEdit {
                         range,
-                        new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
+                        new_text: edit.content().map_or_default(ToString::to_string),
                     }
                 });
                 Completion {
@@ -480,7 +567,7 @@ impl Workspace {
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation: comp
                         .documentation
-                        .map(|docstring| docstring.render_plaintext()),
+                        .map(|docstring| docstring.render(MarkupKind::PlainText)),
                 }
             })
             .collect())
@@ -493,12 +580,13 @@ impl Workspace {
 
         let result = inlay_hints(
             &self.db,
-            file_id.file,
+            self.db.program_file(file_id.file),
             range.to_text_range(&index, &source, self.position_encoding)?,
             // TODO: Provide a way to configure this
             &InlayHintSettings {
                 variable_types: true,
                 call_argument_names: true,
+                return_types: true,
             },
         );
 
@@ -550,7 +638,8 @@ impl Workspace {
         let index = line_index(&self.db, file_id.file);
         let source = source_text(&self.db, file_id.file);
 
-        let semantic_token = ty_ide::semantic_tokens(&self.db, file_id.file, None);
+        let semantic_token =
+            ty_ide::semantic_tokens(&self.db, self.db.program_file(file_id.file), None);
 
         let result = semantic_token
             .iter()
@@ -575,7 +664,7 @@ impl Workspace {
 
         let semantic_token = ty_ide::semantic_tokens(
             &self.db,
-            file_id.file,
+            self.db.program_file(file_id.file),
             Some(range.to_text_range(&index, &source, self.position_encoding)?),
         );
 
@@ -612,7 +701,7 @@ impl Workspace {
             actions.extend(
                 ty_ide::code_actions(
                     &self.db,
-                    file_id.file,
+                    self.db.program_file(file_id.file),
                     range,
                     diagnostic.inner.id().as_str(),
                 )
@@ -647,7 +736,9 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(signature_help_info) = signature_help(&self.db, file_id.file, offset) else {
+        let Some(signature_help_info) =
+            signature_help(&self.db, self.db.program_file(file_id.file), offset)
+        else {
             return Ok(None);
         };
 
@@ -668,7 +759,7 @@ impl Workspace {
                     label: sig.label,
                     documentation: sig
                         .documentation
-                        .map(|docstring| docstring.render_plaintext()),
+                        .map(|docstring| docstring.render(MarkupKind::PlainText)),
                     parameters,
                     active_parameter: sig.active_parameter.and_then(|p| u32::try_from(p).ok()),
                 }
@@ -694,7 +785,9 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = document_highlights(&self.db, file_id.file, offset) else {
+        let Some(targets) =
+            document_highlights(&self.db, self.db.program_file(file_id.file), offset)
+        else {
             return Ok(Vec::new());
         };
 
@@ -775,8 +868,34 @@ impl FileHandle {
 
 #[wasm_bindgen]
 pub struct Diagnostic {
-    #[wasm_bindgen(readonly)]
     inner: diagnostic::Diagnostic,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Hint {
+    #[wasm_bindgen(getter_with_clone)]
+    pub message: String,
+    pub range: Range,
+}
+
+impl Hint {
+    fn from_ide_hint(
+        db: &dyn Db,
+        file: File,
+        position_encoding: PositionEncoding,
+        hint: &IdeHint,
+    ) -> Self {
+        Self {
+            message: hint.message(),
+            range: Range::from_text_range(
+                hint.range,
+                &line_index(db, file),
+                &source_text(db, file),
+                position_encoding,
+            ),
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -791,6 +910,36 @@ impl Diagnostic {
     }
 
     #[wasm_bindgen]
+    pub fn annotations(&self, workspace: &Workspace) -> Vec<DiagnosticAnnotation> {
+        self.inner
+            .annotations()
+            .iter()
+            .map(|annotation| DiagnosticAnnotation::from_db(workspace, annotation))
+            .collect()
+    }
+
+    #[wasm_bindgen(js_name = "subDiagnostics")]
+    pub fn sub_diagnostics(&self, workspace: &Workspace) -> Vec<SubDiagnostic> {
+        self.inner
+            .sub_diagnostics()
+            .iter()
+            .map(|sub_diagnostic| {
+                let annotations = sub_diagnostic
+                    .annotations()
+                    .iter()
+                    .map(|annotation| DiagnosticAnnotation::from_db(workspace, annotation))
+                    .collect();
+
+                SubDiagnostic {
+                    severity: sub_diagnostic.severity().into(),
+                    message: sub_diagnostic.headline_message().to_string(),
+                    annotations,
+                }
+            })
+            .collect()
+    }
+
+    #[wasm_bindgen]
     pub fn id(&self) -> JsString {
         JsString::from(self.inner.id().to_string())
     }
@@ -798,6 +947,16 @@ impl Diagnostic {
     #[wasm_bindgen]
     pub fn severity(&self) -> Severity {
         Severity::from(self.inner.severity())
+    }
+
+    #[wasm_bindgen]
+    pub fn tags(&self) -> Vec<DiagnosticTag> {
+        self.inner
+            .primary_tags()
+            .unwrap_or_default()
+            .iter()
+            .map(DiagnosticTag::from)
+            .collect()
     }
 
     #[wasm_bindgen(js_name = "textRange")]
@@ -820,7 +979,7 @@ impl Diagnostic {
 
     #[wasm_bindgen]
     pub fn display(&self, workspace: &Workspace) -> JsString {
-        let config = DisplayDiagnosticConfig::default().color(false);
+        let config = DisplayDiagnosticConfig::new("ty").color(false);
         self.inner
             .display(&workspace.db, &config)
             .to_string()
@@ -856,6 +1015,55 @@ impl Diagnostic {
             preferred: true,
         })
     }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubDiagnostic {
+    pub severity: SubDiagnosticSeverity,
+    #[wasm_bindgen(getter_with_clone)]
+    pub message: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub annotations: Vec<DiagnosticAnnotation>,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagnosticAnnotation {
+    pub primary: bool,
+    #[wasm_bindgen(getter_with_clone)]
+    pub message: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub location: Option<Location>,
+}
+
+impl DiagnosticAnnotation {
+    fn from_db(workspace: &Workspace, annotation: &diagnostic::Annotation) -> Self {
+        let location = FileRange::try_from(annotation.get_span())
+            .ok()
+            .map(|file_range| Location {
+                path: file_range.file().path(&workspace.db).to_string(),
+                range: Range::from_file_range(
+                    &workspace.db,
+                    file_range,
+                    workspace.position_encoding,
+                ),
+            });
+
+        Self {
+            primary: annotation.is_primary(),
+            message: annotation.get_message().map(ToOwned::to_owned),
+            location,
+        }
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Location {
+    #[wasm_bindgen(getter_with_clone)]
+    pub path: String,
+    pub range: Range,
 }
 
 fn edit_to_text_edit(workspace: &Workspace, file: File, edit: &Edit) -> TextEdit {
@@ -1006,15 +1214,55 @@ pub enum Severity {
     Warning,
     Error,
     Fatal,
+    Hint,
 }
 
 impl From<diagnostic::Severity> for Severity {
     fn from(value: diagnostic::Severity) -> Self {
         match value {
+            diagnostic::Severity::Hint => Self::Hint,
             diagnostic::Severity::Info => Self::Info,
             diagnostic::Severity::Warning => Self::Warning,
             diagnostic::Severity::Error => Self::Error,
             diagnostic::Severity::Fatal => Self::Fatal,
+        }
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum DiagnosticTag {
+    Unnecessary,
+    Deprecated,
+}
+
+impl From<&diagnostic::DiagnosticTag> for DiagnosticTag {
+    fn from(value: &diagnostic::DiagnosticTag) -> Self {
+        match value {
+            diagnostic::DiagnosticTag::Unnecessary => Self::Unnecessary,
+            diagnostic::DiagnosticTag::Deprecated => Self::Deprecated,
+        }
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum SubDiagnosticSeverity {
+    Help,
+    Info,
+    Warning,
+    Error,
+    Fatal,
+}
+
+impl From<diagnostic::SubDiagnosticSeverity> for SubDiagnosticSeverity {
+    fn from(value: diagnostic::SubDiagnosticSeverity) -> Self {
+        match value {
+            diagnostic::SubDiagnosticSeverity::Help => Self::Help,
+            diagnostic::SubDiagnosticSeverity::Info => Self::Info,
+            diagnostic::SubDiagnosticSeverity::Warning => Self::Warning,
+            diagnostic::SubDiagnosticSeverity::Error => Self::Error,
+            diagnostic::SubDiagnosticSeverity::Fatal => Self::Fatal,
         }
     }
 }
@@ -1184,6 +1432,16 @@ pub struct TextEdit {
 }
 
 #[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenameEdit {
+    #[wasm_bindgen(getter_with_clone)]
+    pub path: String,
+    pub range: Range,
+    #[wasm_bindgen(getter_with_clone)]
+    pub new_text: String,
+}
+
+#[wasm_bindgen]
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub enum InlayHintKind {
     Type,
@@ -1322,6 +1580,8 @@ pub enum SemanticTokenKind {
     Decorator,
     BuiltinConstant,
     TypeParameter,
+    Operator,
+    Regexp,
 }
 
 impl From<ty_ide::SemanticTokenType> for SemanticTokenKind {
@@ -1342,6 +1602,8 @@ impl From<ty_ide::SemanticTokenType> for SemanticTokenKind {
             ty_ide::SemanticTokenType::Decorator => Self::Decorator,
             ty_ide::SemanticTokenType::BuiltinConstant => Self::BuiltinConstant,
             ty_ide::SemanticTokenType::TypeParameter => Self::TypeParameter,
+            ty_ide::SemanticTokenType::Operator => Self::Operator,
+            ty_ide::SemanticTokenType::Regexp => Self::Regexp,
         }
     }
 }
@@ -1366,6 +1628,21 @@ impl System for WasmSystem {
 
     fn canonicalize_path(&self, path: &SystemPath) -> ruff_db::system::Result<SystemPathBuf> {
         self.fs.canonicalize(path)
+    }
+
+    fn is_same_file(
+        &self,
+        first: &SystemPath,
+        second: &SystemPath,
+    ) -> ruff_db::system::Result<bool> {
+        // The in-memory file system does not support hard links, so canonical paths uniquely
+        // identify files.
+        Ok(self.canonicalize_path(first)? == self.canonicalize_path(second)?)
+    }
+
+    fn is_file_open(&self, path: &FilePath) -> bool {
+        path.as_system_path()
+            .is_some_and(|path| self.fs.is_file(path))
     }
 
     fn read_to_string(&self, path: &SystemPath) -> ruff_db::system::Result<String> {
@@ -1394,12 +1671,8 @@ impl System for WasmSystem {
         Err(ruff_notebook::NotebookError::Io(not_found()))
     }
 
-    fn path_exists_case_sensitive(&self, path: &SystemPath, _prefix: &SystemPath) -> bool {
-        self.path_exists(path)
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        CaseSensitivity::CaseSensitive
+    fn which(&self, _name: &str) -> WhichResult {
+        Err(WhichError::CannotFindBinaryPath)
     }
 
     fn current_directory(&self) -> &SystemPath {
@@ -1425,13 +1698,6 @@ impl System for WasmSystem {
 
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
         self.fs.walk_directory(path)
-    }
-
-    fn glob(
-        &self,
-        pattern: &str,
-    ) -> Result<Box<dyn Iterator<Item = Result<SystemPathBuf, GlobError>> + '_>, PatternError> {
-        Ok(Box::new(self.fs.glob(pattern)?))
     }
 
     fn as_writable(&self) -> Option<&dyn WritableSystem> {

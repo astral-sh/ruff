@@ -22,3 +22,8 @@ match subject:
         pass
     case 1 + *_:
         pass
+
+# Sequence pattern can contain at most one star pattern
+match subject:
+    case [*head, middle, *tail]:
+        pass

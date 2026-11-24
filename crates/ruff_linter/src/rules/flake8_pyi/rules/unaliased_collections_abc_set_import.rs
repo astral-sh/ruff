@@ -4,6 +4,7 @@ use ruff_python_semantic::{Binding, BindingKind, Scope};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::renamer::Renamer;
 use crate::{Applicability, Fix, FixAvailability, Violation};
 
@@ -40,7 +41,7 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// `import foo as foo` alias, or are imported via a `*` import. As such, the
 /// fix is marked as safe in more cases for `.pyi` files.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Style)]
 pub(crate) struct UnaliasedCollectionsAbcSetImport;
 
 impl Violation for UnaliasedCollectionsAbcSetImport {
@@ -48,7 +49,9 @@ impl Violation for UnaliasedCollectionsAbcSetImport {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin".to_string()
+        "Use `from collections.abc import Set as AbstractSet` \
+            to avoid confusion with the `set` builtin"
+            .to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

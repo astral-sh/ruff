@@ -72,6 +72,18 @@ reveal_type(__qualname__)  # revealed: Literal[42]
 reveal_type(__module__)  # revealed: Literal[42]
 ```
 
+They also take priority over a possibly-bound snapshot from an enclosing `global` declaration:
+
+```py
+def enclosing(flag: bool) -> None:
+    global __module__
+    if flag:
+        __module__ = 1
+
+    class Foo:
+        reveal_type(__module__)  # revealed: str
+```
+
 ## `__firstlineno__` has priority over globals (Python 3.13+)
 
 The same applies to `__firstlineno__` on Python 3.13+:

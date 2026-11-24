@@ -1,3 +1,18 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "mdformat>=1.0.0",
+#     "mdformat-mkdocs>=5.3.0",
+#     "pyyaml>=6.0.3",
+# ]
+#
+# [tool.uv]
+# no-build = true
+# exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
+# ///
+
 """Generate an MkDocs-compatible `docs` and `mkdocs.yml` from the README.md."""
 
 from __future__ import annotations
@@ -8,7 +23,6 @@ import re
 import shutil
 import subprocess
 from collections.abc import Sequence
-from itertools import chain
 from pathlib import Path
 from typing import NamedTuple
 
@@ -47,11 +61,13 @@ SECTIONS: list[Section] = [
     Section("Configuring Ruff", "configuration.md", generated=False),
     Section("Preview", "preview.md", generated=False),
     Section("Rules", "rules.md", generated=True),
+    Section("Default Rules", "default-rules.md", generated=True),
     Section("Settings", "settings.md", generated=True),
     Section("Versioning", "versioning.md", generated=False),
     Section("Integrations", "integrations.md", generated=False),
     Section("FAQ", "faq.md", generated=False),
     Section("Contributing", "contributing.md", generated=True),
+    Section("Proposing Lint Rules", "rule-proposals.md", generated=False),
 ]
 
 LINK_REWRITES: dict[str, str] = {
@@ -66,13 +82,17 @@ LINK_REWRITES: dict[str, str] = {
     "https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8": (
         "faq.md#how-does-ruffs-linter-compare-to-flake8"
     ),
+    "https://docs.astral.sh/ruff/faq/#how-does-ruffs-import-sorting-compare-to-isort": (
+        "faq.md#how-does-ruffs-import-sorting-compare-to-isort"
+    ),
     "https://docs.astral.sh/ruff/faq/#how-does-ruffs-formatter-compare-to-black": (
         "faq.md#how-does-ruffs-formatter-compare-to-black"
     ),
     "https://docs.astral.sh/ruff/installation/": "installation.md",
     "https://docs.astral.sh/ruff/rules/": "rules.md",
+    "https://docs.astral.sh/ruff/default-rules/": "default-rules.md",
     "https://docs.astral.sh/ruff/settings/": "settings.md",
-    "#whos-using-ruff": "https://github.com/astral-sh/ruff#whos-using-ruff",
+    "https://docs.astral.sh/ruff/preview/": "preview.md",
 }
 
 
@@ -103,7 +123,7 @@ def clean_file_content(content: str, title: str) -> str:
 
 
 def generate_rule_metadata(rule_doc: Path) -> None:
-    """Add frontmatter metadata containing a rule's code and description.
+    """Add frontmatter metadata containing a rule's description and optional code.
 
     For example:
     ```yaml
@@ -121,50 +141,44 @@ def generate_rule_metadata(rule_doc: Path) -> None:
     # Get the description and rule code from the rule doc lines.
     rule_code = None
     description = None
+    title_found = False
     what_it_does_found = False
     for line in lines:
         if line == "\n":
             continue
 
-        # Assume that the only first-level heading is the rule title and code.
+        # Assume that the only first-level heading is the rule title and optional code.
         #
         # For example: given `# abstract-base-class-without-abstract-method (B024)`,
         # extract the rule code (`B024`).
         if line.startswith("# "):
-            rule_code = line.strip().rsplit("(", 1)
-            rule_code = rule_code[1][:-1]
+            title_found = True
+            _, separator, code = line.strip().rpartition(" (")
+            if separator and code.endswith(")"):
+                rule_code = code[:-1]
 
         if line.startswith("## What it does"):
             what_it_does_found = True
             continue  # Skip the '## What it does' line
 
-        if what_it_does_found and not description:
+        if what_it_does_found and description is None:
             description = line.removesuffix("\n")
 
-        if all([rule_code, description]):
+        if title_found and description is not None:
             break
     else:
-        if not rule_code:
+        if not title_found:
             raise ValueError("Missing title line")
 
         if not what_it_does_found:
             raise ValueError(f"Missing '## What it does' in {rule_doc}")
 
     with rule_doc.open("w", encoding="utf-8") as f:
-        f.writelines(
-            "\n".join(
-                [
-                    "---",
-                    "description: |-",
-                    f"  {description}",
-                    "tags:",
-                    f"- {rule_code}",
-                    "---",
-                    "",
-                    "",
-                ]
-            )
-        )
+        metadata = ["---", "description: |-", f"  {description}"]
+        if rule_code is not None:
+            metadata.extend(["tags:", f"- {rule_code}"])
+        metadata.extend(["---", "", ""])
+        f.write("\n".join(metadata))
         f.writelines(lines)
 
 
@@ -206,6 +220,11 @@ def main() -> None:
                     ["cargo", "dev", "generate-options"],
                     encoding="utf-8",
                 )
+            elif filename == "default-rules.md":
+                file_content = subprocess.check_output(
+                    ["cargo", "dev", "generate-default-rules"],
+                    encoding="utf-8",
+                )
             else:
                 block = content.split(f"<!-- Begin section: {title} -->\n\n")
                 if len(block) != 2:
@@ -239,39 +258,10 @@ def main() -> None:
         config = yaml.safe_load(fp)
 
     # Add the redirect section to mkdocs.yml.
-    rules = json.loads(
-        subprocess.check_output(
-            [
-                "cargo",
-                "run",
-                "-p",
-                "ruff",
-                "--",
-                "rule",
-                "--all",
-                "--output-format",
-                "json",
-            ],
-        ),
+    redirect_maps = json.loads(
+        subprocess.check_output(["cargo", "dev", "generate-rule-redirects"]),
     )
-    config["plugins"].append(
-        {
-            "redirects": {
-                "redirect_maps": dict(
-                    chain.from_iterable(
-                        [
-                            (f"rules/{rule['code']}.md", f"rules/{rule['name']}.md"),
-                            (
-                                f"rules/{rule['code'].lower()}.md",
-                                f"rules/{rule['name']}.md",
-                            ),
-                        ]
-                        for rule in rules
-                    )
-                ),
-            },
-        },
-    )
+    config["plugins"].append({"redirects": {"redirect_maps": redirect_maps}})
 
     # Add the nav section to mkdocs.yml.
     config["nav"] = []

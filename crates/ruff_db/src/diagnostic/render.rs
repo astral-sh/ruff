@@ -2,10 +2,9 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use full::FullRenderer;
-use ruff_annotate_snippets::{
-    Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
-    Snippet as AnnotateSnippet,
+use annotate_snippets::{
+    Annotation as AnnotateAnnotation, AnnotationKind, Group as AnnotateGroup,
+    Level as AnnotateLevel, Snippet as AnnotateSnippet,
 };
 use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
@@ -18,21 +17,35 @@ use crate::{
 };
 
 use super::{
-    Annotation, Diagnostic, DiagnosticFormat, DiagnosticSource, DisplayDiagnosticConfig,
-    SubDiagnostic, UnifiedFile,
+    Annotation, Diagnostic, DiagnosticSource, DisplayDiagnosticConfig, SubDiagnostic, UnifiedFile,
 };
 
-use azure::AzureRenderer;
-use concise::ConciseRenderer;
-use github::GithubRenderer;
-use pylint::PylintRenderer;
+pub use azure::AzureRenderer;
+pub use concise::ConciseRenderer;
+pub use full::FullRenderer;
+pub use github::GithubRenderer;
+#[cfg(feature = "serde")]
+pub use gitlab::GitlabRenderer;
+pub use grouped::GroupedRenderer;
+#[cfg(feature = "serde")]
+pub use json::JsonRenderer;
+#[cfg(feature = "serde")]
+pub use json_lines::JsonLinesRenderer;
+#[cfg(feature = "junit")]
+pub use junit::JunitRenderer;
+pub use pylint::PylintRenderer;
+#[cfg(feature = "serde")]
+pub use rdjson::RdjsonRenderer;
+#[cfg(feature = "serde")]
+pub use sarif::SarifRenderer;
 
 mod azure;
 mod concise;
 mod full;
-pub mod github;
+mod github;
 #[cfg(feature = "serde")]
 mod gitlab;
+mod grouped;
 #[cfg(feature = "serde")]
 mod json;
 #[cfg(feature = "serde")]
@@ -42,113 +55,55 @@ mod junit;
 mod pylint;
 #[cfg(feature = "serde")]
 mod rdjson;
+#[cfg(feature = "serde")]
+mod sarif;
 
-/// A type that implements `std::fmt::Display` for diagnostic rendering.
-///
-/// It is created via [`Diagnostic::display`].
-///
-/// The lifetime parameter, `'a`, refers to the shorter of:
-///
-/// * The lifetime of the rendering configuration.
-/// * The lifetime of the resolver used to load the contents of `Span`
-///   values. When using Salsa, this most commonly corresponds to the lifetime
-///   of a Salsa `Db`.
-/// * The lifetime of the diagnostic being rendered.
-pub struct DisplayDiagnostic<'a> {
-    config: &'a DisplayDiagnosticConfig,
-    resolver: &'a dyn FileResolver,
-    diag: &'a Diagnostic,
-}
+/// Renders diagnostics in a particular output format.
+pub trait Renderer {
+    /// Renders diagnostics to a formatter.
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result;
 
-impl<'a> DisplayDiagnostic<'a> {
-    pub(crate) fn new(
-        resolver: &'a dyn FileResolver,
-        config: &'a DisplayDiagnosticConfig,
-        diag: &'a Diagnostic,
-    ) -> DisplayDiagnostic<'a> {
-        DisplayDiagnostic {
-            config,
-            resolver,
-            diag,
-        }
+    /// Returns a display implementation for these diagnostics.
+    fn display<'a>(&'a self, diagnostics: &'a [Diagnostic]) -> impl std::fmt::Display + 'a {
+        std::fmt::from_fn(move |f| self.render(f, diagnostics))
+    }
+
+    /// Writes diagnostics to an I/O writer.
+    fn write(
+        &self,
+        writer: &mut dyn std::io::Write,
+        diagnostics: &[Diagnostic],
+    ) -> std::io::Result<()> {
+        write!(writer, "{}", self.display(diagnostics))
     }
 }
 
-impl std::fmt::Display for DisplayDiagnostic<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        DisplayDiagnostics::new(self.resolver, self.config, std::slice::from_ref(self.diag)).fmt(f)
+#[cfg(any(feature = "serde", feature = "junit"))]
+struct FmtAdapter<'a> {
+    fmt: &'a mut dyn std::fmt::Write,
+}
+
+#[cfg(any(feature = "serde", feature = "junit"))]
+impl std::io::Write for FmtAdapter<'_> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.fmt
+            .write_str(std::str::from_utf8(buf).map_err(|_| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Invalid UTF-8 in diagnostic output",
+                )
+            })?)
+            .map_err(std::io::Error::other)?;
+
+        Ok(buf.len())
     }
-}
 
-/// A type that implements `std::fmt::Display` for rendering a collection of diagnostics.
-///
-/// It is intended for collections of diagnostics that need to be serialized together, as is the
-/// case for JSON, for example.
-///
-/// See [`DisplayDiagnostic`] for rendering individual `Diagnostic`s and details about the lifetime
-/// constraints.
-pub struct DisplayDiagnostics<'a> {
-    config: &'a DisplayDiagnosticConfig,
-    resolver: &'a dyn FileResolver,
-    diagnostics: &'a [Diagnostic],
-}
-
-impl<'a> DisplayDiagnostics<'a> {
-    pub fn new(
-        resolver: &'a dyn FileResolver,
-        config: &'a DisplayDiagnosticConfig,
-        diagnostics: &'a [Diagnostic],
-    ) -> DisplayDiagnostics<'a> {
-        DisplayDiagnostics {
-            config,
-            resolver,
-            diagnostics,
-        }
-    }
-}
-
-impl std::fmt::Display for DisplayDiagnostics<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self.config.format {
-            DiagnosticFormat::Concise => {
-                ConciseRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
-            }
-            DiagnosticFormat::Full => {
-                FullRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
-            }
-            DiagnosticFormat::Azure => {
-                AzureRenderer::new(self.resolver).render(f, self.diagnostics)?;
-            }
-            #[cfg(feature = "serde")]
-            DiagnosticFormat::Json => {
-                json::JsonRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
-            }
-            #[cfg(feature = "serde")]
-            DiagnosticFormat::JsonLines => {
-                json_lines::JsonLinesRenderer::new(self.resolver, self.config)
-                    .render(f, self.diagnostics)?;
-            }
-            #[cfg(feature = "serde")]
-            DiagnosticFormat::Rdjson => {
-                rdjson::RdjsonRenderer::new(self.resolver).render(f, self.diagnostics)?;
-            }
-            DiagnosticFormat::Pylint => {
-                PylintRenderer::new(self.resolver).render(f, self.diagnostics)?;
-            }
-            #[cfg(feature = "junit")]
-            DiagnosticFormat::Junit => {
-                junit::JunitRenderer::new(self.resolver).render(f, self.diagnostics)?;
-            }
-            #[cfg(feature = "serde")]
-            DiagnosticFormat::Gitlab => {
-                gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
-            }
-            DiagnosticFormat::Github => {
-                GithubRenderer::new(self.resolver, "ty").render(f, self.diagnostics)?;
-            }
-        }
-
+    fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
+    }
+
+    fn write_fmt(&mut self, args: std::fmt::Arguments<'_>) -> std::io::Result<()> {
+        self.fmt.write_fmt(args).map_err(std::io::Error::other)
     }
 }
 
@@ -185,12 +140,12 @@ impl<'a> Resolved<'a> {
     }
 
     /// Creates a value that is amenable to rendering directly.
-    fn to_renderable(&self, context: usize) -> Renderable<'_> {
+    fn to_renderable(&self, config: &DisplayDiagnosticConfig) -> Renderable<'_> {
         Renderable {
             diagnostics: self
                 .diagnostics
                 .iter()
-                .map(|diag| diag.to_renderable(context))
+                .map(|diag| diag.to_renderable(config))
                 .collect(),
         }
     }
@@ -203,7 +158,7 @@ impl<'a> Resolved<'a> {
 /// both.)
 #[derive(Debug)]
 struct ResolvedDiagnostic<'a> {
-    level: AnnotateLevel,
+    level: AnnotateLevel<'static>,
     id: Option<String>,
     documentation_url: Option<String>,
     message: String,
@@ -235,24 +190,24 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
 
-        let id = if config.hide_severity {
-            // Either the rule code alone (e.g. `F401`), or the lint id with a colon (e.g.
-            // `invalid-syntax:`). When Ruff gets real severities, we should put the colon back in
-            // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve
-            // the formatting of syntax errors for now. This should also be kept consistent with the
+        let use_code = !config.preview || config.prefer_rule_codes;
+        let id = if use_code && let Some(code) = diag.secondary_code() {
+            code.to_string()
+        } else if config.hide_severity {
+            // When Ruff gets real severities, we should put the colon back in
+            // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve the
+            // formatting of human-readable names for now. This should also be kept consistent with the
             // concise formatting.
-            diag.secondary_code().map_or_else(
-                || format!("{id}:", id = diag.inner.id),
-                |code| code.to_string(),
-            )
+            format!("{id}:", id = diag.id())
         } else {
-            diag.inner.id.to_string()
+            diag.id().to_string()
         };
 
+        let level = diag.inner.severity.to_annotate();
         let level = if config.hide_severity {
-            AnnotateLevel::None
+            level.no_name()
         } else {
-            diag.inner.severity.to_annotate()
+            level
         };
 
         ResolvedDiagnostic {
@@ -261,7 +216,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             documentation_url: diag.documentation_url().map(ToString::to_string),
             message: diag.inner.message.as_str().to_string(),
             annotations,
-            is_fixable: config.show_fix_status && diag.has_applicable_fix(config),
+            is_fixable: config.show_fix_status && diag.has_applicable_fix(config.fix_applicability),
             header_offset: diag.inner.header_offset,
         }
     }
@@ -301,7 +256,7 @@ impl<'a> ResolvedDiagnostic<'a> {
     ///
     /// `context` refers to the number of lines both before and after to show
     /// for each snippet.
-    fn to_renderable<'r>(&'r self, context: usize) -> RenderableDiagnostic<'r> {
+    fn to_renderable<'r>(&'r self, config: &DisplayDiagnosticConfig) -> RenderableDiagnostic<'r> {
         let mut ann_by_path: BTreeMap<&'a str, Vec<&ResolvedAnnotation<'a>>> = BTreeMap::new();
         for ann in &self.annotations {
             ann_by_path.entry(ann.path).or_default().push(ann);
@@ -309,6 +264,12 @@ impl<'a> ResolvedDiagnostic<'a> {
         for anns in ann_by_path.values_mut() {
             anns.sort_by_key(|ann1| ann1.range.start());
         }
+
+        // The merge window determines how close two annotations need
+        // to be (in lines) to be rendered inside a single snippet.
+        // This is independent of `context`, which controls how many
+        // extra padding lines appear before and after each snippet.
+        let merge_window = config.merge_window.max(config.context);
 
         let mut snippet_by_path: BTreeMap<&'a str, Vec<Vec<&ResolvedAnnotation<'a>>>> =
             BTreeMap::new();
@@ -322,14 +283,14 @@ impl<'a> ResolvedDiagnostic<'a> {
 
                 let prev_context_ends = context_after(
                     &prev.diagnostic_source.as_source_code(),
-                    context,
+                    merge_window,
                     prev.line_end,
                     prev.notebook_index.as_ref(),
                 )
                 .get();
                 let this_context_begins = context_before(
                     &ann.diagnostic_source.as_source_code(),
-                    context,
+                    merge_window,
                     ann.line_start,
                     ann.notebook_index.as_ref(),
                 )
@@ -381,12 +342,12 @@ impl<'a> ResolvedDiagnostic<'a> {
 
         let mut snippets_by_input = vec![];
         for (path, snippets) in snippet_by_path {
-            snippets_by_input.push(RenderableSnippets::new(context, path, &snippets));
+            snippets_by_input.push(RenderableSnippets::new(config.context, path, &snippets));
         }
         snippets_by_input
             .sort_by(|snips1, snips2| snips1.has_primary.cmp(&snips2.has_primary).reverse());
         RenderableDiagnostic {
-            level: self.level,
+            level: self.level.clone(),
             id: self.id.as_deref(),
             documentation_url: self.documentation_url.as_deref(),
             message: &self.message,
@@ -482,7 +443,7 @@ struct Renderable<'r> {
 #[derive(Debug)]
 struct RenderableDiagnostic<'r> {
     /// The severity of the diagnostic.
-    level: AnnotateLevel,
+    level: AnnotateLevel<'static>,
     /// The ID of the diagnostic. The ID can usually be used on the CLI or in a
     /// config file to change the severity of a lint.
     ///
@@ -510,7 +471,7 @@ struct RenderableDiagnostic<'r> {
 
 impl RenderableDiagnostic<'_> {
     /// Convert this to an "annotate" snippet.
-    fn to_annotate(&self) -> AnnotateMessage<'_> {
+    fn to_annotate(&self) -> AnnotateGroup<'_> {
         let snippets = self.snippets_by_input.iter().flat_map(|snippets| {
             let path = snippets.path;
             snippets
@@ -518,15 +479,18 @@ impl RenderableDiagnostic<'_> {
                 .iter()
                 .map(|snippet| snippet.to_annotate(path))
         });
-        let mut message = self
+        let mut title = self
             .level
-            .title(self.message)
-            .is_fixable(self.is_fixable)
-            .lineno_offset(self.header_offset);
+            .clone()
+            .primary_title(self.message)
+            .is_fixable(self.is_fixable);
         if let Some(id) = self.id {
-            message = message.id_with_url(id, self.documentation_url);
+            title = title.id(id);
+            if let Some(url) = self.documentation_url {
+                title = title.id_url(url);
+            }
         }
-        message.snippets(snippets)
+        title.elements(snippets).lineno_offset(self.header_offset)
     }
 }
 
@@ -703,10 +667,11 @@ impl<'r> RenderableSnippet<'r> {
     }
 
     /// Convert this to an "annotate" snippet.
-    fn to_annotate<'a>(&'a self, path: &'a str) -> AnnotateSnippet<'a> {
-        AnnotateSnippet::source(&self.snippet)
-            .origin(path)
+    fn to_annotate<'a>(&'a self, path: &'a str) -> AnnotateSnippet<'a, AnnotateAnnotation<'a>> {
+        AnnotateSnippet::source(self.snippet.as_ref())
+            .path(path)
             .line_start(self.line_start.get())
+            .fold(false)
             .annotations(
                 self.annotations
                     .iter()
@@ -741,11 +706,12 @@ impl<'r> RenderableAnnotation<'r> {
     /// lifetime parameter here refers to the lifetime of the resolver that
     /// created the given `ResolvedAnnotation`.
     fn new(snippet_start: TextSize, ann: &'_ ResolvedAnnotation<'r>) -> RenderableAnnotation<'r> {
-        // This should only ever saturate if a BOM is present _and_ the annotation range points
-        // before the BOM (i.e. at offset 0). In Ruff this typically results from the use of
-        // `TextRange::default()` for a diagnostic range instead of a range relative to file
-        // contents.
-        let range = ann.range.checked_sub(snippet_start).unwrap_or(ann.range);
+        // An annotation can start at byte zero even when a leading BOM was stripped from the
+        // snippet. Clamp each endpoint separately so the annotation still covers any visible text.
+        let range = TextRange::new(
+            ann.range.start().saturating_sub(snippet_start),
+            ann.range.end().saturating_sub(snippet_start),
+        );
         RenderableAnnotation {
             range,
             message: ann.message,
@@ -756,23 +722,12 @@ impl<'r> RenderableAnnotation<'r> {
 
     /// Convert this to an "annotate" annotation.
     fn to_annotate(&self) -> AnnotateAnnotation<'_> {
-        // This is not really semantically meaningful, but
-        // it does currently result in roughly the message
-        // we want to convey.
-        //
-        // TODO: While this means primary annotations use `^` and
-        // secondary annotations use `-` (which is fine), this does
-        // result in coloring for primary annotations that looks like
-        // an error (red) and coloring for secondary annotations that
-        // looks like a warning (yellow). This is perhaps not quite in
-        // line with what we want, but fixing this probably requires
-        // changes to `ruff_annotate_snippets`, so we punt for now.
-        let level = if self.is_primary {
-            AnnotateLevel::Error
+        let kind = if self.is_primary {
+            AnnotationKind::Primary
         } else {
-            AnnotateLevel::Warning
+            AnnotationKind::Context
         };
-        let mut ann = level.span(self.range.into());
+        let mut ann = kind.span(self.range.into());
         if let Some(message) = self.message {
             ann = ann.label(message);
         }
@@ -1087,92 +1042,13 @@ impl<'r> EscapedSourceCode<'r> {
                 continue;
             }
             let start = range.start();
-            let end = ceil_char_boundary(&self.text, start + TextSize::from(1));
+            let end =
+                TextSize::try_from(self.text.ceil_char_boundary(start.to_usize() + 1)).unwrap();
             ann.range = TextRange::new(start, end);
         }
 
         self
     }
-}
-
-/// Finds the closest [`TextSize`] not less than the offset given for which
-/// `is_char_boundary` is `true`. Unless the offset given is greater than
-/// the length of the underlying contents, in which case, the length of the
-/// contents is returned.
-///
-/// Can be replaced with `str::ceil_char_boundary` once it's stable.
-///
-/// # Examples
-///
-/// From `std`:
-///
-/// ```
-/// use ruff_db::diagnostic::ceil_char_boundary;
-/// use ruff_text_size::{Ranged, TextLen, TextSize};
-///
-/// let source = "❤️🧡💛💚💙💜";
-/// assert_eq!(source.text_len(), TextSize::from(26));
-/// assert!(!source.is_char_boundary(13));
-///
-/// let closest = ceil_char_boundary(source, TextSize::from(13));
-/// assert_eq!(closest, TextSize::from(14));
-/// assert_eq!(&source[..closest.to_usize()], "❤️🧡💛");
-/// ```
-///
-/// Additional examples:
-///
-/// ```
-/// use ruff_db::diagnostic::ceil_char_boundary;
-/// use ruff_text_size::{Ranged, TextRange, TextSize};
-///
-/// let source = "Hello";
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(0)),
-///     TextSize::from(0)
-/// );
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(5)),
-///     TextSize::from(5)
-/// );
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(6)),
-///     TextSize::from(5)
-/// );
-///
-/// let source = "α";
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(0)),
-///     TextSize::from(0)
-/// );
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(1)),
-///     TextSize::from(2)
-/// );
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(2)),
-///     TextSize::from(2)
-/// );
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(3)),
-///     TextSize::from(2)
-/// );
-/// ```
-pub fn ceil_char_boundary(text: &str, offset: TextSize) -> TextSize {
-    let upper_bound = offset
-        .to_u32()
-        .saturating_add(4)
-        .min(text.text_len().to_u32());
-    (offset.to_u32()..upper_bound)
-        .map(TextSize::from)
-        .find(|offset| text.is_char_boundary(offset.to_usize()))
-        .unwrap_or_else(|| TextSize::from(upper_bound))
 }
 
 /// A stub implementation of [`FileResolver`] intended for testing.
@@ -1205,6 +1081,8 @@ mod tests {
 
     use ruff_diagnostics::{Applicability, Edit, Fix};
 
+    #[cfg(feature = "serde")]
+    use crate::diagnostic::RuleMetadata;
     use crate::diagnostic::{
         Annotation, DiagnosticId, IntoDiagnosticMessage, SecondaryCode, Severity, Span,
         SubDiagnosticSeverity,
@@ -1461,7 +1339,6 @@ watermelon
           |
         5 | elephant
           | ^^^^^^^^
-          |
         ",
         );
 
@@ -1495,7 +1372,6 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
-           |
         ",
         );
 
@@ -1552,7 +1428,6 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
-           |
         ",
         );
     }
@@ -1842,7 +1717,6 @@ watermelon
           |
         5 | canary
           | ^^^^^^
-          |
         ",
         );
     }
@@ -2026,7 +1900,6 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
-           |
         ",
         );
 
@@ -2055,7 +1928,6 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
-           |
         warning: sub-diagnostic message
          --> fruits:3:1
           |
@@ -2152,7 +2024,7 @@ watermelon
         4 |   dog
         5 | / elephant
         6 | | finch
-          | |______^
+          | |_____^
         7 |   gorilla
         8 |   hippopotamus
           |
@@ -2244,10 +2116,8 @@ watermelon
           |
         2 |    beetle
         3 |    canary
-        4 |    dog
-          |  __^
-        5 | |  elephant
-          | | _^
+        4 | /  dog
+        5 | |/ elephant
         6 | || finch
           | ||_____^
         7 | |  gorilla
@@ -2273,10 +2143,8 @@ watermelon
           |
         2 |    beetle
         3 |    canary
-        4 |    dog
-          |  __^
-        5 | |  elephant
-          | | _^
+        4 | /  dog
+        5 | |/ elephant
         6 | || finch
           | ||_____^
         7 | |  gorilla
@@ -2304,10 +2172,8 @@ watermelon
           |
         3 |    canary
         4 |    dog
-        5 |    elephant
-          |  __^
-        6 | |  finch
-          | | _^
+        5 | /  elephant
+        6 | |/ finch
         7 | || gorilla
           | ||_______^
           |  |_______|
@@ -2339,13 +2205,11 @@ watermelon
           |
         3 |    canary
         4 |    dog
-        5 |    elephant
-          |   _^
-          |  |_|
+        5 | // elephant
         6 | || finch
           | ||_____^
-        7 |  | gorilla
-          |  |_______^
+        7 | |  gorilla
+          | |________^
         8 |    hippopotamus
         9 |    inchworm
           |
@@ -2367,8 +2231,7 @@ watermelon
           |
         3 |    canary
         4 |    dog
-        5 |    elephant
-          |  __^
+        5 | /  elephant
         6 | |  finch
           | |__^___^
           |   _|
@@ -2422,7 +2285,7 @@ watermelon
         3 | canary
         4 | dog
         5 | elephant
-          |   ----
+          |   ^^^^
           |   |
           |   giant land mammal
           |   but afraid of mice
@@ -2514,7 +2377,6 @@ watermelon
           |
         7 | gorilla
           | ------- secondary 7
-          |
         ",
         );
     }
@@ -2598,9 +2460,75 @@ watermelon
            |
          2 | banana
            | ------ secondary fruits 2
-           |
         ",
         );
+    }
+
+    #[test]
+    fn diagnostic_order_with_missing_locations() {
+        let mut env = TestEnvironment::new();
+        env.add("fruits", FRUITS);
+
+        let fileless = Diagnostic::new(DiagnosticId::Io, Severity::Hint, "Missing directory");
+        let mut whole_file =
+            Diagnostic::new(DiagnosticId::Io, Severity::Warning, "Check this file");
+        whole_file.annotate(Annotation::primary(env.path("fruits")));
+        let at_zero = env.err().primary("fruits", "1:0", "1:0", "").build();
+        let at_one = env.err().primary("fruits", "1:1", "1:1", "").build();
+
+        let mut diagnostics = [&at_one, &whole_file, &at_zero, &fileless];
+        diagnostics.sort_by_key(|diagnostic| diagnostic.rendering_sort_key(&env.db));
+        assert_eq!(diagnostics, [&fileless, &at_zero, &whole_file, &at_one]);
+    }
+
+    #[test]
+    fn diagnostics_with_equal_locations_sort_by_concise_message() {
+        let mut env = TestEnvironment::new();
+        env.add("fruits", FRUITS);
+        let mut diagnostics = [
+            env.invalid_syntax("checking mod.py")
+                .primary("fruits", "1", "1", "")
+                .build(),
+            env.invalid_syntax("checking main.py")
+                .primary("fruits", "1", "1", "")
+                .build(),
+        ];
+
+        diagnostics.sort_by(|left, right| {
+            left.rendering_sort_key(&env.db)
+                .cmp(&right.rendering_sort_key(&env.db))
+        });
+
+        assert_eq!(
+            diagnostics
+                .iter()
+                .map(Diagnostic::headline_message)
+                .collect::<Vec<_>>(),
+            ["checking main.py", "checking mod.py"]
+        );
+    }
+
+    #[derive(Default)]
+    pub(super) enum DiagnosticFormat {
+        #[default]
+        Full,
+        Concise,
+        Grouped,
+        Azure,
+        Github,
+        Pylint,
+        #[cfg(feature = "serde")]
+        Json,
+        #[cfg(feature = "serde")]
+        JsonLines,
+        #[cfg(feature = "serde")]
+        Rdjson,
+        #[cfg(feature = "serde")]
+        Gitlab,
+        #[cfg(feature = "serde")]
+        Sarif,
+        #[cfg(feature = "junit")]
+        Junit,
     }
 
     /// A small harness for setting up an environment specifically for testing
@@ -2608,6 +2536,7 @@ watermelon
     pub(super) struct TestEnvironment {
         db: TestDb,
         config: DisplayDiagnosticConfig,
+        format: DiagnosticFormat,
     }
 
     impl TestEnvironment {
@@ -2615,29 +2544,40 @@ watermelon
         ///
         /// This uses the default diagnostic rendering configuration.
         pub(super) fn new() -> TestEnvironment {
-            TestEnvironment {
+            let mut env = TestEnvironment {
                 db: TestDb::new(),
-                config: DisplayDiagnosticConfig::default(),
-            }
+                config: DisplayDiagnosticConfig::new("ty"),
+                format: DiagnosticFormat::default(),
+            };
+            // Default to a merge window of 0 for testing purposes,
+            // even though this is not the default for user-facing diagnostics.
+            env.merge_window(0);
+            env
         }
 
         /// Set the number of contextual lines to include for each snippet
         /// in diagnostic rendering.
-        fn context(&mut self, lines: usize) {
+        pub(super) fn context(&mut self, lines: usize) {
             // Kind of annoying. I considered making `DisplayDiagnosticConfig`
             // be `Copy` (which it could be, at time of writing, 2025-03-07),
             // but it seems likely to me that it will grow non-`Copy`
             // configuration. So just deal with this inconvenience for now.
-            let mut config = std::mem::take(&mut self.config);
-            config = config.context(lines);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.context(lines);
+        }
+
+        /// Set the "merge window" for annotations and fix diff hunks in this test.
+        ///
+        /// Nearby annotations or fix edits are rendered in a single source frame even when their
+        /// configured context windows would not otherwise overlap.
+        pub(super) fn merge_window(&mut self, lines: usize) {
+            let config = self.config.clone();
+            self.config = config.merge_window(lines);
         }
 
         /// Set the output format to use in diagnostic rendering.
         pub(super) fn format(&mut self, format: DiagnosticFormat) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.format(format);
-            self.config = config;
+            self.format = format;
         }
 
         /// Enable preview functionality for diagnostic rendering.
@@ -2646,37 +2586,26 @@ watermelon
             reason = "This is currently only used for JSON but will be needed soon for other formats"
         )]
         pub(super) fn preview(&mut self, yes: bool) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.preview(yes);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.preview(yes);
         }
 
         /// Hide diagnostic severity when rendering.
         pub(super) fn hide_severity(&mut self, yes: bool) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.hide_severity(yes);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.hide_severity(yes);
         }
 
         /// Show fix availability when rendering.
         pub(super) fn show_fix_status(&mut self, yes: bool) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.with_show_fix_status(yes);
-            self.config = config;
-        }
-
-        /// Show a diff for the fix when rendering.
-        pub(super) fn show_fix_diff(&mut self, yes: bool) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.show_fix_diff(yes);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.with_show_fix_status(yes);
         }
 
         /// The lowest fix applicability to show when rendering.
         pub(super) fn fix_applicability(&mut self, applicability: Applicability) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.with_fix_applicability(applicability);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.with_fix_applicability(applicability);
         }
 
         /// Add a file with the given path and contents to this environment.
@@ -2699,12 +2628,7 @@ watermelon
         /// of the corresponding line minus one. (The "minus one" is because
         /// otherwise, the span will end where the next line begins, and this
         /// confuses `ruff_annotate_snippets` as of 2025-03-13.)
-        pub(super) fn span(
-            &self,
-            path: &str,
-            line_offset_start: &str,
-            line_offset_end: &str,
-        ) -> Span {
+        fn span(&self, path: &str, line_offset_start: &str, line_offset_end: &str) -> Span {
             let span = self.path(path);
 
             let file = span.expect_ty_file();
@@ -2781,7 +2705,7 @@ watermelon
         ///
         /// (This will set the "printed" flag on `Diagnostic`.)
         pub(super) fn render(&self, diag: &Diagnostic) -> String {
-            diag.display(&self.db, &self.config).to_string()
+            self.render_diagnostics(std::slice::from_ref(diag))
         }
 
         /// Render the given diagnostics into a `String`.
@@ -2790,7 +2714,70 @@ watermelon
         ///
         /// (This will set the "printed" flag on `Diagnostic`.)
         pub(super) fn render_diagnostics(&self, diagnostics: &[Diagnostic]) -> String {
-            DisplayDiagnostics::new(&self.db, &self.config, diagnostics).to_string()
+            std::fmt::from_fn(|f| match self.format {
+                DiagnosticFormat::Full => {
+                    FullRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                DiagnosticFormat::Concise => {
+                    ConciseRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                DiagnosticFormat::Grouped => {
+                    GroupedRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                DiagnosticFormat::Azure => {
+                    AzureRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                DiagnosticFormat::Github => {
+                    GithubRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                DiagnosticFormat::Pylint => {
+                    PylintRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                #[cfg(feature = "serde")]
+                DiagnosticFormat::Json => {
+                    JsonRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                #[cfg(feature = "serde")]
+                DiagnosticFormat::JsonLines => {
+                    JsonLinesRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                #[cfg(feature = "serde")]
+                DiagnosticFormat::Rdjson => {
+                    RdjsonRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                #[cfg(feature = "serde")]
+                DiagnosticFormat::Gitlab => {
+                    GitlabRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                #[cfg(feature = "serde")]
+                DiagnosticFormat::Sarif => {
+                    let metadata = diagnostics
+                        .iter()
+                        .filter_map(|diagnostic| diagnostic.id().as_lint())
+                        .map(|name| {
+                            (
+                                name,
+                                RuleMetadata {
+                                    name,
+                                    summary: name.as_str(),
+                                    description: format!("Documentation for `{name}`.").into(),
+                                    help_url: format!("https://ty.dev/rules#{name}"),
+                                    linter: Some("example"),
+                                    default_severity: Some(Severity::Error),
+                                    enabled_by_default: true,
+                                },
+                            )
+                        })
+                        .collect();
+                    SarifRenderer::new(&self.db, &self.config, metadata, "1.0.0")
+                        .render(f, diagnostics)
+                }
+                #[cfg(feature = "junit")]
+                DiagnosticFormat::Junit => {
+                    JunitRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+            })
+            .to_string()
         }
     }
 
@@ -2865,7 +2852,7 @@ watermelon
         }
 
         /// Set the fix on the diagnostic.
-        pub(super) fn fix(mut self, fix: Fix) -> DiagnosticBuilder<'e> {
+        fn fix(mut self, fix: Fix) -> DiagnosticBuilder<'e> {
             self.diag.set_fix(fix);
             self
         }
@@ -2879,6 +2866,16 @@ watermelon
         /// Adds a "help" sub-diagnostic with the given message.
         pub(super) fn help(mut self, message: impl IntoDiagnosticMessage) -> DiagnosticBuilder<'e> {
             self.diag.help(message);
+            self
+        }
+
+        /// Adds a sub-diagnostic constructed with this diagnostic's environment.
+        fn sub(
+            mut self,
+            f: impl Fn(&mut TestEnvironment) -> SubDiagnostic,
+        ) -> DiagnosticBuilder<'e> {
+            let sub = f(self.env);
+            self.diag.sub(sub);
             self
         }
 
@@ -2985,7 +2982,7 @@ def fibonacci(n):
     elif n == 1:
         return 1
     else:
-        return fibonacci(n - 1) + fibonacci(n - 2)
+        return fibonaccii(n - 1) + fibonacci(n - 2)
 "#,
         );
         env.add("undef.py", r"if a == 1: pass");
@@ -3024,6 +3021,26 @@ def fibonacci(n):
                 .noqa_offset(TextSize::from(3))
                 .documentation_url("https://docs.astral.sh/ruff/rules/undefined-name")
                 .build(),
+            env.builder(
+                "undefined-name",
+                Severity::Error,
+                "Undefined name `fibonaccii`",
+            )
+            .primary("fib.py", "12:15", "12:25", "")
+            .secondary_code("F821")
+            .noqa_offset(ruff_text_size::TextSize::from(0))
+            .documentation_url("https://docs.astral.sh/ruff/rules/undefined-name")
+            .secondary("fib.py", "12:35", "12:36", "")
+            .sub(|env| {
+                env.sub_builder(
+                    SubDiagnosticSeverity::Info,
+                    "Did you mean to import it from `/some/path/def.py`?",
+                )
+                .primary("fib.py", "4:4", "4:13", "`fibonacci` is defined here")
+                .secondary("fib.py", "5:4", "5", "`fibonacci` is documented here")
+                .build()
+            })
+            .build(),
         ];
 
         (env, diagnostics)

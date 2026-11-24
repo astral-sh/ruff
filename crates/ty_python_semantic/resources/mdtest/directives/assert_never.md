@@ -8,7 +8,7 @@
 
 ```py
 from typing_extensions import assert_never, Never, Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(never: Never):
     assert_never(never)  # fine
@@ -16,34 +16,137 @@ def _(never: Never):
 
 ### Diagnostics
 
-<!-- snapshot-diagnostics -->
-
 If it is not, a `type-assertion-failure` diagnostic is emitted.
 
 ```py
 from typing_extensions import assert_never, Never, Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _():
-    assert_never(0)  # error: [type-assertion-failure]
+    assert_never(0)  # snapshot: type-assertion-failure
+```
 
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+ --> src/mdtest_snippet.py:5:5
+  |
+5 |     assert_never(0)  # snapshot: type-assertion-failure
+  |     ^^^^^^^^^^^^^-^
+  |                  |
+  |                  Inferred type of argument is `Literal[0]`
+info: `Never` and `Literal[0]` are not equivalent types
+```
+
+```py
 def _():
-    assert_never("")  # error: [type-assertion-failure]
+    assert_never("")  # snapshot: type-assertion-failure
+```
 
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+ --> src/mdtest_snippet.py:7:5
+  |
+7 |     assert_never("")  # snapshot: type-assertion-failure
+  |     ^^^^^^^^^^^^^--^
+  |                  |
+  |                  Inferred type of argument is `Literal[""]`
+info: `Never` and `Literal[""]` are not equivalent types
+```
+
+```py
 def _():
-    assert_never(None)  # error: [type-assertion-failure]
+    assert_never(None)  # snapshot: type-assertion-failure
+```
 
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+ --> src/mdtest_snippet.py:9:5
+  |
+9 |     assert_never(None)  # snapshot: type-assertion-failure
+  |     ^^^^^^^^^^^^^----^
+  |                  |
+  |                  Inferred type of argument is `None`
+info: `Never` and `None` are not equivalent types
+```
+
+```py
 def _():
-    assert_never(())  # error: [type-assertion-failure]
+    assert_never(())  # snapshot: type-assertion-failure
+```
 
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+  --> src/mdtest_snippet.py:11:5
+   |
+11 |     assert_never(())  # snapshot: type-assertion-failure
+   |     ^^^^^^^^^^^^^--^
+   |                  |
+   |                  Inferred type of argument is `tuple[()]`
+info: `Never` and `tuple[()]` are not equivalent types
+```
+
+```py
 def _(flag: bool, never: Never):
-    assert_never(1 if flag else never)  # error: [type-assertion-failure]
+    assert_never(1 if flag else never)  # snapshot: type-assertion-failure
+```
 
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+  --> src/mdtest_snippet.py:13:5
+   |
+13 |     assert_never(1 if flag else never)  # snapshot: type-assertion-failure
+   |     ^^^^^^^^^^^^^--------------------^
+   |                  |
+   |                  Inferred type of argument is `Literal[1]`
+info: `Never` and `Literal[1]` are not equivalent types
+```
+
+```py
 def _(any_: Any):
-    assert_never(any_)  # error: [type-assertion-failure]
+    assert_never(any_)  # snapshot: type-assertion-failure
+```
 
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+  --> src/mdtest_snippet.py:15:5
+   |
+15 |     assert_never(any_)  # snapshot: type-assertion-failure
+   |     ^^^^^^^^^^^^^----^
+   |                  |
+   |                  Inferred type of argument is `Any`
+info: `Never` and `Any` are not equivalent types
+```
+
+```py
 def _(unknown: Unknown):
-    assert_never(unknown)  # error: [type-assertion-failure]
+    assert_never(unknown)  # snapshot: type-assertion-failure
+```
+
+```snapshot
+error[type-assertion-failure]: Argument does not have asserted type `Never`
+  --> src/mdtest_snippet.py:17:5
+   |
+17 |     assert_never(unknown)  # snapshot: type-assertion-failure
+   |     ^^^^^^^^^^^^^-------^
+   |                  |
+   |                  Inferred type of argument is `Unknown`
+info: `Never` and `Unknown` are not equivalent types
+```
+
+### Return type of `assert_never`
+
+The return type of `assert_never` is always `Never`, despite the type of the argument:
+
+```py
+from typing_extensions import Never, assert_never
+
+def _(never: Never):
+    # revealed: Never
+    reveal_type(assert_never(never))
+
+def _():
+    # revealed: Never
+    reveal_type(assert_never(0))  # error: [type-assertion-failure]
 ```
 
 ## Use case: Type narrowing and exhaustiveness checking
@@ -103,6 +206,16 @@ def if_else_singletons_error(obj: Literal[1, "a"] | None):
     else:
         # error: [type-assertion-failure] "Type `Literal["a"]` is not equivalent to `Never`"
         assert_never(obj)
+```
+
+## Match statement exhaustiveness
+
+The final `_ as obj` pattern binds anything not handled by an earlier case. If the earlier cases are
+exhaustive, `obj` is `Never`. In the second example, the misspelled string pattern leaves
+`Literal["a"]` uncovered.
+
+```py
+from typing_extensions import Literal, assert_never
 
 def match_singletons_success(obj: Literal[1, "a"] | None):
     match obj:
@@ -124,10 +237,30 @@ def match_singletons_error(obj: Literal[1, "a"] | None):
         case None:
             pass
         case _ as obj:
-            # TODO: We should emit an error here, but the message should
-            # show the type `Literal["a"]` instead of `@Todo(…)`. We only
-            # assert on the first part of the message because the `@Todo`
-            # message is not available in release mode builds.
-            # error: [type-assertion-failure] "Type `@Todo"
+            # error: [type-assertion-failure] "Type `Literal["a"]` is not equivalent to `Never`"
             assert_never(obj)
+```
+
+## Argument type context
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+The declared parameter type of the value argument to `assert_never` should not be used as type
+context when inferring the value expression. Doing so could influence the type inferred by a nested
+generic call and incorrectly silence the assertion.
+
+```py
+from collections.abc import Iterator
+from typing import Never, assert_never
+
+def _(items: Iterator[Never]):
+    assert_never(next(items))  # ok
+
+def result[T = Never]() -> T:
+    raise NotImplementedError
+
+assert_never(result())  # ok
 ```

@@ -25,8 +25,8 @@ from _typeshed import FileDescriptorOrPath
 from collections.abc import Callable, Generator, Iterable, Sequence
 from re import Pattern
 from token import *
-from typing import Any, Final, NamedTuple, TextIO, type_check_only
-from typing_extensions import TypeAlias, disjoint_base
+from typing import Any, Final, NamedTuple, TextIO, TypeAlias, type_check_only
+from typing_extensions import disjoint_base
 
 if sys.version_info < (3, 12):
     # Avoid double assignment to Final name by imports, which pyright objects to.
@@ -93,6 +93,7 @@ __all__ = [
     "SEMI",
     "SLASH",
     "SLASHEQUAL",
+    "SOFT_KEYWORD",
     "STAR",
     "STAREQUAL",
     "STRING",
@@ -110,9 +111,6 @@ __all__ = [
 ]
 if sys.version_info < (3, 13):
     __all__ += ["ASYNC", "AWAIT"]
-
-if sys.version_info >= (3, 10):
-    __all__ += ["SOFT_KEYWORD"]
 
 if sys.version_info >= (3, 12):
     __all__ += ["EXCLAMATION", "FSTRING_END", "FSTRING_MIDDLE", "FSTRING_START", "EXACT_TOKEN_TYPES"]
@@ -209,7 +207,7 @@ def detect_encoding(readline: Callable[[], bytes | bytearray]) -> tuple[str, Seq
     If no encoding is specified, then the default of 'utf-8' will be returned.
     """
 
-def tokenize(readline: Callable[[], bytes | bytearray]) -> Generator[TokenInfo, None, None]:
+def tokenize(readline: Callable[[], bytes | bytearray]) -> Generator[TokenInfo]:
     """
     The tokenize() generator requires one argument, readline, which
     must be a callable object which provides the same interface as the
@@ -229,7 +227,7 @@ def tokenize(readline: Callable[[], bytes | bytearray]) -> Generator[TokenInfo, 
     which tells you which encoding was used to decode the bytes stream.
     """
 
-def generate_tokens(readline: Callable[[], str]) -> Generator[TokenInfo, None, None]:
+def generate_tokens(readline: Callable[[], str]) -> Generator[TokenInfo]:
     """Tokenize a source reading Python code as unicode strings.
 
     This has the same API as tokenize(), except that it expects the *readline*

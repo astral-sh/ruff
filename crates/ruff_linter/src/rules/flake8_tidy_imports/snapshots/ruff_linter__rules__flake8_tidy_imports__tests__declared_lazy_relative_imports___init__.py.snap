@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
+---
+TID255 Lazy import `helper` is resolved immediately
+ --> __init__.py:7:1
+  |
+5 | from .sub import eager
+6 |
+7 | helper()
+  | ^^^^^^
+8 | func()
+9 | eager()
+  |
+
+TID255 Lazy import `func` is resolved immediately
+ --> __init__.py:8:1
+  |
+7 | helper()
+8 | func()
+  | ^^^^
+9 | eager()
+  |

@@ -1,11 +1,12 @@
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
+use rustc_hash::FxHashSet;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for declared assignments to the same variable multiple times
@@ -34,7 +35,7 @@ use crate::checkers::ast::Checker;
 ///
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Correctness)]
 pub(crate) struct RedeclaredAssignedName {
     name: String,
 }
@@ -48,15 +49,19 @@ impl Violation for RedeclaredAssignedName {
 }
 
 /// PLW0128
-pub(crate) fn redeclared_assigned_name(checker: &Checker, targets: &Vec<Expr>) {
-    let mut names: Vec<Name> = Vec::new();
+pub(crate) fn redeclared_assigned_name(checker: &Checker, targets: &[Expr]) {
+    if matches!(targets, [Expr::Name(_)]) {
+        return;
+    }
+
+    let mut names = FxHashSet::default();
 
     for target in targets {
         check_expr(checker, target, &mut names);
     }
 }
 
-fn check_expr(checker: &Checker, expr: &Expr, names: &mut Vec<Name>) {
+fn check_expr<'a>(checker: &Checker, expr: &'a Expr, names: &mut FxHashSet<&'a str>) {
     match expr {
         Expr::Tuple(tuple) => {
             for target in tuple {
@@ -72,11 +77,7 @@ fn check_expr(checker: &Checker, expr: &Expr, names: &mut Vec<Name>) {
             check_expr(checker, &starred.value, names);
         }
         Expr::Name(ast::ExprName { id, .. }) => {
-            if checker.settings().dummy_variable_rgx.is_match(id) {
-                // Ignore dummy variable assignments
-                return;
-            }
-            if names.contains(id) {
+            if !names.insert(id.as_str()) && !checker.settings().dummy_variable_rgx.is_match(id) {
                 checker.report_diagnostic(
                     RedeclaredAssignedName {
                         name: id.to_string(),
@@ -84,7 +85,6 @@ fn check_expr(checker: &Checker, expr: &Expr, names: &mut Vec<Name>) {
                     expr.range(),
                 );
             }
-            names.push(id.clone());
         }
         _ => {}
     }

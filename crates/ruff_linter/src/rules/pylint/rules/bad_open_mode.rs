@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Check for an invalid `mode` argument in `open` calls.
@@ -37,7 +38,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Correctness)]
 pub(crate) struct BadOpenMode {
     mode: String,
 }
@@ -99,11 +100,9 @@ fn is_open(func: &Expr, semantic: &SemanticModel) -> Option<Kind> {
     let ast::ExprCall {
         func: value_func, ..
     } = value.as_call_expr()?;
-    let qualified_name = semantic.resolve_qualified_name(value_func)?;
-    match qualified_name.segments() {
-        ["pathlib", "Path"] => Some(Kind::Pathlib),
-        _ => None,
-    }
+    semantic
+        .matches_qualified_name(value_func, &["pathlib", "Path"])
+        .then_some(Kind::Pathlib)
 }
 
 /// Returns the mode argument, if present.

@@ -1,7 +1,18 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["tqdm"]
+#
+# [tool.uv]
+# no-build = true
+# exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
+# ///
+
 """This is @konstin's scripts for checking an entire checkout of ~2.1k packages for
 panics, fix errors and similar problems.
 
-It's a less elaborate, more hacky version of check_ecosystem.py
+It's a less elaborate, more hacky ecosystem checker.
 """
 
 from __future__ import annotations
@@ -63,6 +74,7 @@ def main() -> None:
                 cwd=project_dir,
                 capture_output=True,
                 text=True,
+                check=False,
             )
         except CalledProcessError as e:
             tqdm.write(f"Ruff failed on {project_dir}: {e}")

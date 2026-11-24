@@ -26,14 +26,11 @@ impl Printer {
         }
 
         match self.verbosity {
-            VerbosityLevel::Silent => ProgressDrawTarget::hidden(),
-            VerbosityLevel::Quiet => ProgressDrawTarget::hidden(),
-            VerbosityLevel::Default => ProgressDrawTarget::stderr(),
-            // Hide the progress bar when in verbose mode.
-            // Otherwise, it gets interleaved with log messages.
-            VerbosityLevel::Verbose => ProgressDrawTarget::hidden(),
-            VerbosityLevel::ExtraVerbose => ProgressDrawTarget::hidden(),
-            VerbosityLevel::Trace => ProgressDrawTarget::hidden(),
+            VerbosityLevel::Silent | VerbosityLevel::Quiet => ProgressDrawTarget::hidden(),
+            VerbosityLevel::Default
+            | VerbosityLevel::Verbose
+            | VerbosityLevel::ExtraVerbose
+            | VerbosityLevel::Trace => ProgressDrawTarget::stderr(),
         }
     }
 
@@ -147,10 +144,11 @@ impl Stdout {
         self
     }
 
-    fn handle(&mut self) -> Box<dyn std::io::Write + '_> {
+    #[inline]
+    fn with_handle<T>(&mut self, callback: impl FnOnce(&mut dyn std::io::Write) -> T) -> T {
         match self.lock.as_mut() {
-            Some(lock) => Box::new(lock),
-            None => Box::new(std::io::stdout()),
+            Some(lock) => callback(lock),
+            None => callback(&mut std::io::stdout()),
         }
     }
 
@@ -159,13 +157,17 @@ impl Stdout {
     }
 }
 
-impl std::fmt::Write for Stdout {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+impl std::io::Write for Stdout {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         match self.status {
-            StreamStatus::Enabled => {
-                let _ = write!(self.handle(), "{s}");
-                Ok(())
-            }
+            StreamStatus::Enabled => self.with_handle(|handle| handle.write(buf)),
+            StreamStatus::Disabled => Ok(buf.len()),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self.status {
+            StreamStatus::Enabled => self.with_handle(|handle| handle.flush()),
             StreamStatus::Disabled => Ok(()),
         }
     }

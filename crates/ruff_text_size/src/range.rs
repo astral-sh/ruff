@@ -294,7 +294,7 @@ impl TextRange {
     /// The unchecked version (`Sub::sub`) will _always_ panic on overflow,
     /// in contrast to primitive integers, which check in debug mode only.
     #[inline]
-    pub fn checked_sub(self, offset: TextSize) -> Option<TextRange> {
+    fn checked_sub(self, offset: TextSize) -> Option<TextRange> {
         Some(TextRange {
             start: self.start.checked_sub(offset)?,
             end: self.end.checked_sub(offset)?,
@@ -343,6 +343,52 @@ impl TextRange {
         } else {
             Ordering::Equal
         }
+    }
+
+    /// Returns a new range with the start offset set to the
+    /// value given and the end offset unchanged from this
+    /// range.
+    ///
+    /// ## Panics
+    ///
+    /// When `offset > self.end()`.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use ruff_text_size::{Ranged, TextRange, TextSize};
+    ///
+    /// let range = TextRange::new(TextSize::from(5), TextSize::from(10));
+    /// let new = range.with_start(TextSize::from(8));
+    /// assert_eq!(new, TextRange::new(TextSize::from(8), TextSize::from(10)));
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn with_start(&self, offset: TextSize) -> TextRange {
+        TextRange::new(offset, self.end())
+    }
+
+    /// Returns a new range with the end offset set to the
+    /// value given and the start offset unchanged from this
+    /// range.
+    ///
+    /// ## Panics
+    ///
+    /// When `offset < self.start()`.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use ruff_text_size::{Ranged, TextRange, TextSize};
+    ///
+    /// let range = TextRange::new(TextSize::from(5), TextSize::from(10));
+    /// let new = range.with_end(TextSize::from(8));
+    /// assert_eq!(new, TextRange::new(TextSize::from(5), TextSize::from(8)));
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn with_end(&self, offset: TextSize) -> TextRange {
+        TextRange::new(self.start(), offset)
     }
 
     /// Subtracts an offset from the start position.

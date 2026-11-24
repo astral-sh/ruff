@@ -1,6 +1,9 @@
-use super::options::DiagnosticMode;
+use ruff_db::diagnostic::Diagnostic;
+use ruff_db::system::SystemPathBuf;
 use ty_ide::{CompletionSettings, InlayHintSettings};
-use ty_project::metadata::options::ProjectOptionsOverrides;
+use ty_project::metadata::Options;
+
+use super::options::DiagnosticMode;
 
 /// Resolved client settings that are shared across all workspaces.
 #[derive(Clone, Default, Debug, PartialEq)]
@@ -15,8 +18,15 @@ impl GlobalSettings {
         self.diagnostic_mode
     }
 
-    pub(crate) fn show_syntax_errors(&self) -> bool {
-        self.show_syntax_errors
+    /// Whether a diagnostic should be included in result IDs and LSP output.
+    pub(crate) fn should_show_diagnostic(&self, diagnostic: &Diagnostic) -> bool {
+        let Self {
+            diagnostic_mode: _,
+            experimental: ExperimentalSettings {},
+            show_syntax_errors,
+        } = self;
+
+        *show_syntax_errors || !diagnostic.is_invalid_syntax()
     }
 }
 
@@ -32,7 +42,9 @@ pub(crate) struct WorkspaceSettings {
     pub(super) disable_language_services: bool,
     pub(super) inlay_hints: InlayHintSettings,
     pub(super) completions: CompletionSettings,
-    pub(super) overrides: Option<ProjectOptionsOverrides>,
+    pub(super) configuration_file: Option<SystemPathBuf>,
+    pub(super) override_options: Option<Box<Options>>,
+    pub(super) fallback_options: Option<Box<Options>>,
 }
 
 impl WorkspaceSettings {
@@ -40,8 +52,16 @@ impl WorkspaceSettings {
         self.disable_language_services
     }
 
-    pub(crate) fn project_options_overrides(&self) -> Option<&ProjectOptionsOverrides> {
-        self.overrides.as_ref()
+    pub(crate) fn configuration_file(&self) -> Option<&SystemPathBuf> {
+        self.configuration_file.as_ref()
+    }
+
+    pub(crate) fn override_options(&self) -> Option<&Options> {
+        self.override_options.as_deref()
+    }
+
+    pub(crate) fn fallback_options(&self) -> Option<&Options> {
+        self.fallback_options.as_deref()
     }
 
     pub(crate) fn inlay_hints(&self) -> &InlayHintSettings {

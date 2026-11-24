@@ -10,7 +10,7 @@ impl EnvVars {
     ///
     /// For example:
     ///
-    /// - `TY_LOG=uv=debug` is the equivalent of `-vv` to the command line
+    /// - `TY_LOG=ty=debug` is the equivalent of `-vv` to the command line
     /// - `TY_LOG=trace` will enable all trace-level logging.
     ///
     /// See the [tracing documentation](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#example-syntax)
@@ -27,10 +27,17 @@ impl EnvVars {
     /// Accepted values:
     ///
     /// * `short` - Display short memory report
-    /// * `mypy_primer` - Display `mypy_primer` format and suppress workspace diagnostics
     /// * `full` - Display full memory report
+    /// * `json` - Display machine-readable JSON format and suppress workspace diagnostics
     #[attr_hidden]
     pub const TY_MEMORY_REPORT: &'static str = "TY_MEMORY_REPORT";
+
+    /// Perturbs constraint-set variable ordering to help detect order-dependent inference.
+    ///
+    /// Set to `reverse` to reverse builder-local IDs, or to an integer to select an arbitrary
+    /// permutation of the naturally chosen variable ordering.
+    #[attr_hidden]
+    pub const TY_CONSTRAINT_SET_ORDER: &'static str = "TY_CONSTRAINT_SET_ORDER";
 
     /// Specifies an upper limit for the number of tasks ty is allowed to run in parallel.
     ///
@@ -47,6 +54,32 @@ impl EnvVars {
     /// Equivalent to the `--config-file` command-line argument.
     pub const TY_CONFIG_FILE: &'static str = "TY_CONFIG_FILE";
 
+    /// The format to use for printing diagnostic messages.
+    ///
+    /// When set, ty will use this format for output instead of the default.
+    ///
+    /// Accepts the same values as the `--output-format` command-line argument.
+    pub const TY_OUTPUT_FORMAT: &'static str = "TY_OUTPUT_FORMAT";
+
+    /// Enable and configure uv integration.
+    ///
+    /// When set to `scripts`, ty uses [uv](https://docs.astral.sh/uv/) to create and update a
+    /// Python environment for each script with [inline metadata](https://peps.python.org/pep-0723/).
+    ///
+    /// When set to `1` or `true`, ty also uses uv to discover the workspace root and its Python
+    /// environment.
+    ///
+    /// Set to `off` to disable all uv integration, even when `project-manager.project` or
+    /// `project-manager.script` is set to `"uv"`. An explicit `TY_UV` takes precedence over ty
+    /// configuration.
+    pub const TY_UV: &'static str = "TY_UV";
+
+    /// The path to the uv executable to use for workspace discovery and script environments.
+    ///
+    /// ty uses this path when uv integration is enabled.
+    #[attr_hidden]
+    pub const UV: &'static str = "UV";
+
     /// Used to detect an activated virtual environment.
     pub const VIRTUAL_ENV: &'static str = "VIRTUAL_ENV";
 
@@ -59,26 +92,50 @@ impl EnvVars {
     /// Used to determine the name of the active Conda environment.
     pub const CONDA_DEFAULT_ENV: &'static str = "CONDA_DEFAULT_ENV";
 
-    /// Used to detect the path of an active Conda environment.
-    /// If both `VIRTUAL_ENV` and `CONDA_PREFIX` are present, `VIRTUAL_ENV` will be preferred.
+    /// The path to the active Conda or Pixi environment. If it contains no Python interpreter,
+    /// ty continues searching, including in the project's `.venv`.
+    /// A non-empty `VIRTUAL_ENV` takes precedence.
     pub const CONDA_PREFIX: &'static str = "CONDA_PREFIX";
 
     /// Used to determine the root install path of Conda.
     pub const CONDA_ROOT: &'static str = "_CONDA_ROOT";
 
-    /// Filter which tests to run in mdtest.
-    ///
-    /// Only tests whose names contain this filter string will be executed.
-    #[attr_hidden]
-    pub const MDTEST_TEST_FILTER: &'static str = "MDTEST_TEST_FILTER";
-
-    /// Switch mdtest output format to GitHub Actions annotations.
-    ///
-    /// If set (to any value), mdtest will output errors in GitHub Actions format.
-    #[attr_hidden]
-    pub const MDTEST_GITHUB_ANNOTATIONS_FORMAT: &'static str = "MDTEST_GITHUB_ANNOTATIONS_FORMAT";
-
     // Externally defined environment variables
+
+    /// Controls color in `ty check` diagnostics when stdout is a terminal.
+    ///
+    /// Setting this to `0` disables color. Any other non-empty value enables color, even if
+    /// `TERM=dumb`. An empty value has the same effect as leaving the variable unset.
+    ///
+    /// An explicit `--color=always` or `--color=never` takes precedence, as does a non-empty
+    /// `NO_COLOR`, `FORCE_COLOR`, or `CLICOLOR_FORCE` environment variable.
+    pub const CLICOLOR: &'static str = "CLICOLOR";
+
+    /// Alias for [`FORCE_COLOR`](#force_color).
+    pub const CLICOLOR_FORCE: &'static str = "CLICOLOR_FORCE";
+
+    /// Controls color in `ty check` diagnostics, including when piped.
+    ///
+    /// Setting this to any non-empty value (including `0`) forces color. An empty value has the
+    /// same effect as leaving the variable unset. All of the following have higher precedence:
+    /// setting the `NO_COLOR` environment variable to a non-empty value, passing `--color=always`,
+    /// or passing `--color=never`.
+    pub const FORCE_COLOR: &'static str = "FORCE_COLOR";
+
+    /// Controls color in `ty check` diagnostics, including when piped.
+    ///
+    /// Setting this to any non-empty value (including `0`) disables color in diagnostics.
+    /// Setting it to an empty value causes ty to defer to other environment variables and heuristics
+    /// such as whether stdout is a tty.
+    ///
+    /// Passing `--color always` or `--color never` takes precedence over this environment variable.
+    pub const NO_COLOR: &'static str = "NO_COLOR";
+
+    /// In automatic mode, `ty check` uses color when stdout is a terminal unless `TERM` is
+    /// exactly `dumb`. An empty or unset `TERM` allows color on a terminal. An explicit
+    /// `--color=always` or `--color=never` takes precedence, as does a non-empty `NO_COLOR`,
+    /// `FORCE_COLOR`, `CLICOLOR_FORCE`, or `CLICOLOR` environment variable.
+    pub const TERM: &'static str = "TERM";
 
     /// Specifies an upper limit for the number of threads ty uses when performing work in parallel.
     /// Equivalent to `TY_MAX_PARALLELISM`.

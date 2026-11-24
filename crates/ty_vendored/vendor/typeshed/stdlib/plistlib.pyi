@@ -2,7 +2,7 @@
 
 The property list (.plist) file format is a simple XML pickle supporting
 basic object types, like dictionaries, lists, numbers and strings.
-Usually the top level object is a dictionary.
+Usually the top level object is a dictionary or a frozen dictionary.
 
 To write out a plist file, use the dump(value, file)
 function. 'value' is the top level object, 'file' is
@@ -21,7 +21,7 @@ datetime.datetime objects.
 
 Generate Plist example:
 
-    import datetime
+    import datetime as dt
     import plistlib
 
     pl = dict(
@@ -37,7 +37,7 @@ Generate Plist example:
         ),
         someData = b"<binary gunk>",
         someMoreData = b"<lots of binary gunk>" * 10,
-        aDate = datetime.datetime.now()
+        aDate = dt.datetime.now()
     )
     print(plistlib.dumps(pl).decode())
 

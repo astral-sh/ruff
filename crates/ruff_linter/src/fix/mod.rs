@@ -62,10 +62,13 @@ fn apply_fixes<'a>(
     let mut fixed = FixTable::default();
     let mut source_map = SourceMap::default();
 
-    for (code, name, fix) in diagnostics
-        .filter_map(|msg| msg.secondary_code().map(|code| (code, msg.name(), msg)))
-        .filter_map(|(code, name, diagnostic)| diagnostic.fix().map(|fix| (code, name, fix)))
-        .sorted_by(|(_, name1, fix1), (_, name2, fix2)| cmp_fix(name1, name2, fix1, fix2))
+    for (id, code, fix) in diagnostics
+        .filter_map(|diagnostic| {
+            diagnostic
+                .fix()
+                .map(|fix| (diagnostic.id(), diagnostic.secondary_code(), fix))
+        })
+        .sorted_by(|(id1, _, fix1), (id2, _, fix2)| cmp_fix(id1.as_str(), id2.as_str(), fix1, fix2))
     {
         let mut edits = fix
             .edits()
@@ -110,7 +113,7 @@ fn apply_fixes<'a>(
         }
 
         applied.extend(applied_edits.drain(..));
-        *fixed.entry(code).or_default(name) += 1;
+        *fixed.entry(id).or_default(code) += 1;
     }
 
     // Add the remaining content.
@@ -145,17 +148,19 @@ fn cmp_fix(name1: &str, name2: &str, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
     // Break ties in the event of overlapping rules, for some specific combinations.
     .then_with(|| {
         let rules = (name1, name2);
-        // Apply `MissingTrailingPeriod` fixes before `NewLineAfterLastParagraph` fixes.
-        let missing_trailing_period = Rule::MissingTrailingPeriod.name().as_str();
-        let newline_after_last_paragraph = Rule::NewLineAfterLastParagraph.name().as_str();
+        // Apply `D400` fixes before `D209` fixes.
+        let summary_period = Rule::DocstringSummaryWithoutPeriod.name().as_str();
+        let missing_newline_after_last_paragraph = Rule::MissingNewlineAfterLastDocstringParagraph
+            .name()
+            .as_str();
         let if_else_instead_of_dict_get = Rule::IfElseBlockInsteadOfDictGet.name().as_str();
-        let if_else_instead_of_if_exp = Rule::IfElseBlockInsteadOfIfExp.name().as_str();
-        if rules == (missing_trailing_period, newline_after_last_paragraph) {
+        let if_else_instead_of_if_exp = Rule::IfElseAssignmentToSameVariable.name().as_str();
+        if rules == (summary_period, missing_newline_after_last_paragraph) {
             std::cmp::Ordering::Less
-        } else if rules == (newline_after_last_paragraph, missing_trailing_period) {
+        } else if rules == (missing_newline_after_last_paragraph, summary_period) {
             std::cmp::Ordering::Greater
         }
-        // Apply `IfElseBlockInsteadOfDictGet` fixes before `IfElseBlockInsteadOfIfExp` fixes.
+        // Apply `IfElseBlockInsteadOfDictGet` fixes before `IfElseAssignmentToSameVariable` fixes.
         else if rules == (if_else_instead_of_dict_get, if_else_instead_of_if_exp) {
             std::cmp::Ordering::Less
         } else if rules == (if_else_instead_of_if_exp, if_else_instead_of_dict_get) {

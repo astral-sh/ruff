@@ -45,7 +45,7 @@
       ]
     },
     "dummy-variable-rgx": {
-      "description": "A regular expression used to identify \"dummy\" variables, or those which\nshould be ignored when enforcing (e.g.) unused-variable rules. The\ndefault expression matches `_`, `__`, and `_var`, but not `_var_`.",
+      "description": "A regular expression used to identify \"dummy\" variables, or those which\nshould be ignored when enforcing (e.g.) unused-variable rules. The\ndefault expression matches `_`, `__`, `_var`, and `_次`, but not `_var_`\nor `_次_`.",
       "type": [
         "string",
         "null"
@@ -99,7 +99,7 @@
       }
     },
     "extend-ignore": {
-      "description": "A list of rule codes or prefixes to ignore, in addition to those\nspecified by `ignore`.",
+      "description": "A list of rule codes or prefixes to ignore, in addition to those\nspecified by `ignore`.\n\nThis option is deprecated because it is now interchangeable with\n[`ignore`](#lint_ignore). In earlier versions of Ruff, `ignore` would\n_replace_ the set of ignored rules when using configuration inheritance\n(via the top-level [`extend`](https://docs.astral.sh/ruff/settings/#extend)\nsetting), while `extend-ignore` would _add_ to the inherited set. Ruff\nnow merges both `ignore` and `extend-ignore` into a single set, so the\ndistinction no longer applies. Use [`ignore`](#lint_ignore) instead.",
       "type": [
         "array",
         "null"
@@ -145,7 +145,7 @@
       }
     },
     "extend-select": {
-      "description": "A list of rule codes or prefixes to enable, in addition to those\nspecified by [`select`](#lint_select).",
+      "description": "A list of rule codes or prefixes to enable, in addition to those\nspecified by [`select`](#lint_select).\n\nUnlike [`select`](#lint_select), which _replaces_ the default rule set\nwhen specified, `extend-select` _adds_ to whatever rules are already\nactive. This makes `extend-select` the preferred option when you want\nto enable additional rules on top of the defaults without having to\nenumerate them.\n\nFor example, to enable the defaults plus flake8-bugbear:\n\n```toml\n[tool.ruff.lint]\n# Adds flake8-bugbear on top of the default rules.\nextend-select = [\"B\"]\n```\n\nUsing `select = [\"B\"]` instead would _replace_ the defaults, enabling\nonly flake8-bugbear.",
       "type": [
         "array",
         "null"
@@ -175,6 +175,16 @@
       "deprecated": true,
       "items": {
         "$ref": "#/definitions/RuleSelector"
+      }
+    },
+    "extension": {
+      "description": "A mapping of custom file extensions to known file types (overridden\nby the `--extension` command-line flag).\n\nSupported file types include `python`, `pyi`, `ipynb`, and `markdown`.\n\nAny file extensions listed here will be automatically added to the\ndefault `include` list as a `*.{ext}` glob, so that they are linted\nand formatted without needing any additional configuration settings.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "$ref": "#/definitions/Language"
       }
     },
     "external": {
@@ -436,7 +446,7 @@
       ]
     },
     "ignore": {
-      "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the same\nprefix appears in both.",
+      "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the same\nprefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
       "type": [
         "array",
         "null"
@@ -455,7 +465,7 @@
       "deprecated": true
     },
     "include": {
-      "description": "A list of file patterns to include when linting.\n\nInclusion are based on globs, and should be single-path patterns, like\n`*.pyw`, to include any file with the `.pyw` extension. `pyproject.toml` is\nincluded here not for configuration but because we lint whether e.g. the\n`[project]` matches the schema.\n\nNotebook files (`.ipynb` extension) are included by default on Ruff 0.6.0+.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+      "description": "A list of file patterns to include when linting.\n\nInclusion are based on globs, and should be single-path patterns, like\n`*.pyw`, to include any file with the `.pyw` extension.\n`pyproject.toml`, `ruff.toml`, and `.ruff.toml` are included here not for\nconfiguration but because we lint whether e.g. the `[project]` matches\nthe schema in `pyproject.toml` or that rule names are used as selectors.\n\nNotebook files (`.ipynb` extension) are included by default on Ruff 0.6.0+.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
         "array",
         "null"
@@ -488,7 +498,7 @@
       "deprecated": true
     },
     "line-length": {
-      "description": "The line length to use when enforcing long-lines violations (like `E501`)\nand at which `isort` and the formatter prefers to wrap lines.\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis.\nFor these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nThe value must be greater than `0` and less than or equal to `320`.\n\nNote: While the formatter will attempt to format lines such that they remain\nwithin the `line-length`, it isn't a hard upper bound, and formatted lines may\nexceed the `line-length`.\n\nSee [`pycodestyle.max-line-length`](#lint_pycodestyle_max-line-length) to configure different lengths for `E501` and the formatter.",
+      "description": "The line length to use when enforcing long-lines violations (like `E501`)\nand at which `isort` and the formatter prefers to wrap lines.\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis.\nFor these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nThe value must be greater than `0`.\n\nNote: While the formatter will attempt to format lines such that they remain\nwithin the `line-length`, it isn't a hard upper bound, and formatted lines may\nexceed the `line-length`.\n\nSee [`pycodestyle.max-line-length`](#lint_pycodestyle_max-line-length) to configure different lengths for `E501` and the formatter.",
       "anyOf": [
         {
           "$ref": "#/definitions/LineLength"
@@ -552,6 +562,13 @@
         }
       ]
     },
+    "output-prefer-rule-codes": {
+      "description": "Whether to prefer rule codes over human-readable rule names in diagnostic output, even\nwhen preview mode is enabled.\n\nDiagnostics without rule codes, such as syntax errors and formatting diagnostics, will\ncontinue to use the human-readable name, but those corresponding to lint rules will use the\nrule's code. For example, the concise diagnostic for an unused import will use the code\n`F401` instead of the name `unused-import`:\n\n```console\n$ ruff check --preview --config 'output-prefer-rule-codes = true' --output-format=concise example.py\nexample.py:1:8: F401 [*] `math` imported but unused\n$ ruff check --preview --config 'output-prefer-rule-codes = false' --output-format=concise example.py\nexample.py:1:8: unused-import: [*] `math` imported but unused\n```",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "pep8-naming": {
       "description": "Options for the `pep8-naming` plugin.",
       "anyOf": [
@@ -565,7 +582,7 @@
       "deprecated": true
     },
     "per-file-ignores": {
-      "description": "A list of mappings from file pattern to rule codes or prefixes to\nexclude, when considering any matching files. An initial '!' negates\nthe file pattern.",
+      "description": "A list of mappings from file pattern to rule codes or prefixes to\nexclude, when considering any matching files. An initial '!' negates\nthe file pattern.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
         "object",
         "null"
@@ -674,7 +691,7 @@
       ]
     },
     "select": {
-      "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.",
+      "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
       "type": [
         "array",
         "null"
@@ -702,7 +719,7 @@
       }
     },
     "target-version": {
-      "description": "The minimum Python version to target, e.g., when considering automatic\ncode upgrades, like rewriting type annotations. Ruff will not propose\nchanges using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.11 or ==3.11\nspecify `target-version = \"py311\"`.\n\nIf you're already using a `pyproject.toml` file, we recommend\n`project.requires-python` instead, as it's based on Python packaging\nstandards, and will be respected by other tools. For example, Ruff\ntreats the following as identical to `target-version = \"py38\"`:\n\n```toml\n[project]\nrequires-python = \">=3.8\"\n```\n\nIf both are specified, `target-version` takes precedence over\n`requires-python`. See [_Inferring the Python version_](https://docs.astral.sh/ruff/configuration/#inferring-the-python-version)\nfor a complete description of how the `target-version` is determined\nwhen left unspecified.\n\nNote that a stub file can [sometimes make use of a typing feature](https://typing.python.org/en/latest/spec/distributing.html#syntax)\nbefore it is available at runtime, as long as the stub does not make\nuse of new *syntax*. For example, a type checker will understand\n`int | str` in a stub as being a `Union` type annotation, even if the\ntype checker is run using Python 3.9, despite the fact that the `|`\noperator can only be used to create union types at runtime on Python\n3.10+. As such, Ruff will often recommend newer features in a stub\nfile than it would for an equivalent runtime file with the same target\nversion.",
+      "description": "The minimum Python version to target, e.g., when considering automatic\ncode upgrades, like rewriting type annotations. Ruff will not propose\nchanges using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.12 or ==3.12\nspecify `target-version = \"py312\"`.\n\nIf you're already using a `pyproject.toml` file, we recommend\n`project.requires-python` instead, as it's based on Python packaging\nstandards, and will be respected by other tools. For example, Ruff\ntreats the following as identical to `target-version = \"py38\"`:\n\n```toml\n[project]\nrequires-python = \">=3.8\"\n```\n\nIf both are specified, `target-version` takes precedence over\n`requires-python`. See [_Inferring the Python version_](https://docs.astral.sh/ruff/configuration/#inferring-the-python-version)\nfor a complete description of how the `target-version` is determined\nwhen left unspecified.\n\nNote that a stub file can [sometimes make use of a typing feature](https://typing.python.org/en/latest/spec/distributing.html#syntax)\nbefore it is available at runtime, as long as the stub does not make\nuse of new *syntax*. For example, a type checker will understand\n`int | str` in a stub as being a `Union` type annotation, even if the\ntype checker is run using Python 3.9, despite the fact that the `|`\noperator can only be used to create union types at runtime on Python\n3.10+. As such, Ruff will often recommend newer features in a stub\nfile than it would for an equivalent runtime file with the same target\nversion.",
       "anyOf": [
         {
           "$ref": "#/definitions/PythonVersion"
@@ -757,6 +774,30 @@
   "definitions": {
     "Alias": {
       "type": "string"
+    },
+    "AllImports": {
+      "type": "string",
+      "enum": [
+        "all"
+      ]
+    },
+    "AllowedFloatValue": {
+      "type": "number",
+      "format": "double"
+    },
+    "AllowedValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer",
+          "format": "int64"
+        },
+        {
+          "$ref": "#/definitions/AllowedFloatValue"
+        }
+      ]
     },
     "AnalyzeOptions": {
       "description": "Configures Ruff's `analyze` command.",
@@ -828,6 +869,22 @@
         }
       },
       "additionalProperties": false
+    },
+    "AnnotationSemanticsSelection": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/RuntimeSemantics"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "ApiBan": {
       "type": "object",
@@ -1025,7 +1082,7 @@
       "type": "object",
       "properties": {
         "extend-immutable-calls": {
-          "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., the\n`function-call-in-default-argument` rule (`B008`) or `function-call-in-dataclass-defaults`\nrule (`RUF009`).\n\nExpects to receive a list of fully-qualified names (e.g., `fastapi.Query`, rather than\n`Query`).",
+          "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., the\n`function-call-in-parameter-default` rule (`B008`) or `function-call-in-dataclass-field-default`\nrule (`RUF009`).\n\nExpects to receive a list of fully-qualified names (e.g., `fastapi.Query`, rather than\n`Query`).",
           "type": [
             "array",
             "null"
@@ -1172,7 +1229,7 @@
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/Name"
           }
         },
         "function-names": {
@@ -1182,7 +1239,7 @@
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/Name"
           }
         }
       },
@@ -1238,7 +1295,7 @@
           "uniqueItems": true
         },
         "extend-aliases": {
-          "description": "A mapping from module to conventional import alias. These aliases will\nbe added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.",
+          "description": "A mapping from module to conventional import alias. These aliases will\nbe added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping\nand will override any existing `aliases` if the two settings overlap.",
           "type": [
             "object",
             "null"
@@ -1402,7 +1459,7 @@
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/Name"
           }
         },
         "ignore-names": {
@@ -1412,7 +1469,7 @@
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/Name"
           }
         }
       },
@@ -1422,6 +1479,17 @@
       "description": "Options for the `flake8-tidy-imports` plugin",
       "type": "object",
       "properties": {
+        "ban-lazy": {
+          "description": "Specific modules that may not be imported lazily, or `\"all\"` to forbid lazy imports except\nfor any modules excluded from the selector. This rule is only enforced when targeting\nPython 3.15 or newer.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImportSelector"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "ban-relative-imports": {
           "description": "Whether to ban all relative imports (`\"all\"`), or only those imports\nthat extend into the parent module or beyond (`\"parents\"`).",
           "anyOf": [
@@ -1434,7 +1502,7 @@
           ]
         },
         "banned-api": {
-          "description": "Specific modules or module members that may not be imported or accessed.\nNote that this rule is only meant to flag accidental uses,\nand can be circumvented via `eval` or `importlib`.",
+          "description": "Specific modules or module members that may not be imported or accessed.\nThese can be extended by the\n[`extend-banned-api`](#lint_flake8-tidy-imports_extend-banned-api) option.\n\nNote that this rule is only meant to flag accidental uses,\nand can be circumvented via `eval` or `importlib`.",
           "type": [
             "object",
             "null"
@@ -1452,6 +1520,27 @@
           "items": {
             "type": "string"
           }
+        },
+        "extend-banned-api": {
+          "description": "Additional modules or module members that may not be imported or accessed.\nThese entries will be added to the\n[`banned-api`](#lint_flake8-tidy-imports_banned-api) mapping and will override\nany existing entries if the two settings overlap.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/definitions/ApiBan"
+          }
+        },
+        "require-lazy": {
+          "description": "Specific modules that must be imported lazily in contexts where `lazy import` is legal, or\n`\"all\"` to require every lazily-convertible import to use the `lazy` keyword. Ruff ignores\ncontexts where `lazy import` is invalid, such as functions, classes, `try`/`except`\nblocks, `__future__` imports, and `from ... import *` statements. This rule is only\nenforced when targeting Python 3.15 or newer.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImportSelector"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -1478,24 +1567,26 @@
           ]
         },
         "runtime-evaluated-base-classes": {
-          "description": "Exempt classes that list any of the enumerated classes as a base class\nfrom needing to be moved into type-checking blocks.\n\nCommon examples include Pydantic's `pydantic.BaseModel` and SQLAlchemy's\n`sqlalchemy.orm.DeclarativeBase`, but can also support user-defined\nclasses that inherit from those base classes. For example, if you define\na common `DeclarativeBase` subclass that's used throughout your project\n(e.g., `class Base(DeclarativeBase) ...` in `base.py`), you can add it to\nthis list (`runtime-evaluated-base-classes = [\"base.Base\"]`) to exempt\nmodels from being moved into type-checking blocks.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
+          "description": "Exempt classes that list any of the enumerated classes as a base class\nfrom needing to be moved into type-checking blocks.\n\nThis can either be configured as a list, if all entries share the same\nruntime semantics of being runtime required. Or a table where each entry\nis assigned to its desired runtime semantics.\n\nA common example for `\"runtime\"` required semantics is Pydantic's `pydantic.BaseModel`\nbut can also support user-defined classes that inherit from those base classes.\nFor example, if you define a common `BaseModel` subclass that's used throughout\nyour project (e.g., `class Base(BaseModel) ...` in `base.py`), you can add it to\nthis list/table (`runtime-evaluated-base-classes = [\"base.Base\"]`) to exempt\nmodels from being moved into type-checking blocks.\n\n```toml\n[tool.ruff.lint.flake8-type-checking]\nruntime-evaluated-base-classes = [\"pydantic.BaseModel\"]\n```\n\nOr\n\n```toml\n[tool.ruff.lint.flake8-type-checking.runtime-evaluated-base-classes]\n\"pydantic.BaseModel\" = \"required\"\n```\n\nFor some use-cases like SQLAlchemy's `sqlalchemy.orm.DeclarativeBase` it makes more\nsense to mark the class as runtime `\"ambiguous\"`, since references to other models do\nnot need to resolve at runtime. With these semantics ruff will assume the annotations\nalready contain all of the correct forward references, and will not attempt to move\nrelated imports and/or quote annotations.\n\n```toml\n[tool.ruff.lint.flake8-type-checking.runtime-evaluated-base-classes]\n\"sqlalchemy.orm.DeclarativeBase\" = \"ambiguous\"\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnnotationSemanticsSelection"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "runtime-evaluated-decorators": {
-          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nimport fastapi\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
+          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nfrom fastapi import FastAPI\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.\n\nJust like with `runtime-evaluated-base-classes` it's possible to mark\ndecorators as runtime `\"ambiguous\"`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnnotationSemanticsSelection"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "strict": {
           "description": "Enforce `TC001`, `TC002`, and `TC003` rules even when valid runtime imports\nare present for the same module.\n\nSee flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.",
@@ -1575,6 +1666,17 @@
             }
           ]
         },
+        "nested-string-quote-style": {
+          "description": "Controls the quote style for nested strings inside interpolated string expressions.\n\n- `alternating` (default): Use alternating quotes.\n- `preferred`: Use the configured [`quote-style`](#format_quote-style).\n\n```python\nf\"{data['key']}\"  # alternating (default)\nf\"{data[\"key\"]}\"  # preferred\n```\n\nNote: This setting has no effect when targeting Python versions below 3.12.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/NestedStringQuoteStyle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "preview": {
           "description": "Whether to enable the unstable preview style formatting.",
           "type": [
@@ -1611,6 +1713,48 @@
         {
           "type": "string"
         }
+      ]
+    },
+    "ImportSelection": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/AllImports"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "ImportSelector": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ImportSelection"
+        },
+        {
+          "$ref": "#/definitions/ImportSelectorSettings"
+        }
+      ]
+    },
+    "ImportSelectorSettings": {
+      "type": "object",
+      "properties": {
+        "exclude": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "include": {
+          "$ref": "#/definitions/ImportSelection"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "include"
       ]
     },
     "ImportType": {
@@ -1757,6 +1901,33 @@
             "boolean",
             "null"
           ]
+        },
+        "import-heading": {
+          "description": "A mapping from import section names to their heading comments.\n\nWhen set, a comment with the specified text will be added above imports\nin the corresponding section. If a heading comment already exists, it\nwill be replaced.\n\nCompatible with isort's `import_heading_{section_name}` settings.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "first-party": {
+              "type": "string"
+            },
+            "future": {
+              "type": "string"
+            },
+            "local-folder": {
+              "type": "string"
+            },
+            "standard-library": {
+              "type": "string"
+            },
+            "third-party": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "known-first-party": {
           "description": "A list of modules to consider first-party, regardless of whether they\ncan be identified as such via introspection of the local filesystem.\n\nSupports glob patterns. For more information on the glob syntax, refer\nto the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
@@ -1949,6 +2120,15 @@
       },
       "additionalProperties": false
     },
+    "Language": {
+      "type": "string",
+      "enum": [
+        "python",
+        "pyi",
+        "ipynb",
+        "markdown"
+      ]
+    },
     "LineEnding": {
       "oneOf": [
         {
@@ -1974,10 +2154,10 @@
       ]
     },
     "LineLength": {
-      "description": "The length of a line of text that is considered too long.\n\nThe allowed range of values is 1..=320",
+      "description": "The length of a line of text that is considered too long.\n\nThe allowed range of values is 1..=65535",
       "type": "integer",
       "format": "uint16",
-      "maximum": 320,
+      "maximum": 65535,
       "minimum": 1
     },
     "LineWidth": {
@@ -2004,7 +2184,7 @@
           }
         },
         "dummy-variable-rgx": {
-          "description": "A regular expression used to identify \"dummy\" variables, or those which\nshould be ignored when enforcing (e.g.) unused-variable rules. The\ndefault expression matches `_`, `__`, and `_var`, but not `_var_`.",
+          "description": "A regular expression used to identify \"dummy\" variables, or those which\nshould be ignored when enforcing (e.g.) unused-variable rules. The\ndefault expression matches `_`, `__`, `_var`, and `_次`, but not `_var_`\nor `_次_`.",
           "type": [
             "string",
             "null"
@@ -2038,7 +2218,7 @@
           }
         },
         "extend-ignore": {
-          "description": "A list of rule codes or prefixes to ignore, in addition to those\nspecified by `ignore`.",
+          "description": "A list of rule codes or prefixes to ignore, in addition to those\nspecified by `ignore`.\n\nThis option is deprecated because it is now interchangeable with\n[`ignore`](#lint_ignore). In earlier versions of Ruff, `ignore` would\n_replace_ the set of ignored rules when using configuration inheritance\n(via the top-level [`extend`](https://docs.astral.sh/ruff/settings/#extend)\nsetting), while `extend-ignore` would _add_ to the inherited set. Ruff\nnow merges both `ignore` and `extend-ignore` into a single set, so the\ndistinction no longer applies. Use [`ignore`](#lint_ignore) instead.",
           "type": [
             "array",
             "null"
@@ -2072,7 +2252,7 @@
           }
         },
         "extend-select": {
-          "description": "A list of rule codes or prefixes to enable, in addition to those\nspecified by [`select`](#lint_select).",
+          "description": "A list of rule codes or prefixes to enable, in addition to those\nspecified by [`select`](#lint_select).\n\nUnlike [`select`](#lint_select), which _replaces_ the default rule set\nwhen specified, `extend-select` _adds_ to whatever rules are already\nactive. This makes `extend-select` the preferred option when you want\nto enable additional rules on top of the defaults without having to\nenumerate them.\n\nFor example, to enable the defaults plus flake8-bugbear:\n\n```toml\n[tool.ruff.lint]\n# Adds flake8-bugbear on top of the default rules.\nextend-select = [\"B\"]\n```\n\nUsing `select = [\"B\"]` instead would _replace_ the defaults, enabling\nonly flake8-bugbear.",
           "type": [
             "array",
             "null"
@@ -2317,7 +2497,7 @@
           ]
         },
         "ignore": {
-          "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the same\nprefix appears in both.",
+          "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the same\nprefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
           "type": [
             "array",
             "null"
@@ -2378,7 +2558,7 @@
           ]
         },
         "per-file-ignores": {
-          "description": "A list of mappings from file pattern to rule codes or prefixes to\nexclude, when considering any matching files. An initial '!' negates\nthe file pattern.",
+          "description": "A list of mappings from file pattern to rule codes or prefixes to\nexclude, when considering any matching files. An initial '!' negates\nthe file pattern.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "object",
             "null"
@@ -2475,7 +2655,7 @@
           ]
         },
         "select": {
-          "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.",
+          "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
           "type": [
             "array",
             "null"
@@ -2540,8 +2720,19 @@
       },
       "additionalProperties": false
     },
+    "Name": {
+      "description": "An immutable name.\n\n# Choosing a string representation\n\nOn 64-bit targets, [`CharStr`] occupies 16 bytes and stores up to 16 UTF-8 bytes inline. Longer\nvalues use an exactly-sized, reference-counted allocation, so cloning a heap-backed value\nreuses its allocation. [`compact_str::CompactString`] occupies 24 bytes, stores up to 24 bytes\ninline, and remains mutable; cloning a heap-backed value copies its contents into a new\nallocation.\n\nPrefer `CharStr` for immutable text that is retained densely or passed between owners, when\neither the smaller handle or structural sharing offsets the extra heap allocations for values\nbetween 17 and 24 bytes. Prefer `CompactString` for uniquely owned text, especially when it is\nbuilt incrementally, mutated, or commonly falls in that 17-to-24-byte range.\n\n`Name` uses `CharStr` because names appear throughout the AST and repeated heap-backed parser\nnames share an allocation. By contrast, [`crate::DebugText`] uses `CompactString` because it\nbuilds a uniquely owned buffer incrementally, and `ty_module_resolver::ModuleName` uses\n`CompactString` because module names can be extended in place.\n\nConverting a borrowed `&str` into `CharStr` creates a new value and does not preserve structural\nsharing. When an API retains text already held in a `CharStr` (including a `Name`), pass or clone\nthe owned value rather than converting it through `&str`. This is especially relevant at Salsa\ninterning boundaries.",
+      "type": "string"
+    },
     "NameImports": {
       "type": "string"
+    },
+    "NestedStringQuoteStyle": {
+      "type": "string",
+      "enum": [
+        "alternating",
+        "preferred"
+      ]
     },
     "OutputFormat": {
       "type": "string",
@@ -2698,7 +2889,7 @@
       "type": "object",
       "properties": {
         "convention": {
-          "description": "Whether to use Google-style, NumPy-style conventions, or the [PEP 257](https://peps.python.org/pep-0257/)\ndefaults when analyzing docstring sections.\n\nEnabling a convention will disable all rules that are not included in\nthe specified convention. As such, the intended workflow is to enable a\nconvention and then selectively enable or disable any additional rules\non top of it.\n\nFor example, to use Google-style conventions but avoid requiring\ndocumentation for every function parameter:\n\n```toml\n[tool.ruff.lint]\n# Enable all `pydocstyle` rules, limiting to those that adhere to the\n# Google convention via `convention = \"google\"`, below.\nselect = [\"D\"]\n\n# On top of the Google convention, disable `D417`, which requires\n# documentation for every function parameter.\nignore = [\"D417\"]\n\n[tool.ruff.lint.pydocstyle]\nconvention = \"google\"\n```\n\nTo enable an additional rule that's excluded from the convention,\nselect the desired rule via its fully qualified rule code (e.g.,\n`D400` instead of `D4` or `D40`):\n\n```toml\n[tool.ruff.lint]\n# Enable D400 on top of the Google convention.\nextend-select = [\"D400\"]\n\n[tool.ruff.lint.pydocstyle]\nconvention = \"google\"\n```",
+          "description": "Whether to use Google-style, NumPy-style conventions, or the [PEP 257](https://peps.python.org/pep-0257/)\ndefaults when analyzing docstring sections.\n\nEnabling a convention will disable all rules that are not included in\nthe specified convention. As such, the intended workflow is to enable a\nconvention and then selectively enable or disable any additional rules\non top of it.\n\nFor example, to use Google-style conventions but avoid requiring\ndocumentation for every function parameter:\n\n```toml\n[tool.ruff.lint]\n# Enable all `pydocstyle` rules, limiting to those that adhere to the\n# Google convention via `convention = \"google\"`, below.\nselect = [\"D\"]\n\n# On top of the Google convention, disable `D417`, which requires\n# documentation for every function parameter.\nignore = [\"D417\"]\n\n[tool.ruff.lint.pydocstyle]\nconvention = \"google\"\n```\n\nThe PEP 257 convention includes all `D` errors apart from:\n[`D203`](rules/incorrect-blank-line-before-class-docstring.md),\n[`D212`](rules/multiline-docstring-summary-on-separate-line.md),\n[`D213`](rules/multiline-docstring-summary-on-first-line.md),\n[`D214`](rules/over-indented-docstring-section.md),\n[`D215`](rules/over-indented-docstring-section-underline.md),\n[`D404`](rules/docstring-starts-with-this.md),\n[`D405`](rules/incorrectly-capitalized-docstring-section-name.md),\n[`D406`](rules/missing-newline-after-docstring-section-name.md),\n[`D407`](rules/missing-docstring-section-underline.md),\n[`D408`](rules/blank-line-before-docstring-section-underline.md),\n[`D409`](rules/incorrect-docstring-section-underline-length.md),\n[`D410`](rules/missing-blank-line-after-docstring-section.md),\n[`D411`](rules/missing-blank-line-before-docstring-section.md),\n[`D413`](rules/missing-blank-line-after-last-docstring-section.md),\n[`D415`](rules/docstring-summary-without-terminal-punctuation.md),\n[`D416`](rules/docstring-section-name-without-colon.md),\n[`D417`](rules/undocumented-parameter.md), and\n[`D420`](rules/incorrect-docstring-section-order.md).\n\nThe NumPy convention includes all `D` errors apart from:\n[`D107`](rules/undocumented-public-init.md),\n[`D203`](rules/incorrect-blank-line-before-class-docstring.md),\n[`D212`](rules/multiline-docstring-summary-on-separate-line.md),\n[`D213`](rules/multiline-docstring-summary-on-first-line.md),\n[`D402`](rules/signature-in-docstring.md),\n[`D413`](rules/missing-blank-line-after-last-docstring-section.md),\n[`D415`](rules/docstring-summary-without-terminal-punctuation.md),\n[`D416`](rules/docstring-section-name-without-colon.md), and\n[`D417`](rules/undocumented-parameter.md).\n\nThe Google convention includes all `D` errors apart from:\n[`D203`](rules/incorrect-blank-line-before-class-docstring.md),\n[`D204`](rules/incorrect-blank-line-after-class-docstring.md),\n[`D213`](rules/multiline-docstring-summary-on-first-line.md),\n[`D215`](rules/over-indented-docstring-section-underline.md),\n[`D400`](rules/docstring-summary-without-period.md),\n[`D401`](rules/non-imperative-docstring-summary.md),\n[`D404`](rules/docstring-starts-with-this.md),\n[`D406`](rules/missing-newline-after-docstring-section-name.md),\n[`D407`](rules/missing-docstring-section-underline.md),\n[`D408`](rules/blank-line-before-docstring-section-underline.md),\n[`D409`](rules/incorrect-docstring-section-underline-length.md), and\n[`D413`](rules/missing-blank-line-after-last-docstring-section.md).\n\nFor more information see the [FAQ](faq.md#does-ruff-support-numpy-or-google-style-docstrings) entry.\n\nTo enable an additional rule that's excluded from the convention,\nselect the desired rule via its fully qualified rule code (e.g.,\n`D400` instead of `D4` or `D40`):\n\n```toml\n[tool.ruff.lint]\n# Enable D400 on top of the Google convention.\nextend-select = [\"D400\"]\n\n[tool.ruff.lint.pydocstyle]\nconvention = \"google\"\n```",
           "anyOf": [
             {
               "$ref": "#/definitions/Convention"
@@ -2790,6 +2981,26 @@
             "$ref": "#/definitions/ConstantType"
           }
         },
+        "allow-magic-values": {
+          "description": "Specific literal values to ignore when used as \"magic values\" (see `PLR2004`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/AllowedValue"
+          }
+        },
+        "extend-allow-magic-values": {
+          "description": "Literal values to ignore when used as \"magic values\" (see `PLR2004`),\nin addition to those included in [`allow-magic-values`](#lint_pylint_allow-magic-values).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/AllowedValue"
+          }
+        },
         "max-args": {
           "description": "Maximum number of arguments allowed for a function or method definition\n(see `PLR0913`).",
           "type": [
@@ -2864,6 +3075,15 @@
         },
         "max-statements": {
           "description": "Maximum number of statements allowed for a function or method body (see `PLR0915`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "max-statements-in-try": {
+          "description": "Maximum number of statements allowed for a try clause body (see `W0717`).",
           "type": [
             "integer",
             "null"
@@ -2961,7 +3181,7 @@
           ]
         },
         "strictly-empty-init-modules": {
-          "description": "Whether to require `__init__.py` files to contain no code at all, including imports and\ndocstrings (see `RUF067`).",
+          "description": "Whether to require `__init__.py` files to contain no code at all, including imports and\n`__all__` assignments (see `RUF067`). Module and attribute docstrings are still allowed.",
           "type": [
             "boolean",
             "null"
@@ -2987,14 +3207,23 @@
         "AIR00",
         "AIR001",
         "AIR002",
+        "AIR003",
+        "AIR004",
+        "AIR2",
+        "AIR20",
+        "AIR201",
+        "AIR202",
         "AIR3",
         "AIR30",
         "AIR301",
         "AIR302",
         "AIR303",
+        "AIR304",
         "AIR31",
         "AIR311",
         "AIR312",
+        "AIR32",
+        "AIR321",
         "ALL",
         "ANN",
         "ANN0",
@@ -3030,6 +3259,7 @@
         "ASYNC110",
         "ASYNC115",
         "ASYNC116",
+        "ASYNC119",
         "ASYNC2",
         "ASYNC21",
         "ASYNC210",
@@ -3045,6 +3275,9 @@
         "ASYNC25",
         "ASYNC250",
         "ASYNC251",
+        "ASYNC4",
+        "ASYNC40",
+        "ASYNC401",
         "B",
         "B0",
         "B00",
@@ -3086,6 +3319,8 @@
         "B034",
         "B035",
         "B039",
+        "B04",
+        "B043",
         "B9",
         "B90",
         "B901",
@@ -3194,6 +3429,9 @@
         "D417",
         "D418",
         "D419",
+        "D42",
+        "D420",
+        "D421",
         "DJ",
         "DJ0",
         "DJ00",
@@ -3670,6 +3908,8 @@
         "PLE0117",
         "PLE0118",
         "PLE02",
+        "PLE021",
+        "PLE0211",
         "PLE023",
         "PLE0237",
         "PLE024",
@@ -3767,6 +4007,7 @@
         "PLR1708",
         "PLR171",
         "PLR1711",
+        "PLR1712",
         "PLR1714",
         "PLR1716",
         "PLR172",
@@ -3829,6 +4070,7 @@
         "PLW07",
         "PLW071",
         "PLW0711",
+        "PLW0717",
         "PLW1",
         "PLW15",
         "PLW150",
@@ -4071,6 +4313,7 @@
         "RUF048",
         "RUF049",
         "RUF05",
+        "RUF050",
         "RUF051",
         "RUF052",
         "RUF053",
@@ -4089,6 +4332,15 @@
         "RUF066",
         "RUF067",
         "RUF068",
+        "RUF069",
+        "RUF07",
+        "RUF070",
+        "RUF071",
+        "RUF072",
+        "RUF073",
+        "RUF074",
+        "RUF075",
+        "RUF077",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -4096,9 +4348,13 @@
         "RUF102",
         "RUF103",
         "RUF104",
+        "RUF105",
+        "RUF106",
         "RUF2",
         "RUF20",
         "RUF200",
+        "RUF201",
+        "RUF202",
         "S",
         "S1",
         "S10",
@@ -4282,6 +4538,8 @@
         "TID251",
         "TID252",
         "TID253",
+        "TID254",
+        "TID255",
         "TRY",
         "TRY0",
         "TRY00",
@@ -4350,9 +4608,12 @@
         "UP045",
         "UP046",
         "UP047",
+        "UP048",
         "UP049",
         "UP05",
         "UP050",
+        "UP051",
+        "UP052",
         "W",
         "W1",
         "W19",
@@ -4387,7 +4648,991 @@
         "YTT30",
         "YTT301",
         "YTT302",
-        "YTT303"
+        "YTT303",
+        "abstract-base-class-without-abstract-method",
+        "access-annotations-from-class-dict",
+        "airflow-dag-no-schedule-argument",
+        "airflow-task-branch-as-short-circuit",
+        "airflow-task-implicit-multiple-outputs",
+        "airflow-variable-get-outside-task",
+        "airflow-variable-name-task-id-mismatch",
+        "airflow-xcom-pull-in-template-string",
+        "airflow3-dag-dynamic-value",
+        "airflow3-incompatible-function-signature",
+        "airflow3-moved-to-provider",
+        "airflow3-removal",
+        "airflow3-suggested-to-move-to-provider",
+        "airflow3-suggested-update",
+        "airflow31-moved",
+        "ambiguous-class-name",
+        "ambiguous-function-name",
+        "ambiguous-unicode-character-comment",
+        "ambiguous-unicode-character-docstring",
+        "ambiguous-unicode-character-string",
+        "ambiguous-variable-name",
+        "any-eq-ne-annotation",
+        "any-type",
+        "assert",
+        "assert-false",
+        "assert-raises-exception-or-base-exception",
+        "assert-string-literal",
+        "assert-tuple",
+        "assert-with-print-message",
+        "assignment-default-in-stub",
+        "assignment-in-assert",
+        "assignment-to-os-environ",
+        "async-busy-wait",
+        "async-function-with-timeout",
+        "async-zero-sleep",
+        "asyncio-dangling-task",
+        "avoidable-escaped-quote",
+        "await-outside-async",
+        "bad-dunder-method-name",
+        "bad-exit-annotation",
+        "bad-file-permissions",
+        "bad-open-mode",
+        "bad-quotes-docstring",
+        "bad-quotes-inline-string",
+        "bad-quotes-multiline-string",
+        "bad-staticmethod-parameter",
+        "bad-str-strip-call",
+        "bad-string-format-character",
+        "bad-string-format-type",
+        "bad-version-info-comparison",
+        "bad-version-info-order",
+        "banned-api",
+        "banned-import-alias",
+        "banned-import-from",
+        "banned-module-level-imports",
+        "bare-except",
+        "batched-without-explicit-strict",
+        "bidirectional-unicode",
+        "binary-op-exception",
+        "bit-count",
+        "blank-line-after-decorator",
+        "blank-line-after-function-docstring",
+        "blank-line-before-class-docstring",
+        "blank-line-before-docstring-section-underline",
+        "blank-line-before-function-docstring",
+        "blank-line-with-whitespace",
+        "blanket-noqa",
+        "blanket-type-ignore",
+        "blocking-http-call-httpx-in-async-function",
+        "blocking-http-call-in-async-function",
+        "blocking-input-in-async-function",
+        "blocking-open-call-in-async-function",
+        "blocking-path-call-in-async-function",
+        "blocking-sleep-in-async-function",
+        "boolean-annotated-positional-parameter",
+        "boolean-chained-comparison",
+        "boolean-positional-parameter-default",
+        "boolean-positional-value-in-call",
+        "break-outside-loop",
+        "builtin-attribute-shadowing",
+        "builtin-import-shadowing",
+        "builtin-lambda-parameter-shadowing",
+        "builtin-open",
+        "builtin-parameter-shadowing",
+        "builtin-variable-shadowing",
+        "cached-instance-method",
+        "call-date-fromtimestamp",
+        "call-date-today",
+        "call-datetime-fromtimestamp",
+        "call-datetime-now-without-tzinfo",
+        "call-datetime-strptime-without-zone",
+        "call-datetime-today",
+        "call-datetime-utcfromtimestamp",
+        "call-datetime-utcnow",
+        "call-datetime-without-tzinfo",
+        "call-with-shell-equals-true",
+        "camel-case-imported-as-acronym",
+        "camel-case-imported-as-constant",
+        "camel-case-imported-as-lowercase",
+        "cancel-scope-no-checkpoint",
+        "cast-with-unquoted-type",
+        "catch-exception-or-base-exception",
+        "check-and-remove-from-set",
+        "class-as-data-structure",
+        "class-method-receiver-not-named-cls",
+        "class-with-mixed-type-vars",
+        "collapsible-else-if",
+        "collapsible-if",
+        "collection-literal-concatenation",
+        "collections-named-tuple",
+        "commented-out-code",
+        "compare-to-empty-string",
+        "compare-with-tuple",
+        "comparison-of-constant",
+        "comparison-with-itself",
+        "complex-assignment-in-stub",
+        "complex-default-for-annotated-parameter-in-stub",
+        "complex-default-for-unannotated-parameter-in-stub",
+        "complex-if-statement-in-stub",
+        "complex-structure",
+        "complexity",
+        "consecutive-global-or-nonlocal-statements",
+        "constant-imported-as-non-constant",
+        "context-manager-iterator",
+        "continue-in-finally",
+        "continue-outside-loop",
+        "correctness",
+        "create-subprocess-in-async-function",
+        "custom-type-var-for-self",
+        "dataclass-enum",
+        "datetime-min-max",
+        "datetime-timezone-utc",
+        "debugger",
+        "decimal-from-float-literal",
+        "default-except-not-last",
+        "default-factory-kwarg",
+        "delattr-with-constant",
+        "delete-full-slice",
+        "deprecated-abc-decorator",
+        "deprecated-byte-string-type",
+        "deprecated-c-element-tree",
+        "deprecated-import",
+        "deprecated-mock-import",
+        "deprecated-unittest-alias",
+        "dict-get-with-none-default",
+        "dict-index-missing-items",
+        "dict-iter-missing-items",
+        "direct-logger-instantiation",
+        "django-all-with-model-form",
+        "django-exclude-with-model-form",
+        "django-extra",
+        "django-locals-in-render-function",
+        "django-model-without-dunder-str",
+        "django-non-leading-receiver-decorator",
+        "django-nullable-model-string-field",
+        "django-raw-sql",
+        "django-unordered-body-content-in-model",
+        "doc-line-too-long",
+        "docstring-in-stub",
+        "docstring-section-name-without-colon",
+        "docstring-starts-with-lowercase-letter",
+        "docstring-starts-with-this",
+        "docstring-summary-without-period",
+        "docstring-summary-without-terminal-punctuation",
+        "docstring-tab-indentation",
+        "double-negation",
+        "dunder-function-name",
+        "duplicate-bases",
+        "duplicate-class-field-definition",
+        "duplicate-entry-in-dunder-all",
+        "duplicate-handler-exception",
+        "duplicate-isinstance-call",
+        "duplicate-literal-member",
+        "duplicate-try-block-exception",
+        "duplicate-union-member",
+        "duplicate-value",
+        "ellipsis-in-non-empty-class-body",
+        "empty-comment",
+        "empty-docstring",
+        "empty-docstring-section",
+        "empty-method-without-abstract-decorator",
+        "empty-type-checking-block",
+        "eq-without-hash",
+        "escape-sequence-in-docstring",
+        "eval",
+        "except-with-empty-tuple",
+        "except-with-non-exception-classes",
+        "exception-class-without-error-suffix",
+        "exec",
+        "executable-file-without-shebang",
+        "explicit-f-string-type-conversion",
+        "explicit-string-concatenation",
+        "expr-and-false",
+        "expr-and-not-expr",
+        "expr-or-not-expr",
+        "expr-or-true",
+        "expressions-in-star-assignment",
+        "extra-blank-line-before-docstring-section-content",
+        "extraneous-docstring-exception",
+        "extraneous-docstring-parameter",
+        "extraneous-docstring-returns-section",
+        "extraneous-docstring-yields-section",
+        "extraneous-parentheses",
+        "f-string-docstring",
+        "f-string-in-exception",
+        "f-string-in-gettext-call",
+        "f-string-missing-placeholders",
+        "f-string-percent-format",
+        "fallible-context-manager",
+        "falsy-dict-get-fallback",
+        "fast-api-non-annotated-dependency",
+        "fast-api-redundant-response-model",
+        "fast-api-unused-path-parameter",
+        "file-path-as-logger-name",
+        "flask-debug-true",
+        "float-equality-comparison",
+        "for-loop-set-mutations",
+        "for-loop-writes",
+        "formatting",
+        "forward-annotation-syntax-error",
+        "fromisoformat-replace-z",
+        "function-call-in-dataclass-field-default",
+        "function-call-in-parameter-default",
+        "function-uses-loop-variable",
+        "functional-named-tuple",
+        "functional-typed-dict",
+        "future-annotations-in-stub",
+        "future-feature-not-defined",
+        "future-required-type-annotation",
+        "future-rewritable-type-annotation",
+        "generic-not-last-base-class",
+        "getattr-with-constant",
+        "glob",
+        "global-at-module-level",
+        "global-statement",
+        "global-variable-not-assigned",
+        "hardcoded-bind-all-interfaces",
+        "hardcoded-math-constant",
+        "hardcoded-password-argument",
+        "hardcoded-password-parameter-default",
+        "hardcoded-password-string",
+        "hardcoded-string-charset",
+        "hardcoded-temp-file",
+        "hashlib-digest-hex",
+        "hashlib-insecure-hash-function",
+        "if-else-assignment-to-same-variable",
+        "if-else-block-instead-of-dict-get",
+        "if-else-block-instead-of-dict-lookup",
+        "if-expr-min-max",
+        "if-expr-with-body-as-condition",
+        "if-expr-with-false-true",
+        "if-expr-with-identical-branches",
+        "if-expr-with-negated-else-as-condition",
+        "if-expr-with-true-false",
+        "if-key-in-dict-del",
+        "if-stmt-min-max",
+        "if-tuple",
+        "if-with-identical-branches",
+        "implicit-class-var-in-dataclass",
+        "implicit-cwd",
+        "implicit-namespace-package",
+        "implicit-optional",
+        "implicit-return",
+        "implicit-return-value",
+        "implicit-string-concatenation-in-collection-literal",
+        "import-outside-top-level",
+        "import-private-name",
+        "import-self",
+        "import-shadowed-by-loop-var",
+        "in-dict-keys",
+        "in-empty-collection",
+        "incorrect-blank-line-after-class-docstring",
+        "incorrect-blank-line-after-docstring-summary",
+        "incorrect-blank-line-before-class-docstring",
+        "incorrect-decorator-order",
+        "incorrect-dict-iterator",
+        "incorrect-docstring-section-order",
+        "incorrect-docstring-section-underline-length",
+        "incorrectly-capitalized-docstring-section-name",
+        "incorrectly-parenthesized-tuple-in-subscript",
+        "indentation-with-invalid-multiple",
+        "indentation-with-invalid-multiple-comment",
+        "indented-form-feed",
+        "instance-method-receiver-not-named-self",
+        "int-on-sliced-str",
+        "invalid-all-format",
+        "invalid-all-object",
+        "invalid-bool-return-type",
+        "invalid-bytes-return-type",
+        "invalid-envvar-default",
+        "invalid-escape-sequence",
+        "invalid-formatter-suppression-comment",
+        "invalid-getenv-key",
+        "invalid-hash-return-type",
+        "invalid-index-return-type",
+        "invalid-index-type",
+        "invalid-length-return-type",
+        "invalid-mock-access",
+        "invalid-module-name",
+        "invalid-pathlib-with-suffix",
+        "invalid-print-syntax",
+        "invalid-pyproject-toml",
+        "invalid-str-return-type",
+        "invalid-suppression-comment",
+        "invalid-todo-capitalization",
+        "invalid-todo-tag",
+        "io-error",
+        "is-literal",
+        "isinstance-type-none",
+        "iter-method-return-iterable",
+        "iter-method-with-generator-return-annotation",
+        "iteration-over-set",
+        "jinja2-autoescape-false",
+        "jump-statement-in-finally",
+        "lambda-assignment",
+        "late-future-import",
+        "lazy-import-immediately-resolved",
+        "lazy-import-mismatch",
+        "legacy-type-comment",
+        "len-test",
+        "line-contains-fixme",
+        "line-contains-hack",
+        "line-contains-todo",
+        "line-contains-xxx",
+        "line-too-long",
+        "list-reverse-copy",
+        "literal-membership",
+        "literal-union-with-supertype",
+        "load-before-global-declaration",
+        "logging-config-insecure-listen",
+        "logging-eager-conversion",
+        "logging-error-instead-of-exception",
+        "logging-error-with-exc-info",
+        "logging-exc-info-outside-except-handler",
+        "logging-exception-outside-except-handler",
+        "logging-exception-with-falsy-exc-info",
+        "logging-extra-attr-clash",
+        "logging-f-string",
+        "logging-percent-format",
+        "logging-redundant-exc-info",
+        "logging-str-format",
+        "logging-string-concat",
+        "logging-too-few-arguments",
+        "logging-too-many-arguments",
+        "logging-warn",
+        "logging-warn-constant",
+        "long-sleep-not-forever",
+        "loop-iterator-mutation",
+        "loop-variable-overrides-iterator",
+        "lowercase-imported-as-non-lowercase",
+        "lru-cache-call-without-arguments",
+        "lru-cache-with-maxsize-none",
+        "magic-value-comparison",
+        "mako-templates",
+        "manual-dict-comprehension",
+        "manual-from-import",
+        "manual-list-comprehension",
+        "manual-list-copy",
+        "manual-loop-counter",
+        "manual-path-read",
+        "manual-path-write",
+        "manual-str-enum",
+        "map-int-version-parsing",
+        "map-without-explicit-strict",
+        "meta-class-abc-meta",
+        "method-receiver-default",
+        "method-without-parameters",
+        "misplaced-bare-raise",
+        "missing-blank-line-after-docstring-section",
+        "missing-blank-line-after-last-docstring-section",
+        "missing-blank-line-before-docstring-section",
+        "missing-blank-line-before-method",
+        "missing-blank-line-before-nested-definition",
+        "missing-blank-lines-after-top-level-definition",
+        "missing-blank-lines-before-top-level-definition",
+        "missing-copyright-notice",
+        "missing-docstring-returns-section",
+        "missing-docstring-section-underline",
+        "missing-docstring-yields-section",
+        "missing-maxsplit-arg",
+        "missing-newline-after-docstring-section-name",
+        "missing-newline-after-last-docstring-paragraph",
+        "missing-newline-at-end-of-file",
+        "missing-required-import",
+        "missing-return-annotation-for-class-method",
+        "missing-return-annotation-for-private-function",
+        "missing-return-annotation-for-public-function",
+        "missing-return-annotation-for-special-method",
+        "missing-return-annotation-for-static-method",
+        "missing-space-after-todo-colon",
+        "missing-todo-author",
+        "missing-todo-colon",
+        "missing-todo-description",
+        "missing-todo-link",
+        "missing-trailing-comma",
+        "missing-whitespace",
+        "missing-whitespace-after-keyword",
+        "missing-whitespace-around-arithmetic-operator",
+        "missing-whitespace-around-bitwise-or-shift-operator",
+        "missing-whitespace-around-modulo-operator",
+        "missing-whitespace-around-operator",
+        "missing-whitespace-around-parameter-equals",
+        "mixed-case-variable-in-class-scope",
+        "mixed-case-variable-in-global-scope",
+        "mixed-spaces-and-tabs",
+        "modified-iterating-set",
+        "module-import-not-at-top-of-file",
+        "multi-line-implicit-string-concatenation",
+        "multi-value-repeated-key-literal",
+        "multi-value-repeated-key-variable",
+        "multiline-docstring-summary-on-first-line",
+        "multiline-docstring-summary-on-separate-line",
+        "multiple-imports-on-one-line",
+        "multiple-leading-hashes-for-block-comment",
+        "multiple-spaces-after-comma",
+        "multiple-spaces-after-keyword",
+        "multiple-spaces-after-operator",
+        "multiple-spaces-before-keyword",
+        "multiple-spaces-before-operator",
+        "multiple-starred-expressions",
+        "multiple-starts-ends-with",
+        "multiple-statements-on-one-line-colon",
+        "multiple-statements-on-one-line-semicolon",
+        "multiple-with-statements",
+        "mutable-class-default",
+        "mutable-contextvar-default",
+        "mutable-dataclass-field-default",
+        "mutable-fromkeys-value",
+        "mutable-parameter-default",
+        "named-expr-without-context",
+        "nan-comparison",
+        "needless-bool",
+        "needless-else",
+        "negate-equal-op",
+        "negate-not-equal-op",
+        "nested-min-max",
+        "never-union",
+        "no-explicit-stacklevel",
+        "no-indented-block",
+        "no-indented-block-comment",
+        "no-slots-in-namedtuple-subclass",
+        "no-slots-in-str-subclass",
+        "no-slots-in-tuple-subclass",
+        "no-space-after-block-comment",
+        "no-space-after-inline-comment",
+        "non-ascii-import-name",
+        "non-ascii-name",
+        "non-augmented-assignment",
+        "non-camel-case-class-name",
+        "non-decorator-classmethod",
+        "non-decorator-staticmethod",
+        "non-empty-init-module",
+        "non-empty-stub-body",
+        "non-executable-file-with-shebang",
+        "non-imperative-docstring-summary",
+        "non-lowercase-function-name",
+        "non-lowercase-parameter-name",
+        "non-lowercase-variable-in-function",
+        "non-module-level-star-import",
+        "non-octal-permissions",
+        "non-pep585-annotation",
+        "non-pep604-annotation-optional",
+        "non-pep604-annotation-union",
+        "non-pep646-unpack",
+        "non-pep695-generic-class",
+        "non-pep695-generic-function",
+        "non-pep695-type-alias",
+        "non-self-return-type",
+        "non-slot-assignment",
+        "non-string-literal-as-assert-message",
+        "non-unique-enums",
+        "none-comparison",
+        "none-not-at-end-of-union",
+        "nonlocal-and-global",
+        "nonlocal-without-binding",
+        "noqa-comments",
+        "not-in-test",
+        "not-is-test",
+        "numeric-literal-too-long-in-stub",
+        "numpy-deprecated-function",
+        "numpy-deprecated-type-alias",
+        "numpy-legacy-random",
+        "numpy2-deprecation",
+        "open-alias",
+        "open-file-without-context-manager",
+        "os-chmod",
+        "os-error-alias",
+        "os-getcwd",
+        "os-listdir",
+        "os-makedirs",
+        "os-mkdir",
+        "os-path-abspath",
+        "os-path-basename",
+        "os-path-commonprefix",
+        "os-path-dirname",
+        "os-path-exists",
+        "os-path-expanduser",
+        "os-path-getatime",
+        "os-path-getctime",
+        "os-path-getmtime",
+        "os-path-getsize",
+        "os-path-isabs",
+        "os-path-isdir",
+        "os-path-isfile",
+        "os-path-islink",
+        "os-path-join",
+        "os-path-samefile",
+        "os-path-splitext",
+        "os-readlink",
+        "os-remove",
+        "os-rename",
+        "os-replace",
+        "os-rmdir",
+        "os-sep-split",
+        "os-stat",
+        "os-symlink",
+        "os-unlink",
+        "outdated-version-block",
+        "over-indented",
+        "over-indented-docstring-line",
+        "over-indented-docstring-section",
+        "over-indented-docstring-section-underline",
+        "overload-with-docstring",
+        "pandas-nunique-constant-series-check",
+        "pandas-use-of-dot-at",
+        "pandas-use-of-dot-iat",
+        "pandas-use-of-dot-is-null",
+        "pandas-use-of-dot-ix",
+        "pandas-use-of-dot-not-null",
+        "pandas-use-of-dot-pivot-or-unstack",
+        "pandas-use-of-dot-read-table",
+        "pandas-use-of-dot-stack",
+        "pandas-use-of-dot-values",
+        "pandas-use-of-inplace-argument",
+        "pandas-use-of-pd-merge",
+        "parameter-annotated-with-no-return",
+        "paramiko-call",
+        "pass-in-stub-class-body",
+        "pass-statement-stub-body",
+        "patch-version-comparison-in-stub",
+        "path-constructor-current-directory",
+        "pedantic",
+        "pep484-style-positional-only-parameter",
+        "percent-format-expected-mapping",
+        "percent-format-expected-sequence",
+        "percent-format-invalid-syntax",
+        "percent-format-missing-argument",
+        "percent-format-mixed-positional-and-named",
+        "percent-format-positional-count-mismatch",
+        "percent-format-star-requires-sequence",
+        "percent-format-unsupported-format-character",
+        "percent-format-unused-named-arguments",
+        "performance",
+        "possibly-missing-f-string-prefix",
+        "possibly-undefined-name-with-star-import",
+        "post-init-default",
+        "potential-index-error",
+        "pprint",
+        "print",
+        "print-empty-string",
+        "printf-in-gettext-call",
+        "printf-string-formatting",
+        "private-member-access",
+        "private-type-parameter",
+        "property-docstring-starts-with-verb",
+        "property-with-parameters",
+        "property-without-return",
+        "public-type-var-in-stub",
+        "py-path",
+        "pytest-assert-always-false",
+        "pytest-assert-in-except",
+        "pytest-composite-assertion",
+        "pytest-deprecated-yield-fixture",
+        "pytest-duplicate-parametrize-test-cases",
+        "pytest-erroneous-use-fixtures-on-fixture",
+        "pytest-extraneous-scope-function",
+        "pytest-fail-without-message",
+        "pytest-fixture-autouse",
+        "pytest-fixture-finalizer-callback",
+        "pytest-fixture-incorrect-parentheses-style",
+        "pytest-fixture-parameter-without-value",
+        "pytest-fixture-positional-arguments",
+        "pytest-incorrect-mark-parentheses-style",
+        "pytest-incorrect-pytest-import",
+        "pytest-legacy-callable-form",
+        "pytest-parameter-with-default-value",
+        "pytest-parametrize-names-wrong-type",
+        "pytest-parametrize-values-wrong-type",
+        "pytest-patch-with-lambda",
+        "pytest-raises-ambiguous-pattern",
+        "pytest-raises-exception-group",
+        "pytest-raises-too-broad",
+        "pytest-raises-with-multiple-statements",
+        "pytest-raises-without-exception",
+        "pytest-unittest-assertion",
+        "pytest-unittest-raises-assertion",
+        "pytest-unnecessary-asyncio-mark-on-fixture",
+        "pytest-use-fixtures-without-arguments",
+        "pytest-useless-yield-fixture",
+        "pytest-warns-too-broad",
+        "pytest-warns-with-multiple-statements",
+        "pytest-warns-without-warning",
+        "quadratic-list-summation",
+        "quoted-annotation",
+        "quoted-annotation-in-stub",
+        "quoted-type-alias",
+        "raise-exception-or-base-exception",
+        "raise-exception-with-message",
+        "raise-literal",
+        "raise-not-implemented",
+        "raise-stop-iteration-in-generator",
+        "raise-within-try",
+        "raise-without-from-inside-except",
+        "re-sub-positional-arguments",
+        "readlines-in-for",
+        "redeclared-assigned-name",
+        "redefined-for-or-with-target",
+        "redefined-parameter-from-local",
+        "redefined-slots-in-subclass",
+        "redefined-while-unused",
+        "redundant-backslash",
+        "redundant-bool-literal",
+        "redundant-exception-in-logging-message",
+        "redundant-final-literal",
+        "redundant-log-base",
+        "redundant-none-literal",
+        "redundant-numeric-union",
+        "redundant-open-modes",
+        "redundant-super-arguments",
+        "redundant-tuple-in-exception-handler",
+        "regex-flag-alias",
+        "reimplemented-builtin",
+        "reimplemented-container-builtin",
+        "reimplemented-operator",
+        "reimplemented-starmap",
+        "relative-imports",
+        "renamed-rule",
+        "renamed-rule-in-suppression-comment",
+        "repeated-append",
+        "repeated-equality-comparison",
+        "repeated-keyword-argument",
+        "request-with-no-cert-validation",
+        "request-without-timeout",
+        "restriction",
+        "return-in-generator",
+        "return-in-init",
+        "return-in-try-except-finally",
+        "return-outside-function",
+        "reuse-of-groupby-generator",
+        "root-logger-call",
+        "rule-codes-in-selectors",
+        "rule-codes-in-suppression-comments",
+        "run-process-in-async-function",
+        "runtime-import-in-type-checking-block",
+        "runtime-string-union",
+        "security",
+        "self-assigning-variable",
+        "self-or-cls-assignment",
+        "setattr-with-constant",
+        "shallow-copy-environ",
+        "shared-clock-mock",
+        "shebang-leading-whitespace",
+        "shebang-missing-python",
+        "shebang-not-first-line",
+        "signature-in-docstring",
+        "single-item-membership-test",
+        "single-line-implicit-string-concatenation",
+        "single-string-slots",
+        "singledispatch-method",
+        "singledispatchmethod-function",
+        "six-py3",
+        "slice-copy",
+        "slice-to-remove-prefix-or-suffix",
+        "sliced-integer-base-conversion",
+        "snake-case-type-alias",
+        "snmp-insecure-version",
+        "snmp-weak-cryptography",
+        "sorted-min-max",
+        "split-static-string",
+        "ssh-no-host-key-verification",
+        "ssl-insecure-version",
+        "ssl-with-bad-defaults",
+        "ssl-with-no-version",
+        "star-arg-after-keyword",
+        "star-import",
+        "starmap-zip",
+        "start-process-with-a-shell",
+        "start-process-with-no-shell",
+        "start-process-with-partial-path",
+        "static-key-dict-comprehension",
+        "stdlib-module-shadowing",
+        "str-format",
+        "str-format-in-exception",
+        "str-format-in-gettext-call",
+        "str-format-invalid-syntax",
+        "str-format-missing-arguments",
+        "str-format-mixed-placeholder-numbering",
+        "str-format-unused-keyword-arguments",
+        "str-format-unused-positional-arguments",
+        "str-or-repr-defined-in-stub",
+        "string-literal-in-exception",
+        "string-or-bytes-too-long-in-stub",
+        "strip-with-duplicate-characters",
+        "stub-body-multiple-statements",
+        "style",
+        "subclass-builtin",
+        "subprocess-popen-preexec-fn",
+        "subprocess-popen-with-shell-equals-true",
+        "subprocess-run-with-piped-stdout-and-stderr",
+        "subprocess-run-with-universal-newlines",
+        "subprocess-run-without-check",
+        "subprocess-without-shell-equals-true",
+        "super-without-brackets",
+        "suppressible-exception",
+        "suspicious",
+        "suspicious-ftplib-import",
+        "suspicious-ftplib-usage",
+        "suspicious-httpoxy-import",
+        "suspicious-insecure-cipher-mode-usage",
+        "suspicious-insecure-cipher-usage",
+        "suspicious-insecure-hash-usage",
+        "suspicious-mark-safe-usage",
+        "suspicious-marshal-usage",
+        "suspicious-mktemp-usage",
+        "suspicious-non-cryptographic-random-usage",
+        "suspicious-pickle-import",
+        "suspicious-pickle-usage",
+        "suspicious-pycrypto-import",
+        "suspicious-pyghmi-import",
+        "suspicious-sql-string-construction",
+        "suspicious-subprocess-import",
+        "suspicious-telnetlib-import",
+        "suspicious-telnetlib-usage",
+        "suspicious-unverified-context-usage",
+        "suspicious-url-open-usage",
+        "suspicious-xml-element-tree-usage",
+        "suspicious-xml-etree-import",
+        "suspicious-xml-expat-builder-usage",
+        "suspicious-xml-expat-import",
+        "suspicious-xml-expat-reader-usage",
+        "suspicious-xml-mini-dom-usage",
+        "suspicious-xml-minidom-import",
+        "suspicious-xml-pull-dom-usage",
+        "suspicious-xml-pulldom-import",
+        "suspicious-xml-sax-import",
+        "suspicious-xml-sax-usage",
+        "suspicious-xmlc-element-tree-usage",
+        "suspicious-xmlrpc-import",
+        "swap-with-temporary-variable",
+        "sys-exit-alias",
+        "sys-version-cmp-str10",
+        "sys-version-cmp-str3",
+        "sys-version-info-minor-cmp-int",
+        "sys-version-info0-eq3",
+        "sys-version-info1-cmp-int",
+        "sys-version-slice1",
+        "sys-version-slice3",
+        "sys-version0",
+        "sys-version2",
+        "t-suffixed-type-alias",
+        "tab-after-comma",
+        "tab-after-keyword",
+        "tab-after-operator",
+        "tab-before-keyword",
+        "tab-before-operator",
+        "tab-indentation",
+        "tarfile-ignore-zeros-true",
+        "tarfile-unsafe-members",
+        "timeout-error-alias",
+        "too-few-spaces-before-inline-comment",
+        "too-many-blank-lines",
+        "too-many-boolean-expressions",
+        "too-many-branches",
+        "too-many-locals",
+        "too-many-nested-blocks",
+        "too-many-newlines-at-end-of-file",
+        "too-many-parameters",
+        "too-many-positional-parameters",
+        "too-many-public-methods",
+        "too-many-return-statements",
+        "too-many-statements",
+        "too-many-statements-in-try-clause",
+        "trailing-comma-on-bare-tuple",
+        "trailing-whitespace",
+        "trio-call-not-awaited",
+        "true-false-comparison",
+        "try-consider-else",
+        "try-except-continue",
+        "try-except-in-loop",
+        "try-except-pass",
+        "type-bivariance",
+        "type-check-without-type-error",
+        "type-comparison",
+        "type-name-incorrect-variance",
+        "type-none-comparison",
+        "type-of-primitive",
+        "type-param-name-mismatch",
+        "typing-only-first-party-import",
+        "typing-only-standard-library-import",
+        "typing-only-third-party-import",
+        "typing-text-str-alias",
+        "unaliased-collections-abc-set-import",
+        "unannotated-args",
+        "unannotated-assignment-in-stub",
+        "unannotated-kwargs",
+        "unannotated-parameter",
+        "unannotated-type-alias-in-stub",
+        "unary-prefix-increment-decrement",
+        "unassigned-special-variable-in-stub",
+        "uncapitalized-environment-variables",
+        "unclear-boolean-precedence",
+        "unconventional-docstring-quotes",
+        "unconventional-import-alias",
+        "undefined-export",
+        "undefined-local",
+        "undefined-name",
+        "under-indented-docstring-line",
+        "undocumented-magic-method",
+        "undocumented-parameter",
+        "undocumented-public-class",
+        "undocumented-public-function",
+        "undocumented-public-init",
+        "undocumented-public-method",
+        "undocumented-public-module",
+        "undocumented-public-nested-class",
+        "undocumented-public-package",
+        "undocumented-raised-exception",
+        "unescaped-backspace-character",
+        "unescaped-escape-character",
+        "unescaped-null-character",
+        "unescaped-substitute-character",
+        "unescaped-zero-width-space-character",
+        "unexpected-indentation",
+        "unexpected-indentation-comment",
+        "unexpected-spaces-around-argument-or-parameter-equals",
+        "unexpected-special-method-signature",
+        "unicode-kind-prefix",
+        "unintentional-type-annotation",
+        "unix-command-wildcard-injection",
+        "unknown-rule-in-suppression-comment",
+        "unmatched-suppression-comment",
+        "unnecessary-assign",
+        "unnecessary-assign-before-yield",
+        "unnecessary-builtin-import",
+        "unnecessary-call-around-sorted",
+        "unnecessary-cast-to-int",
+        "unnecessary-class-parentheses",
+        "unnecessary-collection-call",
+        "unnecessary-comprehension",
+        "unnecessary-comprehension-in-call",
+        "unnecessary-default-type-arguments",
+        "unnecessary-dict-comprehension-for-iterable",
+        "unnecessary-dict-index-lookup",
+        "unnecessary-dict-kwargs",
+        "unnecessary-direct-lambda-call",
+        "unnecessary-double-cast-or-process",
+        "unnecessary-dunder-call",
+        "unnecessary-else-after-break",
+        "unnecessary-else-after-continue",
+        "unnecessary-else-after-raise",
+        "unnecessary-else-after-return",
+        "unnecessary-empty-iterable-within-deque-call",
+        "unnecessary-encode-utf8",
+        "unnecessary-enumerate",
+        "unnecessary-escaped-quote",
+        "unnecessary-from-float",
+        "unnecessary-future-import",
+        "unnecessary-generator-dict",
+        "unnecessary-generator-list",
+        "unnecessary-generator-set",
+        "unnecessary-if",
+        "unnecessary-iterable-allocation-for-first-element",
+        "unnecessary-key-check",
+        "unnecessary-lambda",
+        "unnecessary-list-call",
+        "unnecessary-list-cast",
+        "unnecessary-list-comprehension-dict",
+        "unnecessary-list-comprehension-set",
+        "unnecessary-list-index-lookup",
+        "unnecessary-literal-constructor",
+        "unnecessary-literal-dict",
+        "unnecessary-literal-set",
+        "unnecessary-literal-union",
+        "unnecessary-literal-within-dict-call",
+        "unnecessary-literal-within-list-call",
+        "unnecessary-literal-within-tuple-call",
+        "unnecessary-map",
+        "unnecessary-multiline-docstring",
+        "unnecessary-nested-literal",
+        "unnecessary-paren-on-raise-exception",
+        "unnecessary-placeholder",
+        "unnecessary-positional-str-format-indices",
+        "unnecessary-range-start",
+        "unnecessary-regular-expression",
+        "unnecessary-regular-expression-compile",
+        "unnecessary-return-none",
+        "unnecessary-round",
+        "unnecessary-spread",
+        "unnecessary-str-join",
+        "unnecessary-subscript-reversal",
+        "unnecessary-trailing-comma",
+        "unnecessary-type-union",
+        "unquoted-type-alias",
+        "unraw-re-pattern",
+        "unrecognized-platform-check-in-stub",
+        "unrecognized-platform-name-in-stub",
+        "unrecognized-version-info-check-in-stub",
+        "unreliable-callable-check",
+        "unsafe-markup-use",
+        "unsafe-yaml-load",
+        "unsorted-dunder-all",
+        "unsorted-dunder-slots",
+        "unsorted-imports",
+        "unspecified-encoding",
+        "unsupported-method-call-on-all",
+        "unused-annotation",
+        "unused-async",
+        "unused-class-method-parameter",
+        "unused-function-parameter",
+        "unused-import",
+        "unused-lambda-parameter",
+        "unused-loop-control-variable",
+        "unused-method-parameter",
+        "unused-private-protocol",
+        "unused-private-type-alias",
+        "unused-private-type-var",
+        "unused-private-typed-dict",
+        "unused-self",
+        "unused-static-method-parameter",
+        "unused-suppression-comment",
+        "unused-unpacked-variable",
+        "unused-variable",
+        "used-dummy-variable",
+        "useless-class-metaclass-type",
+        "useless-comparison",
+        "useless-contextlib-suppress",
+        "useless-else-on-loop",
+        "useless-exception-statement",
+        "useless-expression",
+        "useless-finally",
+        "useless-import-alias",
+        "useless-metaclass-type",
+        "useless-object-inheritance",
+        "useless-return",
+        "useless-semicolon",
+        "useless-try-except",
+        "useless-with-lock",
+        "utf8-encoding-declaration",
+        "verbose-decimal-constructor",
+        "verbose-raise",
+        "wait-for-process-in-async-function",
+        "weak-cryptographic-key",
+        "while-one",
+        "whitespace-after-decorator",
+        "whitespace-after-open-bracket",
+        "whitespace-around-docstring-text",
+        "whitespace-before-close-bracket",
+        "whitespace-before-open-bracket",
+        "whitespace-before-punctuation",
+        "wrong-tuple-length-version-comparison-in-stub",
+        "yield-from-in-async-function",
+        "yield-in-context-manager-in-async-generator",
+        "yield-in-for-loop",
+        "yield-in-init",
+        "yield-outside-function",
+        "yoda-conditions",
+        "zip-dict-keys-and-values",
+        "zip-instead-of-pairwise",
+        "zip-without-explicit-strict"
+      ]
+    },
+    "RuntimeSemantics": {
+      "description": "Represents the desired runtime semantics for a set of type definitions\n\nNote that the order of variants is important here. `Required` has the\nhighest precedence when calling `RuntimeSemantics::combine` on two\nseparate targeting sources. (E.g. classes can be targeted both via\ntheir decorators, but also via their base classes, so this determines\nwhat happens when two sources disagree)",
+      "oneOf": [
+        {
+          "description": "Assume that all targeted annotations are going to be evaluated at runtime\nat some point. So all referenced bindings need to be available at runtime.",
+          "type": "string",
+          "const": "required"
+        },
+        {
+          "description": "Do not make any assumptions about how the targeted annotations are going\nto be interacted with, assume the current execution context of any referenced\nbindings is already correct.",
+          "type": "string",
+          "const": "ambiguous"
+        }
       ]
     },
     "Strictness": {

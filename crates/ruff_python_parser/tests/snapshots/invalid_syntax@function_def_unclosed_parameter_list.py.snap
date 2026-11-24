@@ -254,12 +254,10 @@ Module(
 3 |     return 42
 4 | def foo(a: int, b: str
 5 | x = 10
-  | ^ Syntax Error: Expected `,`, found name
-  |
+  | ^ Syntax Error: Expected `,`, found identifier
 
 
   |
 4 | def foo(a: int, b: str
 5 | x = 10
   |       ^ Syntax Error: unexpected EOF while parsing
-  |

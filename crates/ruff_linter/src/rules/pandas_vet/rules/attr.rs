@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
 
 /// ## What it does
@@ -34,13 +35,13 @@ use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
 /// ## References
 /// - [Pandas documentation: Accessing the values in a Series or Index](https://pandas.pydata.org/pandas-docs/stable/whatsnew/v0.24.0.html#accessing-the-values-in-a-series-or-index)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.188")]
+#[violation_metadata(stable_since = "v0.0.188", category = Category::Pedantic)]
 pub(crate) struct PandasUseOfDotValues;
 
 impl Violation for PandasUseOfDotValues {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Use `.to_numpy()` instead of `.values`".to_string()
+        "Use `.to_numpy()` or `.array` instead of `.values`".to_string()
     }
 }
 

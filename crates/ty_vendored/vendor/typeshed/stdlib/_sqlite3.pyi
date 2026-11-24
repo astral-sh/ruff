@@ -18,8 +18,8 @@ from sqlite3 import (
     Warning as Warning,
     _IsolationLevel,
 )
-from typing import Any, Final, Literal, TypeVar, overload
-from typing_extensions import TypeAlias
+from typing import Any, Final, Literal, TypeAlias, TypeVar, overload
+from typing_extensions import deprecated
 
 if sys.version_info >= (3, 11):
     from sqlite3 import Blob as Blob
@@ -69,6 +69,8 @@ SQLITE_SAVEPOINT: Final = 32
 SQLITE_SELECT: Final = 21
 SQLITE_TRANSACTION: Final = 22
 SQLITE_UPDATE: Final = 23
+if sys.version_info >= (3, 15):
+    SQLITE_KEYWORDS: tuple[str, ...]
 adapters: dict[tuple[type[Any], type[Any]], _Adapter[Any]]
 converters: dict[str, _Converter]
 sqlite_version: str
@@ -171,7 +173,7 @@ if sys.version_info >= (3, 11):
     SQLITE_IOERR_VNODE: Final = 6922
     SQLITE_IOERR_WRITE: Final = 778
     SQLITE_LIMIT_ATTACHED: Final = 7
-    SQLITE_LIMIT_COLUMN: Final = 22
+    SQLITE_LIMIT_COLUMN: Final = 2
     SQLITE_LIMIT_COMPOUND_SELECT: Final = 4
     SQLITE_LIMIT_EXPR_DEPTH: Final = 3
     SQLITE_LIMIT_FUNCTION_ARG: Final = 6
@@ -217,9 +219,9 @@ if sys.version_info >= (3, 11):
 @overload
 def adapt(obj: Any, proto: Any, /) -> Any:
     """Adapt given object to given protocol."""
-
 @overload
 def adapt(obj: Any, proto: Any, alt: _T, /) -> Any | _T: ...
+
 def complete_statement(statement: str) -> bool:
     """Checks if a string contains a complete SQL statement."""
 
@@ -240,13 +242,7 @@ if sys.version_info >= (3, 12):
 
         You can use ":memory:" to open a database connection to a database that
         resides in RAM instead of on disk.
-
-        Note: Passing more than 1 positional argument to _sqlite3.connect() is
-        deprecated. Parameters 'timeout', 'detect_types', 'isolation_level',
-        'check_same_thread', 'factory', 'cached_statements' and 'uri' will
-        become keyword-only parameters in Python 3.15.
         """
-
     @overload
     def connect(
         database: StrOrBytesPath,
@@ -273,7 +269,6 @@ if sys.version_info >= (3, 12):
         uri: bool = False,
         autocommit: bool = ...,
     ) -> _ConnectionT: ...
-
 else:
     @overload
     def connect(
@@ -290,7 +285,6 @@ else:
         You can use ":memory:" to open a database connection to a database that resides
         in RAM instead of on disk.
         """
-
     @overload
     def connect(
         database: StrOrBytesPath,
@@ -320,7 +314,11 @@ def enable_callback_tracebacks(enable: bool, /) -> None:
 
 if sys.version_info < (3, 12):
     # takes a pos-or-keyword argument because there is a C wrapper
-    def enable_shared_cache(do_enable: int) -> None:
+    @deprecated(
+        "Deprecated since Python 3.10; removed in Python 3.12. "
+        "Open database in URI mode using `cache=shared` parameter instead."
+    )
+    def enable_shared_cache(do_enable: int) -> None:  # undocumented
         """Enable or disable shared cache mode for the calling thread.
 
         This method is deprecated and will be removed in Python 3.12.
@@ -329,25 +327,8 @@ if sys.version_info < (3, 12):
         the cache=shared query parameter.
         """
 
-if sys.version_info >= (3, 10):
-    def register_adapter(type: type[_T], adapter: _Adapter[_T], /) -> None:
-        """Register a function to adapt Python objects to SQLite values."""
+def register_adapter(type: type[_T], adapter: _Adapter[_T], /) -> None:
+    """Register a function to adapt Python objects to SQLite values."""
 
-    def register_converter(typename: str, converter: _Converter, /) -> None:
-        """Register a function to convert SQLite values to Python objects."""
-
-else:
-    def register_adapter(type: type[_T], caster: _Adapter[_T], /) -> None:
-        """register_adapter(type, callable)
-
-        Registers an adapter with sqlite3's adapter registry.
-        """
-
-    def register_converter(name: str, converter: _Converter, /) -> None:
-        """register_converter(typename, callable)
-
-        Registers a converter with sqlite3.
-        """
-
-if sys.version_info < (3, 10):
-    OptimizedUnicode = str
+def register_converter(typename: str, converter: _Converter, /) -> None:
+    """Register a function to convert SQLite values to Python objects."""

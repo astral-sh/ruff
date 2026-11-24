@@ -5,9 +5,26 @@
 //! which specific feature this preview check is for. Having named functions simplifies the promotion:
 //! Simply delete the function and let Rust tell you which checks you have to remove.
 
-use crate::settings::LinterSettings;
+use crate::settings::{LinterSettings, types::PreviewMode};
 
 // Rule-specific behavior
+
+// https://github.com/astral-sh/ruff/issues/25375
+pub(crate) const fn is_pytest_asyncio_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/issues/23802
+pub(crate) const fn is_annotated_assignment_redefinition_enabled(
+    settings: &LinterSettings,
+) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/issues/18863
+pub(crate) const fn is_s103_extended_dangerous_bits_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
 
 // https://github.com/astral-sh/ruff/pull/21382
 pub(crate) const fn is_custom_exception_checking_enabled(settings: &LinterSettings) -> bool {
@@ -24,20 +41,28 @@ pub(crate) const fn is_comprehension_with_min_max_sum_enabled(settings: &LinterS
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/12657
-pub(crate) const fn is_check_comprehensions_in_tuple_call_enabled(
-    settings: &LinterSettings,
-) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/issues/15347
 pub(crate) const fn is_bad_version_info_in_non_stub_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/issues/4460
+pub(crate) const fn is_legacy_type_comment_in_non_stub_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/15635
+pub(crate) const fn is_fix_runtime_string_union_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 /// <https://github.com/astral-sh/ruff/pull/19303>
 pub(crate) const fn is_fix_f_string_logging_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/27201
+pub(crate) const fn is_fix_pytest_composite_assertion_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
@@ -170,6 +195,11 @@ pub(crate) const fn is_fix_os_makedirs_enabled(settings: &LinterSettings) -> boo
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/26460
+pub(crate) const fn is_fix_os_stat_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/20009
 pub(crate) const fn is_fix_os_symlink_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -196,49 +226,8 @@ pub(crate) const fn is_allow_nested_roots_enabled(settings: &LinterSettings) -> 
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/18572
-pub(crate) const fn is_optional_as_none_in_union_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/20659
-pub(crate) const fn is_future_required_preview_generics_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/18683
-pub(crate) const fn is_safe_super_call_with_parameters_fix_enabled(
-    settings: &LinterSettings,
-) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/19851
-pub(crate) const fn is_maxsplit_without_separator_fix_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/20027
-pub(crate) const fn is_unnecessary_default_type_args_stubs_enabled(
-    settings: &LinterSettings,
-) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/20343
-pub(crate) const fn is_sim910_expanded_key_support_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/20169
 pub(crate) const fn is_fix_builtin_open_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/20178
-pub(crate) const fn is_a003_class_scope_shadowing_expansion_enabled(
-    settings: &LinterSettings,
-) -> bool {
     settings.preview.is_enabled()
 }
 
@@ -266,43 +255,118 @@ pub(crate) const fn is_b006_unsafe_fix_preserve_assignment_expr_enabled(
     settings.preview.is_enabled()
 }
 
-pub(crate) const fn is_typing_extensions_str_alias_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/19045
-pub(crate) const fn is_extended_i18n_function_matching_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/21374
-pub(crate) const fn is_extended_snmp_api_path_detection_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/21395
-pub(crate) const fn is_enumerate_for_loop_int_index_enabled(settings: &LinterSettings) -> bool {
+pub(crate) const fn is_manual_loop_counter_int_index_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/21469
-pub(crate) const fn is_s310_resolve_string_literal_bindings_enabled(
+// https://github.com/astral-sh/ruff/pull/23046
+pub(crate) const fn is_mutable_default_in_dataclass_field_enabled(
     settings: &LinterSettings,
 ) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/21623
-pub(crate) const fn is_range_suppressions_enabled(settings: &LinterSettings) -> bool {
+// https://github.com/astral-sh/ruff/pull/22830
+pub(crate) const fn is_standalone_mock_non_existent_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/22057
-pub(crate) const fn is_ble001_exc_info_suppression_enabled(settings: &LinterSettings) -> bool {
+// https://github.com/astral-sh/ruff/pull/23013
+pub(crate) const fn is_up024_precise_highlighting_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/22419
-pub(crate) const fn is_py315_support_enabled(settings: &LinterSettings) -> bool {
+// https://github.com/astral-sh/ruff/pull/21078
+pub(crate) const fn is_plural_ngettext_check_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/22560
+pub(crate) const fn is_f811_shadowing_in_type_checking_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/19023
+pub(crate) const fn is_resolve_string_annotation_pyi041_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/23510
+pub(crate) const fn is_baseloader_safe_in_yaml_load_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/21373
+pub(crate) const fn is_expanded_import_conventions_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/23535
+pub(crate) const fn is_file_level_unknown_rule_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/issues/26282
+pub(crate) const fn is_redirected_suppression_code_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/23473
+pub(crate) const fn is_incorrect_dict_iterator_comprehension_enabled(
+    settings: &LinterSettings,
+) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/22212
+pub(crate) const fn is_e402_fix_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/27993
+pub(crate) const fn is_pt020_fix_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/23260
+pub(crate) const fn is_up006_future_annotations_fix_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/24371
+pub(crate) const fn is_collapsible_if_fix_safe_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/23259
+pub(crate) const fn is_pep604_future_annotations_fix_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/25614
+// TODO(brent) Remove ecosystem selector normalization when stabilizing human-readable rule names:
+// https://github.com/astral-sh/ruff/pull/27158
+pub const fn is_human_readable_names_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/29768
+pub const fn is_script_metadata_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/26113
+pub const fn is_warn_on_unknown_selectors_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/27050
+pub(crate) const fn is_b005_precise_diagnostic_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/27666
+pub(crate) const fn is_rule_categories_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
 }

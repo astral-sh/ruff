@@ -4,8 +4,8 @@ import sys
 from _typeshed import SupportsWrite, Unused
 from collections.abc import Generator, Iterable, Iterator, Mapping
 from types import FrameType, TracebackType
-from typing import Any, ClassVar, Literal, overload
-from typing_extensions import Self, TypeAlias, deprecated
+from typing import Any, ClassVar, Literal, SupportsIndex, TypeAlias, overload
+from typing_extensions import Self, deprecated
 
 __all__ = [
     "extract_stack",
@@ -43,88 +43,50 @@ def print_tb(tb: TracebackType | None, limit: int | None = None, file: SupportsW
     method.
     """
 
-if sys.version_info >= (3, 10):
-    @overload
-    def print_exception(
-        exc: type[BaseException] | None,
-        /,
-        value: BaseException | None = ...,
-        tb: TracebackType | None = ...,
-        limit: int | None = None,
-        file: SupportsWrite[str] | None = None,
-        chain: bool = True,
-    ) -> None:
-        """Print exception up to 'limit' stack trace entries from 'tb' to 'file'.
+@overload
+def print_exception(
+    exc: type[BaseException] | None,
+    /,
+    value: BaseException | None = ...,
+    tb: TracebackType | None = ...,
+    limit: int | None = None,
+    file: SupportsWrite[str] | None = None,
+    chain: bool = True,
+) -> None:
+    """Print exception up to 'limit' stack trace entries from 'tb' to 'file'.
 
-        This differs from print_tb() in the following ways: (1) if
-        traceback is not None, it prints a header "Traceback (most recent
-        call last):"; (2) it prints the exception type and value after the
-        stack trace; (3) if type is SyntaxError and value has the
-        appropriate format, it prints the line where the syntax error
-        occurred with a caret on the next line indicating the approximate
-        position of the error.
-        """
+    This differs from print_tb() in the following ways: (1) if
+    traceback is not None, it prints a header "Traceback (most recent
+    call last):"; (2) it prints the exception type and value after the
+    stack trace; (3) if type is SyntaxError and value has the
+    appropriate format, it prints the line where the syntax error
+    occurred with a caret on the next line indicating the approximate
+    position of the error.
+    """
+@overload
+def print_exception(
+    exc: BaseException, /, *, limit: int | None = None, file: SupportsWrite[str] | None = None, chain: bool = True
+) -> None: ...
 
-    @overload
-    def print_exception(
-        exc: BaseException, /, *, limit: int | None = None, file: SupportsWrite[str] | None = None, chain: bool = True
-    ) -> None: ...
-    @overload
-    def format_exception(
-        exc: type[BaseException] | None,
-        /,
-        value: BaseException | None = ...,
-        tb: TracebackType | None = ...,
-        limit: int | None = None,
-        chain: bool = True,
-    ) -> list[str]:
-        """Format a stack trace and the exception information.
+@overload
+def format_exception(
+    exc: type[BaseException] | None,
+    /,
+    value: BaseException | None = ...,
+    tb: TracebackType | None = ...,
+    limit: int | None = None,
+    chain: bool = True,
+) -> list[str]:
+    """Format a stack trace and the exception information.
 
-        The arguments have the same meaning as the corresponding arguments
-        to print_exception().  The return value is a list of strings, each
-        ending in a newline and some containing internal newlines.  When
-        these lines are concatenated and printed, exactly the same text is
-        printed as does print_exception().
-        """
-
-    @overload
-    def format_exception(exc: BaseException, /, *, limit: int | None = None, chain: bool = True) -> list[str]: ...
-
-else:
-    def print_exception(
-        etype: type[BaseException] | None,
-        value: BaseException | None,
-        tb: TracebackType | None,
-        limit: int | None = None,
-        file: SupportsWrite[str] | None = None,
-        chain: bool = True,
-    ) -> None:
-        """Print exception up to 'limit' stack trace entries from 'tb' to 'file'.
-
-        This differs from print_tb() in the following ways: (1) if
-        traceback is not None, it prints a header "Traceback (most recent
-        call last):"; (2) it prints the exception type and value after the
-        stack trace; (3) if type is SyntaxError and value has the
-        appropriate format, it prints the line where the syntax error
-        occurred with a caret on the next line indicating the approximate
-        position of the error.
-        """
-
-    def format_exception(
-        etype: type[BaseException] | None,
-        value: BaseException | None,
-        tb: TracebackType | None,
-        limit: int | None = None,
-        chain: bool = True,
-    ) -> list[str]:
-        """Format a stack trace and the exception information.
-
-        The arguments have the same meaning as the corresponding arguments
-        to print_exception().  The return value is a list of strings, each
-        ending in a newline and some containing internal newlines.  When
-        these lines are concatenated and printed, exactly the same text is
-        printed as does print_exception().
-        """
+    The arguments have the same meaning as the corresponding arguments
+    to print_exception().  The return value is a list of strings, each
+    ending in a newline and some containing internal newlines.  When
+    these lines are concatenated and printed, exactly the same text is
+    printed as does print_exception().
+    """
+@overload
+def format_exception(exc: BaseException, /, *, limit: int | None = None, chain: bool = True) -> list[str]: ...
 
 def print_exc(limit: int | None = None, file: SupportsWrite[str] | None = None, chain: bool = True) -> None:
     """Shorthand for 'print_exception(sys.exception(), limit=limit, file=file, chain=chain)'."""
@@ -148,10 +110,10 @@ def extract_tb(tb: TracebackType | None, limit: int | None = None) -> StackSumma
     This is useful for alternate formatting of stack traces.  If
     'limit' is omitted or None, all entries are extracted.  A
     pre-processed stack trace entry is a FrameSummary object
-    containing attributes filename, lineno, name, and line
-    representing the information that is usually printed for a stack
-    trace.  The line is a string with leading and trailing
-    whitespace stripped; if the source is not available it is None.
+    representing the information that is usually printed for a
+    stack trace. The line attribute is a string with
+    leading and trailing whitespace stripped; if the source is not
+    available the corresponding attribute is None.
     """
 
 def extract_stack(f: FrameType | None = None, limit: int | None = None) -> StackSummary:
@@ -159,9 +121,8 @@ def extract_stack(f: FrameType | None = None, limit: int | None = None) -> Stack
 
     The return value has the same format as for extract_tb().  The
     optional 'f' and 'limit' arguments have the same meaning as for
-    print_stack().  Each item in the list is a quadruple (filename,
-    line number, function name, text), and the entries are in order
-    from oldest to newest stack frame.
+    print_stack().  Each item in the list is a FrameSummary object,
+    and the entries are in order from oldest to newest stack frame.
     """
 
 def format_list(extracted_list: Iterable[FrameSummary | _FrameSummaryTuple]) -> list[str]:
@@ -199,11 +160,9 @@ if sys.version_info >= (3, 13):
         :exc:`BaseExceptionGroup`, the nested exceptions are included as
         well, recursively, with indentation relative to their nesting depth.
         """
-
     @overload
     def format_exception_only(exc: Unused, /, value: BaseException | None, *, show_group: bool = False) -> list[str]: ...
-
-elif sys.version_info >= (3, 10):
+else:
     @overload
     def format_exception_only(exc: BaseException | None, /) -> list[str]:
         """Format the exception part of a traceback.
@@ -216,27 +175,8 @@ elif sys.version_info >= (3, 10):
         about where the syntax error occurred. Following the message, the list
         contains the exception's ``__notes__``.
         """
-
     @overload
     def format_exception_only(exc: Unused, /, value: BaseException | None) -> list[str]: ...
-
-else:
-    def format_exception_only(etype: type[BaseException] | None, value: BaseException | None) -> list[str]:
-        """Format the exception part of a traceback.
-
-        The arguments are the exception type and value such as given by
-        sys.last_type and sys.last_value. The return value is a list of
-        strings, each ending in a newline.
-
-        Normally, the list contains a single string; however, for
-        SyntaxError exceptions, it contains several lines that (when
-        printed) display detailed information about where the syntax
-        error occurred.
-
-        The message indicating which exception occurred is always the last
-        string in the list.
-
-        """
 
 def format_exc(limit: int | None = None, chain: bool = True) -> str:
     """Like print_exc() but return a string."""
@@ -267,7 +207,7 @@ def walk_tb(tb: TracebackType | None) -> Iterator[tuple[FrameType, int]]:
 if sys.version_info >= (3, 11):
     class _ExceptionPrintContext:
         def indent(self) -> str: ...
-        def emit(self, text_gen: str | Iterable[str], margin_char: str | None = None) -> Generator[str, None, None]: ...
+        def emit(self, text_gen: str | Iterable[str], margin_char: str | None = None) -> Generator[str]: ...
 
 class TracebackException:
     """An exception ready for rendering.
@@ -321,12 +261,10 @@ class TracebackException:
     # These fields only exist for `SyntaxError`s, but there is no way to express that in the type system.
     filename: str
     lineno: str | None
-    if sys.version_info >= (3, 10):
-        end_lineno: str | None
+    end_lineno: str | None
     text: str
     offset: int
-    if sys.version_info >= (3, 10):
-        end_offset: int | None
+    end_offset: int | None
     msg: str
 
     if sys.version_info >= (3, 13):
@@ -368,19 +306,6 @@ class TracebackException:
             max_group_depth: int = 10,
             _seen: set[int] | None = None,
         ) -> None: ...
-    elif sys.version_info >= (3, 10):
-        def __init__(
-            self,
-            exc_type: type[BaseException],
-            exc_value: BaseException,
-            exc_traceback: TracebackType | None,
-            *,
-            limit: int | None = None,
-            lookup_lines: bool = True,
-            capture_locals: bool = False,
-            compact: bool = False,
-            _seen: set[int] | None = None,
-        ) -> None: ...
     else:
         def __init__(
             self,
@@ -391,6 +316,7 @@ class TracebackException:
             limit: int | None = None,
             lookup_lines: bool = True,
             capture_locals: bool = False,
+            compact: bool = False,
             _seen: set[int] | None = None,
         ) -> None: ...
 
@@ -408,7 +334,7 @@ class TracebackException:
             max_group_depth: int = 10,
         ) -> Self:
             """Create a TracebackException from an exception."""
-    elif sys.version_info >= (3, 10):
+    else:
         @classmethod
         def from_exception(
             cls,
@@ -420,17 +346,11 @@ class TracebackException:
             compact: bool = False,
         ) -> Self:
             """Create a TracebackException from an exception."""
-    else:
-        @classmethod
-        def from_exception(
-            cls, exc: BaseException, *, limit: int | None = None, lookup_lines: bool = True, capture_locals: bool = False
-        ) -> Self:
-            """Create a TracebackException from an exception."""
 
     def __eq__(self, other: object) -> bool: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
     if sys.version_info >= (3, 11):
-        def format(self, *, chain: bool = True, _ctx: _ExceptionPrintContext | None = None) -> Generator[str, None, None]:
+        def format(self, *, chain: bool = True, _ctx: _ExceptionPrintContext | None = None) -> Generator[str]:
             """Format the exception.
 
             If chain is not *True*, *__cause__* and *__context__* will not be formatted.
@@ -442,8 +362,9 @@ class TracebackException:
             The message indicating which exception occurred is always the last
             string in the output.
             """
+
     else:
-        def format(self, *, chain: bool = True) -> Generator[str, None, None]:
+        def format(self, *, chain: bool = True) -> Generator[str]:
             """Format the exception.
 
             If chain is not *True*, *__cause__* and *__context__* will not be formatted.
@@ -455,8 +376,9 @@ class TracebackException:
             The message indicating which exception occurred is always the last
             string in the output.
             """
+
     if sys.version_info >= (3, 13):
-        def format_exception_only(self, *, show_group: bool = False, _depth: int = 0) -> Generator[str, None, None]:
+        def format_exception_only(self, *, show_group: bool = False, _depth: int = 0) -> Generator[str]:
             """Format the exception part of the traceback.
 
             The return value is a generator of strings, each ending in a newline.
@@ -473,8 +395,9 @@ class TracebackException:
             :exc:`BaseExceptionGroup`, the nested exceptions are included as
             well, recursively, with indentation relative to their nesting depth.
             """
+
     else:
-        def format_exception_only(self) -> Generator[str, None, None]:
+        def format_exception_only(self) -> Generator[str]:
             """Format the exception part of the traceback.
 
             The return value is a generator of strings, each ending in a newline.
@@ -487,6 +410,7 @@ class TracebackException:
             Following the message, generator also yields
             all the exception's ``__notes__``.
             """
+
     if sys.version_info >= (3, 11):
         def print(self, *, file: SupportsWrite[str] | None = None, chain: bool = True) -> None:
             """Print the result of self.format(chain=chain) to 'file'."""
@@ -499,10 +423,16 @@ class FrameSummary:
       active when the frame was captured.
     - :attr:`name` The name of the function or method that was executing
       when the frame was captured.
-    - :attr:`line` The text from the linecache module for the
+    - :attr:`line` The text from the linecache module for the line
       of code that was running when the frame was captured.
     - :attr:`locals` Either None if locals were not supplied, or a dict
       mapping the name to the repr() of the variable.
+    - :attr:`end_lineno` The last line number of the source code for this frame.
+      By default, it is set to lineno and indexation starts from 1.
+    - :attr:`colno` The column number of the source code for this frame.
+      By default, it is None and indexation starts from 0.
+    - :attr:`end_colno` The last column number of the source code for this frame.
+      By default, it is None and indexation starts from 0.
     """
 
     if sys.version_info >= (3, 13):
@@ -545,6 +475,7 @@ class FrameSummary:
             :param line: If provided, use this instead of looking up the line in
                 the linecache.
             """
+
         end_lineno: int | None
         colno: int | None
         end_colno: int | None
@@ -568,12 +499,14 @@ class FrameSummary:
             :param line: If provided, use this instead of looking up the line in
                 the linecache.
             """
+
     filename: str
     lineno: int | None
     name: str
     locals: dict[str, str] | None
     @property
     def line(self) -> str | None: ...
+
     @overload
     def __getitem__(self, pos: Literal[0]) -> str: ...
     @overload
@@ -583,9 +516,10 @@ class FrameSummary:
     @overload
     def __getitem__(self, pos: Literal[3]) -> str | None: ...
     @overload
-    def __getitem__(self, pos: int) -> Any: ...
+    def __getitem__(self, pos: SupportsIndex) -> Any: ...
     @overload
-    def __getitem__(self, pos: slice) -> tuple[Any, ...]: ...
+    def __getitem__(self, pos: slice[SupportsIndex | None]) -> tuple[Any, ...]: ...
+
     def __iter__(self) -> Iterator[Any]: ...
     def __eq__(self, other: object) -> bool: ...
     def __len__(self) -> Literal[4]: ...
@@ -621,6 +555,7 @@ class StackSummary(list[FrameSummary]):
         Create a StackSummary object from a supplied list of
         FrameSummary objects or old-style list of tuples.
         """
+
     if sys.version_info >= (3, 11):
         def format_frame_summary(self, frame_summary: FrameSummary) -> str:
             """Format the lines for a single FrameSummary.

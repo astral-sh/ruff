@@ -1,12 +1,15 @@
 use super::PositionEncoding;
 use crate::Db;
-use crate::system::file_to_url;
+use crate::system::file_to_uri;
 
-use ruff_db::files::{File, FileRange};
+use lsp_types::Uri;
+use ruff_db::files::{File, FileRange, system_path_to_file, vendored_path_to_file};
 use ruff_db::source::{line_index, source_text};
+use ruff_db::system::SystemPathBuf;
 use ruff_source_file::LineIndex;
 use ruff_source_file::{OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use ty_project::ProjectDatabase;
 
 /// A range in an LSP text document (cell or a regular document).
 #[derive(Clone, Debug, Default)]
@@ -14,7 +17,7 @@ pub(crate) struct LspRange {
     range: lsp_types::Range,
 
     /// The URI of this range's text document
-    uri: Option<lsp_types::Url>,
+    uri: Option<lsp_types::Uri>,
 }
 
 impl LspRange {
@@ -55,7 +58,7 @@ pub(crate) struct LspPosition {
     position: lsp_types::Position,
 
     /// The URI of this range's text document
-    uri: Option<lsp_types::Url>,
+    uri: Option<lsp_types::Uri>,
 }
 
 impl LspPosition {
@@ -72,7 +75,7 @@ impl LspPosition {
 
     /// Returns the uri of the text document this position belongs to.
     #[expect(unused)]
-    pub(crate) fn uri(&self) -> Option<&lsp_types::Url> {
+    fn uri(&self) -> Option<&lsp_types::Uri> {
         self.uri.as_ref()
     }
 }
@@ -81,13 +84,13 @@ pub(crate) trait RangeExt {
     /// Convert an LSP Range to a [`TextRange`].
     ///
     /// Returns `None` if `file` is a notebook and the
-    /// cell identified by `url` can't be looked up or if the notebook
+    /// cell identified by `uri` can't be looked up or if the notebook
     /// isn't open in the editor.
     fn to_text_range(
         &self,
         db: &dyn Db,
         file: File,
-        url: &lsp_types::Url,
+        uri: &lsp_types::Uri,
         encoding: PositionEncoding,
     ) -> Option<TextRange>;
 }
@@ -97,14 +100,24 @@ impl RangeExt for lsp_types::Range {
         &self,
         db: &dyn Db,
         file: File,
-        url: &lsp_types::Url,
+        uri: &lsp_types::Uri,
         encoding: PositionEncoding,
     ) -> Option<TextRange> {
-        let start = self.start.to_text_size(db, file, url, encoding)?;
-        let end = self.end.to_text_size(db, file, url, encoding)?;
+        let start = self.start.to_text_size(db, file, uri, encoding)?;
+        let end = self.end.to_text_size(db, file, uri, encoding)?;
 
         Some(TextRange::new(start, end))
     }
+}
+
+/// Returns the range of the notebook cell identified by `cell_uri` in the notebook's
+/// concatenated Python source, including the newline that separates it from the next cell.
+///
+/// Returns `None` if `file` isn't an open notebook, if the cell can't be found, or if the cell
+/// isn't part of the notebook's Python source (for example, because it uses a cell magic).
+pub(crate) fn cell_range(db: &dyn Db, file: File, cell_uri: &lsp_types::Uri) -> Option<TextRange> {
+    let cell_index = db.notebook_document(file)?.cell_index_by_uri(cell_uri)?;
+    source_text(db, file).as_notebook()?.cell_range(cell_index)
 }
 
 pub(crate) trait PositionExt {
@@ -115,13 +128,13 @@ pub(crate) trait PositionExt {
     /// concatenated notebook file.
     ///
     /// Returns `None` if `file` is a notebook and the
-    /// cell identified by `url` can't be looked up or if the notebook
+    /// cell identified by `uri` can't be looked up or if the notebook
     /// isn't open in the editor.
     fn to_text_size(
         &self,
         db: &dyn Db,
         file: File,
-        url: &lsp_types::Url,
+        uri: &lsp_types::Uri,
         encoding: PositionEncoding,
     ) -> Option<TextSize>;
 }
@@ -131,7 +144,7 @@ impl PositionExt for lsp_types::Position {
         &self,
         db: &dyn Db,
         file: File,
-        url: &lsp_types::Url,
+        uri: &lsp_types::Uri,
         encoding: PositionEncoding,
     ) -> Option<TextSize> {
         let source = source_text(db, file);
@@ -139,13 +152,13 @@ impl PositionExt for lsp_types::Position {
 
         if let Some(notebook) = source.as_notebook() {
             let notebook_document = db.notebook_document(file)?;
-            let cell_index = notebook_document.cell_index_by_uri(url)?;
+            let cell_index = notebook_document.cell_index_by_uri(uri)?;
 
-            let cell_start_offset = notebook.cell_offset(cell_index).unwrap_or_default();
+            let cell_range = notebook.cell_content_range(cell_index)?;
             let cell_relative_line = OneIndexed::from_zero_indexed(u32_index_to_usize(self.line));
 
             let cell_start_location =
-                index.source_location(cell_start_offset, source.as_str(), encoding.into());
+                index.source_location(cell_range.start(), source.as_str(), encoding.into());
             assert_eq!(cell_start_location.character_offset, OneIndexed::MIN);
 
             // Absolute position into the concatenated notebook source text.
@@ -155,7 +168,15 @@ impl PositionExt for lsp_types::Position {
                     .saturating_add(cell_relative_line.to_zero_indexed()),
                 character_offset: OneIndexed::from_zero_indexed(u32_index_to_usize(self.character)),
             };
-            return Some(index.offset(absolute_position, &source, encoding.into()));
+            let offset = index.offset(absolute_position, &source, encoding.into());
+
+            // A position beyond the end of the cell (past the end of its last line, or on a line
+            // after it) would otherwise resolve to the cell separator or into the next cell.
+            // Clients can send such positions, e.g., a completion request using the position from
+            // before the user deleted the last character in the cell. Clamp it to the end of the
+            // cell, like an out-of-range position in a regular file is clamped to the end of the
+            // file.
+            return Some(offset.min(cell_range.end()));
         }
 
         Some(lsp_position_to_text_size(*self, &source, &index, encoding))
@@ -203,7 +224,7 @@ impl TextSizeExt for TextSize {
             });
         }
 
-        let uri = file_to_url(db, file);
+        let uri = file_to_uri(db, file);
         let position = text_size_to_lsp_position(*self, &source, &index, encoding);
 
         Some(LspPosition { position, uri })
@@ -320,7 +341,7 @@ impl ToRangeExt for TextRange {
 
         let range = text_range_to_lsp_range(*self, &source, &index, encoding);
 
-        let uri = file_to_url(db, file);
+        let uri = file_to_uri(db, file);
         Some(LspRange { range, uri })
     }
 }
@@ -343,4 +364,45 @@ impl FileRangeExt for FileRange {
     fn to_lsp_range(&self, db: &dyn Db, encoding: PositionEncoding) -> Option<LspRange> {
         self.range().to_lsp_range(db, self.file(), encoding)
     }
+}
+
+/// Attempts to resolve the location for a file and range. This includes
+/// mapping system paths back into their proper vendored
+/// path types (if applicable).
+pub(crate) fn resolve_file_uri_range(
+    db: &ProjectDatabase,
+    file_uri: &Uri,
+    range: lsp_types::Range,
+    encoding: PositionEncoding,
+) -> Option<(File, TextSize)> {
+    let system_path = SystemPathBuf::from_path_buf(file_uri.to_file_path().ok()?).ok()?;
+
+    let file = if let Some(ref vendored_root) = ty_ide::cached_vendored_root(db)
+        && let Some(vendored_path) = ty_ide::map_system_to_vendored(vendored_root, &system_path)
+    {
+        match vendored_path_to_file(db, vendored_path) {
+            Ok(file) => file,
+            Err(err) => {
+                tracing::warn!(
+                    "Could not resolve item location \
+                     for vendored file path `{vendored_path}`: {err}"
+                );
+                return None;
+            }
+        }
+    } else {
+        match system_path_to_file(db, &system_path) {
+            Ok(file) => file,
+            Err(err) => {
+                tracing::warn!(
+                    "Could not resolve item location \
+                     for system file path `{system_path}`: {err}"
+                );
+                return None;
+            }
+        }
+    };
+
+    let offset = range.start.to_text_size(db, file, file_uri, encoding)?;
+    Some((file, offset))
 }

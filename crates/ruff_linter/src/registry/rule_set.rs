@@ -5,7 +5,7 @@ use ruff_macros::CacheKey;
 
 use crate::registry::Rule;
 
-const RULESET_SIZE: usize = 15;
+const RULESET_SIZE: usize = 16;
 
 /// A set of [`Rule`]s.
 ///
@@ -22,10 +22,6 @@ impl RuleSet {
     /// Returns an empty rule set.
     pub const fn empty() -> Self {
         Self(Self::EMPTY)
-    }
-
-    pub fn clear(&mut self) {
-        self.0 = Self::EMPTY;
     }
 
     #[inline]
@@ -257,7 +253,7 @@ impl RuleSet {
 
     /// Returns `true` if any of the rules in `rules` are in this set.
     #[inline]
-    pub const fn any(&self, rules: &[Rule]) -> bool {
+    pub(crate) const fn any(&self, rules: &[Rule]) -> bool {
         let mut any = false;
         let mut i = 0;
 
@@ -302,8 +298,7 @@ impl Display for RuleSet {
         } else {
             writeln!(f, "[")?;
             for rule in self {
-                let code = rule.noqa_code();
-                writeln!(f, "\t{name} ({code}),", name = rule.name())?;
+                writeln!(f, "\t{},", rule.name_and_code())?;
             }
             write!(f, "]")?;
         }
@@ -359,11 +354,9 @@ impl Iterator for RuleSetIterator {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let slice = self.set.0.get_mut(self.index as usize)?;
-            // `trailing_zeros` is guaranteed to return a value in [0;64]
-            #[expect(clippy::cast_possible_truncation)]
-            let bit = slice.trailing_zeros() as u16;
-
-            if bit < RuleSet::SLICE_BITS {
+            if let Some(bit) = slice.lowest_one() {
+                #[expect(clippy::cast_possible_truncation)]
+                let bit = bit as u16;
                 *slice ^= 1 << bit;
                 let rule_value = self.index * RuleSet::SLICE_BITS + bit;
                 // SAFETY: RuleSet guarantees that only valid rules are stored in the set.

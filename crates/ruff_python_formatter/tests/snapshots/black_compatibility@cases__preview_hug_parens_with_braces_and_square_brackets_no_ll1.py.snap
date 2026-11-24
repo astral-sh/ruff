@@ -5,7 +5,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/pre
 ## Input
 
 ```python
-# split out from preview_hug_parens_with_brackes_and_square_brackets, as it produces
+# split out from preview_hug_parens_with_braces_and_square_brackets, as it produces
 # different code on the second pass with line-length 1 in many cases.
 # Seems to be about whether the last string in a sequence gets wrapped in parens or not.
 foo(*["long long long long long line", "long long long long long line", "long long long long long line"])
@@ -171,7 +171,7 @@ nested_array = [[["long line", "long long line", "long long long line", "long lo
 ## Ruff Output
 
 ```python
-# split out from preview_hug_parens_with_brackes_and_square_brackets, as it produces
+# split out from preview_hug_parens_with_braces_and_square_brackets, as it produces
 # different code on the second pass with line-length 1 in many cases.
 # Seems to be about whether the last string in a sequence gets wrapped in parens or not.
 foo(*[
@@ -293,7 +293,7 @@ nested_array = [
 ## Black Output
 
 ```python
-# split out from preview_hug_parens_with_brackes_and_square_brackets, as it produces
+# split out from preview_hug_parens_with_braces_and_square_brackets, as it produces
 # different code on the second pass with line-length 1 in many cases.
 # Seems to be about whether the last string in a sequence gets wrapped in parens or not.
 foo(*[

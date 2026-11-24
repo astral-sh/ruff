@@ -24,7 +24,7 @@ pub struct DefinitionId;
 impl DefinitionId {
     /// Returns the ID for the module definition.
     #[inline]
-    pub const fn module() -> Self {
+    pub(crate) const fn module() -> Self {
         DefinitionId::from_u32(0)
     }
 }
@@ -69,7 +69,7 @@ impl<'a> Module<'a> {
     }
 
     /// Return the name of the module.
-    pub const fn name(&self) -> Option<&'a str> {
+    pub(crate) const fn name(&self) -> Option<&'a str> {
         self.name
     }
 }
@@ -97,7 +97,7 @@ pub struct Member<'a> {
 
 impl<'a> Member<'a> {
     /// Return the name of the member.
-    pub fn name(&self) -> &'a str {
+    fn name(&self) -> &'a str {
         match self.kind {
             MemberKind::Class(class) => &class.name,
             MemberKind::NestedClass(class) => &class.name,
@@ -201,7 +201,7 @@ impl<'a> Definition<'a> {
 pub struct Definitions<'a>(IndexVec<DefinitionId, Definition<'a>>);
 
 impl<'a> Definitions<'a> {
-    pub fn for_module(definition: Module<'a>) -> Self {
+    pub(crate) fn for_module(definition: Module<'a>) -> Self {
         Self(IndexVec::from_raw(vec![Definition::Module(definition)]))
     }
 
@@ -214,11 +214,11 @@ impl<'a> Definitions<'a> {
     }
 
     /// Resolve the visibility of each definition in the collection.
-    pub fn resolve(self, exports: Option<&[DunderAllName]>) -> ContextualizedDefinitions<'a> {
+    pub fn resolve(&'a self, exports: Option<&[DunderAllName]>) -> ContextualizedDefinitions<'a> {
         let mut definitions: IndexVec<DefinitionId, ContextualizedDefinition<'a>> =
             IndexVec::with_capacity(self.len());
 
-        for definition in self {
+        for definition in self.iter() {
             // Determine the visibility of the next definition, taking into account its parent's
             // visibility.
             let visibility = {
@@ -282,7 +282,11 @@ impl<'a> Definitions<'a> {
 
     /// Returns a reference to the Python AST.
     pub fn python_ast(&self) -> Option<&'a [Stmt]> {
-        let module = self[DefinitionId::module()].as_module()?;
+        let Some(definition) = self.get(DefinitionId::module()) else {
+            debug_assert!(false, "Module definition unavailable");
+            return None;
+        };
+        let module = definition.as_module()?;
         Some(module.python_ast)
     }
 }
@@ -306,7 +310,7 @@ impl<'a> IntoIterator for Definitions<'a> {
 
 /// A [`Definition`] in a Python program with its resolved [`Visibility`].
 pub struct ContextualizedDefinition<'a> {
-    pub definition: Definition<'a>,
+    pub definition: &'a Definition<'a>,
     pub visibility: Visibility,
 }
 

@@ -1,0 +1,4 @@
+# Formatting configuration for Python code blocks in lint documentation
+
+[format]
+preview = true

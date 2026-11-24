@@ -16,7 +16,7 @@ def _(obj: NonFinalClass):
     else:
         reveal_type(obj)  # revealed: NonFinalClass & ~<Protocol with members 'spam'>
 
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         reveal_type(obj.spam)  # revealed: Unknown
 
     if hasattr(obj, "not-an-identifier"):
@@ -39,7 +39,7 @@ def _(obj: FinalClass):
     else:
         reveal_type(obj)  # revealed: FinalClass
 
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         reveal_type(obj.spam)  # revealed: Unknown
 ```
 
@@ -80,7 +80,7 @@ def _(obj: MaybeWithSpam):
     else:
         reveal_type(obj)  # revealed: MaybeWithSpam & ~<Protocol with members 'spam'>
 
-        # TODO: Ideally, we would emit `[unresolved-attribute]` and reveal `Unknown` here:
+        # TODO: Ideally, we would emit `[missing-attribute]` and reveal `Unknown` here:
         # error: [possibly-missing-attribute]
         reveal_type(obj.spam)  # revealed: int
 ```
@@ -95,6 +95,44 @@ def f(x: object):
         reveal_type(x.__str__)  # revealed: bound method object.__str__() -> str
         reveal_type(x.__dict__)  # revealed: dict[str, Any]
 
-        # error: [unresolved-attribute] "Object of type `<Protocol with members '__qualname__'>` has no attribute `foo`"
+        # error: [missing-attribute] "Object of type `<Protocol with members '__qualname__'>` has no attribute `foo`"
         reveal_type(x.foo)  # revealed: Unknown
+```
+
+Not every object has an instance dictionary, despite the broad `object.__dict__` annotation in
+typeshed. Checking for `__dict__` therefore preserves the corresponding protocol constraint.
+
+```py
+def has_dictionary(value: object) -> None:
+    if hasattr(value, "__dict__"):
+        reveal_type(value)  # revealed: <Protocol with members '__dict__'>
+```
+
+A protocol can be implemented by classes with or without instance dictionaries, so checking for
+`__dict__` preserves both possibilities.
+
+```py
+from typing import Protocol
+
+class HasValue(Protocol):
+    value: int
+
+def protocol_dictionary(value: HasValue) -> None:
+    if hasattr(value, "__dict__"):
+        reveal_type(value)  # revealed: HasValue & <Protocol with members '__dict__'>
+    else:
+        reveal_type(value)  # revealed: HasValue & ~<Protocol with members '__dict__'>
+```
+
+A final slotted class cannot gain an instance dictionary through a subclass, so the positive branch
+is unreachable.
+
+```py
+@final
+class FinalSlotted:
+    __slots__ = ()
+
+def no_dictionary(value: FinalSlotted) -> None:
+    if hasattr(value, "__dict__"):
+        reveal_type(value)  # revealed: Never
 ```

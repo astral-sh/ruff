@@ -117,9 +117,14 @@ def _(
 
 ## Enum literals
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from enum import Enum
-from typing import Literal, Any
+from typing import Any, Literal, Protocol
 from ty_extensions import Intersection
 
 class Color(Enum):
@@ -150,10 +155,146 @@ def _(
     reveal_type(u2)  # revealed: Literal[Color.RED]
 ```
 
+A protocol can distinguish enum members by their `name`. Only `Color.RED` is redundant in a union
+with `NamedRed`, in either operand order.
+
+```py
+class NamedRed(Protocol):
+    @property
+    def name(self) -> Literal["RED"]: ...
+
+def _(
+    literals_first: Literal[Color.RED, Color.GREEN] | NamedRed = Color.GREEN,
+    protocol_first: NamedRed | Literal[Color.RED, Color.GREEN] = Color.GREEN,
+):
+    reveal_type(literals_first)  # revealed: Literal[Color.GREEN] | NamedRed
+    reveal_type(protocol_first)  # revealed: NamedRed | Literal[Color.GREEN]
+```
+
+The same simplification applies through a type alias for the protocol.
+
+```py
+type Red = NamedRed
+
+def _(
+    literals_first: Literal[Color.RED, Color.GREEN] | Red = Color.GREEN,
+    alias_first: Red | Literal[Color.RED, Color.GREEN] = Color.GREEN,
+):
+    reveal_type(literals_first)  # revealed: Literal[Color.GREEN] | NamedRed
+    reveal_type(alias_first)  # revealed: NamedRed | Literal[Color.GREEN]
+```
+
+A negative `TypeIs` check excludes `T` from `Color.BLUE`. Since `T` is a subtype of `RedOrBlue`,
+adding `RedOrBlue` restores `Color.BLUE`. If we have already found that `RedOrBlue` covers
+`Color.RED`, we remove `Color.RED` before restoring `Color.BLUE`. Otherwise, the three literals
+would combine into `Color` and ty would reject the return.
+
+```py
+from collections.abc import Callable
+from typing_extensions import TypeIs
+
+class RedOrBlue(Protocol):
+    @property
+    def name(self) -> Literal["RED", "BLUE"]: ...
+
+def pick[T: RedOrBlue](
+    test: Callable[[object], TypeIs[T]],
+    value: T,
+    fallback: RedOrBlue,
+    index: int,
+) -> Literal[Color.GREEN] | RedOrBlue:
+    if value is Color.RED or test(Color.BLUE):
+        return fallback
+    direct = (Color.RED, Color.GREEN, Color.BLUE, fallback)[index]
+    reveal_type(direct)  # revealed: Literal[Color.GREEN] | RedOrBlue
+    # Here the protocol first restores T, which in turn restores Color.BLUE.
+    return (Color.RED, Color.GREEN, value, Color.BLUE, fallback)[index]
+```
+
+If the protocol covers neither of the earlier literals, restoring the third completes the enum. We
+can then narrow `Color` to its last remaining member.
+
+```py
+def pick_red[T: NamedRed](
+    test: Callable[[object], TypeIs[T]],
+    fallback: NamedRed,
+    index: int,
+) -> Literal[Color.RED] | None:
+    if test(Color.RED):
+        return None
+    color = (Color.GREEN, Color.BLUE, Color.RED, fallback)[index]
+    if isinstance(color, Color) and color not in (Color.GREEN, Color.BLUE):
+        return color
+    return None
+```
+
+## Unions of integer literals with a numerator protocol
+
+An integer is its own numerator, so only `1` satisfies this protocol.
+
+```py
+from typing import Literal, Protocol
+
+class NumeratorOne(Protocol):
+    @property
+    def numerator(self) -> Literal[1]: ...
+
+def _(literals_first: Literal[1, 2] | NumeratorOne, protocol_first: NumeratorOne | Literal[1, 2]):
+    reveal_type(literals_first)  # revealed: Literal[2] | NumeratorOne
+    reveal_type(protocol_first)  # revealed: NumeratorOne | Literal[2]
+```
+
+## Unions of string and bytes literals with a length protocol
+
+For both strings and bytes, a protocol can distinguish literals by their length.
+
+```py
+from typing import Literal, Protocol
+
+class LengthOne(Protocol):
+    def __len__(self) -> Literal[1]: ...
+
+def _(
+    strings_first: Literal["a", "ab"] | LengthOne,
+    strings_last: LengthOne | Literal["a", "ab"],
+    bytes_first: Literal[b"a", b"ab"] | LengthOne,
+    bytes_last: LengthOne | Literal[b"a", b"ab"],
+):
+    reveal_type(strings_first)  # revealed: Literal["ab"] | LengthOne
+    reveal_type(strings_last)  # revealed: LengthOne | Literal["ab"]
+    reveal_type(bytes_first)  # revealed: Literal[b"ab"] | LengthOne
+    reveal_type(bytes_last)  # revealed: LengthOne | Literal[b"ab"]
+```
+
+## Unions of class objects and string literals
+
+```py
+from typing import Literal
+
+def _(dtype: type[float] | Literal["float", "double"]):
+    reveal_type(dtype)  # revealed: type[float] | Literal["float", "double"]
+    if isinstance(dtype, str):
+        reveal_type(dtype)  # revealed: Literal["float", "double"]
+```
+
+If the metaclass never returns, there is no class object to include in the union.
+
+```py
+from typing_extensions import Never
+
+def meta(*args: object) -> Never:
+    raise ValueError
+
+class C(metaclass=meta): ...
+
+def _(x: type[C] | Literal["a"]):
+    reveal_type(x)  # revealed: Literal["a"]
+```
+
 ## Do not erase `Unknown`
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(u1: Unknown | str, u2: str | Unknown) -> None:
     reveal_type(u1)  # revealed: Unknown | str
@@ -166,7 +307,7 @@ Since `Unknown` is a gradual type, it is not a subtype of anything, but multiple
 union are still redundant:
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(u1: Unknown | Unknown | str, u2: Unknown | str | Unknown, u3: str | Unknown | Unknown) -> None:
     reveal_type(u1)  # revealed: Unknown | str
@@ -179,7 +320,7 @@ def _(u1: Unknown | Unknown | str, u2: Unknown | str | Unknown, u3: str | Unknow
 Simplifications still apply when `Unknown` is present.
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(u1: int | Unknown | bool) -> None:
     reveal_type(u1)  # revealed: int | Unknown
@@ -203,6 +344,56 @@ def _(
     reveal_type(i2)  # revealed: P & Q
 ```
 
+Excluding the same class from unrelated alternatives keeps both. In `Q & Child`, `Child` satisfies
+the `P` bound in `P & Q` even though it comes second.
+
+```py
+class R: ...
+class Child(P): ...
+
+def _(
+    distinct: Intersection[P, Not[R]] | Intersection[Q, Not[R]],
+    narrower_last: Intersection[P, Q] | Intersection[Q, Child],
+    narrower_first: Intersection[Q, Child] | Intersection[P, Q],
+):
+    reveal_type(distinct)  # revealed: (P & ~R) | (Q & ~R)
+    reveal_type(narrower_last)  # revealed: P & Q
+    reveal_type(narrower_first)  # revealed: P & Q
+```
+
+Recombining the truthy and falsy parts of `int` also subsumes the earlier `bool` operand.
+
+```py
+from typing import Union
+from ty_extensions import AlwaysFalsy, AlwaysTruthy
+
+TruthyInt = Intersection[int, Not[AlwaysFalsy]]
+FalsyInt = Intersection[int, Not[AlwaysTruthy]]
+reveal_type(Union[bool, TruthyInt, FalsyInt])  # revealed: <types.UnionType special-form 'int'>
+```
+
+## Unions of gradual literals
+
+When we intersect literals with `Any`, distinct values still give distinct alternatives.
+`LiteralString` can subsume a particular string.
+
+```py
+from typing import Any, Literal
+from typing_extensions import LiteralString
+from ty_extensions import Intersection
+
+def _(
+    distinct: Intersection[Any, Literal["a"]] | Intersection[Literal["b"], Any],
+    same: Intersection[Literal["a"], Any] | Intersection[Any, Literal["a"]],
+    broader: Intersection[Literal["a"], Any] | Intersection[Any, LiteralString],
+    mixed: Intersection[Any, LiteralString] | Intersection[Any, Literal[1]],
+):
+    reveal_type(distinct)  # revealed: (Any & Literal["a"]) | (Literal["b"] & Any)
+    reveal_type(same)  # revealed: Literal["a"] & Any
+    reveal_type(broader)  # revealed: Any & LiteralString
+    reveal_type(mixed)  # revealed: (Any & LiteralString) | (Any & Literal[1])
+```
+
 ## Unions of literals with `AlwaysTruthy` and `AlwaysFalsy`
 
 ```toml
@@ -212,7 +403,8 @@ python-version = "3.12"
 
 ```py
 from typing import Literal, Union
-from ty_extensions import AlwaysTruthy, AlwaysFalsy, is_equivalent_to, static_assert
+from ty_extensions import AlwaysTruthy, AlwaysFalsy, static_assert
+from ty_extensions._internal import is_equivalent_to
 
 type strings = Literal["foo", ""]
 type ints = Literal[0, 1]
@@ -337,6 +529,124 @@ def f(
     reveal_type(h)  # revealed: tuple[Any | str, ...]
 ```
 
+## Tuple unions with narrowed built-in elements
+
+A tuple alternative is redundant when its element type is covered by another alternative, including
+when that element is a built-in type narrowed by an exclusion. The `float` annotation includes
+`int`, so it also covers `int & ~bool`:
+
+```py
+from ty_extensions import Intersection, Not
+
+def numeric(value: tuple[Intersection[int, Not[bool]]] | tuple[float]):
+    reveal_type(value)  # revealed: tuple[float]
+```
+
+## Tuple unions with built-in exclusions
+
+Matching the positive class is not enough to establish redundancy: its exclusions also matter. For
+example, a subclass of both `Marker` and `str` can inhabit the first tuple alternative below, but
+neither branch of the second:
+
+```py
+from ty_extensions import Intersection, Not
+
+class Marker: ...
+
+def different_exclusions(
+    value: tuple[Intersection[Marker, Not[int]]] | tuple[Intersection[Marker, Not[str]] | bytes],
+):
+    reveal_type(value)  # revealed: tuple[Marker & ~int] | tuple[(Marker & ~str) | bytes]
+```
+
+## Tuple unions with different exclusions on the same base
+
+`Base & ~Y` covers `Child & ~Y`, so adding the child's tuple leaves the union unchanged. Excluding a
+third class, or starting from an unrelated class, leaves an additional tuple in the union.
+
+```py
+from ty_extensions import Intersection, Not
+
+class Base: ...
+class Child(Base): ...
+class X: ...
+class Y: ...
+class Z: ...
+
+def compare(
+    flag: bool,
+    target: tuple[Intersection[Base, Not[X]] | Intersection[Base, Not[Y]]],
+    covered: tuple[Intersection[Child, Not[Y]]],
+    different_exclusion: tuple[Intersection[Child, Not[Z]]],
+    unrelated: tuple[Intersection[Z, Not[X]]],
+):
+    reveal_type(covered if flag else target)  # revealed: tuple[(Base & ~X) | (Base & ~Y)]
+    reveal_type(different_exclusion if flag else target)  # revealed: tuple[Child & ~Z] | tuple[(Base & ~X) | (Base & ~Y)]
+    reveal_type(unrelated if flag else target)  # revealed: tuple[Z & ~X] | tuple[(Base & ~X) | (Base & ~Y)]
+```
+
+## Tuple unions with multiple inheritance
+
+Either base of `Both` can cover the narrower tuple, depending on which type its element excludes. A
+`Left` that excludes `str` can still be an `int` outside `Right`, so its tuple stays in the union.
+
+```py
+from ty_extensions import Intersection, Not
+
+class Left: ...
+class Right: ...
+class Both(Left, Right): ...
+
+def compare(
+    flag: bool,
+    target: tuple[Intersection[Left, Not[int]] | Intersection[Right, Not[str]]],
+    via_left: tuple[Intersection[Both, Not[int]]],
+    via_right: tuple[Intersection[Both, Not[str]]],
+    left_excluding_str: tuple[Intersection[Left, Not[str]]],
+):
+    reveal_type(via_left if flag else target)  # revealed: tuple[(Left & ~int) | (Right & ~str)]
+    reveal_type(via_right if flag else target)  # revealed: tuple[(Left & ~int) | (Right & ~str)]
+    reveal_type(left_excluding_str if flag else target)  # revealed: tuple[Left & ~str] | tuple[(Left & ~int) | (Right & ~str)]
+```
+
+## Tuple unions with a base of `Any`
+
+Inheriting from `Any` preserves the distinction between a known subclass and an unrelated class when
+simplifying tuple unions.
+
+```py
+from typing import Any
+from ty_extensions import Intersection, Not
+
+class Base(Any): ...
+class Child(Base): ...
+
+def compare(
+    unrelated: tuple[Intersection[Base, Not[int]]] | tuple[str | bytes],
+    inherited: tuple[Intersection[Child, Not[int]]] | tuple[Intersection[Base, Not[int]] | bytes],
+):
+    reveal_type(unrelated)  # revealed: tuple[Base & ~int] | tuple[str | bytes]
+    reveal_type(inherited)  # revealed: tuple[(Base & ~int) | bytes]
+```
+
+## Tuple unions with a recursive generic base
+
+`Node & ~Excluded` covers `Child & ~Excluded` even when `Node` appears in its own base class
+specialization.
+
+```py
+from ty_extensions import Intersection, Not
+
+class Node(list["Node"]): ...
+class Child(Node): ...
+class Excluded: ...
+
+def recursive(
+    value: tuple[Intersection[Child, Not[Excluded]]] | tuple[Intersection[Node, Not[Excluded]] | str],
+):
+    reveal_type(value)  # revealed: tuple[(Node & ~Excluded) | str]
+```
+
 ## Unions of other generic containers
 
 ```toml
@@ -346,8 +656,6 @@ python-version = "3.12"
 
 ```py
 from typing import Any
-
-class Bivariant[T]: ...
 
 class Covariant[T]:
     def get(self) -> T:
@@ -360,8 +668,6 @@ class Invariant[T]:
     mutable_attribute: T
 
 def _(
-    a: Bivariant[Any] | Bivariant[Any | str],
-    b: Bivariant[Any | str] | Bivariant[Any],
     c: Covariant[Any] | Covariant[Any | str],
     d: Covariant[Any | str] | Covariant[Any],
     e: Contravariant[Any | str] | Contravariant[Any],
@@ -369,12 +675,51 @@ def _(
     g: Invariant[Any] | Invariant[Any | str],
     h: Invariant[Any | str] | Invariant[Any],
 ):
-    reveal_type(a)  # revealed: Bivariant[Any]
-    reveal_type(b)  # revealed: Bivariant[Any | str]
     reveal_type(c)  # revealed: Covariant[Any | str]
     reveal_type(d)  # revealed: Covariant[Any | str]
     reveal_type(e)  # revealed: Contravariant[Any]
     reveal_type(f)  # revealed: Contravariant[Any]
     reveal_type(g)  # revealed: Invariant[Any] | Invariant[Any | str]
     reveal_type(h)  # revealed: Invariant[Any | str] | Invariant[Any]
+```
+
+A type alias does not make a gradual type argument static. Covariant unions simplify the same way
+whether the gradual argument is written directly or hidden behind one or more aliases.
+
+```py
+type GradualAlias = Any | str
+type NestedGradualAlias = GradualAlias
+
+def gradual_aliases(
+    direct_first: Covariant[Any] | Covariant[GradualAlias],
+    direct_last: Covariant[GradualAlias] | Covariant[Any],
+    nested_first: Covariant[Any] | Covariant[NestedGradualAlias],
+    nested_last: Covariant[NestedGradualAlias] | Covariant[Any],
+) -> None:
+    reveal_type(direct_first)  # revealed: Covariant[GradualAlias]
+    reveal_type(direct_last)  # revealed: Covariant[GradualAlias]
+    reveal_type(nested_first)  # revealed: Covariant[NestedGradualAlias]
+    reveal_type(nested_last)  # revealed: Covariant[NestedGradualAlias]
+```
+
+Matching top materializations do not establish that gradual tuple arguments have the same shape. A
+bounded generic must preserve which tuple position contains the gradual element, including in its
+bottom materialization.
+
+```py
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type L = tuple[Any, int]
+type R = tuple[int, Any]
+
+class C[T: tuple[int, int]]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+static_assert(is_equivalent_to(Top[C[L]], Top[C[R]]))
+static_assert(not is_equivalent_to(Bottom[C[L]], Bottom[C[R]]))
+static_assert(not is_equivalent_to(C[L], C[R]))
+static_assert(not is_equivalent_to(C[L] | C[R], C[L]))
+static_assert(not is_equivalent_to(C[R] | C[L], C[R]))
 ```

@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 use bitflags::bitflags;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -55,7 +56,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// [#14764]: https://github.com/python/mypy/issues/14764
 /// [#5421]: https://github.com/microsoft/pyright/issues/5421
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.8.0")]
+#[violation_metadata(preview_since = "0.8.0", category = Category::Complexity)]
 pub(crate) struct RedundantBoolLiteral {
     seen_others: bool,
 }

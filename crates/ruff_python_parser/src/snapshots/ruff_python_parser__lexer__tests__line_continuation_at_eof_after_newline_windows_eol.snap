@@ -5,10 +5,7 @@ expression: line_continuation_at_eof_after_newline(WINDOWS_EOL)
 ## Tokens
 ```
 [
-    (
-        Unknown,
-        0..3,
-    ),
+    Unknown 0..3,
 ]
 ```
 ## Errors

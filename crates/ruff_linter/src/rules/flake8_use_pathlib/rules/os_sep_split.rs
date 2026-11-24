@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of `.split(os.sep)`
@@ -53,7 +54,7 @@ use crate::checkers::ast::Checker;
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.281")]
+#[violation_metadata(stable_since = "v0.0.281", category = Category::Pedantic)]
 pub(crate) struct OsSepSplit;
 
 impl Violation for OsSepSplit {
@@ -89,8 +90,7 @@ pub(crate) fn os_sep_split(checker: &Checker, call: &ast::ExprCall) {
 
     if !checker
         .semantic()
-        .resolve_qualified_name(sep)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "sep"]))
+        .matches_qualified_name(sep, &["os", "sep"])
     {
         return;
     }

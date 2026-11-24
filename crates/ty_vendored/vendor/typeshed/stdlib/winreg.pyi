@@ -6,7 +6,9 @@ CloseKey() - Closes a registry key.
 ConnectRegistry() - Establishes a connection to a predefined registry handle
                     on another computer.
 CreateKey() - Creates the specified key, or opens it if it already exists.
+CreateKeyEx() - Creates the specified key, or opens it if it already exists.
 DeleteKey() - Deletes the specified key.
+DeleteKeyEx() - Deletes the specified key.
 DeleteValue() - Removes a named value from the specified registry key.
 DeleteTree() - Deletes the specified key and all its subkeys and values recursively.
 EnumKey() - Enumerates subkeys of the specified open registry key.
@@ -27,6 +29,9 @@ QueryInfoKey() - Returns information about the specified key.
 SaveKey() - Saves the specified key, and all its subkeys a file.
 SetValue() - Associates a value with a specified key.
 SetValueEx() - Stores data in the value field of an open registry key.
+DisableReflectionKey() - Disables registry reflection for 32bit processes running on a 64bit OS.
+EnableReflectionKey() - Restores registry reflection for a key.
+QueryReflectionKey() - Determines the reflection state for a key.
 
 Special objects:
 
@@ -41,8 +46,8 @@ to see what constants are used, and where.
 import sys
 from _typeshed import ReadableBuffer, Unused
 from types import TracebackType
-from typing import Any, Final, Literal, final, overload
-from typing_extensions import Self, TypeAlias
+from typing import Any, Final, Literal, TypeAlias, final, overload
+from typing_extensions import Self
 
 if sys.platform == "win32":
     _KeyType: TypeAlias = HKEYType | int
@@ -148,6 +153,20 @@ if sys.platform == "win32":
         is removed.  If the function fails, an OSError exception is raised.
         On unsupported Windows versions, NotImplementedError is raised.
         """
+
+    if sys.version_info >= (3, 15):
+        def DeleteTree(key: _KeyType, sub_key: str | None = None, /) -> None:
+            """Deletes the specified key and all its subkeys and values recursively.
+
+              key
+                An already open key, or any one of the predefined HKEY_* constants.
+              sub_key
+                A string that names the subkey to delete. If None, deletes all subkeys
+                and values of the specified key.
+
+            This function deletes a key and all its descendants. If sub_key is None,
+            all subkeys and values of the specified key are deleted.
+            """
 
     def DeleteValue(key: _KeyType, value: str, /) -> None:
         """Removes a named value from a registry key.
@@ -402,7 +421,6 @@ if sys.platform == "win32":
         2048 bytes) should be stored as files with the filenames stored in
         the configuration registry to help the registry perform efficiently.
         """
-
     @overload  # type=REG_SZ|REG_EXPAND_SZ
     def SetValueEx(
         key: _KeyType, value_name: str | None, reserved: Unused, type: Literal[1, 2], value: str | None, /
@@ -429,6 +447,7 @@ if sys.platform == "win32":
         value: int | str | list[str] | ReadableBuffer | None,
         /,
     ) -> None: ...
+
     def DisableReflectionKey(key: _KeyType, /) -> None:
         """Disables registry reflection for 32bit processes running on a 64bit OS.
 
@@ -461,6 +480,7 @@ if sys.platform == "win32":
 
         Will generally raise NotImplementedError if executed on a 32bit OS.
         """
+
     HKEY_CLASSES_ROOT: Final[int]
     HKEY_CURRENT_USER: Final[int]
     HKEY_LOCAL_MACHINE: Final[int]
@@ -542,6 +562,7 @@ if sys.platform == "win32":
         __int__ - Converting a handle to an integer returns the Win32 handle.
         __enter__, __exit__ - Context manager support for 'with' statement,
         automatically closes handle.
+        __eq__, __ne__ - Equality comparison based on Windows handle value.
         """
 
         def __bool__(self) -> bool:

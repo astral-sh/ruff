@@ -15,6 +15,7 @@ use colored::Colorize;
 use itertools::Itertools;
 use path_absolutize::path_dedot;
 use regex::Regex;
+use ruff_command_line::TerminalColor;
 use ruff_graph::Direction;
 use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
@@ -23,14 +24,16 @@ use ruff_linter::settings::types::{
     ExtensionPair, FilePattern, OutputFormat, PatternPrefixPair, PerFileIgnore, PreviewMode,
     PythonVersion, UnsafeFixes,
 };
-use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
+use ruff_linter::{RuleParser, UnresolvedRuleSelector, UnresolvedRuleSelectorParser};
 use ruff_options_metadata::{OptionEntry, OptionsMetadata};
 use ruff_python_ast as ast;
+use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use ruff_source_file::{LineIndex, OneIndexed, PositionEncoding};
 use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
 use ruff_workspace::resolver::ConfigurationTransformer;
+use ruff_workspace::script::ScriptConfiguration;
 use rustc_hash::FxHashMap;
 use toml;
 
@@ -43,7 +46,8 @@ pub struct GlobalConfigArgs {
     /// Either a path to a TOML configuration file (`pyproject.toml` or `ruff.toml`),
     /// or a TOML `<KEY> = <VALUE>` pair
     /// (such as you might find in a `ruff.toml` configuration file)
-    /// overriding a specific configuration option.
+    /// overriding a specific configuration option
+    /// (e.g., `--config "line-length = 100"` or `--config "format.quote-style = 'single'"`).
     /// Overrides of individual settings using this option always take precedence
     /// over all configuration files, including configuration files that were also
     /// specified using `--config`.
@@ -55,7 +59,7 @@ pub struct GlobalConfigArgs {
         global = true,
         help_heading = "Global options",
     )]
-    pub config: Vec<SingleConfigArgument>,
+    config: Vec<SingleConfigArgument>,
     /// Ignore all configuration files.
     //
     // Note: We can't mark this as conflicting with `--config` here
@@ -66,7 +70,7 @@ pub struct GlobalConfigArgs {
     // If a user specifies `ruff check --isolated --config=ruff.toml`,
     // we emit an error later on, after the initial parsing by clap.
     #[arg(long, help_heading = "Global options", global = true)]
-    pub isolated: bool,
+    isolated: bool,
 
     /// Control when colored output is used.
     #[arg(
@@ -87,20 +91,6 @@ impl GlobalConfigArgs {
     fn partition(self) -> (LogLevel, Vec<SingleConfigArgument>, bool) {
         (self.log_level(), self.config, self.isolated)
     }
-}
-
-/// Control when colored output is used.
-#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
-pub(crate) enum TerminalColor {
-    /// Display colors if the output goes to an interactive terminal.
-    #[default]
-    Auto,
-
-    /// Always display colors.
-    Always,
-
-    /// Never display colors.
-    Never,
 }
 
 // Configures Clap v3-style help menu colors
@@ -231,7 +221,7 @@ pub struct AnalyzeGraphCommand {
 pub struct CheckCommand {
     /// List of files or directories to check.
     #[clap(help = "List of files or directories to check, or `-` to read from stdin [default: .]")]
-    pub files: Vec<PathBuf>,
+    files: Vec<PathBuf>,
     /// Apply fixes to resolve lint violations.
     /// Use `--no-fix` to disable or `--unsafe-fixes` to include unsafe fixes.
     #[arg(long, overrides_with("no_fix"))]
@@ -253,10 +243,10 @@ pub struct CheckCommand {
     /// Avoid writing any fixed files back; instead, output a diff for each changed file to stdout, and exit 0 if there are no diffs.
     /// Implies `--fix-only`.
     #[arg(long, conflicts_with = "show_fixes")]
-    pub diff: bool,
+    diff: bool,
     /// Run in watch mode by re-running whenever files change.
     #[arg(short, long)]
-    pub watch: bool,
+    watch: bool,
     /// Apply fixes to resolve lint violations, but don't report on, or exit non-zero for, leftover violations. Implies `--fix`.
     /// Use `--no-fix-only` to disable or `--unsafe-fixes` to include unsafe fixes.
     #[arg(long, overrides_with("no_fix_only"))]
@@ -270,14 +260,14 @@ pub struct CheckCommand {
     /// Output serialization format for violations.
     /// The default serialization format is "full".
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
-    pub output_format: Option<OutputFormat>,
+    output_format: Option<OutputFormat>,
 
     /// Specify file to write the linter output to (default: stdout).
     #[arg(short, long, env = "RUFF_OUTPUT_FILE")]
-    pub output_file: Option<PathBuf>,
+    output_file: Option<PathBuf>,
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
-    pub target_version: Option<PythonVersion>,
+    target_version: Option<PythonVersion>,
     /// Enable preview mode; checks will include unstable rules and fixes.
     /// Use `--no-preview` to disable.
     #[arg(long, overrides_with("no_preview"))]
@@ -289,47 +279,47 @@ pub struct CheckCommand {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub select: Option<Vec<RuleSelector>>,
+    select: Option<Vec<UnresolvedRuleSelector>>,
     /// Comma-separated list of rule codes to disable.
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub ignore: Option<Vec<RuleSelector>>,
+    ignore: Option<Vec<UnresolvedRuleSelector>>,
     /// Like --select, but adds additional rule codes on top of those already specified.
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub extend_select: Option<Vec<RuleSelector>>,
+    extend_select: Option<Vec<UnresolvedRuleSelector>>,
     /// Like --ignore. (Deprecated: You can just use --ignore instead.)
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide = true
     )]
-    pub extend_ignore: Option<Vec<RuleSelector>>,
+    extend_ignore: Option<Vec<UnresolvedRuleSelector>>,
     /// List of mappings from file pattern to code to exclude.
     #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
-    pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    per_file_ignores: Option<Vec<PatternPrefixPair>>,
     /// Like `--per-file-ignores`, but adds additional ignores on top of those already specified.
     #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
-    pub extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
     /// List of paths, used to omit files and/or directories from analysis.
     #[arg(
         long,
@@ -337,7 +327,7 @@ pub struct CheckCommand {
         value_name = "FILE_PATTERN",
         help_heading = "File selection"
     )]
-    pub exclude: Option<Vec<FilePattern>>,
+    exclude: Option<Vec<FilePattern>>,
     /// Like --exclude, but adds additional files and directories on top of those already excluded.
     #[arg(
         long,
@@ -345,47 +335,47 @@ pub struct CheckCommand {
         value_name = "FILE_PATTERN",
         help_heading = "File selection"
     )]
-    pub extend_exclude: Option<Vec<FilePattern>>,
+    extend_exclude: Option<Vec<FilePattern>>,
     /// List of rule codes to treat as eligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`).
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub fixable: Option<Vec<RuleSelector>>,
+    fixable: Option<Vec<UnresolvedRuleSelector>>,
     /// List of rule codes to treat as ineligible for fix. Only applicable when fix itself is enabled (e.g., via `--fix`).
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub unfixable: Option<Vec<RuleSelector>>,
+    unfixable: Option<Vec<UnresolvedRuleSelector>>,
     /// Like --fixable, but adds additional rule codes on top of those already specified.
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
-    pub extend_fixable: Option<Vec<RuleSelector>>,
+    extend_fixable: Option<Vec<UnresolvedRuleSelector>>,
     /// Like --unfixable. (Deprecated: You can just use --unfixable instead.)
     #[arg(
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        value_parser = RuleSelectorParser,
+        value_parser = UnresolvedRuleSelectorParser,
         help_heading = "Rule selection",
         hide = true
     )]
-    pub extend_unfixable: Option<Vec<RuleSelector>>,
+    extend_unfixable: Option<Vec<UnresolvedRuleSelector>>,
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
     /// Use `--no-respect-gitignore` to disable.
     #[arg(
@@ -408,23 +398,23 @@ pub struct CheckCommand {
     no_force_exclude: bool,
     /// Set the line-length for length-associated rules and automatic formatting.
     #[arg(long, help_heading = "Rule configuration", hide = true)]
-    pub line_length: Option<LineLength>,
+    line_length: Option<LineLength>,
     /// Regular expression matching the name of dummy variables.
     #[arg(long, help_heading = "Rule configuration", hide = true)]
-    pub dummy_variable_rgx: Option<Regex>,
+    dummy_variable_rgx: Option<Regex>,
     /// Disable cache reads.
     #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
-    pub no_cache: bool,
+    no_cache: bool,
     /// Path to the cache directory.
     #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
-    pub cache_dir: Option<PathBuf>,
+    cache_dir: Option<PathBuf>,
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
-    pub stdin_filename: Option<PathBuf>,
+    stdin_filename: Option<PathBuf>,
     /// List of mappings from file extension to language (one of `python`, `ipynb`, `pyi`). For
     /// example, to treat `.ipy` files as IPython notebooks, use `--extension ipy:ipynb`.
     #[arg(long, value_delimiter = ',')]
-    pub extension: Option<Vec<ExtensionPair>>,
+    extension: Option<Vec<ExtensionPair>>,
     /// Exit with status code "0", even upon detecting lint violations.
     #[arg(
         short,
@@ -432,10 +422,10 @@ pub struct CheckCommand {
         help_heading = "Miscellaneous",
         conflicts_with = "exit_non_zero_on_fix"
     )]
-    pub exit_zero: bool,
+    exit_zero: bool,
     /// Exit with a non-zero status code if any files were modified via fix, even if no lint violations remain.
     #[arg(long, help_heading = "Miscellaneous", conflicts_with = "exit_zero")]
-    pub exit_non_zero_on_fix: bool,
+    exit_non_zero_on_fix: bool,
     /// Show counts for every rule with at least one violation.
     #[arg(
         long,
@@ -443,7 +433,7 @@ pub struct CheckCommand {
         conflicts_with = "diff",
         conflicts_with = "watch",
     )]
-    pub statistics: bool,
+    statistics: bool,
     /// Enable automatic additions of `noqa` directives to failing lines.
     /// Optionally provide a reason to append after the codes.
     #[arg(
@@ -453,6 +443,7 @@ pub struct CheckCommand {
         num_args = 0..=1,
         require_equals = true,
         // conflicts_with = "add_noqa",
+        conflicts_with = "add_ignore",
         conflicts_with = "show_files",
         conflicts_with = "show_settings",
         // Unsupported default-command arguments.
@@ -463,7 +454,29 @@ pub struct CheckCommand {
         conflicts_with = "fix",
         conflicts_with = "diff",
     )]
-    pub add_noqa: Option<String>,
+    add_noqa: Option<String>,
+    /// Enable automatic additions of `ruff: ignore` comments to failing lines.
+    /// Optionally provide a reason to append after the codes.
+    /// In preview, add suppression comments with rule names instead.
+    #[arg(
+        long,
+        value_name = "REASON",
+        default_missing_value = "",
+        num_args = 0..=1,
+        require_equals = true,
+        // conflicts_with = "add_ignore",
+        conflicts_with = "add_noqa",
+        conflicts_with = "show_files",
+        conflicts_with = "show_settings",
+        // Unsupported default-command arguments.
+        conflicts_with = "ignore_noqa",
+        conflicts_with = "statistics",
+        conflicts_with = "stdin_filename",
+        conflicts_with = "watch",
+        conflicts_with = "fix",
+        conflicts_with = "diff",
+    )]
+    add_ignore: Option<String>,
     /// See the files Ruff will be run against with the current settings.
     #[arg(
         long,
@@ -477,7 +490,7 @@ pub struct CheckCommand {
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
     )]
-    pub show_files: bool,
+    show_files: bool,
     /// See the settings Ruff will use to lint a given Python file.
     #[arg(
         long,
@@ -491,7 +504,7 @@ pub struct CheckCommand {
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
     )]
-    pub show_settings: bool,
+    show_settings: bool,
 }
 
 #[derive(Clone, Debug, clap::Parser)]
@@ -501,22 +514,22 @@ pub struct FormatCommand {
     #[clap(
         help = "List of files or directories to format, or `-` to read from stdin [default: .]"
     )]
-    pub files: Vec<PathBuf>,
+    files: Vec<PathBuf>,
     /// Avoid writing any formatted files back; instead, exit with a non-zero status code if any
     /// files would have been modified, and zero otherwise.
     #[arg(long)]
-    pub check: bool,
+    check: bool,
     /// Avoid writing any formatted files back; instead, exit with a non-zero status code and the
     /// difference between the current file and how the formatted file would look like.
     #[arg(long)]
-    pub diff: bool,
+    diff: bool,
 
     /// Disable cache reads.
     #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
-    pub no_cache: bool,
+    no_cache: bool,
     /// Path to the cache directory.
     #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
-    pub cache_dir: Option<PathBuf>,
+    cache_dir: Option<PathBuf>,
 
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
     /// Use `--no-respect-gitignore` to disable.
@@ -535,7 +548,15 @@ pub struct FormatCommand {
         value_name = "FILE_PATTERN",
         help_heading = "File selection"
     )]
-    pub exclude: Option<Vec<FilePattern>>,
+    exclude: Option<Vec<FilePattern>>,
+    /// Like --exclude, but adds additional files and directories on top of those already excluded.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "FILE_PATTERN",
+        help_heading = "File selection"
+    )]
+    pub extend_exclude: Option<Vec<FilePattern>>,
 
     /// Enforce exclusions, even for paths passed to Ruff directly on the command-line.
     /// Use `--no-force-exclude` to disable.
@@ -549,17 +570,17 @@ pub struct FormatCommand {
     no_force_exclude: bool,
     /// Set the line-length.
     #[arg(long, help_heading = "Format configuration")]
-    pub line_length: Option<LineLength>,
+    line_length: Option<LineLength>,
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
-    pub stdin_filename: Option<PathBuf>,
+    stdin_filename: Option<PathBuf>,
     /// List of mappings from file extension to language (one of `python`, `ipynb`, `pyi`). For
     /// example, to treat `.ipy` files as IPython notebooks, use `--extension ipy:ipynb`.
     #[arg(long, value_delimiter = ',')]
-    pub extension: Option<Vec<ExtensionPair>>,
+    extension: Option<Vec<ExtensionPair>>,
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
-    pub target_version: Option<PythonVersion>,
+    target_version: Option<PythonVersion>,
     /// Enable preview mode; enables unstable formatting.
     /// Use `--no-preview` to disable.
     #[arg(long, overrides_with("no_preview"))]
@@ -580,23 +601,24 @@ pub struct FormatCommand {
     ///
     /// The option can only be used when formatting a single file. Range formatting of notebooks is unsupported.
     #[clap(long, help_heading = "Editor options", verbatim_doc_comment)]
-    pub range: Option<FormatRange>,
+    range: Option<FormatRange>,
 
     /// Exit with a non-zero status code if any files were modified via format, even if all files were formatted successfully.
     #[arg(long, help_heading = "Miscellaneous", alias = "exit-non-zero-on-fix")]
-    pub exit_non_zero_on_format: bool,
+    exit_non_zero_on_format: bool,
 
     /// Output serialization format for violations, when used with `--check`.
     /// The default serialization format is "full".
-    ///
-    /// Note that this option is currently only respected in preview mode. A warning will be emitted
-    /// if this flag is used on stable.
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
-    pub output_format: Option<OutputFormat>,
+    output_format: Option<OutputFormat>,
 }
 
 #[derive(Copy, Clone, Debug, clap::Parser)]
 pub struct ServerCommand {
+    /// Treat all workspaces as untrusted, disabling the uv formatter backend.
+    #[arg(long)]
+    untrusted_workspace: bool,
+
     /// Enable preview mode. Use `--no-preview` to disable.
     ///
     /// This enables unstable server features and turns on the preview mode for the linter
@@ -608,6 +630,14 @@ pub struct ServerCommand {
 }
 
 impl ServerCommand {
+    pub(crate) fn resolve_workspace_trust(self) -> ruff_server::WorkspaceTrust {
+        if self.untrusted_workspace {
+            ruff_server::WorkspaceTrust::Untrusted
+        } else {
+            ruff_server::WorkspaceTrust::Trusted
+        }
+    }
+
     pub(crate) fn resolve_preview(self) -> Option<bool> {
         resolve_bool_arg(self.preview, self.no_preview)
     }
@@ -630,7 +660,7 @@ pub struct LogLevelArgs {
         group = "verbosity",
         help_heading = "Log levels"
     )]
-    pub verbose: bool,
+    verbose: bool,
     /// Print diagnostics, but nothing else.
     #[arg(
         short,
@@ -639,7 +669,7 @@ pub struct LogLevelArgs {
         group = "verbosity",
         help_heading = "Log levels"
     )]
-    pub quiet: bool,
+    quiet: bool,
     /// Disable all logging (but still exit with status code "1" upon detecting diagnostics).
     #[arg(
         short,
@@ -648,7 +678,7 @@ pub struct LogLevelArgs {
         group = "verbosity",
         help_heading = "Log levels"
     )]
-    pub silent: bool,
+    silent: bool,
 }
 
 impl From<&LogLevelArgs> for LogLevel {
@@ -687,8 +717,28 @@ pub struct ConfigArguments {
 }
 
 impl ConfigArguments {
-    pub fn config_file(&self) -> Option<&Path> {
+    pub(crate) fn script_configuration(&self) -> ScriptConfiguration {
+        if self.isolated || self.config_file.is_some() {
+            ScriptConfiguration::Disabled
+        } else {
+            ScriptConfiguration::Enabled
+        }
+    }
+
+    pub(crate) fn config_file(&self) -> Option<&Path> {
         self.config_file.as_deref()
+    }
+
+    pub(crate) fn overrides_script_target(&self) -> bool {
+        self.script_configuration() == ScriptConfiguration::Disabled
+            || self.target_version().is_some()
+            || self.overrides.per_file_target_version.is_some()
+    }
+
+    pub(crate) fn target_version(&self) -> Option<ast::PythonVersion> {
+        self.per_flag_overrides
+            .target_version
+            .or(self.overrides.target_version)
     }
 
     fn from_cli_arguments(
@@ -758,12 +808,13 @@ impl ConfigurationTransformer for ConfigArguments {
 impl CheckCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(
+    pub(crate) fn partition(
         self,
         global_options: GlobalConfigArgs,
     ) -> anyhow::Result<(CheckArguments, ConfigArguments)> {
         let check_arguments = CheckArguments {
             add_noqa: self.add_noqa,
+            add_ignore: self.add_ignore,
             diff: self.diff,
             exit_non_zero_on_fix: self.exit_non_zero_on_fix,
             exit_zero: self.exit_zero,
@@ -835,6 +886,7 @@ impl FormatCommand {
             line_length: self.line_length,
             respect_gitignore: resolve_bool_arg(self.respect_gitignore, self.no_respect_gitignore),
             exclude: self.exclude,
+            extend_exclude: self.extend_exclude,
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
             target_version: self.target_version.map(ast::PythonVersion::from),
@@ -852,7 +904,7 @@ impl FormatCommand {
 impl AnalyzeGraphCommand {
     /// Partition the CLI into command-line arguments and configuration
     /// overrides.
-    pub fn partition(
+    pub(crate) fn partition(
         self,
         global_options: GlobalConfigArgs,
     ) -> anyhow::Result<(AnalyzeGraphArgs, ConfigArguments)> {
@@ -980,8 +1032,10 @@ impl TypedValueParser for ConfigArgumentParser {
             }
         }
 
+        let _guard = ValueSourceGuard::new(ValueSource::Cli, false);
+
         let config_parse_error = match toml::Table::from_str(value) {
-            Ok(table) => match table.try_into::<Options>() {
+            Ok(table) => match Options::from_toml_table(table) {
                 Ok(option) => {
                     if option.extend.is_none() {
                         return Ok(SingleConfigArgument::SettingsOverride(Arc::new(option)));
@@ -1097,20 +1151,21 @@ Possible choices:
 /// CLI settings that are distinct from configuration (commands, lists of files,
 /// etc.).
 #[expect(clippy::struct_excessive_bools)]
-pub struct CheckArguments {
-    pub add_noqa: Option<String>,
-    pub diff: bool,
-    pub exit_non_zero_on_fix: bool,
-    pub exit_zero: bool,
-    pub files: Vec<PathBuf>,
-    pub ignore_noqa: bool,
-    pub no_cache: bool,
-    pub output_file: Option<PathBuf>,
-    pub show_files: bool,
-    pub show_settings: bool,
-    pub statistics: bool,
-    pub stdin_filename: Option<PathBuf>,
-    pub watch: bool,
+pub(crate) struct CheckArguments {
+    pub(crate) add_noqa: Option<String>,
+    pub(crate) add_ignore: Option<String>,
+    pub(crate) diff: bool,
+    pub(crate) exit_non_zero_on_fix: bool,
+    pub(crate) exit_zero: bool,
+    pub(crate) files: Vec<PathBuf>,
+    pub(crate) ignore_noqa: bool,
+    pub(crate) no_cache: bool,
+    pub(crate) output_file: Option<PathBuf>,
+    pub(crate) show_files: bool,
+    pub(crate) show_settings: bool,
+    pub(crate) statistics: bool,
+    pub(crate) stdin_filename: Option<PathBuf>,
+    pub(crate) watch: bool,
 }
 
 /// CLI settings that are distinct from configuration (commands, lists of files,
@@ -1207,8 +1262,8 @@ impl std::error::Error for FormatRangeParseError {}
 
 #[derive(Copy, Clone, Debug)]
 pub struct LineColumn {
-    pub line: OneIndexed,
-    pub column: OneIndexed,
+    line: OneIndexed,
+    column: OneIndexed,
 }
 
 impl From<LineColumn> for ruff_source_file::SourceLocation {
@@ -1334,9 +1389,9 @@ impl LineColumnParseError {
 /// CLI settings that are distinct from configuration (commands, lists of files, etc.).
 #[derive(Clone, Debug)]
 pub struct AnalyzeGraphArgs {
-    pub files: Vec<PathBuf>,
-    pub direction: Direction,
-    pub python: Option<PathBuf>,
+    pub(crate) files: Vec<PathBuf>,
+    pub(crate) direction: Direction,
+    pub(crate) python: Option<PathBuf>,
 }
 
 /// Configuration overrides provided via dedicated CLI flags:
@@ -1346,20 +1401,20 @@ struct ExplicitConfigOverrides {
     dummy_variable_rgx: Option<Regex>,
     exclude: Option<Vec<FilePattern>>,
     extend_exclude: Option<Vec<FilePattern>>,
-    extend_fixable: Option<Vec<RuleSelector>>,
-    extend_ignore: Option<Vec<RuleSelector>>,
-    extend_select: Option<Vec<RuleSelector>>,
-    extend_unfixable: Option<Vec<RuleSelector>>,
-    fixable: Option<Vec<RuleSelector>>,
-    ignore: Option<Vec<RuleSelector>>,
+    extend_fixable: Option<Vec<UnresolvedRuleSelector>>,
+    extend_ignore: Option<Vec<UnresolvedRuleSelector>>,
+    extend_select: Option<Vec<UnresolvedRuleSelector>>,
+    extend_unfixable: Option<Vec<UnresolvedRuleSelector>>,
+    fixable: Option<Vec<UnresolvedRuleSelector>>,
+    ignore: Option<Vec<UnresolvedRuleSelector>>,
     line_length: Option<LineLength>,
     per_file_ignores: Option<Vec<PatternPrefixPair>>,
     extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
     preview: Option<PreviewMode>,
     respect_gitignore: Option<bool>,
-    select: Option<Vec<RuleSelector>>,
+    select: Option<Vec<UnresolvedRuleSelector>>,
     target_version: Option<ast::PythonVersion>,
-    unfixable: Option<Vec<RuleSelector>>,
+    unfixable: Option<Vec<UnresolvedRuleSelector>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
     cache_dir: Option<PathBuf>,
     fix: Option<bool>,
@@ -1471,8 +1526,8 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
 }
 
 /// Convert a list of `PatternPrefixPair` structs to `PerFileIgnore`.
-pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgnore> {
-    let mut per_file_ignores: FxHashMap<String, Vec<RuleSelector>> = FxHashMap::default();
+fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgnore> {
+    let mut per_file_ignores: FxHashMap<String, Vec<UnresolvedRuleSelector>> = FxHashMap::default();
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)
@@ -1481,6 +1536,6 @@ pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgn
     }
     per_file_ignores
         .into_iter()
-        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, &prefixes, None))
+        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, prefixes, None))
         .collect()
 }

@@ -9,7 +9,6 @@ Written by:   Fred L. Drake, Jr.
 Email:        <fdrake@acm.org>
 """
 
-import sys
 from collections.abc import Mapping
 from distutils.ccompiler import CCompiler
 from typing import Final, Literal, overload
@@ -39,9 +38,9 @@ def get_config_var(name: Literal["SO"]) -> int | str | None:
 
     Equivalent to get_config_vars().get(name)
     """
-
 @overload
 def get_config_var(name: str) -> int | str | None: ...
+
 @overload
 def get_config_vars() -> dict[str, str | int]:
     """With no arguments, return a dictionary of all configuration
@@ -53,9 +52,9 @@ def get_config_vars() -> dict[str, str | int]:
     With arguments, return a list of values that result from looking up
     each argument in the configuration variable dictionary.
     """
-
 @overload
 def get_config_vars(arg: str, /, *args: str) -> list[str | int]: ...
+
 def get_config_h_filename() -> str:
     """Return the path of pyconfig.h."""
 
@@ -97,10 +96,3 @@ def customize_compiler(compiler: CCompiler) -> None:
     Mainly needed on Unix, so we can plug in the information that
     varies across Unices and is stored in Python's Makefile.
     """
-
-if sys.version_info < (3, 10):
-    def get_python_version() -> str:
-        """Return a string containing the major and minor Python version,
-        leaving off the patchlevel.  Sample return values could be '1.5'
-        or '2.2'.
-        """

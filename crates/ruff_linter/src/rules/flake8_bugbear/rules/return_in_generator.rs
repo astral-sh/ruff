@@ -5,6 +5,8 @@ use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
+use crate::rules::flake8_pytest_style::helpers::is_pytest_hookimpl_wrapper;
 
 /// ## What it does
 /// Checks for `return {value}` statements in functions that also contain `yield`
@@ -78,7 +80,7 @@ use crate::checkers::ast::Checker;
 ///             yield from dir_path.glob(f"*.{file_type}")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.4.8")]
+#[violation_metadata(preview_since = "v0.4.8", category = Category::Suspicious)]
 pub(crate) struct ReturnInGenerator;
 
 impl Violation for ReturnInGenerator {
@@ -97,6 +99,14 @@ pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunction
 
     // Async functions are flagged by the `ReturnInGenerator` semantic syntax error.
     if function_def.is_async {
+        return;
+    }
+
+    if function_def
+        .decorator_list
+        .iter()
+        .any(|decorator| is_pytest_hookimpl_wrapper(decorator, checker.semantic()))
+    {
         return;
     }
 

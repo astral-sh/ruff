@@ -128,9 +128,9 @@ class Charset:
         string using the ascii codec produces the correct string version
         of the content.
         """
-
     @overload
     def body_encode(self, string: str | bytes) -> str: ...
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __eq__(self, other: object) -> bool: ...
     def __ne__(self, value: object, /) -> bool: ...
@@ -172,6 +172,6 @@ def add_codec(charset: str, codecname: str) -> None:
     """Add a codec that map characters in the given charset to/from Unicode.
 
     charset is the canonical name of a character set.  codecname is the name
-    of a Python codec, as appropriate for the second argument to the unicode()
-    built-in, or to the encode() method of a Unicode string.
+    of a Python codec, as appropriate for the second argument to the str()
+    built-in, or to the encode() method of a string.
     """

@@ -48,8 +48,8 @@ import asyncore
 import socket
 import sys
 from collections import defaultdict
-from typing import Any
-from typing_extensions import TypeAlias, deprecated
+from typing import Any, TypeAlias
+from typing_extensions import deprecated
 
 if sys.version_info >= (3, 11):
     __all__ = ["SMTPChannel", "SMTPServer", "DebuggingServer", "PureProxy"]

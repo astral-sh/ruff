@@ -6,7 +6,8 @@ for both type variable syntaxes.
 
 Unless otherwise specified, all quotations come from the [Generics] section of the typing spec.
 
-Diagnostics for invalid type variables are snapshotted in `diagnostics/legacy_typevars.md`.
+Additional diagnostics for invalid type variables are snapshotted in
+`diagnostics/legacy_typevars.md`.
 
 ## Type variables
 
@@ -26,6 +27,8 @@ reveal_type(T)  # revealed: TypeVar
 reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 
+### Type variable name as a keyword argument
+
 The typevar name can also be provided as a keyword argument:
 
 ```py
@@ -43,7 +46,7 @@ reveal_type(T.__name__)  # revealed: Literal["T"]
 ```py
 from typing import TypeVar
 
-T = TypeVar("T")
+TypingT = TypeVar("TypingT")
 # error: [invalid-legacy-type-variable]
 U: TypeVar = TypeVar("U")
 
@@ -69,23 +72,247 @@ reveal_type(tuple_with_typevar[1])  # revealed: TypeVar
 > The argument to `TypeVar()` must be a string equal to the variable name to which it is assigned.
 
 ```py
+from typing import Generic, TypeVar
+
+# error: [mismatched-typevar-name]
+T = TypeVar("Q")
+reveal_type(T.__name__)  # revealed: Literal["Q"]
+
+class Box(Generic[T]): ...
+
+reveal_type(Box[int]())  # revealed: Box[int]
+```
+
+### Name supplied at runtime
+
+When ty cannot verify the name match, it displays the `TypeVar` using the assignment target.
+
+```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable]
-T = TypeVar("Q")
+def runtime_name() -> str:
+    return "T"
+
+T = TypeVar(runtime_name())  # error: [mismatched-typevar-name]
+
+def as_text(value: T) -> str:
+    # snapshot: invalid-explicit-return
+    return value
+```
+
+```snapshot
+error[invalid-explicit-return]: Return type does not match returned value
+  --> src/mdtest_snippet.py:10:12
+   |
+ 8 | def as_text(value: T) -> str:
+   |                          --- Expected `str` because of return type
+ 9 |     # snapshot: invalid-explicit-return
+10 |     return value
+   |            ^^^^^ expected `str`, found `T@as_text`
+```
+
+### Shadowing checks use the binding name
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import Generic, TypeVar
+
+S = TypeVar("S")
+T = TypeVar("T")
+
+# This recovers as the `Q` binding for source-level name resolution.
+# error: [mismatched-typevar-name]
+Q = TypeVar("T")
+
+class Outer(Generic[Q]):
+    class Ok(Generic[S]): ...
+    # error: [shadowed-type-variable]
+    # error: [shadowed-type-variable]
+    class Bad(Generic[Q]): ...
 ```
 
 ### No redefinition
 
 > Type variables must not be redefined.
 
+#### Sequential definitions
+
 ```py
 from typing import TypeVar
 
 T = TypeVar("T")
 
-# TODO: error
+# error: [invalid-legacy-type-variable] "Cannot redefine `T` as a type variable"
 T = TypeVar("T")
+
+S = object()
+
+# error: [invalid-legacy-type-variable] "Cannot redefine `S` as a type variable"
+S = TypeVar("S")
+
+DeclaredT: object
+
+# error: [invalid-legacy-type-variable] "Cannot redefine `DeclaredT` as a type variable"
+DeclaredT = TypeVar("DeclaredT")
+```
+
+#### Control flow
+
+A previous definition counts if it is reachable from the beginning of the scope, even if it is in a
+mutually exclusive branch. Statically unreachable definitions do not count.
+
+```py
+from typing import TypeVar
+
+def flag() -> bool:
+    return True
+
+if flag():
+    ConditionalT = TypeVar("ConditionalT")
+
+# error: [invalid-legacy-type-variable]
+ConditionalT = TypeVar("ConditionalT")
+
+if flag():
+    BranchT = TypeVar("BranchT")
+else:
+    # error: [invalid-legacy-type-variable]
+    BranchT = TypeVar("BranchT")
+
+# error: [invalid-legacy-type-variable]
+BranchT = TypeVar("BranchT")
+
+if False:
+    UnreachableT = TypeVar("UnreachableT")
+
+UnreachableT = TypeVar("UnreachableT")
+```
+
+Definitions in version-dependent fallback branches are also mutually exclusive:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+import sys
+from typing import TypeVar
+
+class Reader: ...
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    Self = TypeVar("Self", bound=Reader)
+```
+
+#### Star imports
+
+Only names actually exported by a star import count as previous definitions.
+
+`excluded.py`:
+
+```py
+from typing import TypeVar
+
+__all__ = ["X"]
+
+X = 1
+ExcludedT = TypeVar("ExcludedT")
+```
+
+`included.py`:
+
+```py
+from typing import TypeVar
+
+__all__ = ["IncludedT"]
+
+IncludedT = TypeVar("IncludedT")
+```
+
+`main.py`:
+
+```py
+from typing import TypeVar
+
+from excluded import *
+from included import *
+
+ExcludedT = TypeVar("ExcludedT")
+
+# error: [invalid-legacy-type-variable]
+IncludedT = TypeVar("IncludedT")
+```
+
+#### Nested scopes
+
+```py
+from typing import TypeVar
+
+ScopedT = TypeVar("ScopedT")
+
+class C:
+    ScopedT = TypeVar("ScopedT")
+
+    # error: [invalid-legacy-type-variable]
+    ScopedT = TypeVar("ScopedT")
+
+GlobalT = TypeVar("GlobalT")
+
+def redefine_global() -> None:
+    global GlobalT
+    # error: [invalid-legacy-type-variable]
+    GlobalT = TypeVar("GlobalT")
+
+def define_global_before_module_binding() -> None:
+    global LaterGlobalT
+    LaterGlobalT = TypeVar("LaterGlobalT")
+
+LaterGlobalT = object()
+
+DeepGlobalT = object()
+
+def middle() -> None:
+    def redefine_deep_global() -> None:
+        global DeepGlobalT
+        # error: [invalid-legacy-type-variable]
+        DeepGlobalT = TypeVar("DeepGlobalT")
+
+def later_middle() -> None:
+    def define_deep_global_before_module_binding() -> None:
+        global LaterDeepGlobalT
+        LaterDeepGlobalT = TypeVar("LaterDeepGlobalT")
+
+LaterDeepGlobalT = object()
+
+def outer() -> None:
+    NonlocalT = TypeVar("NonlocalT")
+
+    def redefine_nonlocal() -> None:
+        nonlocal NonlocalT
+        # error: [invalid-legacy-type-variable]
+        NonlocalT = TypeVar("NonlocalT")
+
+def define_nonlocal_before_binding() -> None:
+    def inner() -> None:
+        nonlocal LaterNonlocalT
+        LaterNonlocalT = TypeVar("LaterNonlocalT")
+
+    LaterNonlocalT = object()
+
+def chained_nonlocal() -> None:
+    ChainedNonlocalT = object()
+
+    def middle() -> None:
+        nonlocal ChainedNonlocalT
+
+        def inner() -> None:
+            nonlocal ChainedNonlocalT
+            # error: [invalid-legacy-type-variable]
+            ChainedNonlocalT = TypeVar("ChainedNonlocalT")
 ```
 
 ### No variadic arguments
@@ -176,8 +403,224 @@ reveal_type(Valid[int]())  # revealed: Valid[int, int, int]
 reveal_type(Valid[int, str]())  # revealed: Valid[int, str, int | str]
 reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
 
-# TODO: error, default value for U isn't available in the generic context
+# error: [invalid-generic-class] "Default of `U` cannot reference out-of-scope type variable `T`"
 class Invalid(Generic[U]): ...
+```
+
+### Defaults containing bounded type variables
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+A default can specialize a bounded generic with another type variable whose upper bound is
+compatible. Applying the default substitutes the actual type argument, without replacing it with its
+upper bound.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", bound=int)
+
+class Box(Generic[T]): ...
+
+B = TypeVar("B", default=Box[T])
+
+class Holder(Generic[T, B]): ...
+
+reveal_type(Holder[bool]())  # revealed: Holder[bool, Box[bool]]
+```
+
+We reject a nested type argument whose upper bound is incompatible with the generic's bound:
+
+```py
+U = TypeVar("U", bound=str)
+
+# error: [invalid-type-arguments]
+Invalid = TypeVar("Invalid", default=Box[U])
+```
+
+### Defaults containing constrained type variables
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+A constrained type variable can appear inside a default when each of its constraints is allowed by
+the nested generic. The selected type argument is preserved in the default.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", int, str)
+
+class Box(Generic[T]): ...
+
+B = TypeVar("B", default=Box[T])
+
+class Holder(Generic[T, B]): ...
+
+reveal_type(Holder[str]())  # revealed: Holder[str, Box[str]]
+```
+
+We reject a nested type argument if one of its constraints is incompatible with the generic's
+constraints:
+
+```py
+U = TypeVar("U", int, bytes)
+
+# error: [invalid-type-arguments]
+Invalid = TypeVar("Invalid", default=Box[U])
+```
+
+### Invalid defaults
+
+A TypeVar default must be compatible with its bound or constraints.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+#### Concrete default with a bound
+
+<!-- snapshot-diagnostics -->
+
+The default must be assignable to the bound:
+
+```py
+from typing import TypeVar
+
+# error: [invalid-type-variable-default] "TypeVar default is not assignable to the TypeVar's upper bound"
+T = TypeVar("T", bound=str, default=int)
+
+S = TypeVar("S", bound=float, default=int)
+```
+
+#### Concrete default with constraints
+
+<!-- snapshot-diagnostics -->
+
+The default must be one of the constrained types, even if it is a subtype of one of them:
+
+```py
+from typing import Any, TypeVar
+
+# error: [invalid-type-variable-default] "TypeVar default is inconsistent with the TypeVar's constraints: `bytes` is not one of the constraints of `T`"
+T = TypeVar("T", int, str, default=bytes)
+
+S = TypeVar("S", int, str, default=int)
+
+# A subtype is not sufficient; the default must be exactly one of the constraints.
+# error: [invalid-type-variable-default] "TypeVar default is inconsistent with the TypeVar's constraints: `bool` is not one of the constraints of `U`"
+U = TypeVar("U", int, str, default=bool)
+
+# `Any` is always allowed as a default, even for constrained TypeVars.
+V = TypeVar("V", int, str, default=Any)
+```
+
+#### Default TypeVar's bound must be assignable to the outer bound
+
+<!-- snapshot-diagnostics -->
+
+When the default is a TypeVar, its upper bound must be assignable to the outer TypeVar's bound:
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1", bound=int)
+T2 = TypeVar("T2", bound=float)
+T3 = TypeVar("T3", bound=str)
+
+# OK: `float` in a type expression means `int | float`,
+# and the upper bound of `T` (`int`) is assignable to `int | float`
+S = TypeVar("S", default=T1, bound=float)
+
+# error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `float` of `U` because its upper bound `str` is not assignable to `float`"
+U = TypeVar("U", default=T3, bound=float)
+```
+
+#### An unbounded default TypeVar has an implicit `object` bound
+
+<!-- snapshot-diagnostics -->
+
+An unbounded TypeVar has an implicit upper bound of `object`, which is not assignable to a more
+restrictive bound:
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1")
+
+# error: [invalid-type-variable-default] "Default `T1` of TypeVar `S` is not assignable to upper bound `int` of `S` because its upper bound `object` is not assignable to `int`"
+S = TypeVar("S", default=T1, bound=int)
+```
+
+#### A constrained default TypeVar's constraints must all be assignable to the outer bound
+
+<!-- snapshot-diagnostics -->
+
+When the default TypeVar has constraints, every constraint must be assignable to the outer bound:
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1", int, str)
+T2 = TypeVar("T2", int, bool)
+
+# OK: `T1`'s constraints are `int` and `str,
+# which are both assignable to `object`
+S = TypeVar("S", default=T1, bound=object)
+
+# error: [invalid-type-variable-default] "Default `T1` of TypeVar `U` is not assignable to upper bound `int` of `U` because constraint `str` of `T1` is not assignable to `int`"
+U = TypeVar("U", default=T1, bound=int)
+
+# OK: `T2`'s constraints are `int` and `bool`,
+# which are both assignable to `int`
+V = TypeVar("V", default=T2, bound=int)
+```
+
+#### A constrained default TypeVar's constraints must be a subset of the outer constraints
+
+<!-- snapshot-diagnostics -->
+
+When the default TypeVar has constraints, they must all appear in the outer TypeVar's constraint
+list:
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1", int, str)
+T2 = TypeVar("T2", int, str, bool)
+
+# OK: `T1`'s constraints ({int, str}) are a subset
+# of `S`'s constraints ({int, str, bool})
+S = TypeVar("S", int, str, bool, default=T1)
+
+# error: [invalid-type-variable-default]
+U = TypeVar("U", bool, complex, default=T1)
+```
+
+#### A non-constrained default TypeVar is incompatible with a constrained outer TypeVar
+
+<!-- snapshot-diagnostics -->
+
+A bounded or unbounded TypeVar (one without constraints) cannot be used as the default for a
+constrained TypeVar, because there is no guarantee it will satisfy any of the constraints:
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1", bound=int)
+T2 = TypeVar("T2")
+
+# error: [invalid-type-variable-default]
+S = TypeVar("S", float, str, default=T1)
+
+# error: [invalid-type-variable-default]
+U = TypeVar("U", str, bytes, default=T2)
 ```
 
 ### Type variables with an upper bound
@@ -201,7 +644,7 @@ The upper bound must be a valid type expression:
 from typing import TypedDict
 
 # error: [invalid-type-form]
-T = TypeVar("T", bound=TypedDict)
+InvalidBoundT = TypeVar("InvalidBoundT", bound=TypedDict)
 ```
 
 ### Type variables with constraints
@@ -218,14 +661,18 @@ S = TypeVar("S")
 reveal_type(S.__constraints__)  # revealed: tuple[()]
 ```
 
+### Constraints are not simplified
+
 Constraints are not simplified relative to each other, even if one is a subtype of the other:
 
 ```py
+from typing import TypeVar
+
 T = TypeVar("T", int, bool)
 reveal_type(T.__constraints__)  # revealed: tuple[int, bool]
 
 S = TypeVar("S", float, str)
-reveal_type(S.__constraints__)  # revealed: tuple[int | float, str]
+reveal_type(S.__constraints__)  # revealed: tuple[float, str]
 ```
 
 ### Cannot have only one constraint
@@ -236,8 +683,16 @@ reveal_type(S.__constraints__)  # revealed: tuple[int | float, str]
 ```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-type-variable-constraints
 T = TypeVar("T", int)
+```
+
+```snapshot
+error[invalid-type-variable-constraints]: A `TypeVar` cannot have exactly one constraint
+ --> src/mdtest_snippet.py:4:18
+  |
+4 | T = TypeVar("T", int)
+  |                  ^^^
 ```
 
 ### Cannot have both bound and constraint
@@ -245,8 +700,16 @@ T = TypeVar("T", int)
 ```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar("T", int, str, bound=bytes)
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: A `TypeVar` cannot have both a bound and constraints
+ --> src/mdtest_snippet.py:4:5
+  |
+4 | T = TypeVar("T", int, str, bound=bytes)
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
 ### Cannot be both covariant and contravariant
@@ -258,8 +721,102 @@ T = TypeVar("T", int, str, bound=bytes)
 ```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar("T", covariant=True, contravariant=True)
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: A `TypeVar` cannot be both covariant and contravariant
+ --> src/mdtest_snippet.py:4:5
+  |
+4 | T = TypeVar("T", covariant=True, contravariant=True)
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+### Infer variance
+
+For a `TypeVar` with `infer_variance=True`, we infer covariance when the type variable only appears
+in return positions, contravariance when it only appears in parameter positions, and invariance when
+it appears in both positions.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+
+OutT = TypeVar("OutT", infer_variance=True)
+
+class Source(Generic[OutT]):
+    def get(self) -> OutT:
+        raise NotImplementedError
+
+source_int: Source[int] = Source[object]()  # error: [invalid-assignment]
+source_obj: Source[object] = Source[int]()
+
+InT = TypeVar("InT", infer_variance=True)
+
+class Sink(Generic[InT]):
+    def send(self, value: InT) -> None:
+        raise NotImplementedError
+
+sink_obj: Sink[object] = Sink[int]()  # error: [invalid-assignment]
+sink_int: Sink[int] = Sink[object]()
+```
+
+Both assignments are errors when the type variable is inferred to be invariant:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", infer_variance=True)
+
+class Box(Generic[T]):
+    value: T
+
+box_int: Box[int] = Box[object]()  # error: [invalid-assignment]
+box_obj: Box[object] = Box[int]()  # error: [invalid-assignment]
+```
+
+> A generic class that uses the traditional syntax may include combinations of type variables with
+> explicit and inferred variance.
+
+```py
+from typing import Generic, TypeVar
+
+ExplicitOutT = TypeVar("ExplicitOutT", covariant=True)
+InferredInT = TypeVar("InferredInT", infer_variance=True)
+
+class Mixed(Generic[ExplicitOutT, InferredInT]):
+    def get(self) -> ExplicitOutT:
+        raise NotImplementedError
+
+    def send(self, value: InferredInT) -> None:
+        raise NotImplementedError
+
+mixed_covariant: Mixed[object, int] = Mixed[int, int]()
+mixed_not_covariant: Mixed[int, int] = Mixed[object, int]()  # error: [invalid-assignment]
+mixed_contravariant: Mixed[int, int] = Mixed[int, object]()
+mixed_not_contravariant: Mixed[int, object] = Mixed[int, int]()  # error: [invalid-assignment]
+```
+
+Variance cannot be specified explicitly when variance inference is requested:
+
+```py
+from typing import TypeVar
+
+# snapshot: invalid-legacy-type-variable
+CovariantAndInferred = TypeVar("CovariantAndInferred", covariant=True, infer_variance=True)
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: A `TypeVar` cannot specify variance when `infer_variance=True`
+  --> src/mdtest_snippet.py:48:24
+   |
+48 | CovariantAndInferred = TypeVar("CovariantAndInferred", covariant=True, infer_variance=True)
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
 ### Boolean parameters must be unambiguous
@@ -270,14 +827,36 @@ from typing_extensions import TypeVar
 def cond() -> bool:
     return True
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar("T", covariant=cond())
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 U = TypeVar("U", contravariant=cond())
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 V = TypeVar("V", infer_variance=cond())
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: The `covariant` parameter of `TypeVar` cannot have an ambiguous truthiness
+ --> src/mdtest_snippet.py:7:28
+  |
+7 | T = TypeVar("T", covariant=cond())
+  |                            ^^^^^^
+
+
+error[invalid-legacy-type-variable]: The `contravariant` parameter of `TypeVar` cannot have an ambiguous truthiness
+  --> src/mdtest_snippet.py:10:32
+   |
+10 | U = TypeVar("U", contravariant=cond())
+   |                                ^^^^^^
+
+
+error[invalid-legacy-type-variable]: The `infer_variance` parameter of `TypeVar` cannot have an ambiguous truthiness
+  --> src/mdtest_snippet.py:13:33
+   |
+13 | V = TypeVar("V", infer_variance=cond())
+   |                                 ^^^^^^
 ```
 
 ### Invalid keyword arguments
@@ -328,10 +907,7 @@ reveal_type(f(B()))  # revealed: B
 reveal_type(g(C()))  # revealed: C
 reveal_type(g(D()))  # revealed: D
 
-# TODO: one diagnostic would probably be sufficient here...?
-#
 # error: [invalid-argument-type] "Argument type `C` does not satisfy upper bound `A` of type variable `T`"
-# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `B`, found `C`"
 reveal_type(f(C()))  # revealed: B
 
 # error: [invalid-argument-type]
@@ -355,6 +931,7 @@ maintain compatibility.)
 
 ```pyi
 from typing import TypeVar
+
 T = TypeVar("T", default=int)
 ```
 
@@ -381,7 +958,7 @@ from typing_extensions import TypeVar
 
 T = TypeVar("T", default=int)
 # TODO: should not error, should reveal `int`
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(T.__default__)  # revealed: Unknown
 ```
 
@@ -399,9 +976,13 @@ def bound(f: T):
     reveal_type(f())  # revealed: int
 ```
 
+## Constrained callability
+
 Same with a constrained typevar, as long as all constraints are callable:
 
 ```py
+from typing import Callable, TypeVar
+
 T = TypeVar("T", Callable[[], int], Callable[[], str])
 
 def constrained(f: T):
@@ -437,6 +1018,398 @@ def constrained(x: T_constrained):
     reveal_type(type(x))  # revealed: type[T_constrained@constrained]
 ```
 
+## Attribute writes through type variables
+
+An assignment must be valid for every constraint or alternative in a union bound. Reading the
+attribute produces a union of its possible types, but that union is not a valid write type.
+
+```py
+from typing import TypeVar
+
+class A:
+    value: int
+
+class B:
+    value: str
+
+Constrained = TypeVar("Constrained", A, B)
+Bounded = TypeVar("Bounded", bound=A | B)
+
+def constrained(obj: Constrained):
+    obj.value = 1  # error: [invalid-assignment]
+
+def bounded(obj: Bounded):
+    obj.value = 1  # error: [invalid-assignment]
+```
+
+## Self in attribute writes through type variables
+
+An attribute annotation and a property setter can both use `Self` to refer to the receiver's type.
+
+```py
+from typing import Self, TypeVar
+
+class Stored:
+    cls: type[Self]
+
+def condition() -> bool:
+    return True
+
+class WithProperty:
+    if condition():
+        @property
+        def cls(self) -> type[Self]:
+            return type(self)
+
+        @cls.setter
+        def cls(self: Self, value: type[Self]) -> None:
+            pass
+
+        @cls.deleter
+        def cls(self) -> None:
+            pass
+
+    else:
+        @property
+        def cls(self) -> type[Self]:
+            return type(self)
+
+        @cls.setter
+        def cls(self: Self, value: type[Self]) -> None:
+            pass
+
+        @cls.deleter
+        def cls(self) -> None:
+            pass
+```
+
+`Self` stays bound to the original type variable. The actual class `type(obj)` is accepted, but
+`Stored` may be too broad for a receiver whose type is a subclass of `Stored`.
+
+```py
+StoredBound = TypeVar("StoredBound", bound=Stored)
+
+def stored(obj: StoredBound):
+    obj.cls = type(obj)  # ok
+    obj.cls = Stored  # error: [invalid-assignment]
+```
+
+The same binding applies to every possible setter of a conditionally defined property.
+
+```py
+PropertyBound = TypeVar("PropertyBound", bound=WithProperty)
+
+def property_bound(obj: PropertyBound):
+    obj.cls = type(obj)  # ok
+    obj.cls = WithProperty  # error: [invalid-assignment]
+```
+
+Every constraint must permit a write or deletion, with `Self` still bound to the type variable.
+
+```py
+Constrained = TypeVar("Constrained", Stored, WithProperty)
+
+def constrained(obj: Constrained):
+    obj.cls = type(obj)  # ok
+    del obj.cls  # ok
+```
+
+A union bound preserves the same `Self` binding and deletion support.
+
+```py
+Bounded = TypeVar("Bounded", bound=Stored | WithProperty)
+
+def bounded(obj: Bounded):
+    obj.cls = type(obj)  # ok
+    del obj.cls  # ok
+```
+
+A protocol annotation also binds `Self` to the original type variable. Its additional `marker`
+member keeps the protocol distinct from `Stored`.
+
+```py
+from typing import Protocol
+
+class HasClass(Protocol):
+    marker: int
+    cls: type[Self]
+
+ProtocolBound = TypeVar("ProtocolBound", bound=Stored | HasClass)
+
+def protocol_bound(obj: ProtocolBound):
+    obj.cls = type(obj)  # ok
+```
+
+## Read-only attribute alternatives
+
+A getter-only property prevents writes and deletion, even when another receiver permits both.
+
+```py
+from typing import TypeVar
+
+class Stored:
+    value: int
+
+class ReadOnly:
+    @property
+    def value(self) -> int:
+        return 0
+
+T = TypeVar("T", Stored, ReadOnly)
+
+def constrained(obj: T):
+    obj.value = 1  # error: [invalid-assignment]
+    del obj.value  # error: [invalid-assignment]
+```
+
+## Custom `__setattr__` through type variables
+
+A custom setter validates the names and values of otherwise undefined attributes. Explicit attribute
+annotations take precedence over the setter's parameter types.
+
+```py
+from typing import Literal, TypeVar
+
+class Custom:
+    declared: str
+
+    # error: [incompatible-method-override]
+    def __setattr__(self, name: Literal["dynamic"], value: int) -> None:
+        pass
+
+T = TypeVar("T", bound=Custom)
+
+def assign(obj: T):
+    obj.dynamic = 1  # ok
+    obj.dynamic = "wrong"  # error: [invalid-assignment]
+    obj.other = 1  # error: [invalid-assignment]
+    obj.declared = "ok"  # ok
+    obj.declared = 1  # error: [invalid-assignment]
+```
+
+## Self in custom `__setattr__` through type variables
+
+Each setter's `Self` parameter refers to the original type variable.
+
+```py
+from typing import Self, TypeVar
+
+class Custom:
+    def __setattr__(self, name: str, value: Self) -> None:
+        pass
+
+def condition() -> bool:
+    return True
+
+class Other:
+    if condition():
+        def __setattr__(self, name: str, value: Self) -> None:
+            pass
+
+    else:
+        def __setattr__(self, name: str, value: Self) -> None:
+            pass
+
+T = TypeVar("T", bound=Custom | Other)
+
+def assign(obj: T):
+    obj.other = obj  # ok
+    obj.other = Custom()  # error: [invalid-assignment]
+```
+
+Conditionally defined setters also retain the original receiver's type.
+
+```py
+Conditional = TypeVar("Conditional", bound=Other)
+
+def conditional(obj: Conditional):
+    obj.other = obj  # ok
+    # error: [invalid-assignment]
+    # error: [invalid-assignment]
+    obj.other = Other()
+```
+
+Classmethod setters also preserve `Self` as the instance type of the original receiver.
+
+```py
+class ClassMethod:
+    @classmethod
+    def __setattr__(cls, name: str, value: Self) -> None:
+        pass
+
+ClassMethodBound = TypeVar("ClassMethodBound", bound=ClassMethod)
+
+def class_method(obj: ClassMethodBound):
+    obj.other = obj  # ok
+    obj.other = ClassMethod()  # error: [invalid-assignment]
+```
+
+## Terminal `__setattr__` through type variables
+
+A setter returning `Never` also rejects assignments to declared attributes.
+
+```py
+from typing import Never, TypeVar
+
+class Immutable:
+    value: int
+
+    def __setattr__(self, name: str, value: object) -> Never:
+        raise AttributeError
+
+T = TypeVar("T", bound=Immutable)
+
+def assign(obj: T):
+    obj.value = 1  # error: [invalid-assignment]
+```
+
+## Frozen dataclass attributes through type variables
+
+Frozen fields remain read-only through a type variable.
+
+```py
+from dataclasses import dataclass
+from typing import TypeVar
+
+@dataclass(frozen=True)
+class Frozen:
+    value: int
+
+T = TypeVar("T", bound=Frozen)
+
+def bounded(obj: T):
+    obj.value = 1  # error: [invalid-assignment]
+```
+
+An ordinary subclass can introduce mutable attributes while inheriting frozen fields.
+
+```py
+class Child(Frozen):
+    extra: int
+
+ChildBound = TypeVar("ChildBound", bound=Child)
+
+def child(obj: ChildBound):
+    obj.value = 1  # error: [invalid-assignment]
+    obj.extra = 1  # ok
+```
+
+A writable alternative does not make the frozen field writable.
+
+```py
+class Mutable:
+    value: int
+
+Constrained = TypeVar("Constrained", Frozen, Mutable)
+Bounded = TypeVar("Bounded", bound=Frozen | Mutable)
+
+def constrained(obj: Constrained):
+    obj.value = 1  # error: [invalid-assignment]
+
+def union_bound(obj: Bounded):
+    obj.value = 1  # error: [invalid-assignment]
+```
+
+## Static method assignments through type variables
+
+An instance assignment shadows a static method with its underlying function. This also works when
+the instance has a bounded or constrained type variable as its type:
+
+```py
+from typing import TypeVar
+
+class C:
+    @staticmethod
+    def f(x: int) -> int:
+        return x
+
+class D(C): ...
+
+Bound = TypeVar("Bound", bound=C)
+Constrained = TypeVar("Constrained", C, D)
+
+def bounded(obj: Bound):
+    obj.f = obj.f
+    obj.f = 1  # error: [invalid-assignment]
+
+def constrained(obj: Constrained):
+    obj.f = obj.f
+    obj.f = 1  # error: [invalid-assignment]
+```
+
+A class assignment replaces the static method descriptor itself. We reject assigning the unwrapped
+function through a generic class object:
+
+```py
+def bounded_class(cls: type[Bound]):
+    cls.f = cls.f  # error: [invalid-assignment]
+
+def constrained_class(cls: type[Constrained]):
+    cls.f = cls.f  # error: [invalid-assignment]
+```
+
+## Enum members on generic class objects
+
+An enum member cannot be reassigned through a generic class receiver. The restriction applies to
+every constraint or alternative in an upper bound. Non-member attributes remain writable.
+
+```py
+from enum import Enum
+from typing import Any, Protocol, TypeAlias, TypeVar
+
+class A(Enum):
+    X = 0
+    label: str
+
+class B(Enum):
+    X = 0
+    label: str
+
+class Writable(Protocol):
+    X: Any
+```
+
+For a constrained type variable, the assignment must be valid for every constraint. These class
+objects also cannot satisfy a protocol that requires a writable enum member:
+
+```py
+Constrained = TypeVar("Constrained", A, B)
+
+def constrained(cls: type[Constrained]):
+    cls.X = 0  # error: [invalid-assignment]
+    writable: Writable = cls  # error: [invalid-assignment]
+    cls.label = "label"
+```
+
+The same applies to a union bound, including one defined through a type alias:
+
+```py
+Both: TypeAlias = A | B
+Bound = TypeVar("Bound", bound=Both)
+
+def union_bound(cls: type[Bound]):
+    cls.X = 0  # error: [invalid-assignment]
+    writable: Writable = cls  # error: [invalid-assignment]
+    cls.label = "label"
+```
+
+One enum alternative is enough to reject the write, even if another class allows assignment to the
+attribute:
+
+```py
+class Plain:
+    X: int = 0
+
+MixedConstrained = TypeVar("MixedConstrained", Plain, A)
+MixedBound = TypeVar("MixedBound", bound=A | Plain)
+
+def mixed_constraints(cls: type[MixedConstrained]):
+    cls.X = 0  # error: [invalid-assignment]
+
+def mixed_bound(cls: type[MixedBound]):
+    cls.X = 0  # error: [invalid-assignment]
+```
+
 ## Cycles
 
 ### Bounds and constraints
@@ -444,32 +1417,45 @@ def constrained(x: T_constrained):
 A typevar's bounds and constraints cannot be generic, cyclic or otherwise:
 
 ```py
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Generic
 
 S = TypeVar("S")
 
-# TODO: error
+# error: [invalid-type-variable-bound] "TypeVar upper bound cannot be generic"
 T = TypeVar("T", bound=list[S])
 
-# TODO: error
+# error: [invalid-type-variable-constraints] "TypeVar constraint cannot be generic"
 U = TypeVar("U", list["T"], str)
 
-# TODO: error
+# error: [invalid-type-variable-constraints] "TypeVar constraint cannot be generic"
 V = TypeVar("V", list["V"], str)
+
+# error: [invalid-type-variable-constraints] "TypeVar constraint cannot be generic"
+# error: [invalid-type-variable-constraints] "TypeVar constraint cannot be generic"
+W = TypeVar("W", list[list[list[list["V"]]]], V)
+
+class Foo(Generic[S]):
+    # error: [invalid-type-variable-bound] "TypeVar upper bound cannot be generic"
+    T = TypeVar("T", bound=S)
 ```
+
+### Recursive bounds
 
 However, they are lazily evaluated and can cyclically refer to their own type:
 
 ```py
 from typing import TypeVar, Generic
 
-T = TypeVar("T", bound=list["G"])
+T = TypeVar("T", bound=list["G"])  # error: [missing-type-argument]
 
 class G(Generic[T]):
     x: T
 
+# error: [missing-type-argument]
 reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
 ```
+
+### Invalid specialization in a recursive bound
 
 An invalid specialization in a recursive bound doesn't cause a panic:
 
@@ -521,7 +1507,179 @@ class D(Generic[V]):
 reveal_type(D().x)  # revealed: Unknown
 ```
 
+### Defaults through recursive aliases
+
+A default that refers to its own type variable through a recursive alias falls back to `Unknown`.
+This also applies when another specialization of the same alias wraps the reference.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVar
+
+U = TypeVar("U")
+Tree = tuple[U, "Tree[U] | None"]
+T = TypeVar("T", default="Tree[T]")
+N = TypeVar("N", default="Tree[Tree[N]]")
+
+class Box(Generic[T]): ...
+class NestedBox(Generic[N]): ...
+
+reveal_type(Box())  # revealed: Box[Unknown]
+reveal_type(NestedBox())  # revealed: NestedBox[Unknown]
+```
+
 ## Regression
+
+### Specialization cycle recovery preserves concrete defaults
+
+When a generic call uses a type variable's default, cycle recovery must allow the initial `Unknown`
+specialization to resolve to the concrete default.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+class C:
+    pass
+
+def f(a: T | None = None) -> T:
+    raise NotImplementedError
+
+if f():
+    pass
+
+if f():
+    sum()  # error: [no-matching-overload]
+else:
+    sum()  # error: [no-matching-overload]
+
+from typing import TypeVar
+
+T = TypeVar("T", default=C)
+
+reveal_type(f())  # revealed: C
+```
+
+### Specialization cycle recovery prevents oscillating defaults
+
+A type variable's default can depend on an overloaded call that itself uses the same type variable.
+Specialization must converge even when overload selection changes between cycle iterations.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import TypeVar, overload
+
+@overload
+def choose(value: int) -> type[int]: ...
+@overload
+def choose(value: object) -> type[str]: ...
+def choose(value: object) -> type[int] | type[str]:
+    return str
+
+def f() -> T:
+    raise NotImplementedError
+
+if f():
+    Default = str
+else:
+    Default = choose(f())
+
+T = TypeVar("T", default=Default)  # error: [invalid-type-form]
+
+reveal_type(f())  # revealed: str | Unknown
+```
+
+### A default that refers to the subclass through an inherited alias
+
+Both classes use the alias that `Child` inherits from `Root` as their default.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeAlias, TypeVar
+
+R = TypeVar("R")
+P = TypeVar("P", default="Child.Item")
+C = TypeVar("C", default="Child.Item")
+
+class Root(Generic[R]):
+    Item: TypeAlias = "Child[int]"
+
+class Parent(Root["Child[P]"], Generic[P]): ...
+class Child(Parent[C]): ...
+
+reveal_type(Child[int]())  # revealed: Child[int]
+```
+
+### A generic default with an inherited type argument
+
+A bare `Parent` defaults to `Child`, which takes its own default from `Root.Item`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVar
+
+R = TypeVar("R")
+P = TypeVar("P", default="Child")
+C = TypeVar("C", default="Parent.Item")
+
+class Root(Generic[R]):
+    Item = int
+
+class Parent(Root["Child[P]"], Generic[P]): ...
+class Child(Parent[C]): ...
+
+concrete: Child[int]
+
+def check(x: Parent):
+    reveal_type(x)  # revealed: Parent[Child[int]]
+```
+
+### A default that looks up an alias on a grandchild
+
+Resolving `Leaf.Item` traverses `Parent` while its default is being inferred. The alias still
+supplies the concrete type `Child[int]`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeAlias, TypeVar
+
+T = TypeVar("T")
+P = TypeVar("P", default="Leaf.Item")
+C = TypeVar("C", default="Parent.Item")
+
+class Root(Generic[T]):
+    Item: TypeAlias = "Child[int]"
+
+class Mid(Root[T]): ...
+class Parent(Mid["Child[P]"], Generic[P]): ...
+class Child(Parent[C]): ...
+class Leaf(Child[T]): ...
+
+def check(p: Parent):
+    reveal_type(p)  # revealed: Parent[Child[int]]
+```
 
 ### Use of typevar with default inside a function body that binds it
 

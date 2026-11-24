@@ -67,11 +67,13 @@ It is returned in place of lists of (ctext/quoted-pair) and
 XXX: provide complete list of token types.
 """
 
+import sys
+from _typeshed import Incomplete
 from collections.abc import Iterable, Iterator
 from email.errors import HeaderParseError, MessageDefect
 from email.policy import Policy
 from re import Pattern
-from typing import Any, Final
+from typing import Final
 from typing_extensions import Self
 
 WSP: Final[set[str]]
@@ -85,16 +87,20 @@ TOKEN_ENDS: Final[set[str]]
 ASPECIALS: Final[set[str]]
 ATTRIBUTE_ENDS: Final[set[str]]
 EXTENDED_ATTRIBUTE_ENDS: Final[set[str]]
-# Added in Python 3.9.20, 3.10.15, 3.11.10, 3.12.5
+# Added in Python 3.10.15, 3.11.10, 3.12.5
 NLSET: Final[set[str]]
-# Added in Python 3.9.20, 3.10.15, 3.11.10, 3.12.5
+# Added in Python 3.10.15, 3.11.10, 3.12.5
 SPECIALSNL: Final[set[str]]
 
-# Added in Python 3.9.23, 3.10.17, 3.11.12, 3.12.9, 3.13.2
-def make_quoted_pairs(value: Any) -> str:
+# Added in Python 3.10.17, 3.11.12, 3.12.9, 3.13.2
+def make_quoted_pairs(value) -> str:
     """Escape dquote and backslash for use within a quoted-string."""
 
-def quote_string(value: Any) -> str: ...
+def quote_string(value) -> str: ...
+
+# Added in Python 3.10.20, 3.11.15, 3.12.13, 3.13.12, 3.14.3
+def make_parenthesis_pairs(value) -> str:
+    """Escape parenthesis and backslash for use within a comment."""
 
 rfc2047_matcher: Final[Pattern[str]]
 
@@ -103,7 +109,7 @@ class TokenList(list[TokenList | Terminal]):
     syntactic_break: bool
     ew_combine_allowed: bool
     defects: list[MessageDefect]
-    def __init__(self, *args: Any, **kw: Any) -> None: ...
+    def __init__(self, *args, **kw) -> None: ...
     @property
     def value(self) -> str: ...
     @property
@@ -115,6 +121,10 @@ class TokenList(list[TokenList | Terminal]):
 
     @property
     def comments(self) -> list[str]: ...
+    if sys.version_info >= (3, 11):
+        # Added in Python 3.11.18, 3.12.16, 3.13.18, 3.14.9 and 3.15.1.
+        def contains_token_type(self, *token_types: str | None) -> bool: ...
+
     def fold(self, *, policy: Policy) -> str: ...
     def pprint(self, indent: str = "") -> None: ...
     def ppstr(self, indent: str = "") -> str: ...
@@ -160,7 +170,7 @@ class BareQuotedString(QuotedString):
 
 class Comment(WhiteSpaceTokenList):
     token_type: str
-    def quote(self, value: Any) -> str: ...
+    def quote(self, value) -> str: ...
     @property
     def content(self) -> str: ...
 
@@ -362,7 +372,7 @@ class ContentType(ParameterizedHeaderValue):
 class ContentDisposition(ParameterizedHeaderValue):
     token_type: str
     as_ew_allowed: bool
-    content_disposition: Any
+    content_disposition: Incomplete
 
 class ContentTransferEncoding(TokenList):
     token_type: str
@@ -384,6 +394,13 @@ class MessageID(MsgID):
 class InvalidMessageID(MessageID):
     token_type: str
 
+if sys.version_info >= (3, 13):
+    # Added in Python 3.13.12, 3.14.3
+    class MessageIDList(TokenList):
+        token_type: str
+        @property
+        def message_ids(self) -> list[MsgID | Terminal]: ...
+
 class Header(TokenList):
     token_type: str
 
@@ -400,6 +417,10 @@ class Terminal(str):
     def pop_trailing_ws(self) -> None: ...
     @property
     def comments(self) -> list[str]: ...
+    if sys.version_info >= (3, 11):
+        # Added in Python 3.11.18, 3.12.16, 3.13.18, 3.14.9 and 3.15.1.
+        def contains_token_type(self, *token_types: str | None) -> bool: ...
+
     def __getnewargs__(self) -> tuple[str, str]: ...  # type: ignore[override]
 
 class WhiteSpaceTerminal(Terminal):
@@ -526,7 +547,7 @@ def get_dot_atom(value: str) -> tuple[DotAtom, str]:
     word.
     """
 
-def get_word(value: str) -> tuple[Any, str]:
+def get_word(value: str) -> tuple[Incomplete, str]:
     """word = atom / quoted-string
 
     Either atom or quoted-string may start with CFWS.  We have to peel off this
@@ -680,6 +701,13 @@ def get_msg_id(value: str) -> tuple[MsgID, str]:
 
 def parse_message_id(value: str) -> MessageID:
     """message-id      =   "Message-ID:" msg-id CRLF"""
+
+if sys.version_info >= (3, 13):
+    # Added in Python 3.13.12, 3.14.3
+    def parse_message_ids(value: str) -> MessageIDList:
+        """in-reply-to     =   "In-Reply-To:" 1*msg-id CRLF
+        references      =   "References:" 1*msg-id CRLF
+        """
 
 def parse_mime_version(value: str) -> MIMEVersion:
     """mime-version = [CFWS] 1*digit [CFWS] "." [CFWS] 1*digit [CFWS]"""

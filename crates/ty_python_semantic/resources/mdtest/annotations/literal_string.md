@@ -14,9 +14,7 @@ It can be used anywhere a type is accepted:
 ```py
 from typing_extensions import LiteralString
 
-x: LiteralString
-
-def f():
+def _(x: LiteralString):
     reveal_type(x)  # revealed: LiteralString
 ```
 
@@ -33,18 +31,198 @@ bad_nesting: Literal[LiteralString]  # error: [invalid-type-form]
 
 ### Parameterized
 
-`LiteralString` cannot be parameterized.
+`LiteralString` cannot be parameterized. When its arguments are valid literal values, the diagnostic
+offers to replace it with `Literal`, importing that name if needed.
 
-<!-- snapshot-diagnostics -->
+```py
+from typing_extensions import LiteralString
+
+# snapshot: invalid-type-form
+a: LiteralString[str]
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+ --> src/mdtest_snippet.py:4:4
+  |
+4 | a: LiteralString[str]
+  |    ^^^^^^^^^^^^^^^^^^
+```
+
+```py
+# snapshot: invalid-type-form
+b: LiteralString["foo"]
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+ --> src/mdtest_snippet.py:6:4
+  |
+6 | b: LiteralString["foo"]
+  |    -------------^^^^^^^
+  |    |
+  |    Did you mean `Literal`?
+help: Replace `LiteralString` with `Literal`
+  |
+1 + from typing import Literal
+2 | from typing_extensions import LiteralString
+--------------------------------------------------------------------------------
+6 | # snapshot: invalid-type-form
+  - b: LiteralString["foo"]
+7 + b: Literal["foo"]
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+### Literal-valued variables are not valid literal arguments
+
+A variable can have a literal type without being a valid argument to `Literal`. We do not suggest
+`Literal` in this case.
+
+```py
+from typing_extensions import LiteralString
+
+name = "value"
+
+# snapshot: invalid-type-form
+value: LiteralString[name]
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+ --> src/mdtest_snippet.py:6:8
+  |
+6 | value: LiteralString[name]
+  |        ^^^^^^^^^^^^^^^^^^^
+```
+
+### Fixing a parameterized module member
+
+The fix replaces the complete attribute access, preserving the surrounding parentheses, comments,
+and arguments.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+import typing as t
+
+# snapshot: invalid-type-form
+value: (t.LiteralString)[
+    "first",  # A supported value.
+    b"second",
+    True,
+    None,
+    42,
+]
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+  --> src/mdtest_snippet.py:4:8
+   |
+ 4 |   value: (t.LiteralString)[
+   |          ^--------------- Did you mean `Literal`?
+   |  ________|
+   | |
+ 5 | |     "first",  # A supported value.
+ 6 | |     b"second",
+ 7 | |     True,
+ 8 | |     None,
+ 9 | |     42,
+10 | | ]
+   | |_^
+help: Replace `LiteralString` with `Literal`
+  |
+3 | # snapshot: invalid-type-form
+  - value: (t.LiteralString)[
+4 + value: (t.Literal)[
+5 |     "first",  # A supported value.
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+### Parameterized string annotations
+
+Since `LiteralString` cannot be parameterized, its arguments are checked without looking up
+assignment expressions that are absent from the semantic index. Missing names retain their
+diagnostics.
+
+`runtime.py`:
 
 ```py
 from typing_extensions import LiteralString
 
 # error: [invalid-type-form]
-a: LiteralString[str]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+a: "LiteralString[(name := missing)]"
 
 # error: [invalid-type-form]
-b: LiteralString["foo"]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+# error: [not-subscriptable]
+b: "LiteralString[int[(name := missing)]]"
+c: "LiteralString[(name := 0).real]"  # error: [invalid-type-form]
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+d: "LiteralString[lambda default=missing: None]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_direct` used when not defined"
+direct: "LiteralString[missing_direct]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_nested` used when not defined"
+# error: [not-subscriptable]
+nested: "LiteralString[int[missing_nested]]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_call` used when not defined"
+# error: [unresolved-reference] "Name `missing_argument` used when not defined"
+call: "LiteralString[missing_call(missing_argument)]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_binary` used when not defined"
+binary: "LiteralString[missing_binary + 1]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_list` used when not defined"
+collection: "LiteralString[[missing_list]]"
+```
+
+The same error recovery applies in stub files.
+
+`stub.pyi`:
+
+```pyi
+from typing_extensions import LiteralString
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+value: "LiteralString[(name := missing)]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_direct` used when not defined"
+direct: "LiteralString[missing_direct]"
+```
+
+### Parameterized evaluated annotations
+
+Evaluated annotations still report errors in their arguments.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing_extensions import LiteralString
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+value: LiteralString[(name := missing)]
 ```
 
 ### As a base class
@@ -57,6 +235,88 @@ from typing_extensions import LiteralString
 class C(LiteralString): ...  # error: [invalid-base]
 ```
 
+### Literal suggestions in string annotations
+
+A literal alias is valid as a `Literal` argument, so a parameterized `LiteralString` with a literal
+alias suggests `Literal`.
+
+```py
+from typing_extensions import Literal, LiteralString
+
+Alias = Literal["value"]
+
+# snapshot: invalid-type-form
+alias: "LiteralString[Alias]"
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+ --> src/mdtest_snippet.py:6:9
+  |
+6 | alias: "LiteralString[Alias]"
+  |         -------------^^^^^^^
+  |         |
+  |         Did you mean `Literal`?
+help: Replace `LiteralString` with `Literal`
+  |
+1 + import typing
+2 | from typing_extensions import Literal, LiteralString
+--------------------------------------------------------------------------------
+6 | # snapshot: invalid-type-form
+  - alias: "LiteralString[Alias]"
+7 + alias: "typing.Literal[Alias]"
+8 | MultipleValues = Literal["a", "b"]
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+Aliases containing multiple literal values are also valid `Literal` arguments.
+
+```py
+MultipleValues = Literal["a", "b"]
+
+# snapshot: invalid-type-form
+multiple_values: "LiteralString[MultipleValues]"
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+  --> src/mdtest_snippet.py:10:19
+   |
+10 | multiple_values: "LiteralString[MultipleValues]"
+   |                   -------------^^^^^^^^^^^^^^^^
+   |                   |
+   |                   Did you mean `Literal`?
+help: Replace `LiteralString` with `Literal`
+   |
+1  + import typing
+2  | from typing_extensions import Literal, LiteralString
+--------------------------------------------------------------------------------
+10 | # snapshot: invalid-type-form
+   - multiple_values: "LiteralString[MultipleValues]"
+11 + multiple_values: "typing.Literal[MultipleValues]"
+12 | value = "value"
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+Ordinary variables are not valid `Literal` arguments, even if their values are strings.
+
+```py
+value = "value"
+
+# snapshot: invalid-type-form
+variable: "LiteralString[value]"
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+  --> src/mdtest_snippet.py:14:12
+   |
+14 | variable: "LiteralString[value]"
+   |            ^^^^^^^^^^^^^^^^^^^^
+```
+
 ## Inference
 
 ### Common operations
@@ -64,54 +324,68 @@ class C(LiteralString): ...  # error: [invalid-base]
 ```py
 from typing_extensions import LiteralString
 
-foo: LiteralString = "foo"
-reveal_type(foo)  # revealed: Literal["foo"]
+def _(literal_a: LiteralString, literal_b: LiteralString, a_str: str):
+    # Addition
+    reveal_type(literal_a + literal_b)  # revealed: LiteralString
+    reveal_type(literal_a + a_str)  # revealed: str
+    reveal_type(a_str + literal_a)  # revealed: str
 
-bar: LiteralString = "bar"
-reveal_type(foo + bar)  # revealed: Literal["foobar"]
+    # In-place addition
+    combined_literal = literal_a
+    combined_literal += literal_b
+    reveal_type(combined_literal)  # revealed: LiteralString
+    combined_non_literal1 = literal_a
+    combined_non_literal1 += a_str
+    reveal_type(combined_non_literal1)  # revealed: str
+    combined_non_literal2 = a_str
+    combined_non_literal2 += literal_a
+    reveal_type(combined_non_literal2)  # revealed: str
 
-baz: LiteralString = "baz"
-baz += foo
-reveal_type(baz)  # revealed: Literal["bazfoo"]
+    # Join
+    reveal_type(literal_a.join(("abc", "foo", literal_a, literal_b)))  # revealed: LiteralString
+    reveal_type(a_str.join(("abc", "foo", literal_a, literal_b)))  # revealed: str
+    reveal_type(literal_a.join(("abc", "foo", a_str)))  # revealed: str
 
-qux = (foo, bar)
-reveal_type(qux)  # revealed: tuple[Literal["foo"], Literal["bar"]]
+    # .format(…)
+    reveal_type("{}, {}".format(literal_a, literal_b))  # revealed: LiteralString
+    reveal_type("{}, {}".format(literal_a, a_str))  # revealed: str
 
-reveal_type(foo.join(qux))  # revealed: LiteralString
+    # f-string
+    reveal_type(f"{literal_a} {literal_b}")  # revealed: LiteralString
+    reveal_type(f"{literal_a} {a_str}")  # revealed: str
 
-template: LiteralString = "{}, {}"
-reveal_type(template)  # revealed: Literal["{}, {}"]
-reveal_type(template.format(foo, bar))  # revealed: LiteralString
+    if literal_a != "foo":
+        reveal_type(literal_a)  # revealed: LiteralString & ~Literal["foo"]
+
+        # the handling for `LiteralString` works even for subtypes of `LiteralString`,
+        # such as `LiteralString & ~Literal["foo]`, not just `LiteralString` itself
+        reveal_type(f"{literal_a} {literal_b}")  # revealed: LiteralString
+
+    # Repetition
+    reveal_type(literal_a * 10)  # revealed: LiteralString
 ```
 
 ### Assignability
 
-`Literal[""]` is assignable to `LiteralString`, and `LiteralString` is assignable to `str`, but not
-vice versa.
+`Literal["abc"]` is assignable to `LiteralString`, and `LiteralString` is assignable to `str`, but
+not vice versa.
 
 ```py
 from typing_extensions import Literal, LiteralString
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
-def _(flag: bool):
-    foo_1: Literal["foo"] = "foo"
-    bar_1: LiteralString = foo_1  # fine
+static_assert(is_assignable_to(Literal[""], LiteralString))
+static_assert(is_assignable_to(Literal["abc"], LiteralString))
+static_assert(is_assignable_to(Literal["abc", "def"], LiteralString))
 
-    foo_2 = "foo" if flag else "bar"
-    reveal_type(foo_2)  # revealed: Literal["foo", "bar"]
-    bar_2: LiteralString = foo_2  # fine
+static_assert(not is_assignable_to(LiteralString, Literal[""]))
+static_assert(not is_assignable_to(LiteralString, Literal["abc"]))
+static_assert(not is_assignable_to(LiteralString, Literal["abc", "def"]))
 
-    foo_3: LiteralString = "foo" * 1_000_000_000
-    bar_3: str = foo_2  # fine
+static_assert(is_assignable_to(LiteralString, str))
 
-    baz_1: str = repr(object())
-    qux_1: LiteralString = baz_1  # error: [invalid-assignment]
-
-    baz_2: LiteralString = "baz" * 1_000_000_000
-    qux_2: Literal["qux"] = baz_2  # error: [invalid-assignment]
-
-    baz_3 = "foo" if flag else 1
-    reveal_type(baz_3)  # revealed: Literal["foo", 1]
-    qux_3: LiteralString = baz_3  # error: [invalid-assignment]
+static_assert(not is_assignable_to(str, LiteralString))
 ```
 
 ### Narrowing
@@ -144,9 +418,7 @@ python-version = "3.11"
 ```py
 from typing import LiteralString
 
-x: LiteralString = "foo"
-
-def f():
+def _(x: LiteralString):
     reveal_type(x)  # revealed: LiteralString
 ```
 

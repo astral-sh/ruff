@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF047 [*] Empty `else` clause
+ --> RUF047_try.py:7:1
+  |
+5 |   except:
+6 |       pass
+7 | / else:
+8 | |     pass
+  | |________^
+help: Remove the `else` clause
+  |
+6 |     pass
+  - else:
+  -     pass
+7 |
+  |
+
+RUF047 [*] Empty `else` clause
+  --> RUF047_try.py:17:1
+   |
+15 |   except:
+16 |       to()  # `except`
+17 | / else:
+18 | |     ...
+   | |_______^
+help: Remove the `else` clause
+   |
+16 |     to()  # `except`
+   - else:
+   -     ...
+17 |
+   |

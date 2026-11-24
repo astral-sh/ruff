@@ -1,5 +1,5 @@
 //! Rules from [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/).
-mod helpers;
+pub(crate) mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 pub mod types;
@@ -14,13 +14,13 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings::types::IdentifierPattern;
     use crate::test::test_path;
-    use crate::{assert_diagnostics, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     use super::settings::Settings;
     use super::types;
 
     #[test_case(
-        Rule::PytestParameterWithDefaultArgument,
+        Rule::PytestParameterWithDefaultValue,
         Path::new("is_pytest_test.py"),
         Settings::default(),
         "is_pytest_test"
@@ -41,7 +41,7 @@ mod tests {
         "PT001_parentheses"
     )]
     #[test_case(
-        Rule::PytestFixturePositionalArgs,
+        Rule::PytestFixturePositionalArguments,
         Path::new("PT002.py"),
         Settings::default(),
         "PT002"
@@ -214,7 +214,7 @@ mod tests {
         "PT018"
     )]
     #[test_case(
-        Rule::PytestFixtureParamWithoutValue,
+        Rule::PytestFixtureParameterWithoutValue,
         Path::new("PT019.py"),
         Settings::default(),
         "PT019"
@@ -224,6 +224,18 @@ mod tests {
         Path::new("PT020.py"),
         Settings::default(),
         "PT020"
+    )]
+    #[test_case(
+        Rule::PytestDeprecatedYieldFixture,
+        Path::new("PT020_1.py"),
+        Settings::default(),
+        "PT020_1"
+    )]
+    #[test_case(
+        Rule::PytestDeprecatedYieldFixture,
+        Path::new("PT020_2.py"),
+        Settings::default(),
+        "PT020_2"
     )]
     #[test_case(
         Rule::PytestFixtureFinalizerCallback,
@@ -265,7 +277,7 @@ mod tests {
         "PT025"
     )]
     #[test_case(
-        Rule::PytestUseFixturesWithoutParameters,
+        Rule::PytestUseFixturesWithoutArguments,
         Path::new("PT026.py"),
         Settings::default(),
         "PT026"
@@ -283,7 +295,7 @@ mod tests {
         "PT027_1"
     )]
     #[test_case(
-        Rule::PytestParameterWithDefaultArgument,
+        Rule::PytestParameterWithDefaultValue,
         Path::new("PT028.py"),
         Settings::default(),
         "PT028"
@@ -375,6 +387,22 @@ mod tests {
             },
         )?;
         assert_diagnostics!("PT006_and_PT007", diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::PytestExtraneousScopeFunction, Path::new("PT003.py"))]
+    #[test_case(Rule::PytestCompositeAssertion, Path::new("PT018.py"))]
+    #[test_case(Rule::PytestDeprecatedYieldFixture, Path::new("PT020.py"))]
+    #[test_case(Rule::PytestDeprecatedYieldFixture, Path::new("PT020_1.py"))]
+    #[test_case(Rule::PytestDeprecatedYieldFixture, Path::new("PT020_2.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("flake8_pytest_style").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code),
+            &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
+        );
         Ok(())
     }
 }

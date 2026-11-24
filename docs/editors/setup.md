@@ -10,13 +10,8 @@ the [migration guide](./migration.md) for more.
 !!! note
 
     The setup instructions provided below are on a best-effort basis. If you encounter any issues
-    while setting up the Ruff in an editor, please [open an issue](https://github.com/astral-sh/ruff/issues/new)
+    while setting up Ruff in an editor, please [open an issue](https://github.com/astral-sh/ruff/issues/new)
     for assistance and help in improving this documentation.
-
-!!! tip
-
-    Regardless of the editor, it is recommended to disable the older language server
-    ([`ruff-lsp`](https://github.com/astral-sh/ruff-lsp)) to prevent any conflicts.
 
 ## VS Code
 
@@ -30,25 +25,40 @@ For more documentation on the Ruff extension, refer to the
 
 ## Neovim
 
-The [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig) plugin can be used to configure the
-Ruff Language Server in Neovim. To set it up, install
-[`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig) plugin, set it up as per the
-[configuration](https://github.com/neovim/nvim-lspconfig#configuration) documentation, and add the
-following to your `init.lua`:
+The Ruff language server can be set up in Neovim using the built-in LSP client either via
+[`vim.lsp.config`](<https://neovim.io/doc/user/lsp.html#vim.lsp.config()>) (Neovim 0.11+) or the
+[`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig) plugin (Neovim 0.10 and earlier).
 
-=== "Neovim 0.10 (with [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig))"
+To set up using [`vim.lsp.config`](<https://neovim.io/doc/user/lsp.html#vim.lsp.config()>), you can
+either use the [default configuration provided in
+`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig/blob/master/lsp/ruff.lua) or configure
+the server without any external dependencies.
+
+=== "Neovim 0.11+ (without external dependencies)"
+
+    The following configuration needs to be stored in `nvim/lsp/ruff.lua` or `nvim/after/lsp/ruff.lua`:
 
     ```lua
-    require('lspconfig').ruff.setup({
+    ---@type vim.lsp.Config  
+    return {
+      cmd = { 'ruff', 'server' },
+      filetypes = { 'python' },
+      root_markers = { 'pyproject.toml', 'ruff.toml', '.ruff.toml', '.git' },
       init_options = {
         settings = {
           -- Ruff language server settings go here
         }
       }
-    })
+    }
     ```
 
-=== "Neovim 0.11+ (with [`vim.lsp.config`](https://neovim.io/doc/user/lsp.html#vim.lsp.config()))"
+    And, then enable the server by including the following in your `init.lua`:
+
+    ```lua
+    vim.lsp.enable('ruff')
+    ```
+
+=== "Neovim 0.11+ (with [`vim.lsp.config`](https://neovim.io/doc/user/lsp.html#vim.lsp.config()) and [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig))"
 
     ```lua
     vim.lsp.config('ruff', {
@@ -60,6 +70,25 @@ following to your `init.lua`:
     })
 
     vim.lsp.enable('ruff')
+    ```
+
+=== "Neovim 0.10 (with [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig))"
+
+    !!! note
+
+        [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig) has
+        [deprecated](https://github.com/neovim/nvim-lspconfig/issues/3693) support for Neovim 0.10
+        and earlier in favor of using
+        [`vim.lsp.config`](<https://neovim.io/doc/user/lsp.html#vim.lsp.config()>) instead.
+
+    ```lua
+    require('lspconfig').ruff.setup({
+      init_options = {
+        settings = {
+          -- Ruff language server settings go here
+        }
+      }
+    })
     ```
 
 !!! note
@@ -92,7 +121,7 @@ If you'd like to use Ruff exclusively for linting, formatting, and organizing im
 capabilities for Pyright:
 
 ```lua
-require('lspconfig').pyright.setup {
+vim.lsp.config('pyright', {
   settings = {
     pyright = {
       -- Using Ruff's import organizer
@@ -105,20 +134,20 @@ require('lspconfig').pyright.setup {
       },
     },
   },
-}
+})
 ```
 
 By default, the log level for Ruff is set to `info`. To change the log level, you can set the
 [`logLevel`](./settings.md#loglevel) setting:
 
 ```lua
-require('lspconfig').ruff.setup {
+vim.lsp.config('ruff', {
   init_options = {
     settings = {
       logLevel = 'debug',
     }
   }
-}
+})
 ```
 
 By default, Ruff will write logs to stderr which will be available in Neovim's LSP client log file
@@ -127,9 +156,17 @@ file with the [`logFile`](./settings.md#logfile) setting.
 
 To view the trace logs between Neovim and Ruff, set the log level for Neovim's LSP client to `debug`:
 
-```lua
-vim.lsp.set_log_level('debug')
-```
+=== "Neovim 0.12+"
+
+    ```lua
+    vim.lsp.log.set_level('debug')
+    ```
+
+=== "Neovim 0.11"
+
+    ```lua
+    vim.lsp.set_log_level('debug')
+    ```
 
 <details>
 <summary>With the <a href="https://github.com/stevearc/conform.nvim"><code>conform.nvim</code></a> plugin for Neovim.</summary>
@@ -396,7 +433,7 @@ IntelliJ Marketplace (maintained by [@koxudaxi](https://github.com/koxudaxi)).
 
 ## Emacs
 
-Ruff can be utilized as a language server via [`Eglot`](https://github.com/joaotavora/eglot), which is in Emacs's core.
+Ruff can be used as a language server via [`Eglot`](https://github.com/joaotavora/eglot), which is in Emacs's core.
 To enable Ruff with automatic formatting on save, use the following configuration:
 
 ```elisp

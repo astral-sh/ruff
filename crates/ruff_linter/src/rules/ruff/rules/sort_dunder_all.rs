@@ -4,6 +4,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::ruff::rules::sequence_sorting::{
     MultilineStringSequenceValue, SequenceKind, SortClassification, SortingStyle,
     sort_single_line_elements_sequence,
@@ -20,6 +21,13 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// classes), followed by anything else. Within each category,
 /// a [natural sort](https://en.wikipedia.org/wiki/Natural_sort_order)
 /// is used to order the elements.
+///
+/// Note that "isort-style" sorting here refers to how `isort` categorizes
+/// and orders imported symbols by casing (similar to `isort`'s
+/// [`order-by-type`](https://isort.readthedocs.io/en/latest/configuration/options.html#order-by-type)
+/// setting), rather than `isort`'s
+/// [`sort-reexports`](https://isort.readthedocs.io/en/latest/configuration/options.html#sort-re-exports)
+/// option, which sorts `__all__` strictly lexicographically.
 ///
 /// ## Why is this bad?
 /// Consistency is good. Use a common convention for `__all__` to make your
@@ -89,7 +97,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// iteration order of the items in `__all__`, in which case this
 /// rule's fix could theoretically cause breakage.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Style)]
 pub(crate) struct UnsortedDunderAll;
 
 impl Violation for UnsortedDunderAll {

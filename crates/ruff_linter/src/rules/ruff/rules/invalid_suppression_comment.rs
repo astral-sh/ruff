@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::AlwaysFixableViolation;
+use crate::codes::Category;
 use crate::suppression::{InvalidSuppressionKind, ParseErrorKind};
 
 /// ## What it does
@@ -25,7 +26,7 @@ use crate::suppression::{InvalidSuppressionKind, ParseErrorKind};
 /// ## References
 /// - [Ruff error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.11")]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
 pub(crate) struct InvalidSuppressionComment {
     pub(crate) kind: InvalidSuppressionCommentKind,
 }
@@ -38,10 +39,13 @@ impl AlwaysFixableViolation for InvalidSuppressionComment {
                 "unexpected indentation".to_string()
             }
             InvalidSuppressionCommentKind::Invalid(InvalidSuppressionKind::Trailing) => {
-                "trailing comments are not supported".to_string()
+                "trailing comments are only supported for ruff:ignore suppressions".to_string()
             }
             InvalidSuppressionCommentKind::Invalid(InvalidSuppressionKind::Unmatched) => {
                 "no matching 'disable' comment".to_string()
+            }
+            InvalidSuppressionCommentKind::Invalid(InvalidSuppressionKind::NotModuleScope) => {
+                "file-level suppressions must be at global module scope".to_string()
             }
             InvalidSuppressionCommentKind::Error(error) => format!("{error}"),
         };

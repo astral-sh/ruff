@@ -4,7 +4,9 @@ This module provides an implementation of the HeaderRegistry API.
 The implementation is designed to flexibly follow RFC5322 rules.
 """
 
+import sys
 import types
+from _typeshed import Incomplete
 from collections.abc import Iterable, Mapping
 from datetime import datetime as _datetime
 from email._header_value_parser import (
@@ -19,7 +21,7 @@ from email._header_value_parser import (
 )
 from email.errors import MessageDefect
 from email.policy import Policy
-from typing import Any, ClassVar, Literal, Protocol, type_check_only
+from typing import ClassVar, Literal, Protocol, type_check_only
 from typing_extensions import Self
 
 class BaseHeader(str):
@@ -61,7 +63,7 @@ class BaseHeader(str):
     def name(self) -> str: ...
     @property
     def defects(self) -> tuple[MessageDefect, ...]: ...
-    def __new__(cls, name: str, value: Any) -> Self: ...
+    def __new__(cls, name: str, value) -> Self: ...
     def init(self, name: str, *, parse_tree: TokenList, defects: Iterable[MessageDefect]) -> None: ...
     def fold(self, *, policy: Policy) -> str:
         """Fold header according to policy.
@@ -104,7 +106,7 @@ class UnstructuredHeader:
         """
 
     @classmethod
-    def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
+    def parse(cls, value: str, kwds: dict[str, Incomplete]) -> None: ...
 
 class UniqueUnstructuredHeader(UnstructuredHeader):
     max_count: ClassVar[Literal[1]]
@@ -145,7 +147,7 @@ class DateHeader:
         """
 
     @classmethod
-    def parse(cls, value: str | _datetime, kwds: dict[str, Any]) -> None: ...
+    def parse(cls, value: str | _datetime, kwds: dict[str, Incomplete]) -> None: ...
 
 class UniqueDateHeader(DateHeader):
     max_count: ClassVar[Literal[1]]
@@ -160,7 +162,7 @@ class AddressHeader:
     @staticmethod
     def value_parser(value: str) -> AddressList: ...
     @classmethod
-    def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
+    def parse(cls, value: str, kwds: dict[str, Incomplete]) -> None: ...
 
 class UniqueAddressHeader(AddressHeader):
     max_count: ClassVar[Literal[1]]
@@ -195,15 +197,17 @@ class MIMEVersionHeader:
         """mime-version = [CFWS] 1*digit [CFWS] "." [CFWS] 1*digit [CFWS]"""
 
     @classmethod
-    def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
+    def parse(cls, value: str, kwds: dict[str, Incomplete]) -> None: ...
 
 class ParameterizedMIMEHeader:
     max_count: ClassVar[Literal[1]]
-    def init(self, name: str, *, parse_tree: TokenList, defects: Iterable[MessageDefect], params: Mapping[str, Any]) -> None: ...
+    def init(
+        self, name: str, *, parse_tree: TokenList, defects: Iterable[MessageDefect], params: Mapping[str, Incomplete]
+    ) -> None: ...
     @property
-    def params(self) -> types.MappingProxyType[str, Any]: ...
+    def params(self) -> types.MappingProxyType[str, Incomplete]: ...
     @classmethod
-    def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
+    def parse(cls, value: str, kwds: dict[str, Incomplete]) -> None: ...
 
 class ContentTypeHeader(ParameterizedMIMEHeader):
     @property
@@ -235,7 +239,7 @@ class ContentTransferEncodingHeader:
     @property
     def cte(self) -> str: ...
     @classmethod
-    def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
+    def parse(cls, value: str, kwds: dict[str, Incomplete]) -> None: ...
     @staticmethod
     def value_parser(value: str) -> ContentTransferEncoding:
         """mechanism"""
@@ -243,10 +247,24 @@ class ContentTransferEncodingHeader:
 class MessageIDHeader:
     max_count: ClassVar[Literal[1]]
     @classmethod
-    def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
+    def parse(cls, value: str, kwds: dict[str, Incomplete]) -> None: ...
     @staticmethod
     def value_parser(value: str) -> MessageID:
         """message-id      =   "Message-ID:" msg-id CRLF"""
+
+if sys.version_info >= (3, 13):
+    from email._header_value_parser import MessageIDList
+
+    # Added in Python 3.13.12, 3.14.3
+    class ReferencesHeader:
+        max_count: ClassVar[Literal[1]]
+        @classmethod
+        def parse(cls, value: str, kwds: dict[str, Incomplete]) -> None: ...
+        @staticmethod
+        def value_parser(value: str) -> MessageIDList:
+            """in-reply-to     =   "In-Reply-To:" 1*msg-id CRLF
+            references      =   "References:" 1*msg-id CRLF
+            """
 
 @type_check_only
 class _HeaderParser(Protocol):
@@ -254,7 +272,7 @@ class _HeaderParser(Protocol):
     @staticmethod
     def value_parser(value: str, /) -> TokenList: ...
     @classmethod
-    def parse(cls, value: str, kwds: dict[str, Any], /) -> None: ...
+    def parse(cls, value: str, kwds: dict[str, Incomplete], /) -> None: ...
 
 class HeaderRegistry:
     """A header_factory and header registry."""
@@ -280,7 +298,7 @@ class HeaderRegistry:
         """Register cls as the specialized class for handling "name" headers."""
 
     def __getitem__(self, name: str) -> type[BaseHeader]: ...
-    def __call__(self, name: str, value: Any) -> BaseHeader:
+    def __call__(self, name: str, value) -> BaseHeader:
         """Create a header instance for header 'name' from 'value'.
 
         Creates a header instance by creating a specialized class for parsing
@@ -322,6 +340,7 @@ class Address:
         without any Content Transfer Encoding.
 
         """
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __eq__(self, other: object) -> bool: ...
 
@@ -345,5 +364,6 @@ class Group:
         the addresses list.
 
         """
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __eq__(self, other: object) -> bool: ...

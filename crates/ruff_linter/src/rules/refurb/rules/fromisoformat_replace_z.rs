@@ -8,6 +8,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -67,7 +68,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [iso-8601]: https://www.iso.org/obp/ui/#iso:std:iso:8601
 /// [fromisoformat]: https://docs.python.org/3/library/datetime.html#datetime.date.fromisoformat
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Complexity)]
 pub(crate) struct FromisoformatReplaceZ;
 
 impl AlwaysFixableViolation for FromisoformatReplaceZ {
@@ -126,14 +127,7 @@ pub(crate) fn fromisoformat_replace_z(checker: &Checker, call: &ExprCall) {
 }
 
 fn func_is_fromisoformat(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["datetime", "datetime", "fromisoformat"]
-            )
-        })
+    semantic.matches_qualified_name(func, &["datetime", "datetime", "fromisoformat"])
 }
 
 /// A `datetime.replace` call that replaces the timezone with a zero offset.

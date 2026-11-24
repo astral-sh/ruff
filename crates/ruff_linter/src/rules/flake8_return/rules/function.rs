@@ -15,6 +15,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::fix::edits::adjust_indentation;
 use crate::registry::Rule;
@@ -62,7 +63,7 @@ use crate::rules::flake8_return::visitor::{ReturnVisitor, Stack};
 ///
 /// - `lint.pydocstyle.property-decorators`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
+#[violation_metadata(stable_since = "v0.0.154", category = Category::Style)]
 pub(crate) struct UnnecessaryReturnNone;
 
 impl AlwaysFixableViolation for UnnecessaryReturnNone {
@@ -104,7 +105,7 @@ impl AlwaysFixableViolation for UnnecessaryReturnNone {
 ///     return 1
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
+#[violation_metadata(stable_since = "v0.0.154", category = Category::Pedantic)]
 pub(crate) struct ImplicitReturnValue;
 
 impl AlwaysFixableViolation for ImplicitReturnValue {
@@ -143,7 +144,7 @@ impl AlwaysFixableViolation for ImplicitReturnValue {
 ///     return None
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
+#[violation_metadata(stable_since = "v0.0.154", category = Category::Pedantic)]
 pub(crate) struct ImplicitReturn;
 
 impl AlwaysFixableViolation for ImplicitReturn {
@@ -179,7 +180,7 @@ impl AlwaysFixableViolation for ImplicitReturn {
 ///     return 1
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
+#[violation_metadata(stable_since = "v0.0.154", category = Category::Pedantic)]
 pub(crate) struct UnnecessaryAssign {
     name: String,
 }
@@ -222,21 +223,21 @@ impl AlwaysFixableViolation for UnnecessaryAssign {
 ///     return baz
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
-pub(crate) struct SuperfluousElseReturn {
+#[violation_metadata(stable_since = "v0.0.154", category = Category::Pedantic)]
+pub(crate) struct UnnecessaryElseAfterReturn {
     branch: Branch,
 }
 
-impl Violation for SuperfluousElseReturn {
+impl Violation for UnnecessaryElseAfterReturn {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SuperfluousElseReturn { branch } = self;
+        let UnnecessaryElseAfterReturn { branch } = self;
         format!("Unnecessary `{branch}` after `return` statement")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let SuperfluousElseReturn { branch } = self;
+        let UnnecessaryElseAfterReturn { branch } = self;
         Some(format!("Remove unnecessary `{branch}`"))
     }
 }
@@ -267,21 +268,21 @@ impl Violation for SuperfluousElseReturn {
 ///     raise Exception(baz)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
-pub(crate) struct SuperfluousElseRaise {
+#[violation_metadata(stable_since = "v0.0.154", category = Category::Pedantic)]
+pub(crate) struct UnnecessaryElseAfterRaise {
     branch: Branch,
 }
 
-impl Violation for SuperfluousElseRaise {
+impl Violation for UnnecessaryElseAfterRaise {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SuperfluousElseRaise { branch } = self;
+        let UnnecessaryElseAfterRaise { branch } = self;
         format!("Unnecessary `{branch}` after `raise` statement")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let SuperfluousElseRaise { branch } = self;
+        let UnnecessaryElseAfterRaise { branch } = self;
         Some(format!("Remove unnecessary `{branch}`"))
     }
 }
@@ -314,21 +315,21 @@ impl Violation for SuperfluousElseRaise {
 ///         x = 0
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
-pub(crate) struct SuperfluousElseContinue {
+#[violation_metadata(stable_since = "v0.0.154", category = Category::Pedantic)]
+pub(crate) struct UnnecessaryElseAfterContinue {
     branch: Branch,
 }
 
-impl Violation for SuperfluousElseContinue {
+impl Violation for UnnecessaryElseAfterContinue {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SuperfluousElseContinue { branch } = self;
+        let UnnecessaryElseAfterContinue { branch } = self;
         format!("Unnecessary `{branch}` after `continue` statement")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let SuperfluousElseContinue { branch } = self;
+        let UnnecessaryElseAfterContinue { branch } = self;
         Some(format!("Remove unnecessary `{branch}`"))
     }
 }
@@ -361,21 +362,21 @@ impl Violation for SuperfluousElseContinue {
 ///         x = 0
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
-pub(crate) struct SuperfluousElseBreak {
+#[violation_metadata(stable_since = "v0.0.154", category = Category::Pedantic)]
+pub(crate) struct UnnecessaryElseAfterBreak {
     branch: Branch,
 }
 
-impl Violation for SuperfluousElseBreak {
+impl Violation for UnnecessaryElseAfterBreak {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SuperfluousElseBreak { branch } = self;
+        let UnnecessaryElseAfterBreak { branch } = self;
         format!("Unnecessary `{branch}` after `break` statement")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let SuperfluousElseBreak { branch } = self;
+        let UnnecessaryElseAfterBreak { branch } = self;
         Some(format!("Remove unnecessary `{branch}`"))
     }
 }
@@ -568,7 +569,7 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
     let Some(function_scope) = checker.semantic().function_scope(function_def) else {
         return;
     };
-    for (assign, return_, stmt) in &stack.assignment_return {
+    for (assign, return_, stmt, enclosing_finally) in &stack.assignment_return {
         // Identify, e.g., `return x`.
         let Some(value) = return_.value.as_ref() else {
             continue;
@@ -617,6 +618,22 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
         else {
             continue;
         };
+        // Ignore assignments whose name is read or deleted in an enclosing `finally`, which runs
+        // after the `return`. A reference resolving to a later rebinding in the `finally` counts
+        // too, so check every binding of the name.
+        if !enclosing_finally.is_empty()
+            && function_scope
+                .get_all(assigned_id)
+                .flat_map(|binding_id| checker.semantic().binding(binding_id).references())
+                .map(|reference_id| checker.semantic().reference(reference_id))
+                .any(|reference| {
+                    enclosing_finally
+                        .iter()
+                        .any(|finally_range| finally_range.contains_range(reference.range()))
+                })
+        {
+            continue;
+        }
         // Check if there's any reference made to `assigned_binding` in another scope, e.g, nested
         // functions. If there is, ignore them.
         if assigned_binding
@@ -684,13 +701,13 @@ fn superfluous_else_node(
         .unwrap_or_else(|| elif_else.range());
     for child in if_elif_body {
         let diagnostic = if child.is_return_stmt() {
-            checker.report_diagnostic_if_enabled(SuperfluousElseReturn { branch }, range)
+            checker.report_diagnostic_if_enabled(UnnecessaryElseAfterReturn { branch }, range)
         } else if child.is_break_stmt() {
-            checker.report_diagnostic_if_enabled(SuperfluousElseBreak { branch }, range)
+            checker.report_diagnostic_if_enabled(UnnecessaryElseAfterBreak { branch }, range)
         } else if child.is_raise_stmt() {
-            checker.report_diagnostic_if_enabled(SuperfluousElseRaise { branch }, range)
+            checker.report_diagnostic_if_enabled(UnnecessaryElseAfterRaise { branch }, range)
         } else if child.is_continue_stmt() {
-            checker.report_diagnostic_if_enabled(SuperfluousElseContinue { branch }, range)
+            checker.report_diagnostic_if_enabled(UnnecessaryElseAfterContinue { branch }, range)
         } else {
             continue;
         };
@@ -761,10 +778,10 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     };
 
     if checker.any_rule_enabled(&[
-        Rule::SuperfluousElseReturn,
-        Rule::SuperfluousElseRaise,
-        Rule::SuperfluousElseContinue,
-        Rule::SuperfluousElseBreak,
+        Rule::UnnecessaryElseAfterReturn,
+        Rule::UnnecessaryElseAfterRaise,
+        Rule::UnnecessaryElseAfterContinue,
+        Rule::UnnecessaryElseAfterBreak,
     ]) {
         superfluous_elif_else(checker, &stack);
     }

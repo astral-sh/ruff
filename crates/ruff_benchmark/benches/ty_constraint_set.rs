@@ -1,0 +1,1130 @@
+use std::fmt::Write;
+use std::path::PathBuf;
+
+use ruff_benchmark::checkout::get_project_cache_dir;
+use ruff_benchmark::criterion;
+use ruff_benchmark::real_world_projects::{TY_ECOSYSTEM_PIN, install_dependencies_to_cache};
+
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
+use itertools::Itertools;
+use ty_project::metadata::python_version::SupportedPythonVersion;
+
+mod ty_shared;
+
+use ty_shared::{Case, setup_micro_case, setup_micro_case_inner, setup_rayon};
+
+fn setup_micro_case_venv(name: &str, dependencies: &[&str]) -> PathBuf {
+    let cache_dir = get_project_cache_dir(name).expect("Failed to get cache directory");
+    std::fs::create_dir_all(&cache_dir).expect("Failed to create cache directory");
+
+    let venv_path = cache_dir.join(".venv");
+    install_dependencies_to_cache(
+        name,
+        dependencies,
+        &venv_path,
+        SupportedPythonVersion::Py312,
+        TY_ECOSYSTEM_PIN,
+    )
+    .expect("Failed to install dependencies");
+
+    venv_path
+}
+
+/// Regression benchmark for many precise arguments constraining the same type variable.
+///
+/// The parameters are distinct to avoid exercising the `*args` parameter-type accumulator. The
+/// important part is that specialization inference should not repeatedly rebuild a growing union
+/// for `T` as each argument adds another solution.
+fn benchmark_typevar_mapping_large_accumulation(criterion: &mut Criterion) {
+    const NUM_ARGUMENTS: usize = 256;
+
+    setup_rayon();
+
+    let mut code = "def combine[T](\n".to_string();
+    for i in 0..NUM_ARGUMENTS {
+        writeln!(&mut code, "    p{i}: T,").ok();
+    }
+    code.push_str(") -> T:\n    return p0\n\ncombine(\n");
+
+    for i in 0..NUM_ARGUMENTS {
+        writeln!(&mut code, r#"    ("field_{i}", {i}),"#).ok();
+    }
+
+    code.push_str(")\n");
+
+    criterion.bench_function("ty_micro[typevar_mapping_accumulation]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Benchmark for many small type-variable accumulations.
+///
+/// This guards the common case where each type variable only receives a few constraints. Optimizing
+/// the large-accumulation case should not make these small generic calls slower.
+fn benchmark_typevar_mapping_small_accumulations(criterion: &mut Criterion) {
+    const NUM_CALLS: usize = 256;
+
+    setup_rayon();
+
+    let mut code = "\
+def combine[T](first: T, second: T, third: T) -> T:
+    return first
+
+"
+    .to_string();
+
+    for i in 0..NUM_CALLS {
+        writeln!(
+            &mut code,
+            r#"combine(("field_{i}", {i}), ("other_{i}", "{i}"), ("flag_{i}", True))"#
+        )
+        .ok();
+    }
+
+    criterion.bench_function("ty_micro[typevar_mapping_small_accumulations]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Quantify both satisfiable and contradictory bodies containing free variables. The satisfiable
+/// case measures the cost of checking for contradictions when projection still has work to do.
+fn benchmark_constraint_quantification(criterion: &mut Criterion) {
+    const NUM_FUNCTIONS: usize = 128;
+
+    setup_rayon();
+
+    for (name, lower, upper, negation) in [
+        ("satisfiable", "A", "A", ""),
+        ("unsatisfiable", "int", "tuple[A, B]", "not "),
+    ] {
+        let mut code = "from ty_extensions import static_assert\n\
+                        from ty_extensions._internal import ConstraintSet\n\n"
+            .to_string();
+        for i in 0..NUM_FUNCTIONS {
+            writeln!(
+                &mut code,
+                "def check{i}[X, A, B]() -> None:
+    body = ConstraintSet.lower_bound({lower}, X) & ConstraintSet.upper_bound(X, {upper})
+    static_assert({negation}body.exists(tuple[X]))
+"
+            )
+            .ok();
+        }
+
+        criterion.bench_function(
+            &format!("ty_micro[constraint_quantification/{name}]"),
+            |b| {
+                b.iter_batched_ref(
+                    || setup_micro_case(&code),
+                    |Case { db }| assert_eq!(db.check().len(), 0),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+}
+
+/// Compare bottom sources and top targets against distinct signatures.
+fn benchmark_bottom_and_top_signature_comparisons(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for name in ["bottom", "top"] {
+        let mut code = String::from(
+            "\
+from typing import Any, Callable, Literal
+from ty_extensions import Bottom, Top
+",
+        );
+        for i in 0..128 {
+            let signature = format!("Callable[[Literal[{i}], str, bytes], int]");
+            let (source, target) = if name == "bottom" {
+                ("Bottom[Callable[..., Any]]", signature.as_str())
+            } else {
+                (signature.as_str(), "Top[Callable[..., object]]")
+            };
+            writeln!(
+                &mut code,
+                "\ndef check_{i}(source: {source}) -> None:\n    target: {target} = source"
+            )
+            .ok();
+        }
+
+        criterion.bench_function(&format!("ty_micro[{name}_signature_comparisons]"), |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |Case { db }| assert_eq!(db.check().len(), 0),
+                BatchSize::SmallInput,
+            );
+        });
+    }
+}
+
+/// Benchmarks solving many union-bearing upper bounds while inferring a generic call.
+///
+/// Each callable argument places a distinct union upper bound on `T` through callable-parameter
+/// contravariance. Fully materializing the conjunction of these bounds would require constructing
+/// the cross product of all union alternatives. Factored path bounds and bounded intersection
+/// keep the work bounded instead.
+fn benchmark_factored_upper_bounds(criterion: &mut Criterion) {
+    const NUM_CLAUSES: usize = 12;
+    const ALTERNATIVES_PER_CLAUSE: usize = 8;
+
+    setup_rayon();
+
+    let mut code = "from collections.abc import Callable\n\n".to_string();
+    for clause in 0..NUM_CLAUSES {
+        for alternative in 0..ALTERNATIVES_PER_CLAUSE {
+            writeln!(&mut code, "class C{clause}_{alternative}: ...").ok();
+        }
+    }
+
+    code.push_str("\ndef infer[T](\n");
+    for clause in 0..NUM_CLAUSES {
+        writeln!(&mut code, "    consumer{clause}: Callable[[T], None],").ok();
+    }
+    code.push_str(") -> T:\n    raise NotImplementedError\n\n");
+
+    for clause in 0..NUM_CLAUSES {
+        write!(&mut code, "def consume{clause}(value: ").ok();
+        for alternative in 0..ALTERNATIVES_PER_CLAUSE {
+            if alternative > 0 {
+                code.push_str(" | ");
+            }
+            write!(&mut code, "C{clause}_{alternative}").ok();
+        }
+        code.push_str(") -> None: ...\n");
+    }
+
+    code.push_str("\nresult = infer(\n");
+    for clause in 0..NUM_CLAUSES {
+        writeln!(&mut code, "    consume{clause},").ok();
+    }
+    code.push_str(")\n");
+
+    criterion.bench_function("ty_micro[factored_upper_bounds]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Bokeh's constructor combines a large literal alias with `str` in its receiver (ty#5046).
+fn benchmark_constructor_literal_alias(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for (name, receiver_arg, size) in [
+        ("union_28", "A | B", 28),
+        ("alias_12", "Alternatives[A, B]", 12),
+    ] {
+        let markers = (0..size).map(|i| format!("'marker{i}'")).join(", ");
+        let code = format!(
+            r#"
+            from typing import Literal, assert_type
+
+            type Alternatives[A, B] = A | B
+            type Marker = Literal[{markers}]
+
+            class Property[T]:
+                value: T
+
+            class Either[T](Property[T]):
+                def __init__[A, B](
+                    self: "Either[{receiver_arg}]", first: type[Property[A]], second: type[Property[B]]
+                ) -> None: ...
+
+            assert_type(Either(Property[Marker], Property[str]), Either[str])
+            "#
+        );
+        criterion.bench_function(
+            &format!("ty_micro[constructor_literal_alias/{name}]"),
+            |b| {
+                b.iter_batched_ref(
+                    || setup_micro_case(&code),
+                    |Case { db }| assert_eq!(db.check().len(), 0),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+}
+
+/// Bokeh calls `super().__init__()` on a receiver with a large union of literals (ty#5063).
+/// We specialize the overloads before filtering by arity. Two ways to partition the literals
+/// between `A` and `B` already rule out a unique receiver specialization.
+fn benchmark_overloaded_constructor_receiver(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+        from typing import Literal, overload
+
+        type Pattern = Literal["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"]
+
+        class Either[T]:
+            value: T
+
+            @overload
+            def __init__[A, B](self: "Either[A | B]", value: A) -> None: ...
+            @overload
+            def __init__(self) -> None: ...
+            def __init__(self, *args: object) -> None: ...
+
+        class HatchPattern(Either[Pattern]):
+            def __init__(self) -> None:
+                super().__init__()
+    "#;
+
+    criterion.bench_function("ty_micro[overloaded_constructor_receiver]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// These constructors used to hang because recursive substitution kept reordering union
+/// members in their inferred type arguments (ty#5057).
+fn benchmark_constructor_union_specialization(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for (name, parameters, example) in [
+        (
+            "instances",
+            "first: PropertyArg[A], second: PropertyArg[B], third: PropertyArg[C]",
+            r#"
+            result = Either(
+                Property[Literal["start", "center", "end"]](),
+                Property[Literal["left", "center", "right"]](),
+                Property[float](),
+            )
+            assert_type(result, Either[Literal["start", "center", "end", "left", "right"] | float])
+            "#,
+        ),
+        (
+            "classes",
+            "first: type[Property[A]], second: type[Property[B]], third: type[Property[C]]",
+            "
+            result = Either(Property[float], Property[str | None], Property[bytes])
+            assert_type(result, Either[float | str | None | bytes])
+            ",
+        ),
+    ] {
+        for (suffix, typevars) in [("", "A, B, C"), ("_reversed", "C, B, A")] {
+            let code = format!(
+                r#"
+            from typing import Literal, assert_type
+
+            class Property[T]:
+                value: T
+
+            type PropertyArg[T] = type[Property[T]] | Property[T]
+
+            class Either[T](Property[T]):
+                def __init__[{typevars}](
+                    self: "Either[A | B | C]", {parameters}
+                ) -> None: ...
+            {example}
+            "#
+            );
+            criterion.bench_function(
+                &format!("ty_micro[constructor_union_specialization/{name}{suffix}]"),
+                |b| {
+                    b.iter_batched_ref(
+                        || setup_micro_case(&code),
+                        |Case { db }| assert_eq!(db.check().len(), 0),
+                        BatchSize::SmallInput,
+                    );
+                },
+            );
+        }
+    }
+}
+
+/// Rejecting `T <= int` contradicts `T <= bool`. Trying to disprove the expression on that
+/// branch can exhaust every combination of unrelated choices for `V`.
+fn benchmark_counterexample_behind_implied_bound(criterion: &mut Criterion) {
+    setup_rayon();
+    let choices = (0..22)
+        .map(|i| format!(
+            "(ConstraintSet.lower_bound(Literal[{}], V) | ConstraintSet.lower_bound(Literal[{}], V))",
+            2 * i, 2 * i + 1
+        ))
+        .join(" & ");
+    // Falsifying a long disjunction requires one continuous path through every bound.
+    let alternatives = (1000..1033)
+        .map(|i| format!("ConstraintSet.lower_bound(Literal[{i}], U)"))
+        .join(" | ");
+    let code = format!(
+        "
+        from typing import Literal
+        from ty_extensions import static_assert
+        from ty_extensions._internal import ConstraintSet
+
+        def check[T, U, V]():
+            t_bool = ConstraintSet.upper_bound(T, bool)
+            t_int = ConstraintSet.upper_bound(T, int)
+            u_int = ConstraintSet.upper_bound(U, int)
+            choices = {choices}
+            static_assert(not (~(t_bool & choices) | (u_int & t_int)))
+            alternatives = {alternatives}
+            static_assert(not (((t_int | ~choices) & t_bool) | alternatives))
+        "
+    );
+    criterion.bench_function("ty_micro[counterexample_behind_implied_bound]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Guards against quadratic pruning when contravariant callbacks contribute many upper-only bounds.
+fn benchmark_many_upper_bound_callbacks(criterion: &mut Criterion) {
+    const NUM_CALLBACKS: usize = 1_200;
+
+    setup_rayon();
+
+    let mut code = String::from(
+        "from collections.abc import Callable\nfrom typing import Literal\n\ndef accepts[T](\n",
+    );
+    for i in 0..NUM_CALLBACKS {
+        writeln!(&mut code, "    cb{i}: Callable[[T], None],").ok();
+    }
+    code.push_str(") -> None: ...\n\ndef call_many(\n");
+    for i in 0..NUM_CALLBACKS {
+        writeln!(&mut code, "    cb{i}: Callable[[Literal[{i}]], None],").ok();
+    }
+    code.push_str(") -> None:\n    accepts(\n");
+    for i in 0..NUM_CALLBACKS {
+        writeln!(&mut code, "        cb{i},").ok();
+    }
+    code.push_str("    )\n");
+
+    criterion.bench_function("ty_micro[many_upper_bound_callbacks]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Matching a tuple against `T | tuple[T]` makes either the tuple or its element a lower bound
+/// for `T`. Both violate the declared bound, and each union member doubles the number of paths.
+fn benchmark_incompatible_lower_bound_alternatives(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for members in [4, 8, 11, 12] {
+        let union = (0..members)
+            .map(|i| format!("tuple[Literal[{i}]]"))
+            .join(" | ");
+        let code = format!(
+            "from collections.abc import Callable
+from typing import Any, Literal, overload
+
+@overload
+def consume[T: list[Any]](make: Callable[[], T | tuple[T]]) -> None: ...
+@overload
+def consume(make: object) -> None: ...
+def consume(make: object) -> None: ...
+
+def check(make: Callable[[], {union}]) -> None:
+    consume(make)
+",
+        );
+
+        criterion.bench_function(
+            &format!("ty_micro[incompatible_lower_bound_alternatives/{members}]"),
+            |b| {
+                b.iter_batched_ref(
+                    || setup_micro_case(&code),
+                    |Case { db }| assert_eq!(db.check().len(), 0),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+}
+
+/// A long conjunction with only two solutions fits within the traversal budget.
+fn benchmark_long_valid_bound_prefix(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from(
+        "from typing import Any, Literal
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def check[T: tuple[Any]]() -> None:
+    bounds = (ConstraintSet.lower_bound(tuple[Literal[-1]], T)
+              | ConstraintSet.lower_bound(tuple[Literal[-2]], T))
+",
+    );
+    // Allocate the choice first so traversal reaches it after the 64 shared lower bounds.
+    for i in 0..64 {
+        writeln!(
+            &mut code,
+            "    bounds &= ConstraintSet.lower_bound(tuple[Literal[{i}]], T)"
+        )
+        .ok();
+    }
+    code.push_str("    static_assert(len(bounds.solutions(inferable=tuple[T])) == 2)\n");
+
+    criterion.bench_function("ty_micro[long_valid_bound_prefix]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_pandas_tdd(criterion: &mut Criterion) {
+    setup_rayon();
+    let venv_path = setup_micro_case_venv("pandas_tdd", &["pandas-stubs"]);
+    let code = r#"
+        import pandas as pd
+
+        df = pd.DataFrame({
+            "a": [1, 2, 3],
+            "b": [4, 5, 6],
+            "c": [7, 8, 9],
+        })
+        df["d"] = df["a"] + df["b"] + df["c"] + 1 + (
+            df["a"] ** 2 + df["b"] ** 2 + df["c"] ** 2)
+        "#;
+
+    // This example was reported in https://github.com/astral-sh/ty/issues/3039.
+    criterion.bench_function("ty_micro[pandas_tdd]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case_inner(code, Some(&venv_path)),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_mixed_typed_dict_union_copy(criterion: &mut Criterion) {
+    const NUM_VARIANTS: usize = 12;
+
+    setup_rayon();
+
+    let mut code = concat!(
+        "from collections import ChainMap, OrderedDict, defaultdict\n",
+        "from collections.abc import Mapping, MutableMapping\n",
+        "from typing import Any, Literal, TypedDict\n\n",
+    )
+    .to_string();
+
+    for i in 0..NUM_VARIANTS {
+        writeln!(
+            &mut code,
+            "class Item{i}(TypedDict):\n    type: Literal[{i}]"
+        )
+        .ok();
+        if i == 0 {
+            code.push_str("    other: Any\n");
+        }
+        code.push('\n');
+    }
+
+    code.push_str("type Item = ");
+    for i in 0..NUM_VARIANTS {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Item{i}").ok();
+    }
+
+    code.push_str(
+        r#"
+
+def copy_dict(value: Item | dict[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_mapping(value: Item | Mapping[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_mutable_mapping(value: Item | MutableMapping[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_ordered_dict(value: Item | OrderedDict[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_default_dict(value: Item | defaultdict[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_chain_map(value: Item | ChainMap[str, Any]) -> dict[str, object]:
+    return dict(value)
+
+def copy_narrowed_mapping(value: Item | Mapping[str, Any]) -> dict[str, object] | None:
+    if isinstance(value, dict):
+        return dict(value)
+    return None
+"#,
+    );
+
+    criterion.bench_function("ty_micro[mixed_typed_dict_union_copy]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_missing_key_typed_dict_union_copy(criterion: &mut Criterion) {
+    const NUM_VARIANTS: usize = 12;
+
+    setup_rayon();
+
+    // Regression benchmark for https://github.com/astral-sh/ty/issues/4176.
+    let mut code = "from typing import Literal, NotRequired, TypedDict\n\n".to_string();
+    for i in 0..NUM_VARIANTS {
+        writeln!(
+            &mut code,
+            "class Item{i}(TypedDict):\n    kind: Literal[{i}]\n    field_{i}: NotRequired[int]\n"
+        )
+        .ok();
+    }
+
+    code.push_str("type Item = ");
+    for i in 0..NUM_VARIANTS {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Item{i}").ok();
+    }
+
+    code.push_str(
+        r#"
+
+def copy(value: Item) -> dict[str, object] | None:
+    if "missing" in value:
+        return dict(value)
+    return None
+"#,
+    );
+
+    criterion.bench_function("ty_micro[missing_key_typed_dict_union_copy]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_recursive_typed_dict_union_contextual_inference(criterion: &mut Criterion) {
+    const NUM_BRANCHES: usize = 11;
+
+    setup_rayon();
+
+    // Regression benchmark for https://github.com/astral-sh/ty/issues/3663.
+    let mut code = "from typing import Literal, TypedDict\n\n".to_string();
+    for i in 0..NUM_BRANCHES {
+        writeln!(
+            &mut code,
+            "class Node{i}(TypedDict):\n    type: Literal['node-{i}']\n    children: list['Node']\n"
+        )
+        .ok();
+    }
+    code.push_str("class Leaf(TypedDict):\n    type: Literal['leaf']\n    text: str\n\n");
+    code.push_str("type Node = ");
+    for i in 0..NUM_BRANCHES {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Node{i}").ok();
+    }
+    code.push_str(
+        r#" | Leaf
+
+value: list[Node] = [
+    {"type": "node-0", "children": [
+        {"type": "node-1", "children": [
+            {"type": "node-2", "children": [{"type": "leaf", "text": "x"}]},
+            {"type": "node-3", "children": [{"type": "leaf", "text": "y"}]},
+        ]},
+        {"type": "node-4", "children": [
+            {"type": "node-5", "children": [{"type": "leaf", "text": "z"}]},
+            {"type": "node-6", "children": [{"type": "leaf", "text": "w"}]},
+        ]},
+    ]},
+]
+"#,
+    );
+
+    criterion.bench_function(
+        "ty_micro[recursive_typed_dict_union_contextual_inference]",
+        |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        },
+    );
+}
+
+fn benchmark_invariant_generic_return_union(criterion: &mut Criterion) {
+    const NUM_VARIANTS: usize = 21;
+
+    setup_rayon();
+
+    // Regression benchmark for https://github.com/astral-sh/ty/issues/3896.
+    let mut code = String::new();
+    for i in 0..NUM_VARIANTS {
+        writeln!(&mut code, "class M{i}: pass").ok();
+    }
+    code.push_str("\nAllResults = (\n");
+    for i in 0..NUM_VARIANTS {
+        if i > 0 {
+            code.push_str(" |\n");
+        }
+        write!(&mut code, "    dict[int, M{i}]").ok();
+    }
+    code.push_str("\n)\n\nRows = (\n");
+    for i in 0..NUM_VARIANTS {
+        if i > 0 {
+            code.push_str(" |\n");
+        }
+        write!(&mut code, "    list[tuple[int, M{i}]]").ok();
+    }
+    code.push_str(
+        r#"
+)
+
+def map_rows[T](rows: list[tuple[int, T]]) -> dict[int, T]:
+    return {}
+
+def perform(rows: Rows) -> AllResults:
+    return map_rows(rows)
+"#,
+    );
+
+    criterion.bench_function("ty_micro[invariant_generic_return_union]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_sequence_literal_union_access(criterion: &mut Criterion) {
+    const NUM_LITERALS: usize = 1_200;
+
+    setup_rayon();
+
+    // Regression benchmark for https://github.com/astral-sh/ty/issues/4089.
+    let mut code = String::from(
+        "from collections.abc import Sequence\nfrom typing import Literal\n\nItem = Literal[\n",
+    );
+    for i in 0..NUM_LITERALS {
+        writeln!(&mut code, "    'value-{i}',").ok();
+    }
+    code.push_str(
+        r#"]
+
+def iterate(items: Sequence[Item]) -> None:
+    for item in items:
+        pass
+
+def access(items: Sequence[Item]) -> None:
+    items[0]
+"#,
+    );
+
+    criterion.bench_function("ty_micro[sequence_literal_union_access]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_invariant_generic_union_bound(criterion: &mut Criterion) {
+    const NUM_ALIASES: usize = 64;
+
+    setup_rayon();
+
+    let mut code =
+        String::from("from collections.abc import Iterable\nfrom typing import Literal\n\n");
+    for i in 0..NUM_ALIASES {
+        writeln!(
+            &mut code,
+            "type A{i} = Literal[{i}] | int | str | bytes | float"
+        )
+        .ok();
+    }
+    code.push_str("\nALIASES = {\n");
+    for i in 0..NUM_ALIASES {
+        writeln!(&mut code, "    A{i}: {{{i}: A{i}}},").ok();
+    }
+    code.push_str(
+        r#"}
+
+def consume(items: Iterable[object]) -> None: ...
+
+consume(ALIASES.items())
+"#,
+    );
+
+    criterion.bench_function("ty_micro[invariant_generic_union_bound]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_many_invariant_typevars(criterion: &mut Criterion) {
+    setup_rayon();
+
+    // Regression benchmark for https://github.com/astral-sh/ty/issues/3989.
+    let code = r#"
+class Invariant[T]:
+    x: T
+
+def f[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10](
+    box1: Invariant[T1],
+    box2: Invariant[T2],
+    box3: Invariant[T3],
+    box4: Invariant[T4],
+    box5: Invariant[T5],
+    box6: Invariant[T6],
+    box7: Invariant[T7],
+    box8: Invariant[T8],
+    box9: Invariant[T9],
+    box10: Invariant[T10],
+) -> None: ...
+
+x = Invariant[int]()
+f(x, x, x, x, x, x, x, x, x, x)
+"#;
+
+    criterion.bench_function("ty_micro[many_invariant_typevars]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_mixed_many_invariant_typevars(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from __future__ import annotations
+
+class Invariant[T]:
+    x: T
+
+class Constructed[T]:
+    def __new__[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, U](
+        cls,
+        box1: Invariant[T1],
+        box2: Invariant[T2],
+        box3: Invariant[T3],
+        box4: Invariant[T4],
+        box5: Invariant[T5],
+        box6: Invariant[T6],
+        box7: Invariant[T7],
+        box8: Invariant[T8],
+        box9: Invariant[T9],
+        box10: Invariant[T10],
+        box11: Invariant[U],
+    ) -> Constructed[tuple[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, U]]:
+        raise NotImplementedError
+
+def f[T](y: Invariant[T]) -> None:
+    x = Invariant[int]()
+    Constructed(x, x, x, x, x, x, x, x, x, x, y)
+"#;
+
+    criterion.bench_function("ty_micro[mixed_many_invariant_typevars]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
+    const NUM_CORE_SCHEMA_VARIANTS: usize = 24;
+
+    setup_rayon();
+
+    // Minimized from the pydantic and hydra-zen ecosystem regressions seen during the
+    // SpecializationBuilder pending-constraint-set migration. Pydantic has several empty dict
+    // literals with a type context equivalent to `dict[Hashable, core_schema.CoreSchema]`
+    // (including `schema.setdefault("metadata", {})` and tagged-union choice tables).
+    // `CoreSchema` is a large union of TypedDict schema types; this local `CoreSchema` alias is
+    // derived from pydantic-core's real `CoreSchema`, but reduced to enough variants to show the
+    // regression quickly. Solving the empty-dict specialization creates one lower-bound constraint
+    // per union element for `_VT@dict`. Combined with `_KT@dict = Hashable`,
+    // PathAssignments/SequentMap traversal derives cross-typevar facts like
+    // `TypedDictSchema <= _VT@dict <= Hashable`. This benchmark tracks the cost until constraint
+    // projection / path-bounds solving can avoid that work.
+    let mut code = "from collections.abc import Hashable\nfrom typing import Literal, NotRequired, TypedDict\n\n"
+        .to_string();
+    for i in 0..NUM_CORE_SCHEMA_VARIANTS {
+        writeln!(
+            &mut code,
+            "class Schema{i}(TypedDict):\n    type: Literal['schema-{i}']\n    ref: NotRequired[str]\n    value_{i}: NotRequired[int]\n"
+        )
+        .ok();
+    }
+    code.push_str("type CoreSchema = ");
+    for i in 0..NUM_CORE_SCHEMA_VARIANTS {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Schema{i}").ok();
+    }
+    code.push_str("\n\nchoices: dict[Hashable, CoreSchema] = {}\n");
+
+    criterion.bench_function("ty_micro[pydantic_core_schema_dict]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Each overload brings its own `T` into the scope of `P`. Interning the growing set of
+/// binders after each overload retains a quadratic number of entries. Passing `first` keeps
+/// the final argument check from comparing the whole overload set against itself.
+fn benchmark_paramspec_capture_many_overloads(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from("from typing import Callable, Literal, overload\n\n");
+    for tag in 0..256 {
+        writeln!(
+            &mut code,
+            "@overload\ndef select[T](tag: Literal[{tag}], value: T) -> T: ..."
+        )
+        .ok();
+    }
+    code.push_str(
+        "\
+def select(tag: int, value: object) -> object:
+    return value
+
+def register[**P](f: Callable[P, object], g: Callable[P, object]) -> None: ...
+
+def first(tag: Literal[0], value: int) -> int:
+    return value
+
+register(first, select)
+",
+    );
+
+    criterion.bench_function("ty_micro[paramspec_capture_many_overloads]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// An overloaded `__call__` can refer to the protocol itself in each receiver annotation. Checking
+/// the receiver can therefore encounter the same overloads again.
+fn benchmark_overloaded_protocol_receivers(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+        from __future__ import annotations
+
+        from collections.abc import Callable
+        from os import PathLike
+        from typing import Generic, ParamSpec, Protocol, TypeVar, overload
+
+        V = TypeVar("V", covariant=True)
+        A = TypeVar("A", contravariant=True)
+        P = ParamSpec("P")
+        T = TypeVar("T")
+        C = TypeVar("C", bound=type)
+
+        class Wrapper(Protocol, Generic[V, A]):
+            @overload
+            def __call__(
+                self: Wrapper[Callable[P, T], A], f: Callable[P, T], arg: A, /
+            ) -> Callable[P, T]: ...
+            @overload
+            def __call__(
+                self: Wrapper[classmethod[C, P, T], A], f: classmethod[C, P, T], arg: A, /
+            ) -> classmethod[C, P, T]: ...
+            @overload
+            def __call__(
+                self: Wrapper[staticmethod[P, T], A], f: staticmethod[P, T], arg: A, /
+            ) -> staticmethod[P, T]: ...
+            def __call__(self, f, arg, /): ...
+
+        def check(wrapper: Wrapper[object, str | PathLike[str]], f: Callable[P, T]) -> Callable[P, T]:
+            return wrapper(f, "arg")
+    "#;
+
+    criterion.bench_function("ty_micro[overloaded_protocol_receivers]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Inferring the element type of this list checks whether a recursive alias and the type variables
+/// from `product` can satisfy both endpoints of an inference bound.
+fn benchmark_recursive_alias_product(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+        from collections.abc import Hashable, Sequence
+        from itertools import product
+        from typing import Union
+
+        Label = Union[Hashable, tuple["Label", ...]]
+
+        def check(values: tuple[Sequence[Label], ...]):
+            return list(product(*values))
+    "#;
+
+    criterion.bench_function("ty_micro[recursive_alias_product]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Repeated unions share source-order subtrees even after the TDD stops growing. Persisting each
+/// result must not expand those shared subtrees into exponentially many copies.
+fn benchmark_shared_source_order_compaction(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from(
+        "from ty_extensions._internal import ConstraintSet\n\ndef repeated[T]() -> None:\n    c0 = ConstraintSet.lower_bound(int, T)\n    c1 = ConstraintSet.lower_bound(str, T)\n",
+    );
+    for i in 2..26 {
+        writeln!(&mut code, "    c{i} = c{} | c{}", i - 2, i - 1).ok();
+    }
+
+    criterion.bench_function("ty_micro[shared_source_order_compaction]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+criterion_group!(
+    constraint_set,
+    benchmark_typevar_mapping_large_accumulation,
+    benchmark_typevar_mapping_small_accumulations,
+    benchmark_constraint_quantification,
+    benchmark_bottom_and_top_signature_comparisons,
+    benchmark_factored_upper_bounds,
+    benchmark_constructor_literal_alias,
+    benchmark_overloaded_constructor_receiver,
+    benchmark_constructor_union_specialization,
+    benchmark_counterexample_behind_implied_bound,
+    benchmark_many_upper_bound_callbacks,
+    benchmark_incompatible_lower_bound_alternatives,
+    benchmark_long_valid_bound_prefix,
+    benchmark_pandas_tdd,
+    benchmark_mixed_typed_dict_union_copy,
+    benchmark_missing_key_typed_dict_union_copy,
+    benchmark_recursive_typed_dict_union_contextual_inference,
+    benchmark_invariant_generic_return_union,
+    benchmark_sequence_literal_union_access,
+    benchmark_invariant_generic_union_bound,
+    benchmark_many_invariant_typevars,
+    benchmark_mixed_many_invariant_typevars,
+    benchmark_pydantic_core_schema_dict,
+    benchmark_paramspec_capture_many_overloads,
+    benchmark_overloaded_protocol_receivers,
+    benchmark_recursive_alias_product,
+    benchmark_shared_source_order_compaction,
+);
+criterion_main!(constraint_set);

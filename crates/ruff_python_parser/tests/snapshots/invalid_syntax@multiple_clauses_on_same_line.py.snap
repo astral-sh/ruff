@@ -410,7 +410,6 @@ Module(
 5 | try: pass except exc: pass else: pass finally: pass
 6 | try: pass; except exc: pass; else: pass; finally: pass
   |            ^^^^^^ Syntax Error: Expected newline, found `except`
-  |
 
 
   |
@@ -418,7 +417,6 @@ Module(
 5 | try: pass except exc: pass else: pass finally: pass
 6 | try: pass; except exc: pass; else: pass; finally: pass
   |                              ^^^^ Syntax Error: Expected newline, found `else`
-  |
 
 
   |
@@ -426,4 +424,3 @@ Module(
 5 | try: pass except exc: pass else: pass finally: pass
 6 | try: pass; except exc: pass; else: pass; finally: pass
   |                                          ^^^^^^^ Syntax Error: Expected newline, found `finally`
-  |

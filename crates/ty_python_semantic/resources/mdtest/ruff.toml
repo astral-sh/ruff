@@ -1,0 +1,10 @@
+# Formatting configuration for Python codeblocks in mdtests
+
+line-length = 130
+
+[extension]
+py = "pyi"
+python = "pyi"
+
+[format]
+preview = true

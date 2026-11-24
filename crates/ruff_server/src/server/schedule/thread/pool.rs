@@ -127,7 +127,7 @@ impl Pool {
     }
 
     #[expect(dead_code)]
-    pub(super) fn len(&self) -> usize {
+    fn len(&self) -> usize {
         self.extant_tasks.load(Ordering::SeqCst)
     }
 }

@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of mutable objects as `ContextVar` defaults.
@@ -54,7 +55,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `contextvars` — Context Variables](https://docs.python.org/3/library/contextvars.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Suspicious)]
 pub(crate) struct MutableContextvarDefault;
 
 impl Violation for MutableContextvarDefault {
@@ -98,10 +99,7 @@ pub(crate) fn mutable_contextvar_default(checker: &Checker, call: &ast::ExprCall
                     && !is_immutable_func(func, checker.semantic(), &extend_immutable_calls)))
         && checker
             .semantic()
-            .resolve_qualified_name(map_subscript(&call.func))
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["contextvars", "ContextVar"])
-            })
+            .matches_qualified_name(map_subscript(&call.func), &["contextvars", "ContextVar"])
     {
         checker.report_diagnostic(MutableContextvarDefault, default.range());
     }

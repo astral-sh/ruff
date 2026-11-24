@@ -1,6 +1,8 @@
 use lsp_server::ErrorCode;
-use lsp_types::notification::DidChangeTextDocument;
-use lsp_types::{DidChangeTextDocumentParams, VersionedTextDocumentIdentifier};
+use lsp_types::{
+    DidChangeTextDocumentNotification, DidChangeTextDocumentParams, TextDocumentIdentifier,
+    VersionedTextDocumentIdentifier,
+};
 
 use crate::server::Result;
 use crate::server::api::LSPResult;
@@ -12,7 +14,7 @@ use crate::session::client::Client;
 pub(crate) struct DidChangeTextDocumentHandler;
 
 impl NotificationHandler for DidChangeTextDocumentHandler {
-    type NotificationType = DidChangeTextDocument;
+    type NotificationType = DidChangeTextDocumentNotification;
 }
 
 impl SyncNotificationHandler for DidChangeTextDocumentHandler {
@@ -22,16 +24,20 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
         params: DidChangeTextDocumentParams,
     ) -> Result<()> {
         let DidChangeTextDocumentParams {
-            text_document: VersionedTextDocumentIdentifier { uri, version },
+            text_document:
+                VersionedTextDocumentIdentifier {
+                    text_document_identifier: TextDocumentIdentifier { uri },
+                    version,
+                },
             content_changes,
         } = params;
 
         let mut document = session
-            .document_handle(&uri)
+            .open_document_handle(&uri)
             .with_failure_code(ErrorCode::InternalError)?;
 
         document
-            .update_text_document(session, content_changes, version)
+            .update_text_document(session, client, content_changes, version)
             .with_failure_code(ErrorCode::InternalError)?;
 
         publish_diagnostics_if_needed(&document, session, client);

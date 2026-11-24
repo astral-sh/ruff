@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/invalid/statements/match/star_pa
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..408,
+        range: 0..526,
         body: [
             Match(
                 StmtMatch {
@@ -490,6 +490,83 @@ Module(
                     ],
                 },
             ),
+            Match(
+                StmtMatch {
+                    node_index: NodeIndex(None),
+                    range: 465..525,
+                    subject: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 471..478,
+                            id: Name("subject"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 484..525,
+                            node_index: NodeIndex(None),
+                            pattern: MatchSequence(
+                                PatternMatchSequence {
+                                    node_index: NodeIndex(None),
+                                    range: 489..511,
+                                    patterns: [
+                                        MatchStar(
+                                            PatternMatchStar {
+                                                node_index: NodeIndex(None),
+                                                range: 490..495,
+                                                name: Some(
+                                                    Identifier {
+                                                        id: Name("head"),
+                                                        range: 491..495,
+                                                        node_index: NodeIndex(None),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchAs(
+                                            PatternMatchAs {
+                                                node_index: NodeIndex(None),
+                                                range: 497..503,
+                                                pattern: None,
+                                                name: Some(
+                                                    Identifier {
+                                                        id: Name("middle"),
+                                                        range: 497..503,
+                                                        node_index: NodeIndex(None),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchStar(
+                                            PatternMatchStar {
+                                                node_index: NodeIndex(None),
+                                                range: 505..510,
+                                                name: Some(
+                                                    Identifier {
+                                                        id: Name("tail"),
+                                                        range: 506..510,
+                                                        node_index: NodeIndex(None),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Pass(
+                                    StmtPass {
+                                        node_index: NodeIndex(None),
+                                        range: 521..525,
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
         ],
     },
 )
@@ -634,4 +711,13 @@ Module(
    |          ^^^^^^^^ Syntax Error: alternative patterns bind different names
 12 |         pass
 13 |     case Foo(*_):
+   |
+
+
+   |
+26 | # Sequence pattern can contain at most one star pattern
+27 | match subject:
+28 |     case [*head, middle, *tail]:
+   |                          ^^^^^ Syntax Error: multiple starred names in sequence pattern
+29 |         pass
    |

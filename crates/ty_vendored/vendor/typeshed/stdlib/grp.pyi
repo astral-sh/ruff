@@ -28,8 +28,7 @@ if sys.platform != "win32":
         or via the object attributes as named in the above tuple.
         """
 
-        if sys.version_info >= (3, 10):
-            __match_args__: Final = ("gr_name", "gr_passwd", "gr_gid", "gr_mem")
+        __match_args__: Final = ("gr_name", "gr_passwd", "gr_gid", "gr_mem")
 
         @property
         def gr_name(self) -> str:

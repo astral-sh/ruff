@@ -7,7 +7,7 @@
 #
 # Usage:
 # ```shell
-# # You can also use any other check_ecosystem.py input file
+# # You can also use any compatible JSONL input file
 # curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls-clean.jsonl > github_search.jsonl
 # cargo build --release --target x86_64-unknown-linux-musl --bin ruff
 # scripts/ecosystem_all_check.sh check --select RUF200

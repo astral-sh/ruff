@@ -1,12 +1,5 @@
 """A powerful, extensible, and easy-to-use option parser.
 
-By Greg Ward <gward@python.net>
-
-Originally distributed as Optik.
-
-For support, use the optik-users@lists.sourceforge.net mailing list
-(http://lists.sourceforge.net/lists/listinfo/optik-users).
-
 Simple usage example:
 
    from optparse import OptionParser
@@ -25,8 +18,8 @@ import builtins
 from _typeshed import MaybeNone, SupportsWrite
 from abc import abstractmethod
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from typing import Any, ClassVar, Final, Literal, NoReturn, overload
-from typing_extensions import Self
+from typing import Any, ClassVar, Final, Literal, overload
+from typing_extensions import Never, Self
 
 __all__ = [
     "Option",
@@ -324,12 +317,12 @@ class OptionContainer:
     def _check_conflict(self, option: Option) -> None: ...
     def _create_option_mappings(self) -> None: ...
     def _share_option_mappings(self, parser: OptionParser) -> None: ...
+
     @overload
     def add_option(self, opt: Option, /) -> Option:
         """add_option(Option)
         add_option(opt_str, ..., kwarg=val, ...)
         """
-
     @overload
     def add_option(
         self,
@@ -350,6 +343,7 @@ class OptionContainer:
         metavar: str | None = None,
         **kwargs: Any,  # Allow arbitrary keyword arguments for user defined option_class
     ) -> Option: ...
+
     def add_options(self, option_list: Iterable[Option]) -> None: ...
     def destroy(self) -> None:
         """see OptionParser.destroy()."""
@@ -524,10 +518,12 @@ class OptionParser(OptionContainer):
 
     def _process_long_opt(self, rargs: list[str], values: Values) -> None: ...
     def _process_short_opts(self, rargs: list[str], values: Values) -> None: ...
+
     @overload
     def add_option_group(self, opt_group: OptionGroup, /) -> OptionGroup: ...
     @overload
     def add_option_group(self, title: str, /, description: str | None = None) -> OptionGroup: ...
+
     def check_values(self, values: Values, args: list[str]) -> tuple[Values, list[str]]:
         """
         check_values(values : Values, args : [string])
@@ -555,7 +551,7 @@ class OptionParser(OptionContainer):
         allow_interspersed_args.
         """
 
-    def error(self, msg: str) -> NoReturn:
+    def error(self, msg: str) -> Never:
         """error(msg : string)
 
         Print a usage message incorporating 'msg' to stderr and exit.
@@ -563,7 +559,7 @@ class OptionParser(OptionContainer):
         should either exit or raise an exception.
         """
 
-    def exit(self, status: int = 0, msg: str | None = None) -> NoReturn: ...
+    def exit(self, status: int = 0, msg: str | None = None) -> Never: ...
     def expand_prog_name(self, s: str) -> str: ...
     def format_epilog(self, formatter: HelpFormatter) -> str: ...
     def format_help(self, formatter: HelpFormatter | None = None) -> str: ...

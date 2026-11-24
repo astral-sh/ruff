@@ -197,4 +197,3 @@ Module(
 2 | f'first' b'second'
 3 | 'first' f'second' b'third'
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Bytes literal cannot be mixed with non-bytes literals
-  |
