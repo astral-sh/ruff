@@ -48,7 +48,7 @@ use crate::place_load::{
 use crate::reachability::{
     ReachabilityEvaluationCache, evaluate_reachability_with_cache, is_end_of_scope_reachable,
 };
-use crate::types::abstract_methods::AbstractMethods;
+use crate::types::abstract_methods::{AbstractMethods, decorator_preserves_concreteness};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::annotation_target::{is_valid_annotation_target, receiver_method_scope};
 use crate::types::attribute_write::{
@@ -12586,58 +12586,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     pub(super) fn finish_function_decorator_inference(mut self) -> FunctionDecoratorInference<'db> {
-        // Specializing a nominal return type can change a descriptor's type arguments, but it
-        // cannot turn the descriptor into an abstract function, bound method, or property.
-        fn returns_nominal_instance<'db>(db: &'db dyn Db, decorator: Type<'db>) -> bool {
-            let Type::Callable(callable) = decorator else {
-                return false;
-            };
-            if callable.kind(db) != CallableTypeKind::Regular {
-                return false;
-            }
-            let [signature] = callable.signatures(db).overloads.as_slice() else {
-                return false;
-            };
-            matches!(signature.return_ty, Type::NominalInstance(_))
-        }
-
-        // With a single decorator of type `(F) -> F`, the argument is the undecorated
-        // method. Keep the full check if specialization could pick a different function
-        // from a TypeVar constraint, bound, or default.
-        fn is_identity_decorator<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            decorator: Type<'db>,
-        ) -> bool {
-            let Type::FunctionLiteral(function) = decorator else {
-                return false;
-            };
-            if function.known(db).is_some() {
-                return false;
-            }
-            let [signature] = function.signature(db).overloads.as_slice() else {
-                return false;
-            };
-            let Type::TypeVar(variable) = signature.return_ty else {
-                return false;
-            };
-            let [parameter] = signature.parameters().as_slice() else {
-                return false;
-            };
-            parameter.is_positional()
-                && parameter.annotated_type() == signature.return_ty
-                && signature
-                    .generic_context
-                    .is_some_and(|context| context.variables(db).eq([variable]))
-                && !variable.is_paramspec(db)
-                && !variable.is_typevartuple(db)
-                && matches!(
-                    variable.typevar(db).bound_or_constraints(db, env),
-                    None | Some(TypeVarBoundOrConstraints::UpperBound(Type::Callable(_)))
-                )
-                && variable.typevar(db).default_type(db, env).is_none()
-        }
-
         self.infer_region();
 
         let mut known_decorators = FunctionDecorators::empty();
@@ -12646,31 +12594,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let DefinitionKind::Function(function) = definition.kind(self.db())
         {
             may_produce_abstract_method = false;
-            let decorators = &function.node(self.module()).decorator_list;
-            for decorator in decorators {
+            for decorator in &function.node(self.module()).decorator_list {
                 let ty = self.expression_type(&decorator.expression);
                 let flags = FunctionDecorators::from_decorator_type(self.db(), ty);
                 known_decorators |= flags;
-                if !flags.is_empty()
+                if may_produce_abstract_method
+                    || !flags.is_empty()
                     || matches!(ty, Type::ClassLiteral(class)
                         if class.known(self.db()) == Some(KnownClass::Property))
                 {
                     continue;
                 }
-                if decorators.len() == 1 {
-                    if returns_nominal_instance(self.db(), ty) {
-                        continue;
-                    }
-                    // A class-body TypeGuard can narrow the method to an abstract function
-                    // even if the decorator preserves the type of the original definition.
-                    let bindings = self.index.use_def_map(definition.file_scope(self.db()));
-                    if !bindings.may_narrow(definition.place(self.db()))
-                        && is_identity_decorator(self.db(), self.program_environment(), ty)
-                    {
-                        continue;
-                    }
-                }
-                may_produce_abstract_method = true;
+                // Even if the decorator preserves concreteness, a later TypeGuard in the
+                // class body can narrow the member's type to that of an abstract method.
+                let bindings = self.index.use_def_map(definition.file_scope(self.db()));
+                may_produce_abstract_method = bindings.may_narrow(definition.place(self.db()))
+                    || !decorator_preserves_concreteness(self.db(), self.program_environment(), ty);
             }
             may_produce_abstract_method |=
                 known_decorators.contains(FunctionDecorators::ABSTRACT_METHOD);

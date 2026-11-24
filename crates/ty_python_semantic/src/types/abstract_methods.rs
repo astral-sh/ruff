@@ -17,9 +17,11 @@ use crate::{
     types::{
         ClassBase, ClassLiteral, ClassType, LintDiagnosticGuard, Parameters, Signature, Type,
         binding_type,
+        callable::CallableTypeKind,
         diagnostic::{AbstractMethodAnnotationPolicy, abstract_method_span},
         function::AbstractMethodKind,
         infer::{function_known_decorators, infer_definition_types},
+        typevar::TypeVarDomain,
     },
 };
 
@@ -379,6 +381,60 @@ impl<'db> ClassType<'db> {
 
         abstract_methods
     }
+}
+
+/// Returns `true` if we can cheaply rule out any overload of the decorator turning
+/// a concrete member into an explicitly abstract one.
+///
+/// This check is only an optimization. If every decorator passes, abstract-method
+/// discovery can skip inferring the decorated member's type. When proving concreteness
+/// would be expensive, we can conservatively return `false` and let inference proceed.
+///
+/// To check whether a class can be instantiated, ty looks for abstract methods throughout
+/// its MRO. Skipping inference for methods with identity decorators sped up checks of
+/// usort and Fixit (LibCST's `@mark_no_op`) and Flask-PyMongo (`@pymongo._csot.apply`).
+/// Recognizing that both overloads of `contextlib.contextmanager` return a `Callable`
+/// also sped up checks of code that instantiates Click's `CliRunner`.
+pub(super) fn decorator_preserves_concreteness<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    decorator: Type<'db>,
+) -> bool {
+    let signatures = match decorator {
+        Type::FunctionLiteral(function) if function.known(db).is_none() => function.signature(db),
+        Type::Callable(callable) if callable.kind(db) == CallableTypeKind::Regular => {
+            callable.signatures(db)
+        }
+        _ => return false,
+    };
+
+    // Specializing a nominal instance or a callable cannot produce a function literal,
+    // bound method, or property carrying `@abstractmethod`.
+    let stays_concrete = |ty| matches!(ty, Type::NominalInstance(_) | Type::Callable(_));
+
+    signatures.overloads.iter().all(|signature| {
+        let Type::TypeVar(variable) = signature.return_ty else {
+            return stays_concrete(signature.return_ty);
+        };
+
+        // If the decorator is generic in `T` and takes `f: T`, we infer `T` from the
+        // member itself. With `f: Callable[..., T]`, the decorated function's return
+        // type would supply `T` and could be the type of an abstract method.
+        //
+        // Inference can also select a constraint or fall back to a bound or default.
+        let typevar = variable.typevar(db);
+        variable.domain(db) == TypeVarDomain::Type
+            && signature
+                .generic_context
+                .is_some_and(|context| context.contains(db, variable.identity(db)))
+            && signature
+                .parameters()
+                .get_positional(0)
+                .is_some_and(|parameter| parameter.annotated_type() == signature.return_ty)
+            && !typevar.is_constrained(db)
+            && typevar.upper_bound(db, env).is_none_or(stays_concrete)
+            && typevar.default_type(db, env).is_none_or(stays_concrete)
+    })
 }
 
 /// Whether a binding could resolve to a method marked with `@abstractmethod`.
