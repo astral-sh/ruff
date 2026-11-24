@@ -6269,7 +6269,7 @@ fn literal_iterable_truthiness(expr: &ast::Expr) -> Truthiness {
 }
 
 /// Resolve common version and platform guards before building constraints for both branches.
-fn environment_check(
+pub(super) fn environment_check(
     expr: &ast::Expr,
     version: PythonVersion,
     platform: &PythonPlatform,

@@ -786,6 +786,9 @@ fn definition_contains_special_cased_condition<'db>(
     // A version guard can select a different function signature without changing the fact that
     // the function object is always truthy. Only definitions with a source expression above
     // inherit the provenance of their guards.
+    if definition.has_folded_environment_guard(db, &module) {
+        return true;
+    }
     let reachability = definition_reachability(db, definition.scope(db), definition.place(db))
         .get(&definition)
         .copied()
