@@ -797,10 +797,6 @@ impl PlaceState {
     pub(super) fn declarations(&self) -> &Declarations {
         &self.declarations
     }
-
-    pub(super) fn into_parts(self) -> (Bindings, Declarations) {
-        (self.bindings, self.declarations)
-    }
 }
 
 /// The binding's narrowing constraint and the reachability it shares with the declaration.
