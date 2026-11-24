@@ -11,8 +11,6 @@ ContextVar("cv", default=(1, 2, 3))
 ContextVar("cv", default="foo")
 ContextVar("cv", default=tuple())
 ContextVar("cv", default=frozenset())
-ContextVar("cv", default=frozendict())
-ContextVar("cv", default=frozendict.fromkeys(""))
 ContextVar("cv", default=MappingProxyType({}))
 ContextVar("cv", default=re.compile("foo"))
 ContextVar("cv", default=float(1))
@@ -40,3 +38,7 @@ ContextVar("cv", default=time.time())
 
 def baz(): ...
 ContextVar("cv", default=baz())
+
+
+ContextVar("cv", default=frozendict())
+ContextVar("cv", default=frozendict.fromkeys(""))
