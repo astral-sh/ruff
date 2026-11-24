@@ -127,12 +127,13 @@ impl<'db> BoundMethodType<'db> {
         func: Type<'db>,
         program: Program<'db>,
         receiver: Type<'db>,
+        kind: CallableTypeKind,
     ) -> Self {
         Self::new_internal(
             db,
-            func.underlying_function(db),
+            func,
             program,
-            func.is_classmethod(db),
+            kind == CallableTypeKind::ClassMethodLike,
             BoundMethodReceiver::Instance(receiver),
         )
     }
@@ -165,9 +166,10 @@ impl<'db> BoundMethodType<'db> {
     pub(crate) fn new(db: &'db dyn Db, function: FunctionType<'db>, receiver: Type<'db>) -> Self {
         Self::from_callable(
             db,
-            Type::FunctionLiteral(function),
+            Type::FunctionLiteral(function.underlying_function(db)),
             function.program_file(db).program(db),
             receiver,
+            function.callable_type_kind(db),
         )
     }
 

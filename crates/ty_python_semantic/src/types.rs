@@ -4604,7 +4604,13 @@ impl<'db> Type<'db> {
     ) -> PlaceAndQualifiers<'db> {
         Self::class_member_with_policy_inner(
             db,
-            MemberLookupKey::new(db, env.program(db), self, name, policy),
+            MemberLookupKey::new(
+                db,
+                env.program(db),
+                self.literal_member_representative(name).unwrap_or(self),
+                name,
+                policy,
+            ),
         )
     }
 
@@ -4730,6 +4736,16 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Share the raw class member across ordinary literals. The descriptor
+    /// still binds to the original value, and `__len__` uses the literal's length.
+    fn literal_member_representative(self, name: &str) -> Option<Self> {
+        match self.as_literal_value()?.kind() {
+            LiteralValueTypeKind::String(_) if name != "__len__" => Some(Self::literal_string()),
+            LiteralValueTypeKind::Int(_) => Some(Self::int_literal(0)),
+            _ => None,
+        }
+    }
+
     /// A protocol's implicit `__hash__ = None` belongs to the protocol class itself.
     /// A structural implementation can provide a hash or disable hashing.
     fn unspecified_protocol_hash(
@@ -4785,6 +4801,9 @@ impl<'db> Type<'db> {
             }
         }
 
+        if let Some(literal) = ty.literal_member_representative(key.name(db)) {
+            return literal.class_member_with_policy(db, env, key.name(db), key.policy(db));
+        }
         Self::class_member_with_policy_inner(db, key)
     }
 

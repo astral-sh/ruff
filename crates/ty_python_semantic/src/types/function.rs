@@ -867,6 +867,8 @@ impl<'db> OverloadLiteral<'db> {
 pub struct FunctionLiteral<'db> {
     pub(crate) last_definition: OverloadLiteral<'db>,
     overloaded: bool,
+    last_definition_is_classmethod: bool,
+    last_definition_is_staticmethod: bool,
 }
 
 impl<'db> FunctionLiteral<'db> {
@@ -877,9 +879,14 @@ impl<'db> FunctionLiteral<'db> {
         node: &ast::StmtFunctionDef,
         definition: Definition<'db>,
     ) -> Self {
+        let decorators = last_definition.decorators(db);
         Self {
             last_definition,
-            overloaded: last_definition.is_overload(db)
+            last_definition_is_classmethod: decorators.contains(FunctionDecorators::CLASSMETHOD)
+                || is_implicit_classmethod(&node.name),
+            last_definition_is_staticmethod: decorators.contains(FunctionDecorators::STATICMETHOD)
+                || is_implicit_staticmethod(&node.name),
+            overloaded: decorators.contains(FunctionDecorators::OVERLOAD)
                 || last_definition
                     .previous_overload(db, index, node, definition)
                     .is_some(),
@@ -1628,7 +1635,11 @@ impl<'db> FunctionType<'db> {
         if let Some(kind) = self.descriptor_kind(db) {
             return kind == CallableTypeKind::ClassMethodLike;
         }
-        let mut overloads = self.iter_overloads_and_implementation(db);
+        let literal = self.literal(db);
+        if !literal.overloaded {
+            return literal.last_definition_is_classmethod;
+        }
+        let mut overloads = literal.iter_overloads_and_implementation(db);
         // Overload discovery can return no definitions during cycle recovery.
         overloads
             .next()
@@ -1648,7 +1659,11 @@ impl<'db> FunctionType<'db> {
     /// Whether this function was declared as a staticmethod, even if descriptor access has
     /// already exposed the ordinary function. Diagnostics can still use its declaration kind.
     pub(super) fn has_staticmethod_declaration(self, db: &'db dyn Db) -> bool {
-        let mut overloads = self.iter_overloads_and_implementation(db);
+        let literal = self.literal(db);
+        if !literal.overloaded {
+            return literal.last_definition_is_staticmethod;
+        }
+        let mut overloads = literal.iter_overloads_and_implementation(db);
         // Overload discovery can return no definitions during cycle recovery.
         overloads
             .next()
@@ -2099,6 +2114,19 @@ impl<'db> FunctionType<'db> {
 
     /// Return the kind for this function when it is converted into a [`CallableType`].
     pub(crate) fn callable_type_kind(self, db: &'db dyn Db) -> CallableTypeKind {
+        if let Some(kind) = self.descriptor_kind(db) {
+            return kind;
+        }
+        let literal = self.literal(db);
+        if !literal.overloaded {
+            return if literal.last_definition_is_classmethod {
+                CallableTypeKind::ClassMethodLike
+            } else if literal.last_definition_is_staticmethod {
+                CallableTypeKind::StaticMethodLike
+            } else {
+                CallableTypeKind::FunctionLike
+            };
+        }
         if self.is_classmethod(db) {
             CallableTypeKind::ClassMethodLike
         } else if self.is_staticmethod(db) {
@@ -2109,12 +2137,10 @@ impl<'db> FunctionType<'db> {
     }
 
     pub(super) fn runtime_class(self, db: &'db dyn Db) -> KnownClass {
-        if self.is_classmethod(db) {
-            KnownClass::Classmethod
-        } else if self.is_staticmethod(db) {
-            KnownClass::Staticmethod
-        } else {
-            KnownClass::FunctionType
+        match self.callable_type_kind(db) {
+            CallableTypeKind::ClassMethodLike => KnownClass::Classmethod,
+            CallableTypeKind::StaticMethodLike => KnownClass::Staticmethod,
+            _ => KnownClass::FunctionType,
         }
     }
 

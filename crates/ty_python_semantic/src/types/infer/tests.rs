@@ -96,6 +96,53 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
 }
 
 #[test]
+fn literal_member_lookup_preserves_the_receiver_and_length() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let main = "/src/main.py";
+    db.write_dedented(
+        main,
+        r#"
+        from typing import reveal_type
+
+        reveal_type((
+            "a".upper.__self__, "ab".upper.__self__,
+            (1).bit_length.__self__, (2).bit_length.__self__,
+            "a".__len__(), "ab".__len__(),
+        ))
+        "#,
+    )?;
+    assert_revealed_type(
+        &db,
+        main,
+        r#"tuple[Literal["a"], Literal["ab"], Literal[1], Literal[2], Literal[1], Literal[2]]"#,
+    );
+    Ok(())
+}
+
+#[test]
+fn method_binding_tracks_decorator_edits() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let main = "/src/main.py";
+    db.write_file(
+        main,
+        "from typing import reveal_type\nfrom other import C\nreveal_type(C().f)",
+    )?;
+    for (decorator, expected) in [
+        ("", "bound method C.f() -> int"),
+        ("@classmethod", "bound method type[C].f() -> int"),
+        ("@staticmethod", "def f(first) -> int"),
+        ("", "bound method C.f() -> int"),
+    ] {
+        db.write_file(
+            "/src/other.pyi",
+            format!("class C:\n    {decorator}\n    def f(first) -> int: ...\n"),
+        )?;
+        assert_revealed_type(&db, main, expected);
+    }
+    Ok(())
+}
+
+#[test]
 fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     let mut db = TestDbBuilder::new()
         .with_python_version(PythonVersion::PY311)
