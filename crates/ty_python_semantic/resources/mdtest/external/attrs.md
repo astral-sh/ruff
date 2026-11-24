@@ -230,7 +230,7 @@ class Person:
     def _default_id(self) -> int:
         return 0
 
-reveal_type(Person.__init__)  # revealed: (self: Person, /, name: str = ..., id: int = ...) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, /, name: str = "Unnamed", id: int = ...) -> None
 
 person = Person()
 ```
