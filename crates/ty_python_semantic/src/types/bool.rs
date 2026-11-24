@@ -13,24 +13,39 @@ use crate::types::{
 use ty_python_core::Truthiness;
 
 impl<'db> Type<'db> {
-    /// Whether we can test this type's truthiness without inferring more types.
-    /// In particular, a class's metaclass or an instance's `__bool__` can depend
-    /// on the very predicate we're inferring.
-    pub(super) fn has_intrinsic_truthiness(self, db: &'db dyn Db) -> bool {
+    /// Test an operand without looking up a metaclass, special method, or type alias.
+    /// Like [`Self::bool`], stop at the first ambiguous union member.
+    pub(super) fn intrinsic_truthiness(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Truthiness> {
         match self {
-            Type::Dynamic(_) | Type::Never | Type::FunctionLiteral(_) | Type::BoundMethod(_) => {
-                true
+            Type::NominalInstance(instance) => instance.known_class(db).and_then(KnownClass::bool),
+            Type::LiteralValue(literal)
+                if matches!(literal.kind(), LiteralValueTypeKind::Enum(_)) =>
+            {
+                None
             }
-            Type::LiteralValue(value) => !matches!(value.kind(), LiteralValueTypeKind::Enum(_)),
-            Type::NominalInstance(instance) => instance
-                .known_class(db)
-                .and_then(KnownClass::bool)
-                .is_some(),
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .all(|ty| ty.has_intrinsic_truthiness(db)),
-            _ => false,
+            Type::Dynamic(_)
+            | Type::Divergent(_)
+            | Type::Never
+            | Type::FunctionLiteral(_)
+            | Type::BoundMethod(_)
+            | Type::ModuleLiteral(_)
+            | Type::Callable(_)
+            | Type::LiteralValue(_) => Some(self.bool(db, env)),
+            Type::Union(union) => {
+                let mut result = Truthiness::Uninhabited;
+                for element in union.elements(db) {
+                    result = result.union(element.intrinsic_truthiness(db, env)?);
+                    if result.is_ambiguous() {
+                        break;
+                    }
+                }
+                Some(result)
+            }
+            _ => None,
         }
     }
 

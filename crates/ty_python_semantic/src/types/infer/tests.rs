@@ -704,7 +704,9 @@ fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<
             inference(previous.0, previous.1);
         let (mut current_expression, mut current_statement, mut current_definition) =
             inference(current.0, current.1);
-        current_expression.widen_comparison_truthiness(&db, &env, &previous_expression);
+        // Only the first widening changes a predicate input and requires recomputation.
+        assert!(current_expression.widen_comparison_truthiness(&db, &env, &previous_expression));
+        assert!(!current_expression.widen_comparison_truthiness(&db, &env, &previous_expression));
         current_statement.widen_comparison_truthiness(&db, &env, &previous_statement);
         current_definition.widen_comparison_truthiness(&db, &env, &previous_definition);
         assert_eq!(

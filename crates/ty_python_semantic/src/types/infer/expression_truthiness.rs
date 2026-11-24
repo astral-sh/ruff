@@ -1,5 +1,7 @@
 //! Truthiness of already-inferred expressions, including paths that cannot produce a value.
 
+use std::cell::Cell;
+
 use ruff_python_ast as ast;
 use ty_python_core::{Truthiness, expression::ExpressionContext};
 
@@ -35,7 +37,8 @@ use crate::{Db, ProgramEnvironment, types::Type};
 /// ```
 ///
 /// The callbacks read existing inference results; this analyzer does not infer or cache types.
-pub(crate) struct TruthinessAnalyzer<'a, 'db, T, C> {
+pub(crate) struct TruthinessAnalyzer<'a, 'db, T, C, const INTRINSIC: bool = false> {
+    deferred: Cell<bool>,
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
     expression_type: T,
@@ -55,10 +58,52 @@ where
         comparison_truthiness: C,
     ) -> Self {
         Self {
+            deferred: Cell::new(false),
             db,
             env,
             expression_type,
             comparison_truthiness,
+        }
+    }
+
+    /// Follow the usual short-circuit paths, deferring the entire condition if
+    /// any visited operand requires further inference. A call argument, for
+    /// example, only needs to complete, even if its own truthiness is unknown.
+    pub(super) fn intrinsic_truthiness(
+        self,
+        expression: &ast::Expr,
+        context: ExpressionContext,
+    ) -> Option<Truthiness> {
+        let analyzer = TruthinessAnalyzer::<_, _, true> {
+            db: self.db,
+            env: self.env,
+            expression_type: self.expression_type,
+            comparison_truthiness: self.comparison_truthiness,
+            deferred: Cell::new(false),
+        };
+        let outcome = analyzer.truthiness(expression, context);
+        (!analyzer.deferred.get()).then_some(outcome)
+    }
+}
+
+impl<'db, T, C, const INTRINSIC: bool> TruthinessAnalyzer<'_, 'db, T, C, INTRINSIC>
+where
+    T: Fn(&ast::Expr) -> Type<'db>,
+    C: Fn(&ast::Expr) -> Option<Truthiness>,
+{
+    /// Test a value only when a boolean outcome is required.
+    fn test(&self, outcome: EvaluationOutcome<'db>) -> Truthiness {
+        match outcome {
+            EvaluationOutcome::Condition(truthiness) => truthiness,
+            EvaluationOutcome::Value(ty) if INTRINSIC => {
+                ty.intrinsic_truthiness(self.db, self.env)
+                    .unwrap_or_else(|| {
+                        // Stop this path. The caller discards the entire result.
+                        self.deferred.set(true);
+                        Truthiness::Uninhabited
+                    })
+            }
+            EvaluationOutcome::Value(ty) => ty.bool(self.db, self.env),
         }
     }
 
@@ -69,9 +114,7 @@ where
         context: ExpressionContext,
     ) -> Truthiness {
         self.evaluate(expression, context)
-            .map_or(Truthiness::Uninhabited, |outcome| {
-                outcome.truthiness(self.db, self.env)
-            })
+            .map_or(Truthiness::Uninhabited, |outcome| self.test(outcome))
     }
 
     /// Check completion without testing the result object's truthiness.
@@ -91,8 +134,17 @@ where
     ) -> Option<EvaluationOutcome<'db>> {
         let value = || {
             let ty = (self.expression_type)(expression);
-            (!ty.is_equivalent_to(self.db, self.env, Type::Never))
-                .then_some(EvaluationOutcome::Value(ty))
+            let never = if INTRINSIC {
+                let possible = ty.might_be_equivalent_to_never(self.db);
+                if possible && !matches!(ty, Type::Never) {
+                    // A full relation check can require unfolding a type alias.
+                    self.deferred.set(true);
+                }
+                possible
+            } else {
+                ty.is_equivalent_to(self.db, self.env, Type::Never)
+            };
+            (!never).then_some(EvaluationOutcome::Value(ty))
         };
 
         match expression {
@@ -150,8 +202,8 @@ where
                         match (body_outcome, orelse_outcome) {
                             (None, outcome) | (outcome, None) => outcome,
                             (Some(body), Some(orelse)) => {
-                                let body = body.truthiness(self.db, self.env);
-                                let orelse = orelse.truthiness(self.db, self.env);
+                                let body = self.test(body);
+                                let orelse = self.test(orelse);
                                 Some(EvaluationOutcome::Condition(body.union(orelse)))
                             }
                         }
@@ -205,16 +257,8 @@ where
 }
 
 /// Keep value truthiness lazy: checking whether an argument can complete does not call `__bool__`.
+#[derive(Clone, Copy)]
 enum EvaluationOutcome<'db> {
     Value(Type<'db>),
     Condition(Truthiness),
-}
-
-impl<'db> EvaluationOutcome<'db> {
-    fn truthiness(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Truthiness {
-        match self {
-            Self::Value(ty) => ty.bool(db, env),
-            Self::Condition(truthiness) => truthiness,
-        }
-    }
 }

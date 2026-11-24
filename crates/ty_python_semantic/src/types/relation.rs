@@ -1204,9 +1204,12 @@ impl<'db> Type<'db> {
     /// ```
     ///
     /// A `true` result still needs a relation check. For example, an alias may expand to `Never`.
-    fn might_be_equivalent_to_never(self, db: &'db dyn Db) -> bool {
+    pub(super) fn might_be_equivalent_to_never(self, db: &'db dyn Db) -> bool {
         match self {
             Type::NominalInstance(_)
+            | Type::Callable(_)
+            | Type::ModuleLiteral(_)
+            | Type::GenericAlias(_)
             | Type::LiteralValue(_)
             | Type::Dynamic(_)
             | Type::FunctionLiteral(_)
