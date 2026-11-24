@@ -102,7 +102,8 @@
 }
 
 /* See: https://github.com/astral-sh/ruff/issues/9046 */
-[data-md-color-scheme="astral-dark"] div.admonition {
+[data-md-color-scheme="astral-dark"] div.admonition,
+[data-md-color-scheme="astral-dark"] .md-typeset details {
   color: var(--md-code-fg-color);
   background-color: var(--md-code-bg-color);
 }
