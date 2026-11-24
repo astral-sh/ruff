@@ -53,14 +53,14 @@ static MOOD: LazyLock<Mood> = LazyLock::new(Mood::new);
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.228", category = Category::Pedantic)]
-pub(crate) struct NonImperativeMood {
+pub(crate) struct NonImperativeDocstringSummary {
     first_line: String,
 }
 
-impl Violation for NonImperativeMood {
+impl Violation for NonImperativeDocstringSummary {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonImperativeMood { first_line } = self;
+        let NonImperativeDocstringSummary { first_line } = self;
         format!("First line of docstring should be in imperative mood: \"{first_line}\"")
     }
 }
@@ -102,7 +102,7 @@ pub(crate) fn non_imperative_mood(checker: &Checker, docstring: &Docstring, sett
 
     if matches!(MOOD.is_imperative(&first_word_norm), Some(false)) {
         checker.report_diagnostic(
-            NonImperativeMood {
+            NonImperativeDocstringSummary {
                 first_line: first_line.to_string(),
             },
             docstring.range(),

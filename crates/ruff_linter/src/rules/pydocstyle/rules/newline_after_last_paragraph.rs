@@ -50,9 +50,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.68", category = Category::Pedantic)]
-pub(crate) struct MissingNewLineAfterLastDocstringParagraph;
+pub(crate) struct MissingNewlineAfterLastDocstringParagraph;
 
-impl AlwaysFixableViolation for MissingNewLineAfterLastDocstringParagraph {
+impl AlwaysFixableViolation for MissingNewlineAfterLastDocstringParagraph {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Multi-line docstring closing quotes should be on a separate line".to_string()
@@ -85,7 +85,7 @@ pub(crate) fn newline_after_last_paragraph(checker: &Checker, docstring: &Docstr
             {
                 if last_line != "\"\"\"" && last_line != "'''" {
                     let mut diagnostic = checker.report_diagnostic(
-                        MissingNewLineAfterLastDocstringParagraph,
+                        MissingNewlineAfterLastDocstringParagraph,
                         docstring.range(),
                     );
                     // Insert a newline just before the end-quote(s).
