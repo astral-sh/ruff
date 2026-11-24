@@ -2623,20 +2623,43 @@ fn terminal_escape(ch: char) -> Option<char> {
     }
 }
 
+/// In UTF-8, C1 controls share the lead byte 0xC2 with some printable characters.
+fn may_contain_escape(text: &str) -> bool {
+    // Accumulate the two comparisons separately so LLVM can vectorize the scan.
+    let mut esc = false;
+    let mut c1 = false;
+    for byte in text.bytes() {
+        esc |= byte == 0x1b;
+        c1 |= byte == 0xc2;
+    }
+    esc | c1
+}
+
 /// Escape labels before measuring them for layout.
 pub(crate) fn escape_label(label: Cow<'_, str>) -> Cow<'_, str> {
+    if !may_contain_escape(&label) {
+        return label;
+    }
     let Some(start) = label.find(|ch| terminal_escape(ch).is_some()) else {
         return label;
     };
 
     let mut escaped = String::with_capacity(label.len());
     escaped.push_str(&label[..start]);
-    push_escaped(&mut escaped, &label[start..]);
+    push_escaped_slow(&mut escaped, &label[start..]);
     Cow::Owned(escaped)
 }
 
 /// Escape paths only for display, so file comparisons use the original paths.
 pub(super) fn push_escaped(output: &mut String, text: &str) {
+    if may_contain_escape(text) {
+        push_escaped_slow(output, text);
+    } else {
+        output.push_str(text);
+    }
+}
+
+fn push_escaped_slow(output: &mut String, text: &str) {
     let mut start = 0;
     for (i, ch) in text.char_indices() {
         if let Some(visible) = terminal_escape(ch) {
@@ -2921,6 +2944,7 @@ mod test {
             super::normalize_whitespace(text),
             Cow::Borrowed(_)
         ));
+        assert!(matches!(super::escape_label(text.into()), Cow::Borrowed(_)));
     }
 
     fn format_replacements(replacements: Vec<(char, &str)>) -> String {
