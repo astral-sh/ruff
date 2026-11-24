@@ -3188,6 +3188,46 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
     }
 
+    /// When comparing `list[S] -> list[S | T]` to `list[L] -> list[L]`,
+    /// the parameter check requires `L ≤ S`, which implies `L ≤ S | T`.
+    /// Only `S | T ≤ L` remains to check for the invariant return. This
+    /// avoids choosing between `S` and `T` independently for every member of `L`.
+    fn simplify_invariant_return(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+    ) -> Option<(Type<'db>, Type<'db>)> {
+        let context = source.generic_context?;
+        let input = source.single_required_positional_parameter_type()?;
+        let expected = target.single_required_positional_parameter_type()?;
+        if self.typevar_evaluation != TypeVarEvaluation::Lazy
+            || !self.relation.is_assignability()
+            || expected.resolve_type_alias(db) != target.return_ty.resolve_type_alias(db)
+        {
+            return None;
+        }
+        let argument = |ty: Type<'db>| {
+            let instance = ty.resolve_type_alias(db).as_nominal_instance()?;
+            let alias = instance.class(db, self.env).into_generic_alias()?;
+            let args = alias.specialization(db);
+            let &[arg] = args.types(db) else { return None };
+            (!instance.inherits_from_explicit_any() && args.materialization_kind(db).is_none())
+                .then_some((alias.origin(db), arg))
+        };
+        let (class, parameter) = argument(input)?;
+        let (return_class, output) = argument(source.return_ty)?;
+        let (target_class, expected) = argument(expected)?;
+        let slot = class.generic_context(db)?.variables(db).next()?;
+        (class == target_class
+            && class == return_class
+            && context.contains(db, parameter.as_typevar()?.identity(db))
+            && expected.resolve_type_alias(db).is_union()
+            && output.as_union()?.elements(db).contains(&parameter)
+            && slot.variance(db) == TypeVarVariance::Invariant)
+            .then_some((output, expected))
+    }
+
     fn check_paramspec_return_pair(
         &self,
         db: &'db dyn Db,
@@ -3456,6 +3496,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // if the return types are incompatible.
         let return_type_constraints = if target_parameters.as_paramspec_with_prefix().is_some() {
             self.check_paramspec_return_pair(db, source, target)
+        } else if !source.is_paramspec_value()
+            && !target.is_paramspec_value()
+            && let Some((output, expected)) = self.simplify_invariant_return(db, source, target)
+        {
+            self.check_type_pair(db, output, expected)
         } else {
             self.check_signature_return_pair(db, source, target)
         };

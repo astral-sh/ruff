@@ -759,6 +759,31 @@ def perform(rows: Rows) -> AllResults:
     });
 }
 
+/// Meson's list protocol matches the generic overload of `list[T].__add__` against
+/// `(list[Language]) -> list[Language]` while inferring the list literal's element type.
+fn benchmark_invariant_list_protocol(criterion: &mut Criterion) {
+    setup_rayon();
+    let code = r#"
+from typing import Literal, Protocol
+
+Language = Literal["c", "cpp", "cuda", "fortran", "d", "objc", "objcpp", "rust",
+                   "vala", "cs", "swift", "java", "cython", "nasm", "masm", "linearasm"]
+
+class Addable[T](Protocol):
+    def __add__(self, other: list[T], /) -> list[T]: ...
+    def copy(self) -> list[T]: ...
+
+languages: Addable[Language] = ["cpp", "c", "cuda"]
+"#;
+    criterion.bench_function("ty_micro[invariant_list_protocol]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_sequence_literal_union_access(criterion: &mut Criterion) {
     const NUM_LITERALS: usize = 1_200;
 
@@ -1117,6 +1142,7 @@ criterion_group!(
     benchmark_missing_key_typed_dict_union_copy,
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_invariant_generic_return_union,
+    benchmark_invariant_list_protocol,
     benchmark_sequence_literal_union_access,
     benchmark_invariant_generic_union_bound,
     benchmark_many_invariant_typevars,

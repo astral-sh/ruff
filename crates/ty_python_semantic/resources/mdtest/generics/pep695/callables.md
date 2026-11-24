@@ -1919,6 +1919,22 @@ accept_int(Implementation())  # no diagnostic
 accept_str(Implementation())  # error: [invalid-argument-type]
 ```
 
+## An invariant parameter shared with the return type
+
+The return requires `T` to include `str`. The parameter must then accept `list[int | str]`.
+
+```pyi
+from typing import Callable
+from typing_extensions import assert_type
+
+def infer[T](f: Callable[[list[int | T]], list[int | T]]) -> T: ...
+def append[S: (int | str, bytes)](xs: list[S]) -> list[S | str]: ...
+def only_ints[I: int](xs: list[I]) -> list[I | str]: ...
+
+assert_type(infer(append), str)
+infer(only_ints)  # error: [invalid-argument-type]
+```
+
 ## Returned callables with recursive parameter aliases
 
 A type variable used by a recursive parameter alias belongs to the function. The returned callable
