@@ -4316,11 +4316,13 @@ impl ReportDiagnostics {
 
 /// Nested satisfiability checks can have independent traversal limits but must share
 /// the construction budget of the comparison that initiated them.
+#[derive(Clone, Copy)]
 struct SolutionLimits<'a> {
     traversal: Option<BoundedSolutionLimits>,
     construction: &'a ConstructionBudget,
 }
 
+#[derive(Clone, Copy)]
 struct BoundedSolutionLimits {
     remaining_paths: usize,
     remaining_visits: usize,
@@ -4387,9 +4389,11 @@ enum CandidateSearch {
 impl<'db> CandidateSolutions<'db> {
     /// Collects the lower and upper bounds for each type variable on each path in source order.
     ///
-    /// Visits include the concrete-conjunction fast path and both BDD walks. The path limit
-    /// counts materialized constrained paths; an unconstrained or unsatisfiable result needs no
-    /// path allowance. No partially collected family is returned when either limit is exhausted.
+    /// Visits include the simple-conjunction fast path and both BDD walks. When a bound
+    /// contains a fixed typevar, the rest of the fast path and any fallback walk each
+    /// get the remaining traversal budget. The path limit counts materialized constrained paths.
+    /// An unconstrained or unsatisfiable result needs no path allowance. No partially
+    /// collected family is returned when either limit is exhausted.
     fn compute(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -4453,7 +4457,8 @@ impl<'db> CandidateSolutions<'db> {
     ///
     /// We do still have to consider the declared upper bound/constraints of the typevars in the
     /// constraint set. No variable being solved can have declared constraints, since those
-    /// introduce a disjunction. Declared upper bounds must still be free of typevars.
+    /// introduce a disjunction. Declared upper bounds must still be free of typevars,
+    /// and symbolic lower bounds must satisfy them unconditionally.
     #[expect(clippy::too_many_arguments)]
     fn compute_simple_bound_conjunction(
         db: &'db dyn Db,
@@ -4467,19 +4472,35 @@ impl<'db> CandidateSolutions<'db> {
         unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
         report_diagnostics: ReportDiagnostics,
     ) -> ControlFlow<ProjectionError, Option<Self>> {
+        // Once we see a fixed typevar, bound the remaining probe independently. If a
+        // later constraint requires the general solver, it gets the same budget as if
+        // we had fallen back at the first fixed typevar.
+        let mut probe_limits = None;
+        let has_fixed_typevar = Cell::new(false);
         let bound_is_eligible = |constraint: AtomicConstraint<'db>, bound| {
             constraint.provides_candidate_bound(db, env, Some(bound), unspecialized_type_var_policy)
                 && !any_over_type_expanding_aliases(db, env, bound, |ty| {
-                    // A fixed variable in a bound cannot acquire constraints in this solve.
-                    ty.as_typevar()
-                        .is_some_and(|var| var.is_inferable(db, inferable))
+                    let Some(var) = ty.as_typevar() else {
+                        return false;
+                    };
+                    if var.is_inferable(db, inferable) {
+                        return true;
+                    }
+                    has_fixed_typevar.set(true);
+                    false
                 })
         };
 
         let mut constraints = SmallVec::<[_; 1]>::new();
         let mut current = node;
         loop {
-            limits.visit_node()?;
+            if has_fixed_typevar.get() {
+                if probe_limits.get_or_insert(*limits).visit_node().is_break() {
+                    return ControlFlow::Continue(None);
+                }
+            } else {
+                limits.visit_node()?;
+            }
             match current.node() {
                 Node::AlwaysTrue => {
                     if constraints.is_empty() {
@@ -4509,6 +4530,18 @@ impl<'db> CandidateSolutions<'db> {
                     };
 
                     if !typevar.is_inferable(db, inferable) || !bound_is_eligible(constraint, bound)
+                    {
+                        return ControlFlow::Continue(None);
+                    }
+
+                    // A generic signature captured by a ParamSpec brings its own binders
+                    // into scope. The general solver adds them to the inferable set.
+                    if let Type::Callable(captured) = bound
+                        && typevar.is_paramspec(db)
+                        && captured
+                            .signatures(db)
+                            .iter()
+                            .any(|s| s.generic_context.is_some())
                     {
                         return ControlFlow::Continue(None);
                     }
@@ -4567,10 +4600,25 @@ impl<'db> CandidateSolutions<'db> {
                 return ControlFlow::Continue(None);
             }
 
+            // As in SolutionWalker::inferred_lower_satisfies_upper_bound, check
+            // assignability eagerly. A lazy comparison of generic signatures can
+            // project away a local typevar before checking its declared bound.
+            if has_fixed_typevar.get()
+                && bounds.lower.iter().any(|&(_, lower)| {
+                    any_over_type_expanding_aliases(db, env, lower, Type::is_type_var)
+                })
+            {
+                let lower =
+                    UnionType::from_elements(db, env, bounds.lower.iter().map(|&(_, ty)| ty));
+                let when = lower.when_assignable_to_owned(db, env, bound, inferable);
+                if when.node != ALWAYS_TRUE {
+                    return ControlFlow::Continue(None);
+                }
+            }
+
             bounds.add_upper(ConstraintProvenance::VALIDITY, bound);
         }
 
-        limits.satisfied_path()?;
         let mut typevars = Vec::with_capacity(mappings.len());
         for (bound_typevar, bounds) in mappings {
             let Some(solution) = continue_if_ok(bounds.finish(
@@ -4594,6 +4642,8 @@ impl<'db> CandidateSolutions<'db> {
             typevars.push(solution);
         }
 
+        // Charge a path only when we retain a candidate, as in the general solver.
+        limits.satisfied_path()?;
         let candidate = CandidateSolution {
             typevars: typevars.into_boxed_slice(),
             validity: SolutionValidity::Valid,
@@ -6531,12 +6581,15 @@ mod tests {
         let env = db.program_environment();
         let builder = ConstraintSetBuilder::new();
         let build = builder.unlimited();
-        let t = create_typevar(db, "T");
+        let upper = Type::homogeneous_tuple(db, &env, Type::object());
+        let t = create_typevar(db, "T")
+            .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(upper)));
         let u = create_typevar(db, "U");
         let lower = Type::homogeneous_tuple(db, &env, Type::TypeVar(u));
         let set = create_constraint_set_with_bounds(db, &env, build, t, Some(lower), None);
 
-        // Two visits suffice for the constraint and its terminal when U is fixed.
+        // Every tuple[U, ...] satisfies T's bound. When U is fixed, two visits
+        // suffice for the constraint and its terminal.
         let inferable = TypeVarSet::from_typevars(db, [t]);
         assert_matches!(
             bounded_path_bounds(db, build.budget, set, inferable, 1, 2),
@@ -6545,6 +6598,60 @@ mod tests {
         assert_eq!(
             bounded_path_bounds(db, build.budget, set, TypeVarSet::All, 1, 2),
             Err(ProjectionError::TraversalBudgetExceeded)
+        );
+    }
+
+    #[test]
+    fn fixed_bound_probe_preserves_fallback_budget() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let builder = ConstraintSetBuilder::new();
+        let build = builder.unlimited();
+        let tuple = Type::homogeneous_tuple(db, &env, Type::object());
+        let str = KnownClass::Str.to_instance(db, &env);
+        let t = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+            Some(TypeVarBoundOrConstraints::Constraints(
+                TypeVarConstraints::new(db, [tuple, str].as_slice()),
+            ))
+        });
+        let u = create_typevar(db, "U");
+        let lower = Type::homogeneous_tuple(db, &env, Type::TypeVar(u));
+        let set = create_constraint_set_with_bounds(db, &env, build, t, Some(lower), None);
+        let inferable = TypeVarSet::from_typevars(db, [t]);
+
+        // The probe reaches the terminal before discovering T's declared choices.
+        // Only the first visit is shared with the general walk, which needs two more.
+        assert_matches!(
+            bounded_path_bounds(db, build.budget, set, inferable, 1, 3),
+            Ok(CandidateSolutions::Constrained(_))
+        );
+        assert_eq!(
+            bounded_path_bounds(db, build.budget, set, inferable, 1, 2),
+            Err(ProjectionError::TraversalBudgetExceeded)
+        );
+    }
+
+    #[test]
+    fn contradictory_fixed_bounds_need_no_path_allowance() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let builder = ConstraintSetBuilder::new();
+        let build = builder.unlimited();
+        let t = create_typevar(db, "T");
+        let u = create_typevar(db, "U");
+        let lower = Type::homogeneous_tuple(db, &env, Type::TypeVar(u));
+        let upper = KnownClass::Int.to_instance(db, &env);
+        let set = create_constraint_set_with_bounds(db, &env, build, t, Some(lower), None).and(
+            db,
+            build,
+            || create_constraint_set_with_bounds(db, &env, build, t, None, Some(upper)),
+        );
+        let inferable = TypeVarSet::from_typevars(db, [t]);
+        assert_eq!(
+            bounded_path_bounds(db, build.budget, set, inferable, 0, usize::MAX),
+            Ok(CandidateSolutions::Unsatisfiable)
         );
     }
 

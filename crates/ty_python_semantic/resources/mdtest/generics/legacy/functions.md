@@ -644,6 +644,36 @@ def check_disjoint(x: X):
         reject(x)
 ```
 
+## Checking a generic callback against a callable bound
+
+`run` expects a callback that accepts an `int`. No specialization of `log_string` accepts an `int`
+because `S` is bounded by `str`.
+
+```py
+from collections.abc import Callable, Iterable
+from typing import TypeVar
+
+F = TypeVar("F", bound=Callable[[int], object])
+S = TypeVar("S", bound=str)
+N = TypeVar("N", bound=int)
+
+def run(callbacks: Iterable[F]) -> F:
+    callback = next(iter(callbacks))
+    callback(42)
+    return callback
+
+def log_string(s: S) -> S:
+    print(s.upper())
+    return s
+
+def log_number(n: N) -> N:
+    print(n)
+    return n
+
+run([log_string])  # error: [invalid-argument-type]
+run([log_number])  # ok
+```
+
 ## Inferring a bound from a narrowed protocol
 
 Narrowing to `Text` supplies a `str` return type that satisfies the bound, even when the original

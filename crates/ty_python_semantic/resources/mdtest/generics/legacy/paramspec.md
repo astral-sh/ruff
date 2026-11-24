@@ -2738,6 +2738,32 @@ def bounded(fixed: BoundedS) -> None:
     forward(make, 1)  # ok
 ```
 
+### Specializing a captured variable from another callback
+
+`run_bool` passes a `bool` to `box`. Both constraints on `T` accept that argument, so we choose the
+narrower one and infer `list[bool]` for `R`.
+
+```py
+from collections.abc import Callable
+from typing import ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T", bool, int)
+S = TypeVar("S")
+
+def apply(fn: Callable[P, R], run: Callable[[Callable[P, R]], R]) -> R:
+    return run(fn)
+
+def box(x: T, /) -> list[T]:
+    return [x]
+
+def run_bool(fn: Callable[[bool], S]) -> S:
+    return fn(True)
+
+reveal_type(apply(box, run_bool))  # revealed: list[bool]
+```
+
 ### Specializing a captured variable to satisfy a return bound
 
 The callable can be specialized with `T = str` to accept `"text"` and satisfy the return bound. The
