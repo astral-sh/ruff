@@ -5363,14 +5363,20 @@ impl<'db> Parameters<'db> {
                 EitherOrBoth::Both(left, right)
                     if left.is_positional() && right.is_positional() =>
                 {
-                    // An optional slot can be omitted if **kwargs accepts the other name.
                     if let (Some(left_name), Some(right_name)) =
                         (left.keyword_name(), right.keyword_name())
                         && left_name != right_name
-                        && (!left.has_default() || self.keyword_variadic().is_none())
-                        && (!right.has_default() || other.keyword_variadic().is_none())
                     {
-                        return true;
+                        // An optional parameter can be omitted if another parameter or
+                        // **kwargs accepts the keyword. Stop at the first mismatch to
+                        // scan each parameter list at most once for alternative names.
+                        let accepts_keyword = |params: &Self, name: &Name| {
+                            params
+                                .iter()
+                                .any(|p| p.is_keyword_variadic() || p.keyword_name() == Some(name))
+                        };
+                        return (!left.has_default() || !accepts_keyword(self, right_name))
+                            && (!right.has_default() || !accepts_keyword(other, left_name));
                     }
                 }
                 // One signature requires more arguments than the other accepts.
@@ -6832,6 +6838,24 @@ mod tests {
                 "source-backed parameter should have a definition"
             );
         }
+    }
+
+    #[test]
+    fn optional_parameter_can_be_omitted_when_another_accepts_the_keyword() {
+        // (y=0, *, x=0) accepts every call to (x=0).
+        let x = Name::new_static("x");
+        let y = Name::new_static("y");
+        let zero = Type::int_literal(0);
+        let left = Parameters::standard([
+            Parameter::positional_or_keyword(x.clone()).with_default_type(zero)
+        ]);
+        let right = Parameters::standard([
+            Parameter::positional_or_keyword(y).with_default_type(zero),
+            Parameter::keyword_only(x).with_default_type(zero),
+        ]);
+
+        assert!(!left.has_incomparable_positional_prefix(&right));
+        assert!(!right.has_incomparable_positional_prefix(&left));
     }
 
     #[test]
