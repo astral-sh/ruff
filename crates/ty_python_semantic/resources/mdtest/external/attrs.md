@@ -218,6 +218,7 @@ A default value can be specified using a value on the right-hand side, or using 
 `@<field>.default` decorator.
 
 ```py
+import attr
 from attrs import define, field
 
 @define
@@ -247,27 +248,9 @@ The `@<field>.default` decorator also doesn't modify the signature of the method
 reveal_type(person._default_id)  # revealed: bound method Person._default_id() -> int
 ```
 
-Similar to above, we could also verify that the return type of the default method matches the type
-of the field it is providing a default for:
-
-```py
-@define
-class WrongDefault:
-    age: int = field()
-
-    # TODO: emit an error here
-    @age.default
-    def _default_age(self) -> str:
-        return "0"
-```
-
-## Required fields and decorated defaults
-
 Only the field named in the decorator gets a default.
 
 ```py
-import attr
-
 @attr.s
 class Range:
     start: int = attr.ib()
@@ -284,8 +267,6 @@ Range()  # error: [missing-argument] "No argument provided for required paramete
 A required positional field cannot follow a field with a decorated default.
 
 ```py
-from attrs import define, field
-
 @define
 class Invalid:
     x: int = field()
@@ -294,6 +275,20 @@ class Invalid:
     @x.default
     def default_x(self) -> int:
         return 0
+```
+
+Similar to above, we could also verify that the return type of the default method matches the type
+of the field it is providing a default for:
+
+```py
+@define
+class WrongDefault:
+    age: int = field()
+
+    # TODO: emit an error here
+    @age.default
+    def _default_age(self) -> str:
+        return "0"
 ```
 
 ## Custom initialization
