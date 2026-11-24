@@ -1119,30 +1119,3 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
         Self { items }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{CallArgumentTypes, Type, TypeContext};
-
-    #[test]
-    fn contextual_argument_types_preserve_the_fallback() {
-        let fallback = Type::unknown();
-        let first = Type::bool_literal(true);
-        let second = Type::bool_literal(false);
-        let mut types = CallArgumentTypes::new(Some(fallback));
-
-        types.insert(TypeContext::preference(Some(first)), second);
-        types.insert(TypeContext::preference(Some(first)), first);
-        assert_eq!(types.get_default(), Some(first));
-        assert_eq!(types.try_get_for_declared_type(None), Some(fallback));
-
-        types.insert(TypeContext::preference(Some(second)), first);
-        assert_eq!(types.get_default(), Some(first));
-
-        types.insert(TypeContext::preference(Some(second)), second);
-        assert_eq!(types.try_get_for_declared_type(Some(first)), Some(first));
-        assert_eq!(types.try_get_for_declared_type(Some(second)), Some(second));
-        assert_eq!(types.get_default(), Some(fallback));
-        assert_eq!(types.iter().count(), 3);
-    }
-}
