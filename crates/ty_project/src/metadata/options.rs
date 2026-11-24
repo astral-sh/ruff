@@ -141,6 +141,10 @@ impl Options {
     pub fn from_uv_mode(mode: Option<RangedValue<UseUv>>) -> Self {
         Self {
             project_manager: mode.map(|mode| ProjectManagerOptions {
+                project: Some(mode.clone().map_value(|mode| match mode {
+                    UseUv::On => ProjectManager::Uv,
+                    UseUv::Off | UseUv::Scripts => ProjectManager::None,
+                })),
                 script: Some(mode.map_value(|mode| match mode {
                     UseUv::On | UseUv::Scripts => ScriptProjectManager::Uv,
                     UseUv::Off => ScriptProjectManager::None,
@@ -148,6 +152,15 @@ impl Options {
             }),
             ..Self::default()
         }
+    }
+
+    /// Whether these options explicitly select uv for project discovery.
+    pub(crate) fn project_uses_uv(&self) -> Option<bool> {
+        self.project_manager
+            .as_ref()?
+            .project
+            .as_ref()
+            .map(|manager| **manager == ProjectManager::Uv)
     }
 
     pub(crate) fn script_project_manager(&self) -> Option<&RangedValue<ScriptProjectManager>> {
@@ -911,7 +924,29 @@ fn self_environment_search_paths(
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ProjectManagerOptions {
+    /// The project manager to use for discovering the project's workspace and Python environment.
+    ///
+    /// This setting is in preview and may change between ty releases.
+    ///
+    /// - With `"none"` (the default), ty discovers the project and Python environment itself.
+    /// - With `"uv"`, ty uses [uv](https://docs.astral.sh/uv/) to discover the workspace root,
+    ///   Python environment, and dependency metadata. The environment must already be synchronized;
+    ///   ty does not install project dependencies. uv may update the lockfile. This requires
+    ///   uv 0.12.3 or newer.
+    ///
+    /// An explicit `TY_UV` takes precedence over this setting. If your editor marks the workspace
+    /// as untrusted, ty discovers the project without running uv.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#""none""#,
+        value_type = r#""uv" | "none""#,
+        example = r#"project = "uv""#
+    )]
+    pub project: Option<RangedValue<ProjectManager>>,
+
     /// The project manager to use for scripts with PEP 723 inline metadata.
+    ///
+    /// This setting is in preview and may change between ty releases.
     ///
     /// - With `"none"` (the default), ty looks for imported packages in your Python environment.
     ///   Install any third-party packages the script needs in that environment.
@@ -935,6 +970,20 @@ pub struct ProjectManagerOptions {
         example = r#"script = "uv""#
     )]
     pub script: Option<RangedValue<ScriptProjectManager>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, get_size2::GetSize)]
+#[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum ProjectManager {
+    /// Discover the project and Python environment without a project manager.
+    None,
+    /// Discover the workspace, environment, and dependency metadata with uv.
+    Uv,
+}
+
+impl Combine for ProjectManager {
+    fn combine_with(&mut self, _other: Self) {}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, get_size2::GetSize)]

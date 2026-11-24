@@ -30,6 +30,7 @@ use ruff_ranged_value::RangedValue;
 use salsa::Database;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
+use ty_project::metadata::options::ProjectManager;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{
@@ -171,15 +172,13 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
             ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
         }
         None => ProjectMetadata::discover(&project_path, &system)?,
-    }
-    .with_uv_workspace_discovery(use_uv.is_some_and(UseUv::workspace_discovery_enabled));
+    };
 
     project_metadata.apply_configuration_files(&system)?;
 
     let env_options = Options::from_uv_mode(use_uv.map(RangedValue::cli));
     project_metadata.set_override_options(env_options.combine(args.into_options()));
-    if project_metadata.uv_workspace_discovery_enabled()
-        && let [path] = check_paths.as_slice()
+    if let [path] = check_paths.as_slice()
         && system.is_file(path)
         && system
             .read_to_string(path)
@@ -187,10 +186,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     {
         // A single PEP 723 script uses its own uv environment, even with an explicit ty
         // configuration file. The other explicit paths still discover workspace metadata.
-        project_metadata = project_metadata.with_uv_workspace_discovery(false);
+        project_metadata.override_project_manager(RangedValue::cli(ProjectManager::None));
     }
 
-    if project_metadata.uv_workspace_discovery_enabled() {
+    if project_metadata.project_uses_uv() {
         let workspace = UvWorkspace::discover(&project_path, &system);
         project_metadata.apply_uv_workspace(&system, workspace)?;
     }
@@ -562,16 +561,9 @@ impl MainLoop {
                     if !changes.is_empty() {
                         revision += 1;
                     }
-                    if let Some(project_change) = changes.project {
-                        if matches!(
-                            project_change,
-                            ProjectReloadResult::Changed {
-                                files_changed: true,
-                            }
-                        ) {
-                            let scripts = db.project().scripts_to_synchronize(db);
-                            self.synchronize_scripts(db, &scripts);
-                        }
+                    if matches!(changes.project, Some(ProjectReloadResult::Changed { .. })) {
+                        let scripts = db.project().scripts_to_synchronize(db);
+                        self.synchronize_scripts(db, &scripts);
                     }
                     if !changes.is_empty()
                         && let Some(watcher) = self.watcher.as_mut()

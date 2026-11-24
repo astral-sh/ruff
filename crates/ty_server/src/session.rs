@@ -26,7 +26,7 @@ use ty_project::metadata::Options;
 use ty_project::watch::{ChangeEvent, DeletedKind};
 use ty_project::{
     ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ProjectReloadResult,
-    ScriptEnvironmentAvailability, UseUv, UvSyncChanges, UvWorkspace,
+    ScriptEnvironmentAvailability, UvSyncChanges, UvWorkspace,
 };
 
 use index::DocumentError;
@@ -291,12 +291,7 @@ impl Session {
         let environments = db.uv_environments().clone();
         let changes = environments.poll_sync(db);
         if self.global_settings.diagnostic_mode().is_workspace()
-            && matches!(
-                changes.project,
-                Some(ProjectReloadResult::Changed {
-                    files_changed: true,
-                })
-            )
+            && matches!(changes.project, Some(ProjectReloadResult::Changed { .. }))
         {
             let scripts = db.project().scripts_to_synchronize(db);
             Self::synchronize_closed_scripts(
@@ -816,18 +811,10 @@ impl Session {
         }
 
         // Untrusted workspaces disable uv. In trusted workspaces, `TY_UV` takes precedence
-        // for both workspace discovery and scripts. When it is unset, discovery uses
-        // `experimental.useUv`. For scripts, `project-manager.script` in `ty.configuration` wins
-        // over `experimental.useUv`, and either editor setting overrides script or project configuration.
+        // over editor and project configuration. The editor's `project-manager` settings take
+        // precedence over the legacy `experimental.useUv` option.
         let uv_override = self.initialization_options.uv_override(&system);
         let legacy_uv = self.initialization_options.experimental_use_uv();
-        let uv_workspace_discovery = uv_override
-            .as_deref()
-            .or(legacy_uv.as_deref())
-            .copied()
-            .is_some_and(UseUv::workspace_discovery_enabled);
-        metadata = metadata.with_uv_workspace_discovery(uv_workspace_discovery);
-
         let editor_options = workspace
             .settings
             .override_options()
@@ -848,7 +835,7 @@ impl Session {
                     .context("Failed to apply configuration files"),
             )
             .and_then(|()| {
-                if metadata.uv_workspace_discovery_enabled() {
+                if metadata.project_uses_uv() {
                     let workspace = UvWorkspace::discover(workspace_directory, &system);
                     metadata
                         .apply_uv_workspace(&system, workspace)
