@@ -28,14 +28,14 @@ pub(crate) fn fix_all(
     linter_settings: &LinterSettings,
     encoding: PositionEncoding,
 ) -> crate::Result<Fixes> {
-    let settings = query.settings();
+    let settings = query.project_settings();
     let document_path = query.virtual_file_path();
 
     // If the document is excluded, return an empty list of fixes.
     if is_document_excluded_for_linting(
         &document_path,
         &settings.file_resolver,
-        linter_settings,
+        &settings.linter,
         query.text_document_language_id(),
     ) {
         return Ok(Fixes::default());
@@ -158,7 +158,7 @@ fn fix_toml(
         document.contents(),
         linter_settings,
         source_type,
-        query.settings().unsafe_fixes,
+        query.project_settings().unsafe_fixes,
     )
     .transformed;
 

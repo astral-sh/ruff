@@ -39,6 +39,8 @@ pub enum ScriptConfiguration {
     Enabled,
     /// Validate script metadata without applying its configuration or Python requirement.
     Disabled,
+    /// Validate script metadata and apply only `requires-python`, as in editor-only mode.
+    RequiresPythonOnly,
 }
 
 /// A Python file with a PEP 723 script metadata header.
@@ -177,7 +179,9 @@ pub fn script(
     let mut config_path = None;
     let settings = if script_configuration == ScriptConfiguration::Disabled {
         None
-    } else if let Some(options) = options {
+    } else if script_configuration == ScriptConfiguration::Enabled
+        && let Some(options) = options
+    {
         let root = fs::normalize_path(path.and_then(Path::parent).unwrap_or(Path::new(".")));
         let configuration =
             inline_configuration(options, path, &root, requires_python).map_err(config_error)?;

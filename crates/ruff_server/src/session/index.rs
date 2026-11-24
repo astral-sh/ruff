@@ -1,10 +1,14 @@
 use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use anyhow::anyhow;
 use lsp_types::{FileEvent, Uri};
+use ruff_db::diagnostic::Diagnostic;
+use ruff_workspace::Settings;
+use ruff_workspace::script::Script;
 use rustc_hash::{FxHashMap, FxHashSet};
 use thiserror::Error;
 
@@ -53,12 +57,12 @@ enum DocumentController {
 /// A read-only query to an open document.
 /// This query can 'select' a text document, full notebook, or a specific notebook cell.
 /// It also includes document settings.
-#[derive(Clone)]
 pub(crate) enum DocumentQuery {
     Text {
         file_uri: Uri,
         document: Arc<TextDocument>,
         settings: Arc<RuffSettings>,
+        script: OnceLock<Result<Option<Script>, Diagnostic>>,
     },
     Notebook {
         /// The selected notebook cell, if it exists.
@@ -505,6 +509,7 @@ impl DocumentController {
                 settings,
             },
             Self::Text(document) => DocumentQuery::Text {
+                script: OnceLock::new(),
                 file_uri,
                 document: document.clone(),
                 settings,
@@ -554,11 +559,44 @@ impl DocumentQuery {
         }
     }
 
-    /// Get the document settings associated with this query.
-    pub(crate) fn settings(&self) -> &RuffSettings {
+    /// Project settings control discovery, exclusions, and whether unsafe fixes are allowed.
+    pub(crate) fn project_settings(&self) -> &RuffSettings {
         match self {
             Self::Text { settings, .. } | Self::Notebook { settings, .. } => settings,
         }
+    }
+
+    /// Resolve inline settings from this snapshot of the open buffer, once per request.
+    fn script(&self) -> Result<Option<&Script>, &Diagnostic> {
+        let Self::Text {
+            document,
+            settings,
+            script,
+            ..
+        } = self
+        else {
+            return Ok(None);
+        };
+        script
+            .get_or_init(|| {
+                settings
+                    .script(&self.virtual_file_path(), document.contents())
+                    .map_err(|error| error.diagnostic)
+            })
+            .as_ref()
+            .map(Option::as_ref)
+    }
+
+    /// Return the settings for linting and formatting this document.
+    ///
+    /// Resolve inline script settings on first use and fall back to the project settings
+    /// when none apply. Invalid script metadata returns a diagnostic.
+    pub(crate) fn settings(&self) -> Result<&Settings, &Diagnostic> {
+        let project = self.project_settings();
+        Ok(match self.script()? {
+            Some(script) => script.settings(project),
+            None => project,
+        })
     }
 
     /// Generate a Python source kind used by the linter.
