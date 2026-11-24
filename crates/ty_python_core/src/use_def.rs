@@ -1854,13 +1854,24 @@ struct NarrowingPrefix {
     constraint: ScopedNarrowingConstraint,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PendingNarrowing {
+    Constraint(ScopedNarrowingConstraint),
+    /// Tips of two paths that start at this node's parent.
+    Join(PendingReachabilityId, PendingReachabilityId),
+}
+
+impl PendingNarrowing {
+    const ALWAYS_TRUE: Self = Self::Constraint(ScopedNarrowingConstraint::ALWAYS_TRUE);
+}
+
 #[derive(Debug)]
 struct PendingReachabilityConstraint {
     parent: PendingReachabilityId,
     kind: PendingNodeKind,
     narrowing_prefix: Option<NarrowingPrefix>,
     reachability_constraint: ScopedReachabilityConstraintId,
-    narrowing_constraint: ScopedNarrowingConstraint,
+    narrowing_constraint: PendingNarrowing,
     scope_reachability: ScopedReachabilityConstraintId,
     /// Gates through the last merge are visible even to reads of unchanged places.
     last_join: PendingReachabilityId,
@@ -1872,6 +1883,9 @@ struct PendingReachabilityConstraint {
 /// snapshots can share place states and defer applying subsequent constraints until needed.
 #[derive(Debug)]
 struct PendingReachability {
+    /// Bindings with the same narrowing constraint at a fork share the result of its join.
+    join_cache:
+        FxHashMap<(PendingReachabilityId, ScopedNarrowingConstraint), ScopedNarrowingConstraint>,
     constraints: IndexVec<PendingReachabilityId, PendingReachabilityConstraint>,
     current: PendingReachabilityId,
 }
@@ -1885,12 +1899,13 @@ impl Default for PendingReachability {
             kind: PendingNodeKind::Linear,
             narrowing_prefix: None,
             reachability_constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
-            narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
+            narrowing_constraint: PendingNarrowing::ALWAYS_TRUE,
             scope_reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             last_join: root,
         });
         Self {
             constraints,
+            join_cache: FxHashMap::default(),
             current: root,
         }
     }
@@ -1914,7 +1929,7 @@ impl PendingReachability {
             kind: PendingNodeKind::Linear,
             narrowing_prefix: None,
             reachability_constraint,
-            narrowing_constraint,
+            narrowing_constraint: PendingNarrowing::Constraint(narrowing_constraint),
             scope_reachability,
             last_join: parent.last_join,
         });
@@ -1925,7 +1940,7 @@ impl PendingReachability {
     /// The place's node must be an ancestor of `target`. After materialization, the place is
     /// uniquely owned for mutation and records `target` as its last applied node.
     fn materialize<'a>(
-        &self,
+        &mut self,
         pending: &'a mut PendingPlaceState,
         target: PendingReachabilityId,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
@@ -1938,18 +1953,18 @@ impl PendingReachability {
     }
 
     fn materialize_narrowing(
-        &self,
+        &mut self,
         pending: &mut PendingPlaceState,
         target: PendingReachabilityId,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
     ) {
         if pending.narrowing != target {
-            let mut unapplied = SmallVec::<[ScopedNarrowingConstraint; 4]>::new();
+            let mut unapplied = SmallVec::<[PendingReachabilityId; 4]>::new();
             let mut current = target;
             while current != pending.narrowing {
                 let event = &self.constraints[current];
-                if event.narrowing_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE {
-                    unapplied.push(event.narrowing_constraint);
+                if event.narrowing_constraint != PendingNarrowing::ALWAYS_TRUE {
+                    unapplied.push(current);
                 }
                 assert_ne!(
                     current, event.parent,
@@ -1961,7 +1976,14 @@ impl PendingReachability {
             if !unapplied.is_empty() {
                 let state = Rc::make_mut(&mut pending.state);
                 for constraint in unapplied.into_iter().rev() {
-                    state.record_narrowing_constraint(narrowing_constraints, constraint);
+                    match self.constraints[constraint].narrowing_constraint {
+                        PendingNarrowing::Constraint(gate) => {
+                            state.record_narrowing_constraint(narrowing_constraints, gate);
+                        }
+                        PendingNarrowing::Join(..) => state.map_narrowing_constraints(|prefix| {
+                            self.apply_join(constraint, prefix, narrowing_constraints)
+                        }),
+                    }
                 }
             }
             pending.narrowing = target;
@@ -1995,7 +2017,9 @@ impl PendingReachability {
         let mut current = target;
         while current != previous {
             let event = &self.constraints[current];
-            unapplied.push(event.reachability_constraint);
+            if event.reachability_constraint != ScopedReachabilityConstraintId::ALWAYS_TRUE {
+                unapplied.push(event.reachability_constraint);
+            }
             assert_ne!(
                 current, event.parent,
                 "pending reachability must be an ancestor"
@@ -2014,7 +2038,7 @@ impl PendingReachability {
     /// constraints are already materialized, this preserves the shared [`Rc`] instead of making
     /// the state uniquely owned.
     fn materialize_ref<'a>(
-        &self,
+        &mut self,
         pending: &'a mut PendingPlaceState,
         target: PendingReachabilityId,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
@@ -2036,7 +2060,7 @@ impl PendingReachability {
     /// Materialize narrowing through the last merge, but leave subsequent gates pending
     /// until the next place change or merge.
     fn materialize_ref_at_use<'a>(
-        &self,
+        &mut self,
         pending: &'a mut PendingPlaceState,
         target: PendingReachabilityId,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
@@ -2054,12 +2078,12 @@ impl PendingReachability {
     ///
     /// `ancestor` must be an ancestor of `target`.
     fn narrowing_constraint_between(
-        &self,
+        &mut self,
         ancestor: PendingReachabilityId,
         target: PendingReachabilityId,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
     ) -> ScopedNarrowingConstraint {
-        let mut unapplied = SmallVec::<[ScopedNarrowingConstraint; 4]>::new();
+        let mut unapplied = SmallVec::<[PendingReachabilityId; 4]>::new();
         let mut current = target;
         let mut constraint = ScopedNarrowingConstraint::ALWAYS_TRUE;
         let prefix = self.constraints[ancestor].narrowing_prefix;
@@ -2073,8 +2097,8 @@ impl PendingReachability {
                 break;
             }
             let event = &self.constraints[current];
-            if event.narrowing_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE {
-                unapplied.push(event.narrowing_constraint);
+            if event.narrowing_constraint != PendingNarrowing::ALWAYS_TRUE {
+                unapplied.push(current);
             }
             assert_ne!(
                 current, event.parent,
@@ -2084,9 +2108,98 @@ impl PendingReachability {
         }
 
         for pending in unapplied.into_iter().rev() {
-            constraint = narrowing_constraints.add_and_constraint(constraint, pending);
+            constraint = match self.constraints[pending].narrowing_constraint {
+                PendingNarrowing::Constraint(gate) => {
+                    narrowing_constraints.add_and_constraint(constraint, gate)
+                }
+                PendingNarrowing::Join(..) => {
+                    self.apply_join(pending, constraint, narrowing_constraints)
+                }
+            };
         }
         constraint
+    }
+
+    /// Narrows along both paths starting from the same prefix before taking their union.
+    ///
+    /// A flat `if`/`elif` chain can produce deeply nested joins, so use an explicit stack.
+    fn apply_join(
+        &mut self,
+        join: PendingReachabilityId,
+        prefix: ScopedNarrowingConstraint,
+        constraints: &mut NarrowingConstraintsBuilder,
+    ) -> ScopedNarrowingConstraint {
+        enum Step {
+            Apply(PendingReachabilityId),
+            Right {
+                join: PendingReachabilityId,
+                tip: PendingReachabilityId,
+                input: ScopedNarrowingConstraint,
+            },
+            Merge {
+                join: PendingReachabilityId,
+                input: ScopedNarrowingConstraint,
+                left: ScopedNarrowingConstraint,
+            },
+        }
+
+        if let Some(&result) = self.join_cache.get(&(join, prefix)) {
+            return result;
+        }
+
+        let mut steps = SmallVec::<[Step; 8]>::new();
+        steps.push(Step::Apply(join));
+        // Each Right step saves the input while we evaluate the left path.
+        // Each Merge step saves that result while we evaluate the right path.
+        let mut value = prefix;
+        while let Some(step) = steps.pop() {
+            let (fork, mut tip) = match step {
+                Step::Apply(id) => {
+                    let node = &self.constraints[id];
+                    match node.narrowing_constraint {
+                        PendingNarrowing::Constraint(gate) => {
+                            value = constraints.add_and_constraint(value, gate);
+                            continue;
+                        }
+                        PendingNarrowing::Join(left, right) => {
+                            if let Some(&result) = self.join_cache.get(&(id, value)) {
+                                value = result;
+                                continue;
+                            }
+                            steps.push(Step::Right {
+                                join: id,
+                                tip: right,
+                                input: value,
+                            });
+                            (node.parent, left)
+                        }
+                    }
+                }
+                Step::Right { join, tip, input } => {
+                    steps.push(Step::Merge {
+                        join,
+                        input,
+                        left: value,
+                    });
+                    value = input;
+                    (self.constraints[join].parent, tip)
+                }
+                Step::Merge { join, input, left } => {
+                    value = constraints.add_or_constraint(left, value);
+                    self.join_cache.insert((join, input), value);
+                    continue;
+                }
+            };
+            // Push gates backwards so they apply in source order.
+            while tip != fork {
+                let node = &self.constraints[tip];
+                if node.narrowing_constraint != PendingNarrowing::ALWAYS_TRUE {
+                    steps.push(Step::Apply(tip));
+                }
+                tip = node.parent;
+            }
+        }
+        value
     }
 
     /// Returns the lowest common ancestor of two nodes in the pending-constraint tree.
@@ -2163,10 +2276,22 @@ impl PendingReachability {
         let joined = if self.current == tip {
             tip
         } else {
-            let current =
-                self.narrowing_constraint_between(common_ancestor, self.current, narrowing);
-            let incoming = self.narrowing_constraint_between(common_ancestor, tip, narrowing);
-            let narrowing_constraint = narrowing.add_or_constraint(current, incoming);
+            let narrowing_constraint = if common_ancestor == self.current || common_ancestor == tip
+            {
+                PendingNarrowing::ALWAYS_TRUE
+            } else if self.constraints[self.current].last_join != self.constraints[tip].last_join {
+                // At least one path crosses a merge after the fork. Eager narrowing
+                // would have applied the binding's prefix there, giving us
+                // (prefix & left) | (prefix & right). Simplifying left | right first
+                // can remove a test of a Never value, even though neither outcome
+                // of that test is possible.
+                PendingNarrowing::Join(self.current, tip)
+            } else {
+                let current =
+                    self.narrowing_constraint_between(common_ancestor, self.current, narrowing);
+                let incoming = self.narrowing_constraint_between(common_ancestor, tip, narrowing);
+                PendingNarrowing::Constraint(narrowing.add_or_constraint(current, incoming))
+            };
             let parent = &self.constraints[common_ancestor];
             // Every binding and declaration reaching the fork already requires the
             // common prefix. The merged scope therefore supplies the remaining guard
@@ -2176,24 +2301,17 @@ impl PendingReachability {
             } else {
                 scope_reachability
             };
-            // Even if the branches cancel, the prefix must be visible to reads.
-            // Reuse the parent only if it already marks the end of that prefix.
-            if parent.last_join == common_ancestor
-                && reachability_constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE
-                && narrowing_constraint == ScopedNarrowingConstraint::ALWAYS_TRUE
-            {
-                common_ancestor
-            } else {
-                self.constraints.push(PendingReachabilityConstraint {
-                    parent: common_ancestor,
-                    kind: PendingNodeKind::Linear,
-                    narrowing_prefix: None,
-                    reachability_constraint,
-                    narrowing_constraint,
-                    scope_reachability,
-                    last_join: self.constraints.next_index(),
-                })
-            }
+            // Keep a distinct last_join even when both constraints cancel. An outer
+            // merge still needs to know that this path went through a merge.
+            self.constraints.push(PendingReachabilityConstraint {
+                parent: common_ancestor,
+                kind: PendingNodeKind::Linear,
+                narrowing_prefix: None,
+                reachability_constraint,
+                narrowing_constraint,
+                scope_reachability,
+                last_join: self.constraints.next_index(),
+            })
         };
         PendingBranch {
             tip,
