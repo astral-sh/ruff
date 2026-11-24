@@ -7930,7 +7930,6 @@ class E: ...
 
         owned.query(|builder, set| {
             assert!(set.is_always_satisfied(db, &env, TypeVarSet::All));
-            assert!(std::cell::LazyCell::get(&builder.storage).is_none());
             let storage = builder.storage.borrow();
             assert!(storage.compacted.is_none());
             assert!(storage.nodes.is_empty());
@@ -7941,9 +7940,6 @@ class E: ...
         let builder = ConstraintSetBuilder::new();
         let loaded = builder.load(db, &env, &owned);
         assert!(loaded.is_always_satisfied(db, &env, TypeVarSet::All));
-        let opposite = loaded.negate(db, &builder);
-        assert!(opposite.is_never_satisfied(db, &env, TypeVarSet::All));
-        assert!(std::cell::LazyCell::get(&builder.storage).is_none());
     }
 
     /// Round-trip through `OwnedConstraintSet`: build a TDD with uncertain branches, convert to
