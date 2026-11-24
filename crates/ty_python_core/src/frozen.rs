@@ -79,6 +79,14 @@ impl<K: Ord, V, S> From<std::collections::HashMap<K, V, S>> for FrozenMap<K, V> 
 }
 
 impl<K: Ord, V> FrozenMap<K, V> {
+    /// Freeze entries that are already in strictly increasing key order.
+    ///
+    /// Duplicate or unsorted keys would make lookups by binary search unreliable.
+    pub fn from_sorted(entries: Vec<(K, V)>) -> Self {
+        debug_assert!(entries.windows(2).all(|w| w[0].0 < w[1].0));
+        Self(entries.into_boxed_slice())
+    }
+
     /// Creates a frozen map from entries with unique keys.
     pub(crate) fn from_entries(mut entries: Vec<(K, V)>) -> Self {
         entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));

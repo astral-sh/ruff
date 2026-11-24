@@ -30,7 +30,7 @@ use ty_python_core::statement::StatementInner;
 use super::{
     CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
     DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
-    FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
+    FrozenMap, FrozenSet, FunctionDecoratorInference, InferenceRegion,
     OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
     infer_definition_types, infer_expression_types, infer_unpack_types,
 };
@@ -259,6 +259,110 @@ impl SourcePlace<'_> {
     }
 }
 
+/// Expression types collected while inferring a region.
+///
+/// Inference usually visits nodes close to their AST order. Keeping those entries sorted
+/// lets us append whole child regions and freeze the result without sorting it again.
+#[derive(Default, Debug)]
+struct ExpressionMap<'db> {
+    sorted: Vec<(ExpressionNodeKey, Type<'db>)>,
+    /// When present, holds all entries and leaves `sorted` empty. Boxing it keeps
+    /// the builder small when the vector alone suffices.
+    spill: Option<Box<FxHashMap<ExpressionNodeKey, Type<'db>>>>,
+    /// Total number of entries shifted by out-of-order insertions.
+    moved: usize,
+}
+
+impl<'db> ExpressionMap<'db> {
+    /// Record a type and return any previous type for the same node.
+    ///
+    /// If inserting into the sorted vector would exceed the cumulative shift budget,
+    /// switch to a hash map to avoid quadratic work on widely reordered nodes.
+    #[inline]
+    fn insert(&mut self, key: ExpressionNodeKey, value: Type<'db>) -> Option<Type<'db>> {
+        const TAIL_SEARCH: usize = 5;
+        const SHIFTS_PER_ENTRY: usize = 32;
+
+        if let Some(map) = &mut self.spill {
+            return map.insert(key, value);
+        }
+        if self.sorted.last().is_none_or(|&(last, _)| last < key) {
+            self.sorted.push((key, value));
+            return None;
+        }
+
+        // A parent is often inserted just after its children. Check the tail first.
+        let mut pos = self.sorted.len();
+        let position = loop {
+            if pos == 0 {
+                break Err(0);
+            }
+            if self.sorted.len() - pos == TAIL_SEARCH {
+                break self.sorted[..pos].binary_search_by_key(&key, |&(k, _)| k);
+            }
+            match self.sorted[pos - 1].0.cmp(&key) {
+                std::cmp::Ordering::Equal => break Ok(pos - 1),
+                std::cmp::Ordering::Less => break Err(pos),
+                std::cmp::Ordering::Greater => pos -= 1,
+            }
+        };
+        match position {
+            Ok(i) => Some(std::mem::replace(&mut self.sorted[i].1, value)),
+            Err(i) => {
+                self.moved += self.sorted.len() - i;
+                if self.moved > SHIFTS_PER_ENTRY * self.sorted.len() {
+                    let mut map: FxHashMap<_, _> =
+                        std::mem::take(&mut self.sorted).into_iter().collect();
+                    map.insert(key, value);
+                    self.spill = Some(Box::new(map));
+                } else {
+                    self.sorted.insert(i, (key, value));
+                }
+                None
+            }
+        }
+    }
+
+    fn get(&self, key: ExpressionNodeKey) -> Option<&Type<'db>> {
+        if let Some(map) = &self.spill {
+            return map.get(&key);
+        }
+        self.sorted
+            .binary_search_by_key(&key, |&(k, _)| k)
+            .ok()
+            .map(|i| &self.sorted[i].1)
+    }
+
+    fn len(&self) -> usize {
+        self.spill
+            .as_ref()
+            .map_or(self.sorted.len(), |map| map.len())
+    }
+
+    /// Visit every node once, in unspecified order until the map is frozen.
+    fn iter(&self) -> impl Iterator<Item = (ExpressionNodeKey, Type<'db>)> + '_ {
+        self.sorted.iter().copied().chain(
+            self.spill
+                .iter()
+                .flat_map(|map| map.iter().map(|(k, v)| (*k, *v))),
+        )
+    }
+
+    fn extend(&mut self, values: impl IntoIterator<Item = (ExpressionNodeKey, Type<'db>)>) {
+        for (key, value) in values {
+            self.insert(key, value);
+        }
+    }
+
+    /// Return entries in node order, sorting only if we switched to a hash map.
+    fn freeze(self) -> FrozenMap<ExpressionNodeKey, Type<'db>> {
+        if let Some(map) = self.spill {
+            return FrozenMap::from(*map);
+        }
+        FrozenMap::from_sorted(self.sorted)
+    }
+}
+
 /// Builder to infer all types in a region.
 ///
 /// A builder is used by creating it with [`new()`](TypeInferenceBuilder::new), and then calling
@@ -314,7 +418,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     region: InferenceRegion<'db>,
 
     /// The types of every expression in this region.
-    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expressions: ExpressionMap<'db>,
 
     /// Truthiness overrides for evaluating comparison chains directly as conditions.
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for why these are stored
@@ -632,7 +736,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             called_functions: FxIndexSet::default(),
             legacy_aliases: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
-            expressions: FxHashMap::default(),
+            expressions: ExpressionMap::default(),
             comparison_truthiness: FxHashMap::default(),
             expression_cache: None,
             reachability_cache: OnceCell::new(),
@@ -719,7 +823,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.extend_expression_types(inference.expressions.iter().copied());
+        self.extend_sorted(inference.expressions.iter().as_slice());
         self.declarations.extend(inference.declarations(definition));
 
         if self.region.collects_bindings() {
@@ -808,7 +912,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.extend_expression_types(inference.expressions.iter().copied());
+        self.extend_sorted(inference.expressions.iter().as_slice());
         self.declarations.extend(inference.declarations());
 
         if self.region.collects_bindings() {
@@ -856,6 +960,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Merge a frozen region's entries, which have unique keys in ascending order.
+    ///
+    /// Append a disjoint range directly when no truthiness overrides need clearing.
+    fn extend_sorted(&mut self, entries: &[(ExpressionNodeKey, Type<'db>)]) {
+        let Some(&(first, _)) = entries.first() else {
+            return;
+        };
+        if self.comparison_truthiness.is_empty()
+            && self.expressions.spill.is_none()
+            && self
+                .expressions
+                .sorted
+                .last()
+                .is_none_or(|&(last, _)| last < first)
+        {
+            self.expressions.sorted.extend_from_slice(entries);
+        } else {
+            self.extend_expression_types(entries.iter().copied());
+        }
+    }
+
     /// Replacing an expression's type also replaces any truthiness override. A newly inferred
     /// comparison may no longer need an override, so extending the sparse map alone is not enough.
     fn extend_expression_types(
@@ -874,7 +999,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Merges expression results without claiming bindings owned by their enclosing statement.
     fn extend_expression_without_bindings(&mut self, inference: &ExpressionInference<'db>) {
-        self.extend_expression_types(inference.expressions.iter().copied());
+        self.extend_sorted(inference.expressions.iter().as_slice());
 
         if let Some(extra) = &inference.extra {
             self.legacy_aliases
@@ -911,7 +1036,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.extend_expression_types(inference.expressions.iter().map(|(key, ty)| (*key, *ty)));
+        self.extend_expression_types(inference.expressions.iter());
         self.comparison_truthiness.extend(
             inference
                 .comparison_truthiness
@@ -959,7 +1084,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend_scope(&mut self, inference: &ScopeInference<'db>) {
-        self.extend_expression_types(inference.expressions.iter());
+        self.extend_sorted(inference.expressions.iter().as_slice());
 
         if let Some(extra) = &inference.extra {
             self.legacy_aliases
@@ -1151,7 +1276,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn try_expression_type(&self, expr: &ast::Expr) -> Option<Type<'db>> {
         self.expressions
-            .get(&expr.into())
+            .get(expr.into())
             .copied()
             .or(self.fallback_type())
     }
@@ -12540,7 +12665,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         StatementInferenceInner {
-            expressions: FrozenMap::from(expressions),
+            expressions: expressions.freeze(),
             #[cfg(debug_assertions)]
             scope,
             bindings: bindings.into_boxed_slice(),
@@ -12674,7 +12799,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         FunctionDecoratorInference {
             legacy_aliases: legacy_aliases.into_iter().collect(),
             deferred_name_loads: FrozenSet::from(deferred_name_loads),
-            expression_types: FrozenMap::from(expressions),
+            expression_types: expressions.freeze(),
             bindings: bindings.into_boxed_slice(),
             called_functions: called_functions
                 .into_iter()
@@ -12836,7 +12961,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         DefinitionInference {
-            expressions: FrozenMap::from(expressions),
+            expressions: expressions.freeze(),
             #[cfg(debug_assertions)]
             scope,
             types: DefinitionTypes::from_parts(
@@ -12967,7 +13092,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         ScopeInference {
-            expressions: FrozenValueMap::from(expressions),
+            expressions: expressions.freeze(),
             extra,
         }
     }
@@ -13108,7 +13233,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "speculative `TypeInferenceBuilder` should only be used for expression inference"
         );
 
-        self.extend_expression_types(expressions);
+        self.extend_expression_types(expressions.freeze().iter().copied());
         self.comparison_truthiness.extend(comparison_truthiness);
         self.context.extend(&context);
         self.extend_cycle_recovery(cycle_recovery);
@@ -13238,7 +13363,7 @@ enum ExpressionCacheEntry<'db> {
 /// that is otherwise performed for Salsa results.
 struct FullExpressionCacheEntry<'db> {
     legacy_aliases: FxIndexSet<Definition<'db>>,
-    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expressions: ExpressionMap<'db>,
     comparison_truthiness: FxHashMap<ExpressionNodeKey, Truthiness>,
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
     collection_use_constraints: CollectionUseConstraints<'db>,
@@ -13256,7 +13381,7 @@ struct FullExpressionCacheEntry<'db> {
 impl<'db> FullExpressionCacheEntry<'db> {
     fn expression_type(&self, expression: ExpressionNodeKey) -> Type<'db> {
         self.expressions
-            .get(&expression)
+            .get(expression)
             .copied()
             .or(self.cycle_recovery)
             .unwrap_or_else(Type::unknown)
@@ -13264,7 +13389,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
 
     fn is_single_expression(&self, expression: ExpressionNodeKey, ty: Type<'db>) -> bool {
         self.expressions.len() == 1
-            && self.expressions.get(&expression) == Some(&ty)
+            && self.expressions.get(expression) == Some(&ty)
             && !self.has_extra()
     }
 
@@ -13314,7 +13439,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
         });
 
         ExpressionInference {
-            expressions: FrozenMap::from(self.expressions),
+            expressions: self.expressions.freeze(),
             extra,
             #[cfg(debug_assertions)]
             scope: self.scope,
@@ -14034,4 +14159,94 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
 enum BoundOrConstraintsNodes<'ast> {
     Bound(&'ast ast::Expr),
     Constraints(&'ast [ast::Expr]),
+}
+
+#[cfg(test)]
+mod expression_map_tests {
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::parsed::parsed_module;
+    use ruff_db::system::DbWithWritableSystem as _;
+    use ty_python_core::global_scope;
+
+    use super::*;
+    use crate::db::tests::setup_db;
+
+    fn key(index: u32) -> ExpressionNodeKey {
+        let name = ast::Identifier::new("x", TextRange::default());
+        name.node_index.set(index.into());
+        (&name).into()
+    }
+
+    #[test]
+    fn replacements_in_the_tail_and_prefix() {
+        let mut map = ExpressionMap::default();
+        map.extend((1..9).map(|i| (key(i), Type::Never)));
+        assert_eq!(map.insert(key(0), Type::Never), None);
+        for index in [8, 0] {
+            assert_eq!(map.insert(key(index), Type::unknown()), Some(Type::Never));
+            assert_eq!(map.get(key(index)), Some(&Type::unknown()));
+        }
+        assert!(map.spill.is_none());
+        assert!(map.freeze().iter().map(|(k, _)| *k).eq((0..9).map(key)));
+    }
+
+    #[test]
+    fn reversed_keys_switch_to_hashing() {
+        let mut map = ExpressionMap::default();
+        map.extend((0..128).rev().map(|i| (key(i), Type::Never)));
+        assert!(map.spill.is_some());
+        assert_eq!(map.insert(key(100), Type::unknown()), Some(Type::Never));
+        assert_eq!(map.get(key(100)), Some(&Type::unknown()));
+        assert_eq!(map.iter().count(), 128);
+        let frozen = map.freeze();
+        assert!(frozen.iter().map(|(k, _)| *k).eq((0..128).map(key)));
+        assert_eq!(frozen.get(&key(100)), Some(&Type::unknown()));
+    }
+
+    #[test]
+    fn merging_sorted_regions_replaces_types_and_clears_stale_truthiness() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_file("/src/main.py", "")?;
+        let file = system_path_to_file(&db, "/src/main.py")?;
+        let env = db.program_environment();
+        let program_file = ProgramFile::new(&db, file, env.program(&db));
+        let region =
+            InferenceRegion::Scope(global_scope(&db, program_file), TypeContext::default());
+        let module = parsed_module(&db, program_file.python_file(&db)).load(&db);
+        let mut builder = TypeInferenceBuilder::new(
+            &db,
+            &env,
+            region,
+            file,
+            program_file,
+            semantic_index(&db, program_file),
+            &module,
+        );
+
+        builder.extend_sorted(&[]);
+        builder.extend_sorted(&[(key(0), Type::Never)]);
+        builder.extend_sorted(&[(key(2), Type::Never), (key(3), Type::Never)]);
+        builder.extend_sorted(&[(key(1), Type::Never), (key(2), Type::unknown())]);
+        builder
+            .comparison_truthiness
+            .insert(key(2), Truthiness::AlwaysTrue);
+        builder
+            .comparison_truthiness
+            .insert(key(3), Truthiness::AlwaysFalse);
+        builder.extend_sorted(&[(key(3), Type::unknown())]);
+
+        let _ = builder.context.finish();
+        assert!(builder.comparison_truthiness.contains_key(&key(2)));
+        assert!(!builder.comparison_truthiness.contains_key(&key(3)));
+        assert_eq!(
+            builder.expressions.freeze().iter().as_slice(),
+            &[
+                (key(0), Type::Never),
+                (key(1), Type::Never),
+                (key(2), Type::unknown()),
+                (key(3), Type::unknown()),
+            ]
+        );
+        Ok(())
+    }
 }
