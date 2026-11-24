@@ -501,8 +501,9 @@ pub(crate) struct CallArgumentTypes<'db> {
 impl<'db> CallArgumentTypes<'db> {
     fn new(fallback_ty: Option<Type<'db>>) -> Self {
         Self {
+            context_sensitive: false,
             fallback_type: fallback_ty,
-            ..Self::default()
+            types: FxHashMap::default(),
         }
     }
 
