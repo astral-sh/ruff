@@ -112,6 +112,9 @@ fn format_text_document(
         return Ok(None);
     }
 
+    let Ok(settings) = query.settings() else {
+        return Ok(None);
+    };
     let source = text_document.contents();
     let formatted = crate::format::format(
         text_document,

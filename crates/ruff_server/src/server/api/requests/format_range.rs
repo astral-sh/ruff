@@ -73,6 +73,9 @@ fn format_text_document_range(
         return Ok(None);
     }
 
+    let Ok(settings) = query.settings() else {
+        return Ok(None);
+    };
     let text = text_document.contents();
     let index = text_document.index();
     let range = range.to_text_range(text, index, encoding);

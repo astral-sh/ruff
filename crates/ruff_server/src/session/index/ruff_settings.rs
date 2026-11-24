@@ -13,6 +13,7 @@ use ruff_python_ast::PythonVersion;
 use ruff_workspace::Settings;
 use ruff_workspace::pyproject::find_fallback_target_version;
 use ruff_workspace::resolver::{ConfigurationOrigin, Project, match_exclusion};
+use ruff_workspace::script::{Script, ScriptConfiguration, ScriptSettingsError, script};
 use ruff_workspace::{
     configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
     pyproject::{find_user_settings_toml, settings_toml},
@@ -27,7 +28,6 @@ use crate::session::settings::{EditorSettings, ResolvedConfiguration};
 pub(crate) struct RuffSettings {
     project: Project,
     /// Reuse the overrides that successfully resolved this project for its scripts.
-    #[expect(dead_code, reason = "Retained for inline script settings")]
     transformer: Arc<EditorConfigurationTransformer>,
 }
 
@@ -37,6 +37,25 @@ impl RuffSettings {
             project,
             transformer,
         }
+    }
+
+    pub(super) fn script(
+        &self,
+        path: &Path,
+        source: &str,
+    ) -> Result<Option<Script>, ScriptSettingsError> {
+        let configuration = match self.transformer.preference {
+            ConfigurationPreference::EditorOnly => ScriptConfiguration::RequiresPythonOnly,
+            _ => ScriptConfiguration::Enabled,
+        };
+        script(
+            &self.project,
+            self.transformer.as_ref(),
+            configuration,
+            Some(path),
+            self.linter.extension.get_source_type(path),
+            source,
+        )
     }
 
     pub(crate) fn path(&self) -> Option<&Path> {
@@ -83,6 +102,9 @@ impl RuffSettings {
         transformer: &Arc<EditorConfigurationTransformer>,
         root: &Path,
     ) -> RuffSettings {
+        if transformer.preference == ConfigurationPreference::EditorOnly {
+            return Self::editor_only(Arc::clone(transformer), root);
+        }
         find_user_settings_toml()
             .and_then(|user_settings| {
                 tracing::debug!(
@@ -132,8 +154,7 @@ impl RuffSettings {
                 tracing::error!("Failed to resolve editor settings: {error}");
                 let fallback = EditorConfigurationTransformer {
                     configuration: Configuration::default(),
-                    preference: ConfigurationPreference::FilesystemFirst,
-                    server_preview: transformer.server_preview,
+                    ..*transformer
                 };
                 let project =
                     Project::resolve(configuration(), root, &fallback).unwrap_or_else(|error| {
@@ -503,13 +524,13 @@ impl ConfigurationTransformer for EditorConfigurationTransformer {
     fn transform(&self, filesystem_configuration: Configuration) -> Configuration {
         let editor_configuration = self.configuration.clone();
         let mut configuration = match self.preference {
-            ConfigurationPreference::EditorFirst => {
+            // In editor-only mode the current document can still supply a Python requirement.
+            ConfigurationPreference::EditorFirst | ConfigurationPreference::EditorOnly => {
                 editor_configuration.combine(filesystem_configuration)
             }
             ConfigurationPreference::FilesystemFirst => {
                 filesystem_configuration.combine(editor_configuration)
             }
-            ConfigurationPreference::EditorOnly => editor_configuration,
         };
         if let Some(preview) = self.server_preview.map(PreviewMode::from) {
             configuration.preview = Some(preview);
@@ -530,6 +551,7 @@ mod tests {
     use ruff_linter::UnresolvedRuleSelector;
     use ruff_linter::line_width::LineLength;
     use ruff_linter::registry::Rule;
+    use ruff_python_trivia::textwrap::dedent;
     use ruff_ranged_value::{ValueSource, ValueSourceGuard};
     use ruff_workspace::options::Options;
 
@@ -589,6 +611,45 @@ mod tests {
         assert_eq!(configuration.preview, Some(PreviewMode::Disabled));
         assert_eq!(configuration.lint.preview, Some(PreviewMode::Disabled));
         assert_eq!(configuration.format.preview, Some(PreviewMode::Disabled));
+    }
+
+    #[test]
+    fn script_requirement_respects_editor_preference() -> anyhow::Result<()> {
+        let root = Path::new("/src/project");
+        let mut editor = EditorSettings {
+            server_preview: Some(true),
+            configuration: Some(ResolvedConfiguration::Inline(Box::new(Options {
+                target_version: Some(ruff_linter::settings::types::PythonVersion::Py313),
+                ..Default::default()
+            }))),
+            ..Default::default()
+        };
+        let resolve = |editor: &EditorSettings| -> anyhow::Result<_> {
+            let transformer = Arc::new(EditorConfigurationTransformer::new(editor, root));
+            let settings =
+                RuffSettings::with_editor_settings(transformer, root, Some(PythonVersion::PY39));
+            let source = dedent(
+                r"
+                # /// script
+                # requires-python = '>=3.10'
+                # ///
+                ",
+            );
+            let script = settings
+                .script(&root.join("script.py"), &source)
+                .map_err(ScriptSettingsError::into_anyhow)?
+                .context("Expected script settings")?;
+            Ok(script
+                .settings(&settings)
+                .linter
+                .unresolved_target_version
+                .0)
+        };
+
+        assert_eq!(resolve(&editor)?, Some(PythonVersion::PY313));
+        editor.configuration_preference = ConfigurationPreference::FilesystemFirst;
+        assert_eq!(resolve(&editor)?, Some(PythonVersion::PY310));
+        Ok(())
     }
 
     /// This test ensures that the inline configuration is correctly applied to the configuration.
@@ -677,6 +738,39 @@ mod tests {
             settings.formatter.preview,
             ruff_python_formatter::PreviewMode::Enabled
         );
+    }
+
+    #[test]
+    fn editor_only_fallback_honors_script_requires_python() -> anyhow::Result<()> {
+        let root = Path::new("/src/project");
+        let editor_settings = EditorSettings {
+            server_preview: Some(true),
+            exclude: Some(vec!["foo[".to_string()]),
+            configuration_preference: ConfigurationPreference::EditorOnly,
+            ..Default::default()
+        };
+        let settings = RuffSettings::fallback(&editor_settings, root);
+        let source = dedent(
+            r#"
+            # /// script
+            # requires-python = ">=3.10"
+            # tool.ruff.target-version = "py312"
+            # ///
+            "#,
+        );
+        let script = settings
+            .script(&root.join("script.py"), &source)
+            .map_err(ScriptSettingsError::into_anyhow)?
+            .context("Expected script settings")?;
+        assert_eq!(
+            script
+                .settings(&settings)
+                .linter
+                .unresolved_target_version
+                .0,
+            Some(PythonVersion::PY310)
+        );
+        Ok(())
     }
 
     #[test]
