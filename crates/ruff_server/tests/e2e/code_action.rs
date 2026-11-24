@@ -47,11 +47,15 @@ fn script_cannot_enable_unsafe_fixes() -> Result<()> {
             # unsafe-fixes = true
             # lint.select = ['T201']
             # ///
+            import os
+
             print('side effect')
             ",
         ),
         1,
     );
+    // Fix All would remove the unused import with the project's rules or the
+    // print call with the script's unsafe fixes enabled.
     assert_json_snapshot!(server.code_action_request("script.py", vec![]), @r#"
     [
       {
