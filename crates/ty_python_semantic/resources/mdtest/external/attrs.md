@@ -223,18 +223,15 @@ from attrs import define, field
 @define
 class Person:
     name: str = "Unnamed"
-
-    # TODO: This should not be an error once we recognize that `id` has a default
-    # error: [invalid-dataclass-field-order]
     id: int = field()
 
     @id.default
     def _default_id(self) -> int:
         return 0
 
-# TODO: No error here
-# error: [missing-argument] "No argument provided for required parameter `id`"
 person = Person()
+Person(id=1)  # ok
+Person(id="1")  # error: [invalid-argument-type]
 ```
 
 The types of the fields are not affected by this:
@@ -262,6 +259,41 @@ class WrongDefault:
     @age.default
     def _default_age(self) -> str:
         return "0"
+```
+
+## Required fields and decorated defaults
+
+Only the field named in the decorator gets a default.
+
+```py
+import attr
+
+@attr.s
+class Range:
+    start: int = attr.ib()
+    end: int = attr.ib()
+
+    @end.default
+    def _default_end(self) -> int:
+        return self.start
+
+Range(1)  # ok
+Range()  # error: [missing-argument] "No argument provided for required parameter `start`"
+```
+
+A required positional field cannot follow a field with a decorated default.
+
+```py
+from attrs import define, field
+
+@define
+class Invalid:
+    x: int = field()
+    y: int  # error: [invalid-dataclass-field-order]
+
+    @x.default
+    def default_x(self) -> int:
+        return 0
 ```
 
 ## Custom initialization

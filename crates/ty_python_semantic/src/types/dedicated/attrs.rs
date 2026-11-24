@@ -1,5 +1,14 @@
+use itertools::Itertools;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
+use rustc_hash::FxHashSet;
+use ty_python_core::{
+    ast_ids::HasScopedUseId,
+    definition::{Definition, DefinitionKind},
+    place::ScopedPlaceId,
+    use_def_map,
+};
 
 use crate::types::known_instance::FieldInstanceKind;
 use crate::types::{
@@ -83,4 +92,36 @@ pub(in crate::types) fn generic_identity_function<'db>(
         Type::TypeVar(f),
     );
     Type::function_like_callable(db, signature)
+}
+
+/// Records fields for which this method registers a default via `@<field>.default`.
+pub(in crate::types) fn collect_decorated_defaults<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    defaults: &mut FxHashSet<ScopedPlaceId>,
+) {
+    let DefinitionKind::Function(function) = definition.kind(db) else {
+        return;
+    };
+    if !function.has_decorators() {
+        return;
+    }
+
+    let module = parsed_module(db, definition.python_file(db)).load(db);
+    let use_def = use_def_map(db, definition.scope(db));
+    for decorator in &function.node(&module).decorator_list {
+        if let Some(attr) = decorator.expression.as_attribute_expr()
+            && attr.attr.id == "default"
+            && let Some(name) = attr.value.as_name_expr()
+            && let Ok(binding) = use_def
+                .bindings_at_use(name.scoped_use_id(db, definition.program_file(db)))
+                .exactly_one()
+            && let Some(field) = binding.binding.definition()
+            // Rebinding the name to a new field discards the registered default.
+            && let Ok(last) = use_def.end_of_scope_bindings(field.place(db)).exactly_one()
+            && last.binding.definition() == Some(field)
+        {
+            defaults.insert(field.place(db));
+        }
+    }
 }
