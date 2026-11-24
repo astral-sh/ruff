@@ -9,7 +9,6 @@ use ruff_db::{
 use ruff_python_ast as ast;
 use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashSet;
 use std::cell::{LazyCell, RefCell};
 
 use super::implicit_attributes::implicit_attribute_names;
@@ -48,7 +47,7 @@ use crate::{
         function::{DataclassTransformerParams, KnownFunction},
         generics::Specialization,
         inferred_declaration,
-        known_instance::{DeprecatedInstance, FieldInstanceKind},
+        known_instance::DeprecatedInstance,
         member::{Member, class_member, class_member_with_symbol},
         mro::{Mro, MroIterator},
         signatures::CallableSignature,
@@ -2923,7 +2922,7 @@ impl<'db> StaticClassLiteral<'db> {
         let is_attrs = attrs::is_attrs_class(db, self);
         let mut kw_only_sentinel_field_seen = false;
         let mut field_declarations = Vec::new();
-        let mut decorated_defaults = FxHashSet::default();
+        let mut decorated_defaults = attrs::DecoratedDefaults::new();
 
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
@@ -2934,11 +2933,8 @@ impl<'db> StaticClassLiteral<'db> {
             // query, or to the `symbol_from_declarations` call below. Doing so would potentially require
             // us to generate a union of `__init__` methods.
             if !declarations.clone().contains_only_annotated_assignments(db) {
-                if is_attrs
-                    && let Ok(declaration) = declarations.exactly_one()
-                    && let Some(definition) = declaration.declaration.definition()
-                {
-                    attrs::collect_decorated_defaults(db, definition, &mut decorated_defaults);
+                if is_attrs {
+                    decorated_defaults.collect(db, declarations);
                 }
                 continue;
             }
@@ -3025,10 +3021,9 @@ impl<'db> StaticClassLiteral<'db> {
                     default_ty
                 {
                     default_ty = field.default_type(db).or_else(|| {
-                        (is_attrs
-                            && field.kind(db) == FieldInstanceKind::Attrs
-                            && decorated_defaults.contains(&symbol_id.into()))
-                        .then_some(Type::unknown())
+                        decorated_defaults
+                            .contains(db, symbol_id.into(), field)
+                            .then_some(Type::unknown())
                     });
                     init = field.init(db);
                     kw_only = field.kw_only(db);

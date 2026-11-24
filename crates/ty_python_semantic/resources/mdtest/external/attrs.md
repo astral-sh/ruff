@@ -231,6 +231,7 @@ class Person:
 
 person = Person()
 Person(id=1)  # ok
+Person(name="Alice", id=1)  # ok
 Person(id="1")  # error: [invalid-argument-type]
 ```
 
