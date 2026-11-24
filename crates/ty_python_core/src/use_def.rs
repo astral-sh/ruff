@@ -2202,20 +2202,24 @@ impl PendingReachability {
         value
     }
 
-    /// Returns the lowest common ancestor of two nodes in the pending-constraint tree.
+    /// Returns the lowest common ancestor and whether either path applies narrowing after it.
     fn common_ancestor(
         &self,
         mut left: PendingReachabilityId,
         mut right: PendingReachabilityId,
-    ) -> PendingReachabilityId {
+    ) -> (PendingReachabilityId, bool) {
+        let mut has_narrowing = false;
         while left != right {
-            if left.index() > right.index() {
-                left = self.constraints[left].parent;
+            let cursor = if left.index() > right.index() {
+                &mut left
             } else {
-                right = self.constraints[right].parent;
-            }
+                &mut right
+            };
+            let event = &self.constraints[*cursor];
+            has_narrowing |= event.narrowing_constraint != PendingNarrowing::ALWAYS_TRUE;
+            *cursor = event.parent;
         }
-        left
+        (left, has_narrowing)
     }
 }
 
@@ -2264,7 +2268,7 @@ impl PendingReachability {
         scope_reachability: ScopedReachabilityConstraintId,
         narrowing: &mut NarrowingConstraintsBuilder,
     ) -> PendingBranch {
-        let common_ancestor = self.common_ancestor(self.current, tip);
+        let (common_ancestor, has_narrowing) = self.common_ancestor(self.current, tip);
         let mut last_fork = tip;
         while last_fork != common_ancestor
             && self.constraints[last_fork].kind != PendingNodeKind::Fork
@@ -2276,7 +2280,9 @@ impl PendingReachability {
         let joined = if self.current == tip {
             tip
         } else {
-            let narrowing_constraint = if common_ancestor == self.current || common_ancestor == tip
+            let narrowing_constraint = if !has_narrowing
+                || common_ancestor == self.current
+                || common_ancestor == tip
             {
                 PendingNarrowing::ALWAYS_TRUE
             } else if self.constraints[self.current].last_join != self.constraints[tip].last_join {
