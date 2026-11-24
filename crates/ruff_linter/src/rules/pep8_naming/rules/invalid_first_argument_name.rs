@@ -252,10 +252,7 @@ pub(crate) fn invalid_first_argument_name(checker: &Checker, scope: &Scope) {
     let Some(ParameterWithDefault {
         parameter: self_or_cls,
         ..
-    }) = parameters
-        .posonlyargs
-        .first()
-        .or_else(|| parameters.args.first())
+    }) = parameters.iter_positional_params().next()
     else {
         return;
     };
@@ -296,11 +293,7 @@ fn rename_parameter(
     stylist: &Stylist,
 ) -> Result<Option<Fix>> {
     // Don't fix if another parameter has the valid name.
-    if parameters
-        .iter()
-        .skip(1)
-        .any(|parameter| parameter.name() == function_type.valid_first_argument_name())
-    {
+    if parameters.includes(function_type.valid_first_argument_name()) {
         return Ok(None);
     }
     let binding = scope

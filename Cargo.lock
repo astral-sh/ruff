@@ -3493,6 +3493,7 @@ dependencies = [
  "compact_str",
  "get-size2",
  "is-macro",
+ "itertools 0.15.0",
  "memchr",
  "ruff_cache",
  "ruff_macros",

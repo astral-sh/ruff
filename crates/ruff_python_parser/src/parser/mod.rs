@@ -8,7 +8,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
     Alias, AtomicNodeIndex, ElifElseClause, Expr, Int, IpyEscapeKind, Keyword, Mod, ModExpression,
-    ModModule, ParameterWithDefault, Stmt, StringFlags,
+    ModModule, ParameterItem, Stmt, StringFlags,
 };
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -103,7 +103,7 @@ pub(crate) struct Parser<'src> {
     keyword_scratch: ScratchBuffer<Keyword>,
 
     /// Reusable, nesting-safe scratch storage for function and lambda parameters.
-    parameter_scratch: ScratchBuffer<ParameterWithDefault>,
+    parameter_scratch: ScratchBuffer<ParameterItem>,
 
     /// Reusable, nesting-safe scratch storage for statement lists.
     stmt_scratch: ScratchBuffer<Stmt>,

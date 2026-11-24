@@ -537,7 +537,7 @@ where
                 returns,
                 ..
             }) => {
-                parameters.iter().any(|param| {
+                parameters.iter_source_order().any(|param| {
                     param
                         .default()
                         .is_some_and(|default| any_over_expr(default, &mut *func))
