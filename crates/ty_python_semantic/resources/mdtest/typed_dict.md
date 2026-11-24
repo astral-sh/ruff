@@ -3298,6 +3298,28 @@ def _(u: IntX | StrX) -> None:
     reveal_type(u.setdefault("x", 1))  # revealed: int | str
 ```
 
+## Methods bound to a union of `TypedDict`s
+
+Structurally equivalent receivers can share a method. An incompatible receiver remains distinct,
+even for methods with identical return types.
+
+```py
+from typing import TypedDict
+
+class Point(TypedDict):
+    x: int
+
+class OtherPoint(TypedDict):
+    x: int
+
+class Label(TypedDict):
+    name: str
+
+def inspect(value: Point | OtherPoint | Label):
+    reveal_type(value.copy())  # revealed: Point | Label
+    reveal_type(value.keys.__self__)  # revealed: Point | Label
+```
+
 ## `get()` with literal union defaults
 
 ```toml

@@ -361,6 +361,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.never();
         }
 
+        self.check_bound_method_signatures(db, source, target, receiver_constraints)
+    }
+
+    pub(super) fn check_bound_method_signatures(
+        &self,
+        db: &'db dyn Db,
+        source: BoundMethodType<'db>,
+        target: BoundMethodType<'db>,
+        receiver_constraints: Option<ConstraintSet<'db, 'c>>,
+    ) -> ConstraintSet<'db, 'c> {
         // Keep function evidence before receiver evidence in the constraints' source order.
         self.check_type_pair(db, source.func(db), target.func(db))
             .and(db, self.constraints, || {

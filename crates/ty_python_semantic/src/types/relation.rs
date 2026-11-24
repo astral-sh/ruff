@@ -1166,6 +1166,26 @@ impl<'db> Type<'db> {
             signature_relation_visitor: &signature_relation_visitor,
             materialization_visitor: &materialization_visitor,
         };
+        // A standalone redundancy check on bound methods compares their captured
+        // receivers first. Reuse that comparison across methods on a TypedDict
+        // union. Nested relations must retain their active recursion guards.
+        if matches!(relation, TypeRelation::Redundancy { pure: false })
+            && let (Type::BoundMethod(source), Type::BoundMethod(target)) = (self, target)
+            && source != target
+            && !source.has_distinct_function(db, target)
+            && let (left @ Type::TypedDict(_), right @ Type::TypedDict(_)) =
+                (source.self_instance(db), target.self_instance(db))
+        {
+            if !left.is_redundant_with(db, env, right) {
+                return checker.never();
+            }
+            return checker.check_bound_method_signatures(
+                db,
+                source,
+                target,
+                Some(checker.always()),
+            );
+        }
         checker.check_type_pair(db, self, target)
     }
 
