@@ -558,7 +558,11 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    negative_hint: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    /// Transforms argument hints in contravariant positions, such as callback inputs.
+    /// If sibling inference leaves `T` unsolved, these positions can still use
+    /// the full call's binding for `T`. The default transformer caches by type
+    /// alone, so reusing it could give both positions the same substitution.
+    flipped_argument_transformer: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     top_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     bottom_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     top_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -578,7 +582,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             recursion_context: None,
             materialize_typevar_bounds_and_defaults: true,
             default: OnceCell::default(),
-            negative_hint: OnceCell::default(),
+            flipped_argument_transformer: OnceCell::default(),
             top_materialization: OnceCell::default(),
             bottom_materialization: OnceCell::default(),
             top_specialization_materialization: OnceCell::default(),
@@ -619,7 +623,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             TypeMapping::ApplySpecialization(ApplySpecialization::ArgumentHint {
                 flipped: true,
                 ..
-            }) => &self.negative_hint,
+            }) => &self.flipped_argument_transformer,
             TypeMapping::Materialize(MaterializationKind::Top) => &self.top_materialization,
             TypeMapping::Materialize(MaterializationKind::Bottom) => &self.bottom_materialization,
             TypeMapping::ApplySpecializationWithMaterialization {
