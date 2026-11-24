@@ -2632,6 +2632,31 @@ def decorate_with(fn: Callable[P, R], decorator: Callable[[Callable[P, R]], X]) 
 reveal_type(decorate_with(empty, passthrough))  # revealed: [T]() -> list[T]
 ```
 
+### Inferring a parameter list from a decorator's return type
+
+The identity decorator returns `len` unchanged. Matching `len` against `Callable[P, int]` determines
+`P` and overrides its `[int]` default.
+
+```py
+from typing import Callable, TypeVar
+from typing_extensions import ParamSpec
+
+F = TypeVar("F")
+P = ParamSpec("P", default=[int])
+T = TypeVar("T")
+
+def decorate(decorator: Callable[[F], Callable[P, int]], fn: F) -> Callable[P, int]:
+    return decorator(fn)
+
+def identity(x: T) -> T:
+    return x
+
+wrapped = decorate(identity, len)
+reveal_type(wrapped)  # revealed: (obj: Sized, /) -> int
+wrapped("hello")  # ok
+wrapped(42)  # error: [invalid-argument-type]
+```
+
 ### A transform that returns a generic callback
 
 `accept` requires the result of `replace` to be usable as its input. Comparing the two signatures

@@ -31,7 +31,6 @@ pub(crate) struct SolutionBudget {
     /// Satisfied paths collected before per-variable solution selection can reject them.
     pub(crate) paths: usize,
     /// Interior and terminal visits, shared by preprocessing and path collection.
-    /// A speculative conjunction scan past a fixed typevar uses a copy of the remaining budget.
     pub(crate) visits: usize,
     /// Set-theoretic terms contributed to the result, including terms exposed by aliases.
     /// Also bounds storage when retaining alternatives.
