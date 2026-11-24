@@ -258,7 +258,10 @@ impl<'db> Type<'db> {
 
             Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
                 let constraints = ConstraintSetBuilder::new();
-                let tracked_set = constraints.load(db, env, tracked_set.constraints(db));
+                let tracked_set =
+                    constraints
+                        .unlimited()
+                        .load(db, env, tracked_set.constraints(db));
                 // Derive consequences for all variables in the stored constraints when
                 // checking whether their negation is satisfiable.
                 Truthiness::from(tracked_set.is_always_satisfied(db, env, TypeVarSet::All))

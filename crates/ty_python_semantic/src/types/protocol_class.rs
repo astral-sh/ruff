@@ -12,7 +12,9 @@ use crate::types::attribute_write::{
     property_setter_value_type,
 };
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
-use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
+use crate::types::relation::{
+    DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation, try_constraint,
+};
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
@@ -2739,7 +2741,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let result = checker.check_callable_signature_pair(db, &source, &target);
         // This is a sufficient proof. A failed nominal comparison does not rule out a
         // structural match, even between specializations of the same protocol.
-        (!result.is_never_satisfied(db, self.env, self.inferable)).then_some(result)
+        (!try_constraint!(self.try_is_never_satisfied(db, result))).then_some(result)
     }
 
     fn check_protocol_member_read(
@@ -2969,8 +2971,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // implementation. Class access only establishes that the member is present. Callable
             // types and several callable literal forms do not expose a useful `__call__` member
             // through their meta-type.
-            return ConstraintSet::from_bool(
-                self.constraints,
+            return self.when(
                 member.name == "__call__"
                     || protocol_member_read_type(
                         db,
@@ -3178,7 +3179,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         {
             // The instance-side check is authoritative for an ordinary method's signature. Class
             // access only establishes that the source member is also present on the class.
-            return ConstraintSet::from_bool(self.constraints, source.read().is_some());
+            return self.when(source.read().is_some());
         }
         let target = target_member.access(access);
 
@@ -3364,7 +3365,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         if missing && let Some(context) = self.report_context() {
             context.push(ErrorContext::ProtocolMemberNotWritable);
         }
-        ConstraintSet::from_bool(self.constraints, missing)
+        self.when(missing)
     }
 
     /// Checks whether `ty` is disjoint from the readable type required by `member`.

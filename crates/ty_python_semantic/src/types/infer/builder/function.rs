@@ -247,13 +247,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // annotation already accepts the value, the parameter types are unnecessary.
             let accepts = |ty: Type<'db>, relation| {
                 let builder = ConstraintSetBuilder::new();
-                let check = |target| {
-                    ty.has_relation_to(db, env, target, &builder, TypeVarSet::None, relation)
-                };
+                let build = builder.unlimited();
+                let check =
+                    |target| ty.has_relation_to(db, env, target, build, TypeVarSet::None, relation);
                 let lexical = check(*lexical);
                 lexical.is_trivially_always_satisfied()
                     || check(*public)
-                        .or(db, &builder, || lexical)
+                        .or(db, build, || lexical)
                         .is_always_satisfied(db, env, TypeVarSet::None)
             };
 

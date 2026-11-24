@@ -18,16 +18,16 @@ use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, Assignment, AtomicConstraintId, BoundedSolutionLimits,
     CandidateSearch, CandidateSolution, CandidateSolutions, CandidateTypeVarSolution,
     CandidateTypeVarSolver, ConstraintFailureEvidence, ConstraintSetStorage, EvidenceSource,
-    InteriorNodeData, Node, NodeId, SolutionLimits, SolutionValidity, SolutionViolation,
-    SolutionViolationKind,
+    InteriorNodeData, Node, NodeId, ProjectionError, SolutionLimits, SolutionValidity,
+    SolutionViolation, SolutionViolationKind, continue_if_ok,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type, UnionType, any_over_type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
-type ProcessNode<'a, 'db, L, B, R> = dyn Fn(
-        &mut SolutionWalker<'db, L>,
+type ProcessNode<'a, 'db, 'budget, B, R> = dyn Fn(
+        &mut SolutionWalker<'db, 'budget>,
         &mut ConstraintSetStorage<'db>,
         &mut PathAssignments,
         Polarity,
@@ -35,8 +35,8 @@ type ProcessNode<'a, 'db, L, B, R> = dyn Fn(
     ) -> ControlFlow<B, R>
     + 'a;
 
-type ProcessSatisfied<'a, 'db, L, B> = dyn Fn(
-        &mut SolutionWalker<'db, L>,
+type ProcessSatisfied<'a, 'db, 'budget, B> = dyn Fn(
+        &mut SolutionWalker<'db, 'budget>,
         &mut ConstraintSetStorage<'db>,
         &mut PathAssignments,
     ) -> ControlFlow<B>
@@ -57,14 +57,20 @@ type ExploredNodeKey = (
     Box<[(Assignment<AtomicConstraintId>, AtomicConstraintId)]>,
 );
 
-enum Break<B> {
-    Limits(B),
+enum Break {
+    Limits(ProjectionError),
     EarlyBreak,
 }
 
-impl<B> Break<B> {
+impl From<ProjectionError> for Break {
+    fn from(error: ProjectionError) -> Self {
+        Self::Limits(error)
+    }
+}
+
+impl Break {
     #[track_caller]
-    fn expect_limits(self) -> B {
+    fn expect_limits(self) -> ProjectionError {
         match self {
             Break::Limits(b) => b,
             Break::EarlyBreak => panic!("EarlyBreak should not leak"),
@@ -72,13 +78,13 @@ impl<B> Break<B> {
     }
 }
 
-pub(super) struct SolutionWalker<'db, L> {
+pub(super) struct SolutionWalker<'db, 'budget> {
     source_orders: FxIndexSet<AtomicConstraintId>,
     /// The root of the relation. Used to recover the original upper bounds for diagnostics,
     /// since derived bounds can obscure the original evidence.
     original_node: NodeId,
     inferable: TypeVarSet<'db>,
-    limits: L,
+    limits: SolutionLimits<'budget>,
     /// Number of valid candidates still needed, if the caller can stop early.
     remaining_valid: Option<usize>,
     /// How many rejected paths can be rechecked within the traversal budget.
@@ -116,14 +122,14 @@ struct PendingCandidateSolution<'db> {
     source_orders: Vec<usize>,
 }
 
-impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
+impl<'db, 'budget> SolutionWalker<'db, 'budget> {
     pub(super) fn for_node(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         source_orders: FxIndexSet<AtomicConstraintId>,
         inferable: TypeVarSet<'db>,
-        limits: L,
+        limits: SolutionLimits<'budget>,
         original_node: NodeId,
     ) -> (Self, PathAssignments) {
         // Sequent discovery must also happen in source order. Sorting the collected paths is
@@ -174,19 +180,21 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
         atoms: &[AtomicConstraintId],
-    ) -> bool {
-        atoms.iter().all(|atom| {
-            path.assume(
-                db,
-                env,
-                storage,
-                self.inferable,
-                atom.when_false(),
-                self.unspecialized_type_var_policy,
-            )
-        }) && self
-            .pending_candidate_solution(db, env, storage, path, None)
-            .is_some()
+    ) -> ControlFlow<ProjectionError, bool> {
+        ControlFlow::Continue(
+            atoms.iter().all(|atom| {
+                path.assume(
+                    db,
+                    env,
+                    storage,
+                    self.inferable,
+                    atom.when_false(),
+                    self.unspecialized_type_var_policy,
+                )
+            }) && self
+                .pending_candidate_solution(db, env, storage, path, None)?
+                .is_some(),
+        )
     }
 
     pub(super) fn is_never_satisfied(
@@ -196,15 +204,15 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
         polarity: Polarity,
-    ) -> ControlFlow<L::Break, bool> {
+    ) -> ControlFlow<ProjectionError, bool> {
         let node = self.original_node;
         // Bounded callers account for each visit in the exact traversal.
         if polarity == Polarity::Negative
-            && self.limits.traversal_budget().is_none()
+            && self.limits.traversal.is_none()
             && let Some(atoms) = node.all_negative_path_to_false(storage)
         {
             let snapshot = path.snapshot();
-            if self.has_all_negative_counterexample(db, env, storage, path, &atoms) {
+            if self.has_all_negative_counterexample(db, env, storage, path, &atoms)? {
                 return ControlFlow::Continue(false);
             }
             // Keep discovered rules for the fallback, as when backtracking to a sibling.
@@ -226,7 +234,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         all_typevars: Option<&Support>,
         polarity: Polarity,
         node: NodeId,
-    ) -> ControlFlow<L::Break> {
+    ) -> ControlFlow<ProjectionError> {
         let validations = all_typevars.map(|all_typevars| {
             Validations::from_support(db, env, storage, self.inferable, all_typevars)
         });
@@ -236,12 +244,12 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             && path.assignments.is_empty()
             && self.explored_nodes.is_empty()
             && let Some(validations) = validations
-            && let Some((limits, exceeded)) = self.limits.traversal_budget()
+            && let Some(limits) = &self.limits.traversal
             && let Some((visits, bounds_per_path)) =
                 self.binary_lower_bound_visits(db, env, storage, node, validations, limits)
         {
             let Some(extra_visits) = limits.remaining_visits.checked_sub(visits) else {
-                return ControlFlow::Break(exceeded);
+                return ControlFlow::Break(ProjectionError::TraversalBudgetExceeded);
             };
             self.remaining_failed_paths = Some(extra_visits / bounds_per_path);
         }
@@ -361,7 +369,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         polarity: Polarity,
         node: NodeId,
         validations: Option<&Validations<'db>>,
-    ) -> ControlFlow<L::Break> {
+    ) -> ControlFlow<ProjectionError> {
         if self.remaining_valid == Some(0) {
             return ControlFlow::Continue(());
         }
@@ -405,7 +413,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
         validations: Option<&Validations<'db>>,
-    ) -> ControlFlow<L::Break> {
+    ) -> ControlFlow<ProjectionError> {
         let initially_pending = self.pending.len();
         let satisfied = Cell::new(false);
         self.validate_satisfied_path(
@@ -456,7 +464,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         polarity: Polarity,
         node: NodeId,
         validations: Option<&Validations<'db>>,
-    ) -> ControlFlow<L::Break, bool> {
+    ) -> ControlFlow<ProjectionError, bool> {
         let result = self.node_is_satisfiable_on_path_inner(
             db,
             env,
@@ -483,9 +491,9 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         polarity: Polarity,
         node: NodeId,
         validations: Option<&Validations<'db>>,
-    ) -> ControlFlow<Break<L::Break>, ()> {
+    ) -> ControlFlow<Break, ()> {
         self.limits.visit_node().map_break(Break::Limits)?;
-        let break_into_bool = |result: &ControlFlow<Break<L::Break>, ()>| match result {
+        let break_into_bool = |result: &ControlFlow<Break, ()>| match result {
             ControlFlow::Break(Break::Limits(_)) => None,
             ControlFlow::Break(Break::EarlyBreak) => Some(true),
             ControlFlow::Continue(()) => Some(false),
@@ -520,7 +528,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 validations,
                 &|this, storage, path| {
                     let has_solution = this
-                        .pending_candidate_solution(db, env, storage, path, None)
+                        .pending_candidate_solution(db, env, storage, path, None)?
                         .is_some();
                     bool_into_break(has_solution)
                 },
@@ -571,7 +579,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     }
 
     #[expect(clippy::too_many_arguments)]
-    fn visit_constraint<B>(
+    fn visit_constraint<B: From<ProjectionError>>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -579,7 +587,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         path: &mut PathAssignments,
         polarity: Polarity,
         node: NodeId,
-        process_node: &ProcessNode<'_, 'db, L, B, ()>,
+        process_node: &ProcessNode<'_, 'db, 'budget, B, ()>,
     ) -> ControlFlow<B> {
         let interior = storage.interior_node_data(node);
         let constraint_id = interior.constraint;
@@ -599,7 +607,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     }
 
     #[expect(clippy::too_many_arguments)]
-    fn visit_atomic_constraint<B>(
+    fn visit_atomic_constraint<B: From<ProjectionError>>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -608,7 +616,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         polarity: Polarity,
         interior: InteriorNodeData,
         constraint: AtomicConstraintId,
-        process_node: &ProcessNode<'_, 'db, L, B, ()>,
+        process_node: &ProcessNode<'_, 'db, 'budget, B, ()>,
     ) -> ControlFlow<B> {
         debug_assert!(
             storage
@@ -623,7 +631,11 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         let if_true = if polarity == Polarity::Positive {
             interior.if_true
         } else {
-            interior.if_true.or(storage, interior.if_uncertain)
+            continue_if_ok(interior.if_true.or(
+                storage,
+                interior.if_uncertain,
+                self.limits.construction,
+            ))?
         };
         self.visit_atomic_edge(
             db,
@@ -652,7 +664,11 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         let if_false = if polarity == Polarity::Positive {
             interior.if_false
         } else {
-            interior.if_false.or(storage, interior.if_uncertain)
+            continue_if_ok(interior.if_false.or(
+                storage,
+                interior.if_uncertain,
+                self.limits.construction,
+            ))?
         };
         self.visit_atomic_edge(
             db,
@@ -679,7 +695,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         polarity: Polarity,
         assignment: Assignment<AtomicConstraintId>,
         child: NodeId,
-        process_node: &ProcessNode<'_, 'db, L, B, ()>,
+        process_node: &ProcessNode<'_, 'db, 'budget, B, ()>,
     ) -> ControlFlow<B> {
         // Don't bother adding the assignment and checking the sequent map if the edge takes us to
         // the ALWAYS_FALSE terminal.
@@ -727,7 +743,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
         constraints: &[AtomicConstraintId],
-        process_satisfied: &ProcessSatisfied<'_, 'db, L, B>,
+        process_satisfied: &ProcessSatisfied<'_, 'db, 'budget, B>,
     ) -> ControlFlow<B> {
         let Some((constraint, constraints)) = constraints.split_first() else {
             return process_satisfied(self, storage, path);
@@ -756,14 +772,14 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         )
     }
 
-    fn candidate_evidence(
+    fn candidate_evidence<B: From<ProjectionError>>(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         constraints: impl Iterator<Item = AtomicConstraintId>,
         bound_typevar: BoundTypeVarInstance<'db>,
-    ) -> Option<CandidateTypeVarSolution<'db>> {
+    ) -> ControlFlow<B, Option<CandidateTypeVarSolution<'db>>> {
         let mut evidence = CandidateTypeVarSolver::default();
         for constraint in constraints {
             let constraint = storage.atomic_constraint_data(constraint);
@@ -780,7 +796,14 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 evidence.add_constraint(db, bound_typevar, constraint);
             }
         }
-        evidence.finish(db, env, storage, bound_typevar, self.inferable)
+        continue_if_ok(evidence.finish(
+            db,
+            env,
+            storage,
+            bound_typevar,
+            self.inferable,
+            self.limits.construction,
+        ))
     }
 
     /// Check an inferable variable's lower bound against its declared upper bound without
@@ -800,7 +823,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
         bound_typevar: BoundTypeVarInstance<'db>,
-    ) -> ControlFlow<Break<L::Break>, bool> {
+    ) -> ControlFlow<Break, bool> {
         if !bound_typevar.is_inferable(db, self.inferable) {
             return ControlFlow::Continue(true);
         }
@@ -854,7 +877,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         }
 
         let relation = lower.when_assignable_to_owned(db, env, bound, self.inferable);
-        let (node, source_order) = storage.load(db, env, &relation);
+        let (node, source_order) =
+            continue_if_ok(storage.load(db, env, &relation, self.limits.construction))?;
         if node == ALWAYS_TRUE {
             return ControlFlow::Continue(true);
         }
@@ -884,42 +908,67 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         ControlFlow::Continue(!has_counterexample)
     }
 
-    fn evidence_satisfies_declared_constraint(
+    fn evidence_satisfies_declared_constraint<B: From<ProjectionError>>(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         evidence: &CandidateTypeVarSolution<'db>,
         constrained_ty: Type<'db>,
-    ) -> bool {
-        let constraint_lower = constrained_ty.bottom_materialization(db, env);
-        let constraint_upper = constrained_ty.top_materialization(db, env);
-        let (when_lower, when_lower_source_order) = match evidence.evidence_lower {
-            Some(lower) => storage.load(
+    ) -> ControlFlow<B, bool> {
+        continue_if_ok(
+            self.declared_constraint_accepts_bounds(
                 db,
                 env,
-                &lower.when_assignable_to_owned(db, env, constraint_upper, self.inferable),
+                storage,
+                constrained_ty,
+                evidence.evidence_lower,
+                evidence
+                    .upper
+                    .iter_evidence_without_validity(EvidenceSource::All),
             ),
+        )
+    }
+
+    fn declared_constraint_accepts_bounds(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        constrained_ty: Type<'db>,
+        lower: Option<Type<'db>>,
+        uppers: impl Iterator<Item = Type<'db>>,
+    ) -> Result<bool, ProjectionError> {
+        let construction = self.limits.construction;
+        let assignable = |storage: &mut ConstraintSetStorage<'db>, lower: Type<'db>, upper| {
+            let relation = lower.when_assignable_to_owned(db, env, upper, self.inferable);
+            storage.load(db, env, &relation, construction)
+        };
+        let (when_lower, lower_order) = match lower {
+            Some(lower) => assignable(storage, lower, constrained_ty.top_materialization(db, env))?,
             None => (ALWAYS_TRUE, None),
         };
-        let (when_upper, when_upper_source_order) = evidence
-            .upper
-            .iter_evidence_without_validity(EvidenceSource::All)
-            .fold((ALWAYS_TRUE, None), |(when, when_source_order), upper| {
-                let (when_upper, when_upper_source_order) = storage.load(
-                    db,
-                    env,
-                    &constraint_lower.when_assignable_to_owned(db, env, upper, self.inferable),
-                );
-                let when = when.and(storage, when_upper);
-                let when_source_order =
-                    storage.ordered_source_order(when_source_order, when_upper_source_order);
-                (when, when_source_order)
-            });
-        let when = when_lower.and(storage, when_upper);
-        let when_source_order =
-            storage.ordered_source_order(when_lower_source_order, when_upper_source_order);
-        !when.is_never_satisfied(db, env, storage, self.inferable, when_source_order)
+        let mut uppers = uppers.peekable();
+        let (mut when_upper, mut upper_order) = (ALWAYS_TRUE, None);
+        if uppers.peek().is_some() {
+            let constraint_lower = constrained_ty.bottom_materialization(db, env);
+            for upper in uppers {
+                let (next, next_order) = assignable(storage, constraint_lower, upper)?;
+                when_upper = when_upper.and(storage, next, construction)?;
+                upper_order = storage.ordered_source_order(upper_order, next_order);
+            }
+        }
+        let when = when_lower.and(storage, when_upper, construction)?;
+        let when_source_order = storage.ordered_source_order(lower_order, upper_order);
+        Ok(!when.is_unsatisfiable(
+            db,
+            env,
+            storage,
+            self.inferable,
+            when_source_order,
+            Polarity::Positive,
+            SolutionLimits::unbounded(construction),
+        )?)
     }
 
     /// Finds evidence that excludes every declared constraint without relying on both sides of
@@ -932,20 +981,32 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         storage: &mut ConstraintSetStorage<'db>,
         evidence: &CandidateTypeVarSolution<'db>,
         constrained: &Constrained<'db>,
-    ) -> ControlFlow<L::Break, Option<ConstraintFailureEvidence<'db>>> {
-        if let Some(lower) = evidence.inference_lower()
-            && constrained.declared_constraints.iter().all(|declared| {
-                let when = lower.when_assignable_to_owned(
+    ) -> Result<Option<ConstraintFailureEvidence<'db>>, ProjectionError> {
+        let excludes_all = |this: &Self,
+                            storage: &mut ConstraintSetStorage<'db>,
+                            lower: Option<Type<'db>>,
+                            upper: &[Type<'db>]| {
+            if lower.is_none() && upper.is_empty() {
+                return Ok(false);
+            }
+            for declared in &constrained.declared_constraints {
+                if this.declared_constraint_accepts_bounds(
                     db,
                     env,
-                    declared.constrained_ty.top_materialization(db, env),
-                    self.inferable,
-                );
-                let (when, source_order) = storage.load(db, env, &when);
-                when.is_never_satisfied(db, env, storage, self.inferable, source_order)
-            })
+                    storage,
+                    declared.constrained_ty,
+                    lower,
+                    upper.iter().copied(),
+                )? {
+                    return Ok(false);
+                }
+            }
+            Ok::<_, ProjectionError>(true)
+        };
+        if let Some(lower) = evidence.inference_lower()
+            && excludes_all(self, storage, Some(lower), &[])?
         {
-            return ControlFlow::Continue(Some(ConstraintFailureEvidence::Lower(lower)));
+            return Ok(Some(ConstraintFailureEvidence::Lower(lower)));
         }
 
         // The projected path may contain derived constraints such as `T <= Never`, and source
@@ -958,7 +1019,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         let mut upper_bounds = Vec::new();
         let mut current = self.original_node;
         loop {
-            self.limits.visit_node()?;
+            self.limits.visit_node().continue_ok()?;
             let interior = match current.node() {
                 Node::AlwaysTrue => break,
                 Node::AlwaysFalse => {
@@ -1003,29 +1064,11 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         let has_never = unique.shift_remove(&Type::Never);
         let upper_bounds: Box<[_]> = unique.into_iter().collect();
 
-        let excludes_every_constraint =
-            |storage: &mut ConstraintSetStorage<'db>, bounds: &[Type<'db>]| {
-                !bounds.is_empty()
-                    && constrained.declared_constraints.iter().all(|declared| {
-                        let mut when = ALWAYS_TRUE;
-                        let mut source_order = None;
-                        for upper in bounds {
-                            let relation = declared
-                                .constrained_ty
-                                .bottom_materialization(db, env)
-                                .when_assignable_to_owned(db, env, *upper, self.inferable);
-                            let (next, next_order) = storage.load(db, env, &relation);
-                            when = when.and(storage, next);
-                            source_order = storage.ordered_source_order(source_order, next_order);
-                        }
-                        when.is_never_satisfied(db, env, storage, self.inferable, source_order)
-                    })
-            };
-        if excludes_every_constraint(storage, &upper_bounds) {
-            return ControlFlow::Continue(Some(ConstraintFailureEvidence::Upper(upper_bounds)));
+        if excludes_all(self, storage, None, &upper_bounds)? {
+            return Ok(Some(ConstraintFailureEvidence::Upper(upper_bounds)));
         }
-        if has_never && excludes_every_constraint(storage, &[Type::Never]) {
-            return ControlFlow::Continue(Some(ConstraintFailureEvidence::Upper(Box::new([
+        if has_never && excludes_all(self, storage, None, &[Type::Never])? {
+            return Ok(Some(ConstraintFailureEvidence::Upper(Box::new([
                 Type::Never,
             ]))));
         }
@@ -1035,10 +1078,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             .upper
             .iter_evidence_without_validity(EvidenceSource::All)
             .collect();
-        ControlFlow::Continue(
-            excludes_every_constraint(storage, &inferred_upper)
-                .then_some(ConstraintFailureEvidence::UpperUnknown),
-        )
+        Ok(excludes_all(self, storage, None, &inferred_upper)?
+            .then_some(ConstraintFailureEvidence::UpperUnknown))
     }
 
     /// Having found a satisfiable path in the BDD, validates that path against the declared upper
@@ -1050,8 +1091,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
         validations: Option<&Validations<'db>>,
-        process_satisfied: &ProcessSatisfied<'_, 'db, L, Break<L::Break>>,
-    ) -> ControlFlow<Break<L::Break>> {
+        process_satisfied: &ProcessSatisfied<'_, 'db, 'budget, Break>,
+    ) -> ControlFlow<Break> {
         let Some(validations) = validations else {
             return process_satisfied(self, storage, path);
         };
@@ -1080,8 +1121,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         path: &mut PathAssignments,
         upper_bounds: &Slice<BoundTypeVarInstance<'db>, UpperBound>,
         constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
-        process_satisfied: &ProcessSatisfied<'_, 'db, L, Break<L::Break>>,
-    ) -> ControlFlow<Break<L::Break>> {
+        process_satisfied: &ProcessSatisfied<'_, 'db, 'budget, Break>,
+    ) -> ControlFlow<Break> {
         let Some(((&bound_typevar, upper_bound), upper_bounds)) = upper_bounds.split_first() else {
             // We've checked all typevars that have an upper bound. Next check the typevars with
             // declared constraints.
@@ -1134,8 +1175,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
         constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
-        process_satisfied: &ProcessSatisfied<'_, 'db, L, Break<L::Break>>,
-    ) -> ControlFlow<Break<L::Break>> {
+        process_satisfied: &ProcessSatisfied<'_, 'db, 'budget, Break>,
+    ) -> ControlFlow<Break> {
         let Some(((&bound_typevar, constrained_typevar), constrained)) = constrained.split_first()
         else {
             // We've checked all constrained typevars, and we now know that the candidate solution
@@ -1178,7 +1219,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             path.positive_constraints()
                 .map(|(constraint, _)| constraint),
             bound_typevar,
-        ) else {
+        )?
+        else {
             // If the evidence is not satisfiable, then we can return early; none of the
             // constraints can possibly be satisfied.
             return ControlFlow::Continue(());
@@ -1211,10 +1253,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                            path: &mut PathAssignments,
                            witness: Type<'db>| {
             let satisfied = Cell::new(false);
-            let check_candidate: &ProcessSatisfied<'_, 'db, L, Break<L::Break>> =
+            let check_candidate: &ProcessSatisfied<'_, 'db, 'budget, Break> =
                 &|this, storage, path| {
                     if this
-                        .pending_candidate_solution(db, env, storage, path, None)
+                        .pending_candidate_solution(db, env, storage, path, None)?
                         .is_some()
                     {
                         satisfied.set(true);
@@ -1378,13 +1420,13 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                                                 storage,
                                                 &evidence,
                                                 declared_constraint.constrained_ty,
-                                            )
+                                            )?
                                         {
                                             return ControlFlow::Continue(());
                                         }
                                         let solution = this.pending_candidate_solution(
                                             db, env, storage, path, None,
-                                        );
+                                        )?;
                                         if solution.is_some() {
                                             satisfied.set(true);
                                         }
@@ -1563,8 +1605,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         evidence: &CandidateTypeVarSolution<'db>,
         declared_constraint: &DeclaredConstraint<'db>,
         constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
-        process_satisfied: &ProcessSatisfied<'_, 'db, L, Break<L::Break>>,
-    ) -> ControlFlow<Break<L::Break>, bool> {
+        process_satisfied: &ProcessSatisfied<'_, 'db, 'budget, Break>,
+    ) -> ControlFlow<Break, bool> {
         let satisfied = Cell::new(false);
         if let Some(constraints) = declared_constraint.constraints.as_deref() {
             self.with_declared_constraint_solution(
@@ -1587,7 +1629,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                                 storage,
                                 evidence,
                                 declared_constraint.constrained_ty,
-                            ) {
+                            )? {
                                 return ControlFlow::Continue(());
                             }
 
@@ -1622,7 +1664,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     /// TODO(dcreager): I consider this a bug in the sequent map, which should be addressed in its
     /// own right, since there are many other methods that assume that a path to `true` terminal
     /// indicates satisfiability.
-    fn pending_candidate_solution(
+    fn pending_candidate_solution<B: From<ProjectionError>>(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -1631,7 +1673,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         typevar_violations: Option<
             &FxHashMap<BoundTypeVarInstance<'db>, SolutionViolationKind<'db>>,
         >,
-    ) -> Option<PendingCandidateSolution<'db>> {
+    ) -> ControlFlow<B, Option<PendingCandidateSolution<'db>>> {
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
         // any unions or intersections in our type mappings in a stable order. Constraints might
         // come out of `PathAssignments` with identical `source_order`s, but if they do, those
@@ -1694,47 +1736,54 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         }
 
         let mut violations = Vec::new();
-        let typevars: Option<Box<[_]>> = mappings
-            .into_iter()
-            .map(|(bound_typevar, solver)| {
-                let mut solution =
-                    solver.finish(db, env, storage, bound_typevar, self.inferable)?;
-                let argument = match self
-                    .declared_constraint_solutions
-                    .get(&bound_typevar.identity(db))
-                {
-                    Some(&ty) => {
-                        solution.selected_declared_constraint = Some(ty);
-                        Some(ty)
-                    }
-                    None => solution
-                        .has_lower_inference()
-                        .then(|| solution.effective_lower(db, env, EvidenceSource::All)),
-                };
-
-                if let Some(typevar_violations) = typevar_violations
-                    && let Some(kind) = typevar_violations.get(&bound_typevar)
-                {
-                    violations.push(SolutionViolation {
-                        bound_typevar,
-                        variance: solution.variance(),
-                        kind: match kind {
-                            SolutionViolationKind::UpperBound(_) => {
-                                SolutionViolationKind::UpperBound(argument)
-                            }
-                            kind @ SolutionViolationKind::Constraints { .. } => kind.clone(),
-                        },
-                    });
+        let mut typevars = Vec::with_capacity(mappings.len());
+        for (bound_typevar, solver) in mappings {
+            let Some(mut solution) = continue_if_ok(solver.finish(
+                db,
+                env,
+                storage,
+                bound_typevar,
+                self.inferable,
+                self.limits.construction,
+            ))?
+            else {
+                return ControlFlow::Continue(None);
+            };
+            let argument = match self
+                .declared_constraint_solutions
+                .get(&bound_typevar.identity(db))
+            {
+                Some(&ty) => {
+                    solution.selected_declared_constraint = Some(ty);
+                    Some(ty)
                 }
+                None => solution
+                    .has_lower_inference()
+                    .then(|| solution.effective_lower(db, env, EvidenceSource::All)),
+            };
 
-                Some(solution)
-            })
-            .collect();
-        let typevars = typevars?;
+            if let Some(typevar_violations) = typevar_violations
+                && let Some(kind) = typevar_violations.get(&bound_typevar)
+            {
+                violations.push(SolutionViolation {
+                    bound_typevar,
+                    variance: solution.variance(),
+                    kind: match kind {
+                        SolutionViolationKind::UpperBound(_) => {
+                            SolutionViolationKind::UpperBound(argument)
+                        }
+                        kind @ SolutionViolationKind::Constraints { .. } => kind.clone(),
+                    },
+                });
+            }
+
+            typevars.push(solution);
+        }
+        let typevars = typevars.into_boxed_slice();
 
         let validity = match typevar_violations {
             None => SolutionValidity::Valid,
-            Some(_) if violations.is_empty() => return None,
+            Some(_) if violations.is_empty() => return ControlFlow::Continue(None),
             Some(_) => SolutionValidity::Invalid(violations.into_boxed_slice()),
         };
         let candidate = CandidateSolution { typevars, validity };
@@ -1742,7 +1791,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             candidate,
             source_orders,
         };
-        Some(pending)
+        ControlFlow::Continue(Some(pending))
     }
 
     fn found_satisfied_path(
@@ -1751,8 +1800,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         path: &PathAssignments,
-    ) -> ControlFlow<Break<L::Break>, bool> {
-        let Some(pending) = self.pending_candidate_solution(db, env, storage, path, None) else {
+    ) -> ControlFlow<Break, bool> {
+        let Some(pending) = self.pending_candidate_solution(db, env, storage, path, None)? else {
             return ControlFlow::Continue(false);
         };
         self.limits.satisfied_path().map_break(Break::Limits)?;
@@ -1773,12 +1822,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         path: &mut PathAssignments,
         upper_bounds: &Slice<BoundTypeVarInstance<'db>, UpperBound>,
         constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
-    ) -> ControlFlow<L::Break> {
-        if let Some(remaining) = &mut self.remaining_failed_paths
-            && let Some((_, exceeded)) = self.limits.traversal_budget()
-        {
+    ) -> ControlFlow<ProjectionError> {
+        if let Some(remaining) = &mut self.remaining_failed_paths {
             let Some(next) = remaining.checked_sub(1) else {
-                return ControlFlow::Break(exceeded);
+                return ControlFlow::Break(ProjectionError::TraversalBudgetExceeded);
             };
             *remaining = next;
         }
@@ -1798,7 +1845,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                     path,
                     constraints,
                     &|this, storage, path| {
-                        let pending = this.pending_candidate_solution(db, env, storage, path, None);
+                        let pending =
+                            this.pending_candidate_solution(db, env, storage, path, None)?;
                         if pending.is_some() {
                             satisfied.set(true);
                         }
@@ -1823,7 +1871,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                     .iter()
                     .map(|(constraint, _)| *constraint),
                 *bound_typevar,
-            ) else {
+            )?
+            else {
                 continue;
             };
 
@@ -1843,11 +1892,11 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                                 storage,
                                 &evidence,
                                 declared_constraint.constrained_ty,
-                            ) {
+                            )? {
                                 return ControlFlow::Continue(());
                             }
                             let pending =
-                                this.pending_candidate_solution(db, env, storage, path, None);
+                                this.pending_candidate_solution(db, env, storage, path, None)?;
                             if pending.is_some() {
                                 satisfied.set(true);
                             }
@@ -1857,13 +1906,13 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 }
             }
             if !satisfied.into_inner()
-                && let Some(evidence) = self.constraint_failure_evidence(
+                && let Some(evidence) = continue_if_ok(self.constraint_failure_evidence(
                     db,
                     env,
                     storage,
                     &evidence,
                     constrained_typevar,
-                )?
+                ))?
             {
                 violations.insert(
                     *bound_typevar,
@@ -1882,7 +1931,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         }
 
         if let Some(pending) =
-            self.pending_candidate_solution(db, env, storage, path, Some(&violations))
+            self.pending_candidate_solution(db, env, storage, path, Some(&violations))?
         {
             self.limits.satisfied_path()?;
             self.pending.push(pending);

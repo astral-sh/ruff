@@ -473,6 +473,88 @@ def check(make: Callable[[], {union}]) -> None:
     }
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/5088>.
+///
+/// Each string can constrain `T` directly or through its characters. Putting the long string
+/// first introduces all the character bounds before the bounds for the two-letter strings.
+fn benchmark_string_or_sequence_inference(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let letters = "abcdefghijklmnop";
+    let pairs = letters.chars().map(|c| format!("'{c}{c}'")).join(", ");
+    let first = format!("'{letters}', {pairs}");
+    let last = format!("{pairs}, '{letters}'");
+    let consume = |argument: &str, parameter: &str| {
+        format!(
+            "def consume[T](value: {parameter}) -> None: ...
+
+def check(value: {argument}) -> None:
+    consume(value)
+"
+        )
+    };
+    let provide = "def provide[T](x: T) -> Callable[[T | Sequence[T]], None]:
+    raise NotImplementedError
+
+x: Callable[[Words], None] = provide('x')
+";
+    let receiver = "from typing import overload
+
+class C[T]:
+    @overload
+    def f[S](self: 'C[S | Sequence[S]]', x: int) -> S: ...
+    @overload
+    def f(self, x: str) -> int: ...
+    def f(self, x: int | str) -> object: raise NotImplementedError
+
+def check(c: C[Words]) -> None:
+    c.f(1)
+";
+    let generic_callback = "def consume[T](f: Callable[[int], T | Sequence[T]]) -> None: ...
+def callback[X](x: X) -> Words: raise NotImplementedError
+consume(callback)
+";
+    let direct = "T | Sequence[T]";
+    for (case, literals, body) in [
+        ("long_first", &first, consume("Words", direct)),
+        ("long_last", &last, consume("Words", direct)),
+        ("optional", &first, consume("Words | None", direct)),
+        (
+            "tuple",
+            &first,
+            consume("tuple[Words]", "tuple[T | Sequence[T]] | None"),
+        ),
+        (
+            "callable",
+            &first,
+            consume("Callable[[], Words]", "Callable[[], T | Sequence[T]]"),
+        ),
+        ("context", &first, provide.to_owned()),
+        ("overloaded_receiver", &first, receiver.to_owned()),
+        ("generic_callback", &last, generic_callback.to_owned()),
+    ] {
+        let code = format!(
+            "from collections.abc import Callable, Sequence
+from typing import Literal
+
+type Words = Literal[{literals}]
+
+{body}",
+        );
+
+        criterion.bench_function(
+            &format!("ty_micro[string_or_sequence_inference/{case}]"),
+            |b| {
+                b.iter_batched_ref(
+                    || setup_micro_case(&code),
+                    |Case { db }| assert_eq!(db.check().len(), 0),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+}
+
 /// A long conjunction with only two solutions fits within the traversal budget.
 fn benchmark_long_valid_bound_prefix(criterion: &mut Criterion) {
     setup_rayon();
@@ -754,6 +836,31 @@ def perform(rows: Rows) -> AllResults:
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Meson's list protocol matches the generic overload of `list[T].__add__` against
+/// `(list[Language]) -> list[Language]` while inferring the list literal's element type.
+fn benchmark_invariant_list_protocol(criterion: &mut Criterion) {
+    setup_rayon();
+    let code = r#"
+from typing import Literal, Protocol
+
+Language = Literal["c", "cpp", "cuda", "fortran", "d", "objc", "objcpp", "rust",
+                   "vala", "cs", "swift", "java", "cython", "nasm", "masm", "linearasm"]
+
+class Addable[T](Protocol):
+    def __add__(self, other: list[T], /) -> list[T]: ...
+    def copy(self) -> list[T]: ...
+
+languages: Addable[Language] = ["cpp", "c", "cuda"]
+"#;
+    criterion.bench_function("ty_micro[invariant_list_protocol]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
             BatchSize::SmallInput,
         );
     });
@@ -1111,12 +1218,14 @@ criterion_group!(
     benchmark_counterexample_behind_implied_bound,
     benchmark_many_upper_bound_callbacks,
     benchmark_incompatible_lower_bound_alternatives,
+    benchmark_string_or_sequence_inference,
     benchmark_long_valid_bound_prefix,
     benchmark_pandas_tdd,
     benchmark_mixed_typed_dict_union_copy,
     benchmark_missing_key_typed_dict_union_copy,
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_invariant_generic_return_union,
+    benchmark_invariant_list_protocol,
     benchmark_sequence_literal_union_access,
     benchmark_invariant_generic_union_bound,
     benchmark_many_invariant_typevars,

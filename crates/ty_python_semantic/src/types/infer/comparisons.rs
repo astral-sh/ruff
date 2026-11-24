@@ -1316,10 +1316,11 @@ fn infer_binary_type_comparison_inner<'db>(
             Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
         ) => {
             let constraints = ConstraintSetBuilder::new();
-            let left = constraints.load(db, env, left.constraints(db));
-            let right = constraints.load(db, env, right.constraints(db));
+            let build = constraints.unlimited();
+            let left = build.load(db, env, left.constraints(db));
+            let right = build.load(db, env, right.constraints(db));
             let equivalent =
-                left.iff(db, &constraints, right)
+                left.iff(db, build, right)
                     .is_always_satisfied(db, env, TypeVarSet::All);
             match op {
                 NonIdentityOperator::Rich(RichCompareOperator::Eq) => {

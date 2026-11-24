@@ -23,8 +23,8 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, UnionType, any_over_type, semantic_index};
 use crate::types::constraints::{
-    CandidateSolutions, ConstraintProvenance, ConstraintSet, ConstraintSetBuilder,
-    IteratorConstraintsExtension,
+    CandidateSolutions, ConstraintProvenance, ConstraintSet, ConstraintSetBuilder, Construction,
+    ConstructionBudget, IteratorConstraintsExtension,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -36,6 +36,7 @@ use crate::types::infer::{
 };
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
+    try_constraint,
 };
 use crate::types::tuple::{Tuple, TupleType, VariableSegment};
 use crate::types::typed_dict::unpacked_typed_dict_from_kwargs_annotation;
@@ -593,11 +594,11 @@ impl<'db> CallableSignature<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         source: &[Signature<'db>],
-        constraints: &'c ConstraintSetBuilder<'db>,
+        constraints: Construction<'_, 'c, 'db>,
         inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let relation_visitor = HasRelationToVisitor::default(constraints.builder);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints.builder);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = TypeRelationChecker::constraint_set_assignability(
@@ -779,15 +780,15 @@ impl<'db> ReceiverConstraints<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        builder: &'c ConstraintSetBuilder<'db>,
+        constraints: Construction<'_, 'c, 'db>,
         compare: impl Fn(Type<'db>, Type<'db>) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         if self.impossible {
-            return ConstraintSet::from_bool(builder, false);
+            return ConstraintSet::never(constraints.builder);
         }
         self.relations
             .iter()
-            .when_all(db, builder, |&(receiver, annotation)| {
+            .when_all(db, constraints, |&(receiver, annotation)| {
                 // TODO: Also intersect nested receiver type variables, such as the `T` in
                 // `self: list[T]`, with their valid specializations when constructing or solving
                 // the receiver constraint set.
@@ -799,7 +800,7 @@ impl<'db> ReceiverConstraints<'db> {
                 if receiver_typevar.is_some_and(|typevar| {
                     Signature::receiver_violates_typevar_domain(db, env, receiver, typevar)
                 }) {
-                    ConstraintSet::from_bool(builder, false)
+                    ConstraintSet::never(constraints.builder)
                 } else {
                     compare(receiver, annotation)
                 }
@@ -1727,19 +1728,27 @@ impl<'db> Signature<'db> {
 
         let inferable = self.inferable_typevars(db);
         let constraints = ConstraintSetBuilder::new();
-        let when =
-            receiver_constraints.when_assignable(db, env, &constraints, |receiver, annotation| {
-                // A stand-alone receiver check has no active signature comparison to reuse.
-                let when = receiver
-                    .when_constraint_set_assignable_to_owned(db, env, annotation, inferable);
-                constraints.load_with_provenance(db, env, &when, ConstraintProvenance::INFERRED)
-            });
+        let budget = ConstructionBudget::default();
+        let build = constraints.with_budget(&budget);
+        let when = receiver_constraints.when_assignable(db, env, build, |receiver, annotation| {
+            // A stand-alone receiver check has no active signature comparison to reuse.
+            let Some(when) = receiver.inference_relation(
+                db,
+                env,
+                annotation,
+                inferable,
+                ConstraintProvenance::INFERRED,
+            ) else {
+                return ConstraintSet::BudgetExceeded;
+            };
+            build.load_with_provenance(db, env, &when, ConstraintProvenance::INFERRED)
+        });
 
-        match when.solution_count_up_to(db, env, inferable, 2) {
-            Some(0) => return None,
-            Some(1) => {}
+        match when.try_solution_count_up_to(db, env, inferable, 2, &budget) {
+            Ok(Some(0)) => return None,
+            Ok(Some(1)) => {}
             // Each receiver path can leave a different type variable unconstrained. Preserve the
-            // original relation instead of combining those independent solutions.
+            // original relation when there are multiple paths or we cannot finish the search.
             _ => return Some(CallableSignature::single(self.clone())),
         }
 
@@ -1865,7 +1874,13 @@ impl<'db> Signature<'db> {
         let constraints = ConstraintSetBuilder::new();
         let inferable = self.inferable_typevars(db);
         self_type
-            .when_assignable_to(db, env, expected_self_ty, &constraints, inferable)
+            .when_assignable_to(
+                db,
+                env,
+                expected_self_ty,
+                constraints.unlimited(),
+                inferable,
+            )
             .is_always_satisfied(db, env, inferable)
     }
 
@@ -2402,7 +2417,7 @@ impl<'db> Signature<'db> {
         let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = TypeRelationChecker::constraint_set_assignability_with_context(
             env,
-            &constraints,
+            constraints.unlimited(),
             TypeVarSet::None,
             &relation_visitor,
             &disjointness_visitor,
@@ -2439,7 +2454,7 @@ impl<'db> Signature<'db> {
         let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = TypeRelationChecker::assignability_with_context(
             env,
-            &constraints,
+            constraints.unlimited(),
             &relation_visitor,
             &disjointness_visitor,
             &signature_relation_visitor,
@@ -2615,12 +2630,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             {
                 return None;
             }
-            let signatures_are_disjoint = self
-                .as_disjointness_checker()
-                .check_type_pair(db, self_parameter_type, other_parameter_type)
-                .is_always_satisfied(db, env, self.inferable);
+            let disjoint = self.as_disjointness_checker().check_type_pair(
+                db,
+                self_parameter_type,
+                other_parameter_type,
+            );
 
-            if signatures_are_disjoint {
+            if try_constraint!(self.try_is_always_satisfied(db, disjoint)) {
                 continue;
             }
 
@@ -2640,8 +2656,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             || self.check_type_pair(db, return_type_union.build(), target_signature.return_ty);
         let aggregate_relation =
             parameters_cover_target.and(db, self.constraints, returns_match_target);
-        aggregate_relation
-            .is_always_satisfied(db, env, self.inferable)
+        try_constraint!(self.try_is_always_satisfied(db, aggregate_relation))
             .then_some(aggregate_relation)
     }
 
@@ -2787,7 +2802,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 );
             if has_bare_paramspec() {
                 // A bare P can capture the whole generic signature, including its binders.
-                return when.reduce_uncaptured_typevars(db, self.env, self.inferable, inferable);
+                return when.reduce_uncaptured_typevars(
+                    db,
+                    self.env,
+                    self.inferable,
+                    inferable,
+                    self.constraints.budget,
+                );
             }
             // Matching `[T](x: T, y: T) -> T` against `Callable[Concatenate[int, P], R]`
             // gives `int <= T <= R`. Project out the local T to preserve `int <= R` for the
@@ -2862,28 +2883,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 (None, Some((target_tvar, target_signature))) if source_overloads.len() > 1 => {
-                    let env = self.env;
                     // TODO: Ideally, the constraint solver should use the return type constraint
                     // to remove unmatched overloads from the `ParamSpec` specialization instead
                     // of filtering them here.
+                    let mut matching = SmallVec::<[Signature<'db>; 1]>::new();
+                    for signature in source_overloads {
+                        let returns = self.without_context_collection(|| {
+                            self.check_signature_return_pair(db, signature, target_signature)
+                        });
+                        if !try_constraint!(self.try_is_never_satisfied(db, returns)) {
+                            matching.push(capture_parameters(signature));
+                        }
+                    }
                     let lower = Type::Callable(CallableType::paramspec_value_from_signatures(
                         db,
-                        CallableSignature::from_overloads(
-                            source_overloads
-                                .iter()
-                                .filter(|signature| {
-                                    !self
-                                        .without_context_collection(|| {
-                                            self.check_signature_return_pair(
-                                                db,
-                                                signature,
-                                                target_signature,
-                                            )
-                                        })
-                                        .is_never_satisfied(db, env, self.inferable)
-                                })
-                                .map(capture_parameters),
-                        ),
+                        CallableSignature::from_overloads(matching),
                     ));
                     let param_spec_matches =
                         self.check_type_pair(db, lower, Type::TypeVar(target_tvar));
@@ -3081,7 +3095,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 TypeVarEvaluation::Lazy | TypeVarEvaluation::LazyWithEagerBounds
             ) && target.parameters.is_gradual()
                 && !source.parameters.is_top()
-                && result.is_never_satisfied(db, env, checker.inferable)
+                && try_constraint!(checker.try_is_never_satisfied(db, result))
             {
                 // Preserve return-type inference for an incompatible object-variadic callback.
                 // A compatible prefix contributes its own inference bounds in the comparison above.
@@ -3159,10 +3173,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         } else if target.is_inferable(db, self.inferable) {
             (target, source)
         } else {
-            return ConstraintSet::from_bool(
-                self.constraints,
-                source.is_same_typevar_as(db, target),
-            );
+            return self.when(source.is_same_typevar_as(db, target));
         };
         ConstraintSet::constrain_typevar_equivalence_bound(
             db,
@@ -3186,6 +3197,46 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         } else {
             self.check_type_pair(db, source.return_ty, target.return_ty)
         }
+    }
+
+    /// When comparing `list[S] -> list[S | T]` to `list[L] -> list[L]`,
+    /// the parameter check requires `L ≤ S`, which implies `L ≤ S | T`.
+    /// Only `S | T ≤ L` remains to check for the invariant return. This
+    /// avoids choosing between `S` and `T` independently for every member of `L`.
+    fn simplify_invariant_return(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+    ) -> Option<(Type<'db>, Type<'db>)> {
+        let context = source.generic_context?;
+        let input = source.single_required_positional_parameter_type()?;
+        let expected = target.single_required_positional_parameter_type()?;
+        if self.typevar_evaluation != TypeVarEvaluation::Lazy
+            || !self.relation.is_assignability()
+            || expected.resolve_type_alias(db) != target.return_ty.resolve_type_alias(db)
+        {
+            return None;
+        }
+        let argument = |ty: Type<'db>| {
+            let instance = ty.resolve_type_alias(db).as_nominal_instance()?;
+            let alias = instance.class(db, self.env).into_generic_alias()?;
+            let args = alias.specialization(db);
+            let &[arg] = args.types(db) else { return None };
+            (!instance.inherits_from_explicit_any() && args.materialization_kind(db).is_none())
+                .then_some((alias.origin(db), arg))
+        };
+        let (class, parameter) = argument(input)?;
+        let (return_class, output) = argument(source.return_ty)?;
+        let (target_class, expected) = argument(expected)?;
+        let slot = class.generic_context(db)?.variables(db).next()?;
+        (class == target_class
+            && class == return_class
+            && context.contains(db, parameter.as_typevar()?.identity(db))
+            && expected.resolve_type_alias(db).is_union()
+            && output.as_union()?.elements(db).contains(&parameter)
+            && slot.variance(db) == TypeVarVariance::Invariant)
+            .then_some((output, expected))
     }
 
     fn check_paramspec_return_pair(
@@ -3456,12 +3507,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // if the return types are incompatible.
         let return_type_constraints = if target_parameters.as_paramspec_with_prefix().is_some() {
             self.check_paramspec_return_pair(db, source, target)
+        } else if !source.is_paramspec_value()
+            && !target.is_paramspec_value()
+            && let Some((output, expected)) = self.simplify_invariant_return(db, source, target)
+        {
+            self.check_type_pair(db, output, expected)
         } else {
             self.check_signature_return_pair(db, source, target)
         };
-        let return_type_checks = !result
-            .intersect(db, self.constraints, return_type_constraints)
-            .is_never_satisfied(db, env, self.inferable);
+        result.intersect(db, self.constraints, return_type_constraints);
+        let return_type_checks = !try_constraint!(self.try_is_never_satisfied(db, result));
         if let Some(context) = self.report_context()
             && !return_type_checks
         {
@@ -3554,10 +3609,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     Type::Never
                 };
                 let no_collision = self.check_type_pair(db, keyword.annotated_type(), keyword_type);
-                if result
-                    .intersect(db, self.constraints, no_collision)
-                    .is_never_satisfied(db, env, self.inferable)
-                {
+                result.intersect(db, self.constraints, no_collision);
+                if try_constraint!(self.try_is_never_satisfied(db, result)) {
                     // Still allow the ParamSpec handling below to preserve its inferred binding.
                     keyword_collision_checks = false;
                     break;
@@ -3605,9 +3658,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
             // Continuing past a nonterminal contradiction can bind later `ParamSpec`s or
             // replace the diagnostic context that explains the incompatible parameter.
-            !result
-                .intersect(db, self.constraints, constraint_set)
-                .is_never_satisfied(db, env, self.inferable)
+            result.intersect(db, self.constraints, constraint_set);
+            match self.try_is_never_satisfied(db, *result) {
+                Ok(never) => !never,
+                Err(_) => {
+                    *result = ConstraintSet::BudgetExceeded;
+                    false
+                }
+            }
         };
         let parameter_must_have_default = |parameter: &Parameter<'db>, index: usize| {
             ErrorContext::RequiredParameterMustHaveDefault {

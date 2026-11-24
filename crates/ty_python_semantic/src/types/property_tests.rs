@@ -97,7 +97,7 @@ mod stable {
     type_property_test!(
         equivalent_to_never, db, env,
         forall types t. t.is_equivalent_to(db, env, Type::Never)
-            == t.when_equivalent_to(db, env, Type::Never, &ConstraintSetBuilder::new())
+            == t.when_equivalent_to(db, env, Type::Never, ConstraintSetBuilder::new().unlimited())
                 .is_always_satisfied(db, env, TypeVarSet::All)
     );
 

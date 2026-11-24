@@ -3,7 +3,7 @@ use crate::FxOrderSet;
 use crate::place::PlaceAndQualifiers;
 use crate::types::class::{DynamicClassLiteral, metaclass_instance_type};
 use crate::types::constraints::ConstraintSet;
-use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, try_constraint};
 use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral, ClassType,
@@ -456,16 +456,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         match (source.subclass_of, target.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from_bool(self.constraints, !self.relation.is_subtyping())
+                self.when(!self.relation.is_subtyping())
             }
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(target_class)) => {
-                ConstraintSet::from_bool(
-                    self.constraints,
-                    target_class.is_object(db) || self.relation.is_assignability(),
-                )
+                self.when(target_class.is_object(db) || self.relation.is_assignability())
             }
             (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+                self.when(self.relation.is_assignability())
             }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
@@ -500,19 +497,14 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         {
             // Protocols are open structural types, so their meta-types can generally overlap with
             // concrete class-object types and with other protocol meta-types.
-            return ConstraintSet::from_bool(self.constraints, false);
+            return self.never();
         }
 
         match (left.subclass_of, right.subclass_of) {
-            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from_bool(self.constraints, false)
-            }
-            (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => {
-                ConstraintSet::from_bool(
-                    self.constraints,
-                    !left.could_coexist_in_mro_with_disjointness_checker(db, self.env, right, self),
-                )
-            }
+            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => self.never(),
+            (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => self.when(
+                !try_constraint!(left.try_could_coexist_in_mro_with(db, right, self)),
+            ),
             (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
                 unreachable!()
             }

@@ -3968,7 +3968,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
             KnownInstanceType::ConstraintSet(interned_set) => {
                 f.with_type(ty).write_str("ConstraintSet")?;
                 let constraints = ConstraintSetBuilder::new();
-                let set = constraints.load(db, self.env, interned_set.constraints(db));
+                let set = constraints
+                    .unlimited()
+                    .load(db, self.env, interned_set.constraints(db));
                 if interned_set.detailed_display(db) {
                     write!(f, "[{}]", set.display(db, self.env))
                 } else if set.is_always_satisfied(db, self.env, TypeVarSet::All) {

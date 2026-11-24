@@ -4,7 +4,8 @@ use rustc_hash::FxHashSet;
 
 use super::{
     CandidateSearch, CandidateSolutions, CandidateTypeVarSolution, ConstraintSet,
-    PathBoundSolution, ReportDiagnostics, Solutions, TypeVarSolution,
+    ConstructionBudget, PathBoundSolution, ReportDiagnostics, SolutionLimits, Solutions,
+    TypeVarSolution, UnspecializedTypeVarPolicy,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{Type, TypeVarVariance};
@@ -54,6 +55,7 @@ impl Default for SolutionBudget {
 /// caller must not use the prefix visited before a limit was reached as the complete answer.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ProjectionError {
+    ConstructionBudgetExceeded,
     PathBudgetExceeded,
     TraversalBudgetExceeded,
     TypeBudgetExceeded,
@@ -130,7 +132,10 @@ impl<'db> CandidateSolutions<'db> {
         &self,
         db: &'db dyn Db,
         budget: SolutionBudget,
-        choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
+        choose: impl FnMut(
+            TypeVarVariance,
+            &CandidateTypeVarSolution<'db>,
+        ) -> Result<PathBoundSolution<'db>, ProjectionError>,
     ) -> Result<Solutions<'db>, ProjectionError> {
         let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
         self.try_solve_with(choose, |solution| {
@@ -156,14 +161,27 @@ impl<'db> ConstraintSet<'db, '_> {
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
     ) -> Result<Solutions<'db>, ProjectionError> {
-        let builder = self.builder;
-        self.solutions_with(
+        self.solutions_during_construction(db, env, inferable, &ConstructionBudget::Unlimited)
+    }
+
+    pub(in crate::types) fn solutions_during_construction(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+        construction: &ConstructionBudget,
+    ) -> Result<Solutions<'db>, ProjectionError> {
+        let build = self.diagram()?.builder.with_budget(construction);
+        self.try_solutions_with(
             db,
             env,
             inferable,
             SolutionBudget::default(),
+            construction,
             ReportDiagnostics::Yes,
-            |_variance, path_bound| CandidateSolutions::default_solve(db, env, builder, path_bound),
+            |_variance, path_bound| {
+                CandidateSolutions::try_solve_with_preference(db, env, build, path_bound, true)
+            },
         )
     }
 
@@ -187,19 +205,49 @@ impl<'db> ConstraintSet<'db, '_> {
         inferable: TypeVarSet<'db>,
         budget: SolutionBudget,
         report_diagnostics: ReportDiagnostics,
-        choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
+        mut choose: impl FnMut(
+            TypeVarVariance,
+            &CandidateTypeVarSolution<'db>,
+        ) -> PathBoundSolution<'db>,
     ) -> Result<Solutions<'db>, ProjectionError> {
+        self.try_solutions_with(
+            db,
+            env,
+            inferable,
+            budget,
+            &ConstructionBudget::Unlimited,
+            report_diagnostics,
+            |variance, bounds| Ok(choose(variance, bounds)),
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn try_solutions_with(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+        budget: SolutionBudget,
+        construction: &ConstructionBudget,
+        report_diagnostics: ReportDiagnostics,
+        choose: impl FnMut(
+            TypeVarVariance,
+            &CandidateTypeVarSolution<'db>,
+        ) -> Result<PathBoundSolution<'db>, ProjectionError>,
+    ) -> Result<Solutions<'db>, ProjectionError> {
+        let diagram = self.diagram()?;
         let collect = || {
-            CandidateSolutions::compute_bounded(
+            CandidateSolutions::compute(
                 db,
                 env,
                 self,
                 inferable,
-                budget,
+                SolutionLimits::bounded(budget, construction),
+                UnspecializedTypeVarPolicy::Ignore,
                 CandidateSearch::All(report_diagnostics),
             )
         };
-        if self.node.is_terminal() {
+        if diagram.node.is_terminal() {
             return collect()?.solve_with_budget(db, budget, choose);
         }
 
@@ -208,19 +256,19 @@ impl<'db> ConstraintSet<'db, '_> {
         // the raw paths: each solve has its own selector and type-term budget.
         let key = ProjectionKey {
             program: env.program(db),
-            node: self.node,
-            source_order: self.source_order,
+            node: diagram.node,
+            source_order: diagram.source_order,
             inferable,
             budget,
             diagnostics: report_diagnostics,
         };
-        let last = self.builder.storage.borrow_mut().last_projection.take();
+        let last = diagram.builder.storage.borrow_mut().last_projection.take();
         let projection = match last {
             Some(previous) if previous.0 == key => previous,
             _ => Box::new((key, collect()?)),
         };
         let result = projection.1.solve_with_budget(db, budget, choose);
-        self.builder.storage.borrow_mut().last_projection = Some(projection);
+        diagram.builder.storage.borrow_mut().last_projection = Some(projection);
         result
     }
 
@@ -253,12 +301,13 @@ impl<'db> ConstraintSet<'db, '_> {
             &mut ProjectionTypeBudget,
         ) -> Result<T, ProjectionError>,
     ) -> Result<SolutionProjection<T>, ProjectionError> {
-        let path_bounds = CandidateSolutions::compute_bounded(
+        let path_bounds = CandidateSolutions::compute(
             db,
             env,
             self,
             inferable,
-            budget,
+            SolutionLimits::bounded(budget, &ConstructionBudget::Unlimited),
+            UnspecializedTypeVarPolicy::Ignore,
             // The fold consumes only valid solutions and never exposes violations.
             CandidateSearch::All(ReportDiagnostics::No),
         )?;
@@ -295,7 +344,11 @@ impl<'db> CandidateSolutions<'db> {
 
         let mut retained = false;
         for candidate in candidates {
-            let Some((solution, incomplete)) = Self::solve_path_with(candidate, &mut choose) else {
+            let Some((solution, incomplete)) =
+                Self::solve_path_with(candidate, &mut |variance, bounds| {
+                    Ok(choose(variance, bounds))
+                })?
+            else {
                 continue;
             };
             if !solution.is_valid() {

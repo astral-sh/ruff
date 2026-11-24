@@ -915,6 +915,7 @@ fn specialize_narrowing_target_from_intersection<'db>(
 
     let inferable = generic_context.inferable_typevars(db);
     let constraints = ConstraintSetBuilder::new();
+    let build = constraints.unlimited();
     let mut base_constraints = compatible_bases
         .into_iter()
         .map(|(target_base, subject_class)| {
@@ -922,13 +923,13 @@ fn specialize_narrowing_target_from_intersection<'db>(
                 db,
                 env,
                 Type::instance(db, env, subject_class),
-                &constraints,
+                build,
                 inferable,
             )
         });
     let mut combined_constraints = base_constraints.next()?;
     for base_constraint in base_constraints {
-        combined_constraints.intersect(db, &constraints, base_constraint);
+        combined_constraints.intersect(db, build, base_constraint);
     }
 
     let solutions = combined_constraints.solutions(db, env, inferable).ok()?;

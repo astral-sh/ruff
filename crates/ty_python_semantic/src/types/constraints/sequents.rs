@@ -472,7 +472,7 @@ impl<'db> SequentMap<'db> {
                     db,
                     env,
                     right.bound,
-                    &ConstraintSetBuilder::new(),
+                    ConstraintSetBuilder::new().unlimited(),
                     TypeVarSet::None,
                 )
                 .is_trivially_always_satisfied()
@@ -748,6 +748,8 @@ impl<'db> AtomicConstraint<'db> {
             return;
         }
 
+        // TODO: Bound construction of cached solver relations during inference. Comparing
+        // these bounds can expand a large diagram before the caller budgets its import.
         let when = lower
             .bound()
             .when_constraint_set_assignable_to_owned_with_evaluation(
@@ -853,7 +855,10 @@ impl<'db> AtomicConstraint<'db> {
             // PathAssignments state for each of those paths, which is why the logic would have to
             // move.)
             let mut storage = builder.storage.borrow_mut();
-            let mut node = when.node;
+            let mut node = when
+                .diagram()
+                .expect("owned constraint sets are complete")
+                .node;
             if !node.is_single_conjunction(&mut storage) {
                 return;
             }

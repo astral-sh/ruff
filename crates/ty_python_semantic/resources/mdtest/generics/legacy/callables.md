@@ -521,6 +521,27 @@ def consume_explicit(value: E | F) -> None: ...
 reveal_type(infer_from_consumers(consume_first, consume_second, consume_explicit))  # revealed: Unknown
 ```
 
+## Independent bounds after inference exhausts its budget
+
+Matching each string against both `T` and `Sequence[T]` can exhaust the construction budget. The
+callback still violates the upper bound on `U` in either argument order.
+
+```py
+from collections.abc import Callable, Sequence
+from typing import Literal, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U", bound=int)
+Words = Literal[
+    "abcdefghijklmnop", "aa", "bb", "cc", "dd", "ee", "ff", "gg", "hh", "ii", "jj", "kk", "ll", "mm", "nn", "oo", "pp"
+]
+
+def consume(value: T | Sequence[T], other: Callable[[], U]) -> None: ...
+def check(value: Words, other: Callable[[], str]) -> None:
+    consume(value=value, other=other)  # error: [invalid-argument-type] "does not satisfy upper bound `int`"
+    consume(other=other, value=value)  # error: [invalid-argument-type] "does not satisfy upper bound `int`"
+```
+
 ## Narrowing negated intersection aliases
 
 The negation of an aliased intersection acts as a union of negations. Intersecting three such upper
@@ -1942,6 +1963,26 @@ def accept_str(value: Required[str]) -> None: ...
 
 accept_int(Implementation())  # no diagnostic
 accept_str(Implementation())  # error: [invalid-argument-type]
+```
+
+## An invariant parameter shared with the return type
+
+The return requires `T` to include `str`. The parameter must then accept `list[int | str]`.
+
+```pyi
+from typing import Callable, TypeVar
+from typing_extensions import assert_type
+
+T = TypeVar("T")
+S = TypeVar("S", int | str, bytes)
+I = TypeVar("I", bound=int)
+
+def infer(f: Callable[[list[int | T]], list[int | T]]) -> T: ...
+def append(xs: list[S]) -> list[S | str]: ...
+def only_ints(xs: list[I]) -> list[I | str]: ...
+
+assert_type(infer(append), str)
+infer(only_ints)  # error: [invalid-argument-type]
 ```
 
 ## Returned callables with recursive parameter aliases
