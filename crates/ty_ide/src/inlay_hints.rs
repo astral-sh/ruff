@@ -5781,10 +5781,10 @@ Source with applied edits:
         my_func(x="hello")
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/typing_extensions.pyi:LL:9
+          --> stdlib/typing.pyi:LL:5
            |
-        LL |         LiteralString as LiteralString,
-           |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        LL |     LiteralString: _SpecialForm
+           |     ^^^^^^^^^^^^^
         info: Source
           --> main2.py:LL:9
            |
