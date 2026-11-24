@@ -50,7 +50,7 @@ impl ExcludeFilter {
                 // No hit or an allow hit means the file or directory is not excluded.
                 false
             }
-            GlobFilterCheckMode::Adhoc => {
+            GlobFilterCheckMode::WalkRoot | GlobFilterCheckMode::Adhoc => {
                 // If the path is allowlisted or there's no hit, try the parent to ensure we don't return false
                 // for a folder where there's an exclude for a parent.
                 path.ancestors()
