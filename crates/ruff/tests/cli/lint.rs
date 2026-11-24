@@ -4624,6 +4624,25 @@ fn script_requires_python_stdin() -> Result<()> {
 }
 
 #[test]
+fn script_rule_selectors_from_stdin() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "-"]).pass_stdin(indoc! {r#"
+        # /// script
+        # tool.ruff.lint.select = ["RUF999", "blank-line-before-function"]
+        # ///
+    "#}), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: Unknown rule selector `RUF999` in `select` from `-`
+    ");
+    Ok(())
+}
+
+#[test]
 fn invalid_script_metadata_stdin() -> Result<()> {
     let test = CliTest::new()?;
     assert_cmd_snapshot!(test.command()

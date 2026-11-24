@@ -209,11 +209,9 @@ fn script_metadata(
             .map_err(|err| ScriptSettingsError::configuration(path, &err))?;
     }
 
-    let source = path.map_or(ValueSource::Cli, |path| {
-        ValueSource::File(Arc::new(SystemPathBuf::from_path_buf_lossy(
-            path.to_owned(),
-        )))
-    });
+    let source = ValueSource::File(Arc::new(SystemPathBuf::from_path_buf_lossy(
+        path.unwrap_or_else(|| Path::new("-")).to_owned(),
+    )));
     let _guard = ValueSourceGuard::with_source_map(source, tag.source_map().clone());
 
     ScriptMetadata::deserialize(toml::de::Deserializer::from(root))
