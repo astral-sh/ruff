@@ -621,9 +621,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Quotes, "004") => rules::flake8_quotes::rules::UnnecessaryEscapedQuote,
 
         // flake8-annotations
-        (Flake8Annotations, "001") => rules::flake8_annotations::rules::MissingParameterAnnotation,
-        (Flake8Annotations, "002") => rules::flake8_annotations::rules::MissingArgsAnnotation,
-        (Flake8Annotations, "003") => rules::flake8_annotations::rules::MissingKwargsAnnotation,
+        (Flake8Annotations, "001") => rules::flake8_annotations::rules::UnannotatedParameter,
+        (Flake8Annotations, "002") => rules::flake8_annotations::rules::UnannotatedArgs,
+        (Flake8Annotations, "003") => rules::flake8_annotations::rules::UnannotatedKwargs,
         #[allow(deprecated)]
         (Flake8Annotations, "101") => rules::flake8_annotations::rules::MissingTypeSelf,
         #[allow(deprecated)]
