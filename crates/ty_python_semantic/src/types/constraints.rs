@@ -966,6 +966,38 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self
     }
 
+    /// Restrict local type variables to their declared bounds or choices before projection.
+    pub(super) fn with_declared_domains(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        locals: TypeVarSet<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> Self {
+        let builder = self.builder;
+        let provenance = ConstraintProvenance::VALIDITY;
+        self.and(db, builder, || {
+            locals.iter(db).when_all(db, builder, |var| {
+                match var.typevar(db).bound_or_constraints(db, env) {
+                    None => Self::always(builder),
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        Self::constrain_typevar_upper_bound(
+                            db, env, builder, provenance, inferable, var, bound,
+                        )
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(choices)) => choices
+                        .elements(db)
+                        .iter()
+                        .when_any(db, builder, |&choice| {
+                            Self::constrain_typevar_equivalence_bound(
+                                db, env, builder, provenance, inferable, var, choice,
+                            )
+                        }),
+                }
+            })
+        })
+    }
+
     /// Reduces the set of inferable typevars for this constraint set. You provide the typevars that
     /// were inferable when this constraint set was created, and which should be abstracted away.
     /// Those typevars will be removed from the constraint set, and the constraint set will return

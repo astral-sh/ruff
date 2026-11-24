@@ -1996,13 +1996,26 @@ static_assert(not is_subtype_of(TypeOf[identity], Callable[[str], str]))
 static_assert(not is_subtype_of(TypeOf[identity], Callable[[int], bool]))
 ```
 
+When the argument type is an outer type variable `U`, the comparison requires `U ≤ T ≤ int`.
+Eliminating the local `T` leaves `U ≤ int`.
+
+```py
+from ty_extensions._internal import is_constraint_set_subtype_of
+
+U = TypeVar("U")
+
+def check(value: U):
+    when = is_constraint_set_subtype_of(TypeOf[identity], Callable[[U], object])
+    static_assert(when == is_constraint_set_subtype_of(U, int))
+```
+
 A constrained type variable specializes to one of its declared choices. Here, passing a `bool`
 selects `int`, so the return type can be wider than the argument type.
 
 ```py
-U = TypeVar("U", int, str)
+V = TypeVar("V", int, str)
 
-def choose(value: U, /) -> U:
+def choose(value: V, /) -> V:
     return value
 
 static_assert(is_subtype_of(TypeOf[choose], Callable[[bool], int]))

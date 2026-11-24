@@ -3047,10 +3047,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // A generic source is a subtype of a non-generic target if a single specialization
         // satisfies both the contravariant parameter checks and the covariant return check.
         let specialize_source = self.relation.is_subtyping()
-            && self.typevar_evaluation == TypeVarEvaluation::Eager
             && source_inferable != TypeVarSet::None
             && target_inferable == TypeVarSet::None;
-        if specialize_source {
+        if specialize_source && self.typevar_evaluation == TypeVarEvaluation::Eager {
             checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }
         // Preserve receiver typevar constraints until the complete signature relation is solved.
@@ -3125,14 +3124,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
         });
 
-        // Projection can discard a local variable before checking its declared bound or choices.
-        // Unless the relation is unconditional, require a valid solution within the solver budget.
-        if specialize_source
-            && !when.is_trivially_always_satisfied()
-            && when.solution_count_up_to(db, env, inferable, 1) != Some(1)
-        {
-            return self.never();
-        }
+        // Include the declared domain before projecting out each local variable. For example,
+        // eliminating `T: int` from `U ≤ T` should leave `U ≤ int` for the caller.
+        let when = if specialize_source {
+            when.with_declared_domains(db, env, source_inferable, inferable)
+        } else {
+            when
+        };
 
         // But the caller does not need to consider those extra typevars. Whatever constraint set
         // we produce, we reduce it back down to the inferable set that the caller asked about.
