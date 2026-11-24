@@ -141,8 +141,9 @@ class A:
 
         return self
 
-    def implicit_self_generic[T](self, x: T) -> T:
-        reveal_type(self)  # revealed: Self@implicit_self_generic
+    def implicit_self_generic[T](receiver, /, other, x: T) -> T:
+        reveal_type(receiver)  # revealed: Self@implicit_self_generic
+        reveal_type(other)  # revealed: Unknown
 
         return x
 

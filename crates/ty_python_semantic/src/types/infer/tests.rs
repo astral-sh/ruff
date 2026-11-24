@@ -2456,3 +2456,24 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn inherited_attribute_tracks_receiver_scope_changes() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let main = "/src/main.py";
+    let base = "/src/base.py";
+    db.write_file(main, "from typing import reveal_type\nfrom base import Child\ndef check(c: Child):\n    reveal_type(c.value)")?;
+    let one_scope = "class Base:\n    def init(self):\n        self.value = 1\n    def store(self):\n        pass\nclass Child(Base): pass";
+    db.write_file(base, one_scope)?;
+    assert_revealed_type(&db, main, "int");
+
+    db.write_file(
+        base,
+        one_scope.replace("        pass", "        self.value = 'x'"),
+    )?;
+    assert_revealed_type(&db, main, "int | str");
+
+    db.write_file(base, one_scope)?;
+    assert_revealed_type(&db, main, "int");
+    Ok(())
+}

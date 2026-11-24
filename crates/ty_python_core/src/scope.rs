@@ -35,10 +35,6 @@ impl<'db> ScopeId<'db> {
         self.program_file(db).program(db)
     }
 
-    pub fn is_annotation(self, db: &'db dyn Db) -> bool {
-        self.node(db).scope_kind().is_annotation()
-    }
-
     pub fn node(self, db: &'db dyn Db) -> &'db NodeWithScopeKind {
         self.scope(db).node()
     }

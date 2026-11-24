@@ -34,7 +34,8 @@ use ty_python_core::definition::docstring_from_body;
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
-    BindingWithConstraints, DeclarationsIterator, FileScopeId, attribute_scopes, semantic_index,
+    BindingWithConstraints, DeclarationsIterator, FileScopeId, receiver_attribute_places,
+    semantic_index,
 };
 pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
@@ -185,9 +186,7 @@ pub(crate) fn attribute_assignments<'db, 's>(
 > + use<'s, 'db> {
     let index = semantic_index(db, class_body_scope.program_file(db));
 
-    attribute_scopes(db, class_body_scope).filter_map(move |function_scope_id| {
-        let place_table = index.place_table(function_scope_id);
-        let member = place_table.member_id_by_instance_attribute_name(name)?;
+    receiver_attribute_places(db, class_body_scope, name).map(move |(function_scope_id, member)| {
         let use_def = index.use_def_map(function_scope_id);
         let assignments = use_def
             .reachable_member_bindings(member)
@@ -196,7 +195,7 @@ pub(crate) fn attribute_assignments<'db, 's>(
                     .binding
                     .is_defined_and(|definition| definition.kind(db).is_loop_header())
             });
-        Some((assignments, function_scope_id))
+        (assignments, function_scope_id)
     })
 }
 
@@ -212,14 +211,12 @@ pub(crate) fn attribute_declarations<'db, 's>(
 ) -> impl Iterator<Item = (DeclarationsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
     let index = semantic_index(db, class_body_scope.program_file(db));
 
-    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
-        let place_table = index.place_table(function_scope_id);
-        let member = place_table.member_id_by_instance_attribute_name(name)?;
+    receiver_attribute_places(db, class_body_scope, name).map(|(function_scope_id, member)| {
         let use_def = index.use_def_map(function_scope_id);
-        Some((
+        (
             use_def.reachable_member_declarations(member),
             function_scope_id,
-        ))
+        )
     })
 }
 
