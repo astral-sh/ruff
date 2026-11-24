@@ -5,8 +5,6 @@
 //! which specific feature this preview check is for. Having named functions simplifies the promotion:
 //! Simply delete the function and let Rust tell you which checks you have to remove.
 
-use ruff_python_ast::{PySourceType, SourceType};
-
 use crate::settings::{LinterSettings, types::PreviewMode};
 
 // Rule-specific behavior
@@ -354,8 +352,8 @@ pub const fn is_human_readable_names_enabled(preview: PreviewMode) -> bool {
 }
 
 // https://github.com/astral-sh/ruff/pull/29768
-pub const fn is_script_metadata_enabled(preview: PreviewMode, source_type: SourceType) -> bool {
-    preview.is_enabled() && matches!(source_type, SourceType::Python(PySourceType::Python))
+pub const fn is_script_metadata_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
 }
 
 // https://github.com/astral-sh/ruff/pull/26113

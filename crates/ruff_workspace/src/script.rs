@@ -16,8 +16,8 @@ use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging::detect_package_root;
 use ruff_linter::preview::is_script_metadata_enabled;
 use ruff_linter::settings::LinterSettings;
-use ruff_python_ast::SourceType;
 use ruff_python_ast::script::ScriptTag;
+use ruff_python_ast::{PySourceType, SourceType};
 use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use ruff_source_file::{SourceFile, SourceFileBuilder};
 
@@ -125,7 +125,10 @@ pub fn script(
     source_type: SourceType,
     source: &str,
 ) -> Result<Option<Script>, ScriptSettingsError> {
-    if !is_script_metadata_enabled(project.settings.preview, source_type) {
+    if !is_script_metadata_enabled(project.settings.preview) {
+        return Ok(None);
+    }
+    if source_type != SourceType::Python(PySourceType::Python) {
         return Ok(None);
     }
 
