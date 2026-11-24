@@ -112,8 +112,16 @@ fn format_text_document(
         return Ok(None);
     }
 
-    let Ok(settings) = query.settings() else {
-        return Ok(None);
+    let settings = match query.settings() {
+        Ok(settings) => settings,
+        Err(diagnostic) => {
+            tracing::warn!(
+                "Unable to format {} due to invalid script metadata: {}",
+                file_path.display(),
+                diagnostic.concise_message()
+            );
+            return Ok(None);
+        }
     };
     let source = text_document.contents();
     let formatted = crate::format::format(
