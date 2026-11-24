@@ -5,6 +5,7 @@ use std::sync::Arc;
 use ruff_diagnostics::SourceMap;
 use ruff_notebook::Notebook;
 use ruff_python_ast::PySourceType;
+use ruff_python_ast::script::ScriptTag;
 use ruff_source_file::LineIndex;
 
 use crate::Db;
@@ -49,6 +50,25 @@ pub(crate) fn read_source_text(db: &dyn Db, file: File) -> SourceText {
     SourceText {
         inner: Arc::new(SourceTextInner { kind, read_error }),
     }
+}
+
+/// Returns the PEP 723 script tag embedded in `file`.
+///
+/// Most files have no script tag. Boxing keeps the cached result compact when it is `None`.
+#[salsa::tracked(returns(as_deref))]
+pub fn script_tag(db: &dyn Db, file: File) -> Option<Box<ScriptTag>> {
+    let path = file.path(db);
+    if path.is_vendored_path() {
+        return None;
+    }
+
+    // Notebook outputs can be large, so skip notebooks before reading their contents.
+    if is_notebook(db, file) {
+        return None;
+    }
+
+    let source = source_text(db, file);
+    ScriptTag::parse(&source).map(Box::new)
 }
 
 /// Returns whether a file is a notebook without reading its contents.

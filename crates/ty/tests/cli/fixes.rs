@@ -103,6 +103,50 @@ fn add_ignore_keeps_nested_blanket_suppression_used() -> anyhow::Result<()> {
 }
 
 #[test]
+fn add_ignore_does_not_extend_a_comment_in_script_metadata() -> anyhow::Result<()> {
+    // After a docstring, a standalone ignore would apply to the next statement
+    // and be eligible for extension by `--add-ignore`.
+    let case = CliTest::with_file(
+        "script.py",
+        r#"
+        """Module docstring."""
+        # /// script
+        # tool.example.text = """
+        # ty: ignore[invalid-assignment]
+        # """
+        # ///
+        x: int = [missing]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--add-ignore"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+    Added 2 ignore comments
+
+    ----- stderr -----
+    ");
+    assert_eq!(
+        fs::read_to_string(case.root().join("script.py"))?,
+        dedent(
+            r#"
+            """Module docstring."""
+            # /// script
+            # tool.example.text = """
+            # ty: ignore[invalid-assignment]
+            # """
+            # ///
+            x: int = [missing]  # ty: ignore[invalid-assignment, unresolved-reference]
+            "#
+        )
+    );
+
+    Ok(())
+}
+
+#[test]
 fn add_ignore_unfixable() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("has_syntax_error.py", r"print(x  # [unresolved-reference]"),
@@ -198,6 +242,37 @@ fn fix() -> anyhow::Result<()> {
         1,
     ]
     "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn fix_preserves_ignore_comments_in_script_metadata() -> anyhow::Result<()> {
+    let source = r#"
+        # /// script
+        # tool.example.text = """
+        # ty: ignore[unresolved-import]
+        # type: ignore
+        # """
+        # ///
+        # ty: ignore[invalid-assignment]
+        x: int = [missing]
+        "#;
+    let case = CliTest::with_file("script.py", source)?;
+
+    assert_cmd_snapshot!(case.command().args(["--fix", "--output-format", "concise"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:9:11: error[unresolved-reference] Name `missing` used when not defined
+    Found 1 diagnostic (0 fixed, 1 remaining).
+
+    ----- stderr -----
+    ");
+    assert_eq!(
+        fs::read_to_string(case.root().join("script.py"))?,
+        dedent(source)
     );
 
     Ok(())

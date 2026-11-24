@@ -1,11 +1,9 @@
 use pep440_rs::VersionSpecifiers;
-use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
 };
 use ruff_db::files::File;
-use ruff_db::source::{is_notebook, source_text};
-use ruff_python_ast::script::ScriptTag;
+pub use ruff_db::source::script_tag;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use serde::Deserialize;
@@ -244,25 +242,6 @@ pub(crate) fn inline_script_options(db: &dyn Db, file: File) -> Option<&Options>
     }
     let script = script_metadata(db, file)?.as_ref().ok()?;
     script.ty()
-}
-
-/// Returns the PEP 723 script tag embedded in `file`.
-///
-/// Most files have no script tag. Boxing keeps the cached result compact when it is `None`.
-#[salsa::tracked(returns(as_deref))]
-pub fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
-    let path = file.path(db);
-    if path.is_vendored_path() {
-        return None;
-    }
-
-    // Notebook outputs can be large, so skip notebooks before reading their contents.
-    if is_notebook(db, file) {
-        return None;
-    }
-
-    let source = source_text(db, file);
-    ScriptTag::parse(&source).map(Box::new)
 }
 
 /// Parses a script's inline metadata. Edits that move an option must invalidate its diagnostic
