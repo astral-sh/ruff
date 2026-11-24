@@ -82,7 +82,7 @@ use crate::types::typevar::{
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
-    walk_non_atomic_type, walk_type_with_recursion_guard,
+    any_over_type_including_alias_arguments, walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
@@ -8627,6 +8627,109 @@ struct ArgumentContextSpecialization<'db> {
 }
 
 impl<'db> ArgumentContextSpecialization<'db> {
+    /// Limit the growth of repeated intersections when inferring nested overloaded calls.
+    ///
+    /// An overload like `def dot[T: Scalar](a: Vector[T] | Sequence[T], ...) -> T`
+    /// can infer `Vector[...] & Scalar` for T from an expected vector type.
+    /// Narrowing the next call against each union member produces both
+    /// `Vector[Vector[...] & Scalar] & Scalar` and `Sequence[Vector[...] & Scalar] & Scalar`.
+    /// Each additional call turns one hint into two.
+    ///
+    /// Drop the repeating hint only if multiple union members propagate it and
+    /// another operand can constrain the same type. For example, `b: Vector[T]`
+    /// can supply a vector's element type. An unrelated parameter such as
+    /// `default: T | None` can mention `T` without supplying that evidence.
+    fn specialization_for_nested_call(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        kind: TypeContextKind,
+        overload: &Binding<'db>,
+        parameter_index: usize,
+        parameter_type: Type<'db>,
+    ) -> Specialization<'db> {
+        let generic = self.specialization.generic_context(db);
+        let mut hints = Cow::Borrowed(self.specialization.types(db));
+        for (index, typevar) in generic.variables(db).enumerate() {
+            if self.kinds[index] != Some(kind) {
+                continue;
+            }
+            let hint = hints[index];
+            let members = hint
+                .as_union()
+                .map_or(std::slice::from_ref(&hint), |union| union.elements(db));
+            let repeated = members.iter().any(|member| {
+                let Type::Intersection(outer) = member else {
+                    return false;
+                };
+                let Some(bound) = typevar.typevar(db).upper_bound(db, env) else {
+                    return false;
+                };
+                let positive = outer.positive(db);
+                positive.iter().any(|&element| {
+                    any_over_type_including_alias_arguments(db, env, element, |nested| {
+                        let Type::Intersection(inner) = nested else {
+                            return false;
+                        };
+                        inner.positive(db).iter().any(|&shared| {
+                            !shared.is_dynamic()
+                                && shared != element
+                                && positive.contains(&shared)
+                                && shared.is_assignable_to(db, env, bound)
+                        })
+                    })
+                })
+            });
+            if !repeated {
+                continue;
+            }
+            let Some(union) = parameter_type.expand_top_level_aliases(db, env).as_union() else {
+                return self.specialization;
+            };
+            let contains_variable = |ty| {
+                any_over_type_including_alias_arguments(db, env, ty, |ty| {
+                    ty == Type::TypeVar(typevar)
+                })
+            };
+            let alternatives = union.elements(db);
+            let branches = alternatives
+                .iter()
+                .filter(|&&ty| contains_variable(ty))
+                .count();
+            if branches < 2 {
+                continue;
+            }
+            let parameters = overload.signature.parameters();
+            let has_other_operand = overload
+                .argument_matches
+                .iter()
+                .filter(|matched| matched.matched)
+                .flat_map(|matched| &matched.parameters)
+                .filter(|other| other.index != parameter_index)
+                .any(|other| {
+                    let ty = other
+                        .expected_type
+                        .unwrap_or_else(|| parameters[other.index].annotated_type());
+                    if ty == parameter_type {
+                        // A bare `T` can use the operand itself as evidence. If `T`
+                        // occurs only inside containers, a separate alternative
+                        // (e.g. `None`) supplies no information about their elements.
+                        branches == alternatives.len()
+                            || union.contains_member(db, Type::TypeVar(typevar))
+                    } else {
+                        union.contains_member(db, ty) && contains_variable(ty)
+                    }
+                });
+            if has_other_operand {
+                hints.to_mut()[index] = Type::Dynamic(DynamicType::UnspecializedTypeVar);
+            }
+        }
+        match hints {
+            Cow::Owned(hints) => generic.specialize(db, hints),
+            Cow::Borrowed(_) => self.specialization,
+        }
+    }
+
     fn kind_for(
         &self,
         db: &'db dyn Db,
@@ -9271,6 +9374,7 @@ impl<'db> Binding<'db> {
         arguments_types: &CallArguments<'_, 'db>,
         argument_index: usize,
         call_expression_tcx: TypeContext<'db>,
+        nested_overload_argument: bool,
         cache: &ArgumentContextCache<'db>,
     ) -> Option<ArgumentTypeContext<'db>> {
         let argument_matches = self.matched_argument_for_call_argument(binding, argument_index)?;
@@ -9354,6 +9458,19 @@ impl<'db> Binding<'db> {
                 tcx_kind = parameter_tcx_kind;
             }
 
+            let specialization =
+                if nested_overload_argument && call_expression_tcx.expected_type().is_some() {
+                    ordinary_context.specialization_for_nested_call(
+                        db,
+                        env,
+                        call_expression_tcx.kind(),
+                        self,
+                        matched_parameter.index,
+                        parameter_type,
+                    )
+                } else {
+                    ordinary_context.specialization
+                };
             let nested_context = || {
                 self.inference?;
                 let (union, nested) =
@@ -9387,13 +9504,12 @@ impl<'db> Binding<'db> {
                     {
                         member.apply_specialization(db, nested_specialization)
                     } else {
-                        member.apply_specialization(db, ordinary_context.specialization)
+                        member.apply_specialization(db, specialization)
                     }
                 }))
             };
-            parameter_type = nested_context().unwrap_or_else(|| {
-                parameter_type.apply_specialization(db, ordinary_context.specialization)
-            });
+            parameter_type = nested_context()
+                .unwrap_or_else(|| parameter_type.apply_specialization(db, specialization));
             if let Some(expected_return_ty) = call_expression_tcx.expected_type()
                 && let Some(expected) = self.typevartuple_argument_context(
                     db,

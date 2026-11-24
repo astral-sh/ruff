@@ -1336,6 +1336,39 @@ fn benchmark_recursive_protocol_materialization_scaling(criterion: &mut Criterio
     }
 }
 
+/// Models nested calls to NumPy's `dot`. The vector overload returns a bounded
+/// scalar, so using the expected array type to specialize it can generate a new
+/// intersection with the scalar bound at every level of nesting.
+fn benchmark_nested_overloaded_calls(criterion: &mut Criterion) {
+    for depth in [4, 8] {
+        let chain = format!("{}a{}", "dot(".repeat(depth), ", a)".repeat(depth));
+        let code = format!(
+            "
+            from typing import assert_type, overload
+
+            class Scalar: ...
+            class Vector[T]: ...
+            class Matrix[T]: ...
+
+            @overload
+            def dot[T: Scalar](a: Vector[T] | list[T], b: Vector[T]) -> T: ...
+            @overload
+            def dot[T: Scalar](a: Matrix[T] | list[list[T]], b: Matrix[T]) -> Matrix[T]: ...
+            def dot(a, b):
+                raise NotImplementedError
+
+            def chain[T: Scalar](a: Matrix[T]):
+                assert_type({chain}, Matrix[T])
+            "
+        );
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[nested_overloaded_calls_{depth}]"),
+            &code,
+        );
+    }
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/5041>.
 ///
 /// Applying `Top` to a nested generic isolates the cost of materialization in overloaded calls.
@@ -3125,6 +3158,7 @@ criterion_group!(
     benchmark_materialized_recursive_protocol_overload,
     benchmark_materialized_recursive_protocol_subtyping,
     benchmark_recursive_protocol_materialization_scaling,
+    benchmark_nested_overloaded_calls,
     benchmark_nested_generic_materialization,
     benchmark_recursive_callable_materialization,
     benchmark_recursive_protocol_growing_specialization,
