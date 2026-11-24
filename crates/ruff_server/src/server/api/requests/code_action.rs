@@ -59,6 +59,10 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
             return Ok(Some(response));
         }
 
+        if query.settings().is_err() {
+            return Ok(Some(response));
+        }
+
         let supported_code_actions = supported_code_actions(params.context.only.clone());
 
         let fixes = fixes_for_diagnostics(params.context.diagnostics)

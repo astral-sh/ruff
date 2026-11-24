@@ -35,7 +35,7 @@ pub(crate) fn fix_all(
     if is_document_excluded_for_linting(
         &document_path,
         &settings.file_resolver,
-        linter_settings,
+        &settings.linter,
         query.text_document_language_id(),
     ) {
         return Ok(Fixes::default());

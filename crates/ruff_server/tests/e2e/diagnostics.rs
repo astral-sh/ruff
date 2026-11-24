@@ -9,6 +9,55 @@ use ruff_python_trivia::textwrap::dedent;
 use crate::{TestServer, TestServerBuilder};
 
 #[test]
+fn invalid_script_configuration_blocks_edits() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_server_preview(true)
+        .build();
+    server.open_text_document(
+        "script.py",
+        dedent(
+            r"
+            # /// script
+            # tool.ruff.line-length = 'wide'
+            # ///
+            import os
+            x= 1
+            ",
+        ),
+        1,
+    );
+    let diagnostics = server.document_diagnostic_request("script.py", None);
+    assert_json_snapshot!(diagnostics, @r#"
+    {
+      "items": [
+        {
+          "range": {
+            "start": {
+              "line": 2,
+              "character": 26
+            },
+            "end": {
+              "line": 2,
+              "character": 32
+            }
+          },
+          "severity": 1,
+          "code": "invalid-script-metadata",
+          "source": "Ruff",
+          "message": "invalid type: string \"wide\", expected i64",
+          "tags": []
+        }
+      ],
+      "kind": "full"
+    }
+    "#);
+    assert_json_snapshot!(server.code_action_request("script.py", vec![]), @"[]");
+    assert_json_snapshot!(server.format_request("script.py"), @"null");
+    Ok(())
+}
+
+#[test]
 fn inline_script_preserves_project_exclusions() -> Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(".")?
