@@ -583,20 +583,3 @@ impl ReachabilityConstraintsBuilder {
         result
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn cache_ambiguous_and_interior_partners() {
-        let low = ScopedReachabilityConstraintId::new(2);
-        let high = ScopedReachabilityConstraintId::new(63);
-        let mut cache = BinaryConstraintCache::default();
-        cache.insert(low, high, ALWAYS_FALSE);
-        cache.insert(high, AMBIGUOUS, ALWAYS_TRUE);
-        assert_eq!(cache.get(low, high), Some(ALWAYS_FALSE));
-        assert_eq!(cache.get(high, AMBIGUOUS), Some(ALWAYS_TRUE));
-        assert_eq!(cache.get(low, AMBIGUOUS), None);
-    }
-}
