@@ -8,7 +8,7 @@ use ruff_python_ast::visitor::source_order::{
 use ruff_python_ast::{
     AnyNodeRef, ExprAttribute, ExprCall, ExprGenerator, ExprRef, ExprSubscript, Stmt,
 };
-use ruff_python_trivia::{CommentLinePosition, is_python_whitespace};
+use ruff_python_trivia::{CommentLinePosition, PythonWhitespace, is_python_whitespace};
 use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -397,7 +397,7 @@ impl<'a> FoldingRangeVisitor<'a> {
     }
 
     fn comment_body(&self, range: TextRange) -> &str {
-        let comment = self.source[range].trim_start();
+        let comment = self.source[range].trim_whitespace_start();
         comment.strip_prefix('#').unwrap_or(comment).trim_start()
     }
 
