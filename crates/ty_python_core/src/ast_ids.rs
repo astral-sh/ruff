@@ -144,12 +144,15 @@ impl AstIdsBuilder {
     }
 }
 
-/// Set bits identify uses in a group of 64 consecutive root nodes.
+/// Indexes uses and scope ranges for up to 64 consecutive nodes in the root AST.
 #[derive(Debug, get_size2::GetSize)]
 struct UsePage {
+    /// Number of uses on earlier pages. This is the page's starting offset in
+    /// `use_ids` and `places_plus_one`.
     first_use: u32,
-    /// Number of scope ranges started by the end of this page.
+    /// Number of scope ranges that start on this page or an earlier page.
     scope_count: u32,
+    /// Bit `i` is set if the node at offset `i` on this page has a use ID.
     mask: u64,
 }
 
