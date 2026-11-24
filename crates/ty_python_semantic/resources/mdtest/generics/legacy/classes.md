@@ -1529,6 +1529,52 @@ def construct_from_str(value: str) -> None:
     reveal_type(Box(value, Box(1)))
 ```
 
+### Inferring a contravariant parameter from a constructor returning `Self`
+
+Both calls accept the declared specialization. In the second call, contravariance in `U` makes
+`Box[int, int]` assignable to `Box[int, bool]`.
+
+```pyi
+from typing import Generic, TypeVar, overload
+from typing_extensions import Self
+
+T = TypeVar("T", covariant=True)
+U = TypeVar("U", contravariant=True)
+
+class Box(Generic[T, U]):
+    @overload
+    def __new__(cls, value: Box[U, T] | U) -> Self: ...
+    @overload
+    def __new__(cls, source: Box[U, T], value: U) -> Self: ...
+    def get(self, key: U) -> T: ...
+
+def wrap(x: Box[int, int]) -> None:
+    a: Box[int, int | str] = Box(x)
+    b: Box[int, int | Box[int, bool]] = Box(x, x)
+```
+
+### An empty list matches either arm of a union in a constructor
+
+The empty list provides no element type. The callback accepts `object` and returns `int`. We infer
+`Unknown | int` for the result, which allows integer operations.
+
+```pyi
+from collections.abc import Callable
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T", covariant=True)
+U = TypeVar("U", covariant=True)
+
+class Result(Generic[T, U]):
+    def __new__(cls, xs: list[T] | list[U], fallback: Callable[[U], T | U]) -> Self: ...
+    def get(self) -> T | U: ...
+
+def fallback(x: object) -> int: ...
+
+Result([], fallback).get().bit_length()  # ok
+```
+
 ### Constructing through `type(self)`
 
 Calling a constructor through `type(self)` preserves the current `Self` specialization. The class's

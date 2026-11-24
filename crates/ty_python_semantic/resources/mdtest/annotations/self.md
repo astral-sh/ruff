@@ -1600,6 +1600,40 @@ class C:
 reveal_type(generic_context(C.f))
 ```
 
+## A callback constrains a type variable through the receiver
+
+The callback requires `V` to be assignable to both `C[X]` and `Y`. Since `C[X]` is also the receiver
+type, the solver can infer a bound on `V` through `Self`.
+
+```pyi
+from collections.abc import Callable
+from typing import Self
+
+class C[T]:
+    def get(self) -> T: ...
+    def register[V](self, callback: Callable[[V, V], None]) -> tuple[Self, V]: ...
+
+def f[X, Y](x: C[X], callback: Callable[[C[X], Y], None]):
+    reveal_type(x.register(callback))  # revealed: tuple[C[X@f], C[X@f] & Y@f]
+```
+
+## A callable receiver whose type argument is fixed by the caller
+
+Inferring `Q` leaves the caller's `S` unchanged, even though it occurs in both the parameter and the
+return type of the callable.
+
+```pyi
+from collections.abc import Callable
+from typing import Self, assert_type
+
+class Runner[T]:
+    def with_task[Q](self, task: Q) -> Self: ...
+    def __call__(self, value: T) -> Self: ...
+
+def run[S](runner: Runner[Callable[[S], S]], task: Callable[[S], S]) -> None:
+    assert_type(runner.with_task(task), Runner[Callable[[S], S]])
+```
+
 ## Non-positional first parameters
 
 This makes sure that we don't bind `self` if it's not a positional parameter:

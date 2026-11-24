@@ -22,6 +22,7 @@ use crate::types::constraints::{
     SolutionViolation, SolutionViolationKind, continue_if_ok,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
+use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type, UnionType, any_over_type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
@@ -1145,33 +1146,13 @@ impl<'db, 'budget> SolutionWalker<'db, 'budget> {
             return ControlFlow::Continue(());
         }
 
-        // If the only constraint on Self is C[T] <= Self and its declared bound
-        // is the same C[T], the lower bound already supplies a valid solution
-        // for every choice of T. Adding the upper bound here would derive
-        // implications for every partially substituted version of C[T].
         if upper_bounds.is_empty()
             && constrained.is_empty()
             && bound_typevar.typevar(db).is_self(db)
             && let [upper] = constraints
-            && let AtomicConstraint::ConcreteUpper(upper) = storage.atomic_constraint_data(*upper)
+            && self.can_skip_self_bound(db, env, storage, path, *upper)
         {
-            let id = storage.typevar_id(db, bound_typevar);
-            let mut mentions = self.source_orders.iter().copied().filter(|constraint| {
-                storage
-                    .constraint_support(constraint.into_inner())
-                    .iter()
-                    .any(|var| var == id)
-            });
-            if let Some(lower) = mentions.next()
-                && mentions.next().is_none()
-                && path.assignments.contains_key(&Assignment::Positive(lower))
-                && let AtomicConstraint::ConcreteLower(lower) =
-                    storage.atomic_constraint_data(lower)
-                && lower.typevar == upper.typevar
-                && lower.bound == upper.bound
-            {
-                return process_satisfied(self, storage, path);
-            }
+            return process_satisfied(self, storage, path);
         }
 
         // Verify that we can add all of the upper bound's constraints to the current path without
@@ -1195,6 +1176,78 @@ impl<'db, 'budget> SolutionWalker<'db, 'budget> {
                 )
             },
         )
+    }
+
+    /// If the receiver supplies `C[T] <= Self` and the declared bound is also `C[T]`,
+    /// choosing `C[T]` satisfies both. Adding the upper bound can derive constraints
+    /// for every partial specialization of `C[T]`.
+    ///
+    /// Keep those constraints when they can reorder alternative solutions or when
+    /// specializing the receiver can introduce upper bounds on inferred parameters.
+    fn can_skip_self_bound(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        path: &PathAssignments,
+        upper_id: AtomicConstraintId,
+    ) -> bool {
+        let AtomicConstraint::ConcreteUpper(upper) = storage.atomic_constraint_data(upper_id)
+        else {
+            return false;
+        };
+        if !self.original_node.is_single_conjunction(storage) {
+            return false;
+        }
+
+        let self_id = storage.typevar_id(db, upper.typevar);
+        // Check derived constraints too. For example, `V <= C[T]` and
+        // `C[T] <= Self` imply `V <= Self`, so omitting the upper bound can
+        // change the solution for V. Allow only lower bounds from one source.
+        let mut receiver = None;
+        for (&assignment, &(source, _)) in &path.assignments {
+            let support = storage.constraint_support(assignment.constraint().into_inner());
+            if !support.is_complete() {
+                return false;
+            }
+            if !support.iter().any(|id| id == self_id) {
+                continue;
+            }
+
+            let Assignment::Positive(id) = assignment else {
+                return false;
+            };
+            let AtomicConstraint::ConcreteLower(lower) = storage.atomic_constraint_data(id) else {
+                return false;
+            };
+            if lower.typevar != upper.typevar || *receiver.get_or_insert(source) != source {
+                return false;
+            }
+        }
+        let Some(receiver) = receiver else {
+            return false;
+        };
+        if !path
+            .assignments
+            .contains_key(&Assignment::Positive(receiver))
+            || !matches!(storage.atomic_constraint_data(receiver),
+                AtomicConstraint::ConcreteLower(lower)
+                    if lower.typevar == upper.typevar && lower.bound == upper.bound)
+        {
+            return false;
+        }
+
+        let support = storage.constraint_support(upper_id.into_inner());
+        support.is_complete()
+            && support.iter().filter(|&id| id != self_id).all(|id| {
+                let var = storage.typevar_data(id);
+                !var.is_inferable(db, self.inferable)
+                    || upper
+                        .bound
+                        .variance_of(db, env, var.identity(db))
+                        .evaluate(db)
+                        .is_covariant()
+            })
     }
 
     fn validate_constrained(
