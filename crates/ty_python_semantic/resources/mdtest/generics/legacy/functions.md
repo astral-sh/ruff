@@ -597,6 +597,35 @@ def forward(items: list[T]) -> list[T]:
     return reveal_type(keep(items))  # revealed: list[T@forward]
 ```
 
+## Matching a narrowed type variable against union arms
+
+After narrowing, `list[T]` fixes `T` to `Choices`, even with an extra type-variable arm. Testing for
+overlap with `Mixed[S, T]` can exhaust the budget by partitioning the literals between `S` and `T`.
+
+```py
+from typing import Literal, TypeVar
+from typing_extensions import assert_type
+
+Choices = Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+S = TypeVar("S")
+T = TypeVar("T")
+U = TypeVar("U", bound=list[Choices] | None)
+V = TypeVar("V", bound=str)
+
+class Mixed(list[S | T]): ...
+
+def infer_with_extra(x: list[T] | Mixed[S, T] | V) -> T:
+    raise NotImplementedError
+
+def infer_reversed(x: Mixed[S, T] | list[T] | V) -> T:
+    raise NotImplementedError
+
+def check(x: U):
+    if x is not None:
+        assert_type(infer_with_extra(x), Choices)
+        assert_type(infer_reversed(x), Choices)
+```
+
 ## Inferring a bound from a narrowed protocol
 
 Narrowing to `Text` supplies a `str` return type that satisfies the bound, even when the original

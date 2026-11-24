@@ -2242,6 +2242,23 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                         return self.never();
                     }
 
+                    // Disjointness needs only one common specialization. Each unrestricted
+                    // variable can equal the whole literal union, avoiding a diagram for all
+                    // the ways to partition those literals among the variables.
+                    if let (Type::Union(left), Type::Union(right)) = (left_type, right_type) {
+                        for (variables, literals) in [(left, right), (right, left)] {
+                            if variables.elements(db).iter().all(|ty| {
+                                ty.as_typevar().is_some_and(|v| v.typevar(db).is_simple(db))
+                            }) && literals
+                                .elements(db)
+                                .iter()
+                                .all(|ty| matches!(ty, Type::LiteralValue(_)))
+                            {
+                                return self.never();
+                            }
+                        }
+                    }
+
                     // `Bottom[L] <: Top[R]` asks whether the materialization ranges for `L`
                     // and `R` have any common materialization, so this is symmetric despite
                     // using a directional subtyping checker.
