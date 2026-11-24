@@ -92,7 +92,7 @@ pub(in crate::types) fn generic_identity_function<'db>(
     Type::function_like_callable(db, signature)
 }
 
-/// Fields with defaults registered by `@<field>.default` in a single attrs class.
+/// Keeps track of fields that have a default value provided through a `@<field>.default`-decorated method.
 pub(in crate::types) struct DecoratedDefaults {
     fields: FxHashSet<ScopedPlaceId>,
 }
