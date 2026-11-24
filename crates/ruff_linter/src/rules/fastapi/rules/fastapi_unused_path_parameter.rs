@@ -310,29 +310,14 @@ impl<'a> Dependency<'a> {
     ) -> Option<Self> {
         let arguments = depends_arguments(expr, semantic)?;
 
+        if !arguments.is_empty() {
+            return Self::from_depends_call(arguments, semantic);
+        }
+
         // Arguments to `Depends` can be empty if the dependency class is inferred
         // from the parameter type annotation.
         // https://fastapi.tiangolo.com/tutorial/dependencies/classes-as-dependencies/#shortcut
-        if arguments.is_empty() {
-            let annotation = annotation?;
-            let type_expr = if let Expr::Subscript(ExprSubscript { value, slice, .. }) = annotation
-            {
-                if semantic.match_typing_expr(value, "Annotated") {
-                    if let Expr::Tuple(tuple) = slice.as_ref() {
-                        tuple.elts.first()?
-                    } else {
-                        slice.as_ref()
-                    }
-                } else {
-                    annotation
-                }
-            } else {
-                annotation
-            };
-            Self::from_dependency_name(type_expr.as_name_expr()?, semantic)
-        } else {
-            Self::from_depends_call(arguments, semantic)
-        }
+        Self::from_dependency_name(annotation?.as_name_expr()?, semantic)
     }
 
     fn from_depends_call(arguments: &'a Arguments, semantic: &SemanticModel<'a>) -> Option<Self> {
