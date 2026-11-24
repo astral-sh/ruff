@@ -115,6 +115,10 @@ pub(crate) enum GlobFilterCheckMode {
     /// for each path during the traversal.
     TopDown,
 
+    /// A walk root checked with `--force-exclude`. We know it's a check path,
+    /// but the walk hasn't visited its ancestors to check for exclusions.
+    WalkRoot,
+
     /// An adhoc test if a single file or directory is included.
     ///
     /// This is more expensive than a [`Self::TopDown`] check

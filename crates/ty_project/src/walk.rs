@@ -50,7 +50,9 @@ impl<'a> ProjectFilesFilter<'a> {
         mode: GlobFilterCheckMode,
     ) -> Option<CheckPathMatch> {
         match mode {
-            GlobFilterCheckMode::TopDown => Some(CheckPathMatch::Partial),
+            GlobFilterCheckMode::TopDown | GlobFilterCheckMode::WalkRoot => {
+                Some(CheckPathMatch::Partial)
+            }
             GlobFilterCheckMode::Adhoc => {
                 self.included_paths
                     .iter()
@@ -117,7 +119,7 @@ impl<'a> ProjectFilesFilter<'a> {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum CheckPathMatch {
-    /// The path is a partial match of the checked path (it's a sub path)
+    /// The path is under a check path or is a check path subject to `--force-exclude`.
     Partial,
 
     /// The path matches a check path exactly.
@@ -208,7 +210,7 @@ impl ProjectFilesWalker {
                             }
 
                             let match_mode = if entry.depth() == 0 && force_exclude {
-                                GlobFilterCheckMode::Adhoc
+                                GlobFilterCheckMode::WalkRoot
                             } else {
                                 GlobFilterCheckMode::TopDown
                             };

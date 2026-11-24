@@ -1252,6 +1252,24 @@ mod tests {
     }
 
     #[test]
+    fn explicit_file_under_an_excluded_directory() -> ruff_db::system::Result<()> {
+        let root = SystemPathBuf::from("/project");
+        let path = root.join("dist/keep.py");
+        let mut db = TestDb::new(ProjectMetadata::new("test", root.clone()));
+        let project = db.project();
+        db.write_file(&path, "")?;
+        let file = system_path_to_file(&db, &path).unwrap();
+
+        project.set_included_paths(&mut db, vec![root, path]);
+        assert!(project.files(&db).contains(file));
+
+        project.set_force_exclude(&mut db, true);
+        project.reload_files(&mut db);
+        assert!(!project.files(&db).contains(file));
+        Ok(())
+    }
+
+    #[test]
     fn explicit_nested_included_file_is_a_literal_match() {
         let root = SystemPathBuf::from("/project");
         let explicit_file = root.join("build/keep.txt");
