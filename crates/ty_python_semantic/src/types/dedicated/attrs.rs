@@ -1,7 +1,14 @@
+use itertools::Itertools;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
+use rustc_hash::FxHashSet;
+use ty_python_core::{
+    DeclarationsIterator, ast_ids::HasScopedUseId, definition::DefinitionKind,
+    place::ScopedPlaceId, use_def_map,
+};
 
-use crate::types::known_instance::FieldInstanceKind;
+use crate::types::known_instance::{FieldInstance, FieldInstanceKind};
 use crate::types::{
     BoundTypeVarInstance, DataclassFlags, FunctionType, GenericContext, KnownFunction, Parameter,
     Parameters, Signature, StaticClassLiteral, Type, TypeVarVariance,
@@ -83,4 +90,79 @@ pub(in crate::types) fn generic_identity_function<'db>(
         Type::TypeVar(f),
     );
     Type::function_like_callable(db, signature)
+}
+
+/// Keeps track of fields that have a default value provided through a `@<field>.default`-decorated method.
+///
+/// For the following class, `collect_default_generator` will be called for the `default_id` method. It will
+/// then record the field so that it can later be recognized as having a default value.
+///
+/// ```python
+/// from attrs import define, field
+///
+/// @define
+/// class User:
+///     id: int = field()
+///
+///     @id.default
+///     def default_id(self) -> int:
+///         return 0
+/// ```
+pub(in crate::types) struct DecoratedDefaults {
+    fields: FxHashSet<ScopedPlaceId>,
+}
+
+impl DecoratedDefaults {
+    pub(in crate::types) fn new() -> Self {
+        Self {
+            fields: FxHashSet::default(),
+        }
+    }
+
+    /// Whether or not the attrs class contains a `@<field>.default`-decorated method for the given field.
+    pub(in crate::types) fn has_default<'db>(
+        &self,
+        db: &'db dyn Db,
+        place: ScopedPlaceId,
+        field: FieldInstance<'db>,
+    ) -> bool {
+        self.fields.contains(&place) && field.kind(db) == FieldInstanceKind::Attrs
+    }
+
+    /// This function is called for declarations in the attrs class. If the declaration refers
+    /// to a method with a `@<field>.default` decorator, it records the field so that we can
+    /// later determine if it has a default value.
+    pub(in crate::types) fn collect_default_generator<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        declarations: DeclarationsIterator<'_, 'db>,
+    ) {
+        let Ok(declaration) = declarations.exactly_one() else {
+            return;
+        };
+        let Some(definition) = declaration.declaration.definition() else {
+            return;
+        };
+        let DefinitionKind::Function(function) = definition.kind(db) else {
+            return;
+        };
+        if !function.has_decorators() {
+            return;
+        }
+
+        let module = parsed_module(db, definition.python_file(db)).load(db);
+        let use_def = use_def_map(db, definition.scope(db));
+        for decorator in &function.node(&module).decorator_list {
+            if let Some(attr) = decorator.expression.as_attribute_expr()
+                && attr.attr.id == "default"
+                && let Some(name) = attr.value.as_name_expr()
+                && let Ok(binding) = use_def
+                    .bindings_at_use(name.scoped_use_id(db, definition.program_file(db)))
+                    .exactly_one()
+                && let Some(field) = binding.binding.definition()
+            {
+                self.fields.insert(field.place(db));
+            }
+        }
+    }
 }

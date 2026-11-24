@@ -218,22 +218,20 @@ A default value can be specified using a value on the right-hand side, or using 
 `@<field>.default` decorator.
 
 ```py
+import attr
 from attrs import define, field
 
 @define
 class Person:
     name: str = "Unnamed"
-
-    # TODO: This should not be an error once we recognize that `id` has a default
-    # error: [invalid-dataclass-field-order]
     id: int = field()
 
     @id.default
     def _default_id(self) -> int:
         return 0
 
-# TODO: No error here
-# error: [missing-argument] "No argument provided for required parameter `id`"
+reveal_type(Person.__init__)  # revealed: (self: Person, /, name: str = "Unnamed", id: int = ...) -> None
+
 person = Person()
 ```
 
@@ -248,6 +246,35 @@ The `@<field>.default` decorator also doesn't modify the signature of the method
 
 ```py
 reveal_type(person._default_id)  # revealed: bound method Person._default_id() -> int
+```
+
+Only the field named in the decorator gets a default.
+
+```py
+@attr.s
+class Range:
+    start: int = attr.ib()
+    end: int = attr.ib()
+
+    @end.default
+    def _default_end(self) -> int:
+        return self.start
+
+Range(1)  # ok
+Range()  # error: [missing-argument] "No argument provided for required parameter `start`"
+```
+
+A required positional field cannot follow a field with a default.
+
+```py
+@define
+class Invalid:
+    x: int = field()
+    y: int  # error: [invalid-dataclass-field-order]
+
+    @x.default
+    def default_x(self) -> int:
+        return 0
 ```
 
 Similar to above, we could also verify that the return type of the default method matches the type
