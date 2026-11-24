@@ -1295,18 +1295,37 @@ fn benchmark_generic_list_arguments(criterion: &mut Criterion) {
         ",
     );
 
-    // The typed lists can't both match list[T] with the same T. The empty
-    // lists can still pass a growing hint back and forth in later rounds.
+    // The union is inside the tuple, so the argument can't be restricted to list[T].
     benchmark_micro_case(
         criterion,
-        "ty_micro[conflicting_list_arguments]",
+        "ty_micro[tuple_with_ambiguous_list_arguments]",
         "
-        def f[T](*xs: T | list[T]) -> None: ...
+        def f[T](*xs: tuple[T | list[T]]) -> None: ...
 
-        def _(a: list[int], b: list[str]):
-            f(a, b, [], [], [], [], [], [])
+        f(([1],), ([1],), ([1],), ([1],), ([1],), ([1],), ([1],), ([1],), ([1],))
         ",
     );
+
+    // The typed lists can't both match list[T] with the same T. Even a
+    // nonempty literal can pass a growing hint to its siblings.
+    for (suffix, value) in [
+        ("", "[]"),
+        ("_nested", "[[1]]"),
+        ("_conditional", "[[1]] if flag else 0"),
+    ] {
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[conflicting_list_arguments{suffix}]"),
+            &format!(
+                "
+                def f[T](*xs: T | list[T]) -> None: ...
+
+                def _(a: list[int], b: list[str], flag: bool):
+                    f(a, b, {value}, {value}, {value}, {value}, {value}, {value})
+                "
+            ),
+        );
+    }
 }
 
 /// Regression benchmark for ty#4269: inherited receiver binding with nested type variables.

@@ -42,8 +42,8 @@ use crate::types::constraints::projection::{ProjectionTypeBudget, SolutionBudget
 use crate::types::constraints::resolution::SolutionType;
 use crate::types::constraints::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
-    ConstraintSet, ConstraintSetBuilder, Construction, OwnedConstraintSet, PathBoundSolution,
-    ReportDiagnostics, SolutionPaths, Solutions,
+    ConstraintSet, ConstraintSetBuilder, Construction, ConstructionBudget, OwnedConstraintSet,
+    PathBoundSolution, ReportDiagnostics, SolutionPaths, Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
 use crate::types::cyclic::PairVisitor;
@@ -7034,6 +7034,103 @@ impl<'db> CallInference<'_, 'db> {
         })
     }
 
+    /// Prefer the element type of a list passed to `T | list[T]`. A sibling
+    /// or the expected return type can require the list itself to be `T`.
+    /// Try all restrictions together, falling back to the original parameters
+    /// if the resulting specialization doesn't work for the whole call.
+    fn infer_structured(
+        &self,
+        constraints: &ConstraintSetBuilder<'db>,
+    ) -> Option<InferredCall<'db>> {
+        self.signature.generic_context?;
+        let db = self.db;
+        let env = self.env;
+        let vars = self.inferable_typevars;
+        let mut restricted = None;
+        let matches = self.argument_matches.iter().zip(self.arguments.iter());
+        for (index, (matched, argument)) in matches.enumerate() {
+            for (i, param) in matched.iter().enumerate() {
+                let parameter = &self.signature.parameters()[param.index];
+                let formal = param
+                    .expected_type
+                    .unwrap_or_else(|| parameter.annotated_type())
+                    .expand_top_level_aliases(db, env);
+                let Some(union) = formal.as_union() else {
+                    continue;
+                };
+                let Some(actual) =
+                    argument.matched_type(parameter.argument_context_type(), param.argument_type)
+                else {
+                    continue;
+                };
+                // In T | list[T] | list[U], removing T still lets the same list bind U.
+                // Narrowing T in a purely contravariant return would widen the result.
+                let mut bare = SmallVec::<[_; 1]>::new();
+                for &member in union.elements(db) {
+                    if let Some(var) = member.as_typevar()
+                        && var.is_inferable(db, vars)
+                        && let Some(nested) = nested_members(db, env, formal, var)
+                        && self.can_match(constraints, actual, nested)
+                        && self
+                            .return_ty
+                            .variance_of(db, env, var.identity(db))
+                            .evaluate(db)
+                            != TypeVarVariance::Contravariant
+                    {
+                        bare.push(member);
+                    }
+                }
+                if !bare.is_empty() {
+                    let matches = restricted.get_or_insert_with(|| self.argument_matches.to_vec());
+                    matches[index].parameters[i].expected_type =
+                        Some(union.filter(db, |member| !bare.contains(member)));
+                }
+            }
+        }
+        let call = CallInference {
+            argument_matches: restricted.as_deref()?,
+            ..*self
+        };
+        let result = call.infer(constraints);
+        let inference = result.inference?;
+        (result.errors.is_empty()
+            && !result.constraint_set_errors.contains(&true)
+            && matches!(
+                inference.solutions(db),
+                TypeVarInferenceSolutions::Single | TypeVarInferenceSolutions::Alternatives(_)
+            )
+            && call.accepts_arguments(
+                inference.merged_specialization(db),
+                call.argument_relations(),
+            )
+            && self
+                .call_expression_tcx
+                .expected_type()
+                .is_none_or(|expected| result.return_ty.is_assignable_to(db, env, expected)))
+        .then_some(result)
+    }
+
+    /// Only this call's variables may be solved to make the match work. An enclosing
+    /// function's unconstrained `U` cannot be assumed to match `list[T]`.
+    fn can_match(
+        &self,
+        constraints: &ConstraintSetBuilder<'db>,
+        actual: Type<'db>,
+        formal: Type<'db>,
+    ) -> bool {
+        let vars = self.inferable_typevars;
+        actual
+            .when_assignable_to(
+                self.db,
+                self.env,
+                formal,
+                constraints.with_budget(&ConstructionBudget::default()),
+                vars,
+            )
+            .is_never_satisfied_bounded(self.db, self.env, vars)
+            == Some(false)
+    }
+
     fn infer(&self, constraints: &ConstraintSetBuilder<'db>) -> InferredCall<'db> {
         let db = self.db;
         let mut constraint_set_errors = vec![false; self.arguments.len()];
@@ -9444,7 +9541,7 @@ impl<'db> Binding<'db> {
     /// together. If we exclude only the one we're inferring, the other can give
     /// its growing element type back to it on the next pass.
     ///
-    /// The original parameters still determine the result and validate every argument.
+    /// These partial matches are only for hints.
     fn sibling_specialization(
         &self,
         db: &'db dyn Db,
@@ -9455,35 +9552,46 @@ impl<'db> Binding<'db> {
         ordinary: Specialization<'db>,
     ) -> Option<Specialization<'db>> {
         let generic = ordinary.generic_context(db);
-        // A merged union can combine matches against T and a container of T.
+        let constraints = &ConstraintSetBuilder::new();
+        let arguments = arguments.with_self(binding.bound_type);
+        let call = CallInference {
+            return_ty: self.unspecialized_return_type(db),
+            inferable_typevars: self.inferable_typevars,
+            ..CallInference::new(db, env, self, &arguments, tcx)
+        };
+        let contextual = |arg: &ArgumentRelation<'db>| {
+            arguments
+                .source_types(arg.argument_index)
+                .is_some_and(|a| a.context_sensitive)
+        };
+        // Only variables shared with an argument that can use a hint matter.
         let hints: SmallVec<[_; 2]> = generic
             .variables(db)
             .zip(ordinary.types(db))
-            .filter_map(|(var, ty)| Some((var, ty.as_union()?)))
+            .filter(|(var, _)| {
+                let vars = TypeVarSet::from_typevars(db, [*var]);
+                call.argument_relations()
+                    .filter(contextual)
+                    .any(|arg| inferable_typevar_occurrences(db, env, arg.declared_type, vars) > 0)
+            })
             .collect();
         if hints.is_empty() {
             return None;
         }
-        let constraints = &ConstraintSetBuilder::new();
-        let arguments = arguments.with_self(binding.bound_type);
-        let vars = self.inferable_typevars;
-        // An enclosing function's unconstrained U cannot be assumed to match list[T].
-        let accepts = |nested, ty: Type<'db>| {
-            ty.when_assignable_to(db, env, nested, constraints.unlimited(), vars)
-                .is_never_satisfied_bounded(db, env, vars)
-                == Some(false)
-        };
+        let accepts = |nested, ty| call.can_match(constraints, ty, nested);
         let mut ambiguous = FxHashSet::default();
-        let mut invariant = FxHashMap::default();
-        let mut omitted = SmallVec::<[_; 2]>::new();
-        let concrete = |actual: Type<'db>| !actual.is_union() && actual.is_fully_static(db, env);
+        let mut invariant = FxHashSet::default();
+        let mut omitted = false;
         let mut pending = SmallVec::<[_; 4]>::new();
         let matches = self.argument_matches.iter().zip(arguments.iter());
         for (index, (matched, argument)) in matches.enumerate() {
             let fixed = !argument.source_types().context_sensitive;
             for mut param in matched.iter() {
-                let raw = self.signature.parameters()[param.index].annotated_type();
-                let Some(actual) = argument.matched_type(raw, param.argument_type) else {
+                let parameter = &self.signature.parameters()[param.index];
+                let raw = parameter.annotated_type();
+                let Some(actual) =
+                    argument.matched_type(parameter.argument_context_type(), param.argument_type)
+                else {
                     continue;
                 };
                 let ty = param
@@ -9496,14 +9604,26 @@ impl<'db> Binding<'db> {
                     Type::Union(u) if !fixed => u.elements(db),
                     _ => std::slice::from_ref(&actual),
                 };
-                // Keep independent evidence such as `xs: list[int]` for `list[T]`
-                // or `n` for `T`. A nested call can already reflect a previous hint.
-                let mut keep = fixed || ty.is_type_var();
                 let mut circular = false;
                 let mut arms = SmallVec::<[_; 1]>::new();
                 for &(var, hint) in &hints {
+                    // A fixed list[Literal["red"]] can restore a literal hint lost in
+                    // Tree(Branch("red")). Assignability alone also allows gradual widening.
+                    if fixed
+                        && !matches!(argument, CallArgument::Synthetic(_))
+                        && !actual.is_dynamic()
+                        && ty.variance_of(db, env, var.identity(db)).evaluate(db)
+                            == TypeVarVariance::Invariant
+                    {
+                        let target = ty.apply_specialization(db, ordinary);
+                        if actual != target && !actual.is_subtype_of(db, env, target) {
+                            invariant.insert(var);
+                        }
+                    }
+                    let Some(hint) = hint.as_union() else {
+                        continue;
+                    };
                     if let Some(nested) = nested_members(db, env, ty, var) {
-                        keep = true;
                         if candidates.iter().any(|&ty| accepts(nested, ty)) {
                             ambiguous.insert(var);
                             arms.push(nested);
@@ -9516,33 +9636,20 @@ impl<'db> Binding<'db> {
                     }) {
                         ambiguous.insert(var);
                         circular = true;
-                    } else if fixed
-                        && !actual.is_dynamic()
-                        && !matches!(argument, CallArgument::Synthetic(_))
-                        && ty.variance_of(db, env, var.identity(db)).evaluate(db)
-                            == TypeVarVariance::Invariant
-                    {
-                        invariant.insert(var, hint);
                     }
                 }
-                if circular {
-                    omitted.push(ty);
+                if circular || !arms.is_empty() && (!ty.is_union() || !fixed && actual.is_union()) {
+                    // An intersection requires the bare arm too. Within a tuple we
+                    // can't restrict the inner union by changing the outer parameter.
+                    omitted = true;
                     continue;
                 }
                 if !arms.is_empty() {
-                    // An intersection still requires the bare variable.
-                    if !ty.is_union() || !(fixed || concrete(actual)) {
-                        omitted.push(ty);
-                        continue;
-                    }
                     param.expected_type = Some(UnionType::from_elements(db, env, arms));
                 }
-                pending.push((index, param, (!keep).then_some((ty, actual))));
+                pending.push((index, param, (!fixed).then_some(actual)));
             }
         }
-        // Without either source of a growing hint, skip checking whether other arguments
-        // contain their own parameter type. For `next(generator, None)`, that would
-        // test every member of the generator's yield type against `SupportsNext[T]`.
         if ambiguous.is_empty() && invariant.is_empty() {
             return None;
         }
@@ -9554,56 +9661,27 @@ impl<'db> Binding<'db> {
                 ..*matched
             })
             .collect();
-        for (index, param, check) in pending {
-            // [1, "x"] supplies its own element types for list[T]. A Tree
-            // inside Tree[T] could come from substituting a previous hint.
-            if let Some((ty, actual)) = check
-                && (!concrete(actual)
-                    || any_over_type(db, env, actual, false, |part| {
-                        part != actual && accepts(ty, part)
-                    }))
+        // A concrete literal like [1, "x"] can supply its own element types. When
+        // recovering a hint from an invariant sibling alone, use only fixed arguments.
+        for (index, param, contextual_type) in pending {
+            if let Some(actual) = contextual_type
+                && (ambiguous.is_empty() || !actual.is_fully_static(db, env))
             {
-                omitted.push(ty);
+                omitted = true;
                 continue;
             }
             siblings[index].parameters.push(param);
         }
-        // In `select(xs, Tree(Branch()))`, the inner call can add `Branch[Unknown]`
-        // to T. Substituting T into the outer `tree: Tree[T]` parameter then puts
-        // a tree inside a tree. Use `xs: list[T]` to recover an independent hint
-        // in this case. An invariant sibling alone isn't evidence of growth.
-        let repeats_container = |(&var, &hint): (_, &UnionType<'db>)| {
-            let var_set = TypeVarSet::from_typevars(db, [var]);
-            omitted.iter().any(|&ty| {
-                any_over_type(db, env, ty, false, |part| {
-                    matches!(part, Type::NominalInstance(_) | Type::ProtocolInstance(_))
-                        && inferable_typevar_occurrences(db, env, part, var_set) > 0
-                        && hint
-                            .elements(db)
-                            .iter()
-                            .any(|&member| !member.is_dynamic() && accepts(part, member))
-                })
-            })
-        };
-        if ambiguous.is_empty() && !invariant.iter().any(repeats_container) {
-            return None;
-        }
         let call = CallInference {
             argument_matches: &siblings,
-            return_ty: self.unspecialized_return_type(db),
-            inferable_typevars: vars,
-            ..CallInference::new(db, env, self, &arguments, tcx)
+            ..call
         };
         let inference = call.infer(constraints).inference?;
         // List literals inferred as list[int] and list[str] can both adopt list[int | str]
         // on the next pass. Only fixed arguments have to accept the hint already.
-        let fixed = call.argument_relations().filter(|arg| {
-            !arguments
-                .source_types(arg.argument_index)
-                .is_some_and(|arg| arg.context_sensitive)
-        });
+        let fixed = call.argument_relations().filter(|arg| !contextual(arg));
         let valid = call.accepts_arguments(inference.merged_specialization(db), fixed);
-        if !valid && omitted.is_empty() {
+        if !valid && !omitted {
             return None;
         }
         let initial = self
@@ -9612,9 +9690,7 @@ impl<'db> Binding<'db> {
         Some(inference.merged_specialization_with(db, |var, inferred| {
             // If the siblings conflict, only discard bindings that risk feeding back
             // into an omitted argument. An unrelated invariant sibling can still fix U.
-            let fixed = invariant
-                .get_key_value(&var)
-                .is_some_and(|binding| valid || repeats_container(binding));
+            let fixed = valid && invariant.contains(&var);
             if !fixed && !ambiguous.contains(&var) {
                 return ordinary.get(db, var);
             }
@@ -9919,8 +9995,10 @@ impl<'db> Binding<'db> {
             return;
         }
 
-        let inferred =
-            CallInference::new(db, env, self, arguments, call_expression_tcx).infer(constraints);
+        let call = CallInference::new(db, env, self, arguments, call_expression_tcx);
+        let inferred = call
+            .infer_structured(constraints)
+            .unwrap_or_else(|| call.infer(constraints));
 
         let mut checker = ArgumentTypeChecker::new(
             db,

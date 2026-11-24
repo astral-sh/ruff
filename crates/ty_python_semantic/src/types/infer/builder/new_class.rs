@@ -264,14 +264,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             &mut |builder, (_, expr, tcx)| {
                 if name_node.is_some_and(|name| std::ptr::eq(expr, name)) {
                     let _ = builder.infer_expression(expr, tcx);
-                    KnownClass::Str.to_instance(db, env)
+                    super::InferredValue::fixed(KnownClass::Str.to_instance(db, env))
                 } else if bases_arg.is_some_and(|bases| std::ptr::eq(expr, bases)) {
                     if definition.is_none() {
                         let _ = builder.infer_expression(expr, tcx);
                     }
-                    iterable_object
+                    super::InferredValue::fixed(iterable_object)
                 } else {
-                    builder.infer_expression(expr, tcx)
+                    builder.infer_value(expr, tcx)
                 }
             },
             bindings,

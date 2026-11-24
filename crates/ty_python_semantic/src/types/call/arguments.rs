@@ -492,7 +492,7 @@ impl<'db> KeywordArgument<'db> {
 /// with type context across multiple bindings.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct CallArgumentTypes<'db> {
-    /// Whether we may need to revisit the expression with a hint.
+    /// Whether the parameter hint might affect this argument's inferred type.
     pub(super) context_sensitive: bool,
     fallback_type: Option<Type<'db>>,
     types: ContextualTypes<'db>,
@@ -617,11 +617,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     }
                 }
             };
-            let mut item = CallArgument::new(argument, ty);
-            let expr = arg_or_keyword.value();
-            item.source_types_mut().context_sensitive =
-                !arg_or_keyword.is_variadic() && !expr.is_name_expr() && !expr.is_attribute_expr();
-            call_arguments.items.push(item);
+            call_arguments.items.push(CallArgument::new(argument, ty));
         }
 
         call_arguments
@@ -812,6 +808,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .expect("argument index should be valid")
             .source_types_mut()
             .insert(tcx, ty);
+    }
+
+    pub(crate) fn mark_context_sensitive(&mut self, index: usize) {
+        self.items[index].source_types_mut().context_sensitive = true;
     }
 
     pub(crate) fn clear_types(&mut self, index: usize) {

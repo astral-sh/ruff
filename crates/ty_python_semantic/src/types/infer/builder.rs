@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::cell::{Cell, LazyCell, OnceCell, RefCell};
 use std::collections::{HashSet, hash_map};
 use std::convert::Infallible;
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 use compact_str::CompactString;
@@ -6074,7 +6075,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .infer_and_check_argument_types(
                         ast_arguments,
                         argument_types,
-                        infer_argument_ty,
+                        &mut |builder, arg| InferredValue::fixed(infer_argument_ty(builder, arg)),
                         bindings,
                         call_expression_tcx,
                     )
@@ -6151,7 +6152,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         ast_arguments: ArgumentsIter<'_>,
         argument_types: &'args mut CallArguments<'call, 'db>,
-        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> InferredValue<'db>,
         mut bindings: Bindings<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Result<CallArgumentInference<'args, 'call, 'db>, CallError<'db>> {
@@ -6364,11 +6365,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // context as the default inference.
                 for (index, argument) in ast_arguments.enumerate() {
                     if !argument.is_variadic() {
-                        let ty = infer_argument_ty(
+                        let value = infer_argument_ty(
                             self,
                             (index, argument.value(), TypeContext::default()),
                         );
-                        argument_types.insert_type(index, TypeContext::default(), ty);
+                        if value.context_sensitive {
+                            argument_types.mark_context_sensitive(index);
+                        }
+                        argument_types.insert_type(index, TypeContext::default(), value.ty);
                     }
                 }
 
@@ -6421,7 +6425,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         ast_arguments: ArgumentsIter<'_>,
         argument_types: &mut CallArguments<'call, 'db>,
-        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> InferredValue<'db>,
         bindings: &mut Bindings<'db>,
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
@@ -6513,7 +6517,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         ast_arguments: &ArgumentsIter<'_>,
         argument_types: &mut CallArguments<'_, 'db>,
-        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> InferredValue<'db>,
         bindings: &mut Bindings<'db>,
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
@@ -6716,14 +6720,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ast_arguments: ArgumentsIter<'_>,
         argument_types: &mut CallArguments<'_, 'db>,
         arguments_tcx: &[Option<MatchingArgumentTypeContext<'db>>],
-        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> InferredValue<'db>,
         mode: CallArgumentInferenceMode,
     ) {
         let insert_argument_ty =
             |argument_index,
-             inferred_ty,
+             inferred: InferredValue<'db>,
              argument_tcx: &Option<ArgumentTypeContext<'db>>,
              argument_types: &mut CallArguments<'_, 'db>| {
+                if inferred.context_sensitive {
+                    argument_types.mark_context_sensitive(argument_index);
+                }
+                let inferred_ty = inferred.ty;
                 if let Some(argument_tcx) = argument_tcx {
                     argument_tcx.insert_inferred_type_into(
                         argument_types,
@@ -6791,11 +6799,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             (argument_index, ast_argument, TypeContext::default()),
                         );
 
-                        argument_types.insert_type(
-                            argument_index,
-                            TypeContext::default(),
-                            inferred_ty,
-                        );
+                        insert_argument_ty(argument_index, inferred_ty, &None, argument_types);
 
                         inferred_by_cache_key.insert(None, inferred_ty);
                     }
@@ -6875,6 +6879,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     #[track_caller]
     fn infer_expression(&mut self, expression: &ast::Expr, tcx: TypeContext<'db>) -> Type<'db> {
+        self.infer_value(expression, tcx).ty
+    }
+
+    #[track_caller]
+    fn infer_value(&mut self, expression: &ast::Expr, tcx: TypeContext<'db>) -> InferredValue<'db> {
         debug_assert!(
             !self.index.is_standalone_expression(expression),
             "Calling `self.infer_expression` on a standalone-expression \
@@ -6914,9 +6923,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
         peer_ty: Option<Type<'db>>,
-    ) -> Type<'db> {
+    ) -> InferredValue<'db> {
         self.infer_with_collection_literal_peer_context(expression, tcx, peer_ty, |builder, tcx| {
-            builder.infer_expression(expression, tcx)
+            builder.infer_value(expression, tcx)
         })
     }
 
@@ -6931,13 +6940,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
     }
 
-    fn infer_with_collection_literal_peer_context(
+    fn infer_with_collection_literal_peer_context<T>(
         &mut self,
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
         peer_ty: Option<Type<'db>>,
-        mut infer_expression: impl FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
-    ) -> Type<'db> {
+        mut infer_expression: impl FnMut(&mut Self, TypeContext<'db>) -> T,
+    ) -> T {
         let db = self.db();
         let env = self.program_environment();
         let peer_tcx = if is_collection_literal(expression)
@@ -6973,12 +6982,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// parameter's type unknown, and the cast is neither redundant nor disjoint. Casts allow
     /// `redundant-cast` diagnostics from nested casts so that those warnings do not interrupt
     /// context propagation.
-    fn infer_with_type_context_fallback(
+    fn infer_with_type_context_fallback<T>(
         &mut self,
         tcx: TypeContext<'db>,
         fallback_tcx: TypeContext<'db>,
-        mut infer_expression: impl FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
-    ) -> Type<'db> {
+        mut infer_expression: impl FnMut(&mut Self, TypeContext<'db>) -> T,
+    ) -> T {
         if tcx == fallback_tcx {
             return infer_expression(self, tcx);
         }
@@ -7034,7 +7043,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
-    ) -> Type<'db> {
+    ) -> InferredValue<'db> {
         // A nominal target other than `tuple` supplies no element types to a tuple
         // literal. Drop it before the cache lookup so overloads expecting, for
         // example, `list[str]` and `list[bytes]` can share the same inference.
@@ -7065,55 +7074,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // See if we already have a cached entry for this expression.
         let expression_key = expression.into();
-        let cache_entry = expression_cache.borrow().get(expression_key, tcx).cloned();
-
-        match cache_entry {
-            Some(ExpressionCacheEntry::Small(ty)) => {
-                self.store_expression_type(expression, ty);
-                ty
-            }
-
-            Some(ExpressionCacheEntry::Full(inference)) => {
-                let ty = inference.expression_type(expression_key);
-                self.extend_expression_cache_entry(&inference);
-                ty
-            }
-
-            _ => {
-                // The expression is uncached, infer it independently and cache the inference results.
-                let mut speculative_builder = self.speculate();
-                let ty = speculative_builder.infer_expression_uncached(expression, tcx);
-                let inference = speculative_builder.into_expression_cache_entry();
-
-                let cached = if inference.is_single_expression(expression_key, ty) {
+        let cached = expression_cache.borrow().get(expression_key, tcx);
+        if let Some((entry, context_sensitive)) = cached {
+            let ty = match entry {
+                ExpressionCacheEntry::Small(ty) => {
                     self.store_expression_type(expression, ty);
-                    ExpressionCacheEntry::Small(ty)
-                } else {
-                    self.extend_expression_cache_entry(&inference);
-                    ExpressionCacheEntry::Full(Rc::new(inference))
-                };
-
-                if let Some(expression_cache) = &self.expression_cache {
-                    expression_cache
-                        .borrow_mut()
-                        .insert(expression_key, tcx, cached);
+                    ty
                 }
-
-                ty
-            }
+                ExpressionCacheEntry::Full(inference) => {
+                    let ty = inference.expression_type(expression_key);
+                    self.extend_expression_cache_entry(&inference);
+                    ty
+                }
+            };
+            return InferredValue {
+                ty,
+                context_sensitive,
+            };
         }
+
+        // The expression is uncached, infer it independently and cache the inference results.
+        let mut speculative_builder = self.speculate();
+        let value = speculative_builder.infer_expression_uncached(expression, tcx);
+        let inference = speculative_builder.into_expression_cache_entry();
+        let entry = if inference.is_single_expression(expression_key, value.ty) {
+            self.store_expression_type(expression, value.ty);
+            ExpressionCacheEntry::Small(value.ty)
+        } else {
+            self.extend_expression_cache_entry(&inference);
+            ExpressionCacheEntry::Full(Rc::new(inference))
+        };
+
+        if let Some(expression_cache) = &self.expression_cache {
+            expression_cache.borrow_mut().insert(
+                expression_key,
+                CachedExpression {
+                    tcx,
+                    entry,
+                    context_sensitive: value.context_sensitive,
+                },
+            );
+        }
+
+        value
     }
 
     fn infer_expression_uncached(
         &mut self,
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
-    ) -> Type<'db> {
+    ) -> InferredValue<'db> {
         if let Some(target) = tcx.expected_type()
             && let Some(ty) = self.infer_type_form_contextual_expression(expression, target)
         {
             self.store_expression_type(expression, ty);
-            return ty;
+            return InferredValue {
+                ty,
+                context_sensitive: true,
+            };
         }
 
         self.infer_value_expression_impl(expression, tcx)
@@ -7127,8 +7145,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
-    ) -> Type<'db> {
+    ) -> InferredValue<'db> {
         let db = self.db();
+        let mut context_sensitive = false;
+        // Request the outer hint even when it is still empty. For example, []
+        // may acquire an element type on a later pass. Hints used internally
+        // by an expression such as xs[i] are independent of this one.
+        let mut hint = || {
+            context_sensitive = true;
+            tcx
+        };
         let ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
                 range: _,
@@ -7136,53 +7162,55 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }) => Type::none(db, self.program_environment()),
             ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
             ast::Expr::BooleanLiteral(literal) => self.infer_boolean_literal_expression(literal),
-            ast::Expr::StringLiteral(literal) => self.infer_string_literal_expression(literal, tcx),
+            ast::Expr::StringLiteral(literal) => {
+                self.infer_string_literal_expression(literal, hint())
+            }
             ast::Expr::BytesLiteral(bytes_literal) => {
                 self.infer_bytes_literal_expression(bytes_literal)
             }
             ast::Expr::FString(fstring) => self.infer_fstring_expression(fstring),
             ast::Expr::TString(tstring) => self.infer_tstring_expression(tstring),
             ast::Expr::EllipsisLiteral(literal) => self.infer_ellipsis_literal_expression(literal),
-            ast::Expr::Tuple(tuple) => self.infer_tuple_expression(tuple, tcx),
-            ast::Expr::List(list) => self.infer_list_expression(list, tcx),
-            ast::Expr::Set(set) => self.infer_set_expression(set, tcx),
-            ast::Expr::Dict(dict) => self.infer_dict_expression(dict, tcx),
-            ast::Expr::Generator(generator) => self.infer_generator_expression(generator, tcx),
+            ast::Expr::Tuple(tuple) => self.infer_tuple_expression(tuple, hint()),
+            ast::Expr::List(list) => self.infer_list_expression(list, hint()),
+            ast::Expr::Set(set) => self.infer_set_expression(set, hint()),
+            ast::Expr::Dict(dict) => self.infer_dict_expression(dict, hint()),
+            ast::Expr::Generator(generator) => self.infer_generator_expression(generator, hint()),
             ast::Expr::ListComp(listcomp) => {
-                self.infer_list_comprehension_expression(listcomp, tcx)
+                self.infer_list_comprehension_expression(listcomp, hint())
             }
             ast::Expr::DictComp(dictcomp) => {
-                self.infer_dict_comprehension_expression(dictcomp, tcx)
+                self.infer_dict_comprehension_expression(dictcomp, hint())
             }
-            ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, tcx),
+            ast::Expr::SetComp(setcomp) => self.infer_set_comprehension_expression(setcomp, hint()),
             ast::Expr::Name(name) => {
                 let ty = self.infer_name_expression(name);
-                tcx.expected_type().map_or(ty, |target| {
-                    self.specialize_generic_class_from_context(ty, target)
-                })
+                self.specialize_generic_class_from_context(ty, hint)
             }
             ast::Expr::Attribute(attribute) => {
                 let ty = self.infer_attribute_expression(attribute);
-                tcx.expected_type().map_or(ty, |target| {
-                    self.specialize_generic_class_from_context(ty, target)
-                })
+                self.specialize_generic_class_from_context(ty, hint)
             }
             ast::Expr::UnaryOp(unary_op) => self.infer_unary_expression(unary_op),
-            ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, tcx),
-            ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op, tcx),
+            ast::Expr::BinOp(binary) => self.infer_binary_expression(binary, hint()),
+            ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op, hint()),
             ast::Expr::Compare(compare) => self.infer_compare_expression(compare),
             ast::Expr::Subscript(subscript) => self.infer_subscript_expression(subscript),
             ast::Expr::Slice(slice) => self.infer_slice_expression(slice),
-            ast::Expr::If(if_expression) => self.infer_if_expression(if_expression, tcx),
-            ast::Expr::Lambda(lambda_expression) => {
-                self.infer_lambda_expression(lambda_expression, tcx)
+            ast::Expr::If(if_expression) => {
+                let value = self.infer_if_expression(if_expression, tcx);
+                context_sensitive = value.context_sensitive;
+                value.ty
             }
-            ast::Expr::Call(call_expression) => self.infer_call_expression(call_expression, tcx),
-            ast::Expr::Starred(starred) => self.infer_starred_expression(starred, tcx),
+            ast::Expr::Lambda(lambda_expression) => {
+                self.infer_lambda_expression(lambda_expression, hint())
+            }
+            ast::Expr::Call(call_expression) => self.infer_call_expression(call_expression, hint()),
+            ast::Expr::Starred(starred) => self.infer_starred_expression(starred, hint()),
             ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
             ast::Expr::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
             ast::Expr::Await(await_expression) => {
-                self.infer_await_expression(await_expression, tcx)
+                self.infer_await_expression(await_expression, hint())
             }
             ast::Expr::Named(named) => self.infer_named_expression(named),
             ast::Expr::IpyEscapeCommand(_) => {
@@ -7190,7 +7218,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        self.finish_expression_type(expression, ty, tcx)
+        // A literal hint can also prevent promotion in `apply_type_context`.
+        context_sensitive |= matches!(ty, Type::LiteralValue(literal) if literal.is_promotable());
+        InferredValue {
+            ty: self.finish_expression_type(expression, ty, tcx),
+            context_sensitive,
+        }
     }
 
     /// Apply context before recording an inferred expression type.
@@ -7378,11 +7411,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// This allows `list` to be specialized to `list[str]` given the type context
     /// `type[list[str]]` or `Callable[[], list[str]]`.
-    fn specialize_generic_class_from_context(&self, ty: Type<'db>, target: Type<'db>) -> Type<'db> {
+    fn specialize_generic_class_from_context(
+        &self,
+        ty: Type<'db>,
+        hint: impl FnOnce() -> TypeContext<'db>,
+    ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
 
         let Type::ClassLiteral(class) = ty else {
+            return ty;
+        };
+
+        let Some(target) = hint().expected_type() else {
             return ty;
         };
 
@@ -9343,7 +9384,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         if_expression: &ast::ExprIf,
         tcx: TypeContext<'db>,
-    ) -> Type<'db> {
+    ) -> InferredValue<'db> {
         let db = self.db();
         let env = self.program_environment();
         let ast::ExprIf {
@@ -9355,26 +9396,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = if_expression;
 
         let test_ty = self.infer_maybe_standalone_expression(test, TypeContext::default());
-        let (body_ty, orelse_ty) = if is_collection_literal(body)
+        let (body_value, orelse_value) = if is_collection_literal(body)
             && prefer_collection_literal_peer_context(db, env, tcx)
             && !is_nonempty_collection_literal_with_empty_peer(body, orelse)
         {
             // Infer the peer branch first so the body can use its type as context.
-            let orelse_ty = self.infer_expression(orelse, tcx);
-            let body_ty = self.infer_expression_with_collection_literal_peer_context(
+            let orelse_value = self.infer_value(orelse, tcx);
+            let body_value = self.infer_expression_with_collection_literal_peer_context(
                 body,
                 tcx,
-                Some(orelse_ty),
+                Some(orelse_value.ty),
             );
-            (body_ty, orelse_ty)
+            (body_value, orelse_value)
         } else {
-            let body_ty = self.infer_expression(body, tcx);
-            let orelse_ty = self.infer_expression_with_collection_literal_peer_context(
+            let body_value = self.infer_value(body, tcx);
+            let orelse_value = self.infer_expression_with_collection_literal_peer_context(
                 orelse,
                 tcx,
-                Some(body_ty),
+                Some(body_value.ty),
             );
-            (body_ty, orelse_ty)
+            (body_value, orelse_value)
         };
 
         let test_truthiness = match test_ty.try_bool(db, env) {
@@ -9388,10 +9429,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.check_condition_redundancy(test, test_ty);
 
         match test_truthiness {
-            Truthiness::AlwaysTrue => body_ty,
-            Truthiness::AlwaysFalse => orelse_ty,
-            Truthiness::Ambiguous => UnionType::from_two_elements(db, env, body_ty, orelse_ty),
-            Truthiness::Uninhabited => Type::Never,
+            Truthiness::AlwaysTrue => body_value,
+            Truthiness::AlwaysFalse => orelse_value,
+            Truthiness::Ambiguous => InferredValue {
+                ty: UnionType::from_two_elements(db, env, body_value.ty, orelse_value.ty),
+                context_sensitive: body_value.context_sensitive || orelse_value.context_sensitive,
+            },
+            Truthiness::Uninhabited => InferredValue::fixed(Type::Never),
         }
     }
 
@@ -10382,11 +10426,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some((value, value_tcx)) = value_context
                     && std::ptr::eq(expr, value)
                 {
-                    return builder.infer_with_type_context_fallback(
+                    return InferredValue::fixed(builder.infer_with_type_context_fallback(
                         value_tcx,
                         TypeContext::default(),
                         |builder, tcx| builder.infer_expression(value, tcx),
-                    );
+                    ));
                 }
 
                 // Permit bare ParamSpecs only in direct names and dotted attributes, so nested
@@ -10405,14 +10449,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .context
                         .inference_flags
                         .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
-                    let ty = builder.infer_expression(expr, tcx);
+                    let ty = builder.infer_value(expr, tcx);
                     builder.context.inference_flags.set(
                         InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
                         previously_allowed,
                     );
                     ty
                 } else {
-                    builder.infer_expression(expr, tcx)
+                    builder.infer_value(expr, tcx)
                 }
             },
             bindings,
@@ -10516,7 +10560,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // type is keyed, may not be the same as the type context we get here. It is not immediately
                         // clear how to retrieve those types, and so we just re-infer the argument expressions
                         // for simplicity.
-                        &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
+                        &mut |builder, (_, expr, tcx)| builder.infer_value(expr, tcx),
                         identity_bindings,
                         call_expression_tcx,
                     );
@@ -12182,6 +12226,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let ty = if index == values.len() - 1 {
                     builder
                         .infer_expression_with_collection_literal_peer_context(value, tcx, peer_ty)
+                        .ty
                 } else {
                     builder.infer_maybe_standalone_expression_with_collection_literal_peer_context(
                         value, tcx, peer_ty,
@@ -13142,22 +13187,30 @@ impl<'db> ExpressionCache<'db> {
         &self,
         expression: ExpressionNodeKey,
         tcx: TypeContext<'db>,
-    ) -> Option<&ExpressionCacheEntry<'db>> {
-        self.entries.get(&expression)?.get(tcx)
+    ) -> Option<(ExpressionCacheEntry<'db>, bool)> {
+        let cached = match self.entries.get(&expression)? {
+            ExpressionCacheEntries::Single(cached) if cached.tcx == tcx => cached,
+            ExpressionCacheEntries::Single(_) => return None,
+            ExpressionCacheEntries::Many(values) => values.get(&tcx)?,
+        };
+        Some((cached.entry.clone(), cached.context_sensitive))
     }
 
-    fn insert(
-        &mut self,
-        expression: ExpressionNodeKey,
-        tcx: TypeContext<'db>,
-        value: ExpressionCacheEntry<'db>,
-    ) {
-        match self.entries.entry(expression) {
-            hash_map::Entry::Occupied(mut entry) => {
-                entry.get_mut().insert(tcx, value);
-            }
+    fn insert(&mut self, expression: ExpressionNodeKey, value: CachedExpression<'db>) {
+        let values = match self.entries.entry(expression) {
             hash_map::Entry::Vacant(entry) => {
-                entry.insert(ExpressionCacheEntries::Single(tcx, value));
+                entry.insert(ExpressionCacheEntries::Single(value));
+                return;
+            }
+            hash_map::Entry::Occupied(entry) => entry.into_mut(),
+        };
+        match values {
+            ExpressionCacheEntries::Single(old) if old.tcx == value.tcx => *old = value,
+            ExpressionCacheEntries::Single(old) => {
+                *values = ExpressionCacheEntries::Many(FxHashSet::from_iter([old.clone(), value]));
+            }
+            ExpressionCacheEntries::Many(entries) => {
+                entries.replace(value);
             }
         }
     }
@@ -13165,38 +13218,56 @@ impl<'db> ExpressionCache<'db> {
 
 /// The inferred types of a given expression, keyed by type context.
 enum ExpressionCacheEntries<'db> {
-    Single(TypeContext<'db>, ExpressionCacheEntry<'db>),
-    Many(FxHashMap<TypeContext<'db>, ExpressionCacheEntry<'db>>),
+    Single(CachedExpression<'db>),
+    Many(FxHashSet<CachedExpression<'db>>),
 }
 
-impl<'db> ExpressionCacheEntries<'db> {
-    fn get(&self, tcx: TypeContext<'db>) -> Option<&ExpressionCacheEntry<'db>> {
-        match self {
-            Self::Single(cached_tcx, value) if *cached_tcx == tcx => Some(value),
-            Self::Single(_, _) => None,
-            Self::Many(values) => values.get(&tcx),
-        }
+/// Only the type context identifies a cached result. Storing the sensitivity flag
+/// alongside the key and value lets it fit in their alignment padding in release builds.
+#[derive(Clone)]
+struct CachedExpression<'db> {
+    tcx: TypeContext<'db>,
+    entry: ExpressionCacheEntry<'db>,
+    context_sensitive: bool,
+}
+
+// Neither the inline entry nor a second context should cost more than the original pair.
+#[cfg(all(not(debug_assertions), target_pointer_width = "64"))]
+static_assertions::assert_eq_size!(CachedExpression, ExpressionCacheEntries, [u8; 48]);
+
+impl PartialEq for CachedExpression<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.tcx == other.tcx
     }
+}
 
-    fn insert(&mut self, tcx: TypeContext<'db>, value: ExpressionCacheEntry<'db>) {
-        if let Self::Single(cached_tcx, cached_value) = self
-            && *cached_tcx == tcx
-        {
-            *cached_value = value;
-            return;
+impl Eq for CachedExpression<'_> {}
+
+impl Hash for CachedExpression<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.tcx.hash(state);
+    }
+}
+
+impl<'db> std::borrow::Borrow<TypeContext<'db>> for CachedExpression<'db> {
+    fn borrow(&self) -> &TypeContext<'db> {
+        &self.tcx
+    }
+}
+
+/// The expression's type and whether a different outer hint might change it.
+#[derive(Clone, Copy)]
+struct InferredValue<'db> {
+    ty: Type<'db>,
+    context_sensitive: bool,
+}
+
+impl<'db> InferredValue<'db> {
+    fn fixed(ty: Type<'db>) -> Self {
+        Self {
+            ty,
+            context_sensitive: false,
         }
-
-        let previous = std::mem::replace(self, Self::Many(FxHashMap::default()));
-        *self = match previous {
-            Self::Single(cached_tcx, cached_value) => Self::Many(FxHashMap::from_iter([
-                (cached_tcx, cached_value),
-                (tcx, value),
-            ])),
-            Self::Many(mut values) => {
-                values.insert(tcx, value);
-                Self::Many(values)
-            }
-        };
     }
 }
 
