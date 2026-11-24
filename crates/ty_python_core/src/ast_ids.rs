@@ -110,11 +110,14 @@ impl AstIdsBuilder {
     /// Stores use IDs and their lexical places in node-index order.
     /// The IDs themselves keep the order in which the flow builder visited uses in each scope.
     pub(super) fn finish(self) -> AstIds {
-        let mut pages = Vec::with_capacity(self.root.len().div_ceil(64));
+        let mut pages = Vec::with_capacity(self.root.len().div_ceil(NODES_PER_PAGE));
         let mut use_ids = Vec::new();
         let mut places_plus_one = Vec::new();
         let mut scopes = Vec::new();
-        for (first_node, rows) in (0_u32..).step_by(64).zip(self.root.chunks(64)) {
+        for (first_node, rows) in (0_u32..)
+            .step_by(NODES_PER_PAGE)
+            .zip(self.root.chunks(NODES_PER_PAGE))
+        {
             let first_use = u32::try_from(use_ids.len()).expect("more uses than node indices");
             let mut mask = 0;
             for (offset, row) in (0_u32..).zip(rows) {
@@ -144,7 +147,10 @@ impl AstIdsBuilder {
     }
 }
 
-/// Indexes uses and scope ranges for up to 64 consecutive nodes in the root AST.
+/// Number of nodes in a full [`UsePage`], one per bit in its use mask.
+const NODES_PER_PAGE: usize = u64::BITS as usize;
+
+/// Indexes uses and scope ranges for up to [`NODES_PER_PAGE`] consecutive nodes in the root AST.
 #[derive(Debug, get_size2::GetSize)]
 struct UsePage {
     /// Number of uses on earlier pages. This is the page's starting offset in
@@ -195,9 +201,9 @@ impl AstIds {
     /// Looks up a node in the packed use array. Each earlier set bit on the same page
     /// accounts for one preceding entry in the array.
     fn use_index(&self, node: ast::NodeIndex) -> Option<usize> {
-        let node = node.as_u32()?;
-        let page = self.pages.get(node as usize / 64)?;
-        let bit = 1_u64 << (node % 64);
+        let node = node.as_u32()? as usize;
+        let page = self.pages.get(node / NODES_PER_PAGE)?;
+        let bit = 1_u64 << (node % NODES_PER_PAGE);
         if page.mask & bit == 0 {
             return None;
         }
@@ -206,7 +212,7 @@ impl AstIds {
     }
 
     fn scope_at(&self, node: ast::NodeIndex) -> Option<FileScopeId> {
-        let page_index = node.as_u32()? as usize / 64;
+        let page_index = node.as_u32()? as usize / NODES_PER_PAGE;
         let end = self.pages.get(page_index)?.scope_count as usize;
         // A range started on an earlier page may extend across the boundary.
         let start = page_index.checked_sub(1).map_or(0, |previous| {
