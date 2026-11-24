@@ -126,7 +126,7 @@ impl DecoratedDefaults {
         place: ScopedPlaceId,
         field: FieldInstance<'db>,
     ) -> bool {
-        self.fields.contains(&place) && field.kind(db) == FieldInstanceKind::Attrs
+        self.fields.contains(&place) && field.kind(db).is_attrs()
     }
 
     /// This function is called for declarations in the attrs class. If the declaration refers
