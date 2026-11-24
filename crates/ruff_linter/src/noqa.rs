@@ -1,3 +1,4 @@
+use std::cell::LazyCell;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt::Display;
@@ -10,6 +11,7 @@ use itertools::Itertools;
 use log::warn;
 
 use ruff_db::diagnostic::{Diagnostic, LintName};
+use ruff_python_ast::script::ScriptTag;
 use ruff_python_trivia::PythonWhitespace;
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
@@ -967,6 +969,10 @@ fn find_suppression_comments<'a>(
 ) -> Vec<Option<SuppressionComment<'a>>> {
     // List of suppression comments, ordered to match up with `messages`
     let mut comments_by_line: Vec<Option<SuppressionComment<'a>>> = vec![];
+    let script_markers = LazyCell::new(|| {
+        let range = ScriptTag::parse(locator.contents())?.range();
+        Some([range.start(), locator.line_start(range.end())])
+    });
 
     // Mark any non-ignored diagnostics.
     for message in diagnostics {
@@ -1059,8 +1065,15 @@ fn find_suppression_comments<'a>(
             }
         };
 
+        let line = locator.line_start(directive.map_or(noqa_offset, |directive| directive.start()));
+        // Both PEP 723 delimiters must occupy the whole line.
+        if script_markers.is_some_and(|markers| markers.contains(&line)) {
+            comments_by_line.push(None);
+            continue;
+        }
+
         comments_by_line.push(Some(SuppressionComment {
-            line: locator.line_start(directive.map_or(noqa_offset, |directive| directive.start())),
+            line,
             identifier,
             directive,
         }));

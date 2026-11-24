@@ -9,6 +9,7 @@ use anyhow::Result;
 use indoc::indoc;
 
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
+use ruff_python_trivia::textwrap::dedent;
 
 use crate::CliTest;
 
@@ -2682,6 +2683,164 @@ select = ["D100"]
     # noqa: D100
     ");
 
+    Ok(())
+}
+
+#[test]
+fn add_noqa_skips_script_opening_marker() -> Result<()> {
+    let source = dedent(
+        r"
+            #!/usr/bin/env python3
+            # /// script
+            # dependencies = []
+            # ///
+            print(42)
+        ",
+    );
+    let source = source.trim_start();
+    let test = CliTest::with_file("script.py", source)?;
+
+    assert_cmd_snapshot!(test.check_command().args(["--select=D100", "--add-noqa", "script.py"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+    assert_eq!(test.read_file("script.py")?, source);
+    Ok(())
+}
+
+#[test]
+fn add_noqa_in_multiline_script_metadata() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # requires-python = """>=3.11, \
+            # <4"""
+            # ///
+            print(42)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(test.check_command().args([
+        "--select=E501",
+        "--line-length=30",
+        "--add-noqa",
+        "script.py",
+    ]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    ");
+    // FIXME: Appending a suppression after the continuation backslash invalidates the TOML.
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:3:35: invalid-script-metadata: invalid multi-line basic string, expected newline
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn add_ignore_reuses_directive_in_multiline_script_metadata() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # tool.example.text = """
+            # ruff: ignore[F541]
+            # """
+            # ///
+            print(f"hello")
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(test.check_command().args(["--select=T201,F541", "--add-ignore", "script.py"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 ignore comment.
+    ");
+    // FIXME: The apparent ignore suppresses F541 on the statement. Extending it to
+    // suppress T201 changes the TOML string.
+    insta::assert_snapshot!(test.read_file("script.py")?, @r#"
+
+    # /// script
+    # tool.example.text = """
+    # ruff: ignore[F541, T201]
+    # """
+    # ///
+    print(f"hello")
+    "#);
+    Ok(())
+}
+
+#[test]
+fn add_ignore_to_script_metadata() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # dependencies = ["numpy", "scipy", "matplotlib"]
+            # ///
+            print(42)
+        "#,
+    )?;
+    let args = ["--select=E501", "--line-length=40", "script.py"];
+
+    assert_cmd_snapshot!(test.check_command().args(args).arg("--add-ignore"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 ignore comment.
+    ");
+    assert_cmd_snapshot!(test.check_command().args(args), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn add_ignore_skips_script_closing_marker() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r"
+            # /// script
+            # ///",
+    )?;
+    let source = test.read_file("script.py")?;
+
+    assert_cmd_snapshot!(test.check_command().args([
+        "--preview",
+        "--select=W292",
+        "--add-ignore",
+        "script.py",
+    ]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+    assert_eq!(test.read_file("script.py")?, source);
     Ok(())
 }
 
