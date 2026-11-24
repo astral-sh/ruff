@@ -4774,13 +4774,28 @@ fn cli_target_version_overrides_script_requirement() -> Result<()> {
             x: Optional[int]
         ",
     )?;
-    assert_cmd_snapshot!(test.check_command().args(["--preview", "--select=UP045", "--target-version=py310", "script.py"]), @"
+    test.write_file("ruff.toml", "target-version = 'py310'")?;
+    let args = [
+        "check",
+        "--quiet",
+        "--preview",
+        "--select=UP045",
+        "--output-format=concise",
+        "script.py",
+    ];
+    // Warm the cache. The explicit override changes the script target but not the project target.
+    assert_cmd_snapshot!(test.command().args(args), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+    assert_cmd_snapshot!(test.command().args(args).arg("--target-version=py310"), @"
     success: false
     exit_code: 1
     ----- stdout -----
     script.py:6:4: non-pep604-annotation-optional: [*] Use `X | None` for type annotations
-    Found 1 error.
-    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");

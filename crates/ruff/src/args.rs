@@ -729,6 +729,12 @@ impl ConfigArguments {
         self.config_file.as_deref()
     }
 
+    pub(crate) fn overrides_script_target(&self) -> bool {
+        self.script_configuration() == ScriptConfiguration::Disabled
+            || self.target_version().is_some()
+            || self.overrides.per_file_target_version.is_some()
+    }
+
     pub(crate) fn target_version(&self) -> Option<ast::PythonVersion> {
         self.per_flag_overrides
             .target_version
