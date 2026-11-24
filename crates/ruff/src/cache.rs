@@ -1094,7 +1094,8 @@ mod tests {
             let file_path = self.package_root.join(path);
             format_path(
                 &file_path,
-                &self.project.settings.formatter,
+                &self.project,
+                &ConfigArguments::default(),
                 SourceType::Python(PySourceType::Python),
                 FormatMode::Write,
                 None,
