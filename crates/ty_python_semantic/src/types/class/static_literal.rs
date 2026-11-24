@@ -1644,9 +1644,9 @@ impl<'db> StaticClassLiteral<'db> {
     )]
     fn class_namespace(self, db: &'db dyn Db) -> ClassNamespace<'db> {
         let generator = CodeGeneratorKind::from_static_class(db, self);
-        // Keep generated slots lazy because they can depend on field types.
-        let may_have_slot_descriptors =
-            generator.is_some() || self.slot_names(db).is_some_and(|names| !names.is_empty());
+        // Both explicit and generated slot names can depend on members of this class.
+        // Defer resolving them until we check for a descriptor.
+        let may_have_slot_descriptors = generator.is_some() || self.has_explicit_slots(db);
         ClassNamespace {
             sources: self.member_sources(db).clone(),
             generator,

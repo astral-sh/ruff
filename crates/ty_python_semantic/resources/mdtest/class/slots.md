@@ -362,6 +362,22 @@ reveal_type(IndirectDictionarySlots().value)  # revealed: Unknown
 IndirectDictionarySlots().missing  # error: [missing-attribute]
 ```
 
+## Recursive slot declarations
+
+In this stub, `name` refers to itself through an instance. We can still infer the fallback slot name
+and expose its descriptor on the class.
+
+```pyi
+instance: Slotted
+
+class Slotted:
+    name = instance.name
+    __slots__ = name or "value"
+
+reveal_type(Slotted.__slots__)  # revealed: Literal["value"]
+reveal_type(Slotted.value)  # revealed: MemberDescriptorType
+```
+
 ## Mutated slot declarations
 
 Slot names are taken from the original literal. Later changes to that literal are not evaluated, so
