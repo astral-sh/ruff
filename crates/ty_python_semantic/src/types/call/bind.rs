@@ -7089,9 +7089,8 @@ impl<'db> CallInference<'_, 'db> {
         let result = call.infer(constraints);
         let inference = result.inference?;
         // Prefer the restricted call only if inference completed without binding or
-        // constraint errors, the merged specialization accepts every argument, and
-        // the return type fits the expected type. After budget exhaustion, a fallback
-        // to Unknown can pass both assignability checks.
+        // constraint errors or budget exhaustion, the merged specialization accepts
+        // every argument, and the return type fits the expected type.
         (result.errors.is_empty()
             && !result.constraint_set_errors.contains(&true)
             && inference.solutions(db).is_complete()
