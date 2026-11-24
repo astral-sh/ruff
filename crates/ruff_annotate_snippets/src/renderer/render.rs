@@ -2616,6 +2616,16 @@ const OUTPUT_REPLACEMENTS: &[(char, &str)] = &[
 ];
 
 pub(crate) fn normalize_whitespace(s: &str) -> Cow<'_, str> {
+    // All non-ASCII characters in OUTPUT_REPLACEMENTS start with 0xE2 in UTF-8.
+    let mut may_need_replacement = false;
+    for byte in s.bytes() {
+        let control = byte.is_ascii_control() && byte != b'\n';
+        may_need_replacement |= control | (byte == 0xe2);
+    }
+    if !may_need_replacement {
+        return Cow::Borrowed(s);
+    }
+
     if !s
         .chars()
         .any(|user| OUTPUT_REPLACEMENTS.iter().any(|(bad, _)| user == *bad))
@@ -2860,8 +2870,26 @@ fn newline_count(body: &str) -> usize {
 
 #[cfg(test)]
 mod test {
+    use alloc::borrow::Cow;
+
     use super::{OUTPUT_REPLACEMENTS, newline_count};
     use snapbox::IntoData;
+
+    #[test]
+    fn normalization_covers_all_output_replacements() {
+        for &(ch, replacement) in OUTPUT_REPLACEMENTS {
+            assert_eq!(super::normalize_whitespace(&ch.to_string()), replacement);
+        }
+    }
+
+    #[test]
+    fn printable_text_with_matching_lead_bytes_stays_borrowed() {
+        let text = "© →";
+        assert!(matches!(
+            super::normalize_whitespace(text),
+            Cow::Borrowed(_)
+        ));
+    }
 
     fn format_replacements(replacements: Vec<(char, &str)>) -> String {
         replacements
