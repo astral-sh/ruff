@@ -62,6 +62,7 @@ use crate::types::{
 };
 use crate::{Db, FxIndexSet};
 
+pub(super) use builder::MethodCall;
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};

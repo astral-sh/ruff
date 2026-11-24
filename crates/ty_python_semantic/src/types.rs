@@ -95,7 +95,7 @@ use crate::types::function::{
 };
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{ApplySpecialization, Specialization, bind_typevar};
-use crate::types::infer::InferenceFlags;
+use crate::types::infer::{InferenceFlags, MethodCall};
 use crate::types::known_instance::{InternedConstraintSet, InternedType, SentinelInstance};
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
@@ -7251,10 +7251,20 @@ impl<'db> Type<'db> {
     /// elements. It's usually best to only worry about "callability" relative to a particular
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Bindings<'db> {
+        self.bindings_for_method_call(db, env, None)
+    }
+
+    /// Allows synthesized methods to discard inapplicable overloads before cloning them.
+    fn bindings_for_method_call(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        call: Option<&MethodCall<'_>>,
+    ) -> Bindings<'db> {
         if let Type::ClassLiteral(ClassLiteral::Static(class)) = self {
             return Self::static_class_bindings(db, env, class);
         }
-        self.bindings_impl(db, env, &ActiveRecursionDetector::default())
+        self.bindings_inner(db, env, &ActiveRecursionDetector::default(), None, call)
     }
 
     /// Caches constructors for static classes in their own program.
@@ -7317,6 +7327,17 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         recursion_guard: &ActiveRecursionDetector<Type<'db>>,
         receiver: Option<Type<'db>>,
+    ) -> Bindings<'db> {
+        self.bindings_inner(db, env, recursion_guard, receiver, None)
+    }
+
+    fn bindings_inner(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursion_guard: &ActiveRecursionDetector<Type<'db>>,
+        receiver: Option<Type<'db>>,
+        call: Option<&MethodCall<'_>>,
     ) -> Bindings<'db> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
             return fallback.bindings_with_receiver(db, env, recursion_guard, receiver);
@@ -7408,9 +7429,14 @@ impl<'db> Type<'db> {
                     binding.bake_bound_type_into_overloads(db, env);
                     binding.into()
                 } else {
+                    let selection = call.and_then(|call| call.overloads(db, env, bound_method));
+                    let candidates = signature.iter().filter(|overload| {
+                        selection.is_none_or(|selection| selection.includes(overload))
+                    });
+
                     // Solve exact receiver constraints before checking the other arguments, but
                     // retain the receiver itself for call inference and receiver diagnostics.
-                    let overloads = signature.overloads.iter().flat_map(|overload| {
+                    let overloads = candidates.flat_map(|overload| {
                         if overload.has_receiver_determined_method_typevar(db, env)
                             && let Some(specialized) = overload.specialize_for_bound_receiver(
                                 db,
@@ -7734,13 +7760,18 @@ impl<'db> Type<'db> {
                 Binding::single(self, Signature::dynamic(self)).into()
             }
 
-            // Note that this correctly returns `None` if none of the union elements are callable.
-            Type::Union(union) => Bindings::from_union(
-                self,
-                union.elements(db).iter().map(|element| {
-                    element.bindings_with_receiver(db, env, recursion_guard, receiver)
-                }),
-            ),
+            Type::Union(union) => {
+                let elements = union.elements(db);
+                // Limit early selection to calls where each alternative is a bound method.
+                let call =
+                    call.filter(|_| elements.iter().all(|ty| matches!(ty, Type::BoundMethod(_))));
+                Bindings::from_union(
+                    self,
+                    elements.iter().map(|element| {
+                        element.bindings_inner(db, env, recursion_guard, receiver, call)
+                    }),
+                )
+            }
 
             // A narrowed `type[T: Base] & type[Child]` still needs to construct `T & Child`,
             // but its constructor must come from `Child`, not from `Base` as an independent,

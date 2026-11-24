@@ -62,6 +62,7 @@ use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorK
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, FrozenDataclassDispatch, MethodDecorator,
+    TypedDictGetOverloads,
 };
 use crate::types::constraints::{CandidateSolutions, ConstraintSetBuilder, Solutions};
 use crate::types::context::{InferContext, InferContextResult};
@@ -141,16 +142,17 @@ use crate::types::unpacker::{
 };
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
-    ClassType, DeclaredType, DynamicType, GeneratorTypeMode, InferenceFlags, InternedConstraintSet,
-    InternedType, IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, KnownUnion, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy,
-    ParamSpecAttrKind, Parameter, Parameters, ProgramEnvironment, PropertyDeprecations,
-    SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
-    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
-    TypeVarVariance, TypingModule, UnionAccumulator, UnionBuilder, UnionType, any_over_type,
-    binding_type, extract_fixed_length_iterable_element_types, infer_complete_scope_types,
-    infer_scope_types, is_discarded_dict_key_assignment, todo_type,
+    BindingContext, BoundMethodType, BoundTypeVarInstance, CallDunderError, CallableBinding,
+    CallableType, ClassType, DeclaredType, DynamicType, GeneratorTypeMode, InferenceFlags,
+    InternedConstraintSet, InternedType, IntersectionBuilder, IntersectionType,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueType,
+    LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters,
+    ProgramEnvironment, PropertyDeprecations, SentinelInstance, Signature, SpecialFormType,
+    SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule, UnionAccumulator,
+    UnionBuilder, UnionType, any_over_type, binding_type,
+    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
+    is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::ast_ids::PlaceUse;
@@ -587,6 +589,62 @@ fn transparent_callable_decorator_result<'db>(
         Type::Callable(_) => Some(decorated_ty),
         _ => None,
     }
+}
+
+/// Method calls whose syntax can rule out overloads before argument inference.
+pub(in crate::types) enum MethodCall<'a> {
+    Get {
+        key: &'a ast::ExprStringLiteral,
+        file: File,
+    },
+    GetWithDefault,
+}
+
+impl<'a> MethodCall<'a> {
+    fn from_expr(call: &'a ast::ExprCall, file: File) -> Option<Self> {
+        if call.func.as_attribute_expr()?.attr.id != "get" || !call.arguments.keywords.is_empty() {
+            return None;
+        }
+
+        match call.arguments.args.as_ref() {
+            [ast::Expr::StringLiteral(key)] => Some(Self::Get { key, file }),
+            [ast::Expr::StringLiteral(_), default] if !default.is_starred_expr() => {
+                Some(Self::GetWithDefault)
+            }
+            _ => None,
+        }
+    }
+
+    /// Decide independently for each bound method in a union. Unrelated methods
+    /// keep all their overloads and don't depend on the file's open state.
+    pub(in crate::types) fn overloads<'db>(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        method: BoundMethodType<'db>,
+    ) -> Option<TypedDictGetOverloads<'db>> {
+        if !TypedDictGetOverloads::applies_to(db, env, method) {
+            return None;
+        }
+
+        Some(match self {
+            Self::Get { key, file } => {
+                // Keep all keys for completions or when inference widens the literal.
+                let key = if collects_expected_types(db, *file) {
+                    None
+                } else {
+                    TypeInferenceBuilder::string_literal_type(db, key).as_string_literal()
+                };
+                TypedDictGetOverloads::Key(key)
+            }
+            Self::GetWithDefault => TypedDictGetOverloads::WithDefault,
+        })
+    }
+}
+
+/// Expected types for string completions are only read for files open in the editor.
+fn collects_expected_types(db: &dyn Db, file: File) -> bool {
+    db.is_open_file(file)
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -1027,66 +1085,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Attaches the call site's scope so generic argument matching can detect recursive calls.
-    fn bindings_for_call(&self, callable_type: Type<'db>) -> Bindings<'db> {
-        let db = self.db();
-        callable_type
-            .bindings(db, self.program_environment())
-            .with_call_site_scope(self.scope())
-    }
-
-    /// Prepares `get` with a literal string key and at most one positional default.
-    /// Synthesized `TypedDict.get` overloads have fixed arities, so we can discard
-    /// those with the wrong number of parameters before matching arguments.
-    fn bindings_for_get(
+    fn bindings_for_call(
         &self,
         callable_type: Type<'db>,
-        key: &ast::ExprStringLiteral,
-        arity: usize,
+        call: Option<&ast::ExprCall>,
     ) -> Bindings<'db> {
-        let db = self.db();
-        let env = self.program_environment();
-        let bind = |ty: Type<'db>| {
-            if let Type::BoundMethod(method) = ty
-                && let receiver @ Type::TypedDict(_) = method.self_instance(db)
-                && let Type::Callable(callable) = method.func(db)
-                // An attribute named `get` can also hold another bound method.
-                && receiver.member(db, env, "get").ignore_possibly_undefined() == Some(ty)
-            {
-                // Even overloads for other keys can affect how we infer a default, including
-                // how we expand it against other members of a union. Keep all keys in that
-                // case, and when the editor needs them for completions.
-                let key = (arity == 1
-                    && key.value.len() <= Self::MAX_STRING_LITERAL_SIZE
-                    && !self.collects_expected_types())
-                .then(|| key.value.to_str());
-                let overloads = callable.signatures(db).iter().filter(|signature| {
-                    let parameters = signature.parameters();
-                    parameters.len() == arity + 1
-                        && key.is_none_or(|key| {
-                            parameters[1]
-                                .annotated_type()
-                                .as_string_literal()
-                                .is_none_or(|expected| expected.value(db) == key)
-                        })
-                });
-                return CallableBinding::from_overloads(ty, overloads.cloned())
-                    .with_bound_type(receiver)
-                    .into();
-            }
-            ty.bindings(db, env)
-        };
-        match callable_type {
-            Type::Union(union)
-                if union
-                    .elements(db)
-                    .iter()
-                    .all(|ty| matches!(ty, Type::BoundMethod(_))) =>
-            {
-                Bindings::from_union(callable_type, union.elements(db).iter().copied().map(bind))
-            }
-            _ => bind(callable_type),
-        }
-        .with_call_site_scope(self.scope())
+        let method_call = call.and_then(|expr| MethodCall::from_expr(expr, self.file()));
+        callable_type
+            .bindings_for_method_call(self.db(), self.program_environment(), method_call.as_ref())
+            .with_call_site_scope(self.scope())
     }
 
     fn settings(&self) -> &AnalysisSettings {
@@ -6103,11 +6110,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 provenance,
                 ..
             }) => {
-                let bindings = self.bindings_for_call(dunder_callable).match_parameters(
-                    db,
-                    env,
-                    argument_types,
-                );
+                let bindings = self
+                    .bindings_for_call(dunder_callable, None)
+                    .match_parameters(db, env, argument_types);
 
                 let bindings = self
                     .infer_and_check_argument_types(
@@ -7294,7 +7299,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let tcx = if let ast::Expr::StringLiteral(literal) = expression
             && let Some(expected) = tcx.expected_type().and_then(Type::as_string_literal)
             && literal.value.to_str() != expected.value(self.db())
-            && !self.collects_expected_types()
+            && !collects_expected_types(self.db(), self.file())
         {
             TypeContext::default()
         } else {
@@ -7671,12 +7676,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assert_eq!(previous, None);
     }
 
-    /// Whether this region's inference should record expected types for string-literal
-    /// completions. They're only ever read for files open in the editor.
-    fn collects_expected_types(&self) -> bool {
-        self.db().is_open_file(self.file())
-    }
-
     fn store_maybe_expected_type(
         &mut self,
         expression: impl Into<ExpressionNodeKey>,
@@ -7691,7 +7690,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn store_expected_type(&mut self, expression: impl Into<ExpressionNodeKey>, ty: Type<'db>) {
-        if !self.collects_expected_types() {
+        if !collects_expected_types(self.db(), self.file()) {
             return;
         }
 
@@ -7791,8 +7790,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 aliased_type,
             )));
         }
+        Self::string_literal_type(self.db(), literal)
+    }
+
+    fn string_literal_type(db: &'db dyn Db, literal: &ast::ExprStringLiteral) -> Type<'db> {
         if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
-            Type::string_literal(self.db(), literal.value.to_str())
+            Type::string_literal(db, literal.value.to_str())
         } else {
             Type::literal_string()
         }
@@ -10586,18 +10589,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 _ => {}
             }
         }
-        let bindings = if let ast::Expr::Attribute(attr) = func.as_ref()
-            && attr.attr.id == "get"
-            && let Some(ast::Expr::StringLiteral(key)) = arguments.args.first()
-            && arguments.keywords.is_empty()
-            && arguments.args.len() <= 2
-            && !arguments.args.iter().any(ast::Expr::is_starred_expr)
-        {
-            self.bindings_for_get(callable_type, key, arguments.args.len())
-        } else {
-            self.bindings_for_call(callable_type)
-        }
-        .match_parameters(db, env, &call_arguments);
+        let bindings = self
+            .bindings_for_call(callable_type, Some(call_expression))
+            .match_parameters(db, env, &call_arguments);
 
         report_missing_implicit_constructor_call(
             &self.context,

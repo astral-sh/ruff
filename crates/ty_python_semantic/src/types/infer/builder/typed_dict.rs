@@ -502,9 +502,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } else {
             callable_type
         };
-        let bindings =
-            self.bindings_for_call(binding_callable)
-                .match_parameters(db, env, &call_arguments);
+        let bindings = self
+            .bindings_for_call(binding_callable, None)
+            .match_parameters(db, env, &call_arguments);
 
         if can_infer && !bindings.satisfies(|_| true) {
             self.context.mark_failed_call(call_expression);

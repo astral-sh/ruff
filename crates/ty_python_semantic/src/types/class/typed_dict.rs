@@ -23,9 +23,10 @@ use crate::types::typed_dict::{
     deferred_functional_typed_dict_openness, deferred_functional_typed_dict_schema,
 };
 use crate::types::{
-    BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, IntersectionBuilder,
-    KnownClass, MemberLookupPolicy, SelfTypeVarOrigin, Type, TypeContext, TypeMapping,
-    TypeVarVariance, TypedDictType, TypingModule, UnionType, determine_self_class,
+    BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
+    IntersectionBuilder, KnownClass, MemberLookupPolicy, SelfTypeVarOrigin, StringLiteralType,
+    Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictType, TypingModule, UnionType,
+    determine_self_class,
 };
 use crate::{Db, FxIndexMap};
 use ty_python_core::definition::Definition;
@@ -374,6 +375,44 @@ fn synthesize_typed_dict_delitem<'db>(
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
     ))
+}
+
+/// Overloads to retain for a positional call to the synthesized `TypedDict.get`.
+#[derive(Copy, Clone)]
+pub(in crate::types) enum TypedDictGetOverloads<'db> {
+    Key(Option<StringLiteralType<'db>>),
+    /// Even other keys can supply inference context for the default or affect
+    /// argument expansion when another member of a union is overloaded.
+    WithDefault,
+}
+
+impl<'db> TypedDictGetOverloads<'db> {
+    /// An attribute named `get` can hold another method, such as `row.pop`.
+    pub(in crate::types) fn applies_to(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        method: BoundMethodType<'db>,
+    ) -> bool {
+        let receiver = method.self_instance(db);
+        receiver.is_typed_dict()
+            && matches!(method.func(db), Type::Callable(_))
+            && receiver.member(db, env, "get").ignore_possibly_undefined()
+                == Some(Type::BoundMethod(method))
+    }
+
+    pub(in crate::types) fn includes(self, signature: &Signature<'db>) -> bool {
+        match (self, signature.parameters().as_slice()) {
+            (Self::Key(Some(key)), [_, parameter]) => {
+                // Non-literal parameters cover missing keys and the general string fallback.
+                parameter
+                    .annotated_type()
+                    .as_string_literal()
+                    .is_none_or(|expected| key == expected)
+            }
+            (Self::Key(None), [_, _]) | (Self::WithDefault, [_, _, _]) => true,
+            _ => false,
+        }
+    }
 }
 
 /// Synthesize the `get` method for a `TypedDict`.
