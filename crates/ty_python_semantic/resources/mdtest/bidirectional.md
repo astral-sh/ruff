@@ -1157,6 +1157,41 @@ x1: dict[Hashable, Callable[..., object]] = {"x": lambda: 1}
 x2: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
 ```
 
+## Generic calls with the same argument types
+
+When the expected return type is incompatible, the arguments can still determine the return type.
+Each argument error points to the offending value in its own call.
+
+```py
+from typing import Any
+
+def first[T](values: list[T], tag: Any) -> T:
+    return values[0]
+
+def check(values: list[int] | None):
+    # error: [invalid-assignment] "Object of type `int` is not assignable to `str`"
+    a: str = first(values, 0)  # error: 20 [invalid-argument-type] "Expected `list[int]`"
+    # error: [invalid-assignment] "Object of type `int` is not assignable to `str`"
+    b: str = first(tag="b", values=values)  # error: 29 [invalid-argument-type] "Expected `list[int]`"
+```
+
+Both attributes initially have type `list[int]`. Only the annotation takes precedence over `Any`
+when the attributes are reassigned.
+
+```py
+def wrap[T](value: T) -> list[T]:
+    return [value]
+
+class Fields:
+    def update(self, value: Any):
+        self.inferred = [1]
+        self.declared: list[int] = [1]
+        self.inferred = wrap(value)
+        self.declared = wrap(value)
+        reveal_type(self.inferred)  # revealed: list[Any]
+        reveal_type(self.declared)  # revealed: list[int]
+```
+
 ## Preserving literal element types in a generic call
 
 `max(..., key=len)` returns one of its input tuples. When the result is annotated as `Colors`, ty
