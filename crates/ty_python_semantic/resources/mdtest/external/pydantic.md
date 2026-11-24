@@ -717,9 +717,8 @@ Unions are converted element-wise:
 class LaxUnion(BaseModel):
     value: int | list[str] | None
 
-reveal_type(
-    LaxUnion.__init__
-)  # revealed: [Self](self: Self, /, *, value: LaxInt | Iterable[LaxStr] | None, **extra: Any) -> None
+# revealed: [Self](self: Self, /, *, value: LaxInt | Iterable[LaxStr] | None, **extra: Any) -> None
+reveal_type(LaxUnion.__init__)
 
 LaxUnion(value=1)
 LaxUnion(value="1")
