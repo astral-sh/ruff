@@ -64,3 +64,67 @@ fn display_settings_from_nested_directory() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn show_inline_script_settings_path() -> anyhow::Result<()> {
+    let test = CliTest::with_settings(|_, mut settings| {
+        settings.add_filter(
+            r"(?s)# General Settings.*----- stderr -----",
+            "[settings omitted]\n\n----- stderr -----",
+        );
+        settings
+    })?;
+    test.write_file(
+        "script.py",
+        r#"
+            # /// script
+            # [tool.ruff]
+            # ///
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(test.command().args(["check", "--preview", "--show-settings", "script.py"]), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Resolved settings for: "[TMP]/script.py"
+    Settings path: "[TMP]/script.py"
+
+    [settings omitted]
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn show_settings_invalid_script_metadata() -> anyhow::Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # requires-python = 42
+            # ///
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(test.command().args(["check", "--preview", "--show-settings", "script.py"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: invalid-script-metadata: invalid type: integer `42`, expected a string
+     --> script.py:3:21
+      |
+    2 | # /// script
+    3 | # requires-python = 42
+      |                     ^^
+    4 | # ///
+      |
+    ");
+
+    Ok(())
+}

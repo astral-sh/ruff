@@ -1,7 +1,7 @@
 //! Resolve Ruff settings from inline script metadata (PEP 723).
 
 use std::fmt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -18,7 +18,7 @@ use ruff_linter::message::RenderContext;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging::detect_package_root;
 use ruff_linter::preview::is_script_metadata_enabled;
-use ruff_linter::settings::LinterSettings;
+use ruff_linter::settings::{LinterSettings, types::PreviewMode};
 use ruff_python_ast::script::ScriptTag;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_ranged_value::{ValueSource, ValueSourceGuard};
@@ -45,9 +45,17 @@ pub enum ScriptConfiguration {
 #[derive(Debug)]
 pub struct Script {
     settings: ScriptSettings,
+    config_path: Option<PathBuf>,
 }
 
 impl Script {
+    /// Return the inline configuration's path, falling back to the project's path.
+    pub fn config_path<'a>(&'a self, project: &'a Project) -> Option<&'a Path> {
+        self.config_path
+            .as_deref()
+            .or_else(|| project.config_path())
+    }
+
     /// Return the script's resolved settings, falling back to the project's settings.
     pub fn settings<'a>(&'a self, project: &'a Settings) -> &'a Settings {
         match &self.settings {
@@ -118,6 +126,12 @@ enum ScriptSettings {
     Declared(Option<Box<Settings>>),
 }
 
+/// Whether to look for inline script metadata in this file.
+pub fn should_read_script_metadata(preview: PreviewMode, source_type: SourceType) -> bool {
+    is_script_metadata_enabled(preview)
+        && matches!(source_type, SourceType::Python(PySourceType::Python))
+}
+
 /// Resolve a Python file's inline script settings. Returns `None` if script metadata
 /// support is disabled or the file has no PEP 723 script metadata header.
 pub fn script(
@@ -128,10 +142,7 @@ pub fn script(
     source_type: SourceType,
     source: &str,
 ) -> Result<Option<Script>, ScriptSettingsError> {
-    if !is_script_metadata_enabled(project.settings.preview) {
-        return Ok(None);
-    }
-    if source_type != SourceType::Python(PySourceType::Python) {
+    if !should_read_script_metadata(project.settings.preview, source_type) {
         return Ok(None);
     }
 
@@ -151,12 +162,14 @@ pub fn script(
             .map_err(config_error)
     };
 
+    let mut config_path = None;
     let settings = if script_configuration == ScriptConfiguration::Disabled {
         None
     } else if let Some(options) = options {
         let root = fs::normalize_path(path.and_then(Path::parent).unwrap_or(Path::new(".")));
         let configuration =
             inline_configuration(options, path, &root, requires_python).map_err(config_error)?;
+        config_path = path.map(fs::normalize_path);
         Some(resolve(configuration, &root)?)
     } else if let Some(version) = requires_python.and_then(get_minimum_supported_version) {
         let mut configuration = project.configuration.clone();
@@ -172,6 +185,7 @@ pub fn script(
     };
 
     Ok(Some(Script {
+        config_path,
         settings: if declared {
             ScriptSettings::Declared(settings.map(Box::new))
         } else {
