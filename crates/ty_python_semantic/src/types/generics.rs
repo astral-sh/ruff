@@ -2830,6 +2830,13 @@ pub(crate) enum TypeVarInferenceSolutions<'db> {
     Unavailable(TypeVarInferenceFallback),
 }
 
+impl TypeVarInferenceSolutions<'_> {
+    /// Whether the solver returned a complete set of alternatives without fallback.
+    pub(crate) fn is_complete(&self) -> bool {
+        matches!(self, Self::Single | Self::Alternatives(_))
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum TypeVarInferenceFallback {
     Unconstrained,

@@ -7088,12 +7088,13 @@ impl<'db> CallInference<'_, 'db> {
         };
         let result = call.infer(constraints);
         let inference = result.inference?;
+        // Prefer the restricted call only if inference completed without binding or
+        // constraint errors, the merged specialization accepts every argument, and
+        // the return type fits the expected type. After budget exhaustion, a fallback
+        // to Unknown can pass both assignability checks.
         (result.errors.is_empty()
             && !result.constraint_set_errors.contains(&true)
-            && matches!(
-                inference.solutions(db),
-                TypeVarInferenceSolutions::Single | TypeVarInferenceSolutions::Alternatives(_)
-            )
+            && inference.solutions(db).is_complete()
             && call.accepts_arguments(inference.merged_specialization(db))
             && self
                 .call_expression_tcx
@@ -7102,8 +7103,14 @@ impl<'db> CallInference<'_, 'db> {
         .then_some(result)
     }
 
-    /// Only this call's variables may be solved to make the match work. An enclosing
-    /// function's unconstrained `U` cannot be assumed to match `list[T]`.
+    /// Test whether assigning `actual` to the candidate arm `formal` produces
+    /// satisfiable constraints on this call's type variables. For example,
+    /// `list[int]` can match `list[T]`, but an enclosing function's unconstrained
+    /// `U` cannot be assumed to be a list.
+    ///
+    /// The full solve checks declared bounds and constraints, sibling arguments,
+    /// and the expected return type. If this preliminary check exhausts its
+    /// budget, return `false` so we don't restrict the parameter on that basis.
     fn can_match(
         &self,
         constraints: &ConstraintSetBuilder<'db>,

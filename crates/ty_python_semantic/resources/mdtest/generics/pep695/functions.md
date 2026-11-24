@@ -4036,6 +4036,29 @@ red = ("red",)
 result: tuple[Literal["red"], ...] = pick([red])  # ok
 ```
 
+## Incomplete match for a callable union arm
+
+The callback itself is a valid choice for `T`. Matching both arguments against `Callable[[T], None]`
+would give `T` the upper bound `(int | str) & (A | B | Callback)`. If solving that intersection
+exceeds the solver's budget, we keep the bare `T` match so we can still check calls to the result.
+
+```py
+from collections.abc import Callable
+
+class A: ...
+class B: ...
+
+type Callback = Callable[[int | str], None]
+
+def pick[T](x: T | Callable[[T], None], sink: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def _(x: Callback, sink: Callable[[A | B | Callback], None]):
+    result = pick(x, sink)
+    reveal_type(result)  # revealed: (int | str, /) -> None
+    result(None)  # error: [invalid-argument-type]
+```
+
 ## List literals with intersection parameters
 
 For `[1]`, invariance fixes `T` to `int`, but the list itself must also satisfy `T`.
