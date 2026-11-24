@@ -45,13 +45,9 @@ pub(super) fn project_files<'a>(
     root.cache_key(&mut key);
     settings.file_resolver.cache_key(&mut key);
     let cache_dir = settings.cache_dir.join(ruff_linter::VERSION);
-    let cache_path = cache_dir.join(format!("format-discovery-v1-{}", key.finish()));
+    let cache_path = cache_dir.join(format!("format-discovery-v2-{}", key.finish()));
 
-    if let Some(snapshot) = fs::read(&cache_path)
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<Snapshot>(&bytes).ok())
-        .filter(|snapshot| snapshot.root == root && snapshot.is_current())
-    {
+    if let Some(snapshot) = Snapshot::load(&cache_path, &root) {
         debug!("Format discovery cache hit");
         let files = snapshot
             .files
@@ -84,7 +80,6 @@ pub(super) fn project_files<'a>(
     let (files, resolver) =
         project_files_in_path_with_directories(paths, root_project, transformer, Some(&visit))?;
     if let Ok(Some(directories)) = directories.into_inner()
-        && directories.iter().any(|(path, _)| *path == root)
         && let Some(nested_files) = files
             .iter()
             .map(|file| match file {
@@ -113,16 +108,36 @@ struct Snapshot {
 }
 
 impl Snapshot {
+    /// Treat damaged snapshots as misses even if the file list still parses as valid JSON.
+    fn load(path: &Path, root: &Path) -> Option<Self> {
+        let bytes = fs::read(path).ok()?;
+        let (checksum, payload) = bytes.split_first_chunk::<8>()?;
+        if *checksum != Self::checksum(payload) {
+            return None;
+        }
+        let snapshot: Self = serde_json::from_slice(payload).ok()?;
+        (snapshot.root == root && snapshot.is_current()).then_some(snapshot)
+    }
+
+    fn checksum(payload: &[u8]) -> [u8; 8] {
+        let mut hasher = CacheKeyHasher::new();
+        hasher.write(payload);
+        hasher.finish().to_le_bytes()
+    }
+
     fn is_current(&self) -> bool {
-        self.directories
-            .par_iter()
-            .all(|(path, stamp)| DirectoryStamp::read(path).is_ok_and(|current| current == *stamp))
+        self.directories.iter().any(|(path, _)| *path == self.root)
+            && self.directories.par_iter().all(|(path, stamp)| {
+                DirectoryStamp::read(path).is_ok_and(|current| current == *stamp)
+            })
     }
 
     fn store(&self, parent: &Path, path: &Path) -> Result<()> {
         fs::create_dir_all(parent)?;
         let mut temp = tempfile::NamedTempFile::new_in(parent)?;
-        temp.write_all(&serde_json::to_vec(self)?)?;
+        let payload = serde_json::to_vec(self)?;
+        temp.write_all(&Self::checksum(&payload))?;
+        temp.write_all(&payload)?;
         temp.persist(path)?;
         Ok(())
     }
@@ -166,5 +181,47 @@ impl DirectoryStamp {
                         Duration::new(seconds, nanos) + Duration::from_secs(2) < before
                     })
             })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use anyhow::Result;
+
+    use super::{DirectoryStamp, Snapshot};
+
+    #[test]
+    fn rejects_damaged_or_incomplete_snapshots() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let cache = temp.path().join("snapshot");
+        let root = temp.path().join("project");
+        let nested = root.join("src");
+        fs::create_dir_all(&nested)?;
+        let mut snapshot = Snapshot {
+            root: root.clone(),
+            directories: vec![
+                (root.clone(), DirectoryStamp::read(&root)?),
+                (nested.clone(), DirectoryStamp::read(&nested)?),
+            ],
+            files: vec![nested.join("main.py")],
+        };
+        snapshot.store(temp.path(), &cache)?;
+        assert!(Snapshot::load(&cache, &root).is_some());
+
+        // Losing a file can leave the JSON valid and all directory stamps unchanged.
+        let mut bytes = fs::read(&cache)?;
+        bytes.truncate(8);
+        snapshot.files.clear();
+        serde_json::to_writer(&mut bytes, &snapshot)?;
+        fs::write(&cache, bytes)?;
+        assert!(Snapshot::load(&cache, &root).is_none());
+
+        // Even a checksummed snapshot must include the directory where the walk started.
+        snapshot.directories.remove(0);
+        snapshot.store(temp.path(), &cache)?;
+        assert!(Snapshot::load(&cache, &root).is_none());
+        Ok(())
     }
 }
