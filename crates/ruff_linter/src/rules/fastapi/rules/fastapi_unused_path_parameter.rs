@@ -256,6 +256,8 @@ impl<'a> Dependency<'a> {
     ///     #                 ^^^^^^^^^^^^
     ///     a: str = Depends(foo),
     ///     #        ^^^^^^^^^^^^
+    ///     a: foo = Depends(),
+    ///     #  ^^^   ^^^^^^^^^
     /// ): ...
     /// ```
     fn from_parameter(
@@ -264,7 +266,7 @@ impl<'a> Dependency<'a> {
     ) -> Option<Self> {
         if let Some(dependency) = parameter
             .default()
-            .and_then(|default| Self::from_default(default, semantic))
+            .and_then(|default| Self::from_default(default, parameter.annotation(), semantic))
         {
             return Some(dependency);
         }
@@ -301,10 +303,21 @@ impl<'a> Dependency<'a> {
         }
     }
 
-    fn from_default(expr: &'a Expr, semantic: &SemanticModel<'a>) -> Option<Self> {
+    fn from_default(
+        expr: &'a Expr,
+        annotation: Option<&'a Expr>,
+        semantic: &SemanticModel<'a>,
+    ) -> Option<Self> {
         let arguments = depends_arguments(expr, semantic)?;
 
-        Self::from_depends_call(arguments, semantic)
+        if !arguments.is_empty() {
+            return Self::from_depends_call(arguments, semantic);
+        }
+
+        // Arguments to `Depends` can be empty if the dependency class is inferred
+        // from the parameter type annotation.
+        // https://fastapi.tiangolo.com/tutorial/dependencies/classes-as-dependencies/#shortcut
+        Self::from_dependency_name(annotation?.as_name_expr()?, semantic)
     }
 
     fn from_depends_call(arguments: &'a Arguments, semantic: &SemanticModel<'a>) -> Option<Self> {
