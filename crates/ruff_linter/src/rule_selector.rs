@@ -224,6 +224,19 @@ pub enum ParseError {
 }
 
 impl RuleSelector {
+    /// Display an exact rule by name and optional code, or a broader selector by its text.
+    /// The alternate format surrounds names, codes, and selectors with backticks.
+    pub fn name_and_code(&self) -> impl std::fmt::Display + '_ {
+        std::fmt::from_fn(|f| match self {
+            Self::Rule { rule } => std::fmt::Display::fmt(&rule.name_and_code(), f),
+            _ => {
+                let (prefix, code) = self.prefix_and_code();
+                let quote = if f.alternate() { "`" } else { "" };
+                write!(f, "{quote}{prefix}{code}{quote}")
+            }
+        })
+    }
+
     pub fn prefix_and_code(&self) -> (&'static str, &'static str) {
         match self {
             RuleSelector::All => ("", "ALL"),
@@ -383,17 +396,17 @@ mod schema {
             })
             .filter(|_rule| {
                 // Filter out all test-only rules
-                #[cfg(any(feature = "test-rules", test))]
-                #[expect(clippy::used_underscore_binding)]
-                if _rule.starts_with("RUF9")
-                    || _rule == "PLW0101"
-                    || Rule::from_name(_rule)
-                        .is_ok_and(|rule| matches!(rule.category(), Category::Testing))
-                {
-                    return false;
+                cfg_select! {
+                    any(feature = "test-rules", test) => {
+                        #[expect(clippy::used_underscore_binding)]
+                        let is_test_rule = _rule.starts_with("RUF9")
+                            || _rule == "PLW0101"
+                            || Rule::from_name(_rule)
+                                .is_ok_and(|rule| matches!(rule.category(), Category::Testing));
+                        !is_test_rule
+                    }
+                    _ => true,
                 }
-
-                true
             })
             .sorted()
             .collect();

@@ -116,14 +116,17 @@ jobs:
               --old-ty "./ty-old" \
               --new-ty "./ty-new" \
               --projects-dir "${GITHUB_WORKSPACE}/memory_projects" \
-              --output ../memory_report_diff.diff
+              --output ../memory_report_diff.md
           )
+
+      - name: Write job summary
+        run: cat memory_report_diff.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload diff
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: memory_report_diff
-          path: memory_report_diff.diff
+          path: memory_report_diff.md
 
   publish-report:
     needs: memory_report
@@ -142,4 +145,4 @@ jobs:
     with:
       report: memory
       artifact: memory_report_diff
-      filename: memory_report_diff.diff
+      filename: memory_report_diff.md

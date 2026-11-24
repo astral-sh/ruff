@@ -362,6 +362,22 @@ reveal_type(IndirectDictionarySlots().value)  # revealed: Unknown
 IndirectDictionarySlots().missing  # error: [missing-attribute]
 ```
 
+## Recursive slot declarations
+
+In this stub, `name` refers to itself through an instance. We can still infer the fallback slot name
+and expose its descriptor on the class.
+
+```pyi
+instance: Slotted
+
+class Slotted:
+    name = instance.name
+    __slots__ = name or "value"
+
+reveal_type(Slotted.__slots__)  # revealed: Literal["value"]
+reveal_type(Slotted.value)  # revealed: MemberDescriptorType
+```
+
 ## Mutated slot declarations
 
 Slot names are taken from the original literal. Later changes to that literal are not evaluated, so
@@ -1083,6 +1099,24 @@ class Child(Slotted):
 
 reveal_type(Child().missing)  # revealed: int
 Child().missing = 1
+```
+
+## Receiver annotations do not create instance storage
+
+Redeclaring an inherited nested class as an instance attribute still requires a slot or an instance
+dictionary.
+
+```py
+class Base:
+    __slots__ = ()
+
+    class Inner: ...
+
+class Child(Base):
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        self.Inner: type[Base.Inner] = Base.Inner  # error: [missing-slot]
 ```
 
 ## Class attributes cannot have the same name as a slot

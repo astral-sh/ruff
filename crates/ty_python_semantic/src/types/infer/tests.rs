@@ -6,7 +6,8 @@ use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::lint::{LintSource, RuleSelection};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
-use crate::types::{KnownClass, KnownInstanceType, check_types};
+use crate::types::{KnownClass, KnownInstanceType, TypeAndQualifiers, check_types};
+use ruff_db::Db as _;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
@@ -1157,6 +1158,32 @@ fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definit
 }
 
 #[test]
+fn star_import_infers_unused_bindings_on_demand() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_files([
+        ("/src/main.py", "from dependency import *"),
+        ("/src/dependency.py", "value: int = 1"),
+    ])?;
+
+    let main = system_path_to_file(&db, "/src/main.py")?;
+    db.clear_salsa_events();
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    let check_events = db.take_salsa_events();
+
+    let ty = global_symbol(&db, main, "value").place.expect_type();
+    assert_eq!(
+        ty.display(&db, &db.program_environment()).to_string(),
+        "int"
+    );
+    let lookup_events = db.take_salsa_events();
+
+    let binding = first_public_binding(&db, main, "value");
+    assert_function_query_was_not_run(&db, infer_definition_types, binding, &check_events);
+    assert_function_query_was_run(&db, infer_definition_types, binding, &lookup_events);
+    Ok(())
+}
+
+#[test]
 fn changing_a_name_use_keeps_an_imported_declaration_cached() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_files([
@@ -1183,6 +1210,22 @@ fn changing_a_name_use_keeps_an_imported_declaration_cached() -> anyhow::Result<
     assert_imported_type(&db);
     let events = db.take_salsa_events();
     assert_function_query_was_not_run_by_name(&db, query_name, None, &events);
+    Ok(())
+}
+
+#[test]
+fn project_builtins_follow_file_creation_and_removal() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let main = "/src/main.py";
+    let builtins = "/src/__builtins__.pyi";
+    db.write_file(main, "value = project_value")?;
+
+    let missing = &["Name `project_value` used when not defined"];
+    assert_file_diagnostics(&db, main, missing);
+    db.write_file(builtins, "project_value: int")?;
+    assert_file_diagnostics(&db, main, &[]);
+    db.remove_file(builtins)?;
+    assert_file_diagnostics(&db, main, missing);
     Ok(())
 }
 
@@ -1334,6 +1377,31 @@ fn redundant_elif_fix_preserves_line_endings_and_checks_cleanly() -> anyhow::Res
         db.write_file("/src/main.py", fixed)?;
         assert_file_diagnostics(&db, "/src/main.py", &[]);
     }
+    Ok(())
+}
+
+#[test]
+fn inserting_a_binding_before_a_function_preserves_importer_inference() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let function = "def callback() -> int: return 1\n";
+    db.write_file("/src/api.py", function)?;
+    db.write_dedented(
+        "/src/main.py",
+        "
+        from api import callback
+
+        def get_callback():
+            return callback
+        ",
+    )?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+
+    // The new binding changes the callback's place ID, but not its body scope.
+    db.write_file("/src/api.py", format!("import os\n{function}"))?;
+    db.clear_salsa_events();
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run_by_name(&db, "infer_scope_types_impl", None, &events);
     Ok(())
 }
 
@@ -1514,6 +1582,53 @@ fn parameter_default_presence_invalidates_caller() -> anyhow::Result<()> {
 }
 
 #[test]
+fn inherited_writes_follow_changes_to_frozen_bases() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let path = "/src/main.py";
+    db.write_file(
+        path,
+        "\
+from base import Base
+
+class Child[T](Base[T]): ...
+
+def update(a: Child[int], b: Child[str]):
+    a.value = 42
+    del b.value
+",
+    )?;
+
+    for frozen in [false, true, false] {
+        let flag = if frozen { "True" } else { "False" };
+        db.write_file(
+            "/src/base.py",
+            format!(
+                "\
+from dataclasses import dataclass
+
+@dataclass(frozen={flag})
+class Base[T]:
+    value: T
+"
+            ),
+        )?;
+        if frozen {
+            assert_file_diagnostics(
+                &db,
+                path,
+                &[
+                    "Property `value` defined in `Child[int]` is read-only",
+                    "Cannot delete attribute `value` on type `Child[str]` whose `__delattr__` method returns `Never`/`NoReturn`",
+                ],
+            );
+        } else {
+            assert_file_diagnostics(&db, path, &[]);
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn dynamic_class_metaclass_updates_after_base_change() -> anyhow::Result<()> {
     let mut db = setup_db();
     let base = "\
@@ -1544,6 +1659,30 @@ reveal_type(type(C))
 
     db.write_file("/src/base.py", base)?;
     assert_revealed_type(&db, "/src/main.py", "<class 'Meta1'>");
+    Ok(())
+}
+
+#[test]
+fn iteration_follows_changes_to_the_iterator() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file(
+        "/src/main.py",
+        "\
+from typing_extensions import reveal_type
+from source import Items
+
+def use(items: Items):
+    for item in items:
+        reveal_type(item)
+",
+    )?;
+    for element in ["int", "str", "int"] {
+        db.write_file(
+            "/src/source.pyi",
+            format!("class Items:\n    def __iter__(self) -> Items: ...\n    def __next__(self) -> {element}: ..."),
+        )?;
+        assert_revealed_type(&db, "/src/main.py", element);
+    }
     Ok(())
 }
 
@@ -1639,6 +1778,28 @@ fn recursive_protocol_materialization_tracks_member_type_changes() -> anyhow::Re
         assert_file_diagnostics(&db, "/src/main.py", diagnostics);
     }
 
+    Ok(())
+}
+
+#[test]
+fn abstract_methods_track_changes_to_identity_decorators() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let module = "/src/main.py";
+    db.write_file(
+        module,
+        "from decorate import decorate\nclass Base:\n    @decorate\n    def method(self) -> int: return 1\nBase()",
+    )?;
+    let decorator = "/src/decorate.py";
+    let identity = "from typing import Callable, TypeVar\nF = TypeVar('F', bound=Callable)\ndef decorate(f: F) -> F: return f";
+
+    db.write_file(decorator, identity)?;
+    assert_file_diagnostics(&db, module, &[]);
+
+    db.write_file(decorator, "from abc import abstractmethod as decorate")?;
+    assert_file_diagnostics(&db, module, &["Cannot instantiate abstract class `Base`"]);
+
+    db.write_file(decorator, identity)?;
+    assert_file_diagnostics(&db, module, &[]);
     Ok(())
 }
 
@@ -1796,6 +1957,41 @@ fn dependency_implicit_alias_definition() -> anyhow::Result<()> {
             assert_function_query_was_not_run(&db, infer_definition_types, definition, &events);
         }
     }
+    Ok(())
+}
+
+#[test]
+fn statement_call_index_survives_unrelated_revisions() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    // Project files have LOW durability, unlike setup_db's search paths.
+    db.files().try_add_root(
+        &db,
+        ruff_db::system::SystemPath::new("/src/project"),
+        ruff_db::files::FileRootKind::Project,
+    );
+    let source = "def run(callback):\n    callback()\n";
+    db.write_file("/src/project/target.py", source)?;
+    let file = system_path_to_file(&db, "/src/project/target.py")?;
+    semantic_index(&db, program_file(&db, file));
+
+    db.synthetic_write(salsa::Durability::LOW);
+    db.clear_salsa_events();
+    semantic_index(&db, program_file(&db, file));
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run(&db, semantic_index, program_file(&db, file), &events);
+    assert!(
+        !events.iter().any(|event| matches!(
+            event.kind,
+            salsa::EventKind::DidValidateInternedValue { key, .. }
+                if db.ingredient_debug_name(key.ingredient_index()) == "CallableAndCallExpr"
+        )),
+        "validating the semantic index depended on an interned call key"
+    );
+
+    db.write_file("/src/project/target.py", format!("{source}changed = 1\n"))?;
+    semantic_index(&db, program_file(&db, file));
+    let events = db.take_salsa_events();
+    assert_function_query_was_run(&db, semantic_index, program_file(&db, file), &events);
     Ok(())
 }
 

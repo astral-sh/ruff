@@ -25,7 +25,10 @@ use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
     SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
-use crate::place::{DefinedPlace, Provenance, TypeOrigin, place_from_declarations};
+use crate::place::{
+    ConsideredDefinitions, DefinedPlace, Provenance, RequiresExplicitReExport, TypeOrigin,
+    place_by_id, place_from_declarations,
+};
 use crate::reachability::{DeclarationsIteratorExtension, ReachabilityConstraintsExtension};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
@@ -48,9 +51,10 @@ use crate::types::tuple::{Tuple, TupleLength, TupleSpec};
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceOrigin;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams, ErrorContext,
-    ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping,
-    TypingModule, UnionBuilder, VarianceInferable, VarianceTerm,
+    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassFlags, DataclassParams,
+    ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType,
+    RecursiveTypeNormalizer, TypeContext, TypeMapping, TypingModule, UnionBuilder,
+    VarianceInferable, VarianceTerm,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet,
@@ -65,6 +69,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
@@ -205,7 +210,7 @@ impl<'db> CodeGeneratorKind<'db> {
 
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _| None,
+            cycle_initial=|_, _, _, _| None,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn code_generator_of_static_class<'db>(
@@ -267,7 +272,7 @@ impl<'db> CodeGeneratorKind<'db> {
     fn from_dynamic_class(db: &'db dyn Db, class: DynamicClassLiteral<'db>) -> Option<Self> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _| None,
+            cycle_initial=|_, _, _, _| None,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn code_generator_of_dynamic_class<'db>(
@@ -335,6 +340,22 @@ impl<'db> CodeGeneratorKind<'db> {
         matches!(self, Self::Pydantic(_))
     }
 
+    /// Whether the class's frozen setting is enforced for ordinary attribute writes.
+    fn is_frozen(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        class: StaticClassLiteral<'db>,
+    ) -> bool {
+        match self {
+            Self::Pydantic(metadata) => {
+                metadata.is_frozen(db)
+                    && pydantic::uses_base_model_setattr(db, env, class) == Some(true)
+            }
+            _ => class.has_dataclass_param(db, self, DataclassFlags::FROZEN),
+        }
+    }
+
     /// Return `true` if field declarations should be treated as instance attributes.
     ///
     /// For example, a bare annotation in a dataclass body is seen as evidence for the
@@ -364,13 +385,13 @@ impl<'db> CodeGeneratorKind<'db> {
     ///
     /// C(value=42)
     /// ```
-    fn synthesizes_constructor_signature_from_fields(
+    pub(super) fn synthesizes_constructor_signature_from_fields(
         self,
         db: &'db dyn Db,
         class: StaticClassLiteral<'db>,
     ) -> bool {
         match self {
-            Self::DataclassLike(_) => true,
+            Self::DataclassLike(_) => class.has_dataclass_param(db, self, DataclassFlags::INIT),
             Self::Pydantic(_) => pydantic::synthesizes_constructor_signature_from_fields(db, class),
             Self::NamedTuple | Self::TypedDict => false,
         }
@@ -423,19 +444,19 @@ impl<'db> GenericAlias<'db> {
         ))
     }
 
-    pub(super) fn recursive_type_normalized_impl(
+    pub(super) fn normalize_recursive(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalizer: &mut RecursiveTypeNormalizer<'_, 'db>,
         nested: bool,
     ) -> Option<Self> {
-        Some(Self::new(
-            db,
-            self.origin(db),
-            self.specialization(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-        ))
+        let original = self.specialization(db);
+        let normalized = original.normalize_recursive(db, normalizer, nested)?;
+        if normalized == original {
+            Some(self)
+        } else {
+            Some(Self::new(db, self.origin(db), normalized))
+        }
     }
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
@@ -452,7 +473,7 @@ impl<'db> GenericAlias<'db> {
         let tcx = if type_mapping.is_structural() {
             &[]
         } else {
-            tcx.declared_type()
+            tcx.expected_type()
                 .and_then(|ty| ty.specialization_of(db, visitor.env, self.origin(db)))
                 .map(|specialization| specialization.types(db))
                 .unwrap_or(&[])
@@ -526,7 +547,7 @@ impl<'db> GenericAlias<'db> {
     /// Resolve this alias's ancestors in MRO order with its type arguments applied.
     #[salsa::tracked(
         returns(as_ref),
-        cycle_initial=|db, _, alias: GenericAlias<'db>| {
+        cycle_initial=|db, _, _, alias: GenericAlias<'db>| {
             let origin = alias.origin(db);
             let env = ProgramEnvironment::from_scope(origin.body_scope(db));
             Err(Box::new(StaticMroError::cycle(
@@ -557,7 +578,7 @@ impl<'db> GenericAlias<'db> {
     /// `P[list[T]]` finite without expanding specialized class bodies.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
+        cycle_initial=|_, _, _, _, _| VarianceTerm::BIVARIANT,
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(in crate::types) fn variance_equation(
@@ -1207,12 +1228,21 @@ impl<'db> ClassType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        self.normalize_recursive(db, &mut RecursiveTypeNormalizer::new(env, div), nested)
+    }
+
+    pub(super) fn normalize_recursive(
+        self,
+        db: &'db dyn Db,
+        normalizer: &mut RecursiveTypeNormalizer<'_, 'db>,
+        nested: bool,
+    ) -> Option<Self> {
         match self {
             Self::NonGeneric(class) => Some(Self::NonGeneric(
-                class.recursive_type_normalized_impl(db, env, div, nested)?,
+                class.recursive_type_normalized_impl(db, normalizer.env, normalizer.div, nested)?,
             )),
             Self::Generic(generic) => Some(Self::Generic(
-                generic.recursive_type_normalized_impl(db, env, div, nested)?,
+                generic.normalize_recursive(db, normalizer, nested)?,
             )),
         }
     }
@@ -1626,7 +1656,7 @@ impl<'db> ClassType<'db> {
     /// Returns `None` if this class does not have any disjoint bases in its MRO.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _| None,
+        cycle_initial=|_, _, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(super) fn nearest_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
@@ -1859,11 +1889,7 @@ impl<'db> ClassType<'db> {
         else {
             return true;
         };
-        if types_are_disjoint(self_metaclass_instance, other_metaclass_instance) {
-            return false;
-        }
-
-        true
+        !types_are_disjoint(self_metaclass_instance, other_metaclass_instance)
     }
 
     /// Return a type representing "the set of all instances of the metaclass of this class".
@@ -2341,7 +2367,7 @@ impl<'db> ClassType<'db> {
     /// instance-returning constructors and constructors that explicitly return another type.
     #[salsa::tracked(
         returns(clone),
-        cycle_initial=|db, _, _, _| CallableTypes::one(CallableType::bottom(db)),
+        cycle_initial=|db, _, _, _, _| CallableTypes::one(CallableType::bottom(db)),
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(super) fn into_callable_with_receiver(
@@ -2399,7 +2425,7 @@ impl<'db> ClassType<'db> {
         }
 
         let dunder_new_callables = lookup_type
-            .lookup_dunder_new(db, env, MemberLookupPolicy::default())
+            .lookup_dunder_new(db, env, MemberLookupPolicy::INHERIT_GENERIC_CONTEXT)
             .and_then(|place_and_quals| {
                 receiver
                     .resolve_dunder_new_callable(db, env, place_and_quals.place)
@@ -2859,7 +2885,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         }
     }
 
-    /// Finds the annotation governing a new class-body default, without inferring existing defaults.
+    /// Finds the type governing a new class-body default. A bare `ClassVar` gets its public type
+    /// from the base class's bindings.
     ///
     /// An unannotated binding retains its owner's inherited declaration. Resolving that owner
     /// before continuing the MRO prevents a later sibling base from supplying a different contract.
@@ -2885,9 +2912,10 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             };
             let use_def = use_def_map(db, scope);
             let declarations = use_def.end_of_scope_symbol_declarations(symbol);
-            let declared = place_from_declarations(db, &self.env, declarations.clone())
-                .ignore_conflicting_declarations();
-            let declaration = if declared.is_undefined() {
+            let declared = place_from_declarations(db, &self.env, declarations.clone());
+            let qualifier_only = declared.is_qualifier_only();
+            let declared = declared.ignore_conflicting_declarations();
+            let mut declaration = if declared.is_undefined() {
                 let mut bindings = use_def.end_of_scope_symbol_bindings(symbol);
                 let predicates = bindings.predicates();
                 let constraints = bindings.reachability_constraints();
@@ -2899,16 +2927,43 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 }) {
                     continue;
                 }
-                inherited_class_body_declaration(db, scope, symbol)
+                inherited_class_body_declaration(db, scope, symbol)?
+            } else if declared.qualifiers.contains(TypeQualifiers::FINAL)
+                || !declarations.contains_only_annotated_assignments(db)
+            {
+                return None;
             } else {
-                (!declared.qualifiers.contains(TypeQualifiers::FINAL)
-                    && declarations.contains_only_annotated_assignments(db))
-                .then_some(ClassBodyDeclaration {
-                    member: declared,
+                ClassBodyDeclaration {
+                    member: if qualifier_only {
+                        Place::Undefined.with_qualifiers(declared.qualifiers)
+                    } else {
+                        declared
+                    },
                     class: base,
-                })
+                }
             };
-            return declaration.map(|declaration| ClassBodyDeclaration {
+            // The first class to bind a bare ClassVar supplies its type to subclasses.
+            // An uninitialized declaration or a stub placeholder supplies only the qualifier.
+            if declaration.member.is_class_var()
+                && !declaration.member.place.is_definitely_bound()
+                && let Place::Defined(binding) = place_by_id(
+                    db,
+                    scope,
+                    symbol.into(),
+                    RequiresExplicitReExport::No,
+                    ConsideredDefinitions::EndOfScope,
+                )
+                .place
+                && (!declaration.member.is_undefined() || !binding.ty.is_unknown())
+            {
+                declaration.member.place = Place::Defined(DefinedPlace {
+                    ty: binding.public_type(db, &self.env),
+                    public_type_policy: PublicTypePolicy::Raw,
+                    ..binding
+                });
+                declaration.class = base;
+            }
+            return Some(ClassBodyDeclaration {
                 member: declaration
                     .member
                     .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
@@ -3098,7 +3153,16 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// allowing the caller to handle this case specially.
     fn instance_member(self, name: &str) -> InstanceMemberResult<'db> {
         let db = self.db;
-        let mut union = UnionBuilder::new(db, &self.env);
+        // Repeated writes to an attribute often see the same wide union from one class.
+        // Collect the inputs in MRO order so their normalization can be reused.
+        let mut types = SmallVec::<[Type<'db>; 1]>::new();
+        let mut known_nonempty = false;
+        let combined_type = |types: &[Type<'db>]| {
+            if types.is_empty() {
+                return Type::Never;
+            }
+            UnionType::normalize_place_types(db, &self.env, types)
+        };
         let mut union_qualifiers = TypeQualifiers::empty();
         let mut definitely_bound_member: Option<PlaceAndQualifiers<'db>> = None;
         let mut provenance = Provenance::Unknown;
@@ -3119,11 +3183,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     let member = class.own_instance_member(db, &self.env, name);
                     let definitely_declared = matches!(
                         member.inner.place,
-                        Place::Defined(DefinedPlace {
-                            origin: TypeOrigin::Declared,
-                            definedness: Definedness::AlwaysDefined,
-                            ..
-                        })
+                        Place::Defined(place) if place.is_definitely_defined()
+                            && (place.origin.is_declared() || member.qualifiers().contains(TypeQualifiers::FINAL))
                     );
                     if definitely_declared {
                         let overriding_class_default =
@@ -3176,7 +3237,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         // If the attribute is not definitely declared on this class, keep looking
                         // higher up in the MRO, and build a union of all inferred types (and
                         // possibly-declared types):
-                        union = union.add(ty);
+                        types.push(ty);
                         provenance = provenance.or(member_provenance);
 
                         // TODO: We could raise a diagnostic here if there are conflicting type
@@ -3189,7 +3250,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 &self.env,
                                 &pending_augmented_bindings,
                             );
-                            union = union.add(inferred_ty);
+                            types.push(inferred_ty);
                             provenance = provenance.or(inferred_provenance);
                             union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
                             pending_augmented_bindings.clear();
@@ -3218,11 +3279,14 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         }
 
                         if origin.is_declared() {
-                            if union.is_empty() {
+                            // Once a type contributes, later defaults cannot make the union
+                            // empty. Avoid interning a growing union at each default.
+                            if !known_nonempty && combined_type(&types) == Type::Never {
                                 return InstanceMemberResult::Done(class_member.inner);
                             }
+                            known_nonempty = true;
 
-                            union = union.add(class_member_ty);
+                            types.push(class_member_ty);
                             provenance = provenance.or(class_member_provenance);
                             union_qualifiers |= class_member.inner.qualifiers;
                         } else {
@@ -3231,7 +3295,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 &self.env,
                                 &pending_augmented_bindings,
                             );
-                            union = union.add(inferred_ty);
+                            types.push(inferred_ty);
                             provenance = provenance.or(inferred_provenance);
                             union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
                         }
@@ -3248,7 +3312,9 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             }
         }
 
-        let result = if union.is_empty() {
+        // The builder drops Never but retains a bottom-materialized divergent type.
+        let ty = combined_type(&types);
+        let result = if ty == Type::Never {
             Place::Undefined.with_qualifiers(TypeQualifiers::empty())
         } else {
             let boundness = if definitely_bound_member.is_some() {
@@ -3258,7 +3324,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             };
 
             Place::Defined(DefinedPlace {
-                ty: union.build(),
+                ty,
                 origin: TypeOrigin::Inferred,
                 definedness: boundness,
                 public_type_policy: PublicTypePolicy::Raw,

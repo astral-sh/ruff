@@ -62,28 +62,37 @@ impl ScriptTag {
     /// ```
     ///
     /// See: <https://peps.python.org/pep-0723/>
-    pub fn parse(contents: &[u8]) -> Option<Self> {
-        FINDER
-            .find_iter(contents)
-            .find_map(|index| Self::parse_at(contents, index))
+    pub fn parse(contents: &str) -> Option<Self> {
+        let mut offset = 0;
+        while let Some(index) = FINDER.find(&contents.as_bytes()[offset..]) {
+            match Self::parse_at(contents, offset + index) {
+                Ok(tag) => return Some(tag),
+                Err(end) => offset = end,
+            }
+        }
+        None
     }
 
-    fn parse_at(contents: &[u8], index: usize) -> Option<Self> {
+    /// Returns the offset at which to resume searching if the block is invalid. An opening
+    /// marker inside an unclosed comment block would scan the same suffix and fail too.
+    fn parse_at(contents: &str, index: usize) -> Result<Self, usize> {
+        let mut end = index + 1;
         // The opening pragma must be the first line, or immediately preceded by a newline.
-        if !(index == 0 || matches!(contents[index - 1], b'\r' | b'\n')) {
-            return None;
+        if !(index == 0 || matches!(contents.as_bytes()[index - 1], b'\r' | b'\n')) {
+            return Err(end);
         }
 
-        let contents = std::str::from_utf8(contents).ok()?;
         let contents = &contents[index..];
 
-        let start = TextSize::try_from(index).ok()?;
+        let start = TextSize::try_from(index).map_err(|_| end)?;
         let mut lines = UniversalNewlineIterator::with_offset(contents, start);
 
         // Ensure that the first line is exactly `# /// script`.
-        if lines.next().is_none_or(|line| line != "# /// script") {
-            return None;
+        let opening = lines.next().ok_or(end)?;
+        if opening != "# /// script" {
+            return Err(end);
         }
+        end = usize::from(opening.end());
 
         // > Every line between these two lines (# /// TYPE and # ///) MUST be a comment starting
         // > with #. If there are characters after the # then the first character MUST be a space. The
@@ -117,6 +126,7 @@ impl ScriptTag {
             source_map.push_marker(metadata.text_len(), line.start() + prefix_length);
             metadata.push_str(content);
             metadata.push('\n');
+            end = usize::from(line.end());
         }
 
         // The last closing `# ///` wins, so discard that delimiter and everything after it.
@@ -131,7 +141,7 @@ impl ScriptTag {
         // ```
         //
         // The latter `///` is the closing pragma
-        let (metadata_end, marker_count, closing_range) = closing?;
+        let (metadata_end, marker_count, closing_range) = closing.ok_or(end)?;
         metadata.truncate(metadata_end);
         source_map.truncate(marker_count);
 
@@ -141,7 +151,7 @@ impl ScriptTag {
             source_map.push_marker(metadata.text_len(), closing_range.start());
         }
 
-        Some(Self {
+        Ok(Self {
             metadata,
             range: TextRange::new(start, closing_range.end()),
             source_map,
@@ -206,8 +216,27 @@ mod tests {
     use super::ScriptTag;
 
     #[test]
+    fn overlapping_unclosed_script_tags() -> Result<(), &'static str> {
+        let source = r"# /// script
+# /// script
+# /// script
+x = 1
+# /// script
+# dependencies = []
+# ///
+";
+        let tag = ScriptTag::parse(source).ok_or("Expected valid script metadata")?;
+        assert_eq!(
+            tag.metadata(),
+            r"dependencies = []
+"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn carriage_return_line_endings() -> Result<(), &'static str> {
-        let tag = ScriptTag::parse(b"# /// script\r# value = true\r# ///\r")
+        let tag = ScriptTag::parse("# /// script\r# value = true\r# ///\r")
             .ok_or("Expected script metadata with carriage-return line endings")?;
 
         assert_eq!(tag.metadata(), "value = true\n");
@@ -220,7 +249,7 @@ mod tests {
         let prefix = "#!/usr/bin/env python3\n\n";
         let metadata = "# /// script\n# dependencies = []\n# ///";
         let source = format!("{prefix}{metadata}\n\nprint('hello')\n");
-        let tag = ScriptTag::parse(source.as_bytes()).ok_or("Expected valid script metadata")?;
+        let tag = ScriptTag::parse(&source).ok_or("Expected valid script metadata")?;
 
         assert_eq!(
             tag.range(),
@@ -244,7 +273,7 @@ last
 # """"#
             .replace('\n', "\r\n");
         let source = format!("π\r\n# /// script\r\n# value = {source_value}\r\n# ///\r\n");
-        let tag = ScriptTag::parse(source.as_bytes()).ok_or("Expected valid script metadata")?;
+        let tag = ScriptTag::parse(&source).ok_or("Expected valid script metadata")?;
 
         assert_eq!(tag.metadata(), format!("value = {metadata_value}\n"));
 
@@ -268,7 +297,7 @@ last
 # ///
 # ignored = true
 ";
-        let tag = ScriptTag::parse(source.as_bytes()).ok_or("Expected valid script metadata")?;
+        let tag = ScriptTag::parse(source).ok_or("Expected valid script metadata")?;
 
         assert_eq!(
             tag.metadata(),

@@ -1,0 +1,6 @@
+cooldown-days = 7
+exclusions = [
+  { name = "salsa", version = "0.28.6", reason = "Salsa release artifacts and dependency changes were reviewed for this upgrade." },
+  { name = "salsa-macro-rules", version = "0.28.6", reason = "Salsa release artifacts and dependency changes were reviewed for this upgrade." },
+  { name = "salsa-macros", version = "0.28.6", reason = "Salsa release artifacts and dependency changes were reviewed for this upgrade." },
+]

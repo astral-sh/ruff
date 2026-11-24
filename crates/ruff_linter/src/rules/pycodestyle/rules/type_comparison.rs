@@ -196,9 +196,9 @@ fn is_type(expr: &Expr, semantic: &SemanticModel) -> bool {
 fn is_dtype(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         // Ex) `np.dtype(obj)`
-        Expr::Call(ast::ExprCall { func, .. }) => semantic
-            .resolve_qualified_name(func)
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["numpy", "dtype"])),
+        Expr::Call(ast::ExprCall { func, .. }) => {
+            semantic.matches_qualified_name(func, &["numpy", "dtype"])
+        }
         // Ex) `obj.dtype`
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
             // Ex) `obj.dtype`

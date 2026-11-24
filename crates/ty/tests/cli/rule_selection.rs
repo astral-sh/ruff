@@ -453,7 +453,7 @@ fn removed_rule_in_configuration_and_ignore_comment() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    warning[ignore-comment-unknown-rule]: Rule `invalid-type-guard-call` has been removed
+    warning[unknown-rule-in-ignore-comment]: Rule `invalid-type-guard-call` has been removed
      --> test.py:2:21
       |
     2 | x = 1  # ty: ignore[invalid-type-guard-call]

@@ -457,6 +457,13 @@ impl KnownClass {
         }
     }
 
+    pub(in crate::types) const fn is_builtin_enum_base(self) -> bool {
+        matches!(
+            self,
+            Self::Enum | Self::IntEnum | Self::StrEnum | Self::Flag | Self::IntFlag
+        )
+    }
+
     /// Return `true` if this class is a subclass of `enum.Enum` *and* has enum members, i.e.
     /// if it is an "actual" enum, not `enum.Enum` itself or a similar custom enum class.
     pub(crate) const fn is_enum_subclass_with_members(self) -> bool {
@@ -1253,7 +1260,7 @@ impl KnownClass {
 
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_initial=|_, id, _, _| Type::divergent(id),
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, argument: KnownClassArgument<'db>| {
                 let env = ProgramEnvironment::from_program(argument.program(db));
                 result.cycle_normalized(db, &env, *previous, cycle)
@@ -1387,7 +1394,7 @@ impl KnownClass {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Result<Option<StaticClassLiteral<'db>>, KnownClassLookupError<'db>> {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
         fn known_class_to_class_literal<'db>(
             db: &'db dyn Db,
             argument: KnownClassArgument<'db>,
@@ -1642,8 +1649,8 @@ impl KnownClass {
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
-            Self::NamedTupleLike => KnownModule::TyExtensions,
-            Self::ConstraintSet
+            Self::NamedTupleLike
+            | Self::ConstraintSet
             | Self::ConstraintSetSolution
             | Self::GenericContext
             | Self::Specialization

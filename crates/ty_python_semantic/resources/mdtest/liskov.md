@@ -397,13 +397,12 @@ info: the signature must accept arbitrary positional arguments
 info: This violates the Liskov Substitution Principle
 ```
 
-Finally, this is not a Liskov violation because this is a gradual callable. It contains both `*args`
-and `**kwargs` without annotations, so it is compatible with any signature of `method` on the
-superclass.
+The base method accepts a call with no arguments. An override with unannotated variadics still has
+to accept that call, so it cannot introduce required parameters.
 
 ```pyi
 class Sub23(Super4):
-    def method(self, x, *args, y, **kwargs): ...
+    def method(self, x, *args, y, **kwargs): ...  # error: [incompatible-method-override]
 ```
 
 ## Dropping a positional parameter's keyword name
@@ -2208,6 +2207,50 @@ class InstanceChild(InstanceBase):
     def clone(self: Self) -> Self: ...
 ```
 
+## Overrides with a type variable shared by the receiver and an argument
+
+`Base.remove` accepts `3`. Both overrides use the receiver's key type for the `key` parameter, so a
+map with `bool` keys rejects that same call.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Generic, TypeVar
+
+class Base:
+    def remove(self, key: int) -> None: ...
+
+V = TypeVar("V", covariant=True)
+K = TypeVar("K", bound=bool, covariant=True)
+T = TypeVar("T", bound=bool)
+
+class LegacyMap(Base, Generic[V, K]):
+    # error: [incompatible-method-override]
+    def remove(self: "LegacyMap[Any, T]", key: T) -> None: ...
+
+class Map[V, K: bool](Base):
+    # error: [incompatible-method-override]
+    def remove[T: bool](self: "Map[Any, T]", key: T) -> None: ...
+
+def check(legacy: LegacyMap[int, bool], modern: Map[int, bool]):
+    legacy.remove(3)  # error: [invalid-argument-type]
+    modern.remove(3)  # error: [invalid-argument-type]
+```
+
+The same receiver annotations permit every specialization of each subclass. The override is valid
+when its key parameter accepts every `int`.
+
+```py
+class LegacyIntMap(Base, Generic[V, K]):
+    def remove(self: "LegacyIntMap[Any, T]", key: int) -> None: ...  # ok
+
+class IntMap[V, K: bool](Base):
+    def remove[T: bool](self: "IntMap[Any, T]", key: int) -> None: ...  # ok
+```
+
 ## Generic methods on generic classes work as expected
 
 ```toml
@@ -3095,6 +3138,78 @@ error[incompatible-attribute-override]: Invalid override of attribute `value`
   |     ^^^^^ Type `str` is not assignable to inherited type `int`
 ```
 
+## Nested class overrides
+
+A subclass of `Base` can override its read-only nested class `Inner` with a subclass of
+`Base.Inner`, but not with an unrelated class.
+
+```py
+class Base:
+    class Inner: ...
+
+class Compatible(Base):
+    class Inner(Base.Inner): ...  # ok
+
+class Incompatible(Base):
+    class Inner: ...  # error: [incompatible-attribute-override]
+```
+
+An override can add writes. Once an attribute is writable, a further override must preserve those
+writes.
+
+```py
+class Writable(Base):
+    Inner: type[Base.Inner] = Base.Inner  # ok
+
+class ReadOnly(Writable):
+    class Inner(Base.Inner): ...  # error: [incompatible-attribute-override]
+```
+
+The override also preserves class access. Accessing a property on the class returns the property
+object, even if its getter returns the right type on instances.
+
+```py
+class PropertyOverride(Base):
+    @property
+    def Inner(self) -> type[Base.Inner]:  # error: [incompatible-property-override]
+        return Base.Inner
+```
+
+## Overriding setter-only nested descriptors
+
+A nested class whose metaclass defines only `__set__` exposes the class object on reads. A
+replacement descriptor that returns the same class must still accept the inherited setter's values.
+
+```py
+class Setter(type):
+    def __set__(cls, instance: object, value: int) -> None: ...
+
+class Base:
+    class Inner(metaclass=Setter): ...
+
+class StrSetter(type):
+    def __get__(cls, instance: object, owner: type | None = None) -> type[Base.Inner]:
+        return Base.Inner
+
+    def __set__(cls, instance: object, value: str) -> None: ...
+
+class Child(Base):
+    class Inner(metaclass=StrSetter): ...  # error: [incompatible-mutable-override]
+```
+
+A receiver annotation does not replace the setter contract of a descriptor stored on the class.
+
+```py
+class Annotated:
+    Inner: type[Base.Inner] = Base.Inner
+
+    def __init__(self):
+        self.Inner: type[Base.Inner]
+
+class AnnotatedChild(Annotated):
+    class Inner(metaclass=StrSetter): ...  # error: [incompatible-mutable-override]
+```
+
 ## Annotated attributes with class defaults
 
 A class-body default does not erase an annotation's contract. Both the default and a later instance
@@ -3255,6 +3370,28 @@ class Same(Base):
     shared: ClassVar[int]
 ```
 
+A subclass can redeclare an `Any` attribute as `type[Any]` and still assign class objects to it.
+
+```py
+class DataType:
+    kind: Any
+
+class ConcreteDataType(DataType):
+    kind: type[Any]  # ok
+
+ConcreteDataType().kind = int  # ok
+```
+
+The attribute remains writable when its type also permits a descriptor with only a getter.
+
+```py
+class Getter:
+    def __get__(self, instance: object, owner: type) -> Any: ...
+
+class WithGetter(DataType):
+    kind: Getter | type[Any]  # ok
+```
+
 ## Property value types
 
 Read-only properties may narrow their result types. They cannot return an unrelated type, even when
@@ -3314,7 +3451,7 @@ contract of an inherited attribute or property. The same check applies when an a
 method.
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
 class PropertyBase:
     @property
@@ -3355,6 +3492,20 @@ class CallablePropertyBase:
 class CompatibleMethod(CallablePropertyBase):
     def value(self) -> int:  # ok
         return 1
+```
+
+The base attribute accepts callables returning any object. An overriding method that returns `int`
+would reject some of those writes.
+
+```py
+class Domain:
+    dtype: type[Any] | Callable[[int], object]
+
+Domain().dtype = str  # ok
+
+class Field(Domain):
+    def dtype(self, value: int) -> int:  # error: [incompatible-mutable-override]
+        return value
 ```
 
 ## Decorators preserving method binding
@@ -3810,6 +3961,119 @@ class IncompatibleProperty(ClassBase):
         return ""
 ```
 
+For an inherited getter-only property, ty checks the instance read type. A descriptor stored in a
+bare or explicitly typed `ClassVar` can supply that type even when class access returns the
+descriptor.
+
+```py
+from typing_extensions import Self, overload
+
+class IntDescriptor:
+    @overload
+    def __get__(self, instance: None, owner: type) -> Self: ...
+    @overload
+    def __get__(self, instance: object, owner: type) -> int: ...
+    def __get__(self, instance: object, owner: type) -> Self | int:
+        return self if instance is None else 1
+
+class InferredDescriptor(Base):
+    value: ClassVar = IntDescriptor()  # ok
+
+class ExplicitDescriptor(Base):
+    value: ClassVar[IntDescriptor] = IntDescriptor()  # ok
+
+class TextBase:
+    @property
+    def value(self) -> str:
+        return ""
+
+class IncompatibleDescriptor(TextBase):
+    # error: [incompatible-property-override] "Read type `int` is not assignable to inherited read type `str`"
+    value: ClassVar = IntDescriptor()
+```
+
+When the base declares a mutable `ClassVar`, subclasses must also preserve class reads and
+assignments. Here a class read returns the descriptor itself, and assignment replaces it.
+
+```py
+class NarrowDescriptor(IntDescriptor): ...
+
+class NarrowOverride(ExplicitDescriptor):
+    # error: [incompatible-mutable-override] "Override does not accept writes of type `IntDescriptor`"
+    value: ClassVar[NarrowDescriptor] = NarrowDescriptor()
+
+class NarrowBase:
+    value: ClassVar = NarrowDescriptor()
+
+class WideOverride(NarrowBase):
+    # error: [incompatible-attribute-override] "Type `IntDescriptor` is not assignable to inherited type `NarrowDescriptor`"
+    value: ClassVar[IntDescriptor] = IntDescriptor()
+```
+
+## Class variables with restricted descriptor access
+
+A getter that accepts only `None` as its instance cannot implement a readable property, even when
+its return type matches the property's.
+
+```py
+from typing import ClassVar
+
+class Readable:
+    @property
+    def value(self) -> int:
+        return 1
+
+class ClassOnly:
+    def __get__(self, instance: None, owner: type) -> int:
+        return 1
+
+class Inferred(Readable):
+    # error: [incompatible-property-override] "Attribute cannot be read through an instance"
+    value: ClassVar = ClassOnly()
+
+class Explicit(Readable):
+    # error: [incompatible-property-override] "Attribute cannot be read through an instance"
+    value: ClassVar[ClassOnly] = ClassOnly()
+```
+
+The same conflict can come from two bases. When the base itself provides only class access, an
+override still needs to accept writes through the class.
+
+```py
+class ClassOnlyBase:
+    value: ClassVar = ClassOnly()
+
+class Combined(ClassOnlyBase, Readable): ...  # error: [incompatible-property-override]
+class NarrowClassOnly(ClassOnly): ...
+
+class NarrowOverride(ClassOnlyBase):
+    # error: [incompatible-mutable-override] "Override does not accept writes of type `ClassOnly`"
+    value: ClassVar[NarrowClassOnly] = NarrowClassOnly()
+```
+
+A readable property can be implemented by an instance-only getter. A `ClassVar` that also supports
+class reads cannot lose that operation in a subclass.
+
+```py
+class InstanceOnly:
+    def __get__(self, instance: Readable, owner: type) -> int:
+        return 1
+
+class InstanceProperty(Readable):
+    value: ClassVar = InstanceOnly()  # ok
+
+class Both(InstanceOnly):
+    def __get__(self, instance: Readable | None, owner: type) -> int:
+        return 1
+
+class BothReads(Readable):
+    value: ClassVar = Both()
+
+class LosesClassRead(BothReads):
+    # error: [incompatible-attribute-override] "Attribute cannot be read through the class"
+    value: ClassVar[InstanceOnly] = InstanceOnly()
+```
+
 ## Conditional property definitions
 
 The property override rule applies when an inherited property can have different definitions. Reads
@@ -4165,6 +4429,29 @@ def check(child: Child) -> None:
     child.value = True
     child.value = 1  # error: [invalid-assignment]
     value: HasValue = child  # error: [invalid-assignment]
+```
+
+## Overriding setter-only descriptors
+
+A descriptor with only `__set__` returns itself on instance reads. An overriding property can
+preserve that read type and still reject values accepted by the descriptor's setter.
+
+```py
+class AcceptsInt:
+    def __set__(self, instance: object, value: int) -> None: ...
+
+class Base:
+    value = AcceptsInt()
+
+Base().value = 1  # ok
+
+class Child(Base):
+    @property
+    def value(self) -> AcceptsInt:
+        return AcceptsInt()
+
+    @value.setter
+    def value(self, value: str) -> None: ...  # error: [incompatible-property-override]
 ```
 
 ## Descriptor decorators

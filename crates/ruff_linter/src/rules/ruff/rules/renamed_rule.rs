@@ -30,7 +30,7 @@ use crate::codes::Category;
 /// ignore = ["TC002"]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Suspicious)]
+#[violation_metadata(preview_since = "0.17.5", category = Category::Suspicious)]
 pub(crate) struct RenamedRule {
     original: &'static str,
     target: &'static str,

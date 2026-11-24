@@ -76,7 +76,19 @@ impl<'db> Type<'db> {
                 a.definition(db) == b.definition(db)
             }
             (Type::TypeAlias(a), Type::TypeAlias(b)) => a.definition(db) == b.definition(db),
-            (Type::TypedDict(a), Type::TypedDict(b)) => a.definition(db) == b.definition(db),
+            (
+                Type::TypedDict(TypedDictType::Class(a)),
+                Type::TypedDict(TypedDictType::Class(b)),
+            ) => {
+                // Different specializations of the same recursive TypedDict can form a cycle.
+                // Each class statement has a unique body scope, so comparing scopes tells us
+                // whether the types came from the same class, even after decorators.
+                // Other TypedDicts can only match by exact equality, which we checked above.
+                matches!(
+                    (a.class_literal(db).as_static(), b.class_literal(db).as_static()),
+                    (Some(a), Some(b)) if a.body_scope(db) == b.body_scope(db)
+                )
+            }
             (Type::Recursive(a), Type::Recursive(b)) => a.definition(db) == b.definition(db),
             _ => false,
         }
@@ -312,24 +324,12 @@ impl<'db> RecursiveDefinition<'db> {
         generic_context.default_specialization(db, known_class)
     }
 
-    fn parameter_identity(
-        db: &'db dyn Db,
-        parameter: BoundTypeVarInstance<'db>,
-    ) -> BoundTypeVarIdentity<'db> {
-        let identity = parameter.identity(db);
-        if identity.is_paramspec(db) {
-            identity.without_paramspec_attr(db)
-        } else {
-            identity
-        }
-    }
-
     /// The identities of this definition's formal parameters, in declaration order.
     fn parameters(self, db: &'db dyn Db) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> {
         self.generic_context(db)
             .into_iter()
             .flat_map(|context| context.variables(db))
-            .map(move |parameter| Self::parameter_identity(db, parameter))
+            .map(move |parameter| parameter.identity(db).binder())
     }
 
     /// Returns `None` if two formal parameters share an identity, since their flows could not be
@@ -347,7 +347,7 @@ impl<'db> RecursiveDefinition<'db> {
     fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _, ()| true,
+            cycle_initial=|_, _, _, _, ()| true,
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn may_have_unbounded_specialization_inner<'db>(
@@ -663,7 +663,7 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         if let Type::TypeVar(typevar) = ty {
-            let identity = RecursiveDefinition::parameter_identity(db, typevar);
+            let identity = typevar.identity(db).binder();
             if !self.source_parameters.contains(&identity) {
                 // Nested definitions can capture a type variable from an outer generic scope.
                 // Specialization does not yet retain the parent mapping needed to model it.
@@ -732,7 +732,7 @@ impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         if let Type::TypeVar(typevar) = ty {
-            let identity = RecursiveDefinition::parameter_identity(db, typevar);
+            let identity = typevar.identity(db).binder();
             if self.source_parameters.contains(&identity) {
                 self.found
                     .borrow_mut()
@@ -798,8 +798,14 @@ impl<'db> ProtocolInstanceType<'db> {
 }
 
 /// An item that provides the identity used to detect active recursive cycles.
-pub trait HasIdentity<'db> {
+pub trait HasIdentity<'db>: PartialEq {
     type Id: PartialEq;
+
+    /// Returns whether revisiting this item should use the detector's recursion fallback.
+    /// Completed visits are cached using the full item.
+    fn is_same_active_visit(&self, other: &Self) -> bool {
+        self == other
+    }
 
     /// Returns `false` if `self` and `other` cannot have the same identity.
     ///
@@ -910,7 +916,8 @@ where
     /// Visits `item`, returning it in `Err` if another active item has the same identity.
     ///
     /// The caller must convert `Err(item)` into an operation-specific conservative result. An
-    /// exact recursive reentry uses the detector's configured fallback and is returned as `Ok`.
+    /// active visit matching [`HasIdentity::is_same_active_visit`] uses the detector's configured
+    /// fallback and is returned as `Ok`.
     ///
     /// Completed results are reused only when `reuse_cached` accepts them. Otherwise, the visit
     /// recomputes the result using the same active recursion guards, without replacing the cached
@@ -923,7 +930,7 @@ where
         reuse_cached: impl FnOnce(&R) -> bool,
         compute: impl FnOnce() -> R,
     ) -> Result<R, T> {
-        let cached_result = self.cache.borrow().get(&item).cloned();
+        let cached_result = self.completed(&item);
         let was_cached = cached_result.is_some();
         if let Some(result) = cached_result
             && reuse_cached(&result)
@@ -946,9 +953,14 @@ where
         }
     }
 
+    /// Returns a completed result without starting an active visit.
+    pub(super) fn completed(&self, item: &T) -> Option<R> {
+        self.cache.borrow().get(item).cloned()
+    }
+
     fn begin_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
-        if let Some(result) = self.cache.borrow().get(&item) {
-            return CycleDetectorVisit::Ready(result.clone());
+        if let Some(result) = self.completed(&item) {
+            return CycleDetectorVisit::Ready(result);
         }
 
         self.begin_active_visit(db, item)
@@ -956,7 +968,10 @@ where
 
     fn begin_active_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
         let seen = self.seen.borrow();
-        if seen.iter().any(|active| active.item == item) {
+        if seen
+            .iter()
+            .any(|active| item.is_same_active_visit(&active.item))
+        {
             return CycleDetectorVisit::Ready(self.fallback.clone());
         }
 

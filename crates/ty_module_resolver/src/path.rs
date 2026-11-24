@@ -822,8 +822,9 @@ impl SearchPath {
         }
     }
 
+    /// Returns the search root's filesystem path, or `None` for a vendored search root.
     #[must_use]
-    pub(crate) fn as_system_path(&self) -> Option<&SystemPath> {
+    pub fn as_system_path(&self) -> Option<&SystemPath> {
         self.as_path().as_system_path()
     }
 

@@ -22,8 +22,8 @@ pub(crate) fn deferred_lambdas(checker: &mut Checker) {
         if checker.is_rule_enabled(Rule::ReimplementedContainerBuiltin) {
             flake8_pie::rules::reimplemented_container_builtin(checker, lambda);
         }
-        if checker.is_rule_enabled(Rule::BuiltinLambdaArgumentShadowing) {
-            flake8_builtins::rules::builtin_lambda_argument_shadowing(checker, lambda);
+        if checker.is_rule_enabled(Rule::BuiltinLambdaParameterShadowing) {
+            flake8_builtins::rules::builtin_lambda_parameter_shadowing(checker, lambda);
         }
     }
 }

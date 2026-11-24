@@ -259,7 +259,7 @@ pub(crate) fn type_expr(
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
         });
-        Some((expr, edit.map_or_else(Vec::new, |edit| vec![edit])))
+        Some((expr, edit.map_or_default(|edit| vec![edit])))
     }
 
     match python_type {

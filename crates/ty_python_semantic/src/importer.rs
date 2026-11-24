@@ -483,7 +483,8 @@ impl<'a> Importer<'a> {
                     .stmt
                     .as_import_from_stmt()
                     .is_some_and(|import_from| {
-                        !import_from.is_lazy && import_from.module.as_deref() == Some("__future__")
+                        !import_from.is_lazy
+                            && import_from.is_future_import(self.file.python_version(self.db))
                     })
             })
             .last()

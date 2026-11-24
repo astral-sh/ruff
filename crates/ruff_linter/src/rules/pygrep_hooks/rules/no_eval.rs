@@ -30,13 +30,13 @@ use crate::codes::Category;
 /// - [Python documentation: `eval`](https://docs.python.org/3/library/functions.html#eval)
 /// - [_Eval really is dangerous_ by Ned Batchelder](https://nedbatchelder.com/blog/201206/eval_really_is_dangerous.html)
 ///
-/// [S307]: https://docs.astral.sh/ruff/rules/suspicious-eval-usage/
+/// [S307]: https://docs.astral.sh/ruff/rules/eval/
 #[derive(ViolationMetadata)]
 #[violation_metadata(removed_since = "v0.2.0", category = Category::Security)]
-pub(crate) struct Eval;
+pub(crate) struct PygrepHooksEval;
 
 /// PGH001
-impl Violation for Eval {
+impl Violation for PygrepHooksEval {
     #[derive_message_formats]
     fn message(&self) -> String {
         "No builtin `eval()` allowed".to_string()

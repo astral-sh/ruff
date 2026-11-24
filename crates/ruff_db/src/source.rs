@@ -211,7 +211,7 @@ impl From<Notebook> for SourceTextKind {
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq, Clone, get_size2::GetSize)]
 pub enum SourceTextError {
-    #[error("Failed to read notebook: {0}`")]
+    #[error("Failed to read notebook: {0}")]
     FailedToReadNotebook(String),
     #[error("Failed to read file: {0}")]
     FailedToReadFile(String),

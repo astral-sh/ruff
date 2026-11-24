@@ -10,8 +10,8 @@ use crate::checkers::ast::Checker;
 use crate::preview::is_fix_f_string_logging_enabled;
 use crate::registry::Rule;
 use crate::rules::flake8_logging_format::violations::{
-    LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
-    LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
+    LoggingErrorWithExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
+    LoggingRedundantExcInfo, LoggingStrFormat, LoggingStringConcat, LoggingWarn,
 };
 use crate::{Edit, Fix};
 
@@ -167,11 +167,11 @@ fn check_msg(checker: &Checker, msg: &Expr, arguments: &Arguments, msg_pos: usiz
         }
         // Check for .format() calls.
         Expr::Call(ast::ExprCall { func, .. })
-            if checker.is_rule_enabled(Rule::LoggingStringFormat) =>
+            if checker.is_rule_enabled(Rule::LoggingStrFormat) =>
         {
             if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                 if attr == "format" && value.is_literal_expr() {
-                    checker.report_diagnostic(LoggingStringFormat, msg.range());
+                    checker.report_diagnostic(LoggingStrFormat, msg.range());
                 }
             }
         }
@@ -300,7 +300,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // G201, G202
-    if checker.any_rule_enabled(&[Rule::LoggingExcInfo, Rule::LoggingRedundantExcInfo]) {
+    if checker.any_rule_enabled(&[Rule::LoggingErrorWithExcInfo, Rule::LoggingRedundantExcInfo]) {
         if !checker.semantic().in_exception_handler() {
             return;
         }
@@ -310,7 +310,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         if let LoggingCallType::LevelCall(logging_level) = logging_call_type {
             match logging_level {
                 LoggingLevel::Error => {
-                    checker.report_diagnostic_if_enabled(LoggingExcInfo, range);
+                    checker.report_diagnostic_if_enabled(LoggingErrorWithExcInfo, range);
                 }
                 LoggingLevel::Exception => {
                     checker.report_diagnostic_if_enabled(LoggingRedundantExcInfo, exc_info.range());

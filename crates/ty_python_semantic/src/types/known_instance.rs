@@ -720,10 +720,20 @@ pub struct DeprecatedInstance<'db> {
     pub(crate) message: Option<StringLiteralType<'db>>,
 }
 
+/// The kind of field object returned by a dataclass field specifier.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum FieldInstanceKind {
+    Other,
+    Attrs,
+}
+
 /// Contains information about instances of `dataclasses.Field`, typically created using
 /// `dataclasses.field()`.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FieldInstance<'db> {
+    #[returns(copy)]
+    pub(crate) kind: FieldInstanceKind,
+
     /// The type of the default value for this field. This is derived from the `default` or
     /// `default_factory` arguments to `dataclasses.field()`.
     #[returns(copy)]
@@ -779,6 +789,7 @@ impl<'db> FieldInstance<'db> {
         });
         Self::new(
             db,
+            self.kind(db),
             default_type,
             self.init(db),
             self.kw_only(db),
@@ -824,6 +835,7 @@ impl<'db> FieldInstance<'db> {
         };
         Some(FieldInstance::new(
             db,
+            self.kind(db),
             default_type,
             self.init(db),
             self.kw_only(db),

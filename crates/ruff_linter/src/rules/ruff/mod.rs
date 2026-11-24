@@ -27,20 +27,20 @@ mod tests {
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005_slices.py"))]
     #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"))]
     #[test_case(Rule::ZipInsteadOfPairwise, Path::new("RUF007.py"))]
-    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
-    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
-    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_deferred.py"))]
-    #[test_case(Rule::FunctionCallInDataclassDefaultArgument, Path::new("RUF009.py"))]
+    #[test_case(Rule::MutableDataclassFieldDefault, Path::new("RUF008.py"))]
+    #[test_case(Rule::MutableDataclassFieldDefault, Path::new("RUF008_attrs.py"))]
+    #[test_case(Rule::MutableDataclassFieldDefault, Path::new("RUF008_deferred.py"))]
+    #[test_case(Rule::FunctionCallInDataclassFieldDefault, Path::new("RUF009.py"))]
     #[test_case(
-        Rule::FunctionCallInDataclassDefaultArgument,
+        Rule::FunctionCallInDataclassFieldDefault,
         Path::new("RUF009_attrs.py")
     )]
     #[test_case(
-        Rule::FunctionCallInDataclassDefaultArgument,
+        Rule::FunctionCallInDataclassFieldDefault,
         Path::new("RUF009_attrs_auto_attribs.py")
     )]
     #[test_case(
-        Rule::FunctionCallInDataclassDefaultArgument,
+        Rule::FunctionCallInDataclassFieldDefault,
         Path::new("RUF009_deferred.py")
     )]
     #[test_case(Rule::ExplicitFStringTypeConversion, Path::new("RUF010.py"))]
@@ -61,27 +61,27 @@ mod tests {
     #[test_case(Rule::AssignmentInAssert, Path::new("RUF018.py"))]
     #[test_case(Rule::UnnecessaryKeyCheck, Path::new("RUF019.py"))]
     #[test_case(Rule::NeverUnion, Path::new("RUF020.py"))]
-    #[test_case(Rule::ParenthesizeChainedOperators, Path::new("RUF021.py"))]
+    #[test_case(Rule::UnclearBooleanPrecedence, Path::new("RUF021.py"))]
     #[test_case(Rule::UnsortedDunderAll, Path::new("RUF022.py"))]
     #[test_case(Rule::UnsortedDunderSlots, Path::new("RUF023.py"))]
     #[test_case(Rule::MutableFromkeysValue, Path::new("RUF024.py"))]
     #[test_case(Rule::DefaultFactoryKwarg, Path::new("RUF026.py"))]
-    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_0.py"))]
-    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_1.py"))]
-    #[test_case(Rule::MissingFStringSyntax, Path::new("RUF027_2.py"))]
+    #[test_case(Rule::PossiblyMissingFStringPrefix, Path::new("RUF027_0.py"))]
+    #[test_case(Rule::PossiblyMissingFStringPrefix, Path::new("RUF027_1.py"))]
+    #[test_case(Rule::PossiblyMissingFStringPrefix, Path::new("RUF027_2.py"))]
     #[test_case(Rule::InvalidFormatterSuppressionComment, Path::new("RUF028.py"))]
     #[test_case(Rule::UnusedAsync, Path::new("RUF029.py"))]
     #[test_case(Rule::AssertWithPrintMessage, Path::new("RUF030.py"))]
     #[test_case(Rule::IncorrectlyParenthesizedTupleInSubscript, Path::new("RUF031.py"))]
     #[test_case(Rule::DecimalFromFloatLiteral, Path::new("RUF032.py"))]
     #[test_case(Rule::PostInitDefault, Path::new("RUF033.py"))]
-    #[test_case(Rule::UselessIfElse, Path::new("RUF034.py"))]
+    #[test_case(Rule::IfExprWithIdenticalBranches, Path::new("RUF034.py"))]
     #[test_case(Rule::NoneNotAtEndOfUnion, Path::new("RUF036.py"))]
     #[test_case(Rule::NoneNotAtEndOfUnion, Path::new("RUF036.pyi"))]
     #[test_case(Rule::UnnecessaryEmptyIterableWithinDequeCall, Path::new("RUF037.py"))]
     #[test_case(Rule::RedundantBoolLiteral, Path::new("RUF038.py"))]
     #[test_case(Rule::RedundantBoolLiteral, Path::new("RUF038.pyi"))]
-    #[test_case(Rule::InvalidAssertMessageLiteralArgument, Path::new("RUF040.py"))]
+    #[test_case(Rule::NonStringLiteralAsAssertMessage, Path::new("RUF040.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.pyi"))]
     #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
@@ -109,9 +109,9 @@ mod tests {
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_2.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_3.py"))]
     #[test_case(Rule::InEmptyCollection, Path::new("RUF060.py"))]
-    #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_raises.py"))]
-    #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_warns.py"))]
-    #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_deprecated_call.py"))]
+    #[test_case(Rule::PytestLegacyCallableForm, Path::new("RUF061_raises.py"))]
+    #[test_case(Rule::PytestLegacyCallableForm, Path::new("RUF061_warns.py"))]
+    #[test_case(Rule::PytestLegacyCallableForm, Path::new("RUF061_deprecated_call.py"))]
     #[test_case(Rule::NonOctalPermissions, Path::new("RUF064.py"))]
     #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_0.py"))]
     #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_1.py"))]
@@ -119,10 +119,10 @@ mod tests {
     #[test_case(Rule::DuplicateEntryInDunderAll, Path::new("RUF068.py"))]
     #[test_case(Rule::OsPathCommonprefix, Path::new("RUF071.py"))]
     #[test_case(Rule::IncorrectDecoratorOrder, Path::new("RUF074.py"))]
-    #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
-    #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
-    #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
-    #[test_case(Rule::InvalidRuleCode, Path::new("RUF102_1.py"))]
+    #[test_case(Rule::RenamedRuleInSuppressionComment, Path::new("RUF101_0.py"))]
+    #[test_case(Rule::RenamedRuleInSuppressionComment, Path::new("RUF101_1.py"))]
+    #[test_case(Rule::UnknownRuleInSuppressionComment, Path::new("RUF102.py"))]
+    #[test_case(Rule::UnknownRuleInSuppressionComment, Path::new("RUF102_1.py"))]
     #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/__init__.py"))]
     #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/okay.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -244,9 +244,9 @@ mod tests {
     fn missing_fstring_syntax_backslash_py311() -> Result<()> {
         assert_diagnostics_diff!(
             Path::new("ruff/RUF027_0.py"),
-            &LinterSettings::for_rule(Rule::MissingFStringSyntax)
+            &LinterSettings::for_rule(Rule::PossiblyMissingFStringPrefix)
                 .with_target_version(PythonVersion::PY312),
-            &LinterSettings::for_rule(Rule::MissingFStringSyntax)
+            &LinterSettings::for_rule(Rule::PossiblyMissingFStringPrefix)
                 .with_target_version(PythonVersion::PY311),
         );
         Ok(())
@@ -498,11 +498,11 @@ mod tests {
             Path::new("ruff/suppressions.py"),
             &settings::LinterSettings::for_rules(vec![
                 Rule::UnusedVariable,
-                Rule::UnusedFunctionArgument,
-                Rule::UnusedMethodArgument,
+                Rule::UnusedFunctionParameter,
+                Rule::UnusedMethodParameter,
                 Rule::AmbiguousVariableName,
-                Rule::UnusedNOQA,
-                Rule::InvalidRuleCode,
+                Rule::UnusedSuppressionComment,
+                Rule::UnknownRuleInSuppressionComment,
                 Rule::InvalidSuppressionComment,
                 Rule::UnmatchedSuppressionComment,
             ])
@@ -520,13 +520,13 @@ mod tests {
             &settings::LinterSettings {
                 external: vec!["V101".to_string()],
                 ..settings::LinterSettings::for_rules(vec![
-                    Rule::UnusedNOQA,
+                    Rule::UnusedSuppressionComment,
                     Rule::LineTooLong,
                     Rule::UnusedImport,
                     Rule::UnusedVariable,
                     Rule::TabIndentation,
                     Rule::YodaConditions,
-                    Rule::SuspiciousEvalUsage,
+                    Rule::Eval,
                 ])
             },
         )?;
@@ -541,13 +541,13 @@ mod tests {
             &settings::LinterSettings {
                 external: vec!["V".to_string()],
                 ..settings::LinterSettings::for_rules(vec![
-                    Rule::UnusedNOQA,
+                    Rule::UnusedSuppressionComment,
                     Rule::LineTooLong,
                     Rule::UnusedImport,
                     Rule::UnusedVariable,
                     Rule::TabIndentation,
                     Rule::YodaConditions,
-                    Rule::SuspiciousEvalUsage,
+                    Rule::Eval,
                 ])
             },
         )?;
@@ -559,7 +559,10 @@ mod tests {
     fn ruf100_1() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_1.py"),
-            &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnusedSuppressionComment,
+                Rule::UnusedImport,
+            ]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -567,8 +570,10 @@ mod tests {
 
     #[test]
     fn ruf100_2() -> Result<()> {
-        let mut settings =
-            settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]);
+        let mut settings = settings::LinterSettings::for_rules(vec![
+            Rule::UnusedSuppressionComment,
+            Rule::UnusedImport,
+        ]);
 
         settings.per_file_ignores = CompiledPerFileIgnoreList::resolve(
             vec![PerFileIgnore::new(
@@ -590,7 +595,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_3.py"),
             &settings::LinterSettings::for_rules(vec![
-                Rule::UnusedNOQA,
+                Rule::UnusedSuppressionComment,
                 Rule::LineTooLong,
                 Rule::UndefinedName,
             ]),
@@ -603,7 +608,10 @@ mod tests {
     fn ruf100_4() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_4.py"),
-            &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnusedSuppressionComment,
+                Rule::UnusedImport,
+            ]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -615,7 +623,7 @@ mod tests {
             Path::new("ruff/RUF100_5.py"),
             &settings::LinterSettings {
                 ..settings::LinterSettings::for_rules(vec![
-                    Rule::UnusedNOQA,
+                    Rule::UnusedSuppressionComment,
                     Rule::LineTooLong,
                     Rule::CommentedOutCode,
                 ])
@@ -629,7 +637,7 @@ mod tests {
     fn ruff_noqa_filedirective_unused() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_6.py"),
-            &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA]),
+            &settings::LinterSettings::for_rules(vec![Rule::UnusedSuppressionComment]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -640,7 +648,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_7.py"),
             &settings::LinterSettings::for_rules(vec![
-                Rule::UnusedNOQA,
+                Rule::UnusedSuppressionComment,
                 Rule::FStringMissingPlaceholders,
                 Rule::LineTooLong,
                 Rule::UnusedVariable,
@@ -652,9 +660,9 @@ mod tests {
 
     #[test_case(Path::new("ruff/RUF102.py"))]
     #[test_case(Path::new("ruff/RUF102_1.py"))]
-    fn invalid_rule_code_external_rules(path: &Path) -> Result<()> {
+    fn unknown_rule_in_suppression_comment_external_rules(path: &Path) -> Result<()> {
         let snapshot = format!(
-            "invalid_rule_code_external_rules_{}",
+            "unknown_rule_in_suppression_comment_external_rules_{}",
             path.to_string_lossy(),
         );
         let diagnostics = test_path(
@@ -662,7 +670,7 @@ mod tests {
             &settings::LinterSettings {
                 external: vec!["V".to_string()],
                 preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(Rule::InvalidRuleCode)
+                ..settings::LinterSettings::for_rule(Rule::UnknownRuleInSuppressionComment)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
@@ -686,7 +694,10 @@ mod tests {
                     PreviewMode::Disabled,
                 )
                 .unwrap(),
-                ..settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedNOQA])
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::UnusedImport,
+                    Rule::UnusedSuppressionComment,
+                ])
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -707,7 +718,7 @@ mod tests {
                     PreviewMode::Disabled,
                 )
                 .unwrap(),
-                ..settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA])
+                ..settings::LinterSettings::for_rules(vec![Rule::UnusedSuppressionComment])
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -782,8 +793,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
-    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
+    #[test_case(Rule::MutableDataclassFieldDefault, Path::new("RUF008.py"))]
+    #[test_case(Rule::MutableDataclassFieldDefault, Path::new("RUF008_attrs.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039_concat.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_0.py"))]

@@ -14,15 +14,15 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
 
-    #[test_case(Rule::RaiseVanillaClass, Path::new("TRY002.py"))]
-    #[test_case(Rule::RaiseVanillaArgs, Path::new("TRY003.py"))]
+    #[test_case(Rule::RaiseExceptionOrBaseException, Path::new("TRY002.py"))]
+    #[test_case(Rule::RaiseExceptionWithMessage, Path::new("TRY003.py"))]
     #[test_case(Rule::TypeCheckWithoutTypeError, Path::new("TRY004.py"))]
     #[test_case(Rule::VerboseRaise, Path::new("TRY201.py"))]
     #[test_case(Rule::UselessTryExcept, Path::new("TRY203.py"))]
     #[test_case(Rule::TryConsiderElse, Path::new("TRY300.py"))]
     #[test_case(Rule::RaiseWithinTry, Path::new("TRY301.py"))]
-    #[test_case(Rule::ErrorInsteadOfException, Path::new("TRY400.py"))]
-    #[test_case(Rule::VerboseLogMessage, Path::new("TRY401.py"))]
+    #[test_case(Rule::LoggingErrorInsteadOfException, Path::new("TRY400.py"))]
+    #[test_case(Rule::RedundantExceptionInLoggingMessage, Path::new("TRY401.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(

@@ -414,7 +414,7 @@ impl SpecialFormType {
 
         SpecialFormTypeBuilder::try_from(name)
             .ok()
-            .map(|form| -> &'static [Self] {
+            .map_or_default(|form| -> &'static [Self] {
                 match form {
                     SpecialFormTypeBuilder::AlwaysFalsy => &[Self::AlwaysFalsy],
                     SpecialFormTypeBuilder::AlwaysTruthy => &[Self::AlwaysTruthy],
@@ -498,7 +498,6 @@ impl SpecialFormType {
                     }
                 }
             })
-            .unwrap_or_default()
     }
 
     /// Return `true` if `module` is a module from which this `SpecialFormType` variant can validly originate.

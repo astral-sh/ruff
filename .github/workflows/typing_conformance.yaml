@@ -112,14 +112,17 @@ jobs:
              --new-ty "./ty-new" \
              --tests-path "${GITHUB_WORKSPACE}/typing/conformance/" \
              --python-version "$PYTHON_VERSION" \
-             --output ../typing_conformance_diagnostics.diff
+             --output ../typing_conformance_diagnostics.md
           )
+
+      - name: Write job summary
+        run: cat typing_conformance_diagnostics.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload diff
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: typing_conformance_diagnostics_diff
-          path: typing_conformance_diagnostics.diff
+          path: typing_conformance_diagnostics.md
 
   publish-report:
     needs: typing_conformance
@@ -138,4 +141,4 @@ jobs:
     with:
       report: typing-conformance
       artifact: typing_conformance_diagnostics_diff
-      filename: typing_conformance_diagnostics.diff
+      filename: typing_conformance_diagnostics.md

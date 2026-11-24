@@ -127,14 +127,7 @@ pub(crate) fn fromisoformat_replace_z(checker: &Checker, call: &ExprCall) {
 }
 
 fn func_is_fromisoformat(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["datetime", "datetime", "fromisoformat"]
-            )
-        })
+    semantic.matches_qualified_name(func, &["datetime", "datetime", "fromisoformat"])
 }
 
 /// A `datetime.replace` call that replaces the timezone with a zero offset.

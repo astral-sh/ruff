@@ -22,9 +22,10 @@ use crate::fix::edits::delete_comment;
 use crate::preview::{is_human_readable_names_enabled, is_redirected_suppression_code_enabled};
 use crate::rule_redirects::{get_redirect, get_redirect_target};
 use crate::rules::ruff::rules::{
-    InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
-    RedirectedNOQA, RuleCodesInSuppressionComments, UnmatchedSuppressionComment, UnusedCodes,
-    UnusedNOQA, UnusedNOQAKind, code_is_valid,
+    InvalidSuppressionComment, InvalidSuppressionCommentKind, RenamedRuleInSuppressionComment,
+    RuleCodesInSuppressionComments, UnknownRuleCommentKind, UnknownRuleInSuppressionComment,
+    UnmatchedSuppressionComment, UnusedRules, UnusedSuppressionComment, UnusedSuppressionKind,
+    code_is_valid,
 };
 use crate::settings::LinterSettings;
 use crate::settings::types::PreviewMode;
@@ -401,7 +402,7 @@ impl Suppressions {
     /// Check for rule codes and redirected names in valid suppression comments.
     pub(crate) fn check_rule_codes(&self, context: &LintContext, locator: &Locator) {
         let check_names = context.is_rule_enabled(Rule::RuleCodesInSuppressionComments);
-        let check_redirects = context.is_rule_enabled(Rule::RedirectedNOQA)
+        let check_redirects = context.is_rule_enabled(Rule::RenamedRuleInSuppressionComment)
             && is_redirected_suppression_code_enabled(context.settings());
         if !check_names && !check_redirects {
             return;
@@ -424,8 +425,10 @@ impl Suppressions {
                 let second_range = second_comment.and_then(|comment| comment.codes.get(index));
 
                 if check_redirects && let Some((original, target)) = redirect {
-                    let mut diagnostic =
-                        context.report_diagnostic(RedirectedNOQA { original, target }, *range);
+                    let mut diagnostic = context.report_diagnostic(
+                        RenamedRuleInSuppressionComment { original, target },
+                        *range,
+                    );
                     let edit = Edit::range_replacement(target.to_string(), *range);
                     // Conservatively mark any fixes involving a `ruff: disable` comment unsafe
                     // because the fix could make the `disable` match a previously unmatched, nested
@@ -491,9 +494,9 @@ impl Suppressions {
                     group.suppression,
                     &group.invalid_codes,
                     true,
-                    InvalidRuleCode {
-                        rule_code: group.invalid_codes.iter().join(", "),
-                        kind: InvalidRuleCodeKind::Suppression,
+                    UnknownRuleInSuppressionComment {
+                        rule: group.invalid_codes.iter().join(", "),
+                        kind: UnknownRuleCommentKind::Suppression,
                         whole_comment: group.suppression.codes().len() == group.invalid_codes.len(),
                     },
                 ) {
@@ -512,13 +515,13 @@ impl Suppressions {
                     group.suppression,
                     &codes,
                     false,
-                    UnusedNOQA {
-                        codes: Some(UnusedCodes {
+                    UnusedSuppressionComment {
+                        rules: Some(UnusedRules {
                             disabled: &group.disabled_codes,
                             duplicated: &group.duplicated_codes,
                             unmatched: &group.unused_codes,
                         }),
-                        kind: UnusedNOQAKind::Suppression,
+                        kind: UnusedSuppressionKind::Suppression,
                     },
                 );
             }
@@ -546,13 +549,13 @@ impl Suppressions {
             let name_is_valid = is_human_readable_names_enabled(self.preview) && name_is_known;
 
             if !code_is_valid && !name_is_valid {
-                // InvalidRuleCode
+                // UnknownRuleInSuppressionComment
                 let (_key, group) = grouped_diagnostic
                     .get_or_insert_with(|| (key, SuppressionDiagnostic::new(suppression)));
                 group.invalid_codes.push(code_str);
                 group.has_stable_rule_name |= name_is_known;
             } else if !suppression.used.get() {
-                // UnusedNOQA
+                // UnusedSuppressionComment
                 let Some(rule) = suppression.rule(self.preview) else {
                     continue; // "external" lint code, don't treat it as unused
                 };
@@ -795,8 +798,7 @@ impl<'a> SuppressionsBuilder<'a> {
                     };
                     token.kind() == TokenKind::Indent && count < 0
                 })
-                .map(|token| self.source.slice(token))
-                .unwrap_or_default();
+                .map_or_default(|token| self.source.slice(token));
 
             indents.push(last_indent);
 
@@ -1018,7 +1020,7 @@ impl<'a> SuppressionsBuilder<'a> {
             } else {
                 self.invalid.push(InvalidSuppression {
                     kind: InvalidSuppressionKind::Unmatched,
-                    comment: self.pending.remove(comment_index).comment.clone(),
+                    comment: self.pending.remove(comment_index).comment,
                 });
             }
         }

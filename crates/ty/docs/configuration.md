@@ -76,7 +76,10 @@ If the same table specifies both a rule's current name and an alias, the current
 
 ### `allowed-unresolved-imports`
 
-A list of module glob patterns for which `import-not-found` diagnostics should be suppressed.
+A list of module glob patterns for which `import-not-found` and
+`missing-module-member` diagnostics should be suppressed.
+For `from pkg import name`, ty matches against `pkg` if the module cannot be resolved,
+and against `pkg.name` if the module resolves but the name cannot be imported.
 
 Details on supported glob patterns:
 - `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but
@@ -772,7 +775,10 @@ severity levels or disable them entirely.
 
 #### `allowed-unresolved-imports`
 
-A list of module glob patterns for which `import-not-found` diagnostics should be suppressed.
+A list of module glob patterns for which `import-not-found` and
+`missing-module-member` diagnostics should be suppressed.
+For `from pkg import name`, ty matches against `pkg` if the module cannot be resolved,
+and against `pkg.name` if the module resolves but the name cannot be imported.
 
 Details on supported glob patterns:
 - `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but
@@ -1109,6 +1115,89 @@ Defaults to `false`.
     [overrides.analysis]
     # Use the top materialization when narrowing to an unspecialized generic class
     strict-generic-narrowing = true
+    ```
+
+---
+
+## `project-manager`
+
+### `project`
+
+The project manager to use for discovering the project's workspace and Python environment.
+
+This setting is in preview and may change between ty releases.
+
+- With `"none"` (the default), ty discovers the project and Python environment itself.
+- With `"uv"`, ty uses [uv](https://docs.astral.sh/uv/) to discover the workspace root,
+  Python environment, and dependency metadata. The environment must already be synchronized;
+  ty does not install project dependencies. uv may update the lockfile. This requires
+  uv 0.12.3 or newer.
+
+An explicit `TY_UV` takes precedence over this setting. If your editor marks the workspace
+as untrusted, ty discovers the project without running uv.
+
+**Default value**: `"none"`
+
+**Type**: `"uv" | "none"`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.project-manager]
+    project = "uv"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [project-manager]
+    project = "uv"
+    ```
+
+---
+
+### `script`
+
+The project manager to use for scripts with PEP 723 inline metadata.
+
+This setting is in preview and may change between ty releases.
+
+- With `"none"` (the default), ty looks for imported packages in your Python environment.
+  Install any third-party packages the script needs in that environment.
+- With `"uv"`, each script gets its own Python environment. ty uses
+  [uv](https://docs.astral.sh/uv/) to install the script's declared dependencies there
+  and resolves imports from that environment. This requires uv 0.12.3 or newer.
+
+If a script has an inline `[tool.ty]` table, its `project-manager.script` setting
+takes precedence. Otherwise, the script inherits the project's value.
+
+When checking untrusted code with `ty check`, pass `--config 'project-manager.script="none"'`
+to disable script synchronization. To disable both script synchronization and uv workspace
+discovery, set the `TY_UV` environment variable to `off`. `TY_UV` takes precedence over
+`--config`. If your editor marks the workspace as untrusted, ty disables both automatically.
+
+`uv check` sets `TY_UV=1`, so it always enables script synchronization.
+
+**Default value**: `"none"`
+
+**Type**: `"uv" | "none"`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.project-manager]
+    script = "uv"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [project-manager]
+    script = "uv"
     ```
 
 ---

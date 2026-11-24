@@ -387,6 +387,20 @@ class ConcreteDeleter(AbstractDeleter):
 ConcreteDeleter()  # ok
 ```
 
+## Implicit override of an abstract hash
+
+Defining `__eq__` implicitly sets `__hash__ = None`, which overrides the abstract method on
+`collections.abc.Hashable`.
+
+```py
+from collections.abc import Hashable
+
+class Concrete(Hashable):
+    __eq__ = object.__eq__
+
+Concrete()  # ok
+```
+
 ## Slots overriding abstract properties
 
 A slot creates a descriptor in the class namespace, which overrides an inherited abstract property.
@@ -575,4 +589,36 @@ class Stacked(ABC):
         pass
 
 Stacked()  # error: [abstract-class-instantiation]
+```
+
+## Narrowing a method in the class body
+
+The identity decorator leaves `method` unchanged. The class body then marks it abstract, and the
+type guard narrows it to the type of the abstract `Interface.method`.
+
+```py
+from abc import ABC, abstractmethod
+from typing import TypeGuard, TypeVar
+
+F = TypeVar("F")
+
+def identity(f: F) -> F:
+    return f
+
+def same(f: object, other: F) -> TypeGuard[F]:
+    return f is other
+
+class Interface(ABC):
+    @abstractmethod
+    def method(self: object) -> None: ...
+
+class Example(ABC):
+    @identity
+    def method(self: object) -> None:
+        pass
+
+    Interface.method = abstractmethod(method)
+    assert same(method, Interface.method)
+
+Example()  # error: [abstract-class-instantiation]
 ```

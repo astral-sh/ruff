@@ -433,7 +433,7 @@ impl WorkspaceSettingsIndex {
 
         let client_settings = if let Some(workspace_options) = workspace.options() {
             let options = workspace_options.clone().combine(global.options().clone());
-            let settings = match options.into_settings() {
+            let settings = match options.into_settings(global.server_preview) {
                 Ok(settings) => settings,
                 Err(settings) => {
                     client.show_error_message(format_args!(

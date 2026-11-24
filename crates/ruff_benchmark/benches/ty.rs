@@ -1167,6 +1167,39 @@ fn benchmark_inherited_recursive_protocol(criterion: &mut Criterion) {
     }
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4961>.
+///
+/// The inner constructor call matches both arms of `V | Declaration[K, V]`. Even without an
+/// expected type for the outer call, feeding the merged binding back into the inner call can
+/// add another `Declaration` layer on every inference pass.
+fn benchmark_nested_generic_constructor_arguments(criterion: &mut Criterion) {
+    for (suffix, choices) in [
+        ("", "V | Declaration[K, V]"),
+        ("_aliased", "Choice[K, V] | None"),
+    ] {
+        let code = format!(
+            r#"
+            from __future__ import annotations
+
+            type Choice[K, V] = V | Declaration[K, V]
+
+            class Declaration[K, V]:
+                def __init__(self, key: K | None = None, *choices: {choices}): ...
+
+            class Attribute[V](Declaration[str, V]): ...
+            class SubFactory[V](Declaration[str, V]): ...
+
+            Declaration("name", Declaration("name", Attribute(), SubFactory()), None)
+        "#
+        );
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[nested_generic_constructor_arguments{suffix}]"),
+            &code,
+        );
+    }
+}
+
 /// Regression benchmark for ty#4269: inherited receiver binding with nested type variables.
 ///
 /// The nominal relation constrains `T` inside the source's union argument. Ignoring that
@@ -1300,6 +1333,35 @@ fn benchmark_recursive_protocol_materialization_scaling(criterion: &mut Criterio
             &format!("ty_micro[recursive_protocol_materialization_{num_methods}]"),
             &code,
         );
+    }
+}
+
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/5041>.
+///
+/// Applying `Top` to a nested generic isolates the cost of materialization in overloaded calls.
+/// Covariant layers reuse the top materialization. Contravariant layers alternate between top
+/// and bottom, so computing an unused top materialization can also lead to exponential work.
+fn benchmark_nested_generic_materialization(criterion: &mut Criterion) {
+    for depth in [12, 20] {
+        let nested = format!("{}Any{}", "Row[".repeat(depth), "]".repeat(depth));
+        for variance in ["covariant", "contravariant"] {
+            let code = format!(
+                r#"
+                from typing import Any, Generic, TypeVar
+                from ty_extensions import Top
+
+                T = TypeVar("T", {variance}=True)
+                class Row(Generic[T]): ...
+
+                def f(x: Top[{nested}]): ...
+                "#
+            );
+            benchmark_micro_case(
+                criterion,
+                &format!("ty_micro[nested_{variance}_materialization_{depth}]"),
+                &code,
+            );
+        }
     }
 }
 
@@ -1459,6 +1521,25 @@ fn benchmark_gradual_vararg_call(criterion: &mut Criterion) {
     benchmark_micro_case(criterion, "ty_micro[gradual_vararg_call]", &code);
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4990>.
+fn benchmark_list_of_generic_callable(criterion: &mut Criterion) {
+    let code = "
+        type Box[T] = list[T]
+
+        def f[
+            A: (int, str, bytes, range, slice),
+            B: (int, str, bytes, range, slice),
+            C: (int, str, bytes, range, slice),
+            D: (int, str, bytes, range, slice),
+            E: (int, str, bytes, range, slice),
+        ](a: Box[A], b: Box[B], c: Box[C], d: Box[D], e: Box[E]) -> None: ...
+
+        funcs = [f]
+    ";
+
+    benchmark_micro_case(criterion, "ty_micro[list_of_generic_callable]", code);
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/4796>.
 ///
 /// Capturing independently bounded generic overloads must not enumerate every combination of
@@ -1572,6 +1653,96 @@ fn benchmark_typed_dict_get_large_literal_union(criterion: &mut Criterion) {
     );
 }
 
+fn benchmark_typed_dict_union_assignability(criterion: &mut Criterion) {
+    let variants = |name: &str, count| {
+        (0..count)
+            .map(|i| format!("{name}[Literal[{i}]]"))
+            .join(", ")
+    };
+
+    // Each source only matches Default. Checking child before tag compares Leaf to Nodes
+    // for every source and target pair. The trailing None prevents caching the whole union
+    // result, so each comparison walks all the arms even when the Node results are cached.
+    let [nodes, sources, targets] = ["Node", "Source", "Target"].map(|name| variants(name, 160));
+    let nullable = format!(
+        "
+        from typing import Literal, TypedDict, Union
+
+        class Leaf(TypedDict):
+            extra: int
+
+        class Node[T](TypedDict):
+            value: T
+
+        Nodes = Union[{nodes}, None]
+
+        class Source[T](TypedDict):
+            child: Leaf
+            tag: T
+
+        class Target[T](TypedDict):
+            child: Nodes
+            tag: T
+
+        class Default(TypedDict):
+            child: Leaf
+
+        Sources = Union[{sources}]
+        Targets = Union[{targets}, Default]
+
+        def assign(source: Sources) -> Targets:
+            return source
+        "
+    );
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[nullable_typed_dict_union_assignability]",
+        &nullable,
+    );
+
+    // The envelopes compare the same two recursive schemas before checking their tags.
+    // Once the individual comparisons complete, each source node can reuse its result
+    // against the entire target schema.
+    let [sources, targets, source_envelopes, target_envelopes] =
+        ["Source", "Target", "SourceEnvelope", "TargetEnvelope"].map(|name| variants(name, 59));
+    let recursive = format!(
+        "
+        from typing import Literal, NotRequired, TypedDict, Union
+        from typing_extensions import ReadOnly
+
+        class Source[T](TypedDict):
+            tag: T
+            child: ReadOnly[NotRequired['Sources']]
+
+        class Target[T](TypedDict):
+            tag: T
+            child: ReadOnly[NotRequired['Targets']]
+
+        Sources = Union[{sources}]
+        Targets = Union[{targets}]
+
+        class SourceEnvelope[T](TypedDict):
+            child: ReadOnly[Sources]
+            tag: T
+
+        class TargetEnvelope[T](TypedDict):
+            child: ReadOnly[Targets]
+            tag: T
+
+        SourceEnvelopes = Union[{source_envelopes}]
+        TargetEnvelopes = Union[{target_envelopes}]
+
+        def assign(source: SourceEnvelopes) -> TargetEnvelopes:
+            return source
+        "
+    );
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[recursive_typed_dict_union_assignability]",
+        &recursive,
+    );
+}
+
 fn benchmark_union_construction(criterion: &mut Criterion) {
     const NUM_CLASSES: usize = 256;
 
@@ -1612,6 +1783,44 @@ fn benchmark_union_construction(criterion: &mut Criterion) {
         writeln!(split, "U{i} = U{} | Literal[{i}]", i - 1).ok();
     }
     benchmark_micro_case(criterion, "ty_micro[split_literal_union_1024]", &split);
+}
+
+fn benchmark_literal_union_aliases(criterion: &mut Criterion) {
+    let members = (1..=4000).join(", ");
+
+    // Keeping the single literal alongside Codes should not require negating all of Codes.
+    let codes = format!(
+        "
+        from typing import Literal
+
+        type Codes = Literal[{members}]
+
+        def zero() -> Literal[0] | Codes:
+            return 0
+        "
+    );
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[literal_union_alias_of_literals_4000]",
+        &codes,
+    );
+
+    // Integer covers every literal in the group. Returning an arbitrary int forces ty to check it.
+    let integer = format!(
+        "
+        from typing import Literal
+
+        type Integer = int
+
+        def identity(value: int) -> Literal[{members}] | Integer:
+            return value
+        "
+    );
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[literal_union_alias_of_int_4000]",
+        &integer,
+    );
 }
 
 /// Benchmark for narrowing a large union type through multiple match statements.
@@ -1995,6 +2204,17 @@ fn benchmark_literal_match_fallthrough(criterion: &mut Criterion) {
         "ty_micro[literal_match_fallthrough]",
         &literal_match_fallthrough_code(false),
     );
+}
+
+/// Each failed case adds another literal exclusion to the type of `opcode`.
+fn benchmark_int_match_fallthrough(criterion: &mut Criterion) {
+    let mut code = String::from("def decode(opcode: int) -> int:\n    match opcode:\n");
+    for opcode in 0..128 {
+        writeln!(code, "        case {opcode}: return {opcode}").unwrap();
+    }
+    code.push_str("    return opcode\n");
+
+    benchmark_micro_case(criterion, "ty_micro[int_match_fallthrough]", &code);
 }
 
 /// Benchmarks guarded `match` fallthrough over a gradual literal subject.
@@ -2602,6 +2822,25 @@ fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
     }
 }
 
+/// Each call adds a reachability constraint for the next statement. Passing an extra argument
+/// forces a diagnostic at every call, so scanning all ranges for each diagnostic is quadratic.
+fn benchmark_diagnostic_range_reachability(criterion: &mut Criterion) {
+    const CALLS: usize = 4_000;
+    let code = format!(
+        "def f(value: str) -> None:\n{}",
+        "    value.upper(0)\n".repeat(CALLS)
+    );
+
+    setup_rayon();
+    criterion.bench_function("ty_micro[diagnostic_range_reachability]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| assert_eq!(case.db.check().len(), CALLS),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Exercises repeated control-flow gates with and without interleaved statement-call predicates.
 ///
 /// Each suppressing context manager merges the old binding with a reassigned binding. Repeating
@@ -2881,24 +3120,30 @@ criterion_group!(
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
     benchmark_inherited_recursive_protocol,
+    benchmark_nested_generic_constructor_arguments,
     benchmark_nested_recursive_protocol_receiver,
     benchmark_materialized_recursive_protocol_overload,
     benchmark_materialized_recursive_protocol_subtyping,
     benchmark_recursive_protocol_materialization_scaling,
+    benchmark_nested_generic_materialization,
     benchmark_recursive_callable_materialization,
     benchmark_recursive_protocol_growing_specialization,
     benchmark_recursive_protocol_specialized_receiver,
     benchmark_async_context_manager_recursive_protocol,
+    benchmark_list_of_generic_callable,
     benchmark_paramspec_bounded_overloads,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
+    benchmark_typed_dict_union_assignability,
     benchmark_very_large_tuple,
     benchmark_nested_tuple_comparison,
     benchmark_union_construction,
+    benchmark_literal_union_aliases,
     benchmark_large_union_narrowing,
     benchmark_class_or_pattern_captures,
     benchmark_large_isinstance_narrowing,
     benchmark_literal_match_fallthrough,
+    benchmark_int_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
     benchmark_enum_union_equality,
@@ -2914,6 +3159,7 @@ criterion_group!(
     benchmark_nested_mapping_pattern_exhaustiveness,
     benchmark_typeis_narrowing,
     benchmark_repeated_statement_calls,
+    benchmark_diagnostic_range_reachability,
     benchmark_repeated_suppressing_context_managers,
     benchmark_repeated_narrowed_assignments,
 );

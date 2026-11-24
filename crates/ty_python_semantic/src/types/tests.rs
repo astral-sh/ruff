@@ -309,7 +309,7 @@ fn oscillating_generic_alias_cycle_recover<'db>(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_initial=|_, id, _, _| Type::divergent(id),
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]
 fn oscillating_generic_alias<'db>(db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
@@ -395,17 +395,50 @@ fn todo_types() {
 }
 
 #[test]
-fn divergent_type() {
-    let db = setup_db();
-    let db = &db;
+fn unions_deduplicate_only_identical_divergent_markers() {
+    let db = &setup_db();
     let env = db.program_environment();
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let other = Type::divergent(salsa::plumbing::Id::from_bits(2));
+
+    let both = UnionType::from_elements(db, &env, [div, other, div]);
+    assert_eq!(both.expect_union().elements(db), [div, other]);
+}
+
+#[test]
+fn unions_treat_materialized_divergent_markers_as_object_or_never() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let other = Type::divergent(salsa::plumbing::Id::from_bits(2));
+    let top_div = div.top_materialization(db, &env);
+    let bottom_div = div.bottom_materialization(db, &env);
+
+    assert!(UnionType::from_elements(db, &env, [other, top_div]).is_object());
+    assert_eq!(
+        UnionType::from_elements(db, &env, [bottom_div, other]),
+        other
+    );
+    assert_eq!(
+        UnionType::from_elements(db, &env, [other, bottom_div]),
+        other
+    );
+}
+
+#[test]
+fn materialization_makes_divergent_static_and_preserves_its_identity() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+
     assert!(div.is_dynamic());
     assert!(div.has_dynamic(db, &env));
+
     let visitor = ApplyTypeMappingVisitor::new(&env);
     let top_div = div.materialize(db, MaterializationKind::Top, &visitor);
     let bottom_div = div.materialize(db, MaterializationKind::Bottom, &visitor);
-
+    assert_eq!(top_div, div.top_materialization(db, &env));
+    assert_eq!(bottom_div, div.bottom_materialization(db, &env));
     assert!(top_div.is_divergent());
     assert!(bottom_div.is_divergent());
     assert!(!top_div.is_dynamic());
@@ -416,6 +449,16 @@ fn divergent_type() {
     assert!(!top_div.is_never());
     assert!(!bottom_div.is_object());
     assert!(bottom_div.is_never());
+}
+
+#[test]
+fn negating_divergent_flips_only_its_materialization() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let top_div = div.top_materialization(db, &env);
+    let bottom_div = div.bottom_materialization(db, &env);
+
     assert_eq!(top_div.negate(db, &env), bottom_div);
     assert_eq!(bottom_div.negate(db, &env), top_div);
     assert_eq!(
@@ -434,18 +477,30 @@ fn divergent_type() {
             .build(),
         top_div
     );
-    assert!(
-        KnownClass::Int
-            .to_instance(db, &env)
-            .is_assignable_to(db, &env, top_div)
-    );
-    assert!(!top_div.is_assignable_to(db, &env, KnownClass::Int.to_instance(db, &env)));
-    assert!(bottom_div.is_assignable_to(db, &env, KnownClass::Int.to_instance(db, &env)));
-    assert!(
-        !KnownClass::Int
-            .to_instance(db, &env)
-            .is_assignable_to(db, &env, bottom_div)
-    );
+}
+
+#[test]
+fn divergent_bounds_are_assignable_like_object_and_never() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let top_div = div.top_materialization(db, &env);
+    let bottom_div = div.bottom_materialization(db, &env);
+    let int = KnownClass::Int.to_instance(db, &env);
+
+    assert!(int.is_assignable_to(db, &env, top_div));
+    assert!(!top_div.is_assignable_to(db, &env, int));
+    assert!(bottom_div.is_assignable_to(db, &env, int));
+    assert!(!int.is_assignable_to(db, &env, bottom_div));
+}
+
+#[test]
+fn top_divergent_supports_the_same_operations_as_object() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let top_div = div.top_materialization(db, &env);
+
     assert_eq!(
         top_div.member(db, &env, "__str__").place.expect_type(),
         Type::object()
@@ -454,15 +509,25 @@ fn divergent_type() {
             .expect_type()
     );
     assert_eq!(
-        top_div.member(db, &env, "__class__",).place.expect_type(),
+        top_div.member(db, &env, "__class__").place.expect_type(),
         Type::object().dunder_class(db, &env)
     );
     assert!(top_div.try_upcast_to_callable(db, &env).is_none());
     assert!(
         top_div
-            .subscript(db, &env, Type::int_literal(0), ast::ExprContext::Load,)
+            .subscript(db, &env, Type::int_literal(0), ast::ExprContext::Load)
             .is_err()
     );
+}
+
+#[test]
+fn recursive_normalization_recognizes_materialized_divergent_markers() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let top_div = div.top_materialization(db, &env);
+    let bottom_div = div.bottom_materialization(db, &env);
+
     assert_eq!(
         top_div.recursive_type_normalized_impl(db, &env, div, true),
         None
@@ -471,35 +536,44 @@ fn divergent_type() {
         bottom_div.recursive_type_normalized_impl(db, &env, div, true),
         None
     );
+}
 
-    // The `Divergent` type must not be eliminated in union with other dynamic types,
-    // as this would prevent detection of divergent type inference using `Divergent`.
+#[test]
+fn unions_keep_divergent_alongside_unknown() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+
+    // Losing the marker here would prevent ty from detecting a cycle in type inference.
     let union = UnionType::from_elements(db, &env, [Type::unknown(), div]);
-    assert_eq!(
-        union.display(db, &db.program_environment()).to_string(),
-        "Unknown | Divergent"
-    );
+    assert_eq!(union.display(db, &env).to_string(), "Unknown | Divergent");
 
     let union = UnionType::from_elements(db, &env, [div, Type::unknown()]);
-    assert_eq!(
-        union.display(db, &db.program_environment()).to_string(),
-        "Divergent | Unknown"
-    );
+    assert_eq!(union.display(db, &env).to_string(), "Divergent | Unknown");
 
     let union = UnionType::from_elements(db, &env, [div, Type::unknown(), todo_type!("1")]);
-    assert_eq!(
-        union.display(db, &db.program_environment()).to_string(),
-        "Divergent | Unknown"
-    );
+    assert_eq!(union.display(db, &env).to_string(), "Divergent | Unknown");
+}
+
+#[test]
+fn divergent_is_neither_equivalent_to_nor_redundant_with_unknown() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
 
     assert!(div.is_equivalent_to(db, &env, div));
     assert!(!div.is_equivalent_to(db, &env, Type::unknown()));
     assert!(!Type::unknown().is_equivalent_to(db, &env, div));
     assert!(!div.is_redundant_with(db, &env, Type::unknown()));
     assert!(!Type::unknown().is_redundant_with(db, &env, div));
+}
 
-    // `Divergent & T` and `Divergent & ~T` both simplify to `Divergent`, except for the
-    // specific case of `Divergent & Never`, which simplifies to `Never`.
+#[test]
+fn divergent_absorbs_other_dynamic_types_in_intersections() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+
     let divergent_intersection = IntersectionBuilder::new(db, &env)
         .add_positive(div)
         .add_positive(todo_type!("2"))
@@ -512,6 +586,14 @@ fn divergent_type() {
         .add_positive(div)
         .build();
     assert_eq!(divergent_intersection, div);
+}
+
+#[test]
+fn never_absorbs_divergent_in_intersections() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+
     let divergent_never_intersection = IntersectionBuilder::new(db, &env)
         .add_positive(div)
         .add_positive(Type::Never)
@@ -523,20 +605,33 @@ fn divergent_type() {
         .build();
     assert_eq!(divergent_never_intersection, Type::Never);
 
-    // The `object` type has a good convergence property, that is, its union with all other types is `object`.
-    // (e.g. `object | tuple[Divergent] == object`, `object | tuple[object] == object`)
-    // So we can safely eliminate `Divergent`.
+    let intersection = IntersectionType::from_elements(db, &env, [Type::Never, div]);
+    assert_eq!(intersection.display(db, &env).to_string(), "Never");
+
+    let intersection = IntersectionType::from_elements(db, &env, [div, Type::Never]);
+    assert_eq!(intersection.display(db, &env).to_string(), "Never");
+}
+
+#[test]
+fn object_absorbs_divergent_in_unions() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+
+    // Even if the next iteration wraps the marker in a tuple, the union still
+    // simplifies to `object`, so it is safe to drop the marker.
     let union = UnionType::from_elements(db, &env, [div, KnownClass::Object.to_instance(db, &env)]);
-    assert_eq!(
-        union.display(db, &db.program_environment()).to_string(),
-        "object"
-    );
+    assert_eq!(union.display(db, &env).to_string(), "object");
 
     let union = UnionType::from_elements(db, &env, [KnownClass::Object.to_instance(db, &env), div]);
-    assert_eq!(
-        union.display(db, &db.program_environment()).to_string(),
-        "object"
-    );
+    assert_eq!(union.display(db, &env).to_string(), "object");
+}
+
+#[test]
+fn recursive_normalization_keeps_the_outer_list_around_divergent() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
 
     let recursive = UnionType::from_elements(
         db,
@@ -548,128 +643,118 @@ fn divergent_type() {
     );
     let nested_rec = KnownClass::List.to_specialized_instance(db, &env, &[recursive]);
     assert_eq!(
-        nested_rec
-            .display(db, &db.program_environment())
-            .to_string(),
+        nested_rec.display(db, &env).to_string(),
         "list[list[Divergent] | None]"
     );
     let normalized = nested_rec
         .recursive_type_normalized_impl(db, &env, div, false)
         .unwrap();
-    assert_eq!(
-        normalized
-            .display(db, &db.program_environment())
-            .to_string(),
-        "list[Divergent]"
-    );
+    assert_eq!(normalized.display(db, &env).to_string(), "list[Divergent]");
+}
 
-    let recursive_tuple = Type::heterogeneous_tuple(
+#[test]
+fn recursive_normalization_preserves_shared_unions_from_other_cycles() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let other = Type::divergent(salsa::plumbing::Id::from_bits(2));
+
+    let list = |ty| KnownClass::List.to_specialized_instance(db, &env, &[ty]);
+    let recursive = UnionType::from_elements(db, &env, [list(div), Type::none(db, &env)]);
+    let shared = UnionType::from_elements(
         db,
         &env,
         [
-            UnionType::from_elements(
-                db,
-                &env,
-                [
-                    KnownClass::Int.to_instance(db, &env),
-                    Type::heterogeneous_tuple(
-                        db,
-                        &env,
-                        [
-                            UnionType::from_elements(
-                                db,
-                                &env,
-                                [KnownClass::Int.to_instance(db, &env), div],
-                            ),
-                            KnownClass::Str.to_instance(db, &env),
-                        ],
-                    ),
-                ],
-            ),
-            KnownClass::Str.to_instance(db, &env),
+            list(recursive),
+            Type::heterogeneous_tuple(db, &env, [recursive]),
         ],
     );
+    assert_eq!(
+        shared.recursive_type_normalized_impl(db, &env, div, true),
+        None
+    );
+    assert_eq!(
+        shared.recursive_type_normalized_impl(db, &env, other, true),
+        Some(shared)
+    );
+}
+
+#[test]
+fn recursive_normalization_replaces_only_the_divergent_tuple_element() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+
+    let int = KnownClass::Int.to_instance(db, &env);
+    let str_type = KnownClass::Str.to_instance(db, &env);
+    let tuple = |ty| {
+        Type::heterogeneous_tuple(
+            db,
+            &env,
+            [UnionType::from_elements(db, &env, [int, ty]), str_type],
+        )
+    };
+    let recursive_tuple = tuple(tuple(div));
     let normalized = recursive_tuple
         .recursive_type_normalized_impl(db, &env, div, false)
         .unwrap();
     assert_eq!(
-        normalized
-            .display(db, &db.program_environment())
-            .to_string(),
+        normalized.display(db, &env).to_string(),
         "tuple[Divergent, str]"
     );
+}
 
-    let recursive_dict = KnownClass::Dict.to_specialized_instance(
-        db,
-        &env,
-        &[
-            KnownClass::Str.to_instance(db, &env),
-            UnionType::from_elements(
-                db,
-                &env,
-                [
-                    KnownClass::Int.to_instance(db, &env),
-                    KnownClass::Dict.to_specialized_instance(
-                        db,
-                        &env,
-                        &[
-                            KnownClass::Str.to_instance(db, &env),
-                            UnionType::from_elements(
-                                db,
-                                &env,
-                                [KnownClass::Int.to_instance(db, &env), div],
-                            ),
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    );
+#[test]
+fn recursive_normalization_replaces_only_the_divergent_dict_value() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+
+    let int = KnownClass::Int.to_instance(db, &env);
+    let str_type = KnownClass::Str.to_instance(db, &env);
+    let dict = |ty| {
+        KnownClass::Dict.to_specialized_instance(
+            db,
+            &env,
+            &[str_type, UnionType::from_elements(db, &env, [int, ty])],
+        )
+    };
+    let recursive_dict = dict(dict(div));
     let normalized = recursive_dict
         .recursive_type_normalized_impl(db, &env, div, false)
         .unwrap();
     assert_eq!(
-        normalized
-            .display(db, &db.program_environment())
-            .to_string(),
+        normalized.display(db, &env).to_string(),
         "dict[str, Divergent]"
     );
+}
+
+#[test]
+fn divergent_satisfies_assignability_constraints_with_unknown_and_unions() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
 
     let union = UnionType::from_elements(db, &env, [div, KnownClass::Int.to_instance(db, &env)]);
-    assert_eq!(
-        union.display(db, &db.program_environment()).to_string(),
-        "Divergent | int"
-    );
     for (source, target) in [(div, union), (div, Type::unknown()), (Type::unknown(), div)] {
-        let when = source.when_constraint_set_assignable_to_owned(db, &env, target);
-        assert!(when.query(|_builder, when| when.is_always_satisfied(db, &env, TypeVarSet::None)));
+        let when =
+            source.when_constraint_set_assignable_to_owned(db, &env, target, TypeVarSet::All);
+        assert!(when.query(|_builder, when| when.is_always_satisfied(db, &env, TypeVarSet::All)));
     }
+}
+
+#[test]
+fn recursive_normalization_drops_divergent_from_a_top_level_union() {
+    let db = &setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+
+    let union = UnionType::from_elements(db, &env, [div, KnownClass::Int.to_instance(db, &env)]);
+    assert_eq!(union.display(db, &env).to_string(), "Divergent | int");
     let normalized = union
         .recursive_type_normalized_impl(db, &env, div, false)
         .unwrap();
-    assert_eq!(
-        normalized
-            .display(db, &db.program_environment())
-            .to_string(),
-        "int"
-    );
-
-    // The same can be said about intersections for the `Never` type.
-    let intersection = IntersectionType::from_elements(db, &env, [Type::Never, div]);
-    assert_eq!(
-        intersection
-            .display(db, &db.program_environment())
-            .to_string(),
-        "Never"
-    );
-
-    let intersection = IntersectionType::from_elements(db, &env, [div, Type::Never]);
-    assert_eq!(
-        intersection
-            .display(db, &db.program_environment())
-            .to_string(),
-        "Never"
-    );
+    assert_eq!(normalized.display(db, &env).to_string(), "int");
 }
 
 #[test]

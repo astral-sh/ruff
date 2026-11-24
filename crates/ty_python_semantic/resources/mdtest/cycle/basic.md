@@ -36,6 +36,30 @@ def f(x: f):
 reveal_type(f)  # revealed: def f(x: Unknown) -> Unknown
 ```
 
+## A `TypeVar` name depends on its own `__name__`
+
+The name passed to `TypeVar` comes from `T.__name__` in another module. Inferring `T.__name__` leads
+back to the name argument, so ty falls back to `str` for the attribute.
+
+`parameter.py`:
+
+```py
+from typing import TypeVar
+from typing_extensions import reveal_type
+from names import name
+
+T = TypeVar(name)  # error: [mismatched-typevar-name]
+reveal_type(T.__name__)  # revealed: str
+```
+
+`names.py`:
+
+```py
+from parameter import T
+
+name = T.__name__
+```
+
 ## Unpacking a recursively growing tuple
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3838>.
@@ -759,8 +783,9 @@ while value:
 python-version = "3.12"
 ```
 
-A list passed to a generic function retains the type inferred from its elements, even when the
-call's return type supplies an incompatible context for that list.
+An unannotated list receives element types from both its initializer and its later uses. Here the
+return annotation supplies `T` through `keep`, but the list also contains an `int`. Returning it as
+`list[T]` would be unsafe.
 
 ```py
 def keep[U](values: list[U]) -> list[U]:
@@ -768,6 +793,24 @@ def keep[U](values: list[U]) -> list[U]:
 
 def make[T](arg: T) -> list[T]:
     values = [42]
-    reveal_type(values)  # revealed: list[int]
-    return keep(values)  # error: [invalid-return-type]
+    reveal_type(values)  # revealed: list[T@make | int]
+    return keep(values)  # error: [invalid-explicit-return]
+```
+
+## A nested union inside and outside a bound method
+
+Both alternatives for `items` are one-element tuples. While normalizing the outer `copy` method, ty
+can encounter the same method on the inner frozenset. That recursion must not affect the independent
+tuple in the next field.
+
+```py
+from typing import Literal
+
+def check(flag: bool):
+    items = (frozenset({1}).copy,) if flag else (0,)
+    state = None
+    for _ in range(2):
+        state = (frozenset((items,)).copy, items, state)
+        size: Literal[1] = len(state[1])
+        state[1].append(42)  # error: [missing-attribute]
 ```

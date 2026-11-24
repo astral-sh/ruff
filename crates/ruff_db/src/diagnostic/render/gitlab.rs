@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     hash::{DefaultHasher, Hash, Hasher},
     path::Path,
 };
@@ -58,44 +58,45 @@ impl Serialize for SerializedMessages<'_> {
     {
         let mut s = serializer.serialize_seq(Some(self.diagnostics.len()))?;
         let mut fingerprints = HashSet::<u64>::with_capacity(self.diagnostics.len());
+        let mut last_fingerprints = HashMap::new();
 
         for diagnostic in self.diagnostics {
-            let location = diagnostic
-                .primary_span()
-                .map(|span| {
-                    let file = span.file();
-                    let positions = if self.resolver.is_notebook(file) {
-                        // We can't give a reasonable location for the structured formats,
-                        // so we show one that's clearly a fallback
-                        Default::default()
-                    } else {
-                        let diagnostic_source = file.diagnostic_source(self.resolver);
-                        let source_code = diagnostic_source.as_source_code();
-                        span.range()
-                            .map(|range| Positions {
-                                begin: source_code.line_column(range.start()),
-                                end: source_code.line_column(range.end()),
-                            })
-                            .unwrap_or_default()
-                    };
+            let span = diagnostic.primary_span_ref();
+            let location = span.map_or_default(|span| {
+                let file = span.file();
+                let positions = if self.resolver.is_notebook(file) {
+                    // We can't give a reasonable location for the structured formats,
+                    // so we show one that's clearly a fallback
+                    Default::default()
+                } else {
+                    let diagnostic_source = file.diagnostic_source(self.resolver);
+                    let source_code = diagnostic_source.as_source_code();
+                    span.range().map_or_default(|range| Positions {
+                        begin: source_code.line_column(range.start()),
+                        end: source_code.line_column(range.end()),
+                    })
+                };
 
-                    let path = self.project_dir.as_ref().map_or_else(
-                        || file.relative_path(self.resolver).display().to_string(),
-                        |project_dir| relativize_path_to(file.path(self.resolver), project_dir),
-                    );
+                let path = self.project_dir.as_ref().map_or_else(
+                    || file.relative_path(self.resolver).display().to_string(),
+                    |project_dir| relativize_path_to(file.path(self.resolver), project_dir),
+                );
 
-                    Location { path, positions }
-                })
-                .unwrap_or_default();
+                Location { path, positions }
+            });
 
-            let mut message_fingerprint = fingerprint(diagnostic, &location.path, 0);
-
-            // Make sure that we do not get a fingerprint that is already in use
-            // by adding in the previously generated one.
-            while fingerprints.contains(&message_fingerprint) {
+            // For the same rule and file, every fingerprint through the last one
+            // we emitted is still in use. Resume there, checking for collisions
+            // with fingerprints from other rules and files.
+            let path = span.map(|span| span.file().path(self.resolver));
+            let last = last_fingerprints
+                .entry((diagnostic.name(), path))
+                .or_insert(0);
+            let mut message_fingerprint = fingerprint(diagnostic, &location.path, *last);
+            while !fingerprints.insert(message_fingerprint) {
                 message_fingerprint = fingerprint(diagnostic, &location.path, message_fingerprint);
             }
-            fingerprints.insert(message_fingerprint);
+            *last = message_fingerprint;
 
             let description = diagnostic.concise_message();
             let check_name = if self.config.preview && !self.config.prefer_rule_codes {

@@ -1320,7 +1320,7 @@ fn infer_binary_type_comparison_inner<'db>(
             let right = constraints.load(db, env, right.constraints(db));
             let equivalent =
                 left.iff(db, &constraints, right)
-                    .is_always_satisfied(db, env, TypeVarSet::None);
+                    .is_always_satisfied(db, env, TypeVarSet::All);
             match op {
                 NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
                     Some(Ok(Type::bool_literal(equivalent)))

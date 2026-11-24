@@ -1308,12 +1308,12 @@ fn preview_enabled_prefix() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: stable-test-rule: Hey this is a stable test rule.
-    -:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
-    -:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
     -:1:1: preview-test-rule: Hey this is a preview test rule.
     -:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
+    -:1:1: stable-test-rule: Hey this is a stable test rule.
+    -:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    -:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
     Found 6 errors.
     [*] 1 fixable with `--fix` (1 unsafe fix available with `--fix --unsafe-fixes`).
 
@@ -1330,20 +1330,20 @@ fn preview_enabled_all() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: undocumented-public-module: Missing docstring in public module
     -:1:1: missing-copyright-notice: Missing copyright notice at top of file
-    -:1:1: stable-test-rule: Hey this is a stable test rule.
-    -:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
-    -:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
     -:1:1: preview-test-rule: Hey this is a preview test rule.
     -:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
+    -:1:1: stable-test-rule: Hey this is a stable test rule.
+    -:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    -:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
+    -:1:1: undocumented-public-module: Missing docstring in public module
     Found 8 errors.
     [*] 1 fixable with `--fix` (1 unsafe fix available with `--fix --unsafe-fixes`).
 
     ----- stderr -----
-    warning: `incorrect-blank-line-before-class` (D203) and `blank-line-before-class` (D211) are incompatible. Ignoring `incorrect-blank-line-before-class`.
-    warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
+    warning: `incorrect-blank-line-before-class-docstring` (D203) and `blank-line-before-class-docstring` (D211) are incompatible. Ignoring `incorrect-blank-line-before-class-docstring`.
+    warning: `multiline-docstring-summary-on-separate-line` (D212) and `multiline-docstring-summary-on-first-line` (D213) are incompatible. Ignoring `multiline-docstring-summary-on-first-line`.
     ");
 }
 
@@ -1377,7 +1377,7 @@ fn preview_disabled_direct() {
     All checks passed!
 
     ----- stderr -----
-    warning: Selection `RUF911` has no effect because preview is not enabled.
+    warning: Selection `preview-test-rule` (`RUF911`) has no effect because preview is not enabled.
     ");
 }
 
@@ -1470,12 +1470,12 @@ fn preview_enabled_group_ignore() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: stable-test-rule: Hey this is a stable test rule.
-    -:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
-    -:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
     -:1:1: preview-test-rule: Hey this is a preview test rule.
     -:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
+    -:1:1: stable-test-rule: Hey this is a stable test rule.
+    -:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    -:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
     Found 6 errors.
     [*] 1 fixable with `--fix` (1 unsafe fix available with `--fix --unsafe-fixes`).
 
@@ -1494,7 +1494,7 @@ fn removed_direct() {
 
     ----- stderr -----
     ruff failed
-      Cause: Rule `RUF931` was removed and cannot be selected.
+      Cause: Rule `another-removed-test-rule` (`RUF931`) was removed and cannot be selected.
     ");
 }
 
@@ -1513,8 +1513,8 @@ fn removed_direct_multiple() {
     ----- stderr -----
     ruff failed
       Cause: The following rules have been removed and cannot be selected:
-        - RUF930
-        - RUF931
+        - `removed-test-rule` (`RUF930`)
+        - `another-removed-test-rule` (`RUF931`)
     ");
 }
 
@@ -1544,7 +1544,7 @@ fn removed_ignore_direct() {
 
     ----- stderr -----
     warning: The following rules have been removed and ignoring them has no effect:
-        - UP027
+        - `unpacked-list-comprehension` (`UP027`)
     ");
 }
 
@@ -1561,8 +1561,8 @@ fn removed_ignore_multiple_direct() {
 
     ----- stderr -----
     warning: The following rules have been removed and ignoring them has no effect:
-        - PLR1706
-        - UP027
+        - `and-or-ternary` (`PLR1706`)
+        - `unpacked-list-comprehension` (`UP027`)
     ");
 }
 
@@ -1662,7 +1662,7 @@ fn deprecated_direct() {
     Found 1 error.
 
     ----- stderr -----
-    warning: Rule `RUF920` is deprecated and will be removed in a future release.
+    warning: Rule `deprecated-test-rule` (`RUF920`) is deprecated and will be removed in a future release.
     ");
 }
 
@@ -1677,17 +1677,17 @@ fn deprecated_multiple_direct() {
     success: false
     exit_code: 1
     ----- stdout -----
-    RUF920 Hey this is a deprecated test rule.
+    RUF921 Hey this is another deprecated test rule.
     --> -:1:1
 
-    RUF921 Hey this is another deprecated test rule.
+    RUF920 Hey this is a deprecated test rule.
     --> -:1:1
 
     Found 2 errors.
 
     ----- stderr -----
-    warning: Rule `RUF920` is deprecated and will be removed in a future release.
-    warning: Rule `RUF921` is deprecated and will be removed in a future release.
+    warning: Rule `deprecated-test-rule` (`RUF920`) is deprecated and will be removed in a future release.
+    warning: Rule `another-deprecated-test-rule` (`RUF921`) is deprecated and will be removed in a future release.
     ");
 }
 
@@ -1719,7 +1719,7 @@ fn deprecated_direct_preview_enabled() {
 
     ----- stderr -----
     ruff failed
-      Cause: Selection of deprecated rule `RUF920` is not allowed when preview is enabled.
+      Cause: Selection of deprecated rule `deprecated-test-rule` (`RUF920`) is not allowed when preview is enabled.
     ");
 }
 
@@ -1754,8 +1754,8 @@ fn deprecated_multiple_direct_preview_enabled() {
     ----- stderr -----
     ruff failed
       Cause: Selection of deprecated rules is not allowed when preview is enabled. Remove selection of:
-    	- RUF920
-    	- RUF921
+        - `deprecated-test-rule` (`RUF920`)
+        - `another-deprecated-test-rule` (`RUF921`)
     ");
 }
 
@@ -2461,8 +2461,19 @@ extend-safe-fixes = ["RUF9"]
     success: false
     exit_code: 1
     ----- stdout -----
+    RUF950 Hey this is a test rule that was redirected from another.
+    --> -:1:1
+
     RUF900 Hey this is a stable test rule.
     --> -:1:1
+
+    RUF903 Hey this is a stable test rule with a display only fix.
+    --> -:1:1
+      |
+    1 + # fix from stable-test-rule-display-only-fix
+    2 | x = {'a': 1, 'a': 1}
+      |
+    note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
     RUF901 Hey this is a stable test rule with a safe fix.
     --> -:1:1
@@ -2478,17 +2489,6 @@ extend-safe-fixes = ["RUF9"]
     1 + # fix from stable-test-rule-unsafe-fix
     2 | x = {'a': 1, 'a': 1}
       |
-
-    RUF903 Hey this is a stable test rule with a display only fix.
-    --> -:1:1
-      |
-    1 + # fix from stable-test-rule-display-only-fix
-    2 | x = {'a': 1, 'a': 1}
-      |
-    note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
-
-    RUF950 Hey this is a test rule that was redirected from another.
-    --> -:1:1
 
     Found 5 errors.
     [*] 1 fixable with `--fix` (1 unsafe fix available with `--fix --unsafe-fixes`).

@@ -1431,10 +1431,7 @@ impl<'src> CodeExampleMarkdown<'src> {
             self.fence_kind.to_char().is_ascii(),
             "fence char should be ASCII",
         );
-        if !rest[fence_len..].chars().all(is_python_whitespace) {
-            return false;
-        }
-        true
+        rest[fence_len..].chars().all(is_python_whitespace)
     }
 
     /// Pushes the given line as part of this code example.

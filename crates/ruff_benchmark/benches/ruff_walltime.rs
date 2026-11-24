@@ -1,5 +1,6 @@
 use std::ffi::OsString;
 use std::fmt;
+use std::num::NonZeroUsize;
 
 use anyhow::{Result, ensure};
 use clap::Parser;
@@ -121,8 +122,9 @@ fn run_ruff(args: Args) {
 }
 
 fn main() {
+    ruff_db::set_max_parallelism(NonZeroUsize::MIN).expect("parallelism already initialized");
     ThreadPoolBuilder::new()
-        .num_threads(1)
+        .num_threads(ruff_db::max_parallelism().get())
         .use_current_thread()
         .build_global()
         .expect("Initialize benchmark worker pool");

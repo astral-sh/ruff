@@ -25,7 +25,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Fast-path dict(...) in TypedDict context: infer keyword values against fields,
         // then validate and return the TypedDict type. This also covers `dict(**src)` when `src`
         // is `TypedDict`-shaped.
-        if let Some(tcx) = call_expression_tcx.declared_type()
+        if let Some(tcx) = call_expression_tcx.expected_type()
             && let Some(typed_dict) = tcx
                 .filter_union(db, self.program_environment(), Type::is_typed_dict)
                 .as_typed_dict()
@@ -56,7 +56,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
 
             if supports_typed_dict_context {
-                self.infer_typed_dict_constructor_keyword_values(typed_dict, arguments);
+                self.infer_typed_dict_constructor_keyword_values(
+                    typed_dict,
+                    arguments,
+                    call_expression_tcx,
+                );
                 validate_typed_dict_constructor(
                     &self.context,
                     typed_dict,

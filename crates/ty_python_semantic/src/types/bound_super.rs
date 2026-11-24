@@ -962,7 +962,7 @@ impl<'db> BoundSuperType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
-        policy: MemberLookupPolicy,
+        mut policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         let owner = self.owner(db);
         let class = match &owner {
@@ -976,7 +976,17 @@ impl<'db> BoundSuperType<'db> {
                     .find_name_in_mro_with_policy(db, env, name, policy)
                     .expect("Calling `find_name_in_mro` on Unknown should return `Some`");
             }
-            SuperOwnerKind::Resolved(resolved_owner) => resolved_owner.lookup_anchor,
+            SuperOwnerKind::Resolved(resolved_owner) => {
+                // With a bare class as the owner, e.g. `super(Child, Child).__init__`, the call
+                // can infer the class's type arguments from the explicit receiver.
+                if matches!(name, "__new__" | "__init__")
+                    && resolved_owner.receiver == DescriptorReceiverKind::Class
+                    && resolved_owner.owner_type.is_class_literal()
+                {
+                    policy |= MemberLookupPolicy::INHERIT_GENERIC_CONTEXT;
+                }
+                resolved_owner.lookup_anchor
+            }
         };
 
         let mut mro_after_pivot = self.skip_until_after_pivot(db, env, owner.iter_mro(db, env));

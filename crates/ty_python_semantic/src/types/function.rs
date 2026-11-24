@@ -68,6 +68,7 @@ use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::cyclic::ActiveRecursionDetector;
 
+use crate::types::dedicated::attrs;
 use crate::types::generics::{
     GenericContext, Specialization, typing_self, walk_specialization_types,
 };
@@ -79,16 +80,16 @@ use crate::types::known_instance::DeprecatedInstance;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::TypeRelationChecker;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope, Signature};
-use crate::types::typevar::TypeVarNonce;
 use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
-    CallableType, ClassType, FindLegacyTypeVarsVisitor, KnownClass, MemberLookupPolicy,
-    SubclassOfInner, SubclassOfType, Type, TypeContext, TypeMapping, UnionType, binding_type,
-    definition_expression_type, walk_signature,
+    CallableType, ClassType, DataclassFlags, DataclassParams, FindLegacyTypeVarsVisitor,
+    KnownClass, MemberLookupPolicy, SubclassOfInner, SubclassOfType, Type, TypeContext,
+    TypeMapping, UnionType, binding_type, definition_expression_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
+use ty_python_core::ast_node_ref::AstNodeRef;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{FileScopeId, ProgramFile, SemanticIndex, semantic_index};
@@ -258,6 +259,14 @@ pub(crate) fn is_implicit_staticmethod(function_name: &str) -> bool {
 /// Whether a function should implicitly be treated as a classmethod based on its name.
 pub(crate) fn is_implicit_classmethod(function_name: &str) -> bool {
     matches!(function_name, "__init_subclass__" | "__class_getitem__")
+}
+
+/// Look up the function that owns this body scope without querying the semantic index again.
+fn function_node_ref<'db>(
+    index: &'db SemanticIndex<'db>,
+    body: FileScopeId,
+) -> &'db AstNodeRef<ast::StmtFunctionDef> {
+    index.scope(body).node().expect_function()
 }
 
 /// Representation of a function definition in the AST: either a non-generic function, or a generic
@@ -462,29 +471,39 @@ impl<'db> OverloadLiteral<'db> {
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
         let index = semantic_index(db, body_scope.program_file(db));
-        index.expect_single_definition(body_scope.node(db).expect_function())
+        let node = function_node_ref(index, body_scope.file_scope_id(db));
+        index.expect_single_definition(node)
     }
 
     /// Overload sets ending at different declarations share their earlier links.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _| None,
+        cycle_initial=|_, _, _, _| None,
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn previous_overload_in_chain(self, db: &'db dyn Db) -> Option<OverloadLiteral<'db>> {
-        Some(self.previous_overload(db)?.last_definition)
+        let scope = self.body_scope(db);
+        let file = scope.program_file(db);
+        let module = parsed_module(db, file.python_file(db)).load(db);
+        let index = semantic_index(db, file);
+        let node = function_node_ref(index, scope.file_scope_id(db)).node(&module);
+        self.previous_overload(db, index, node, index.expect_single_definition(node))
     }
 
-    /// Returns the overload immediately before this one in the AST. Returns `None` if there is no
-    /// previous overload.
-    fn previous_overload(self, db: &'db dyn Db) -> Option<FunctionLiteral<'db>> {
+    /// Find the previous overload using the declaration already available during inference.
+    /// Keeping the binding out of the literal's identity lets importers reuse the function
+    /// when an edit renumbers places in the enclosing scope.
+    fn previous_overload(
+        self,
+        db: &'db dyn Db,
+        index: &SemanticIndex<'db>,
+        node: &ast::StmtFunctionDef,
+        definition: Definition<'db>,
+    ) -> Option<OverloadLiteral<'db>> {
         // The semantic model records a use for each function on the name node. This is used
         // here to get the previous function definition with the same name.
-        let scope = self.definition(db).scope(db);
-        let module = parsed_module(db, self.python_file(db)).load(db);
-        let index = semantic_index(db, scope.program_file(db));
+        let scope = definition.scope(db);
         let local_scope = scope.file_scope_id(db);
-        let node = self.body_scope(db).node(db).expect_function().node(&module);
         // A loop can reach this same def from a previous iteration. An undecorated
         // def cannot be its own overload, and there is no other local binding.
         if node.decorator_list.is_empty()
@@ -497,7 +516,7 @@ impl<'db> OverloadLiteral<'db> {
             return None;
         }
         let use_def = index.use_def_map(local_scope);
-        let use_id = node.name.scoped_use_id(db, self.program_file(db));
+        let use_id = node.name.scoped_use_id(db, scope.program_file(db));
 
         let env = ProgramEnvironment::from_scope(scope);
         let Place::Defined(DefinedPlace {
@@ -534,7 +553,7 @@ impl<'db> OverloadLiteral<'db> {
             return None;
         }
 
-        Some(previous_literal)
+        Some(previous_overload)
     }
 
     /// Typed internally-visible signature for this function.
@@ -550,7 +569,7 @@ impl<'db> OverloadLiteral<'db> {
     /// over-invalidation.
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         let scope = self.body_scope(db);
-        let program_file = self.program_file(db);
+        let program_file = scope.program_file(db);
         let python_file = program_file.python_file(db);
         let mut signature = if self.is_overload(db) {
             self.public_overload_signature(db).clone()
@@ -558,9 +577,9 @@ impl<'db> OverloadLiteral<'db> {
             self.raw_signature(db, ReturnCallableTypeVarScope::Public)
         };
         let module = parsed_module(db, python_file).load(db);
-        let function_node = scope.node(db).expect_function().node(&module);
         let index = semantic_index(db, program_file);
         let file_scope_id = scope.file_scope_id(db);
+        let function_node = function_node_ref(index, file_scope_id).node(&module);
         let is_generator = file_scope_id.is_generator_function(index);
 
         if function_node.is_async && !is_generator {
@@ -593,7 +612,7 @@ impl<'db> OverloadLiteral<'db> {
     /// than one overload set.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|_, _, _| Signature::bottom(),
+        cycle_initial=|_, _, _, _| Signature::bottom(),
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(super) fn public_overload_signature(self, db: &'db dyn Db) -> Signature<'db> {
@@ -671,21 +690,21 @@ impl<'db> OverloadLiteral<'db> {
                 .is_some_and(|class| class.is_protocol(db))
         }
 
-        let env = &ProgramEnvironment::from_scope(self.body_scope(db));
         let scope = self.body_scope(db);
-        let program_file = self.program_file(db);
+        let env = &ProgramEnvironment::from_scope(scope);
+        let program_file = scope.program_file(db);
         let python_file = program_file.python_file(db);
         let module = parsed_module(db, python_file).load(db);
-        let function_stmt_node = scope.node(db).expect_function().node(&module);
-        let definition = self.definition(db);
         let index = semantic_index(db, program_file);
+        let file_scope_id = scope.file_scope_id(db);
+        let function_stmt_node = function_node_ref(index, file_scope_id).node(&module);
+        let definition = index.expect_single_definition(function_stmt_node);
         let pep695_ctx = function_stmt_node
             .type_params
             .as_ref()
             .and_then(|type_params| {
                 GenericContext::from_type_params(db, index, definition, type_params)
             });
-        let file_scope_id = scope.file_scope_id(db);
 
         let has_implicitly_positional_first_parameter = has_implicitly_positional_only_first_param(
             db,
@@ -851,11 +870,19 @@ pub struct FunctionLiteral<'db> {
 }
 
 impl<'db> FunctionLiteral<'db> {
-    pub(super) fn new(db: &'db dyn Db, last_definition: OverloadLiteral<'db>) -> Self {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        last_definition: OverloadLiteral<'db>,
+        index: &SemanticIndex<'db>,
+        node: &ast::StmtFunctionDef,
+        definition: Definition<'db>,
+    ) -> Self {
         Self {
             last_definition,
             overloaded: last_definition.is_overload(db)
-                || last_definition.previous_overload(db).is_some(),
+                || last_definition
+                    .previous_overload(db, index, node, definition)
+                    .is_some(),
         }
     }
 
@@ -931,7 +958,7 @@ impl<'db> FunctionLiteral<'db> {
     ) -> (&'db [OverloadLiteral<'db>], Option<OverloadLiteral<'db>>) {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _| (Box::default(), None),
+            cycle_initial=|_, _, _, _| (Box::default(), None),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn overloads_and_implementation_inner<'db>(
@@ -1066,7 +1093,7 @@ impl<'db> FunctionLiteral<'db> {
         if self.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD) {
             return Some(AbstractMethodKind::Explicit);
         }
-        if self.definition(db).file(db).is_stub(db) {
+        if self.last_definition.file(db).is_stub(db) {
             return None;
         }
         if !enclosing_class.is_protocol(db) {
@@ -1118,7 +1145,7 @@ impl<'db> FunctionLiteral<'db> {
     /// Methods defined in stub files are never considered to have trivial bodies,
     /// since stubs use `...` as a placeholder regardless of the runtime implementation.
     fn has_trivial_body(self, db: &'db dyn Db) -> bool {
-        !self.definition(db).file(db).is_stub(db)
+        !self.last_definition.file(db).is_stub(db)
             && matches!(
                 self.body_kind(db),
                 FunctionBodyKind::Stub | FunctionBodyKind::AlwaysRaisesNotImplementedError
@@ -1237,7 +1264,7 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 ) {
     if let Some(callable_signature) = function.updated_signature(db) {
         for signature in &callable_signature.overloads {
-            walk_signature(db, signature, visitor);
+            visitor.visit_signature(db, signature);
         }
     }
     if let Some(callables) = function.updated_implementation_callables(db) {
@@ -1490,6 +1517,21 @@ impl<'db> FunctionType<'db> {
         }
     }
 
+    /// Default dataclass parameters when this function is used as a decorator or decorator factory.
+    pub(super) fn dataclass_params(self, db: &'db dyn Db) -> Option<DataclassParams<'db>> {
+        // Ideally, either the implementation, or exactly one of the overloads
+        // of the function can have the dataclass_transform decorator applied.
+        // However, we do not yet enforce this, and in the case of multiple
+        // applications of the decorator, we will only consider the last one.
+        let params = self
+            .iter_overloads_and_implementation(db)
+            .rev()
+            .find_map(|overload| overload.dataclass_transformer_params(db))?;
+        let mut flags = DataclassFlags::from(params.flags(db));
+        flags.set(DataclassFlags::ATTRS, attrs::is_known_decorator(db, self));
+        Some(DataclassParams::new(db, flags, params.field_specifiers(db)))
+    }
+
     pub(crate) fn with_dataclass_transformer_params(
         self,
         db: &'db dyn Db,
@@ -1629,7 +1671,7 @@ impl<'db> FunctionType<'db> {
         self.literal(db).implementation_deprecated(db)
     }
 
-    /// Returns the [`Definition`] of the implementation or first overload of this function.
+    /// Returns the [`Definition`] of the implementation or last overload of this function.
     ///
     /// ## Warning
     ///
@@ -1797,8 +1839,7 @@ impl<'db> FunctionType<'db> {
         let method_renaming = overload.generic_context.and_then(|context| {
             let definition = self.definition(db);
             let fresh = context.variables(db).filter(|var| {
-                var.freshness(db) != TypeVarNonce::NONE
-                    && var.binding_context(db).definition() == Some(definition)
+                var.is_fresh(db) && var.binding_context(db).definition() == Some(definition)
             });
             let env = ProgramEnvironment::from_definition(definition);
             let declared = GenericContext::try_from_typevar_instances(
@@ -1819,7 +1860,7 @@ impl<'db> FunctionType<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_initial=|_, id, _, _| Type::divergent(id),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, function: FunctionType<'db>| {
             let env = ProgramEnvironment::from_scope(function.literal(db).last_definition.body_scope(db));
             result.cycle_normalized(db, &env, *previous, cycle)
@@ -1911,7 +1952,7 @@ impl<'db> FunctionType<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _| None,
+        cycle_initial=|_, _, _, _| None,
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn inherited_return_annotation(self, db: &'db dyn Db) -> Option<Type<'db>> {
@@ -1969,7 +2010,7 @@ impl<'db> FunctionType<'db> {
     /// computed signature changes. Updated signatures are already stored on the interned function.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|db, id, function: FunctionType<'db>| {
+        cycle_initial=|db, id, _, function: FunctionType<'db>| {
             let env = ProgramEnvironment::from_scope(
                 function.literal(db).last_definition.body_scope(db),
             );
@@ -2000,7 +2041,7 @@ impl<'db> FunctionType<'db> {
     /// the caller's environment. Recursive `TypeOf` annotations remain named references.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
+        cycle_initial=|_, _, _, _, _| VarianceTerm::BIVARIANT,
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(in crate::types) fn variance_equation(
@@ -2023,7 +2064,7 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|_, _, _|Signature::bottom(),
+        cycle_initial=|_, _, _, _|Signature::bottom(),
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
@@ -2044,7 +2085,7 @@ impl<'db> FunctionType<'db> {
     /// return-position `Callable` stay bound to the function or move to the returned callable.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|_, _, _, _|Signature::bottom(),
+        cycle_initial=|_, _, _, _, _|Signature::bottom(),
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(super) fn last_definition_raw_signature(
@@ -2333,6 +2374,21 @@ pub enum KnownFunction {
     /// `dataclasses.field`
     Field,
 
+    /// `attr.attrs`, also exported as `attr.s`, `attr.attributes`, and `attr.dataclass`.
+    #[strum(serialize = "attrs")]
+    AttrAttrs,
+    /// `attr.attrib`, also exported as `attr.ib` and `attr.attr`.
+    #[strum(serialize = "attrib")]
+    AttrAttrib,
+    /// `attrs.field`
+    AttrsField,
+    /// `attrs.define`, also exported as `attrs.mutable`.
+    #[strum(serialize = "define")]
+    AttrsDefine,
+    /// `attrs.frozen`
+    #[strum(serialize = "frozen")]
+    AttrsFrozen,
+
     /// `pydantic.fields.Field`
     #[strum(serialize = "Field")]
     PydanticField,
@@ -2415,12 +2471,18 @@ impl KnownFunction {
             return Some(Self::DataclassTransform);
         }
 
-        let candidate = Self::from_str(name).ok()?;
-        candidate
-            .check_module(
-                file_to_module(db, definition.program_file(db).resolver_file(db))?.known(db)?,
-            )
-            .then_some(candidate)
+        let candidates: &[Self] = match name {
+            "field" => &[Self::Field, Self::AttrsField],
+            _ => &[Self::from_str(name).ok()?],
+        };
+
+        let file = definition.program_file(db).resolver_file(db);
+        let module = file_to_module(db, file)?.known(db)?;
+
+        candidates
+            .iter()
+            .copied()
+            .find(|candidate| candidate.check_module(module))
     }
 
     /// Return `true` if `self` is defined in `module`
@@ -2452,6 +2514,11 @@ impl KnownFunction {
             }
             Self::Dataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
+            }
+            Self::AttrAttrs | Self::AttrAttrib => matches!(module, KnownModule::Attr),
+            // Older attrs stubs define the modern API in `attr`.
+            Self::AttrsDefine | Self::AttrsFrozen | Self::AttrsField => {
+                matches!(module, KnownModule::Attr | KnownModule::Attrs)
             }
             Self::PydanticField => matches!(module, KnownModule::PydanticFields),
             Self::PydanticFieldValidator => {
@@ -2493,7 +2560,10 @@ impl KnownFunction {
     }
 
     pub(crate) fn name(self) -> &'static str {
-        self.into()
+        match self {
+            Self::Field | Self::AttrsField => "field",
+            _ => self.into(),
+        }
     }
 }
 
@@ -2543,6 +2613,10 @@ pub(crate) mod tests {
 
                 KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
 
+                KnownFunction::AttrAttrs | KnownFunction::AttrAttrib => KnownModule::Attr,
+                KnownFunction::AttrsDefine
+                | KnownFunction::AttrsFrozen
+                | KnownFunction::AttrsField => KnownModule::Attrs,
                 KnownFunction::PydanticField => KnownModule::PydanticFields,
                 KnownFunction::PydanticFieldValidator => KnownModule::PydanticFunctionalValidators,
                 KnownFunction::PytestFixture | KnownFunction::PytestYieldFixture => {

@@ -274,7 +274,7 @@ We expect virtually all projects to want the `correctness` rules enabled. The li
 include syntax errors that are not yet mapped to `invalid-syntax` diagnostics and other problems
 that cause immediate runtime errors. From there, `suspicious` is likely to be the next most helpful
 category. It includes rules that flag deprecated code, as well as classic footguns like
-`mutable-argument-default` (`B006`) that are almost always wrong but may be intentional in some
+`mutable-parameter-default` (`B006`) that are almost always wrong but may be intentional in some
 cases. We tried to be conservative with the rules in `correctness`, so many rules like this that are
 only _usually_ accurate are found in `suspicious` instead. In general, you should feel comfortable
 using a `ruff: ignore` comment on diagnostics from the `suspicious` or lower categories but think
@@ -690,7 +690,7 @@ The file-level suppression comment specification is as follows:
 
 ### Detecting unused suppressions
 
-Ruff implements a special rule, [`unused-noqa`](https://docs.astral.sh/ruff/rules/unused-noqa/),
+Ruff implements a special rule, [`unused-suppression-comment`](https://docs.astral.sh/ruff/rules/unused-suppression-comment/),
 under the `RUF100` code, to enforce that your suppressions are "valid", in that the violations
 they _say_ they ignore are actually being triggered and suppressed. To flag
 unused suppression comments, run Ruff with `--extend-select RUF100`, like so:

@@ -83,8 +83,7 @@ pub(crate) fn deprecated_abc_decorator(checker: &Checker, decorator_list: &[Deco
         ] {
             if checker
                 .semantic()
-                .resolve_qualified_name(&decorator.expression)
-                .is_some_and(|qualified_name| qualified_name.segments() == ["abc", from])
+                .matches_qualified_name(&decorator.expression, &["abc", from])
             {
                 let mut diagnostic =
                     checker.report_diagnostic(DeprecatedAbcDecorator { from, to }, decorator.range);

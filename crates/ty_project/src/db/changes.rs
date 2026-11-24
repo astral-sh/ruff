@@ -1,7 +1,7 @@
 use crate::db::{Db, ProjectDatabase};
 use crate::script::script_tag;
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
-use crate::{GlobFilterCheckMode, ProjectMetadata, ProjectReloadResult};
+use crate::{GlobFilterCheckMode, ProjectMetadata, ProjectReloadResult, UvWorkspace};
 use std::collections::BTreeSet;
 
 use crate::walk::{ProjectFilesWalker, create_walker_builder};
@@ -42,6 +42,9 @@ impl ChangeResult {
     /// Callers must defer environment synchronization until those changes are saved:
     /// uv reads the file from disk, not the editor buffer.
     pub fn scripts_to_synchronize(&self, db: &dyn Db) -> Vec<File> {
+        if db.project().metadata(db).script_uv_override() == Some(false) {
+            return Vec::new();
+        }
         match &self.changed_files {
             ChangedFiles::Unindexed => Vec::new(),
             ChangedFiles::Known(changed_files) => {
@@ -97,7 +100,7 @@ impl ProjectDatabase {
         let metadata = project.metadata(self);
         let configuration_paths = ConfigurationPaths::from_metadata(metadata);
         // The initial uv metadata request may have failed before a workspace could be discovered.
-        let uv_enabled = metadata.use_uv().workspace_discovery_enabled();
+        let project_uses_uv = metadata.project_uses_uv();
         let resolved_environment = project
             .program_settings(self)
             .last_usable_python_environment()
@@ -164,7 +167,7 @@ impl ProjectDatabase {
 
             // Recreating an environment can change uv's reported interpreter and installed
             // module ownership without changing the lockfile.
-            if uv_enabled
+            if project_uses_uv
                 && !reload_project
                 && (environment_changed || affects_uv_metadata(self, change))
             {
@@ -368,15 +371,18 @@ impl ProjectDatabase {
                 .ancestors()
                 .find(|path| self.system().is_directory(path))
                 .unwrap_or(&project_root);
-            let metadata = project.metadata(self);
-            if metadata.use_uv().workspace_discovery_enabled() {
-                result.project_sync_path = Some(path.to_path_buf());
-            } else {
-                // We're not refreshing uv metadata, so use the existing workspace.
-                let workspace = metadata.uv_workspace().clone();
-                match project.rediscover(self, path, workspace) {
-                    Ok(ProjectReloadResult::Unchanged) => {}
-                    Ok(ProjectReloadResult::Changed { files_changed }) => {
+            match project
+                .metadata(self)
+                .rediscover(self.system(), path, UvWorkspace::default())
+            {
+                Ok(metadata) if metadata.project_uses_uv() => {
+                    result.project_sync_path = Some(path.to_path_buf());
+                }
+                Ok(metadata) => {
+                    self.uv_environments().cancel_project_sync();
+                    if let ProjectReloadResult::Changed { files_changed } =
+                        project.apply_rediscovered_metadata(self, metadata)
+                    {
                         result.project_changed = true;
                         result.changed_files.mark_unknown();
                         if files_changed {
@@ -385,16 +391,16 @@ impl ProjectDatabase {
                             return result;
                         }
                     }
-                    Err(error) => {
-                        let error = anyhow::Error::new(error);
-                        tracing::error!(
-                            "Failed to load project, keeping old project configuration: {error:#}"
-                        );
-                        if reload_project_files {
-                            project.reload_files(self);
-                            result.changed_files.mark_unknown();
-                            return result;
-                        }
+                }
+                Err(error) => {
+                    let error = anyhow::Error::new(error);
+                    tracing::error!(
+                        "Failed to load project, keeping old project configuration: {error:#}"
+                    );
+                    if reload_project_files {
+                        project.reload_files(self);
+                        result.changed_files.mark_unknown();
+                        return result;
                     }
                 }
             }

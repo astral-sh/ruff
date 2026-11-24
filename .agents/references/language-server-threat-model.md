@@ -3,8 +3,8 @@
 ## Overview
 
 This model covers the Ruff and ty language servers and their interactions with editors. The
-[CLI threat model](cli-threat-model.md) also applies. The workspace trust rules below take precedence
-when deciding which inputs are trusted. Browser integrations have a separate
+[CLI threat model](cli-threat-model.md) also applies. The workspace trust and availability rules
+below take precedence. Browser integrations have a separate
 [playground model](playground-threat-model.md).
 
 ## Trust boundaries and assumptions
@@ -30,9 +30,14 @@ symlinks that point outside it.
 - **Output:** Attacker-controlled text in diagnostics, documentation, and logs must not inject code
     or editor commands. Actions intentionally provided by the editor or language server may run when
     the user chooses them.
-- **Availability:** An isolated analysis failure or slow analysis is a correctness or performance bug.
-    A security issue requires repeatable, disproportionate resource use that materially disrupts
-    the editor or the developer's machine beyond the failed analysis.
+- **Availability:** Analysis failures and the CPU and memory costs of analyzing workspace inputs
+    and producing, sending, or displaying results do not by themselves warrant security findings.
+    Treat these as correctness or performance issues even if a small, crafted input repeatedly
+    stalls unrelated requests or exhausts memory in the server, editor, or host.
+    An availability finding must show how an untrusted workspace causes disproportionate resource
+    use through a separate mechanism that reliably and materially disrupts the editor or host.
+    For example, a workspace could trigger a reload loop that fills the disk with log entries
+    and prevents the user from saving unrelated files.
 
 ## Severity calibration
 
@@ -42,6 +47,6 @@ symlinks that point outside it.
     such as executing attacker code despite an effective untrusted-workspace restriction.
 - **Medium:** A limited unauthorized read or write, or bypass of an execution restriction with
     limited effect.
-- **Low:** A narrow disclosure or safety gap with limited practical impact, or reliable resource
-    exhaustion affecting the editor or the developer's machine.
+- **Low:** A narrow disclosure or safety gap with limited practical impact, or a violation of the
+    availability rule above.
 - **Informational:** A genuine security concern with negligible current impact.

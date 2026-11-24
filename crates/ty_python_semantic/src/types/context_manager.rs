@@ -67,7 +67,7 @@ impl<'db> Type<'db> {
     ) -> bool {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial = |_, _, _, _, _| false,
+            cycle_initial = |_, _, _, _, _, _| false,
             heap_size = ruff_memory_usage::heap_size
         )]
         fn can_suppress_exceptions_impl<'db>(
@@ -586,12 +586,8 @@ impl<'db> ContextManagerError<'db> {
                 exit_error,
                 ..
             } => {
-                let enter_unbound_on = enter_error
-                    .as_deref()
-                    .map_or_else(FxOrderSet::default, unbound_on);
-                let exit_unbound_on = exit_error
-                    .as_deref()
-                    .map_or_else(FxOrderSet::default, unbound_on);
+                let enter_unbound_on = enter_error.as_deref().map_or_default(unbound_on);
+                let exit_unbound_on = exit_error.as_deref().map_or_default(unbound_on);
 
                 for ty in &enter_unbound_on {
                     if exit_unbound_on.contains(ty) {

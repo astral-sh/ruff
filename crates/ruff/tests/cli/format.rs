@@ -668,12 +668,7 @@ if __name__ == "__main__":
     say_hy("dear Ruff contributor")
 "#;
 
-    let test = CliTest::with_settings(|_project_dir, mut settings| {
-        // JSON double escapes backslashes
-        settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
-
-        settings
-    })?;
+    let test = CliTest::with_settings(crate::output_format_settings)?;
     test.write_file("input.py", CONTENT)?;
 
     let snapshot = format!("output_format_{output_format}");
@@ -1396,8 +1391,8 @@ def say_hy(name: str):
     1 file reformatted
 
     ----- stderr -----
-    warning: `incorrect-blank-line-before-class` (D203) and `blank-line-before-class` (D211) are incompatible. Ignoring `incorrect-blank-line-before-class`.
-    warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
+    warning: `incorrect-blank-line-before-class-docstring` (D203) and `blank-line-before-class-docstring` (D211) are incompatible. Ignoring `incorrect-blank-line-before-class-docstring`.
+    warning: `multiline-docstring-summary-on-separate-line` (D212) and `multiline-docstring-summary-on-first-line` (D213) are incompatible. Ignoring `multiline-docstring-summary-on-first-line`.
     warning: The following rule may cause conflicts when used with the formatter: `missing-trailing-comma` (`COM812`). To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
     ");
     Ok(())

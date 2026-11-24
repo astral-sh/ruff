@@ -315,6 +315,13 @@ segments: Mapping[str, Any] = {"start": (1, 2), "end": (3, 4, 5)}
 reveal_type(segments)  # revealed: dict[str, tuple[int, ...]]
 ```
 
+## A non-literal tuple blocks promotion even after a literal with the same type
+
+```py
+def _(single: tuple[int]) -> None:
+    reveal_type([(1,), single, (2, 3)])  # revealed: list[tuple[int] | tuple[int, int]]
+```
+
 ## Non-tuple elements do not block tuple-size promotion
 
 A non-literal tuple blocks tuple-size promotion because its shape must be preserved. A tuple nested

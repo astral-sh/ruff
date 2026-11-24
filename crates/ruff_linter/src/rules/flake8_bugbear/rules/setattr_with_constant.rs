@@ -60,9 +60,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: `setattr`](https://docs.python.org/3/library/functions.html#setattr)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.111", category = Category::Complexity)]
-pub(crate) struct SetAttrWithConstant;
+pub(crate) struct SetattrWithConstant;
 
-impl AlwaysFixableViolation for SetAttrWithConstant {
+impl AlwaysFixableViolation for SetattrWithConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Do not call `setattr` with a constant attribute value. It is not any safer than \
@@ -136,7 +136,7 @@ pub(crate) fn setattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
             // around the call are removed too: `(obj.attr = value)` is a syntax error.
             let has_comments = checker.comment_ranges().intersects(*statement_range);
             let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name || has_comments;
-            let mut diagnostic = checker.report_diagnostic(SetAttrWithConstant, expr.range());
+            let mut diagnostic = checker.report_diagnostic(SetattrWithConstant, expr.range());
             let edit = Edit::range_replacement(
                 assignment(obj, name.to_str(), value, checker.generator()),
                 *statement_range,

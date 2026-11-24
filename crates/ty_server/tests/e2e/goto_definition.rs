@@ -66,7 +66,7 @@ mod uv_metadata {
         WorkspaceDocumentDiagnosticReport,
     };
     use ruff_db::system::{SystemPath, SystemPathBuf};
-    use ty_project::UseUv;
+    use ruff_python_trivia::textwrap::dedent;
     use ty_server::{ClientOptions, DiagnosticMode};
 
     use crate::{TestServer, TestServerBuilder};
@@ -78,14 +78,18 @@ mod uv_metadata {
         let source = r#"# /// script
 # requires-python = '>=3.12'
 # dependencies = ['attrs==25.4.0']
+#
+# [tool.ty]
+# project-manager.script = 'uv'
 # ///
+
 from attrs import define
 "#;
 
         let mut server = TestServerBuilder::new()?
             .with_workspace(workspace_root, None)?
             .with_file(script, source)?
-            .with_real_uv(UseUv::Scripts)?
+            .with_real_uv()?
             .enable_work_done_progress(true)
             .build()
             .wait_until_workspaces_are_initialized();
@@ -99,7 +103,7 @@ from attrs import define
         );
 
         let definition = server
-            .goto_definition_request(script, Position::new(4, 18))
+            .goto_definition_request(script, Position::new(8, 18))
             .context("expected attrs.define to resolve")?;
         let DefinitionResponse::Definition(Definition::LocationList(locations)) = definition else {
             return Err(anyhow!("expected dependency definition locations"));
@@ -144,7 +148,11 @@ from attrs import define
         let first_source = r#"# /// script
 # requires-python = '>=3.12'
 # dependencies = ['attrs==25.4.0']
+#
+# [tool.ty]
+# project-manager.script = 'uv'
 # ///
+
 from attrs import define
 from idna import encode
 "#;
@@ -153,7 +161,11 @@ from idna import encode
         let second_source = r#"# /// script
 # requires-python = '>=3.12'
 # dependencies = ['idna==3.10']
+#
+# [tool.ty]
+# project-manager.script = 'uv'
 # ///
+
 from idna import encode
 from attrs import define
 "#;
@@ -163,7 +175,7 @@ from attrs import define
             .with_workspace(second_workspace, None)?
             .with_file(first_script, first_source)?
             .with_file(second_script, second_source)?
-            .with_real_uv(UseUv::Scripts)?
+            .with_real_uv()?
             .enable_workspace_diagnostic_refresh(true)
             .build()
             .wait_until_workspaces_are_initialized();
@@ -175,25 +187,25 @@ from attrs import define
 
         assert!(
             server
-                .goto_definition_request(first_script, Position::new(4, 18))
+                .goto_definition_request(first_script, Position::new(8, 18))
                 .is_some(),
             "expected attrs.define to resolve in the first workspace"
         );
         assert!(
             server
-                .goto_definition_request(second_script, Position::new(4, 18))
+                .goto_definition_request(second_script, Position::new(8, 18))
                 .is_some(),
             "expected idna.encode to resolve in the second workspace"
         );
         assert!(
             server
-                .goto_definition_request(first_script, Position::new(5, 18))
+                .goto_definition_request(first_script, Position::new(9, 18))
                 .is_none(),
             "the first workspace must not resolve the second workspace's dependencies"
         );
         assert!(
             server
-                .goto_definition_request(second_script, Position::new(5, 18))
+                .goto_definition_request(second_script, Position::new(9, 18))
                 .is_none(),
             "the second workspace must not resolve the first workspace's dependencies"
         );
@@ -208,20 +220,28 @@ from attrs import define
         let initial = r#"# /// script
 # requires-python = '>=3.12'
 # dependencies = ['attrs==25.4.0']
+#
+# [tool.ty]
+# project-manager.script = 'uv'
 # ///
+
 value = 1
 "#;
         let updated = r#"# /// script
 # requires-python = '>=3.12'
 # dependencies = ['attrs==25.4.0', 'idna==3.10']
+#
+# [tool.ty]
+# project-manager.script = 'uv'
 # ///
+
 from idna import encode
 "#;
 
         let mut server = TestServerBuilder::new()?
             .with_workspace(workspace_root, None)?
             .with_file(script, initial)?
-            .with_real_uv(UseUv::Scripts)?
+            .with_real_uv()?
             .with_watched_file_support(true)
             .enable_workspace_diagnostic_refresh(true)
             .build()
@@ -245,7 +265,7 @@ from idna import encode
 
         assert!(
             server
-                .goto_definition_request(script, Position::new(4, 19))
+                .goto_definition_request(script, Position::new(8, 19))
                 .is_none(),
             "unsaved dependency changes must keep the previous environment"
         );
@@ -262,7 +282,7 @@ from idna import encode
 
         assert!(
             server
-                .goto_definition_request(script, Position::new(4, 19))
+                .goto_definition_request(script, Position::new(8, 19))
                 .is_none(),
             "watcher events must not synchronize open scripts before they are saved"
         );
@@ -274,7 +294,7 @@ from idna import encode
 
         assert!(
             server
-                .goto_definition_request(script, Position::new(4, 19))
+                .goto_definition_request(script, Position::new(8, 19))
                 .is_some(),
             "saving must synchronize newly declared script dependencies"
         );
@@ -288,19 +308,26 @@ from idna import encode
         let initial = r#"# /// script
 # requires-python = '>=3.12'
 # dependencies = []
+#
+# [tool.ty]
+# project-manager.script = 'uv'
 # ///
 "#;
         let updated = r#"# /// script
 # requires-python = '>=3.12'
 # dependencies = ['attrs==25.4.0']
+#
+# [tool.ty]
+# project-manager.script = 'uv'
 # ///
+
 from attrs import define
 "#;
 
         let mut server = TestServerBuilder::new()?
             .with_workspace(SystemPath::new("src"), None)?
             .with_file(script, initial)?
-            .with_real_uv(UseUv::Scripts)?
+            .with_real_uv()?
             .with_watched_file_support(true)
             .enable_workspace_diagnostic_refresh(true)
             .build()
@@ -312,7 +339,7 @@ from attrs import define
         let (_, site_packages) = watched_site_packages(&mut server)?;
         assert!(
             server
-                .goto_definition_request(script, Position::new(4, 18))
+                .goto_definition_request(script, Position::new(8, 18))
                 .is_none(),
             "unsaved dependencies must not be installed"
         );
@@ -323,7 +350,7 @@ from attrs import define
         installed_package_event(&mut server, &site_packages, "attrs")?;
         assert!(
             server
-                .goto_definition_request(script, Position::new(4, 18))
+                .goto_definition_request(script, Position::new(8, 18))
                 .is_some(),
             "saving must install attrs even though the editor's metadata is unchanged"
         );
@@ -334,11 +361,20 @@ from attrs import define
     #[test]
     fn workspace_check_does_not_synchronize_unsaved_script_metadata() -> Result<()> {
         let script = SystemPath::new("src/script.py");
-        let ordinary = "from attrs import define\nprint(define)\n";
+        let ordinary = dedent(
+            "
+            from attrs import define
+            print(define)
+            ",
+        );
         let source = r#"# /// script
 # requires-python = '>=3.12'
 # dependencies = ['attrs==25.4.0']
+#
+# [tool.ty]
+# project-manager.script = 'uv'
 # ///
+
 from attrs import define
 print(define)
 "#;
@@ -349,7 +385,7 @@ print(define)
                 Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
             )?
             .with_file(script, ordinary)?
-            .with_real_uv(UseUv::Scripts)?
+            .with_real_uv()?
             .enable_workspace_diagnostic_refresh(true)
             .build()
             .wait_until_workspaces_are_initialized();
@@ -378,7 +414,7 @@ print(define)
         server.await_diagnostic_refresh();
         assert!(
             server
-                .goto_definition_request(script, Position::new(4, 18))
+                .goto_definition_request(script, Position::new(8, 18))
                 .is_some(),
             "the first save must synchronize the script's dependencies"
         );
@@ -393,14 +429,18 @@ print(define)
         let initial = r#"# /// script
 # requires-python = '>=3.12'
 # dependencies = []
+#
+# [tool.ty]
+# project-manager.script = 'uv'
 # ///
+
 from attrs import define
 "#;
 
         let mut server = TestServerBuilder::new()?
             .with_workspace(workspace_root, None)?
             .with_file(script, initial)?
-            .with_real_uv(UseUv::Scripts)?
+            .with_real_uv()?
             .with_watched_file_support(true)
             .enable_workspace_diagnostic_refresh(true)
             .build()
@@ -412,7 +452,7 @@ from attrs import define
 
         assert!(
             server
-                .goto_definition_request(script, Position::new(4, 18))
+                .goto_definition_request(script, Position::new(8, 18))
                 .is_none(),
             "attrs should not resolve before it is declared as a dependency"
         );
@@ -423,7 +463,11 @@ from attrs import define
                 r#"# /// script
 # requires-python = '>=3.12'
 # dependencies = ['']
+#
+# [tool.ty]
+# project-manager.script = 'uv'
 # ///
+
 from attrs import define
 "#,
             ),
@@ -432,7 +476,11 @@ from attrs import define
                 r#"# /// script
 # requires-python = '>=3.12'
 # dependencies = ['attrs==25.4.0']
+#
+# [tool.ty]
+# project-manager.script = 'uv'
 # ///
+
 from attrs import define
 "#,
             ),
@@ -468,7 +516,7 @@ from attrs import define
 
         assert!(
             server
-                .goto_definition_request(script, Position::new(4, 18))
+                .goto_definition_request(script, Position::new(8, 18))
                 .is_some(),
             "correcting invalid script metadata must make newly installed dependencies available"
         );
@@ -484,20 +532,31 @@ from attrs import define
         let initial = r#"# /// script
 # requires-python = '>=3.12'
 # dependencies = ['attrs==25.4.0']
+#
+# [tool.ty]
+# project-manager.script = 'uv'
 # ///
+
 value = 1
 "#;
         let updated = r#"# /// script
 # requires-python = '>=3.12'
 # dependencies = ['attrs==25.4.0', 'idna==3.10']
+#
+# [tool.ty]
+# project-manager.script = 'uv'
 # ///
+
 from idna import encode
 "#;
 
         let mut server = TestServerBuilder::new()?
-            .with_workspace(workspace_root, None)?
+            .with_workspace(
+                workspace_root,
+                Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
+            )?
             .with_file(script, initial)?
-            .with_real_uv(UseUv::Scripts)?
+            .with_real_uv()?
             .enable_workspace_diagnostic_refresh(true)
             .build()
             .wait_until_workspaces_are_initialized();
@@ -519,7 +578,7 @@ from idna import encode
         server.open_text_document(script, updated, 2);
         assert!(
             server
-                .goto_definition_request(script, Position::new(4, 19))
+                .goto_definition_request(script, Position::new(8, 19))
                 .is_some(),
             "watched changes must update environments even while scripts are closed"
         );

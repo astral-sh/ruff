@@ -80,19 +80,20 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 .collect::<String>(),
             code = rule
                 .noqa_code()
-                .map(|code| format!("%20OR%20{code}"))
-                .unwrap_or_default(),
+                .map_or_default(|code| format!("%20OR%20{code}")),
         );
 
         let _ = writeln!(
             &mut output,
             r#"<small>
 {status_text} ·
+Category: [{category}](../rules.md?category={category}) ·
 <a href="https://github.com/astral-sh/ruff/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{issue_search}" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/{file}#L{line}" target="_blank">View source</a>
 </small>
 
 "#,
+            category = rule.category(),
             file = url::form_urlencoded::byte_serialize(rule.file().replace('\\', "/").as_bytes())
                 .collect::<String>(),
             line = rule.line(),

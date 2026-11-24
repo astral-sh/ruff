@@ -17,11 +17,14 @@ use crate::types::{Type, TypeQualifiers};
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 
-/// Functional enum member specification captured from the call site.
+/// Functional enum namespace captured from the call site.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumSpec<'db> {
     #[returns(deref)]
     pub(crate) members: Box<[(Name, Type<'db>)]>,
+    /// Ordinary class attributes, before descriptor binding.
+    #[returns(deref)]
+    pub(crate) nonmembers: Box<[(Name, Type<'db>)]>,
     #[returns(copy)]
     pub(crate) has_known_members: bool,
 }
@@ -34,17 +37,23 @@ impl<'db> EnumSpec<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let members = self
-            .members(db)
-            .iter()
-            .map(|(name, ty)| {
-                let ty = ty.recursive_type_normalized_impl(db, env, div, true);
-                let ty = if nested { ty? } else { ty.unwrap_or(div) };
-                Some((name.clone(), ty))
-            })
-            .collect::<Option<Box<_>>>()?;
-
-        Some(Self::new(db, members, self.has_known_members(db)))
+        let normalize = |(name, ty): &(Name, Type<'db>)| {
+            let ty = ty.recursive_type_normalized_impl(db, env, div, true);
+            let ty = if nested { ty? } else { ty.unwrap_or(div) };
+            Some((name.clone(), ty))
+        };
+        Some(Self::new(
+            db,
+            self.members(db)
+                .iter()
+                .map(normalize)
+                .collect::<Option<Box<_>>>()?,
+            self.nonmembers(db)
+                .iter()
+                .map(normalize)
+                .collect::<Option<Box<_>>>()?,
+            self.has_known_members(db),
+        ))
     }
 }
 
@@ -193,7 +202,7 @@ impl<'db> DynamicEnumLiteral<'db> {
     #[salsa::tracked(
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
-        cycle_initial=|db, _, self_: DynamicEnumLiteral<'db>| {
+        cycle_initial=|db, _, _, self_: DynamicEnumLiteral<'db>| {
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::DynamicEnum(self_))),
                 ClassBase::object(db, &ProgramEnvironment::from_scope(self_.scope(db))),
@@ -228,13 +237,23 @@ impl<'db> DynamicEnumLiteral<'db> {
         }
     }
 
+    pub(in crate::types) fn nonmember(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
+        self.spec(db)
+            .nonmembers(db)
+            .iter()
+            .find_map(|(attr_name, ty)| (name == attr_name).then_some(*ty))
+    }
+
     /// Look up an own class member (not inherited) by name.
     ///
-    /// For known members, returns the `EnumLiteralType` if `name` matches.
+    /// Returns an ordinary class attribute or an `EnumLiteralType` for a known enum member.
     /// For unknown members, returns `Member::unbound()` — the unknown-member
     /// fallback is handled in `class_member` as a last resort after checking
     /// the full MRO (matching the `NamedTuple` pattern).
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+        if let Some(ty) = self.nonmember(db, name) {
+            return Member::definitely_declared(ty);
+        }
         let spec = self.spec(db);
         if spec.has_known_members(db)
             && let Some(enum_class) = ClassLiteral::DynamicEnum(self).into_enum_class(db)
@@ -318,8 +337,7 @@ impl<'db> DynamicEnumLiteral<'db> {
         self.with_unknown_member_fallback(db, result)
     }
 
-    /// Functional enums don't define own instance attributes — `.name`, `.value`
-    /// etc. come from the `Enum` base class, not from the dynamic enum itself.
+    /// The functional enum namespace contains only class attributes.
     #[expect(clippy::unused_self)]
     pub(super) fn own_instance_member(self, _db: &'db dyn Db, _name: &str) -> Member<'db> {
         Member::unbound()

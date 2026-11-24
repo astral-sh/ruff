@@ -57,6 +57,7 @@ fn exact_with_provenance<'db, 'c>(
         &db.program_environment(),
         builder,
         provenance,
+        TypeVarSet::All,
         typevar,
         ty,
     )
@@ -191,6 +192,7 @@ fn invalid_paths_respect_projection_budgets() {
             &env,
             &builder,
             ConstraintProvenance::INFERRED,
+            TypeVarSet::All,
             t,
             ty,
         )
@@ -268,6 +270,7 @@ fn alternative_constraint_failures_keep_upper_bounds_on_separate_paths() {
             &env,
             &builder,
             ConstraintProvenance::INFERRED,
+            TypeVarSet::All,
             t,
             ty,
         )
@@ -348,6 +351,7 @@ fn caller_fixed_upper_bound_failures_preserve_evidence_and_order() {
                 &env,
                 &builder,
                 ConstraintProvenance::INFERRED,
+                inferable,
                 t,
                 ty,
             )
@@ -380,6 +384,7 @@ fn caller_fixed_upper_bound_failures_preserve_evidence_and_order() {
                 &env,
                 &builder,
                 ConstraintProvenance::INFERRED,
+                inferable,
                 t,
                 ty,
             )
@@ -402,12 +407,14 @@ fn upper_bound_checks_validity_lower_when_evidence_selects_a_solution() {
     let t = create_typevar(db, "T")
         .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
     let s = create_typevar(db, "S");
+    let inferable = TypeVarSet::from_typevars(db, [t]);
     let builder = ConstraintSetBuilder::new();
     let set = ConstraintSet::constrain_typevar_lower_bound(
         db,
         &env,
         &builder,
         ConstraintProvenance::INFERRED,
+        inferable,
         t,
         str,
     )
@@ -417,12 +424,11 @@ fn upper_bound_checks_validity_lower_when_evidence_selects_a_solution() {
             &env,
             &builder,
             ConstraintProvenance::VALIDITY,
+            inferable,
             t,
             Type::TypeVar(s),
         )
     });
-    let inferable = TypeVarSet::from_typevars(db, [t]);
-
     let result = set.solutions(db, &env, inferable);
     let Ok(Solutions::Unsatisfiable(paths)) = result else {
         panic!("expected invalid paths, got {result:?}");
@@ -464,6 +470,7 @@ fn upper_bound_checks_mixed_evidence_after_substitution() {
         &env,
         &builder,
         ConstraintProvenance::INFERRED,
+        TypeVarSet::All,
         t,
         Type::TypeVar(u),
     )
@@ -500,6 +507,7 @@ fn mixed_evidence_may_use_a_caller_typevars_declared_bound() {
         &env,
         &builder,
         ConstraintProvenance::INFERRED,
+        TypeVarSet::All,
         t,
         Type::TypeVar(u),
     )
@@ -542,6 +550,7 @@ fn upper_bound_cannot_narrow_a_callable_receiver() {
         &env,
         &builder,
         ConstraintProvenance::INFERRED,
+        TypeVarSet::All,
         t,
         callable,
     );
@@ -580,6 +589,7 @@ fn unspecialized_phantom_argument_respects_the_evidence_policy() -> anyhow::Resu
         &env,
         &builder,
         ConstraintProvenance::INFERRED,
+        TypeVarSet::All,
         t,
         list,
     );
@@ -622,6 +632,28 @@ fn unspecialized_phantom_argument_respects_the_evidence_policy() -> anyhow::Resu
         ))
     );
     Ok(())
+}
+
+#[test]
+fn incompatible_bounds_exhaust_no_additional_paths_when_folding() {
+    let db = setup_db();
+    let db = &db;
+    let t = create_typevar(db, "T");
+    let builder = ConstraintSetBuilder::new();
+    let set = exact(db, &builder, t, known_instance(db, KnownClass::Int)).and(db, &builder, || {
+        exact(db, &builder, t, known_instance(db, KnownClass::Str))
+    });
+
+    // Visiting the two constraints and their true terminal is enough to reject the only path.
+    let budget = SolutionBudget {
+        visits: 3,
+        paths: 1,
+        type_terms: 0,
+    };
+    assert_eq!(
+        collect_paths(db, &builder, set, &[t], budget),
+        Ok(SolutionProjection::Unsatisfiable)
+    );
 }
 
 #[test]

@@ -63,11 +63,11 @@ pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) 
         return;
     };
 
-    if !parent.bases().iter().any(|expr| {
-        semantic
-            .resolve_qualified_name(expr)
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["enum", "Enum"]))
-    }) {
+    if !parent
+        .bases()
+        .iter()
+        .any(|expr| semantic.matches_qualified_name(expr, &["enum", "Enum"]))
+    {
         return;
     }
 
@@ -103,11 +103,8 @@ pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) 
 }
 
 fn is_call_to_enum_auto(semantic: &SemanticModel, expr: &Expr) -> bool {
-    expr.as_call_expr().is_some_and(|call| {
-        semantic
-            .resolve_qualified_name(&call.func)
-            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["enum", "auto"]))
-    })
+    expr.as_call_expr()
+        .is_some_and(|call| semantic.matches_qualified_name(&call.func, &["enum", "auto"]))
 }
 
 /// Whether the value is a bare ellipsis literal (`A = ...`)

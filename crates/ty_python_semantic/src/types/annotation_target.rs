@@ -1,11 +1,14 @@
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ty_python_core::place::{PlaceExpr, ScopedPlaceId};
-use ty_python_core::scope::{FileScopeId, ScopeId};
+use ty_python_core::scope::{FileScopeId, NodeWithScopeRef, ScopeId};
 use ty_python_core::{ProgramFile, SemanticIndex, semantic_index};
 
 use crate::Db;
-use crate::types::infer::{infer_definition_types, nearest_enclosing_function};
+use crate::types::ClassLiteral;
+use crate::types::infer::{
+    infer_definition_types, nearest_enclosing_function, original_class_type,
+};
 
 /// Returns whether a variable annotation is allowed on this assignment target.
 /// Names and attributes of an implicit method receiver (such as `self.x` or `cls.x`) can
@@ -26,6 +29,26 @@ pub fn is_valid_annotation_target(db: &dyn Db, file: ProgramFile, target: &ast::
         receiver_method_scope(db, index, scope, receiver)
             .is_some_and(|receiver_scope_id| receiver_scope_id != scope_id)
     })
+}
+
+/// Whether this method can initialize a `Final` instance attribute of its defining class.
+pub(super) fn is_final_attribute_initializer(
+    db: &dyn Db,
+    index: &SemanticIndex,
+    method: &ast::StmtFunctionDef,
+) -> bool {
+    match method.name.as_str() {
+        "__init__" => true,
+        "__post_init__" => {
+            let scope = index.node_scope(NodeWithScopeRef::Function(method));
+            index
+                .class_definition_of_method(scope)
+                .and_then(|definition| original_class_type(db, definition))
+                .and_then(ClassLiteral::as_static)
+                .is_some_and(|class| class.is_dataclass_like(db))
+        }
+        _ => false,
+    }
 }
 
 /// The index marks attributes on the first parameter of the enclosing method, provided the
