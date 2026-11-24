@@ -1610,8 +1610,8 @@ This is only performed if the previous step resulted in more than one matching o
 
 ### Protocols and an argument of type `Any`
 
-The first two overloads of `read` cannot cover `object` together, so the last one still
-contributes to the result. The first overload of `select` accepts `object()` through `Hashable`.
+The first two overloads of `read` cannot cover `object` together, so the last one still contributes
+to the result. The first overload of `select` accepts `object()` through `Hashable`.
 
 ```py
 from collections.abc import Hashable
