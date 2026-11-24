@@ -8,3 +8,4 @@ f(*x for x in y)
 {*x async for x in y}
 {**x async for x in y}
 (*x async for x in y)
+{**x or {} for x in xs}

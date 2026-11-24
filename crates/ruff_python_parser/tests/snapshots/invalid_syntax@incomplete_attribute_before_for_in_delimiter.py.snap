@@ -8,31 +8,31 @@ input_file: crates/ruff_python_parser/resources/inline/err/incomplete_attribute_
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..142,
+        range: 0..205,
         body: [
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 0..22,
+                    range: 44..66,
                     value: ListComp(
                         ExprListComp {
                             node_index: NodeIndex(None),
-                            range: 0..22,
+                            range: 44..66,
                             elt: Attribute(
                                 ExprAttribute {
                                     node_index: NodeIndex(None),
-                                    range: 1..6,
+                                    range: 45..50,
                                     value: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 1..5,
+                                            range: 45..49,
                                             id: Name("item"),
                                             ctx: Load,
                                         },
                                     ),
                                     attr: Identifier {
                                         id: Name(""),
-                                        range: 6..6,
+                                        range: 50..50,
                                         node_index: NodeIndex(None),
                                     },
                                     ctx: Load,
@@ -40,12 +40,12 @@ Module(
                             ),
                             generators: [
                                 Comprehension {
-                                    range: 7..21,
+                                    range: 51..65,
                                     node_index: NodeIndex(None),
                                     target: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 11..15,
+                                            range: 55..59,
                                             id: Name("item"),
                                             ctx: Store,
                                         },
@@ -53,7 +53,7 @@ Module(
                                     iter: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 19..21,
+                                            range: 63..65,
                                             id: Name("xs"),
                                             ctx: Load,
                                         },
@@ -69,26 +69,26 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 23..51,
+                    range: 67..95,
                     value: ListComp(
                         ExprListComp {
                             node_index: NodeIndex(None),
-                            range: 23..51,
+                            range: 67..95,
                             elt: Attribute(
                                 ExprAttribute {
                                     node_index: NodeIndex(None),
-                                    range: 24..29,
+                                    range: 68..73,
                                     value: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 24..28,
+                                            range: 68..72,
                                             id: Name("item"),
                                             ctx: Load,
                                         },
                                     ),
                                     attr: Identifier {
                                         id: Name(""),
-                                        range: 29..29,
+                                        range: 73..73,
                                         node_index: NodeIndex(None),
                                     },
                                     ctx: Load,
@@ -96,12 +96,12 @@ Module(
                             ),
                             generators: [
                                 Comprehension {
-                                    range: 30..50,
+                                    range: 74..94,
                                     node_index: NodeIndex(None),
                                     target: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 40..44,
+                                            range: 84..88,
                                             id: Name("item"),
                                             ctx: Store,
                                         },
@@ -109,7 +109,7 @@ Module(
                                     iter: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 48..50,
+                                            range: 92..94,
                                             id: Name("xs"),
                                             ctx: Load,
                                         },
@@ -125,26 +125,26 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 52..74,
+                    range: 96..118,
                     value: SetComp(
                         ExprSetComp {
                             node_index: NodeIndex(None),
-                            range: 52..74,
+                            range: 96..118,
                             elt: Attribute(
                                 ExprAttribute {
                                     node_index: NodeIndex(None),
-                                    range: 53..58,
+                                    range: 97..102,
                                     value: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 53..57,
+                                            range: 97..101,
                                             id: Name("item"),
                                             ctx: Load,
                                         },
                                     ),
                                     attr: Identifier {
                                         id: Name(""),
-                                        range: 58..58,
+                                        range: 102..102,
                                         node_index: NodeIndex(None),
                                     },
                                     ctx: Load,
@@ -152,12 +152,12 @@ Module(
                             ),
                             generators: [
                                 Comprehension {
-                                    range: 59..73,
+                                    range: 103..117,
                                     node_index: NodeIndex(None),
                                     target: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 63..67,
+                                            range: 107..111,
                                             id: Name("item"),
                                             ctx: Store,
                                         },
@@ -165,7 +165,7 @@ Module(
                                     iter: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 71..73,
+                                            range: 115..117,
                                             id: Name("xs"),
                                             ctx: Load,
                                         },
@@ -181,26 +181,26 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 75..97,
+                    range: 119..141,
                     value: Generator(
                         ExprGenerator {
                             node_index: NodeIndex(None),
-                            range: 75..97,
+                            range: 119..141,
                             elt: Attribute(
                                 ExprAttribute {
                                     node_index: NodeIndex(None),
-                                    range: 76..81,
+                                    range: 120..125,
                                     value: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 76..80,
+                                            range: 120..124,
                                             id: Name("item"),
                                             ctx: Load,
                                         },
                                     ),
                                     attr: Identifier {
                                         id: Name(""),
-                                        range: 81..81,
+                                        range: 125..125,
                                         node_index: NodeIndex(None),
                                     },
                                     ctx: Load,
@@ -208,12 +208,12 @@ Module(
                             ),
                             generators: [
                                 Comprehension {
-                                    range: 82..96,
+                                    range: 126..140,
                                     node_index: NodeIndex(None),
                                     target: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 86..90,
+                                            range: 130..134,
                                             id: Name("item"),
                                             ctx: Store,
                                         },
@@ -221,7 +221,7 @@ Module(
                                     iter: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 94..96,
+                                            range: 138..140,
                                             id: Name("xs"),
                                             ctx: Load,
                                         },
@@ -238,38 +238,38 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 98..120,
+                    range: 142..164,
                     value: ListComp(
                         ExprListComp {
                             node_index: NodeIndex(None),
-                            range: 98..120,
+                            range: 142..164,
                             elt: Name(
                                 ExprName {
                                     node_index: NodeIndex(None),
-                                    range: 99..103,
+                                    range: 143..147,
                                     id: Name("item"),
                                     ctx: Load,
                                 },
                             ),
                             generators: [
                                 Comprehension {
-                                    range: 104..119,
+                                    range: 148..163,
                                     node_index: NodeIndex(None),
                                     target: Attribute(
                                         ExprAttribute {
                                             node_index: NodeIndex(None),
-                                            range: 108..113,
+                                            range: 152..157,
                                             value: Name(
                                                 ExprName {
                                                     node_index: NodeIndex(None),
-                                                    range: 108..112,
+                                                    range: 152..156,
                                                     id: Name("item"),
                                                     ctx: Load,
                                                 },
                                             ),
                                             attr: Identifier {
                                                 id: Name(""),
-                                                range: 113..113,
+                                                range: 157..157,
                                                 node_index: NodeIndex(None),
                                             },
                                             ctx: Store,
@@ -278,7 +278,7 @@ Module(
                                     iter: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 117..119,
+                                            range: 161..163,
                                             id: Name("xs"),
                                             ctx: Load,
                                         },
@@ -294,23 +294,23 @@ Module(
             For(
                 StmtFor {
                     node_index: NodeIndex(None),
-                    range: 121..141,
+                    range: 165..185,
                     is_async: false,
                     target: Attribute(
                         ExprAttribute {
                             node_index: NodeIndex(None),
-                            range: 125..130,
+                            range: 169..174,
                             value: Name(
                                 ExprName {
                                     node_index: NodeIndex(None),
-                                    range: 125..129,
+                                    range: 169..173,
                                     id: Name("item"),
                                     ctx: Load,
                                 },
                             ),
                             attr: Identifier {
                                 id: Name(""),
-                                range: 130..130,
+                                range: 174..174,
                                 node_index: NodeIndex(None),
                             },
                             ctx: Store,
@@ -319,7 +319,7 @@ Module(
                     iter: Name(
                         ExprName {
                             node_index: NodeIndex(None),
-                            range: 134..136,
+                            range: 178..180,
                             id: Name("xs"),
                             ctx: Load,
                         },
@@ -328,17 +328,74 @@ Module(
                         Expr(
                             StmtExpr {
                                 node_index: NodeIndex(None),
-                                range: 138..141,
+                                range: 182..185,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
                                         node_index: NodeIndex(None),
-                                        range: 138..141,
+                                        range: 182..185,
                                     },
                                 ),
                             },
                         ),
                     ],
                     orelse: [],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 186..204,
+                    value: DictComp(
+                        ExprDictComp {
+                            node_index: NodeIndex(None),
+                            range: 186..204,
+                            key: None,
+                            value: Attribute(
+                                ExprAttribute {
+                                    node_index: NodeIndex(None),
+                                    range: 189..191,
+                                    value: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 189..190,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: Name(""),
+                                        range: 191..191,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    ctx: Load,
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 192..203,
+                                    node_index: NodeIndex(None),
+                                    target: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 196..197,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 201..203,
+                                            id: Name("xs"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
                 },
             ),
         ],
@@ -348,53 +405,65 @@ Module(
 ## Errors
 
   |
-1 | [item. for item in xs]
+1 | # parse_options: {"target-version": "3.15"}
+2 | [item. for item in xs]
   |        ^^^ Syntax Error: Expected an identifier
-2 | [item. async for item in xs]
-3 | {item. for item in xs}
+3 | [item. async for item in xs]
+4 | {item. for item in xs}
   |
 
 
   |
-1 | [item. for item in xs]
-2 | [item. async for item in xs]
+1 | # parse_options: {"target-version": "3.15"}
+2 | [item. for item in xs]
+3 | [item. async for item in xs]
   |        ^^^^^ Syntax Error: Expected an identifier
-3 | {item. for item in xs}
-4 | (item. for item in xs)
+4 | {item. for item in xs}
+5 | (item. for item in xs)
   |
 
 
   |
-1 | [item. for item in xs]
-2 | [item. async for item in xs]
-3 | {item. for item in xs}
+2 | [item. for item in xs]
+3 | [item. async for item in xs]
+4 | {item. for item in xs}
   |        ^^^ Syntax Error: Expected an identifier
-4 | (item. for item in xs)
-5 | [item for item. in xs]
+5 | (item. for item in xs)
+6 | [item for item. in xs]
   |
 
 
   |
-2 | [item. async for item in xs]
-3 | {item. for item in xs}
-4 | (item. for item in xs)
+3 | [item. async for item in xs]
+4 | {item. for item in xs}
+5 | (item. for item in xs)
   |        ^^^ Syntax Error: Expected an identifier
-5 | [item for item. in xs]
-6 | for item. in xs: ...
+6 | [item for item. in xs]
+7 | for item. in xs: ...
   |
 
 
   |
-3 | {item. for item in xs}
-4 | (item. for item in xs)
-5 | [item for item. in xs]
+4 | {item. for item in xs}
+5 | (item. for item in xs)
+6 | [item for item. in xs]
   |                 ^^ Syntax Error: Expected an identifier
-6 | for item. in xs: ...
+7 | for item. in xs: ...
+8 | {**x. for x in xs}
   |
 
 
   |
-4 | (item. for item in xs)
-5 | [item for item. in xs]
-6 | for item. in xs: ...
+5 | (item. for item in xs)
+6 | [item for item. in xs]
+7 | for item. in xs: ...
   |           ^^ Syntax Error: Expected an identifier
+8 | {**x. for x in xs}
+  |
+
+
+  |
+6 | [item for item. in xs]
+7 | for item. in xs: ...
+8 | {**x. for x in xs}
+  |       ^^^ Syntax Error: Expected an identifier

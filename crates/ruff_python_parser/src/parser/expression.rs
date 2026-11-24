@@ -424,19 +424,35 @@ impl<'src> Parser<'src> {
         self.parse_primary_expression(context)
     }
 
+    /// Parses the operand after `{**`. A dict comprehension allows an `expression`,
+    /// while a dict display requires `bitwise_or`.
+    fn parse_initial_unpacking_operand(&mut self) -> ParsedExpr {
+        let operand = self.parse_conditional_expression_or_higher_impl(
+            ExpressionContext::default().with_for_excluded(),
+        );
+        if !matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
+            self.validate_bitwise_or(&operand);
+        }
+        operand
+    }
+
     /// Parses an expression with a minimum precedence of bitwise `or`.
     ///
-    /// This methods actually parses the expression using the `expression` rule
+    /// For error recovery, this method parses the expression using the `expression` rule
     /// of the [Python grammar] and then validates the parsed expression. In a
     /// sense, it matches the `bitwise_or` rule of the [Python grammar].
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    fn parse_expression_with_bitwise_or_precedence(&mut self) -> ParsedExpr {
-        let parsed_expr = self.parse_conditional_expression_or_higher();
+    fn parse_bitwise_or(&mut self) -> ParsedExpr {
+        let operand = self.parse_conditional_expression_or_higher();
+        self.validate_bitwise_or(&operand);
+        operand
+    }
 
+    fn validate_bitwise_or(&mut self, parsed_expr: &ParsedExpr) {
         if parsed_expr.is_parenthesized {
-            // Parentheses resets the precedence, so we don't need to validate it.
-            return parsed_expr;
+            // Parentheses reset the precedence, so we don't need to validate it.
+            return;
         }
 
         let expr_name = match parsed_expr.expr {
@@ -448,15 +464,13 @@ impl<'src> Parser<'src> {
             }) => "Boolean",
             Expr::If(_) => "Conditional",
             Expr::Lambda(_) => "Lambda",
-            _ => return parsed_expr,
+            _ => return,
         };
 
         self.add_error(
             ParseErrorType::OtherError(format!("{expr_name} expression cannot be used here")),
-            &parsed_expr,
+            parsed_expr,
         );
-
-        parsed_expr
     }
 
     /// Parses a name.
@@ -526,12 +540,14 @@ impl<'src> Parser<'src> {
         }
 
         // test_err incomplete_attribute_before_for_in_delimiter
+        // # parse_options: {"target-version": "3.15"}
         // [item. for item in xs]
         // [item. async for item in xs]
         // {item. for item in xs}
         // (item. for item in xs)
         // [item for item. in xs]
         // for item. in xs: ...
+        // {**x. for x in xs}
         if (context.is_for_excluded())
             && (self.at(TokenKind::For)
                 || (self.at(TokenKind::Async) && self.peek() == TokenKind::For))
@@ -2105,6 +2121,7 @@ impl<'src> Parser<'src> {
         // {*x async for x in y}
         // {**x async for x in y}
         // (*x async for x in y)
+        // {**x or {} for x in xs}
 
         // test_err pep_798_unpacking_comprehensions_py314
         // # parse_options: {"target-version": "3.14"}
@@ -2144,9 +2161,7 @@ impl<'src> Parser<'src> {
         let after_brace = self.node_start();
 
         if self.eat(TokenKind::DoubleStar) {
-            // Handle dictionary unpacking. Here, the grammar is `'**' bitwise_or`
-            // which requires limiting the expression.
-            let value = self.parse_expression_with_bitwise_or_precedence();
+            let value = self.parse_initial_unpacking_operand();
             let unpack_range = TextRange::new(after_brace, value.range().end());
 
             if matches!(self.current_token_kind(), TokenKind::Async | TokenKind::For) {
@@ -2247,7 +2262,7 @@ impl<'src> Parser<'src> {
                 let value = if self.at(TokenKind::DoubleStar) {
                     let unpack_start = self.node_start();
                     self.bump(TokenKind::DoubleStar);
-                    let value = self.parse_expression_with_bitwise_or_precedence();
+                    let value = self.parse_bitwise_or();
                     self.add_error(
                         ParseErrorType::InvalidStarredExpressionUsage,
                         TextRange::new(unpack_start, value.range().end()),
@@ -2498,7 +2513,7 @@ impl<'src> Parser<'src> {
                 // which requires limiting the expression.
                 items.push(ast::DictItem {
                     key: None,
-                    value: parser.parse_expression_with_bitwise_or_precedence().expr,
+                    value: parser.parse_bitwise_or().expr,
                 });
             } else {
                 let key = parser.parse_conditional_expression_or_higher().expr;
@@ -2713,9 +2728,7 @@ impl<'src> Parser<'src> {
                     // print(* *[])
                     context.disallow_starred_expressions(),
                 ),
-            StarredExpressionPrecedence::BitwiseOr => {
-                self.parse_expression_with_bitwise_or_precedence()
-            }
+            StarredExpressionPrecedence::BitwiseOr => self.parse_bitwise_or(),
         };
 
         ast::ExprStarred {
