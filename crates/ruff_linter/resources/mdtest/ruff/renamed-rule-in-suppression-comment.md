@@ -133,16 +133,16 @@ def f():  # ruff: ignore[missing-return-type-undocumented-public-function]
 ```
 
 ```snapshot
-error[RUF101]: `missing-return-type-undocumented-public-function` is a redirect to `missing-return-type-public-function`
+error[RUF101]: `missing-return-type-undocumented-public-function` is a redirect to `missing-return-annotation-for-public-function`
  --> src/mdtest_snippet.py:2:26
   |
 2 | def f():  # ruff: ignore[missing-return-type-undocumented-public-function]
   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-help: Replace with `missing-return-type-public-function`
+help: Replace with `missing-return-annotation-for-public-function`
   |
 1 | # snapshot: renamed-rule-in-suppression-comment
   - def f():  # ruff: ignore[missing-return-type-undocumented-public-function]
-2 + def f():  # ruff: ignore[missing-return-type-public-function]
+2 + def f():  # ruff: ignore[missing-return-annotation-for-public-function]
 3 |     pass
   |
 ```

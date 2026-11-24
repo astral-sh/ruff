@@ -31,14 +31,14 @@ use crate::codes::Category;
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.83", category = Category::Suspicious)]
-pub(crate) struct AssertRaisesException {
+pub(crate) struct AssertRaisesExceptionOrBaseException {
     exception: ExceptionKind,
 }
 
-impl Violation for AssertRaisesException {
+impl Violation for AssertRaisesExceptionOrBaseException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AssertRaisesException { exception } = self;
+        let AssertRaisesExceptionOrBaseException { exception } = self;
         format!("Do not assert blind exception: `{exception}`")
     }
 }
@@ -123,7 +123,10 @@ pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
         if let Some(exception) =
             detect_blind_exception(checker.semantic(), func.as_ref(), arguments)
         {
-            checker.report_diagnostic(AssertRaisesException { exception }, item.range());
+            checker.report_diagnostic(
+                AssertRaisesExceptionOrBaseException { exception },
+                item.range(),
+            );
         }
     }
 }
@@ -143,6 +146,9 @@ pub(crate) fn assert_raises_exception_call(checker: &Checker, call: &ast::ExprCa
     }
 
     if let Some(exception) = detect_blind_exception(semantic, func.as_ref(), arguments) {
-        checker.report_diagnostic(AssertRaisesException { exception }, call.range());
+        checker.report_diagnostic(
+            AssertRaisesExceptionOrBaseException { exception },
+            call.range(),
+        );
     }
 }

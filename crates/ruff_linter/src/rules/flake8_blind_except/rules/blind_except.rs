@@ -69,14 +69,14 @@ use crate::rules::flake8_logging::helpers::is_logger_method_name;
 /// - [PEP 8: Programming Recommendations on bare `except`](https://peps.python.org/pep-0008/#programming-recommendations)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.127", category = Category::Suspicious)]
-pub(crate) struct BlindExcept {
+pub(crate) struct CatchExceptionOrBaseException {
     name: String,
 }
 
-impl Violation for BlindExcept {
+impl Violation for CatchExceptionOrBaseException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlindExcept { name } = self;
+        let CatchExceptionOrBaseException { name } = self;
         format!("Do not catch blind exception: `{name}`")
     }
 }
@@ -128,7 +128,7 @@ pub(crate) fn blind_except(
     }
 
     checker.report_diagnostic(
-        BlindExcept {
+        CatchExceptionOrBaseException {
             name: builtin_exception_type.into(),
         },
         range,

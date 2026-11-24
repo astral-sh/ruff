@@ -37,14 +37,14 @@ use crate::rules::flake8_bandit::helpers::{matches_password_name, string_literal
 /// - [Common Weakness Enumeration: CWE-259](https://cwe.mitre.org/data/definitions/259.html)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.116", category = Category::Security)]
-pub(crate) struct HardcodedPasswordFuncArg {
+pub(crate) struct HardcodedPasswordArgument {
     name: String,
 }
 
-impl Violation for HardcodedPasswordFuncArg {
+impl Violation for HardcodedPasswordArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let HardcodedPasswordFuncArg { name } = self;
+        let HardcodedPasswordArgument { name } = self;
         format!(
             "Possible hardcoded password assigned to argument: \"{}\"",
             name.escape_debug()
@@ -65,7 +65,7 @@ pub(crate) fn hardcoded_password_func_arg(checker: &Checker, keywords: &[Keyword
             continue;
         }
         checker.report_diagnostic(
-            HardcodedPasswordFuncArg {
+            HardcodedPasswordArgument {
                 name: arg.to_string(),
             },
             keyword.range(),

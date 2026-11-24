@@ -21,14 +21,14 @@ mod tests {
             Path::new("flake8_annotations/annotation_presence.py"),
             &LinterSettings {
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingTypeFunctionArgument,
-                    Rule::MissingTypeArgs,
-                    Rule::MissingTypeKwargs,
-                    Rule::MissingReturnTypePublicFunction,
-                    Rule::MissingReturnTypePrivateFunction,
-                    Rule::MissingReturnTypeSpecialMethod,
-                    Rule::MissingReturnTypeStaticMethod,
-                    Rule::MissingReturnTypeClassMethod,
+                    Rule::UnannotatedParameter,
+                    Rule::UnannotatedArgs,
+                    Rule::UnannotatedKwargs,
+                    Rule::MissingReturnAnnotationForPublicFunction,
+                    Rule::MissingReturnAnnotationForPrivateFunction,
+                    Rule::MissingReturnAnnotationForSpecialMethod,
+                    Rule::MissingReturnAnnotationForStaticMethod,
+                    Rule::MissingReturnAnnotationForClassMethod,
                     Rule::AnyType,
                 ])
             },
@@ -47,14 +47,14 @@ mod tests {
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingTypeFunctionArgument,
-                    Rule::MissingTypeArgs,
-                    Rule::MissingTypeKwargs,
-                    Rule::MissingReturnTypePublicFunction,
-                    Rule::MissingReturnTypePrivateFunction,
-                    Rule::MissingReturnTypeSpecialMethod,
-                    Rule::MissingReturnTypeStaticMethod,
-                    Rule::MissingReturnTypeClassMethod,
+                    Rule::UnannotatedParameter,
+                    Rule::UnannotatedArgs,
+                    Rule::UnannotatedKwargs,
+                    Rule::MissingReturnAnnotationForPublicFunction,
+                    Rule::MissingReturnAnnotationForPrivateFunction,
+                    Rule::MissingReturnAnnotationForSpecialMethod,
+                    Rule::MissingReturnAnnotationForStaticMethod,
+                    Rule::MissingReturnAnnotationForClassMethod,
                     Rule::AnyType,
                 ])
             },
@@ -73,9 +73,9 @@ mod tests {
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingTypeFunctionArgument,
-                    Rule::MissingTypeArgs,
-                    Rule::MissingTypeKwargs,
+                    Rule::UnannotatedParameter,
+                    Rule::UnannotatedArgs,
+                    Rule::UnannotatedKwargs,
                 ])
             },
         )?;
@@ -93,11 +93,11 @@ mod tests {
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingReturnTypePublicFunction,
-                    Rule::MissingReturnTypePrivateFunction,
-                    Rule::MissingReturnTypeSpecialMethod,
-                    Rule::MissingReturnTypeStaticMethod,
-                    Rule::MissingReturnTypeClassMethod,
+                    Rule::MissingReturnAnnotationForPublicFunction,
+                    Rule::MissingReturnAnnotationForPrivateFunction,
+                    Rule::MissingReturnAnnotationForSpecialMethod,
+                    Rule::MissingReturnAnnotationForStaticMethod,
+                    Rule::MissingReturnAnnotationForClassMethod,
                 ])
             },
         )?;
@@ -111,11 +111,11 @@ mod tests {
             Path::new("flake8_annotations/auto_return_type.py"),
             &LinterSettings {
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingReturnTypePublicFunction,
-                    Rule::MissingReturnTypePrivateFunction,
-                    Rule::MissingReturnTypeSpecialMethod,
-                    Rule::MissingReturnTypeStaticMethod,
-                    Rule::MissingReturnTypeClassMethod,
+                    Rule::MissingReturnAnnotationForPublicFunction,
+                    Rule::MissingReturnAnnotationForPrivateFunction,
+                    Rule::MissingReturnAnnotationForSpecialMethod,
+                    Rule::MissingReturnAnnotationForStaticMethod,
+                    Rule::MissingReturnAnnotationForClassMethod,
                 ])
             },
         )?;
@@ -130,11 +130,11 @@ mod tests {
             &LinterSettings {
                 unresolved_target_version: PythonVersion::PY38.into(),
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingReturnTypePublicFunction,
-                    Rule::MissingReturnTypePrivateFunction,
-                    Rule::MissingReturnTypeSpecialMethod,
-                    Rule::MissingReturnTypeStaticMethod,
-                    Rule::MissingReturnTypeClassMethod,
+                    Rule::MissingReturnAnnotationForPublicFunction,
+                    Rule::MissingReturnAnnotationForPrivateFunction,
+                    Rule::MissingReturnAnnotationForSpecialMethod,
+                    Rule::MissingReturnAnnotationForStaticMethod,
+                    Rule::MissingReturnAnnotationForClassMethod,
                 ])
             },
         )?;
@@ -152,14 +152,14 @@ mod tests {
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingTypeFunctionArgument,
-                    Rule::MissingTypeArgs,
-                    Rule::MissingTypeKwargs,
-                    Rule::MissingReturnTypePublicFunction,
-                    Rule::MissingReturnTypePrivateFunction,
-                    Rule::MissingReturnTypeSpecialMethod,
-                    Rule::MissingReturnTypeStaticMethod,
-                    Rule::MissingReturnTypeClassMethod,
+                    Rule::UnannotatedParameter,
+                    Rule::UnannotatedArgs,
+                    Rule::UnannotatedKwargs,
+                    Rule::MissingReturnAnnotationForPublicFunction,
+                    Rule::MissingReturnAnnotationForPrivateFunction,
+                    Rule::MissingReturnAnnotationForSpecialMethod,
+                    Rule::MissingReturnAnnotationForStaticMethod,
+                    Rule::MissingReturnAnnotationForClassMethod,
                     Rule::AnyType,
                 ])
             },
@@ -190,11 +190,11 @@ mod tests {
             Path::new("flake8_annotations/allow_overload.py"),
             &LinterSettings {
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingReturnTypePublicFunction,
-                    Rule::MissingReturnTypePrivateFunction,
-                    Rule::MissingReturnTypeSpecialMethod,
-                    Rule::MissingReturnTypeStaticMethod,
-                    Rule::MissingReturnTypeClassMethod,
+                    Rule::MissingReturnAnnotationForPublicFunction,
+                    Rule::MissingReturnAnnotationForPrivateFunction,
+                    Rule::MissingReturnAnnotationForSpecialMethod,
+                    Rule::MissingReturnAnnotationForStaticMethod,
+                    Rule::MissingReturnAnnotationForClassMethod,
                 ])
             },
         )?;
@@ -208,11 +208,11 @@ mod tests {
             Path::new("flake8_annotations/allow_nested_overload.py"),
             &LinterSettings {
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingReturnTypePublicFunction,
-                    Rule::MissingReturnTypePrivateFunction,
-                    Rule::MissingReturnTypeSpecialMethod,
-                    Rule::MissingReturnTypeStaticMethod,
-                    Rule::MissingReturnTypeClassMethod,
+                    Rule::MissingReturnAnnotationForPublicFunction,
+                    Rule::MissingReturnAnnotationForPrivateFunction,
+                    Rule::MissingReturnAnnotationForSpecialMethod,
+                    Rule::MissingReturnAnnotationForStaticMethod,
+                    Rule::MissingReturnAnnotationForClassMethod,
                 ])
             },
         )?;
@@ -224,7 +224,7 @@ mod tests {
     fn simple_magic_methods() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_annotations/simple_magic_methods.py"),
-            &LinterSettings::for_rule(Rule::MissingReturnTypeSpecialMethod),
+            &LinterSettings::for_rule(Rule::MissingReturnAnnotationForSpecialMethod),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -235,11 +235,11 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_annotations/shadowed_builtins.py"),
             &LinterSettings::for_rules(vec![
-                Rule::MissingReturnTypePublicFunction,
-                Rule::MissingReturnTypePrivateFunction,
-                Rule::MissingReturnTypeSpecialMethod,
-                Rule::MissingReturnTypeStaticMethod,
-                Rule::MissingReturnTypeClassMethod,
+                Rule::MissingReturnAnnotationForPublicFunction,
+                Rule::MissingReturnAnnotationForPrivateFunction,
+                Rule::MissingReturnAnnotationForSpecialMethod,
+                Rule::MissingReturnAnnotationForStaticMethod,
+                Rule::MissingReturnAnnotationForClassMethod,
             ]),
         )?;
         assert_diagnostics!(diagnostics);

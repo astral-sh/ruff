@@ -7,12 +7,11 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 
 /// ## What it does
-/// Checks for variables defined in `for`, `try`, `with` statements
-/// that redefine function parameters.
+/// Checks for function parameters rebound by `for` or `with` targets or `except` aliases.
 ///
 /// ## Why is this bad?
-/// Redefined variables can cause unexpected behavior because of overridden function parameters.
-/// If nested functions are declared, an inner function's body can override an outer function's parameters.
+/// Reusing a parameter name overwrites its original value, which can cause unexpected behavior
+/// when the parameter is used later in the function.
 ///
 /// ## Example
 /// ```python
@@ -35,15 +34,15 @@ use crate::codes::Category;
 /// - [Pylint documentation](https://pylint.readthedocs.io/en/latest/user_guide/messages/refactor/redefined-argument-from-local.html)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.5.0", category = Category::Suspicious)]
-pub(crate) struct RedefinedArgumentFromLocal {
+pub(crate) struct RedefinedParameterFromLocal {
     name: String,
 }
 
-impl Violation for RedefinedArgumentFromLocal {
+impl Violation for RedefinedParameterFromLocal {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedefinedArgumentFromLocal { name } = self;
-        format!("Redefining argument with the local name `{name}`")
+        let RedefinedParameterFromLocal { name } = self;
+        format!("Redefining parameter with the local name `{name}`")
     }
 }
 
@@ -70,7 +69,7 @@ pub(crate) fn redefined_argument_from_local(checker: &Checker, scope_id: ScopeId
                 continue;
             }
             checker.report_diagnostic(
-                RedefinedArgumentFromLocal {
+                RedefinedParameterFromLocal {
                     name: name.to_string(),
                 },
                 binding.range(),

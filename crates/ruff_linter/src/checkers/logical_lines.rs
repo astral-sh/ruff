@@ -55,7 +55,7 @@ pub(crate) fn check_logical_lines(
         Rule::TabAfterOperator,
     ]);
     let enforce_whitespace_around_named_parameter_equals = context.any_rule_enabled(&[
-        Rule::UnexpectedSpacesAroundKeywordParameterEquals,
+        Rule::UnexpectedSpacesAroundArgumentOrParameterEquals,
         Rule::MissingWhitespaceAroundParameterEquals,
     ]);
     let enforce_missing_whitespace_around_operator = context.any_rule_enabled(&[
@@ -87,7 +87,7 @@ pub(crate) fn check_logical_lines(
         Rule::MultipleLeadingHashesForBlockComment,
     ]);
     let enforce_whitespace_before_parameters =
-        context.is_rule_enabled(Rule::WhitespaceBeforeParameters);
+        context.is_rule_enabled(Rule::WhitespaceBeforeOpenBracket);
     let enforce_redundant_backslash = context.is_rule_enabled(Rule::RedundantBackslash);
     let enforce_indentation = context.any_rule_enabled(&[
         Rule::IndentationWithInvalidMultiple,

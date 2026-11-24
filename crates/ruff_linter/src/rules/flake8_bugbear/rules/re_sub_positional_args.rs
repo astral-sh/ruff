@@ -43,14 +43,14 @@ use crate::codes::Category;
 /// - [Python documentation: `re.split`](https://docs.python.org/3/library/re.html#re.split)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.278", category = Category::Pedantic)]
-pub(crate) struct ReSubPositionalArgs {
+pub(crate) struct ReSubPositionalArguments {
     method: Method,
 }
 
-impl Violation for ReSubPositionalArgs {
+impl Violation for ReSubPositionalArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ReSubPositionalArgs { method } = self;
+        let ReSubPositionalArguments { method } = self;
         let param_name = method.param_name();
         format!(
             "`{method}` should pass `{param_name}` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions"
@@ -76,7 +76,7 @@ pub(crate) fn re_sub_positional_args(
     };
 
     if call.arguments.args.len() > method.num_args() {
-        checker.report_diagnostic(ReSubPositionalArgs { method }, call.range());
+        checker.report_diagnostic(ReSubPositionalArguments { method }, call.range());
     }
 }
 

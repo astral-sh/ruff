@@ -21,8 +21,8 @@ mod tests {
 
     #[test_case(Rule::AbstractBaseClassWithoutAbstractMethod, Path::new("B024.py"))]
     #[test_case(Rule::AssertFalse, Path::new("B011.py"))]
-    #[test_case(Rule::AssertRaisesException, Path::new("B017_0.py"))]
-    #[test_case(Rule::AssertRaisesException, Path::new("B017_1.py"))]
+    #[test_case(Rule::AssertRaisesExceptionOrBaseException, Path::new("B017_0.py"))]
+    #[test_case(Rule::AssertRaisesExceptionOrBaseException, Path::new("B017_1.py"))]
     #[test_case(Rule::AssignmentToOsEnviron, Path::new("B003.py"))]
     #[test_case(Rule::CachedInstanceMethod, Path::new("B019.py"))]
     #[test_case(Rule::ClassAsDataStructure, Path::new("class_as_data_structure.py"))]
@@ -34,26 +34,26 @@ mod tests {
     #[test_case(Rule::ExceptWithEmptyTuple, Path::new("B029.py"))]
     #[test_case(Rule::ExceptWithNonExceptionClasses, Path::new("B030.py"))]
     #[test_case(Rule::FStringDocstring, Path::new("B021.py"))]
-    #[test_case(Rule::FunctionCallInDefaultArgument, Path::new("B006_B008.py"))]
+    #[test_case(Rule::FunctionCallInParameterDefault, Path::new("B006_B008.py"))]
     #[test_case(Rule::FunctionUsesLoopVariable, Path::new("B023.py"))]
     #[test_case(Rule::GetattrWithConstant, Path::new("B009_B010.py"))]
     #[test_case(Rule::JumpStatementInFinally, Path::new("B012.py"))]
     #[test_case(Rule::LoopVariableOverridesIterator, Path::new("B020.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_2.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_3.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_4.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_5.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_6.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_7.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_8.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_9.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.pyi"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_1.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_2.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_3.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_4.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_5.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_6.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_7.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_8.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_9.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_B008.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_1.pyi"))]
     #[test_case(Rule::NoExplicitStacklevel, Path::new("B028.py"))]
     #[test_case(Rule::RaiseLiteral, Path::new("B016.py"))]
     #[test_case(Rule::RaiseWithoutFromInsideExcept, Path::new("B904.py"))]
-    #[test_case(Rule::ReSubPositionalArgs, Path::new("B034.py"))]
+    #[test_case(Rule::ReSubPositionalArguments, Path::new("B034.py"))]
     #[test_case(Rule::RedundantTupleInExceptionHandler, Path::new("B013.py"))]
     #[test_case(Rule::ReuseOfGroupbyGenerator, Path::new("B031.py"))]
     #[test_case(Rule::DelattrWithConstant, Path::new("B043.py"))]
@@ -85,17 +85,17 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_2.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_3.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_4.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_5.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_6.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_7.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_8.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_9.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"))]
-    #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.pyi"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_1.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_2.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_3.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_4.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_5.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_6.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_7.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_8.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_9.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_B008.py"))]
+    #[test_case(Rule::MutableParameterDefault, Path::new("B006_1.pyi"))]
     #[test_case(Rule::StripWithDuplicateCharacters, Path::new("B005.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
@@ -167,7 +167,7 @@ mod tests {
                         "custom.ImmutableTypeB".to_string(),
                     ],
                 },
-                ..LinterSettings::for_rule(Rule::MutableArgumentDefault)
+                ..LinterSettings::for_rule(Rule::MutableParameterDefault)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
@@ -188,7 +188,7 @@ mod tests {
                         "B008_extended.Class".to_string(),
                     ],
                 },
-                ..LinterSettings::for_rule(Rule::FunctionCallInDefaultArgument)
+                ..LinterSettings::for_rule(Rule::FunctionCallInParameterDefault)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);

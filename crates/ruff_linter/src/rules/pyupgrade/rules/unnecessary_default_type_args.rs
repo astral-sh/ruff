@@ -62,9 +62,9 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// - [Python documentation: `typing.AsyncGenerator`](https://docs.python.org/3/library/typing.html#typing.AsyncGenerator)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.8.0", category = Category::Complexity)]
-pub(crate) struct UnnecessaryDefaultTypeArgs;
+pub(crate) struct UnnecessaryDefaultTypeArguments;
 
-impl AlwaysFixableViolation for UnnecessaryDefaultTypeArgs {
+impl AlwaysFixableViolation for UnnecessaryDefaultTypeArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Unnecessary default type arguments".to_string()
@@ -105,7 +105,7 @@ pub(crate) fn unnecessary_default_type_args(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(UnnecessaryDefaultTypeArgs, expr.range());
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryDefaultTypeArguments, expr.range());
 
     let applicability = if checker
         .comment_ranges()

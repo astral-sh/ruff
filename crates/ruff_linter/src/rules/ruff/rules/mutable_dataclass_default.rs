@@ -62,9 +62,9 @@ use crate::rules::ruff::helpers::{dataclass_kind, is_class_var_annotation, is_da
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.262", category = Category::Suspicious)]
-pub(crate) struct MutableDataclassDefault;
+pub(crate) struct MutableDataclassFieldDefault;
 
-impl Violation for MutableDataclassDefault {
+impl Violation for MutableDataclassFieldDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Do not use mutable default values for dataclass attributes".to_string()
@@ -108,7 +108,7 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
             && !is_class_var_annotation(annotation, checker.semantic())
             && !is_immutable_annotation(annotation, checker.semantic(), &[])
         {
-            checker.report_diagnostic(MutableDataclassDefault, value.range());
+            checker.report_diagnostic(MutableDataclassFieldDefault, value.range());
         }
     }
 }

@@ -10,7 +10,7 @@ use crate::codes::Category;
 use crate::rules::flake8_bandit::helpers::{matches_password_name, string_literal};
 
 /// ## What it does
-/// Checks for potential uses of hardcoded passwords in function argument
+/// Checks for potential uses of hardcoded passwords in function parameter
 /// defaults.
 ///
 /// ## Why is this bad?
@@ -41,14 +41,14 @@ use crate::rules::flake8_bandit::helpers::{matches_password_name, string_literal
 /// - [Common Weakness Enumeration: CWE-259](https://cwe.mitre.org/data/definitions/259.html)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.116", category = Category::Security)]
-pub(crate) struct HardcodedPasswordDefault {
+pub(crate) struct HardcodedPasswordParameterDefault {
     name: String,
 }
 
-impl Violation for HardcodedPasswordDefault {
+impl Violation for HardcodedPasswordParameterDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let HardcodedPasswordDefault { name } = self;
+        let HardcodedPasswordParameterDefault { name } = self;
         format!(
             "Possible hardcoded password assigned to function default: \"{}\"",
             name.escape_debug()
@@ -65,7 +65,7 @@ fn check_password_kwarg(checker: &Checker, parameter: &Parameter, default: &Expr
         return;
     }
     checker.report_diagnostic(
-        HardcodedPasswordDefault {
+        HardcodedPasswordParameterDefault {
             name: kwarg_name.to_string(),
         },
         default.range(),

@@ -414,7 +414,7 @@ help: Remove assignment to unused variable `bar`
     |
 note: This is an unsafe fix and may change runtime behavior
 
-ARG001 Unused function argument: `bar`
+ARG001 Unused function parameter: `bar`
    --> suppressions.py:146:5
     |
 144 |     # ruff: ignore[ARG001]  should only cover the first argument
@@ -425,7 +425,7 @@ ARG001 Unused function argument: `bar`
 148 |     print("hello")
     |
 
-ARG001 Unused function argument: `bar`
+ARG001 Unused function parameter: `bar`
    --> suppressions.py:153:5
     |
 151 | def f(

@@ -28,11 +28,11 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
-pub(crate) struct WhitespaceBeforeParameters {
+pub(crate) struct WhitespaceBeforeOpenBracket {
     bracket: TokenKind,
 }
 
-impl WhitespaceBeforeParameters {
+impl WhitespaceBeforeOpenBracket {
     fn bracket_text(&self) -> char {
         match self.bracket {
             TokenKind::Lpar => '(',
@@ -42,7 +42,7 @@ impl WhitespaceBeforeParameters {
     }
 }
 
-impl AlwaysFixableViolation for WhitespaceBeforeParameters {
+impl AlwaysFixableViolation for WhitespaceBeforeOpenBracket {
     #[derive_message_formats]
     fn message(&self) -> String {
         let bracket = self.bracket_text();
@@ -76,7 +76,7 @@ pub(crate) fn whitespace_before_parameters(line: &LogicalLine, context: &LintCon
         {
             let start = prev_end;
             let end = token.end() - TextSize::from(1);
-            let kind: WhitespaceBeforeParameters = WhitespaceBeforeParameters { bracket: kind };
+            let kind: WhitespaceBeforeOpenBracket = WhitespaceBeforeOpenBracket { bracket: kind };
 
             if let Some(mut diagnostic) =
                 context.report_diagnostic_if_enabled(kind, TextRange::new(start, end))

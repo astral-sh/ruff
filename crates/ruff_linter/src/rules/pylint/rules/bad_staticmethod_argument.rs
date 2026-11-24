@@ -11,12 +11,12 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 
 /// ## What it does
-/// Checks for static methods that use `self` or `cls` as their first argument.
+/// Checks for static methods that use `self` or `cls` as their first parameter.
 /// This rule also applies to `__new__` methods, which are implicitly static.
 ///
 /// ## Why is this bad?
-/// [PEP 8] recommends the use of `self` and `cls` as the first arguments for
-/// instance methods and class methods, respectively. Naming the first argument
+/// [PEP 8] recommends the use of `self` and `cls` as the first parameters for
+/// instance methods and class methods, respectively. Naming the first parameter
 /// of a static method as `self` or `cls` can be misleading, as static methods
 /// do not receive an instance or class reference as their first argument.
 ///
@@ -44,15 +44,15 @@ use crate::codes::Category;
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.6.0", category = Category::Suspicious)]
-pub(crate) struct BadStaticmethodArgument {
+pub(crate) struct BadStaticmethodParameter {
     argument_name: String,
 }
 
-impl Violation for BadStaticmethodArgument {
+impl Violation for BadStaticmethodParameter {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { argument_name } = self;
-        format!("First argument of a static method should not be named `{argument_name}`")
+        format!("First parameter of a static method should not be named `{argument_name}`")
     }
 }
 
@@ -109,7 +109,7 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
     }
 
     checker.report_diagnostic(
-        BadStaticmethodArgument {
+        BadStaticmethodParameter {
             argument_name: self_or_cls.name.to_string(),
         },
         self_or_cls.range(),

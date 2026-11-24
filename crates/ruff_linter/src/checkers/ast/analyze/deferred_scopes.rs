@@ -12,9 +12,9 @@ use crate::rules::{
 pub(crate) fn deferred_scopes(checker: &Checker) {
     if !checker.any_rule_enabled(&[
         Rule::AsyncioDanglingTask,
-        Rule::BadStaticmethodArgument,
+        Rule::BadStaticmethodParameter,
         Rule::BuiltinAttributeShadowing,
-        Rule::FunctionCallInDataclassDefaultArgument,
+        Rule::FunctionCallInDataclassFieldDefault,
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
@@ -22,10 +22,10 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::InstanceMethodReceiverNotNamedSelf,
         Rule::MethodReceiverDefault,
         Rule::MutableClassDefault,
-        Rule::MutableDataclassDefault,
-        Rule::NoMethodArgument,
+        Rule::MutableDataclassFieldDefault,
+        Rule::MethodWithoutParameters,
         Rule::UnusedSelf,
-        Rule::RedefinedArgumentFromLocal,
+        Rule::RedefinedParameterFromLocal,
         Rule::RedefinedWhileUnused,
         Rule::RuntimeImportInTypeCheckingBlock,
         Rule::SingledispatchMethod,
@@ -37,16 +37,16 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::TypingOnlyThirdPartyImport,
         Rule::UndefinedLocal,
         Rule::UnusedAnnotation,
-        Rule::UnusedClassMethodArgument,
-        Rule::UnusedFunctionArgument,
+        Rule::UnusedClassMethodParameter,
+        Rule::UnusedFunctionParameter,
         Rule::UnusedImport,
-        Rule::UnusedLambdaArgument,
-        Rule::UnusedMethodArgument,
+        Rule::UnusedLambdaParameter,
+        Rule::UnusedMethodParameter,
         Rule::UnusedPrivateProtocol,
         Rule::UnusedPrivateTypeAlias,
         Rule::UnusedPrivateTypedDict,
         Rule::UnusedPrivateTypeVar,
-        Rule::UnusedStaticMethodArgument,
+        Rule::UnusedStaticMethodParameter,
         Rule::UnusedUnpackedVariable,
         Rule::UnusedVariable,
         Rule::UnnecessaryFutureImport,
@@ -101,7 +101,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             pylint::rules::swap_with_temporary_variable(checker, scope_id, scope);
         }
 
-        if checker.is_rule_enabled(Rule::RedefinedArgumentFromLocal) {
+        if checker.is_rule_enabled(Rule::RedefinedParameterFromLocal) {
             pylint::rules::redefined_argument_from_local(checker, scope_id, scope);
         }
 
@@ -140,13 +140,13 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                     checker, scope_id, scope, class_def,
                 );
             }
-            if checker.is_rule_enabled(Rule::FunctionCallInDataclassDefaultArgument) {
+            if checker.is_rule_enabled(Rule::FunctionCallInDataclassFieldDefault) {
                 ruff::rules::function_call_in_dataclass_default(checker, class_def, scope_id);
             }
             if checker.is_rule_enabled(Rule::MutableClassDefault) {
                 ruff::rules::mutable_class_default(checker, class_def);
             }
-            if checker.is_rule_enabled(Rule::MutableDataclassDefault) {
+            if checker.is_rule_enabled(Rule::MutableDataclassFieldDefault) {
                 ruff::rules::mutable_dataclass_default(checker, class_def);
             }
         }
@@ -199,11 +199,11 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
 
             if !checker.source_type.is_stub() {
                 if checker.any_rule_enabled(&[
-                    Rule::UnusedClassMethodArgument,
-                    Rule::UnusedFunctionArgument,
-                    Rule::UnusedLambdaArgument,
-                    Rule::UnusedMethodArgument,
-                    Rule::UnusedStaticMethodArgument,
+                    Rule::UnusedClassMethodParameter,
+                    Rule::UnusedFunctionParameter,
+                    Rule::UnusedLambdaParameter,
+                    Rule::UnusedMethodParameter,
+                    Rule::UnusedStaticMethodParameter,
                 ]) {
                     flake8_unused_arguments::rules::unused_arguments(checker, scope);
                 }
@@ -247,7 +247,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         }
 
         if scope.kind.is_function() {
-            if checker.is_rule_enabled(Rule::NoMethodArgument) {
+            if checker.is_rule_enabled(Rule::MethodWithoutParameters) {
                 pylint::rules::no_method_argument(checker, scope);
             }
 
@@ -267,7 +267,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                 pylint::rules::singledispatchmethod_function(checker, scope);
             }
 
-            if checker.is_rule_enabled(Rule::BadStaticmethodArgument) {
+            if checker.is_rule_enabled(Rule::BadStaticmethodParameter) {
                 pylint::rules::bad_staticmethod_argument(checker, scope);
             }
 

@@ -17,7 +17,7 @@ pub(crate) fn get_redirect(selector: &str) -> Option<(&'static str, &'static str
 pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     (
         "missing-return-type-undocumented-public-function",
-        Rule::MissingReturnTypePublicFunction,
+        Rule::MissingReturnAnnotationForPublicFunction,
     ),
     (
         "blank-line-before-function",
@@ -161,7 +161,7 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ("set-attr-with-constant", Rule::SetattrWithConstant),
     ("del-attr-with-constant", Rule::DelattrWithConstant),
     ("f-string-in-get-text-func-call", Rule::FStringInGettextCall),
-    ("format-in-get-text-func-call", Rule::FormatInGettextCall),
+    ("format-in-get-text-func-call", Rule::StrFormatInGettextCall),
     ("printf-in-get-text-func-call", Rule::PrintfInGettextCall),
     ("exec-builtin", Rule::Exec),
     ("suspicious-eval-usage", Rule::Eval),
@@ -201,7 +201,7 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
     ),
     (
         "boolean-default-value-positional-argument",
-        Rule::BooleanDefaultValuePositionalParameter,
+        Rule::BooleanPositionalParameterDefault,
     ),
     ("invalid-class-name", Rule::NonCamelCaseClassName),
     ("invalid-function-name", Rule::NonLowercaseFunctionName),
@@ -389,6 +389,186 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
         Rule::UnnecessaryPositionalStrFormatIndices,
     ),
     ("f-string", Rule::StrFormat),
+    (
+        "string-dot-format-invalid-format",
+        Rule::StrFormatInvalidSyntax,
+    ),
+    (
+        "string-dot-format-extra-named-arguments",
+        Rule::StrFormatUnusedKeywordArguments,
+    ),
+    (
+        "string-dot-format-extra-positional-arguments",
+        Rule::StrFormatUnusedPositionalArguments,
+    ),
+    (
+        "string-dot-format-missing-arguments",
+        Rule::StrFormatMissingArguments,
+    ),
+    (
+        "string-dot-format-mixing-automatic",
+        Rule::StrFormatMixedPlaceholderNumbering,
+    ),
+    ("blind-except", Rule::CatchExceptionOrBaseException),
+    (
+        "assert-raises-exception",
+        Rule::AssertRaisesExceptionOrBaseException,
+    ),
+    ("logging-string-format", Rule::LoggingStrFormat),
+    (
+        "builtin-argument-shadowing",
+        Rule::BuiltinParameterShadowing,
+    ),
+    (
+        "builtin-lambda-argument-shadowing",
+        Rule::BuiltinLambdaParameterShadowing,
+    ),
+    ("missing-type-function-argument", Rule::UnannotatedParameter),
+    ("missing-type-args", Rule::UnannotatedArgs),
+    ("missing-type-kwargs", Rule::UnannotatedKwargs),
+    ("unused-function-argument", Rule::UnusedFunctionParameter),
+    ("unused-method-argument", Rule::UnusedMethodParameter),
+    (
+        "unused-class-method-argument",
+        Rule::UnusedClassMethodParameter,
+    ),
+    (
+        "unused-static-method-argument",
+        Rule::UnusedStaticMethodParameter,
+    ),
+    ("unused-lambda-argument", Rule::UnusedLambdaParameter),
+    ("mutable-argument-default", Rule::MutableParameterDefault),
+    (
+        "function-call-in-default-argument",
+        Rule::FunctionCallInParameterDefault,
+    ),
+    ("no-method-argument", Rule::MethodWithoutParameters),
+    ("bad-staticmethod-argument", Rule::BadStaticmethodParameter),
+    ("too-many-arguments", Rule::TooManyParameters),
+    (
+        "too-many-positional-arguments",
+        Rule::TooManyPositionalParameters,
+    ),
+    (
+        "redefined-argument-from-local",
+        Rule::RedefinedParameterFromLocal,
+    ),
+    (
+        "pytest-use-fixtures-without-parameters",
+        Rule::PytestUseFixturesWithoutArguments,
+    ),
+    (
+        "pytest-parameter-with-default-argument",
+        Rule::PytestParameterWithDefaultValue,
+    ),
+    ("super-call-with-parameters", Rule::RedundantSuperArguments),
+    (
+        "lru-cache-without-parameters",
+        Rule::LRUCacheCallWithoutArguments,
+    ),
+    (
+        "whitespace-before-parameters",
+        Rule::WhitespaceBeforeOpenBracket,
+    ),
+    (
+        "unexpected-spaces-around-keyword-parameter-equals",
+        Rule::UnexpectedSpacesAroundArgumentOrParameterEquals,
+    ),
+    (
+        "function-call-in-dataclass-default-argument",
+        Rule::FunctionCallInDataclassFieldDefault,
+    ),
+    (
+        "invalid-assert-message-literal-argument",
+        Rule::NonStringLiteralAsAssertMessage,
+    ),
+    ("unprefixed-type-param", Rule::PublicTypeVarInStub),
+    (
+        "unrecognized-version-info-check",
+        Rule::UnrecognizedVersionInfoCheckInStub,
+    ),
+    (
+        "patch-version-comparison",
+        Rule::PatchVersionComparisonInStub,
+    ),
+    (
+        "wrong-tuple-length-version-comparison",
+        Rule::WrongTupleLengthVersionComparisonInStub,
+    ),
+    (
+        "unrecognized-platform-check",
+        Rule::UnrecognizedPlatformCheckInStub,
+    ),
+    (
+        "unrecognized-platform-name",
+        Rule::UnrecognizedPlatformNameInStub,
+    ),
+    ("pass-in-class-body", Rule::PassInStubClassBody),
+    ("string-or-bytes-too-long", Rule::StringOrBytesTooLongInStub),
+    (
+        "numeric-literal-too-long",
+        Rule::NumericLiteralTooLongInStub,
+    ),
+    (
+        "missing-return-type-public-function",
+        Rule::MissingReturnAnnotationForPublicFunction,
+    ),
+    (
+        "missing-return-type-private-function",
+        Rule::MissingReturnAnnotationForPrivateFunction,
+    ),
+    (
+        "missing-return-type-special-method",
+        Rule::MissingReturnAnnotationForSpecialMethod,
+    ),
+    (
+        "missing-return-type-static-method",
+        Rule::MissingReturnAnnotationForStaticMethod,
+    ),
+    (
+        "missing-return-type-class-method",
+        Rule::MissingReturnAnnotationForClassMethod,
+    ),
+    (
+        "percent-format-invalid-format",
+        Rule::PercentFormatInvalidSyntax,
+    ),
+    (
+        "percent-format-extra-named-arguments",
+        Rule::PercentFormatUnusedNamedArguments,
+    ),
+    ("logging-too-many-args", Rule::LoggingTooManyArguments),
+    ("logging-too-few-args", Rule::LoggingTooFewArguments),
+    ("re-sub-positional-args", Rule::ReSubPositionalArguments),
+    ("format-in-gettext-call", Rule::StrFormatInGettextCall),
+    (
+        "unnecessary-default-type-args",
+        Rule::UnnecessaryDefaultTypeArguments,
+    ),
+    (
+        "hardcoded-password-func-arg",
+        Rule::HardcodedPasswordArgument,
+    ),
+    (
+        "hardcoded-password-default",
+        Rule::HardcodedPasswordParameterDefault,
+    ),
+    (
+        "boolean-default-value-positional-parameter",
+        Rule::BooleanPositionalParameterDefault,
+    ),
+    (
+        "pytest-fixture-positional-args",
+        Rule::PytestFixturePositionalArguments,
+    ),
+    (
+        "pytest-fixture-param-without-value",
+        Rule::PytestFixtureParameterWithoutValue,
+    ),
+    (
+        "mutable-dataclass-default",
+        Rule::MutableDataclassFieldDefault,
+    ),
 ];
 
 static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {

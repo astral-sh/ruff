@@ -12,7 +12,7 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
 
-    #[test_case(Rule::BlindExcept, Path::new("BLE.py"))]
+    #[test_case(Rule::CatchExceptionOrBaseException, Path::new("BLE.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(

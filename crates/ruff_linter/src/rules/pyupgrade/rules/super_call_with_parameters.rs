@@ -15,7 +15,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Why is this bad?
 /// In Python 3, `super` can be invoked without any arguments when: (1) the
 /// first argument is `__class__`, and (2) the second argument is equivalent to
-/// the first argument of the enclosing method.
+/// the first parameter of the enclosing method.
 ///
 /// When possible, omit the arguments to `super` to make the code more concise
 /// and maintainable.
@@ -54,9 +54,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [super/MRO, Python's most misunderstood feature.](https://www.youtube.com/watch?v=X1PQ7zzltz4)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.155", category = Category::Style)]
-pub(crate) struct SuperCallWithParameters;
+pub(crate) struct RedundantSuperArguments;
 
-impl Violation for SuperCallWithParameters {
+impl Violation for RedundantSuperArguments {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -65,7 +65,7 @@ impl Violation for SuperCallWithParameters {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Remove `super()` parameters".to_string())
+        Some("Remove `super()` arguments".to_string())
     }
 }
 
@@ -246,7 +246,7 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(SuperCallWithParameters, call.arguments.range());
+    let mut diagnostic = checker.report_diagnostic(RedundantSuperArguments, call.arguments.range());
 
     // Only provide a fix if there are no keyword arguments, since super() doesn't accept keyword arguments
     if call.arguments.keywords.is_empty() {

@@ -21,7 +21,7 @@ use crate::preview::{
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for uses of mutable objects as function argument defaults.
+/// Checks for uses of mutable objects as function parameter defaults.
 ///
 /// ## Why is this bad?
 /// Function defaults are evaluated once, when the function is defined.
@@ -34,12 +34,12 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// default, and initialize a new mutable object inside the function body
 /// for each call.
 ///
-/// Arguments with immutable type annotations will be ignored by this rule.
+/// Parameters with immutable type annotations will be ignored by this rule.
 /// Types outside of the standard library can be marked as immutable with the
 /// [`lint.flake8-bugbear.extend-immutable-calls`] configuration option.
 ///
 /// ## Known problems
-/// Mutable argument defaults can be used intentionally to cache computation
+/// Mutable parameter defaults can be used intentionally to cache computation
 /// results. Replacing the default with `None` or an immutable data structure
 /// does not work for such usages. Instead, prefer the `@functools.lru_cache`
 /// decorator from the standard library.
@@ -81,14 +81,14 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.92", category = Category::Suspicious)]
-pub(crate) struct MutableArgumentDefault;
+pub(crate) struct MutableParameterDefault;
 
-impl Violation for MutableArgumentDefault {
+impl Violation for MutableParameterDefault {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Do not use mutable data structures for argument defaults".to_string()
+        "Do not use mutable data structures for parameter defaults".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -125,7 +125,8 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
                 is_immutable_annotation(expr, checker.semantic(), extend_immutable_calls.as_slice())
             })
         {
-            let mut diagnostic = checker.report_diagnostic(MutableArgumentDefault, default.range());
+            let mut diagnostic =
+                checker.report_diagnostic(MutableParameterDefault, default.range());
 
             // If the function body is on the same line as the function def, do not fix
             if let Some(fix) = move_initialization(function_def, parameter, default, checker) {
