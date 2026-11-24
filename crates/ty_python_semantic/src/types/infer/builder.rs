@@ -280,7 +280,9 @@ impl<'db> ExpressionMap<'db> {
     /// switch to a hash map to avoid quadratic work on widely reordered nodes.
     #[inline]
     fn insert(&mut self, key: ExpressionNodeKey, value: Type<'db>) -> Option<Type<'db>> {
-        const TAIL_SEARCH: usize = 5;
+        // In a list like `[1, -2]`, we record `2` before `-2`. Checking the last
+        // two keys lets us insert `-2` between `1` and `2` without a binary search.
+        const TAIL_SEARCH: usize = 2;
         const SHIFTS_PER_ENTRY: usize = 32;
 
         if let Some(map) = &mut self.spill {
@@ -291,7 +293,6 @@ impl<'db> ExpressionMap<'db> {
             return None;
         }
 
-        // A parent is often inserted just after its children. Check the tail first.
         let mut pos = self.sorted.len();
         let position = loop {
             if pos == 0 {
