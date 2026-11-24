@@ -288,7 +288,7 @@ help: Remove unused suppression
 87 |     print("hello")
    |
 
-RUF102 [*] Invalid rule code in suppression: YF829
+RUF102 [*] Unknown rule in suppression: YF829
   --> suppressions.py:93:21
    |
 91 | def f():
@@ -311,7 +311,7 @@ help: Remove the suppression comment
 96 |
    |
 
-RUF102 [*] Invalid rule code in suppression: RQW320
+RUF102 [*] Unknown rule in suppression: RQW320
   --> suppressions.py:94:27
    |
 92 |     # Unknown rule codes
@@ -323,7 +323,7 @@ RUF102 [*] Invalid rule code in suppression: RQW320
    |                          ------
 97 |     # ruff: enable[YF829]
    |
-help: Remove the rule code `RQW320`
+help: Remove the rule `RQW320`
    |
 93 |     # ruff: disable[YF829]
    -     # ruff: disable[F841, RQW320]

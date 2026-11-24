@@ -121,8 +121,8 @@ mod tests {
     #[test_case(Rule::IncorrectDecoratorOrder, Path::new("RUF074.py"))]
     #[test_case(Rule::RenamedRuleInSuppressionComment, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RenamedRuleInSuppressionComment, Path::new("RUF101_1.py"))]
-    #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
-    #[test_case(Rule::InvalidRuleCode, Path::new("RUF102_1.py"))]
+    #[test_case(Rule::UnknownRuleInSuppressionComment, Path::new("RUF102.py"))]
+    #[test_case(Rule::UnknownRuleInSuppressionComment, Path::new("RUF102_1.py"))]
     #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/__init__.py"))]
     #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/okay.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -502,7 +502,7 @@ mod tests {
                 Rule::UnusedMethodArgument,
                 Rule::AmbiguousVariableName,
                 Rule::UnusedSuppressionComment,
-                Rule::InvalidRuleCode,
+                Rule::UnknownRuleInSuppressionComment,
                 Rule::InvalidSuppressionComment,
                 Rule::UnmatchedSuppressionComment,
             ])
@@ -670,7 +670,7 @@ mod tests {
             &settings::LinterSettings {
                 external: vec!["V".to_string()],
                 preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(Rule::InvalidRuleCode)
+                ..settings::LinterSettings::for_rule(Rule::UnknownRuleInSuppressionComment)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);

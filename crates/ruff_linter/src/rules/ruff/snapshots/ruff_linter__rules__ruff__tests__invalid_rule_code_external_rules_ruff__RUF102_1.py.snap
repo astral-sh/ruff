@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF102 [*] Invalid rule code in `# noqa`: INVALID123
+RUF102 [*] Unknown rule in `# noqa`: INVALID123
  --> RUF102_1.py:2:1
   |
 1 | # Invalid file-level code

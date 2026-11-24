@@ -13,39 +13,42 @@ use crate::rule_redirects::get_redirect_target;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum InvalidRuleCodeKind {
+pub(crate) enum UnknownRuleCommentKind {
     Noqa,
     Suppression,
 }
 
-impl InvalidRuleCodeKind {
+impl UnknownRuleCommentKind {
     fn as_str(&self) -> &str {
         match self {
-            InvalidRuleCodeKind::Noqa => "`# noqa`",
-            InvalidRuleCodeKind::Suppression => "suppression",
+            UnknownRuleCommentKind::Noqa => "`# noqa`",
+            UnknownRuleCommentKind::Suppression => "suppression",
         }
     }
 }
 
 /// ## What it does
-/// Checks for `noqa` codes that are invalid.
+/// Checks for unknown rule names and codes in suppression comments.
 ///
 /// ## Why is this bad?
-/// Invalid rule codes serve no purpose and may indicate outdated code suppressions.
+/// Unknown rules in suppression comments serve no purpose and may indicate outdated suppressions.
 ///
 /// ## Example
 /// ```python
 /// import os  # noqa: XYZ999
+/// import sys  # ruff: ignore[unknown-rule]
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// import os
+/// import sys
 /// ```
 ///
 /// Or if there are still valid codes needed:
 /// ```python
 /// import os  # noqa: E402
+/// import sys  # ruff: ignore[E402]
 /// ```
 ///
 /// ## Fix safety
@@ -63,19 +66,19 @@ impl InvalidRuleCodeKind {
 /// - `lint.external`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
-pub(crate) struct InvalidRuleCode {
-    pub(crate) rule_code: String,
-    pub(crate) kind: InvalidRuleCodeKind,
+pub(crate) struct UnknownRuleInSuppressionComment {
+    pub(crate) rule: String,
+    pub(crate) kind: UnknownRuleCommentKind,
     pub(crate) whole_comment: bool,
 }
 
-impl AlwaysFixableViolation for InvalidRuleCode {
+impl AlwaysFixableViolation for UnknownRuleInSuppressionComment {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Invalid rule code in {}: {}",
-            self.kind.as_str(),
-            self.rule_code
+            "Unknown rule in {comment}: {rule}",
+            comment = self.kind.as_str(),
+            rule = self.rule,
         )
     }
 
@@ -83,12 +86,12 @@ impl AlwaysFixableViolation for InvalidRuleCode {
         if self.whole_comment {
             format!("Remove the {} comment", self.kind.as_str())
         } else {
-            format!("Remove the rule code `{}`", self.rule_code)
+            format!("Remove the rule `{rule}`", rule = self.rule)
         }
     }
 }
 
-/// RUF102 for invalid noqa codes
+/// RUF102 for unknown noqa codes
 pub(crate) fn invalid_noqa_code(
     context: &LintContext,
     file_noqa_directives: &FileNoqaDirectives,
@@ -144,13 +147,13 @@ fn all_codes_invalid_diagnostic(
     context: &LintContext,
 ) {
     let mut diagnostic = context.report_custom_diagnostic(
-        InvalidRuleCode {
-            rule_code: invalid_codes
+        UnknownRuleInSuppressionComment {
+            rule: invalid_codes
                 .into_iter()
                 .map(Code::as_str)
                 .collect::<Vec<_>>()
                 .join(", "),
-            kind: InvalidRuleCodeKind::Noqa,
+            kind: UnknownRuleCommentKind::Noqa,
             whole_comment: true,
         },
         directive.range(),
@@ -166,9 +169,9 @@ fn some_codes_are_invalid_diagnostic(
     context: &LintContext,
 ) {
     let mut diagnostic = context.report_custom_diagnostic(
-        InvalidRuleCode {
-            rule_code: invalid_code.to_string(),
-            kind: InvalidRuleCodeKind::Noqa,
+        UnknownRuleInSuppressionComment {
+            rule: invalid_code.to_string(),
+            kind: UnknownRuleCommentKind::Noqa,
             whole_comment: false,
         },
         invalid_code.range(),

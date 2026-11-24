@@ -115,16 +115,16 @@ help: Use `ruff: file-ignore` instead
 ### Unknown codes still receive a diagnostic
 
 In case the unknown code is a typo rather than an intentionally external code, we emit both
-`invalid-rule-code` and `noqa-comments`:
+`unknown-rule-in-suppression-comment` and `noqa-comments`:
 
 ```toml
 [lint]
 preview = true
-select = ["noqa-comments", "unused-suppression-comment", "invalid-rule-code", "F401"]
+select = ["noqa-comments", "unused-suppression-comment", "unknown-rule-in-suppression-comment", "F401"]
 ```
 
 ```py
-# error: [invalid-rule-code]
+# error: [unknown-rule-in-suppression-comment]
 # snapshot: noqa-comments
 import math  # noqa: F401, UNK001
 ```
@@ -148,7 +148,7 @@ help: Use `ruff: ignore` instead
 ```toml
 [lint]
 preview = true
-select = ["noqa-comments", "unused-suppression-comment", "invalid-rule-code", "F401"]
+select = ["noqa-comments", "unused-suppression-comment", "unknown-rule-in-suppression-comment", "F401"]
 external = ["EXT"]
 ```
 

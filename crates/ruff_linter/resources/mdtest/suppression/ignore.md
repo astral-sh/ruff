@@ -319,7 +319,7 @@ select = ["F401", "RUF102"]
 With preview disabled, this should continue to emit `F401`, as well as `RUF102`:
 
 ```py
-# snapshot: invalid-rule-code
+# snapshot: unknown-rule-in-suppression-comment
 # ruff:disable[unused-import]
 # error: [unused-import]
 import math
@@ -327,7 +327,7 @@ import math
 ```
 
 ```snapshot
-error[RUF102]: Invalid rule code in suppression: unused-import
+error[RUF102]: Unknown rule in suppression: unused-import
  --> src/mdtest_snippet.py:2:16
   |
 2 | # ruff:disable[unused-import]
@@ -339,19 +339,19 @@ error[RUF102]: Invalid rule code in suppression: unused-import
 help: Enable `lint.preview` to use rule names
 help: Remove the suppression comment
   |
-1 | # snapshot: invalid-rule-code
+1 | # snapshot: unknown-rule-in-suppression-comment
   - # ruff:disable[unused-import]
 2 | # error: [unused-import]
 3 | import math
   - # ruff:enable[unused-import]
-4 | # snapshot: invalid-rule-code
+4 | # snapshot: unknown-rule-in-suppression-comment
   |
 ```
 
 Emit both (non-fix-title) help messages when rule names and unknown codes are present:
 
 ```py
-# snapshot: invalid-rule-code
+# snapshot: unknown-rule-in-suppression-comment
 # ruff:disable[unused-import, unknown-rule]
 # error: [unused-import]
 import sys
@@ -359,7 +359,7 @@ import sys
 ```
 
 ```snapshot
-error[RUF102]: Invalid rule code in suppression: unknown-rule, unused-import
+error[RUF102]: Unknown rule in suppression: unknown-rule, unused-import
   --> src/mdtest_snippet.py:7:1
    |
  7 | # ruff:disable[unused-import, unknown-rule]
@@ -371,7 +371,7 @@ error[RUF102]: Invalid rule code in suppression: unknown-rule, unused-import
 help: Enable `lint.preview` to use rule names
 help: Remove the suppression comment
   |
-6 | # snapshot: invalid-rule-code
+6 | # snapshot: unknown-rule-in-suppression-comment
   - # ruff:disable[unused-import, unknown-rule]
 7 | # error: [unused-import]
 8 | import sys
@@ -464,25 +464,25 @@ but obviously continue working with rule codes:
 import math  # noqa: F401
 ```
 
-### `invalid-rule-code`
+### `unknown-rule-in-suppression-comment`
 
 Unknown rule names should emit `RUF102`, while preserving valid names in the same suppression:
 
 ```py
-# snapshot: invalid-rule-code
+# snapshot: unknown-rule-in-suppression-comment
 # ruff:ignore[unused-import, not-a-rule]
 import pathlib
 ```
 
 ```snapshot
-error[RUF102]: Invalid rule code in suppression: not-a-rule
+error[RUF102]: Unknown rule in suppression: not-a-rule
  --> src/mdtest_snippet.py:2:30
   |
 2 | # ruff:ignore[unused-import, not-a-rule]
   |                              ^^^^^^^^^^
-help: Remove the rule code `not-a-rule`
+help: Remove the rule `not-a-rule`
   |
-1 | # snapshot: invalid-rule-code
+1 | # snapshot: unknown-rule-in-suppression-comment
   - # ruff:ignore[unused-import, not-a-rule]
 2 + # ruff:ignore[unused-import]
 3 | import pathlib
@@ -817,7 +817,7 @@ help: Remove unused suppression
   |
 ```
 
-## `invalid-rule-code`
+## `unknown-rule-in-suppression-comment`
 
 ```toml
 [lint]
@@ -827,7 +827,7 @@ select = ["F821", "RUF102", "RUF103"]
 The `RUF102` fix should also be unsafe when it would promote a later suppression:
 
 ```py
-# snapshot: invalid-rule-code
+# snapshot: unknown-rule-in-suppression-comment
 # error: [invalid-suppression-comment]
 # ruff:ignore[XYZ] # ruff:file-ignore[F821]
 # error: [undefined-name]
@@ -835,7 +835,7 @@ undefined_name
 ```
 
 ```snapshot
-error[RUF102]: Invalid rule code in suppression: XYZ
+error[RUF102]: Unknown rule in suppression: XYZ
  --> src/mdtest_snippet.py:3:15
   |
 3 | # ruff:ignore[XYZ] # ruff:file-ignore[F821]

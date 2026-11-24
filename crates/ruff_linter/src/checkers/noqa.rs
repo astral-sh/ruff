@@ -281,8 +281,8 @@ pub(crate) fn check_noqa(
         );
     }
 
-    if context.is_rule_enabled(Rule::InvalidRuleCode)
-        && !exemption.enumerates(Rule::InvalidRuleCode)
+    if context.is_rule_enabled(Rule::UnknownRuleInSuppressionComment)
+        && !exemption.enumerates(Rule::UnknownRuleInSuppressionComment)
     {
         ruff::rules::invalid_noqa_code(
             context,
