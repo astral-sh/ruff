@@ -87,6 +87,128 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Resolve truthiness through the instance's special methods and tuple shape.
+    fn try_bool_dunders(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Result<Truthiness, BoolError<'db>> {
+        let type_to_truthiness = |ty: Type<'db>| {
+            match ty.as_literal_value_kind() {
+                Some(LiteralValueTypeKind::Bool(bool_val)) => Truthiness::from(bool_val),
+                Some(LiteralValueTypeKind::Int(int_val)) => Truthiness::from(int_val.as_i64() != 0),
+                // anything else is handled lower down
+                _ => Truthiness::Ambiguous,
+            }
+        };
+
+        match self.try_call_dunder(
+            db,
+            env,
+            "__bool__",
+            CallArguments::none(),
+            TypeContext::default(),
+        ) {
+            Ok(outcome) => {
+                let return_type = outcome.return_type(db, env);
+                if !return_type.is_assignable_to(db, env, KnownClass::Bool.to_instance(db, env)) {
+                    // The type has a `__bool__` method, but it doesn't return a
+                    // boolean.
+                    return Err(BoolError::IncorrectReturnType {
+                        return_type,
+                        not_boolable_type: *self,
+                    });
+                }
+                Ok(type_to_truthiness(return_type))
+            }
+
+            Err(CallDunderError::PossiblyUnbound {
+                bindings: outcome, ..
+            }) => {
+                let return_type = outcome.return_type(db, env);
+                if !return_type.is_assignable_to(db, env, KnownClass::Bool.to_instance(db, env)) {
+                    // The type has a `__bool__` method, but it doesn't return a
+                    // boolean.
+                    return Err(BoolError::IncorrectReturnType {
+                        return_type: outcome.return_type(db, env),
+                        not_boolable_type: *self,
+                    });
+                }
+
+                // Don't trust possibly missing `__bool__` method.
+                Ok(Truthiness::Ambiguous)
+            }
+
+            // TODO: with regards to tuple types, we intend to emit a diagnostic
+            // if a tuple subclass defines a `__bool__` method with a return type
+            // that is inconsistent with the tuple's length. Otherwise, the special
+            // handling for tuples here isn't sound.
+            Err(CallDunderError::MethodNotAvailable)
+                if let Type::NominalInstance(instance) = self
+                    && let Some(tuple_spec) = instance.tuple_spec(db, env) =>
+            {
+                Ok(tuple_spec.truthiness())
+            }
+
+            // We only consider `__len__` for tuples and `@final` types,
+            // since `__bool__` takes precedence
+            // and a subclass could add a `__bool__` method.
+            Err(CallDunderError::MethodNotAvailable)
+                if let Type::NominalInstance(instance) = self
+                    && instance.class(db, env).is_final(db) =>
+            {
+                match self.try_call_dunder(
+                    db,
+                    env,
+                    "__len__",
+                    CallArguments::none(),
+                    TypeContext::default(),
+                ) {
+                    Ok(outcome) => {
+                        let return_type = outcome.return_type(db, env);
+                        if return_type.is_assignable_to(
+                            db,
+                            env,
+                            KnownClass::SupportsIndex.to_instance(db, env),
+                        ) {
+                            Ok(type_to_truthiness(return_type))
+                        } else {
+                            // TODO: should report a diagnostic similar to if return type of `__bool__`
+                            // is not assignable to `bool`
+                            Ok(Truthiness::Ambiguous)
+                        }
+                    }
+                    // if a `@final` type does not define `__bool__` or `__len__`, it is always truthy
+                    Err(CallDunderError::MethodNotAvailable) => Ok(Truthiness::AlwaysTrue),
+                    // TODO: errors during a `__len__` call (if `__len__` exists) should be reported
+                    // as diagnostics similar to errors during a `__bool__` call (when `__bool__` exists)
+                    Err(_) => Ok(Truthiness::Ambiguous),
+                }
+            }
+
+            Err(CallDunderError::MethodNotAvailable) => Ok(Truthiness::Ambiguous),
+
+            Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)) => {
+                Err(BoolError::IncorrectArguments {
+                    truthiness: type_to_truthiness(bindings.return_type(db, env)),
+                    not_boolable_type: *self,
+                })
+            }
+
+            Err(CallDunderError::CallError(CallErrorKind::NotCallable, _, _)) => {
+                Err(BoolError::NotCallable {
+                    not_boolable_type: *self,
+                })
+            }
+
+            Err(CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _, _)) => {
+                Err(BoolError::Other {
+                    not_boolable_type: *self,
+                })
+            }
+        }
+    }
+
     /// Resolves the boolean value of a type.
     ///
     /// Setting `allow_short_circuit` to `true` allows the implementation to
@@ -106,123 +228,15 @@ impl<'db> Type<'db> {
         allow_short_circuit: bool,
         visitor: &TryBoolVisitor<'db>,
     ) -> Result<Truthiness, BoolError<'db>> {
-        let type_to_truthiness = |ty: Type<'db>| {
-            match ty.as_literal_value_kind() {
-                Some(LiteralValueTypeKind::Bool(bool_val)) => Truthiness::from(bool_val),
-                Some(LiteralValueTypeKind::Int(int_val)) => Truthiness::from(int_val.as_i64() != 0),
-                // anything else is handled lower down
-                _ => Truthiness::Ambiguous,
-            }
-        };
-
         let try_dunders = || {
-            match self.try_call_dunder(
-                db,
-                env,
-                "__bool__",
-                CallArguments::none(),
-                TypeContext::default(),
-            ) {
-                Ok(outcome) => {
-                    let return_type = outcome.return_type(db, env);
-                    if !return_type.is_assignable_to(db, env, KnownClass::Bool.to_instance(db, env))
-                    {
-                        // The type has a `__bool__` method, but it doesn't return a
-                        // boolean.
-                        return Err(BoolError::IncorrectReturnType {
-                            return_type,
-                            not_boolable_type: *self,
-                        });
-                    }
-                    Ok(type_to_truthiness(return_type))
-                }
-
-                Err(CallDunderError::PossiblyUnbound {
-                    bindings: outcome, ..
-                }) => {
-                    let return_type = outcome.return_type(db, env);
-                    if !return_type.is_assignable_to(db, env, KnownClass::Bool.to_instance(db, env))
-                    {
-                        // The type has a `__bool__` method, but it doesn't return a
-                        // boolean.
-                        return Err(BoolError::IncorrectReturnType {
-                            return_type: outcome.return_type(db, env),
-                            not_boolable_type: *self,
-                        });
-                    }
-
-                    // Don't trust possibly missing `__bool__` method.
-                    Ok(Truthiness::Ambiguous)
-                }
-
-                // TODO: with regards to tuple types, we intend to emit a diagnostic
-                // if a tuple subclass defines a `__bool__` method with a return type
-                // that is inconsistent with the tuple's length. Otherwise, the special
-                // handling for tuples here isn't sound.
-                Err(CallDunderError::MethodNotAvailable)
-                    if let Type::NominalInstance(instance) = self
-                        && let Some(tuple_spec) = instance.tuple_spec(db, env) =>
-                {
-                    Ok(tuple_spec.truthiness())
-                }
-
-                // We only consider `__len__` for tuples and `@final` types,
-                // since `__bool__` takes precedence
-                // and a subclass could add a `__bool__` method.
-                Err(CallDunderError::MethodNotAvailable)
-                    if let Type::NominalInstance(instance) = self
-                        && instance.class(db, env).is_final(db) =>
-                {
-                    match self.try_call_dunder(
-                        db,
-                        env,
-                        "__len__",
-                        CallArguments::none(),
-                        TypeContext::default(),
-                    ) {
-                        Ok(outcome) => {
-                            let return_type = outcome.return_type(db, env);
-                            if return_type.is_assignable_to(
-                                db,
-                                env,
-                                KnownClass::SupportsIndex.to_instance(db, env),
-                            ) {
-                                Ok(type_to_truthiness(return_type))
-                            } else {
-                                // TODO: should report a diagnostic similar to if return type of `__bool__`
-                                // is not assignable to `bool`
-                                Ok(Truthiness::Ambiguous)
-                            }
-                        }
-                        // if a `@final` type does not define `__bool__` or `__len__`, it is always truthy
-                        Err(CallDunderError::MethodNotAvailable) => Ok(Truthiness::AlwaysTrue),
-                        // TODO: errors during a `__len__` call (if `__len__` exists) should be reported
-                        // as diagnostics similar to errors during a `__bool__` call (when `__bool__` exists)
-                        Err(_) => Ok(Truthiness::Ambiguous),
-                    }
-                }
-
-                Err(CallDunderError::MethodNotAvailable) => Ok(Truthiness::Ambiguous),
-
-                Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)) => {
-                    Err(BoolError::IncorrectArguments {
-                        truthiness: type_to_truthiness(bindings.return_type(db, env)),
-                        not_boolable_type: *self,
-                    })
-                }
-
-                Err(CallDunderError::CallError(CallErrorKind::NotCallable, _, _)) => {
-                    Err(BoolError::NotCallable {
-                        not_boolable_type: *self,
-                    })
-                }
-
-                Err(CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _, _)) => {
-                    Err(BoolError::Other {
-                        not_boolable_type: *self,
-                    })
-                }
+            // Reachability can test the same instance type in many predicates. Only
+            // cache the outcome when the caller does not need diagnostic details.
+            if allow_short_circuit
+                && let Some(result) = cached_instance_truthiness(db, env.program(db), *self)
+            {
+                return Ok(result);
             }
+            self.try_bool_dunders(db, env)
         };
 
         let try_union = |union: UnionType<'db>| {
@@ -421,6 +435,26 @@ impl<'db> Type<'db> {
 
         Ok(truthiness)
     }
+}
+
+/// Reuse special method lookups after the instance type has been inferred. When a
+/// lookup participates in a cycle, let the caller evaluate it directly.
+#[salsa::tracked(
+    returns(copy),
+    cycle_result = |_, _, _, _| None,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+#[allow(clippy::unnecessary_wraps, reason = "Salsa returns None during cycles")]
+fn cached_instance_truthiness<'db>(
+    db: &'db dyn Db,
+    program: crate::Program<'db>,
+    instance: Type<'db>,
+) -> Option<Truthiness> {
+    Some(
+        instance
+            .try_bool_dunders(db, &ProgramEnvironment::from_program(program))
+            .unwrap_or_else(|err| err.fallback_truthiness()),
+    )
 }
 
 /// A [`CycleDetector`] that is used in `try_bool` methods.
