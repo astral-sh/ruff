@@ -3092,7 +3092,7 @@ mod tests {
                 "#,
                 SuppressionKind::Noqa,
                 &LinterSettings::for_rules([
-                    Rule::MissingParameterAnnotation,
+                    Rule::UnannotatedParameter,
                     Rule::MissingReturnAnnotationForPublicFunction,
                     Rule::UnusedFunctionParameter,
                     Rule::UndocumentedPublicFunction,
@@ -3122,7 +3122,7 @@ mod tests {
                 "#,
                 SuppressionKind::Noqa,
                 &LinterSettings::for_rules([
-                    Rule::MissingParameterAnnotation,
+                    Rule::UnannotatedParameter,
                     Rule::MissingReturnAnnotationForPublicFunction,
                     Rule::UnusedFunctionParameter,
                     Rule::UndocumentedPublicFunction,
@@ -3153,7 +3153,7 @@ mod tests {
                 "#,
                 SuppressionKind::Ignore,
                 &LinterSettings::for_rules([
-                    Rule::MissingParameterAnnotation,
+                    Rule::UnannotatedParameter,
                     Rule::MissingReturnAnnotationForPublicFunction,
                     Rule::UnusedFunctionParameter,
                     Rule::UndocumentedPublicFunction,
@@ -3234,7 +3234,7 @@ mod tests {
                 "#,
                 SuppressionKind::Ignore,
                 &LinterSettings::for_rules([
-                    Rule::MissingParameterAnnotation,
+                    Rule::UnannotatedParameter,
                     Rule::MissingReturnAnnotationForPublicFunction,
                     Rule::UnusedFunctionParameter,
                     Rule::UndocumentedPublicFunction,
@@ -3265,7 +3265,7 @@ mod tests {
                 "#,
                 SuppressionKind::Ignore,
                 &LinterSettings::for_rules([
-                    Rule::MissingParameterAnnotation,
+                    Rule::UnannotatedParameter,
                     Rule::MissingReturnAnnotationForPublicFunction,
                     Rule::UndocumentedPublicFunction,
                 ])
@@ -3277,7 +3277,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        def unused(x):  # ruff: ignore[missing-parameter-annotation, missing-return-annotation-for-public-function, undocumented-public-function]
+        def unused(x):  # ruff: ignore[missing-return-annotation-for-public-function, unannotated-parameter, undocumented-public-function]
             pass
         ```
         "
@@ -3324,7 +3324,7 @@ mod tests {
                 "#,
                 SuppressionKind::Ignore,
                 &LinterSettings::for_rules([
-                    Rule::MissingParameterAnnotation,
+                    Rule::UnannotatedParameter,
                     Rule::MissingReturnAnnotationForPublicFunction,
                 ])
                 .with_preview_mode(),

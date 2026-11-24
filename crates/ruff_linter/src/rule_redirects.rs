@@ -423,12 +423,9 @@ pub const RULE_NAME_REDIRECTS: &[(&str, Rule)] = &[
         "builtin-lambda-argument-shadowing",
         Rule::BuiltinLambdaParameterShadowing,
     ),
-    (
-        "missing-type-function-argument",
-        Rule::MissingParameterAnnotation,
-    ),
-    ("missing-type-args", Rule::MissingArgsAnnotation),
-    ("missing-type-kwargs", Rule::MissingKwargsAnnotation),
+    ("missing-type-function-argument", Rule::UnannotatedParameter),
+    ("missing-type-args", Rule::UnannotatedArgs),
+    ("missing-type-kwargs", Rule::UnannotatedKwargs),
     ("unused-function-argument", Rule::UnusedFunctionParameter),
     ("unused-method-argument", Rule::UnusedMethodParameter),
     (

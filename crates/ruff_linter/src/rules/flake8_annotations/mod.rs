@@ -21,9 +21,9 @@ mod tests {
             Path::new("flake8_annotations/annotation_presence.py"),
             &LinterSettings {
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingParameterAnnotation,
-                    Rule::MissingArgsAnnotation,
-                    Rule::MissingKwargsAnnotation,
+                    Rule::UnannotatedParameter,
+                    Rule::UnannotatedArgs,
+                    Rule::UnannotatedKwargs,
                     Rule::MissingReturnAnnotationForPublicFunction,
                     Rule::MissingReturnAnnotationForPrivateFunction,
                     Rule::MissingReturnAnnotationForSpecialMethod,
@@ -47,9 +47,9 @@ mod tests {
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingParameterAnnotation,
-                    Rule::MissingArgsAnnotation,
-                    Rule::MissingKwargsAnnotation,
+                    Rule::UnannotatedParameter,
+                    Rule::UnannotatedArgs,
+                    Rule::UnannotatedKwargs,
                     Rule::MissingReturnAnnotationForPublicFunction,
                     Rule::MissingReturnAnnotationForPrivateFunction,
                     Rule::MissingReturnAnnotationForSpecialMethod,
@@ -73,9 +73,9 @@ mod tests {
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingParameterAnnotation,
-                    Rule::MissingArgsAnnotation,
-                    Rule::MissingKwargsAnnotation,
+                    Rule::UnannotatedParameter,
+                    Rule::UnannotatedArgs,
+                    Rule::UnannotatedKwargs,
                 ])
             },
         )?;
@@ -152,9 +152,9 @@ mod tests {
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![
-                    Rule::MissingParameterAnnotation,
-                    Rule::MissingArgsAnnotation,
-                    Rule::MissingKwargsAnnotation,
+                    Rule::UnannotatedParameter,
+                    Rule::UnannotatedArgs,
+                    Rule::UnannotatedKwargs,
                     Rule::MissingReturnAnnotationForPublicFunction,
                     Rule::MissingReturnAnnotationForPrivateFunction,
                     Rule::MissingReturnAnnotationForSpecialMethod,

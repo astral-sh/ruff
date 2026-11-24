@@ -24,9 +24,9 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::MissingReturnAnnotationForSpecialMethod,
         Rule::MissingReturnAnnotationForStaticMethod,
         Rule::MissingReturnAnnotationForPublicFunction,
-        Rule::MissingArgsAnnotation,
-        Rule::MissingParameterAnnotation,
-        Rule::MissingKwargsAnnotation,
+        Rule::UnannotatedArgs,
+        Rule::UnannotatedParameter,
+        Rule::UnannotatedKwargs,
     ]);
     let enforce_stubs =
         checker.source_type.is_stub() && checker.is_rule_enabled(Rule::DocstringInStub);

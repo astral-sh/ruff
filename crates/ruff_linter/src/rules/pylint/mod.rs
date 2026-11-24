@@ -490,7 +490,7 @@ mod tests {
             Path::new("pylint/swap_with_temporary_variable_1.py"),
             &LinterSettings::for_rules(vec![
                 Rule::SwapWithTemporaryVariable,
-                Rule::MissingParameterAnnotation,
+                Rule::UnannotatedParameter,
             ]),
         )?;
         assert_diagnostics!(diagnostics);
