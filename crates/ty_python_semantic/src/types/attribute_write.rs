@@ -1600,7 +1600,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         value_ty,
                     );
                     result = result.and(db, self.constraints, || element_result);
-                    if result.is_trivially_never_satisfied() {
+                    if result.short_circuits_and() {
                         break;
                     }
                 }
@@ -1623,7 +1623,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         value_ty,
                     );
                     result = result.or(db, self.constraints, || element_result);
-                    if result.is_trivially_always_satisfied() {
+                    if result.short_circuits_or() {
                         break;
                     }
                 }
@@ -1700,6 +1700,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             InstanceAttributeWriteMember::ClassVar => self.never(),
             InstanceAttributeWriteMember::Explicit { member, fallback } => {
                 let member_result = self.check_explicit_attribute_write(db, member, value_ty);
+                if member_result.is_budget_exceeded()
+                    || (member_result.is_trivially_never_satisfied()
+                        && !self.is_context_collection_enabled())
+                {
+                    return member_result;
+                }
                 if let Some(fallback) = fallback {
                     let fallback_result =
                         self.check_fallback_attribute_write(db, fallback, value_ty);
@@ -1737,13 +1743,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         match member {
             ClassAttributeWriteMember::Explicit { member, fallback } => {
                 let member_result = self.check_explicit_attribute_write(db, member, value_ty);
-                if member_result.is_trivially_never_satisfied() {
-                    return member_result;
-                }
                 if let Some(fallback) = fallback {
-                    let fallback_result =
-                        self.check_fallback_attribute_write(db, fallback, value_ty);
-                    member_result.and(db, self.constraints, || fallback_result)
+                    member_result.and(db, self.constraints, || {
+                        self.check_fallback_attribute_write(db, fallback, value_ty)
+                    })
                 } else {
                     member_result
                 }

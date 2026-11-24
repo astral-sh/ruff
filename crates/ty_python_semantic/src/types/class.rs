@@ -31,6 +31,7 @@ use crate::place::{
 };
 use crate::reachability::{DeclarationsIteratorExtension, ReachabilityConstraintsExtension};
 use crate::types::callable::CallableTypeKind;
+use crate::types::constraints::projection::ProjectionError;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
@@ -52,9 +53,8 @@ use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceOrigin;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassFlags, DataclassParams,
-    ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType,
-    RecursiveTypeNormalizer, TypeContext, TypeMapping, TypingModule, UnionBuilder,
-    VarianceInferable, VarianceTerm,
+    ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, RecursiveTypeNormalizer,
+    TypeContext, TypeMapping, TypingModule, UnionBuilder, VarianceInferable, VarianceTerm,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet,
@@ -1538,7 +1538,7 @@ impl<'db> ClassType<'db> {
         let checker = TypeRelationChecker::new(
             env,
             relation,
-            &constraints,
+            constraints.unlimited(),
             TypeVarSet::None,
             &relation_visitor,
             &disjointness_visitor,
@@ -1666,84 +1666,66 @@ impl<'db> ClassType<'db> {
     }
 
     /// Return `true` if this class could exist in the MRO of `other`.
-    fn could_exist_in_mro_of(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        other: Self,
-        constraints: &ConstraintSetBuilder<'db>,
-    ) -> bool {
-        self.could_exist_in_mro_of_impl(db, other, |this, other| {
-            this.is_disjoint_from(db, env, other, constraints, TypeVarSet::None)
-                .is_always_satisfied(db, env, TypeVarSet::None)
-        })
-    }
-
-    /// Like [`ClassType::could_exist_in_mro_of`], but reuses an active disjointness checker for
-    /// nested specialization checks so recursive class graphs keep the same cycle guard.
-    pub(super) fn could_exist_in_mro_of_with_disjointness_checker<'c>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        other: Self,
-        checker: &DisjointnessChecker<'_, 'c, 'db>,
-    ) -> bool {
-        self.could_exist_in_mro_of_impl(db, other, |this, other| {
-            checker
-                .check_specialization_pair(db, this, other)
-                .is_always_satisfied(db, env, checker.inferable)
-        })
-    }
-
-    fn could_exist_in_mro_of_impl(
+    /// Nested specialization checks reuse the active disjointness checker's cycle guard.
+    pub(super) fn could_exist_in_mro_of(
         self,
         db: &'db dyn Db,
         other: Self,
-        specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
-    ) -> bool {
-        other
-            .iter_mro(db)
-            .filter_map(ClassBase::into_class)
-            .any(|class| match (self, class) {
+        checker: &DisjointnessChecker<'_, '_, 'db>,
+    ) -> Result<bool, ProjectionError> {
+        for class in other.iter_mro(db).filter_map(ClassBase::into_class) {
+            let found = match (self, class) {
                 (ClassType::NonGeneric(this_class), ClassType::NonGeneric(other_class)) => {
                     this_class == other_class
                 }
                 (ClassType::Generic(this_alias), ClassType::Generic(other_alias)) => {
                     this_alias.origin(db) == other_alias.origin(db)
-                        && !specializations_are_disjoint(
-                            this_alias.specialization(db),
+                        && !this_alias.specialization(db).is_disjoint_from(
+                            db,
                             other_alias.specialization(db),
-                        )
+                            checker,
+                        )?
                 }
                 (ClassType::NonGeneric(_), ClassType::Generic(_))
                 | (ClassType::Generic(_), ClassType::NonGeneric(_)) => false,
-            })
+            };
+            if found {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     fn has_incompatible_generic_base(
         self,
         db: &'db dyn Db,
         other: Self,
-        specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
-    ) -> bool {
+        checker: &DisjointnessChecker<'_, '_, 'db>,
+    ) -> Result<bool, ProjectionError> {
         let other_generic_bases: Vec<_> = other
             .iter_mro(db)
             .filter_map(ClassBase::into_class)
             .filter_map(ClassType::into_generic_alias)
             .collect();
 
-        self.iter_mro(db)
+        for self_alias in self
+            .iter_mro(db)
             .filter_map(ClassBase::into_class)
             .filter_map(ClassType::into_generic_alias)
-            .any(|self_alias| {
-                other_generic_bases.iter().any(|other_alias| {
-                    self_alias.origin(db) == other_alias.origin(db)
-                        && specializations_are_disjoint(
-                            self_alias.specialization(db),
-                            other_alias.specialization(db),
-                        )
-                })
-            })
+        {
+            for other_alias in &other_generic_bases {
+                if self_alias.origin(db) == other_alias.origin(db)
+                    && self_alias.specialization(db).is_disjoint_from(
+                        db,
+                        other_alias.specialization(db),
+                        checker,
+                    )?
+                {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
     }
 
     /// Return `true` if this class could coexist in an MRO with `other`.
@@ -1758,93 +1740,51 @@ impl<'db> ClassType<'db> {
         other: Self,
         constraints: &ConstraintSetBuilder<'db>,
     ) -> bool {
-        self.could_coexist_in_mro_with_impl(
+        self.try_could_coexist_in_mro_with(
             db,
-            env,
             other,
-            None,
-            |this, other| this.could_exist_in_mro_of(db, env, other, constraints),
-            |this, other| {
-                this.is_disjoint_from(db, env, other, constraints, TypeVarSet::None)
-                    .is_always_satisfied(db, env, TypeVarSet::None)
-            },
-            |this, other| {
-                this.when_disjoint_from(db, env, other, constraints, TypeVarSet::None)
-                    .is_always_satisfied(db, env, TypeVarSet::None)
-            },
+            &DisjointnessChecker::new(
+                env,
+                constraints.unlimited(),
+                TypeVarSet::None,
+                &HasRelationToVisitor::default(constraints),
+                &IsDisjointVisitor::default(constraints),
+                &SignatureRelationVisitor::default(),
+                &ApplyTypeMappingVisitor::new(env),
+            ),
         )
+        .expect("unbounded comparison")
     }
 
-    pub(super) fn could_coexist_in_mro_with_disjointness_checker<'c>(
+    /// Reuse the active cycle guard for nested specialization and metaclass checks.
+    pub(super) fn try_could_coexist_in_mro_with(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
         other: Self,
-        checker: &DisjointnessChecker<'_, 'c, 'db>,
-    ) -> bool {
-        // Reuse the active disjointness checker for nested specialization and
-        // metaclass checks so recursive class graphs keep the same cycle guard.
-        self.could_coexist_in_mro_with_impl(
-            db,
-            env,
-            other,
-            checker.report_context(),
-            |this, other| {
-                this.could_exist_in_mro_of_with_disjointness_checker(db, env, other, checker)
-            },
-            |this, other| {
-                checker
-                    .check_specialization_pair(db, this, other)
-                    .is_always_satisfied(db, env, checker.inferable)
-            },
-            |this, other| {
-                checker
-                    .check_type_pair(db, this, other)
-                    .is_always_satisfied(db, env, checker.inferable)
-            },
-        )
-    }
-
-    #[expect(clippy::too_many_arguments)]
-    fn could_coexist_in_mro_with_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        other: Self,
-        context: Option<&ErrorContextTree<'db>>,
-        could_exist_in_mro_of: impl Fn(Self, Self) -> bool,
-        specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
-        types_are_disjoint: impl Fn(Type<'db>, Type<'db>) -> bool,
-    ) -> bool {
+        checker: &DisjointnessChecker<'_, '_, 'db>,
+    ) -> Result<bool, ProjectionError> {
+        let env = checker.env;
+        let context = checker.report_context();
         if self == other {
-            return true;
+            return Ok(true);
         }
 
-        if self.is_final(db) {
-            let compatible = could_exist_in_mro_of(other, self);
-            if !compatible && let Some(context) = context {
-                context.push(ErrorContext::FinalClassDisjoint {
-                    final_type: Type::instance(db, env, self),
-                    other: Type::instance(db, env, other),
-                });
+        for (class, base) in [(self, other), (other, self)] {
+            if class.is_final(db) {
+                let compatible = base.could_exist_in_mro_of(db, class, checker)?;
+                if !compatible && let Some(context) = context {
+                    context.push(ErrorContext::FinalClassDisjoint {
+                        final_type: Type::instance(db, env, class),
+                        other: Type::instance(db, env, base),
+                    });
+                }
+                return Ok(compatible);
             }
-            return compatible;
-        }
-
-        if other.is_final(db) {
-            let compatible = could_exist_in_mro_of(self, other);
-            if !compatible && let Some(context) = context {
-                context.push(ErrorContext::FinalClassDisjoint {
-                    final_type: Type::instance(db, env, other),
-                    other: Type::instance(db, env, self),
-                });
-            }
-            return compatible;
         }
 
         // A class cannot implement two incompatible specializations of an invariant base.
-        if self.has_incompatible_generic_base(db, other, specializations_are_disjoint) {
-            return false;
+        if self.has_incompatible_generic_base(db, other, checker)? {
+            return Ok(false);
         }
 
         // Two disjoint bases can only coexist in an MRO if one is a subclass of the other.
@@ -1864,7 +1804,7 @@ impl<'db> ClassType<'db> {
                     right: Type::instance(db, env, other),
                 });
             }
-            return false;
+            return Ok(false);
         }
 
         // Check to see whether the metaclasses of `self` and `other` are disjoint.
@@ -1875,21 +1815,28 @@ impl<'db> ClassType<'db> {
         let type_class = KnownClass::Type.to_class_literal(db, env);
         let self_metaclass = self.inferred_metaclass(db).for_inheritance(db, env);
         if self_metaclass == type_class {
-            return true;
+            return Ok(true);
         }
         let other_metaclass = other.inferred_metaclass(db).for_inheritance(db, env);
         if other_metaclass == type_class {
-            return true;
+            return Ok(true);
         }
         let Some(self_metaclass_instance) = self_metaclass.to_instance_approximation(db, env)
         else {
-            return true;
+            return Ok(true);
         };
         let Some(other_metaclass_instance) = other_metaclass.to_instance_approximation(db, env)
         else {
-            return true;
+            return Ok(true);
         };
-        !types_are_disjoint(self_metaclass_instance, other_metaclass_instance)
+        let disjoint =
+            checker.check_type_pair(db, self_metaclass_instance, other_metaclass_instance);
+        Ok(!disjoint.try_is_always_satisfied(
+            db,
+            env,
+            checker.inferable,
+            checker.constraints.budget,
+        )?)
     }
 
     /// Return a type representing "the set of all instances of the metaclass of this class".
@@ -2669,7 +2616,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let found = source
                 .relation_bases(db, target.class_literal(db))
                 .any(|base| base == ClassBase::Class(target) || unknown_base_matches(base));
-            return ConstraintSet::from_bool(self.constraints, found);
+            return self.when(found);
         };
 
         let origin = target_alias.origin(db);

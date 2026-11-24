@@ -354,6 +354,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Diagnostics retain the original order so signature mismatches keep their context.
         let receiver_constraints = (!self.is_context_collection_enabled())
             .then(|| self.check_type_pair(db, source.self_instance(db), target.self_instance(db)));
+        if receiver_constraints.is_some_and(ConstraintSet::is_budget_exceeded) {
+            return ConstraintSet::BudgetExceeded;
+        }
         if receiver_constraints.is_some_and(ConstraintSet::is_trivially_never_satisfied) {
             return self.never();
         }
@@ -911,7 +914,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             ) => self.check_property_instance_pair(db, source_property, target_property),
 
             (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
-                ConstraintSet::from_bool(self.constraints, source == target)
+                self.when(source == target)
             }
 
             (

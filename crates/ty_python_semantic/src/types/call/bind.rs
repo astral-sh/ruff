@@ -42,8 +42,8 @@ use crate::types::constraints::projection::{ProjectionTypeBudget, SolutionBudget
 use crate::types::constraints::resolution::SolutionType;
 use crate::types::constraints::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
-    ConstraintSet, ConstraintSetBuilder, PathBoundSolution, ReportDiagnostics, SolutionPaths,
-    Solutions,
+    ConstraintSet, ConstraintSetBuilder, Construction, OwnedConstraintSet, PathBoundSolution,
+    ReportDiagnostics, SolutionPaths, Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
 use crate::types::cyclic::PairVisitor;
@@ -2963,7 +2963,7 @@ impl<'db> Bindings<'db> {
                         let result = constraints.into_owned(|constraints| {
                             let Some(lower) = normalize_constraint_bound(db, env, typevar, *lower)
                             else {
-                                return ConstraintSet::from_bool(constraints, false);
+                                return ConstraintSet::never(constraints.builder);
                             };
                             ConstraintSet::constrain_typevar_lower_bound(
                                 db,
@@ -2993,7 +2993,7 @@ impl<'db> Bindings<'db> {
                         let result = constraints.into_owned(|constraints| {
                             let Some(upper) = normalize_constraint_bound(db, env, typevar, *upper)
                             else {
-                                return ConstraintSet::from_bool(constraints, false);
+                                return ConstraintSet::never(constraints.builder);
                             };
                             ConstraintSet::constrain_typevar_upper_bound(
                                 db,
@@ -3023,7 +3023,7 @@ impl<'db> Bindings<'db> {
                         let result = constraints.into_owned(|constraints| {
                             let Some(value) = normalize_constraint_bound(db, env, typevar, *value)
                             else {
-                                return ConstraintSet::from_bool(constraints, false);
+                                return ConstraintSet::never(constraints.builder);
                             };
                             ConstraintSet::constrain_typevar_equivalence_bound(
                                 db,
@@ -3056,7 +3056,7 @@ impl<'db> Bindings<'db> {
                                 normalize_constraint_bound(db, env, typevar, *lower),
                                 normalize_constraint_bound(db, env, typevar, *upper),
                             ) else {
-                                return ConstraintSet::from_bool(constraints, false);
+                                return ConstraintSet::never(constraints.builder);
                             };
                             ConstraintSet::constrain_typevar(
                                 db,
@@ -3079,10 +3079,7 @@ impl<'db> Bindings<'db> {
                         if !overload.parameter_types().is_empty() {
                             return;
                         }
-                        let constraints = ConstraintSetBuilder::new();
-                        let result = constraints
-                            .into_owned(|constraints| ConstraintSet::from_bool(constraints, true));
-                        let tracked = InternedConstraintSet::new(db, result);
+                        let tracked = InternedConstraintSet::new(db, OwnedConstraintSet::always());
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),
                         ));
@@ -3092,10 +3089,7 @@ impl<'db> Bindings<'db> {
                         if !overload.parameter_types().is_empty() {
                             return;
                         }
-                        let constraints = ConstraintSetBuilder::new();
-                        let result = constraints
-                            .into_owned(|constraints| ConstraintSet::from_bool(constraints, false));
-                        let tracked = InternedConstraintSet::new(db, result);
+                        let tracked = InternedConstraintSet::new(db, OwnedConstraintSet::default());
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),
                         ));
@@ -3214,7 +3208,9 @@ impl<'db> Bindings<'db> {
                         };
 
                         let constraints = ConstraintSetBuilder::new();
-                        let set = constraints.load(db, env, tracked.constraints(db));
+                        let set = constraints
+                            .unlimited()
+                            .load(db, env, tracked.constraints(db));
                         let result = match set.solutions(db, env, inferable) {
                             Ok(Solutions::Constrained(paths)) => Type::heterogeneous_tuple(
                                 db,
@@ -3300,7 +3296,9 @@ impl<'db> Bindings<'db> {
                         };
 
                         let constraints = ConstraintSetBuilder::new();
-                        let set = constraints.load(db, env, tracked.constraints(db));
+                        let set = constraints
+                            .unlimited()
+                            .load(db, env, tracked.constraints(db));
                         let result = match set.solutions(db, env, inferable) {
                             Ok(Solutions::Constrained(paths)) => Type::heterogeneous_tuple(
                                 db,
@@ -4128,6 +4126,8 @@ impl<'db> CallableBinding<'db> {
             "after step 2",
         );
 
+        let constraints = constraints.unlimited();
+
         // If we are in the "retry for provisional arity" case, we have to try argument expansion
         // before deciding we are done or moving on to step 4+.
         if !should_retry_after_provisional_arity {
@@ -4418,7 +4418,7 @@ impl<'db> CallableBinding<'db> {
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: Construction<'_, '_, 'db>,
         arguments: &CallArguments<'_, 'db>,
         indexes: &[usize],
     ) {
@@ -4500,7 +4500,7 @@ impl<'db> CallableBinding<'db> {
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: Construction<'_, '_, 'db>,
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
     ) {
@@ -4511,7 +4511,12 @@ impl<'db> CallableBinding<'db> {
             let env = &ProgramEnvironment::from_program(pair.program(db));
             Some(
                 pair.first(db)
-                    .when_equivalent_to(db, env, pair.second(db), &ConstraintSetBuilder::new())
+                    .when_equivalent_to(
+                        db,
+                        env,
+                        pair.second(db),
+                        ConstraintSetBuilder::new().unlimited(),
+                    )
                     .is_always_satisfied(db, env, TypeVarSet::None),
             )
         }
@@ -5985,7 +5990,7 @@ fn validate_keyword_unpack_key_type<'db>(
             db,
             env,
             KnownClass::Str.to_instance(db, env),
-            constraints,
+            constraints.unlimited(),
             inferable_typevars,
         )
         .is_always_satisfied(db, env, inferable_typevars)
@@ -9438,6 +9443,7 @@ impl<'db> Binding<'db> {
     ) -> Option<Specialization<'db>> {
         let generic = self.signature.generic_context?;
         let constraints = &ConstraintSetBuilder::new();
+        let build = constraints.unlimited();
         let arguments = arguments.with_self(binding.bound_type);
         let mut restricted = None;
         for (argument_index, (matched, argument)) in self
@@ -9462,7 +9468,7 @@ impl<'db> Binding<'db> {
                 // An enclosing function's unbounded `U` can be a `list` for some callers,
                 // but that does not let us bind an argument of type `U` to `list[T]` here.
                 if actual
-                    .when_assignable_to(db, env, nested, constraints, self.inferable_typevars)
+                    .when_assignable_to(db, env, nested, build, self.inferable_typevars)
                     .is_never_satisfied_bounded(db, env, self.inferable_typevars)
                     == Some(false)
                 {

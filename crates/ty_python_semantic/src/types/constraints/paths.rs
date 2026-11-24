@@ -1296,7 +1296,7 @@ mod tests {
 
     fn create_constraint<'db, 'c>(
         db: &'db TestDb,
-        builder: &'c ConstraintSetBuilder<'db>,
+        build: Construction<'_, 'c, 'db>,
         bound_typevar: BoundTypeVarInstance<'db>,
         bound: KnownClass,
     ) -> ConstraintSet<'db, 'c> {
@@ -1305,7 +1305,7 @@ mod tests {
         ConstraintSet::constrain_typevar_equivalence_bound(
             db,
             &env,
-            builder,
+            build,
             ConstraintProvenance::INFERRED,
             TypeVarSet::All,
             bound_typevar,
@@ -1321,21 +1321,22 @@ mod tests {
         let t = create_typevar(db, "T");
         let u = create_typevar(db, "U");
         let builder = ConstraintSetBuilder::new();
+        let build = builder.unlimited();
 
-        let t_int = create_constraint(db, &builder, t, KnownClass::Int);
-        let t_bool = create_constraint(db, &builder, t, KnownClass::Bool);
-        let u_str = create_constraint(db, &builder, u, KnownClass::Str);
-        let u_int = create_constraint(db, &builder, u, KnownClass::Int);
+        let t_int = create_constraint(db, build, t, KnownClass::Int);
+        let t_bool = create_constraint(db, build, t, KnownClass::Bool);
+        let u_str = create_constraint(db, build, u, KnownClass::Str);
+        let u_int = create_constraint(db, build, u, KnownClass::Int);
 
-        let lhs = t_int.or(db, &builder, || u_str);
-        let rhs = t_bool.or(db, &builder, || u_int);
-        let intersection = lhs.and(db, &builder, || rhs);
-        let tautology = lhs.or(db, &builder, || lhs.negate(db, &builder));
+        let lhs = t_int.or(db, build, || u_str);
+        let rhs = t_bool.or(db, build, || u_int);
+        let intersection = lhs.and(db, build, || rhs);
+        let tautology = lhs.or(db, build, || lhs.negate(db, build));
 
         let t_bool_upper = ConstraintSet::constrain_typevar_upper_bound(
             db,
             &env,
-            &builder,
+            build,
             ConstraintProvenance::INFERRED,
             TypeVarSet::All,
             t,
@@ -1344,20 +1345,18 @@ mod tests {
         let t_int_upper = ConstraintSet::constrain_typevar_upper_bound(
             db,
             &env,
-            &builder,
+            build,
             ConstraintProvenance::INFERRED,
             TypeVarSet::All,
             t,
             KnownClass::Int.to_instance(db, &env),
         );
-        let implication = t_bool_upper
-            .negate(db, &builder)
-            .or(db, &builder, || t_int_upper);
+        let implication = t_bool_upper.negate(db, build).or(db, build, || t_int_upper);
 
         for set in [lhs, rhs, intersection, tautology, implication] {
             assert_eq!(
                 set.is_always_satisfied(db, &env, TypeVarSet::All),
-                set.negate(db, &builder)
+                set.negate(db, build)
                     .is_never_satisfied(db, &env, TypeVarSet::All)
             );
         }
@@ -1371,18 +1370,19 @@ mod tests {
         let t = create_typevar(db, "T");
         let u = create_typevar(db, "U");
         let builder = ConstraintSetBuilder::new();
-        let t_int = create_constraint(db, &builder, t, KnownClass::Int);
-        let u_str = create_constraint(db, &builder, u, KnownClass::Str);
+        let build = builder.unlimited();
+        let t_int = create_constraint(db, build, t, KnownClass::Int);
+        let u_str = create_constraint(db, build, u, KnownClass::Str);
 
         // Construct the set in the opposite order from constraint creation. This ensures the
         // initializer follows the sidecar rather than either TDD traversal or constraint IDs.
-        let set = u_str.and(db, &builder, || t_int);
+        let set = u_str.and(db, build, || t_int).diagram().unwrap();
         let mut storage = builder.storage.borrow_mut();
         let source_orders = storage.calculate_source_orders(set.source_order);
         let path = set
             .node
             .path_assignments(db, &env, &mut storage, &source_orders);
-        let expected = [u_str.node, t_int.node].map(|node| {
+        let expected = [u_str.diagram().unwrap().node, t_int.diagram().unwrap().node].map(|node| {
             storage
                 .interior_node_data(node)
                 .constraint
@@ -1400,23 +1400,26 @@ mod tests {
         let env = db.program_environment();
         let t = create_typevar(db, "T");
         let builder = ConstraintSetBuilder::new();
-        let t_int = create_constraint(db, &builder, t, KnownClass::Int);
-        let t_str = create_constraint(db, &builder, t, KnownClass::Str);
-        let set = t_int.or(db, &builder, || t_str);
+        let build = builder.unlimited();
+        let t_int = create_constraint(db, build, t, KnownClass::Int);
+        let t_str = create_constraint(db, build, t, KnownClass::Str);
+        let set = t_int.or(db, build, || t_str);
+        let diagram = set.diagram().unwrap();
         let source_orders = builder
             .storage
             .borrow()
-            .calculate_source_orders(set.source_order);
+            .calculate_source_orders(diagram.source_order);
         let inferable = TypeVarSet::from_typevars(db, [t]);
         let expected = CandidateSolutions::compute(
             db,
             &env,
-            &mut builder.storage.borrow_mut(),
-            set.node,
+            set,
             inferable,
-            set.source_order,
+            SolutionLimits::unbounded(build.budget),
             UnspecializedTypeVarPolicy::Ignore,
-        );
+            CandidateSearch::All(ReportDiagnostics::Yes),
+        )
+        .unwrap();
 
         // Both limits interrupt an edge with path-local assignments: the visit limit stops
         // below the root, and the path limit stops after collecting the first alternative.
@@ -1425,10 +1428,14 @@ mod tests {
             (1, usize::MAX, ProjectionError::PathBudgetExceeded),
         ] {
             let mut storage = builder.storage.borrow_mut();
-            let limits = BoundedSolutionLimits {
-                remaining_paths,
-                remaining_visits,
-            };
+            let limits = SolutionLimits::bounded(
+                SolutionBudget {
+                    paths: remaining_paths,
+                    visits: remaining_visits,
+                    ..SolutionBudget::default()
+                },
+                build.budget,
+            );
             let (mut walker, mut path) = SolutionWalker::for_node(
                 db,
                 &env,
@@ -1436,7 +1443,7 @@ mod tests {
                 source_orders.clone(),
                 inferable,
                 limits,
-                set.node,
+                diagram.node,
             );
             assert_eq!(
                 walker.visit_node(
@@ -1446,13 +1453,13 @@ mod tests {
                     &mut path,
                     None,
                     Polarity::Positive,
-                    set.node
+                    diagram.node
                 ),
                 ControlFlow::Break(error)
             );
             drop(walker);
 
-            let limits = UnboundedSolutionLimits;
+            let limits = SolutionLimits::unbounded(build.budget);
             let (mut walker, _) = SolutionWalker::for_node(
                 db,
                 &env,
@@ -1460,17 +1467,20 @@ mod tests {
                 source_orders.clone(),
                 inferable,
                 limits,
-                set.node,
+                diagram.node,
             );
-            let ControlFlow::Continue(()) = walker.visit_node(
-                db,
-                &env,
-                &mut storage,
-                &mut path,
-                None,
-                Polarity::Positive,
-                set.node,
-            );
+            walker
+                .visit_node(
+                    db,
+                    &env,
+                    &mut storage,
+                    &mut path,
+                    None,
+                    Polarity::Positive,
+                    diagram.node,
+                )
+                .continue_ok()
+                .unwrap();
             assert_eq!(walker.finish(), expected);
         }
     }

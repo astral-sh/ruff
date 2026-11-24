@@ -9,8 +9,8 @@ use salsa::plumbing::AsId;
 
 use crate::types::Type;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintSetStorage, Node, NodeId, SourceOrderId,
-    max_constructor_and_typevar_depth, wobble_index,
+    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintSetStorage, ConstructionBudget, Node, NodeId,
+    ProjectionError, SourceOrderId, max_constructor_and_typevar_depth, wobble_index,
 };
 use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain, TypeVarSet};
 use crate::{Db, ProgramEnvironment};
@@ -136,7 +136,8 @@ impl<'db> Constraint<'db> {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         constraints: I,
-    ) -> (NodeId, Option<SourceOrderId>)
+        budget: &ConstructionBudget,
+    ) -> Result<(NodeId, Option<SourceOrderId>), ProjectionError>
     where
         I: IntoIterator<Item = Result<C, UnsatisfiableBound>>,
         C: Into<Self>,
@@ -144,14 +145,14 @@ impl<'db> Constraint<'db> {
         let (mut node, mut source_order) = (ALWAYS_TRUE, None);
         for constraint in constraints {
             let Ok(constraint) = constraint else {
-                return (ALWAYS_FALSE, None);
+                return Ok((ALWAYS_FALSE, None));
             };
             let constraint = constraint.into();
             let (constraint_node, constraint_source_order) = constraint.new_node(db, env, storage);
-            node = node.and(storage, constraint_node);
+            node = node.and(storage, constraint_node, budget)?;
             source_order = storage.ordered_source_order(source_order, constraint_source_order);
         }
-        (node, source_order)
+        Ok((node, source_order))
     }
 
     pub(super) fn display<'a>(

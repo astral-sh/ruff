@@ -677,6 +677,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let env = self.program_environment();
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
+        let build = constraints.unlimited();
         let slice_node = subscript.slice.as_ref();
 
         let exactly_one_paramspec =
@@ -1099,7 +1100,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     match bound_or_constraints {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             if type_to_check
-                                .when_assignable_to(db, env, bound, &constraints, TypeVarSet::None)
+                                .when_assignable_to(db, env, bound, build, TypeVarSet::None)
                                 .is_never_satisfied(db, env, TypeVarSet::None)
                             {
                                 if let Some(builder) = self
@@ -1134,7 +1135,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     db,
                                     env,
                                     typevar_constraints.as_type(db, env),
-                                    &constraints,
+                                    build,
                                     TypeVarSet::None,
                                 )
                                 .is_never_satisfied(db, env, TypeVarSet::None)

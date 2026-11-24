@@ -498,6 +498,22 @@ def check(value: {argument}) -> None:
 
 x: Callable[[Words], None] = provide('x')
 ";
+    let receiver = "from typing import overload
+
+class C[T]:
+    @overload
+    def f[S](self: 'C[S | Sequence[S]]', x: int) -> S: ...
+    @overload
+    def f(self, x: str) -> int: ...
+    def f(self, x: int | str) -> object: raise NotImplementedError
+
+def check(c: C[Words]) -> None:
+    c.f(1)
+";
+    let generic_callback = "def consume[T](f: Callable[[int], T | Sequence[T]]) -> None: ...
+def callback[X](x: X) -> Words: raise NotImplementedError
+consume(callback)
+";
     let direct = "T | Sequence[T]";
     for (case, literals, body) in [
         ("long_first", &first, consume("Words", direct)),
@@ -514,6 +530,8 @@ x: Callable[[Words], None] = provide('x')
             consume("Callable[[], Words]", "Callable[[], T | Sequence[T]]"),
         ),
         ("context", &first, provide.to_owned()),
+        ("overloaded_receiver", &first, receiver.to_owned()),
+        ("generic_callback", &last, generic_callback.to_owned()),
     ] {
         let code = format!(
             "from collections.abc import Callable, Sequence

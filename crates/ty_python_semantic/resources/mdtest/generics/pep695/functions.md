@@ -2177,6 +2177,9 @@ type Choices = Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 
 class Mixed[S, T](list[S | T]): ...
 
+def infer[S, T](x: list[T] | Mixed[S, T]) -> T:
+    raise NotImplementedError
+
 def infer_with_extra[S, T, V: str](x: list[T] | Mixed[S, T] | V) -> T:
     raise NotImplementedError
 
@@ -2185,8 +2188,20 @@ def infer_reversed[S, T, V: str](x: Mixed[S, T] | list[T] | V) -> T:
 
 def check[U: list[Choices] | None](x: U):
     if x is not None:
+        assert_type(infer(x), Choices)
         assert_type(infer_with_extra(x), Choices)
         assert_type(infer_reversed(x), Choices)
+```
+
+If no arm overlaps the narrowed argument, both bound violations should still be reported.
+
+```py
+def reject[V: str, W: bytes](x: V | W | None) -> None: ...
+def check_disjoint[X: Choices | None](x: X):
+    if x is not None:
+        # error: [invalid-argument-type] "does not satisfy upper bound `str`"
+        # error: [invalid-argument-type] "does not satisfy upper bound `bytes`"
+        reject(x)
 ```
 
 ## Inferring a bound from a narrowed protocol

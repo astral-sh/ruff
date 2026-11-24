@@ -3767,10 +3767,11 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         inferable: TypeVarSet<'db>,
     ) -> DiscardDisjointUnionElementsResult<'db> {
-        let constraints = ConstraintSetBuilder::new();
+        let builder = ConstraintSetBuilder::new();
+        let constraints = builder.unlimited();
         let filtered = self.filter_union(db, env, |elem| {
             !elem
-                .when_disjoint_from(db, env, target, &constraints, inferable)
+                .when_disjoint_from(db, env, target, constraints, inferable)
                 .is_always_satisfied(db, env, inferable)
         });
         if filtered.is_never() && !self.is_never() {

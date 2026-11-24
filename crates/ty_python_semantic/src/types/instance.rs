@@ -27,7 +27,8 @@ use crate::types::protocol_class::{
     walk_protocol_interface,
 };
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
+    TypeRelationChecker, try_constraint,
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -985,7 +986,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // recursive protocol can expand its interface before structural member ordering gets
             // a chance to reject an incompatible finite member.
             let can_use_nominal_result_directly =
-                nominally_satisfied.is_never_satisfied(db, env, self.inferable)
+                try_constraint!(self.try_is_never_satisfied(db, nominally_satisfied))
                     || ((protocol.materialization_kind(db) == Some(MaterializationKind::Top)
                         || !protocol.materialization_changes_requirements(db, env, protocol))
                         && !source_protocol.is_some_and(|source| {
@@ -995,7 +996,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             if can_use_nominal_result_directly
                 && result
                     .union(db, self.constraints, nominally_satisfied)
-                    .is_trivially_always_satisfied()
+                    .short_circuits_or()
             {
                 return result;
             }
@@ -1140,13 +1141,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let source_alias = source_class.into_generic_alias()?;
 
         let source_arguments = source_alias.specialization(db).types(db);
+        let nominal = try_constraint!(nominally_satisfied.diagram());
         // Nested variables, such as `T` in `Concrete[T | Iterable[T]]`, can also be
         // constrained by the nominal relation. Only variables absent from that relation
         // require structural inference that the nominal proof cannot account for.
         if source_arguments.iter().any(|argument| {
             any_over_type_expanding_aliases(db, env, *argument, |nested| {
                 matches!(nested, Type::TypeVar(typevar)
-                    if !nominally_satisfied.mentions_typevar(typevar))
+                    if !nominal.mentions_typevar(typevar))
             })
         }) {
             return None;
@@ -1192,10 +1194,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.type_satisfies_protocol_member(db, ty, member)
                 });
         for (_, member) in recursive_members {
-            if structurally_satisfied
-                .implies(db, self.constraints, || nominally_satisfied)
-                .is_always_satisfied(db, env, self.inferable)
-            {
+            if try_constraint!(self.try_is_always_satisfied(
+                db,
+                structurally_satisfied.implies(db, self.constraints, || nominally_satisfied)
+            )) {
                 break;
             }
             structurally_satisfied = structurally_satisfied.and(db, self.constraints, || {
@@ -1336,6 +1338,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             ),
         );
 
+        let structural = try_constraint!(structurally_satisfied.diagram());
+
         // A skipped member can be the only source of information about a type variable. In this
         // example, `marker: Any` ensures materialization changes the interface for static arguments:
         //
@@ -1374,12 +1378,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .any(|argument| {
                     any_over_type_expanding_aliases(db, env, *argument, |nested| {
                         matches!(nested, Type::TypeVar(typevar)
-                            if !structurally_satisfied.mentions_typevar(typevar))
+                            if !structural.mentions_typevar(typevar))
                     })
                 })
-                || !structurally_satisfied
-                    .implies(db, self.constraints, || nominally_satisfied)
-                    .is_always_satisfied(db, env, self.inferable))
+                || !try_constraint!(self.try_is_always_satisfied(
+                    db,
+                    structurally_satisfied.implies(db, self.constraints, || nominally_satisfied)
+                )))
         {
             return None;
         }
@@ -1388,7 +1393,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // expanding recursive members. If it cannot reject, the caller checks the full
         // interface instead.
         (self.typevar_evaluation.is_lazy()
-            || structurally_satisfied.is_never_satisfied(db, env, self.inferable))
+            || try_constraint!(self.try_is_never_satisfied(db, structurally_satisfied)))
         .then_some(structurally_satisfied)
     }
 
@@ -1546,8 +1551,8 @@ fn non_recursive_protocol_constraints<'db>(
     let env = ProgramEnvironment::from_program(target.base().program(db));
     let constraints = ConstraintSetBuilder::new();
     constraints.try_into_owned(|constraints| {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let relation_visitor = HasRelationToVisitor::default(constraints.builder);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints.builder);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::new(&env);
         let checker = TypeRelationChecker::constraint_set_assignability(
@@ -1599,24 +1604,17 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             let compatible = self.check_tuple_spec_pair(db, &left_spec, &right_spec);
             if result
                 .union(db, self.constraints, compatible)
-                .is_trivially_always_satisfied()
+                .short_circuits_or()
             {
                 return result;
             }
         }
 
         result.or(db, self.constraints, || {
-            ConstraintSet::from_bool(
-                self.constraints,
-                !left
-                    .class(db, env)
-                    .could_coexist_in_mro_with_disjointness_checker(
-                        db,
-                        env,
-                        right.class(db, env),
-                        self,
-                    ),
-            )
+            self.when(!try_constraint!(
+                left.class(db, env)
+                    .try_could_coexist_in_mro_with(db, right.class(db, env), self)
+            ))
         })
     }
 }
@@ -1982,7 +1980,7 @@ impl<'db> ProtocolInstanceType<'db> {
             let materialization_visitor = ApplyTypeMappingVisitor::new(&env);
             let checker = TypeRelationChecker::subtyping(
                 &env,
-                &constraints,
+                constraints.unlimited(),
                 TypeVarSet::None,
                 &relation_visitor,
                 &disjointness_visitor,
@@ -2140,7 +2138,7 @@ impl<'db> ProtocolInstanceType<'db> {
         non_recursive_protocol_constraints(db, self, target, inferable)
             .as_ref()
             .map(Some)
-            .ok_or(ProjectionError::TraversalBudgetExceeded)
+            .ok_or(ProjectionError::ConstructionBudgetExceeded)
     }
 }
 
