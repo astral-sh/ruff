@@ -224,11 +224,22 @@ fn match_mapping_fields(
     ComparableSlice::new(items)
 }
 
+type ComparablePatternOrKeyword<'a> =
+    ast::PatternOrKeyword<ComparablePattern<'a>, ComparablePatternKeyword<'a>>;
+
+impl<'a> From<&'a ast::PatternOrKeyword> for ComparablePatternOrKeyword<'a> {
+    fn from(item: &'a ast::PatternOrKeyword) -> Self {
+        match item {
+            ast::PatternOrKeyword::Pattern(pattern) => Self::Pattern(pattern.into()),
+            ast::PatternOrKeyword::Keyword(keyword) => Self::Keyword(keyword.into()),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct MatchClassFields<'a> {
     cls: ComparableExpr<'a>,
-    patterns: ComparablePatternSlice<'a>,
-    keywords: ComparableSlice<'a, ast::PatternKeyword, ComparablePatternKeyword<'a>>,
+    items: ComparableSlice<'a, ast::PatternOrKeyword, ComparablePatternOrKeyword<'a>>,
 }
 
 fn match_class_fields(node: &ast::PatternMatchClass) -> MatchClassFields<'_> {
@@ -236,8 +247,7 @@ fn match_class_fields(node: &ast::PatternMatchClass) -> MatchClassFields<'_> {
         cls,
         arguments:
             ast::PatternArguments {
-                patterns,
-                keywords,
+                items,
                 range: _,
                 node_index: _,
             },
@@ -246,8 +256,7 @@ fn match_class_fields(node: &ast::PatternMatchClass) -> MatchClassFields<'_> {
     } = node;
     MatchClassFields {
         cls: cls.into(),
-        patterns: ComparableSlice::new(patterns),
-        keywords: ComparableSlice::new(keywords),
+        items: ComparableSlice::new(items),
     }
 }
 
