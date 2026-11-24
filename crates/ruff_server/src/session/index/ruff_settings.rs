@@ -11,7 +11,7 @@ use ruff_linter::settings::types::GlobPath;
 use ruff_linter::{settings::types::FilePattern, settings::types::PreviewMode};
 use ruff_workspace::Settings;
 use ruff_workspace::pyproject::find_fallback_target_version;
-use ruff_workspace::resolver::{ConfigurationOrigin, ResolvedSettings, match_exclusion};
+use ruff_workspace::resolver::{ConfigurationOrigin, Project, match_exclusion};
 use ruff_workspace::{
     configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
     pyproject::{find_user_settings_toml, settings_toml},
@@ -23,7 +23,7 @@ use crate::session::options::ConfigurationPreference;
 use crate::session::settings::{EditorSettings, ResolvedConfiguration};
 
 #[derive(Debug)]
-pub(crate) struct RuffSettings(ResolvedSettings);
+pub(crate) struct RuffSettings(Project);
 
 impl RuffSettings {
     pub(crate) fn path(&self) -> Option<&Path> {
@@ -113,20 +113,20 @@ impl RuffSettings {
         root: &Path,
         configuration: Configuration,
     ) -> RuffSettings {
-        let settings = transformer
-            .transform(configuration.clone())
-            .into_settings(root)
-            .unwrap_or_else(|error| {
+        let project =
+            Project::resolve(configuration.clone(), root, transformer).unwrap_or_else(|error| {
                 tracing::error!("Failed to resolve editor settings: {error}");
-                let mut configuration = configuration;
-                apply_server_preview(&mut configuration, transformer.server_preview);
-                configuration.into_settings(root).unwrap_or_else(|error| {
+                let fallback = EditorConfigurationTransformer {
+                    configuration: Configuration::default(),
+                    preference: ConfigurationPreference::FilesystemFirst,
+                    server_preview: transformer.server_preview,
+                };
+                Project::resolve(configuration, root, &fallback).unwrap_or_else(|error| {
                     tracing::error!("Failed to resolve default settings: {error}");
-                    Settings::default()
+                    Project::fallback(root)
                 })
             });
-
-        RuffSettings(ResolvedSettings::new(settings))
+        Self(project)
     }
 }
 
@@ -161,6 +161,7 @@ impl RuffSettingsIndex {
 
         tracing::debug!("Indexing settings for workspace: {}", root.display());
 
+        let configuration_cache = ruff_workspace::resolver::ConfigurationCache::default();
         let mut has_error = false;
         let mut respect_gitignore = None;
         let mut index = BTreeMap::default();
@@ -175,10 +176,11 @@ impl RuffSettingsIndex {
         for directory in root.ancestors().skip(should_skip_workspace) {
             match settings_toml(directory) {
                 Ok(Some(pyproject)) => {
-                    match ruff_workspace::resolver::resolve_root_settings(
+                    match ruff_workspace::resolver::resolve_scoped_settings(
                         &pyproject,
                         &transformer,
                         ConfigurationOrigin::Ancestor,
+                        Some(&configuration_cache),
                     ) {
                         Ok(resolved) => {
                             tracing::debug!("Loaded settings from: `{}`", pyproject.display());
@@ -302,10 +304,11 @@ impl RuffSettingsIndex {
 
                 match settings_toml(&directory) {
                     Ok(Some(pyproject)) => {
-                        match ruff_workspace::resolver::resolve_root_settings(
+                        match ruff_workspace::resolver::resolve_scoped_settings(
                             &pyproject,
                             &transformer,
                             ConfigurationOrigin::Ancestor,
+                            Some(&configuration_cache),
                         ) {
                             Ok(settings) => {
                                 tracing::debug!(
@@ -488,16 +491,12 @@ impl ConfigurationTransformer for EditorConfigurationTransformer {
             }
             ConfigurationPreference::EditorOnly => editor_configuration,
         };
-        apply_server_preview(&mut configuration, self.server_preview);
+        if let Some(preview) = self.server_preview.map(PreviewMode::from) {
+            configuration.preview = Some(preview);
+            configuration.lint.preview = Some(preview);
+            configuration.format.preview = Some(preview);
+        }
         configuration
-    }
-}
-
-fn apply_server_preview(configuration: &mut Configuration, server_preview: Option<bool>) {
-    if let Some(preview) = server_preview.map(PreviewMode::from) {
-        configuration.preview = Some(preview);
-        configuration.lint.preview = Some(preview);
-        configuration.format.preview = Some(preview);
     }
 }
 

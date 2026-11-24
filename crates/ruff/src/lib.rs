@@ -213,11 +213,11 @@ pub fn run_command(
 
 fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
     let (cli, config_arguments) = args.partition(global_options)?;
-    let root_settings = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
+    let root_project = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
-        commands::format_stdin::format_stdin(&cli, &config_arguments, &root_settings)
+        commands::format_stdin::format_stdin(&cli, &config_arguments, &root_project)
     } else {
-        commands::format::format(cli, &config_arguments, &root_settings)
+        commands::format::format(cli, &config_arguments, &root_project)
     }
 }
 
@@ -239,7 +239,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let root_settings = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
+    let root_project = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
 
     let mut writer: Box<dyn Write> = match cli.output_file {
         Some(path) if !cli.watch => {
@@ -260,14 +260,14 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     if cli.show_settings {
         commands::show_settings::show_settings(
             &files,
-            &root_settings,
+            &root_project,
             &config_arguments,
             &mut writer,
         )?;
         return Ok(ExitStatus::Success);
     }
     if cli.show_files {
-        commands::show_files::show_files(&files, &root_settings, &config_arguments, &mut writer)?;
+        commands::show_files::show_files(&files, &root_project, &config_arguments, &mut writer)?;
         return Ok(ExitStatus::Success);
     }
 
@@ -280,7 +280,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         output_format,
         show_fixes,
         ..
-    } = root_settings.resolved.settings;
+    } = root_project.project.settings;
 
     // Fix rules are as follows:
     // - By default, generate all fixes, but don't apply them to the filesystem.
@@ -339,7 +339,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
 
         let modifications = commands::add_noqa::add_noqa(
             &files,
-            &root_settings,
+            &root_project,
             &config_arguments,
             reason_opt,
             suppression_kind,
@@ -369,8 +369,8 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     // the settings should already be combined with the CLI overrides at this point
     // TODO: this should reference the global preview mode once https://github.com/astral-sh/ruff/issues/8232
     //   is resolved.
-    let preview = root_settings.resolved.settings.linter.preview;
-    let prefer_rule_codes = root_settings.resolved.settings.output_prefer_rule_codes;
+    let preview = root_project.project.settings.linter.preview;
+    let prefer_rule_codes = root_project.project.settings.output_prefer_rule_codes;
 
     if cli.watch {
         // Configure the file watcher.
@@ -379,7 +379,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         for file in &files {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
-        if let Some(file) = root_settings.resolved.config_path() {
+        if let Some(file) = root_project.project.config_path() {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
 
@@ -389,7 +389,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
 
         let diagnostics = commands::check::check(
             &files,
-            &root_settings,
+            &root_project,
             &config_arguments,
             cache.into(),
             noqa.into(),
@@ -400,7 +400,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
-        let mut root_settings = root_settings;
+        let mut root_project = root_project;
 
         loop {
             let Some(change_kind) = change_detected(&rx.recv()??) else {
@@ -408,14 +408,14 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             };
 
             if matches!(change_kind, ChangeKind::Configuration) {
-                root_settings = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
+                root_project = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
             }
             Printer::clear_screen()?;
             printer.write_to_user("File change detected...\n");
 
             let diagnostics = commands::check::check(
                 &files,
-                &root_settings,
+                &root_project,
                 &config_arguments,
                 cache.into(),
                 noqa.into(),
@@ -429,7 +429,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     let diagnostics = if is_stdin {
         commands::check_stdin::check_stdin(
             cli.stdin_filename.map(fs::normalize_path).as_deref(),
-            &root_settings,
+            &root_project,
             &config_arguments,
             noqa.into(),
             fix_mode,
@@ -437,7 +437,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     } else {
         commands::check::check(
             &files,
-            &root_settings,
+            &root_project,
             &config_arguments,
             cache.into(),
             noqa.into(),

@@ -11,23 +11,21 @@ use ruff_linter::linter::add_suppressions_to_path;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_workspace::resolver::{
-    ResolvedFile, RootSettings, match_exclusion, project_files_in_path,
-};
+use ruff_workspace::resolver::{ResolvedFile, RootProject, match_exclusion, project_files_in_path};
 
 use crate::args::ConfigArguments;
 
 /// Add suppression directives to a collection of files.
 pub(crate) fn add_noqa(
     files: &[PathBuf],
-    root_settings: &RootSettings,
+    root_project: &RootProject,
     config_arguments: &ConfigArguments,
     reason: Option<&str>,
     suppression_kind: SuppressionKind,
 ) -> Result<usize> {
     // Collect all the files to check.
     let start = Instant::now();
-    let (mut paths, resolver) = project_files_in_path(files, root_settings, config_arguments)?;
+    let (mut paths, resolver) = project_files_in_path(files, root_project, config_arguments)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {duration:?}");
 

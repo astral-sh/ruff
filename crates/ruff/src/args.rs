@@ -720,6 +720,12 @@ impl ConfigArguments {
         self.config_file.as_deref()
     }
 
+    pub(crate) fn target_version(&self) -> Option<ast::PythonVersion> {
+        self.per_flag_overrides
+            .target_version
+            .or(self.overrides.target_version)
+    }
+
     fn from_cli_arguments(
         global_options: GlobalConfigArgs,
         per_flag_overrides: ExplicitConfigOverrides,

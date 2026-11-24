@@ -7,7 +7,7 @@ use log::error;
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_python_ast::SourceType;
 use ruff_workspace::FormatterSettings;
-use ruff_workspace::resolver::{Resolver, RootSettings, match_exclusion, project_file_at_path};
+use ruff_workspace::resolver::{Resolver, RootProject, match_exclusion, project_file_at_path};
 
 use crate::ExitStatus;
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
@@ -21,9 +21,9 @@ use crate::stdin::{parrot_stdin, read_from_stdin};
 pub(crate) fn format_stdin(
     cli: &FormatArguments,
     config_arguments: &ConfigArguments,
-    root_settings: &RootSettings,
+    root_project: &RootProject,
 ) -> Result<ExitStatus> {
-    let mut resolver = Resolver::new(root_settings);
+    let mut resolver = Resolver::new(root_project);
     warn_incompatible_formatter_settings(&resolver);
 
     let mode = FormatMode::from_cli(cli);

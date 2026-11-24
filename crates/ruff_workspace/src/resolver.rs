@@ -27,7 +27,7 @@ use crate::pyproject::settings_toml;
 use crate::settings::Settings;
 use crate::{FileResolverSettings, pyproject};
 
-/// The root settings and configuration discovery strategy for a Ruff invocation.
+/// The root project and configuration discovery strategy for a Ruff invocation.
 ///
 /// The root settings come from a selected configuration file, user-level configuration, or
 /// Ruff's defaults. With hierarchical discovery, a closer configuration can supply the settings
@@ -35,11 +35,11 @@ use crate::{FileResolverSettings, pyproject};
 /// `tests/` if it exists. With `--config <path>` or `--isolated`, the root settings apply to every
 /// input instead.
 #[derive(Debug)]
-pub struct RootSettings {
+pub struct RootProject {
     /// Whether to look for a closer configuration file for each input.
     pub strategy: PyprojectDiscoveryStrategy,
-    /// The resolved settings for the invocation's root configuration.
-    pub resolved: ResolvedSettings,
+    /// The invocation's root configuration and its resolved settings.
+    pub project: Project,
 }
 
 /// How the resolver chooses a configuration for each input file.
@@ -61,33 +61,33 @@ impl PyprojectDiscoveryStrategy {
 
 #[derive(Debug)]
 pub struct Resolver<'a> {
-    root_settings: &'a RootSettings,
-    /// All [`Settings`] that have been added to the resolver, along with their config file paths.
-    settings: Vec<ResolvedSettings>,
-    /// A router from path to index into the `settings` vector.
+    root_project: &'a RootProject,
+    /// Projects discovered beneath the root project.
+    projects: Vec<Project>,
+    /// A router from path to index into the `projects` vector.
     router: Router<usize>,
 }
 
 impl<'a> Resolver<'a> {
-    /// Create a new [`Resolver`] for the given [`RootSettings`].
-    pub fn new(root_settings: &'a RootSettings) -> Self {
+    /// Create a new [`Resolver`] for the given [`RootProject`].
+    pub fn new(root_project: &'a RootProject) -> Self {
         Self {
-            root_settings,
-            settings: Vec::new(),
+            root_project,
+            projects: Vec::new(),
             router: Router::new(),
         }
     }
 
-    /// Return the [`Settings`] from the [`RootSettings`].
+    /// Return the [`Settings`] from the [`RootProject`].
     #[inline]
     pub fn root_settings(&self) -> &Settings {
-        &self.root_settings.resolved.settings
+        &self.root_project.project.settings
     }
 
     /// Return `true` if the [`Resolver`] is using a hierarchical discovery strategy.
     #[inline]
     fn is_hierarchical(&self) -> bool {
-        self.root_settings.strategy.is_hierarchical()
+        self.root_project.strategy.is_hierarchical()
     }
 
     /// Return `true` if the [`Resolver`] should force-exclude files passed directly to the CLI.
@@ -103,8 +103,8 @@ impl<'a> Resolver<'a> {
     }
 
     /// Add resolved [`Settings`] under the given directory.
-    fn add(&mut self, path: &Path, settings: ResolvedSettings) {
-        self.settings.push(settings);
+    fn add(&mut self, path: &Path, settings: Project) {
+        self.projects.push(settings);
 
         // Normalize the path to use `/` separators and escape the '{' and '}' characters,
         // which matchit uses for routing parameters.
@@ -112,7 +112,7 @@ impl<'a> Resolver<'a> {
 
         match self
             .router
-            .insert(format!("{path}/{{*filepath}}"), self.settings.len() - 1)
+            .insert(format!("{path}/{{*filepath}}"), self.projects.len() - 1)
         {
             Ok(()) => {}
             Err(InsertError::Conflict { .. }) => {
@@ -124,7 +124,7 @@ impl<'a> Resolver<'a> {
         // Insert a mapping that matches the directory itself (without a trailing slash).
         // Inserting should always succeed because conflicts are resolved above and the above insertion guarantees
         // that the path is correctly escaped.
-        self.router.insert(path, self.settings.len() - 1).unwrap();
+        self.router.insert(path, self.projects.len() - 1).unwrap();
     }
 
     /// Return the appropriate [`Settings`] for a given [`Path`].
@@ -133,14 +133,14 @@ impl<'a> Resolver<'a> {
     }
 
     /// Return the appropriate [`Settings`] and config file path for a given [`Path`].
-    pub fn resolve_with_path(&self, path: &Path) -> &ResolvedSettings {
-        match self.root_settings.strategy {
-            PyprojectDiscoveryStrategy::Fixed => &self.root_settings.resolved,
+    pub fn resolve_with_path(&self, path: &Path) -> &Project {
+        match self.root_project.strategy {
+            PyprojectDiscoveryStrategy::Fixed => &self.root_project.project,
             PyprojectDiscoveryStrategy::Hierarchical => self
                 .router
                 .at(path.to_slash_lossy().as_ref())
-                .map(|Match { value, .. }| &self.settings[*value])
-                .unwrap_or(&self.root_settings.resolved),
+                .map(|Match { value, .. }| &self.projects[*value])
+                .unwrap_or(&self.root_project.project),
         }
     }
 
@@ -216,35 +216,58 @@ impl<'a> Resolver<'a> {
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
     pub fn settings(&self) -> impl Iterator<Item = &Settings> {
         std::iter::once(self.root_settings())
-            .chain(self.settings.iter().map(|entry| &entry.settings))
+            .chain(self.projects.iter().map(|entry| &entry.settings))
     }
 }
 
-/// Resolved Ruff settings and the configuration file from which they were built.
+/// A Ruff project, grouping files that share configuration and a project root.
+///
+/// A project can use default configuration without a configuration file. With hierarchical
+/// discovery, a nested configuration starts another project for files under that directory.
+/// The configuration is retained before CLI or editor overrides; the settings include them.
 #[derive(Debug)]
-pub struct ResolvedSettings {
-    /// The resolved settings.
+pub struct Project {
+    /// The merged configuration before CLI or editor overrides are applied.
+    #[expect(dead_code)]
+    configuration: Configuration,
+    /// The resolved settings, including CLI or editor overrides.
     pub settings: Settings,
-    /// Absolute path to the selected configuration file, if one was loaded.
+    /// Absolute, normalized path to the configuration file, if one was loaded.
     config_path: Option<PathBuf>,
 }
 
-impl ResolvedSettings {
-    pub fn new(settings: Settings) -> Self {
-        Self {
+impl Project {
+    /// Apply invocation overrides and resolve the project's settings.
+    pub fn resolve(
+        configuration: Configuration,
+        project_root: &Path,
+        transformer: &dyn ConfigurationTransformer,
+    ) -> Result<Self> {
+        let settings = transformer
+            .transform(configuration.clone())
+            .into_settings(project_root)?;
+        Ok(Self {
+            configuration,
             settings,
+            config_path: None,
+        })
+    }
+
+    /// Use the built-in defaults if configuration resolution failed during error recovery.
+    pub fn fallback(project_root: &Path) -> Self {
+        Self {
+            configuration: Configuration::default(),
+            settings: Settings::new(project_root),
             config_path: None,
         }
     }
 
-    /// Construct settings with an absolute, normalized configuration path.
-    fn new_with_path(settings: Settings, path: PathBuf) -> Self {
+    /// Record an absolute, normalized configuration path.
+    fn with_config_path(mut self, path: PathBuf) -> Self {
         debug_assert!(path.is_absolute());
         debug_assert_eq!(path.as_os_str(), fs::normalize_path(&path).as_os_str());
-        Self {
-            settings,
-            config_path: Some(path),
-        }
+        self.config_path = Some(path);
+        self
     }
 
     pub fn config_path(&self) -> Option<&Path> {
@@ -291,7 +314,7 @@ pub trait ConfigurationTransformer {
 /// Paths are already normalized, so the project root is part of the cache key.
 /// Target-version fallbacks and CLI overrides remain specific to each chain.
 #[derive(Default)]
-struct ConfigurationCache {
+pub struct ConfigurationCache {
     configurations: RwLock<FxHashMap<(PathBuf, PathBuf), Arc<Configuration>>>,
 }
 
@@ -407,18 +430,16 @@ fn resolve_configuration_with_cache(
 }
 
 /// Resolve settings from a configuration file, reusing configuration files shared by the traversal.
-fn resolve_scoped_settings(
+pub fn resolve_scoped_settings(
     pyproject: &Path,
     transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin<'_>,
     configuration_cache: Option<&ConfigurationCache>,
-) -> Result<ResolvedSettings> {
+) -> Result<Project> {
     let (config_path, configuration) =
         resolve_configuration_with_cache(pyproject, origin, configuration_cache)?;
-    let settings = transformer
-        .transform(configuration)
-        .into_settings(origin.project_root(pyproject))?;
-    Ok(ResolvedSettings::new_with_path(settings, config_path))
+    Project::resolve(configuration, origin.project_root(pyproject), transformer)
+        .map(|project| project.with_config_path(config_path))
 }
 
 /// Extract the [`Settings`] from a given `pyproject.toml` and process the
@@ -427,7 +448,7 @@ pub fn resolve_root_settings(
     pyproject: &Path,
     transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin<'_>,
-) -> Result<ResolvedSettings> {
+) -> Result<Project> {
     resolve_scoped_settings(pyproject, transformer, origin, None)
 }
 
@@ -461,19 +482,19 @@ impl ConfigurationOrigin<'_> {
 /// Find all project files in a set of paths, following configured include/exclude settings.
 pub fn project_files_in_path<'a>(
     paths: &[PathBuf],
-    root_settings: &'a RootSettings,
+    root_project: &'a RootProject,
     transformer: &(dyn ConfigurationTransformer + Sync),
 ) -> Result<(Vec<Result<ResolvedFile, ignore::Error>>, Resolver<'a>)> {
     // Normalize every path (e.g., convert from relative to absolute).
     let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).unique().collect();
 
     // Search for `pyproject.toml` files in all parent directories.
-    let mut resolver = Resolver::new(root_settings);
+    let mut resolver = Resolver::new(root_project);
     let mut seen = FxHashSet::default();
     let configuration_cache = ConfigurationCache::default();
 
     // Insert the directory of the root configuration to avoid parsing the configuration a second time.
-    if let Some(config_path) = &root_settings.resolved.config_path {
+    if let Some(config_path) = root_project.project.config_path() {
         seen.insert(config_path.parent().unwrap());
     }
 
@@ -992,8 +1013,8 @@ mod tests {
     use crate::configuration::Configuration;
     use crate::pyproject::find_settings_toml;
     use crate::resolver::{
-        ConfigurationOrigin, ConfigurationTransformer, PyprojectDiscoveryStrategy, ResolvedFile,
-        ResolvedSettings, Resolver, RootSettings, is_file_excluded, match_exclusion,
+        ConfigurationOrigin, ConfigurationTransformer, Project, PyprojectDiscoveryStrategy,
+        ResolvedFile, Resolver, RootProject, is_file_excluded, match_exclusion,
         project_files_in_path, resolve_root_settings,
     };
     use crate::tests::test_resource_path;
@@ -1023,15 +1044,15 @@ mod tests {
     #[test]
     fn rooted_exclusion() -> Result<()> {
         let package_root = test_resource_path("package");
-        let root_settings = RootSettings {
+        let root_project = RootProject {
             strategy: PyprojectDiscoveryStrategy::Hierarchical,
-            resolved: resolve_root_settings(
+            project: resolve_root_settings(
                 &find_settings_toml(&package_root)?.unwrap(),
                 &NoOpTransformer,
                 ConfigurationOrigin::Ancestor,
             )?,
         };
-        let resolver = Resolver::new(&root_settings);
+        let resolver = Resolver::new(&root_project);
         // src/app.py should not be excluded even if it lives in a hierarchy that should
         // be excluded by virtue of the pyproject.toml having `resources/*` in
         // it.
@@ -1069,9 +1090,9 @@ mod tests {
 
         let (paths, _) = project_files_in_path(
             &[root.to_path_buf()],
-            &RootSettings {
+            &RootProject {
                 strategy: PyprojectDiscoveryStrategy::Fixed,
-                resolved: ResolvedSettings::new(Configuration::default().into_settings(root)?),
+                project: Project::resolve(Configuration::default(), root, &NoOpTransformer)?,
             },
             &NoOpTransformer,
         )?;

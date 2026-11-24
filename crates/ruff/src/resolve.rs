@@ -6,8 +6,7 @@ use log::debug;
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::pyproject::{self, find_fallback_target_version};
 use ruff_workspace::resolver::{
-    ConfigurationOrigin, ConfigurationTransformer, PyprojectDiscoveryStrategy, ResolvedSettings,
-    RootSettings, resolve_root_settings,
+    ConfigurationOrigin, Project, PyprojectDiscoveryStrategy, RootProject, resolve_root_settings,
 };
 
 use ruff_python_ast as ast;
@@ -19,7 +18,7 @@ use crate::args::ConfigArguments;
 pub fn resolve(
     config_arguments: &ConfigArguments,
     stdin_filename: Option<&Path>,
-) -> Result<RootSettings> {
+) -> Result<RootProject> {
     let Ok(cwd) = std::env::current_dir() else {
         bail!("Working directory does not exist")
     };
@@ -27,10 +26,9 @@ pub fn resolve(
     // First priority: if we're running in isolated mode, use the default settings.
     if config_arguments.isolated {
         debug!("Isolated mode, not reading any pyproject.toml");
-        let configuration = config_arguments.transform(Configuration::default());
-        return Ok(RootSettings {
+        return Ok(RootProject {
             strategy: PyprojectDiscoveryStrategy::Fixed,
-            resolved: ResolvedSettings::new(configuration.into_settings(&cwd)?),
+            project: Project::resolve(Configuration::default(), &cwd, config_arguments)?,
         });
     }
 
@@ -38,7 +36,7 @@ pub fn resolve(
     // `pyproject.toml` for _all_ configuration, and resolve paths relative to the
     // current working directory. (This matches ESLint's behavior.)
     if let Some(pyproject) = config_arguments.config_file() {
-        let resolved = resolve_root_settings(
+        let project = resolve_root_settings(
             pyproject,
             config_arguments,
             ConfigurationOrigin::UserSpecified,
@@ -47,9 +45,9 @@ pub fn resolve(
             "Using user-specified configuration file at: {}",
             pyproject.display()
         );
-        return Ok(RootSettings {
+        return Ok(RootProject {
             strategy: PyprojectDiscoveryStrategy::Fixed,
-            resolved,
+            project,
         });
     }
 
@@ -64,11 +62,11 @@ pub fn resolve(
             "Using configuration file (via parent) at: {}",
             pyproject.display()
         );
-        let resolved =
+        let project =
             resolve_root_settings(&pyproject, config_arguments, ConfigurationOrigin::Ancestor)?;
-        return Ok(RootSettings {
+        return Ok(RootProject {
             strategy: PyprojectDiscoveryStrategy::Hierarchical,
-            resolved,
+            project,
         });
     }
 
@@ -81,16 +79,16 @@ pub fn resolve(
             "Using configuration file (via cwd) at: {}",
             pyproject.display()
         );
-        let resolved = resolve_root_settings(
+        let project = resolve_root_settings(
             &pyproject,
             config_arguments,
             ConfigurationOrigin::UserSettings {
                 fallback_directory: &cwd,
             },
         )?;
-        return Ok(RootSettings {
+        return Ok(RootProject {
             strategy: PyprojectDiscoveryStrategy::Hierarchical,
-            resolved,
+            project,
         });
     }
 
@@ -99,8 +97,8 @@ pub fn resolve(
     // end up finding the "closest" `pyproject.toml` file for every Python file later on,
     // so these act as the "default" settings.)
     debug!("Using Ruff default settings");
-    let mut configuration = config_arguments.transform(Configuration::default());
-    if configuration.target_version.is_none() {
+    let mut configuration = Configuration::default();
+    if config_arguments.target_version().is_none() {
         // If we have arrived here, we know that there was no `pyproject.toml`
         // containing a `[tool.ruff]` section found in an ancestral directory.
         // (This is an implicit requirement in the function
@@ -113,8 +111,8 @@ pub fn resolve(
         }
         configuration.target_version = fallback.map(ast::PythonVersion::from);
     }
-    Ok(RootSettings {
+    Ok(RootProject {
         strategy: PyprojectDiscoveryStrategy::Hierarchical,
-        resolved: ResolvedSettings::new(configuration.into_settings(&cwd)?),
+        project: Project::resolve(configuration, &cwd, config_arguments)?,
     })
 }
