@@ -492,8 +492,6 @@ impl<'db> KeywordArgument<'db> {
 /// with type context across multiple bindings.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct CallArgumentTypes<'db> {
-    /// Whether the parameter hint might affect this argument's inferred type.
-    pub(super) context_sensitive: bool,
     fallback_type: Option<Type<'db>>,
     types: ContextualTypes<'db>,
 }
@@ -512,7 +510,6 @@ enum ContextualTypes<'db> {
 impl<'db> CallArgumentTypes<'db> {
     fn new(fallback_ty: Option<Type<'db>>) -> Self {
         Self {
-            context_sensitive: false,
             fallback_type: fallback_ty,
             types: ContextualTypes::Empty,
         }
@@ -808,10 +805,6 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .expect("argument index should be valid")
             .source_types_mut()
             .insert(tcx, ty);
-    }
-
-    pub(crate) fn mark_context_sensitive(&mut self, index: usize) {
-        self.items[index].source_types_mut().context_sensitive = true;
     }
 
     pub(crate) fn clear_types(&mut self, index: usize) {

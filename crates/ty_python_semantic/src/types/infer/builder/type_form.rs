@@ -58,8 +58,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             let contextual_ty = self
                 .speculate_without_diagnostics()
-                .infer_value_expression_impl(expression, TypeContext::preference(Some(target)))
-                .ty;
+                .infer_value_expression_impl(expression, TypeContext::preference(Some(target)));
             if contextual_ty.is_assignable_to(db, env, target) {
                 return None;
             }

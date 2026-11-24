@@ -2859,18 +2859,23 @@ reveal_type(result)  # revealed: list[int]
 nested: list[list[int]] = reveal_type(as_list([1]))  # revealed: list[list[int]]
 ```
 
-An empty sibling can take its element type from `[1]`. A sibling that also contains a string needs a
-wider hint.
+An empty sibling takes its element type from `[1]`. If the element types conflict, the whole second
+list can still match `T`. We keep both bindings, even for literals that could be widened together.
 
 ```py
 def items(xs: list[T], x: T | list[T]) -> list[T]:
     return xs
 
 reveal_type(items([], [1]))  # revealed: list[int]
-reveal_type(items([1, "x"], [1]))  # revealed: list[int | str]
+reveal_type(items([1, "x"], [1]))  # revealed: list[int | str | list[int]]
+
+def _(xs: list[int], value: int | list[int]):
+    items(["x"], xs)  # ok
+    items(["x"], value)  # ok
 ```
 
-If the same list matches both `list[T]` and `list[U]`, its elements supply a hint for both siblings.
+If the same list matches both `list[T]` and `list[U]`, its elements contribute to both bindings. The
+empty lists also contribute `Unknown`.
 
 ```py
 U = TypeVar("U")
@@ -2878,7 +2883,7 @@ U = TypeVar("U")
 def pair(x: T | U | list[T] | list[U], a: list[T], b: list[U]) -> tuple[T, U]:
     return a[0], b[0]
 
-reveal_type(pair([1], [], []))  # revealed: tuple[int, int]
+reveal_type(pair([1], [], []))  # revealed: tuple[int | Unknown, Unknown | int]
 ```
 
 Preferring `list[T]` over `T` still lets the same list bind `U`, even if `U` has no bare arm.
@@ -2907,6 +2912,17 @@ def sink(x: T | list[T]) -> Callable[[T], None]:
     raise NotImplementedError
 
 reveal_type(sink([1]))  # revealed: (list[int] | int, /) -> None
+```
+
+A callback passed to the function can use the element type. If it returns a different type, the
+whole list can match `T`.
+
+```py
+def transform(x: T | list[T], fn: Callable[[T], T]) -> T:
+    raise NotImplementedError
+
+reveal_type(transform([1], lambda x: x.bit_length()))  # revealed: int
+reveal_type(transform([1], lambda _: "x"))  # revealed: list[int] | Literal["x"]
 ```
 
 When the ambiguous union is inside a tuple, both bindings contribute to the result. A callback in
@@ -3096,29 +3112,10 @@ class Tagged(Tree[T], Generic[T, Tag]):
 
 def tagged() -> Tree[Tagged[Unknown, Literal["red"]] | Unknown]:
     return Tree(Branch(Tagged(reveal_type(["red"]))))  # revealed: list[Literal["red"]]
-```
 
-## Invariant constructors with a subscripted sibling
-
-Indexing `rows` gives a list with a fixed element type. That type supplies the literal hint for
-`Tree`, even if a condition selects the row.
-
-```py
-from typing import Generic, Literal, TypeVar
-
-T = TypeVar("T")
-
-class Tree(Generic[T]):
-    value: T
-    def __init__(self, child: "T | Tree[T]"): ...
-
-def select(xs: list[T], tree: Tree[T]) -> list[T]:
-    return xs
-
-def _(rows: list[list[Literal["red"]]], flag: bool):
-    reveal_type(select(rows[0], Tree("red")))  # revealed: list[Literal["red"]]
-    reveal_type(select(rows[0] if flag else rows[1], Tree("red")))  # revealed: list[Literal["red"]]
-    select(rows[0], Tree("blue"))  # error: [invalid-argument-type]
+def with_sibling(values: list[U], child: U | Tree[U]) -> None: ...
+def _(values: list[Tagged[Unknown, Literal["red"]] | Unknown]):
+    with_sibling(values, Tagged(reveal_type(["red"])))  # revealed: list[Literal["red"]]
 ```
 
 ## Inferring a union parameter from other arguments

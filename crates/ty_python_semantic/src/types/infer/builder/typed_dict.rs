@@ -516,10 +516,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
-                if !can_infer && let Some(ty) = builder.try_expression_type(expr) {
-                    super::InferredValue::fixed(ty)
+                if can_infer {
+                    builder.infer_expression(expr, tcx)
                 } else {
-                    builder.infer_value(expr, tcx)
+                    builder.get_or_infer_expression(expr, tcx)
                 }
             },
             bindings,

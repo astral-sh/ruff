@@ -1306,6 +1306,19 @@ fn benchmark_generic_list_arguments(criterion: &mut Criterion) {
         ",
     );
 
+    // Even when the tuple arguments don't get the combined hint, a list[T]
+    // sibling can pass it back to them on the next inference pass.
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[tuple_with_ambiguous_list_arguments_and_sibling]",
+        r#"
+        def f[T](out: list[T], *xs: tuple[T | list[T]]) -> T:
+            return out[0]
+
+        f([], ([1],), (["s"],), ([],), ([],), ([],), ([],), ([],), ([],), ([],), ([],))
+        "#,
+    );
+
     // The typed lists can't both match list[T] with the same T. Even a
     // nonempty literal can pass a growing hint to its siblings.
     for (suffix, value) in [
