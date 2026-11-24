@@ -2238,15 +2238,25 @@ impl<'db> StaticClassLiteral<'db> {
             Some(Type::function_like_callable(db, signature))
         };
 
+        let init_signature = || {
+            // The receiver must not consume keyword arguments for fields named `self`.
+            let self_parameter = Parameter::positional_only(Some(Name::new_static("self")))
+                // TODO: could be `Self`.
+                .with_annotated_type(*instance_ty);
+            signature_from_fields(vec![self_parameter], Type::none(db, env))
+        };
+
         match (field_policy, name) {
             (field_policy, "__init__")
                 if field_policy.synthesizes_constructor_signature_from_fields(db, self) =>
             {
-                // The receiver must not consume keyword arguments for fields named `self`.
-                let self_parameter = Parameter::positional_only(Some(Name::new_static("self")))
-                    // TODO: could be `Self`.
-                    .with_annotated_type(*instance_ty);
-                signature_from_fields(vec![self_parameter], Type::none(db, env))
+                init_signature()
+            }
+            (CodeGeneratorKind::DataclassLike(_), "__attrs_init__")
+                if attrs::is_attrs_class(db, self)
+                    && !self.has_dataclass_param(db, field_policy, DataclassFlags::INIT) =>
+            {
+                init_signature()
             }
             (
                 CodeGeneratorKind::NamedTuple,

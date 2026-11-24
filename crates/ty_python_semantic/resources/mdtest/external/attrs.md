@@ -263,3 +263,51 @@ class WrongDefault:
     def _default_age(self) -> str:
         return "0"
 ```
+
+## Custom initialization
+
+With `init=False`, attrs generates an `__attrs_init__` method that a custom `__init__` can call to
+initialize the fields, even on a frozen class.
+
+```py
+from attrs import frozen
+
+@frozen(init=False)
+class User:
+    name: str
+    role: str = "member"
+
+    def __init__(self, first_name: str, last_name: str) -> None:
+        self.__attrs_init__(name=f"{first_name} {last_name}")
+
+User("John", "Doe")  # ok
+User("John")  # error: [missing-argument]
+
+reveal_type(User.__attrs_init__)  # revealed: (self: User, /, name: str, role: str = "member") -> None
+```
+
+For classes without a custom `__init__`, attrs does not generate `__attrs_init__` when `init` is
+omitted or set to `True`.
+
+```py
+from attrs import define
+
+@define
+class Person:
+    name: str
+
+Person.__attrs_init__  # error: [missing-attribute]
+```
+
+attrs also generates an `__attrs_init__` method when `init` is omitted but the class has a custom
+`__init__`.
+
+```py
+@define
+class Guest:
+    name: str
+
+    def __init__(self) -> None:
+        # TODO: Recognize the generated `__attrs_init__` without an explicit `init=False`.
+        self.__attrs_init__(name="Guest")  # error: [missing-attribute]
+```
