@@ -2859,19 +2859,50 @@ result = as_list(reveal_type([1]))  # revealed: list[int]
 reveal_type(result)  # revealed: list[list[int] | int]
 ```
 
-The same ambiguity can occur inside a tuple. For `int | str`, neither type can match `list[T]`, so
-both supply context for the callback.
+An empty sibling can take its element type from `[1]`. A sibling that also contains a string needs a
+wider hint.
+
+```py
+def items(xs: list[T], x: T | list[T]) -> list[T]:
+    return xs
+
+reveal_type(items([], [1]))  # revealed: list[int]
+reveal_type(items([1, "x"], [1]))  # revealed: list[int | str]
+```
+
+If the same list matches both `list[T]` and `list[U]`, its elements supply a hint for both siblings.
+
+```py
+U = TypeVar("U")
+
+def pair(x: T | U | list[T] | list[U], a: list[T], b: list[U]) -> tuple[T, U]:
+    return a[0], b[0]
+
+reveal_type(pair([1], [], []))  # revealed: tuple[int, int]
+```
+
+Conflicting element types for `T` don't affect the hint for `list[U]`.
+
+```py
+def collect(xs: list[U], ys: list[U], *values: T | list[T]) -> None: ...
+def _(xs: list[int | str], ints: list[int], strs: list[str]):
+    collect(xs, [1], ints, strs, [])  # ok
+```
+
+The same ambiguity can occur inside a tuple. The callback can receive either a list or its element,
+even when we have no independent hint for the element type.
 
 ```py
 from collections.abc import Callable
 
-def apply(args: tuple[T | list[T], Callable[[T], int]]) -> T:
+def apply(args: tuple[T | list[T], Callable[[T], object]]) -> T:
     raise NotImplementedError
 
 reveal_type(apply(([], lambda _: 0)))  # revealed: list[Unknown] | Unknown
 
-def _(value: int | str):
-    apply((value, lambda x: x.bit_length()))  # error: [missing-union-attribute]
+def _(value: int | str, values: list[int]):
+    apply((value, lambda x: reveal_type(x)))  # revealed: int | str
+    apply((values, lambda x: reveal_type(x)))  # revealed: list[int] | int
 ```
 
 The return annotation also constrains the nested `Sequence[T]` arm. Widening its element type to

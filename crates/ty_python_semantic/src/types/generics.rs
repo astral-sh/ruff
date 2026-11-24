@@ -40,8 +40,8 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
-    KnownInstanceType, MaterializationKind, RecursiveType, RecursiveTypeNormalizer,
+    ClassLiteral, DynamicType, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType,
+    KnownClass, KnownInstanceType, MaterializationKind, RecursiveType, RecursiveTypeNormalizer,
     SelfTypeVarOrigin, SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping,
     TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
     binding_type, infer_definition_types, inferred_declaration,
@@ -1502,6 +1502,10 @@ impl<'db> Specialization<'db> {
 
                     specialized
                 }
+                (
+                    TypeVarVariance::Invariant,
+                    TypeMapping::ApplySpecialization(ApplySpecialization::ArgumentHint { .. }),
+                ) => ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 (variance, _) if variance.is_covariant() => {
                     ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }
@@ -2333,6 +2337,15 @@ pub enum AliasPolicy {
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum ApplySpecialization<'a, 'db> {
+    /// A hint inferred from independent siblings. If they leave `T` unsolved,
+    /// a callback input can still use all the possible bindings for `T`.
+    /// In `tuple[T | list[T], Callable[[T], int]]` this supplies the lambda
+    /// parameter type without feeding the same bindings back into `list[T]`.
+    ArgumentHint {
+        siblings: Specialization<'db>,
+        ordinary: Specialization<'db>,
+        flipped: bool,
+    },
     Specialization {
         specialization: Specialization<'db>,
         /// Whether to substitute free owner variables in the declared domain of a retained
@@ -2435,6 +2448,18 @@ impl<'db> ApplySpecialization<'_, 'db> {
                     .get_index_of(&bound_typevar.identity(db))?;
                 types.get(index).copied()
             }
+            ApplySpecialization::ArgumentHint {
+                siblings,
+                ordinary,
+                flipped,
+            } => {
+                let ty = siblings.get(db, bound_typevar)?;
+                if *flipped && ty == Type::Dynamic(DynamicType::UnspecializedTypeVar) {
+                    ordinary.get(db, bound_typevar)
+                } else {
+                    Some(ty)
+                }
+            }
             ApplySpecialization::ReturnCallables(replacements) => {
                 replacements.get(&bound_typevar).copied().map(Type::TypeVar)
             }
@@ -2467,7 +2492,9 @@ impl<'db> ApplySpecialization<'_, 'db> {
                         .collect::<Vec<_>>(),
                 ),
             ),
-            ApplySpecialization::ReturnCallables(_) | ApplySpecialization::Single(..) => None,
+            ApplySpecialization::ReturnCallables(_)
+            | ApplySpecialization::Single(..)
+            | ApplySpecialization::ArgumentHint { .. } => None,
             ApplySpecialization::WithBindings { specialization, .. } => {
                 specialization.as_specialization(db)
             }

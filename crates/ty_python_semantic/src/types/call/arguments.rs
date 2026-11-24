@@ -492,7 +492,7 @@ impl<'db> KeywordArgument<'db> {
 /// with type context across multiple bindings.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct CallArgumentTypes<'db> {
-    /// Whether the expression can change type when we revisit it with a hint.
+    /// Whether we may need to revisit the expression with a hint.
     pub(super) context_sensitive: bool,
     fallback_type: Option<Type<'db>>,
     types: ContextualTypes<'db>,

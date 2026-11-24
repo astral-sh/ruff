@@ -558,6 +558,7 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    negative_hint: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     top_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     bottom_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     top_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -577,6 +578,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             recursion_context: None,
             materialize_typevar_bounds_and_defaults: true,
             default: OnceCell::default(),
+            negative_hint: OnceCell::default(),
             top_materialization: OnceCell::default(),
             bottom_materialization: OnceCell::default(),
             top_specialization_materialization: OnceCell::default(),
@@ -614,6 +616,10 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
         let type_transformer = match type_mapping {
+            TypeMapping::ApplySpecialization(ApplySpecialization::ArgumentHint {
+                flipped: true,
+                ..
+            }) => &self.negative_hint,
             TypeMapping::Materialize(MaterializationKind::Top) => &self.top_materialization,
             TypeMapping::Materialize(MaterializationKind::Bottom) => &self.bottom_materialization,
             TypeMapping::ApplySpecializationWithMaterialization {
@@ -12034,9 +12040,15 @@ impl<'db> TypeMapping<'_, 'db> {
                 specialization: *specialization,
                 materialization_kind: materialization_kind.flip(),
             },
+            TypeMapping::ApplySpecialization(hint) => {
+                let mut hint = *hint;
+                if let ApplySpecialization::ArgumentHint { flipped, .. } = &mut hint {
+                    *flipped = !*flipped;
+                }
+                TypeMapping::ApplySpecialization(hint)
+            }
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
-            TypeMapping::ApplySpecialization(_)
-            | TypeMapping::ApplyRecursiveSubstitution(_)
+            TypeMapping::ApplyRecursiveSubstitution(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
