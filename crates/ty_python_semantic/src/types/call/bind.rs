@@ -6172,11 +6172,6 @@ impl<'db> ParameterContextKey<'db> {
 
 /// Given the type arguments inferred from a call's arguments and expected return type, returns
 /// the specialization of `generic_context` to apply to parameter annotations on the next pass.
-///
-/// Ordinary inference uses the result of solving against the full parameter types. For a union
-/// such as `T | list[T]`, we also solve the call with matching arguments restricted to `list[T]`
-/// and use that result to specialize just that arm. Both paths use the same rules for promoting
-/// inferred types within their bounds and marking unsolved variables that have no default.
 fn inferred_parameter_specialization<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -7048,6 +7043,140 @@ impl<'db> CallInference<'_, 'db> {
                 .apply_specialization(db, specialization);
             actual.is_assignable_to(db, self.env, formal)
         })
+    }
+
+    /// Restrict matching arguments to the structured arms. For hints, also
+    /// omit arguments whose partially known type may reflect a previous hint.
+    fn structured_matches(
+        &self,
+        constraints: &ConstraintSetBuilder<'db>,
+        hint: Option<Specialization<'db>>,
+    ) -> Option<(
+        Vec<MatchedArgument<'db>>,
+        FxHashSet<BoundTypeVarInstance<'db>>,
+    )> {
+        self.signature.generic_context?;
+        let (db, env, arguments) = (self.db, self.env, self.arguments);
+        let hints = hint.is_some();
+        let mut affected = FxHashSet::default();
+        let mut restricted = None;
+        for (argument_index, (matched, argument)) in self
+            .argument_matches
+            .iter()
+            .zip(arguments.iter())
+            .enumerate()
+        {
+            for (match_index, parameter) in matched.parameters.iter().enumerate() {
+                let raw = self.signature.parameters()[parameter.index].annotated_type();
+                let ty = parameter.expected_type.unwrap_or(raw);
+                let expanded = match ty {
+                    Type::Intersection(i) if hints => {
+                        UnionType::from_elements(db, env, i.iter_positive(db))
+                    }
+                    _ => ty,
+                };
+                let Some((union, nested)) =
+                    nested_union_members(db, env, expanded, self.inferable_typevars)
+                else {
+                    // A tuple may contain both an ambiguous list and a callback.
+                    // Avoid feeding an unresolved list element back into the tuple.
+                    if let Some(hint) = hint
+                        && ty.exact_tuple_instance_spec(db).is_some()
+                    {
+                        let mut omit = false;
+                        for (var, choice) in
+                            hint.generic_context(db).variables(db).zip(hint.types(db))
+                        {
+                            if choice
+                                .as_union()
+                                .is_some_and(|u| u.elements(db).iter().any(Type::is_dynamic))
+                            {
+                                let vars = TypeVarSet::from_typevars(db, [var]);
+                                if any_over_type(db, env, ty, false, |part| {
+                                    nested_union_members(db, env, part, vars).is_some()
+                                }) {
+                                    affected.insert(var);
+                                    omit = true;
+                                }
+                            }
+                        }
+                        if omit {
+                            restricted.get_or_insert_with(|| self.argument_matches.to_vec())
+                                [argument_index]
+                                .parameters
+                                .clear();
+                            break;
+                        }
+                    }
+                    continue;
+                };
+                let Some(actual) = argument.matched_type(raw, parameter.argument_type) else {
+                    continue;
+                };
+                // An enclosing function's unbounded `U` can be a `list` for some callers,
+                // but that does not let us bind an argument of type `U` to `list[T]` here.
+                if actual
+                    .when_assignable_to(db, env, nested, constraints, self.inferable_typevars)
+                    .is_never_satisfied_bounded(db, env, self.inferable_typevars)
+                    == Some(false)
+                {
+                    let matches = restricted.get_or_insert_with(|| self.argument_matches.to_vec());
+                    if hints {
+                        affected.extend(union.elements(db).iter().filter_map(|m| m.as_typevar()));
+                    }
+                    if !hints && actual.is_union() && !actual.is_fully_static(db, env) {
+                        return None;
+                    }
+                    if hints && matches!(ty, Type::Intersection(_)) {
+                        matches[argument_index].parameters.clear();
+                        break;
+                    }
+                    matches[argument_index].parameters[match_index].expected_type = Some(nested);
+                }
+            }
+        }
+        let mut restricted = restricted?;
+        if hints {
+            for (matched, arg) in restricted.iter_mut().zip(arguments.iter()) {
+                if arg.source_types().context_sensitive {
+                    matched.parameters.retain(|param| {
+                        let raw = self.signature.parameters()[param.index].annotated_type();
+                        arg.matched_type(raw, param.argument_type)
+                            .is_some_and(|ty| ty.is_fully_static(db, env))
+                    });
+                }
+            }
+        }
+        Some((restricted, affected))
+    }
+
+    /// Prefer matching a container against the structured arm of a union such
+    /// as T | list[T]. Use this solution for both the next hints and the result
+    /// only when all the restricted matches and the expected result agree.
+    fn infer_structured(
+        &self,
+        constraints: &ConstraintSetBuilder<'db>,
+    ) -> Option<InferredCall<'db>> {
+        let (db, env) = (self.db, self.env);
+        let (restricted, _) = self.structured_matches(constraints, None)?;
+        let call = CallInference {
+            argument_matches: &restricted,
+            ..*self
+        };
+        let result = call.infer(constraints);
+        let specialization = result.inference?.merged_specialization(db);
+        if !result.errors.is_empty()
+            || result.constraint_set_errors.iter().any(|&failed| failed)
+            || !call.accepts_arguments(specialization)
+            || !self.accepts_arguments(specialization)
+            || self
+                .call_expression_tcx
+                .expected_type()
+                .is_some_and(|target| !result.return_ty.is_assignable_to(db, env, target))
+        {
+            return None;
+        }
+        Some(result)
     }
 
     fn infer(&self, constraints: &ConstraintSetBuilder<'db>) -> InferredCall<'db> {
@@ -8636,7 +8765,7 @@ fn nested_union_members<'db>(
 #[derive(Default)]
 pub(crate) struct ArgumentContextCache<'db> {
     ordinary: OnceCell<Cow<'db, ArgumentContextSpecialization<'db>>>,
-    nested: OnceCell<Option<Specialization<'db>>>,
+    siblings: OnceCell<Option<Specialization<'db>>>,
 }
 
 /// The call specialization inferred during fixpoint generic call inference.
@@ -9299,6 +9428,7 @@ impl<'db> Binding<'db> {
         };
 
         let parameter = &self.signature.parameters()[matched_parameter.index];
+        let mut leaf = None;
         let original_parameter_type = parameter.annotated_type();
         let mut parameter_type = matched_parameter
             .expected_type
@@ -9374,46 +9504,34 @@ impl<'db> Binding<'db> {
                 tcx_kind = parameter_tcx_kind;
             }
 
-            let nested_context = || {
-                self.inference?;
-                let (union, nested) =
-                    nested_union_members(db, env, parameter_type, self.inferable_typevars)?;
-                let actual = arguments_types
-                    .get(argument_index)?
-                    .matched_type(original_parameter_type, None)?;
-                let nested_specialization = (*cache.nested.get_or_init(|| {
-                    self.nested_union_specialization(
+            let mut hint = ordinary_context.specialization;
+            if self.inference.is_some()
+                && hint.types(db).iter().any(|ty| ty.is_union())
+                && let Some(independent) = *cache.siblings.get_or_init(|| {
+                    self.independent_hint(
                         db,
                         env,
+                        constraints,
                         binding,
                         arguments_types,
                         call_expression_tcx,
+                        hint,
                     )
-                }))?;
-                let specialized_nested = nested.apply_specialization(db, nested_specialization);
-                // An unsolved variable in the nested member supplies no evidence for the next
-                // pass. A gradual argument can also still need the bare arm, even if it is
-                // assignable to the nested member (e.g. `list[int] | Unknown` and `Iterable[int]`).
-                if specialized_nested.has_unspecialized_type_var(db, env)
-                    || !actual.is_redundant_with(db, env, specialized_nested)
-                {
-                    return None;
-                }
-                Some(union.map_leave_aliases(db, env, |&member| {
-                    if member == nested {
-                        specialized_nested
-                    } else if let Type::Union(members) = nested
-                        && members.contains_member(db, member)
-                    {
-                        member.apply_specialization(db, nested_specialization)
-                    } else {
-                        member.apply_specialization(db, ordinary_context.specialization)
-                    }
-                }))
-            };
-            parameter_type = nested_context().unwrap_or_else(|| {
-                parameter_type.apply_specialization(db, ordinary_context.specialization)
-            });
+                })
+            {
+                hint = independent;
+            }
+            // Union simplification can absorb a subclass whose type arguments
+            // still provide useful context for a nested constructor.
+            if let Some((union, _)) =
+                nested_union_members(db, env, parameter_type, self.inferable_typevars)
+            {
+                leaf = union.elements(db).iter().find_map(|m| {
+                    let ty = hint.get(db, m.as_typevar()?)?;
+                    (!ty.is_dynamic() && !ty.is_fully_static(db, env)).then_some(ty)
+                });
+            }
+            parameter_type = parameter_type.apply_specialization(db, hint);
             if let Some(expected_return_ty) = call_expression_tcx.expected_type()
                 && let Some(expected) = self.typevartuple_argument_context(
                     db,
@@ -9444,100 +9562,62 @@ impl<'db> Binding<'db> {
 
         Some(ArgumentTypeContext::standard(
             original_parameter_type,
-            TypeContext::new(Some(parameter_type), tcx_kind),
+            TypeContext::new(Some(parameter_type), tcx_kind).with_additional_target(db, leaf),
         ))
     }
 
-    /// For `x: T | list[T]`, a `list[int]` argument can match `T` with `T = list[int]` or
-    /// `list[T]` with `T = int`. Using both bindings to specialize `list[T]` gives the next
-    /// inference pass a hint of `list[int | list[int]]`. Repeating this can add more list layers.
-    ///
-    /// To compute the hint for the `list[T]` arm, solve the call again as if `x` were declared
-    /// `list[T]`. The argument now contributes `int` as the element type. Apply the same
-    /// restriction to other arguments that can match a nested union member. The remaining
-    /// arguments and the expected return type still constrain `T`. The bare `T` arm uses the
-    /// ordinary specialization. Nested members share a specialization, so in a union like
-    /// `T | list[T] | list[list[T]]` the two nested members can still add list layers.
-    fn nested_union_specialization(
+    /// Re-solve with independent evidence. Literals can adapt to the new
+    /// hint, but fixed arguments must already accept it. If they conflict,
+    /// fall back to return context only for the affected variables.
+    #[expect(clippy::too_many_arguments)]
+    fn independent_hint(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         binding: &CallableBinding<'db>,
-        arguments: &CallArguments<'_, 'db>,
-        tcx: TypeContext<'db>,
+        arguments_types: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+        hint: Specialization<'db>,
     ) -> Option<Specialization<'db>> {
-        let generic = self.signature.generic_context?;
-        let constraints = &ConstraintSetBuilder::new();
-        let arguments = arguments.with_self(binding.bound_type);
-        let mut restricted = None;
-        for (argument_index, (matched, argument)) in self
-            .argument_matches
-            .iter()
-            .zip(arguments.iter())
-            .enumerate()
-        {
-            for (match_index, parameter) in matched.parameters.iter().enumerate() {
-                let raw = self.signature.parameters()[parameter.index].annotated_type();
-                let Some((_, nested)) = nested_union_members(
-                    db,
-                    env,
-                    parameter.expected_type.unwrap_or(raw),
-                    self.inferable_typevars,
-                ) else {
-                    continue;
-                };
-                let Some(actual) = argument.matched_type(raw, parameter.argument_type) else {
-                    continue;
-                };
-                // An enclosing function's unbounded `U` can be a `list` for some callers,
-                // but that does not let us bind an argument of type `U` to `list[T]` here.
-                if actual
-                    .when_assignable_to(db, env, nested, constraints, self.inferable_typevars)
-                    .is_never_satisfied_bounded(db, env, self.inferable_typevars)
-                    == Some(false)
-                {
-                    let matches = restricted.get_or_insert_with(|| self.argument_matches.clone());
-                    matches[argument_index].parameters[match_index].expected_type = Some(nested);
-                }
-            }
-        }
-        let call = CallInference {
-            argument_matches: restricted.as_deref()?,
-            return_ty: self.unspecialized_return_type(db),
-            inferable_typevars: self.inferable_typevars,
-            ..CallInference::new(db, env, self, &arguments, tcx)
-        };
+        let generic_context = hint.generic_context(db);
+        let args = arguments_types.with_self(binding.bound_type);
+        let mut call = CallInference::new(db, env, self, &args, call_expression_tcx);
+        call.return_ty = self.unspecialized_return_type(db);
+        let (matches, affected) = call.structured_matches(constraints, Some(hint))?;
+        call.argument_matches = &matches;
         let result = call.infer(constraints);
         let inference = result.inference?;
-        // A `list[int]` and a `list[str]` can each match `list[T]`, but they require different
-        // values for `T`. We compute one restricted specialization for the whole call. If it
-        // fails for any argument, use the ordinary specialization for all of them.
-        //
-        // `infer` can also succeed by retrying without the expected return type. For example,
-        // given `def f[T](x: T | list[T]) -> T` and `xs: list[int]`, the assignment
-        // `out: list[int] = f(xs)` works through the bare arm with `T = list[int]`. Restricting
-        // `x` to `list[T]` gives `T = int`. That accepts `xs`, but the return type is now `int`,
-        // so keep the ordinary specialization that made the assignment valid.
-        if !result.errors.is_empty()
-            || !call.accepts_arguments(inference.merged_specialization(db))
-            || tcx.expected_type().is_some_and(|target| {
-                self.return_ty.is_assignable_to(db, env, target)
-                    && !result.return_ty.is_assignable_to(db, env, target)
-            })
-        {
-            return None;
-        }
-        Some(
-            self.argument_type_context_specialization(
+        let merged = inference.merged_specialization(db);
+        let valid = call.argument_relations().all(|r| {
+            args.source_types(r.argument_index)
+                .is_some_and(|a| a.context_sensitive)
+                || r.argument_type
+                    .apply_specialization(db, merged)
+                    .is_assignable_to(db, env, r.declared_type.apply_specialization(db, merged))
+        });
+        let initial = self
+            .argument_type_context_specialization(
                 db,
                 env,
-                generic,
-                Some(inference),
+                generic_context,
+                None,
                 constraints,
-                tcx,
+                call_expression_tcx,
             )
-            .specialization,
-        )
+            .specialization;
+        Some(inference.merged_specialization_with(db, |var, inferred| {
+            let ordinary = hint.get(db, var)?;
+            if !ordinary.is_union() || !affected.contains(&var) {
+                return Some(ordinary);
+            }
+            let expected = initial.get(db, var)?;
+            if valid && (expected.is_dynamic() || expected.has_unspecialized_type_var(db, env)) {
+                inferred.or(Some(expected))
+            } else {
+                Some(expected)
+            }
+        }))
     }
 
     /// Returns the specialization that should be applied to the parameters of this overload for
@@ -9827,8 +9907,10 @@ impl<'db> Binding<'db> {
             return;
         }
 
-        let inferred =
-            CallInference::new(db, env, self, arguments, call_expression_tcx).infer(constraints);
+        let call = CallInference::new(db, env, self, arguments, call_expression_tcx);
+        let inferred = call
+            .infer_structured(constraints)
+            .unwrap_or_else(|| call.infer(constraints));
 
         let mut checker = ArgumentTypeChecker::new(
             db,

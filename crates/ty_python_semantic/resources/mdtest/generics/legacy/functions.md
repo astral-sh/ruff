@@ -2795,10 +2795,8 @@ be `list[int] | list[list[int] | int]`. Matching that union against the paramete
 `T = list[list[int] | int] | list[int] | int`. Each pass would add another list layer until we hit
 the iteration limit.
 
-To avoid this, when we revisit `[1]`, we specialize the `list[T]` arm with the binding it
-contributed, `T = int`. That gives the literal just an expected element type of `int`, so its type
-stays `list[int]` and inference converges. Both bindings still contribute to the return type,
-`list[list[int] | int]`.
+To get a hint for the elements of `[1]`, we match the list against just `list[T]`, giving `T = int`.
+This binding also determines the result when it satisfies the whole call.
 
 ```py
 from typing import TypeVar
@@ -2811,7 +2809,59 @@ def as_list(value: T | list[T]) -> list[T]:
     return [value]
 
 result = as_list(reveal_type([1]))  # revealed: list[int]
-reveal_type(result)  # revealed: list[list[int] | int]
+reveal_type(result)  # revealed: list[int]
+
+def check(x: int, xs: list[int]):
+    reveal_type(as_list(xs))  # revealed: list[int]
+    nested: list[list[int]] = reveal_type(as_list([x]))  # revealed: list[list[int]]
+    wide: list[int | list[list[int]]] = as_list([x])
+    either: list[int] | list[list[int]] = as_list([x])
+```
+
+An empty sibling can take its element type from `[1]`. A sibling that also contains a string needs a
+wider hint.
+
+```py
+def items(xs: list[T], x: T | list[T]) -> list[T]:
+    return xs
+
+reveal_type(items([], [1]))  # revealed: list[int]
+reveal_type(items([1, "x"], [1]))  # revealed: list[int | str]
+```
+
+If the same list matches both `list[T]` and `list[U]`, its elements supply a hint for both siblings.
+
+```py
+U = TypeVar("U")
+
+def pair(x: T | U | list[T] | list[U], a: list[T], b: list[U]) -> tuple[T, U]:
+    return a[0], b[0]
+
+reveal_type(pair([1], [], []))  # revealed: tuple[int, int]
+```
+
+Conflicting element types for `T` don't affect the hint for `list[U]`.
+
+```py
+def collect(xs: list[U], ys: list[U], *values: T | list[T]) -> None: ...
+def _(xs: list[int | str], ints: list[int], strs: list[str]):
+    collect(xs, [1], ints, strs, [])  # ok
+```
+
+The same ambiguity can occur inside a tuple. The callback can receive either a list or its element,
+even when we have no independent hint for the element type.
+
+```py
+from collections.abc import Callable
+
+def apply(args: tuple[T | list[T], Callable[[T], object]]) -> T:
+    raise NotImplementedError
+
+reveal_type(apply(([], lambda _: 0)))  # revealed: list[Unknown] | Unknown
+
+def _(value: int | str, values: list[int]):
+    apply((value, lambda x: reveal_type(x)))  # revealed: int | str
+    apply((values, lambda x: reveal_type(x)))  # revealed: list[int] | int
 ```
 
 The return annotation also constrains the nested `Sequence[T]` arm. Widening its element type to
@@ -2826,6 +2876,23 @@ def pick(items: T | Sequence[T]) -> T:
 
 red = ("red",)
 result: tuple[Literal["red"], ...] = pick([red])  # ok
+```
+
+## List literals with intersection parameters
+
+For `[1]`, invariance fixes `T` to `int`, but the list itself must also satisfy `T`.
+
+```py
+from typing import TypeVar
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+
+def f(x: Intersection[T, list[T]]) -> T:
+    return x
+
+reveal_type(f([]))  # revealed: list[Unknown] | Unknown
+f([1])  # error: [invalid-argument-type]
 ```
 
 ## Nested calls with ambiguous union parameters
@@ -2843,6 +2910,13 @@ def choose(left: T | list[T], right: T | list[T]) -> list[T]:
 
 result: list[None] | list[int] = choose(choose(choose(None, None), None), None)
 reveal_type(result)  # revealed: list[None]
+```
+
+A sibling can also require both arms. Its `int` member doesn't match `list[T]`.
+
+```py
+def _(value: int | list[int]):
+    reveal_type(choose([1], value))  # revealed: list[int]
 ```
 
 `collect` must return `list[U]` for any `U`. Both calls to `choose` can use `T = U`. The inner call
@@ -2866,7 +2940,7 @@ def first(value: T, alternatives: list[T]) -> T:
 
 def _(xs: list[int]):
     result = choose([["x"]], first(xs, []))  # ok
-    # TODO: Revisiting [["x"]] still adds extra list layers to the inferred return type.
+    # TODO: Matching [["x"]] against list[T] also adds list[str] to T.
     expected: list[list[list[str]] | list[int]] = result  # error: [invalid-assignment]
 ```
 
@@ -2884,6 +2958,80 @@ def _(xs: list[int]):
     # `list[int]` member that would give `T = int`. See https://github.com/astral-sh/ty/issues/4909
     reveal_type(store(first(xs, []), first(xs, [])))  # revealed: Unknown
     reveal_type(store(list(), first(xs, [])))  # revealed: Unknown
+```
+
+## Nested constructors with recursive union parameters
+
+In `Tree(Tree(Branch()), value)`, we use `value` alone to get a hint for the inner `Tree`. When
+checking a child, we still allow it to match either `T` or `Tree[T]`.
+
+```py
+from typing import Any, Generic, Literal, TypeVar
+
+T = TypeVar("T", covariant=True)
+
+class Tree(Generic[T]):
+    def __init__(self, *children: "T | Tree[T]"): ...
+
+class Branch(Tree[T]): ...
+
+def build(value: int, other: str, flag: bool):
+    reveal_type(Tree(Tree(Branch()), value))  # revealed: Tree[int]
+    reveal_type(Tree(Branch(), value if flag else other))  # revealed: Tree[int | str]
+    leaf: Tree[Branch[int]] = Tree(Branch(value))  # ok
+    subtree: Tree[int] = Tree(Branch(value))  # ok
+```
+
+An invariant `list[U]` argument supplies a hint even when `Node` inherits its constructor and has an
+unused type parameter. `Any` inside `Branch[Any]` doesn't make arbitrary leaves valid.
+
+```py
+U = TypeVar("U")
+Unused = TypeVar("Unused")
+
+class Node(Tree[T], Generic[Unused, T]): ...
+
+def select(values: list[U], tree: Tree[U]) -> list[U]:
+    return values
+
+def nested(xs: list[int]):
+    reveal_type(select(xs, Tree(Branch())))  # revealed: list[int]
+
+def sibling(xs: list[Branch[Any] | int], ys: list[Branch[Any] | int | Any]):
+    values = select(xs, Tree(Node(Branch()), 1))
+    values.append("bad")  # error: [invalid-argument-type]
+    select(xs, Tree(Node(Branch()), "bad"))  # error: [invalid-argument-type]
+    select(ys, Tree(Node(Branch()), 1)).append("ok")  # ok
+```
+
+The expected return type can further constrain `U` or explicitly include a bare `Any`.
+
+```py
+def red(xs: list[Any | int]) -> list[Branch[Literal["red"]] | int]:
+    return select(xs, Tree(Branch("red")))  # ok
+
+def blue(xs: list[Any | int]) -> list[Branch[Literal["red"]] | int]:
+    return select(xs, Tree(Branch("blue")))  # error: [invalid-explicit-return]
+
+def gradual_leaf() -> Tree[Branch[Any] | int]:
+    return Tree(Tree(Branch()), 1)  # ok
+
+def any_leaf() -> Tree[Branch[Any] | Any]:
+    return Tree(reveal_type(Tree()))  # revealed: Tree[Branch[Any] | Any]
+```
+
+The expected leaf type supplies `Tag` even when `Tagged` also matches the subtree arm.
+
+```py
+from ty_extensions._internal import Unknown
+
+Tag = TypeVar("Tag", bound=Literal["red"])
+
+class Tagged(Tree[T], Generic[T, Tag]):
+    def __init__(self, tags: list[Tag]): ...
+
+def tagged() -> Tree[Tagged[Unknown, Literal["red"]] | Unknown]:
+    return Tree(Branch(Tagged(reveal_type(["red"]))))  # revealed: list[Literal["red"]]
 ```
 
 ## Inferring a union parameter from other arguments

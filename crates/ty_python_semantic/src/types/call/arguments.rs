@@ -492,6 +492,8 @@ impl<'db> KeywordArgument<'db> {
 /// with type context across multiple bindings.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct CallArgumentTypes<'db> {
+    /// Whether we may need to revisit the expression with a hint.
+    pub(super) context_sensitive: bool,
     fallback_type: Option<Type<'db>>,
     types: FxHashMap<Type<'db>, Type<'db>>,
 }
@@ -500,7 +502,7 @@ impl<'db> CallArgumentTypes<'db> {
     fn new(fallback_ty: Option<Type<'db>>) -> Self {
         Self {
             fallback_type: fallback_ty,
-            types: FxHashMap::default(),
+            ..Self::default()
         }
     }
 
@@ -587,7 +589,11 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     }
                 }
             };
-            call_arguments.items.push(CallArgument::new(argument, ty));
+            let mut item = CallArgument::new(argument, ty);
+            let expr = arg_or_keyword.value();
+            item.source_types_mut().context_sensitive =
+                !arg_or_keyword.is_variadic() && !expr.is_name_expr() && !expr.is_attribute_expr();
+            call_arguments.items.push(item);
         }
 
         call_arguments
