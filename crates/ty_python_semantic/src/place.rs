@@ -1,6 +1,6 @@
 pub(crate) mod definitions;
 
-use crate::ProgramEnvironment;
+use crate::{Program, ProgramEnvironment};
 use itertools::Either;
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
@@ -692,10 +692,7 @@ fn builtins_symbol_impl<'db>(
     visibility: BuiltinVisibility,
 ) -> Option<(ScopeId<'db>, PlaceAndQualifiers<'db>)> {
     let program = env.program(db);
-    let resolver_environment = program.resolver_environment(db);
-    let resolver = |module: Module<'db>| {
-        let file = ProgramFile::new(db, module.file(db)?, program);
-        let scope = global_scope(db, file);
+    let resolver = |scope: ScopeId<'db>| {
         let found_symbol = symbol_impl(
             db,
             scope,
@@ -707,7 +704,7 @@ fn builtins_symbol_impl<'db>(
             // We're looking up in the builtins namespace and not the module, so we should
             // do the normal lookup in `types.ModuleType` and not the special one as in
             // `imported_symbol`.
-            module_type_implicit_global_symbol(db, file, symbol)
+            module_type_implicit_global_symbol(db, scope.program_file(db), symbol)
         });
         found_symbol.ignore_possibly_undefined()?;
 
@@ -722,16 +719,23 @@ fn builtins_symbol_impl<'db>(
         Some((scope, found_symbol))
     };
     // If this symbol is not present in project-level builtins, search in the default ones.
-    resolve_module_confident(
+    project_builtins_scope(db, program)
+        .and_then(resolver)
+        .or_else(|| standard_builtins_scope(db, program).and_then(resolver))
+}
+
+/// Resolves the optional `__builtins__` scope shared by builtin name lookups in this program.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn project_builtins_scope<'db>(db: &'db dyn Db, program: Program<'db>) -> Option<ScopeId<'db>> {
+    let module = resolve_module_confident(
         db,
-        resolver_environment,
+        program.resolver_environment(db),
         &ModuleName::new_static("__builtins__").unwrap(),
-    )
-    .and_then(resolver)
-    .or_else(|| {
-        resolve_module_confident(db, resolver_environment, &KnownModule::Builtins.name())
-            .and_then(resolver)
-    })
+    )?;
+    Some(global_scope(
+        db,
+        ProgramFile::new(db, module.file(db)?, program),
+    ))
 }
 
 /// Lookup the type of `symbol` in a given known module.
@@ -783,7 +787,18 @@ pub(crate) fn builtins_module_scope<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
 ) -> Option<ScopeId<'db>> {
-    core_module_scope(db, env, KnownModule::Builtins)
+    standard_builtins_scope(db, env.program(db))
+}
+
+/// Resolves `builtins` separately so a name found in `__builtins__` does not
+/// depend on the standard module's scope.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn standard_builtins_scope<'db>(db: &'db dyn Db, program: Program<'db>) -> Option<ScopeId<'db>> {
+    core_module_scope(
+        db,
+        &ProgramEnvironment::from_program(program),
+        KnownModule::Builtins,
+    )
 }
 
 /// Get the scope of a core stdlib module.
