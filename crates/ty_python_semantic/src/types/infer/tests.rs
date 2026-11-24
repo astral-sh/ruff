@@ -637,6 +637,7 @@ fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<
     let inference = |ty, truthiness: Option<Truthiness>| {
         (
             ExpressionInference {
+                loop_truthiness: Some(truthiness.unwrap_or_else(|| Type::bool(&ty, &db, &env))),
                 expressions: [(expression, ty)].into_iter().collect(),
                 extra: truthiness.map(|truthiness| {
                     Box::new(ExpressionInferenceExtra {
@@ -704,6 +705,7 @@ fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<
         let (mut current_expression, mut current_statement, mut current_definition) =
             inference(current.0, current.1);
         current_expression.widen_comparison_truthiness(&db, &env, &previous_expression);
+        assert!(current_expression.loop_truthiness.is_none());
         current_statement.widen_comparison_truthiness(&db, &env, &previous_statement);
         current_definition.widen_comparison_truthiness(&db, &env, &previous_definition);
         assert_eq!(

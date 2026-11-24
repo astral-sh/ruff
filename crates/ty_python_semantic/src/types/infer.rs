@@ -65,7 +65,7 @@ use crate::{Db, FxIndexSet};
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::expression::{Expression, ExpressionKind};
+use ty_python_core::expression::{Expression, ExpressionContext, ExpressionKind};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
@@ -625,15 +625,12 @@ fn evaluate_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'d
         return Truthiness::Ambiguous;
     };
     let inference = infer_expression_types(db, expression, TypeContext::default());
+    if let Some(truthiness) = inference.loop_truthiness {
+        return truthiness;
+    }
     let env = ProgramEnvironment::from_scope(expression.scope(db));
     let module = parsed_module(db, expression.python_file(db)).load(db);
-    TruthinessAnalyzer::new(
-        db,
-        &env,
-        |node| inference.expression_type(node),
-        |node| inference.comparison_truthiness(node),
-    )
-    .truthiness(expression.node_ref(db).node(&module), context)
+    inference.truthiness(db, &env, expression.node_ref(db).node(&module), context)
 }
 
 #[salsa::tracked(
@@ -667,7 +664,7 @@ pub(super) fn infer_expression_types_impl<'db>(
 
     let env = ProgramEnvironment::from_file(program_file);
 
-    TypeInferenceBuilder::new(
+    let mut inference = TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Expression(expression, tcx),
@@ -676,7 +673,17 @@ pub(super) fn infer_expression_types_impl<'db>(
         index,
         &module,
     )
-    .finish_expression()
+    .finish_expression();
+
+    if let ExpressionKind::Predicate {
+        context,
+        in_loop: true,
+    } = expression.kind(db)
+    {
+        inference.loop_truthiness =
+            Some(inference.truthiness(db, &env, expression.node_ref(db).node(&module), context));
+    }
+    inference
 }
 
 fn expression_cycle_initial<'db>(
@@ -1979,6 +1986,10 @@ pub(crate) struct ExpressionInference<'db> {
     /// The types of every expression in this region.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
+    /// A loop predicate can be tested repeatedly without a separate truthiness query.
+    /// Discard its result if cycle recovery changes any of the analyzer's inputs.
+    loop_truthiness: Option<Truthiness>,
+
     extra: Option<Box<ExpressionInferenceExtra<'db>>>,
 
     /// The scope this region is part of.
@@ -2053,6 +2064,7 @@ impl<'db> ExpressionInference<'db> {
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
         Self {
+            loop_truthiness: None,
             extra: Some(Box::new(ExpressionInferenceExtra {
                 cycle_recovery: Some(cycle_recovery),
                 ..ExpressionInferenceExtra::default()
@@ -2091,7 +2103,11 @@ impl<'db> ExpressionInference<'db> {
 
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
+            let normalized = ty.cycle_normalized(db, env, previous_ty, cycle);
+            if self.loop_truthiness.is_some() && normalized != *ty {
+                self.loop_truthiness = None;
+            }
+            *ty = normalized;
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -2135,8 +2151,30 @@ impl<'db> ExpressionInference<'db> {
             |expression| previous.expression_type(expression).bool(db, env),
         );
         if comparison_truthiness.iter().next().is_some() {
-            self.extra.get_or_insert_default().comparison_truthiness = comparison_truthiness;
+            let extra = self.extra.get_or_insert_default();
+            if self.loop_truthiness.is_some()
+                && extra.comparison_truthiness != comparison_truthiness
+            {
+                self.loop_truthiness = None;
+            }
+            extra.comparison_truthiness = comparison_truthiness;
         }
+    }
+
+    fn truthiness(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        node: &ast::Expr,
+        context: ExpressionContext,
+    ) -> Truthiness {
+        TruthinessAnalyzer::new(
+            db,
+            env,
+            |node| self.expression_type(node),
+            |node| self.comparison_truthiness(node),
+        )
+        .truthiness(node, context)
     }
 
     fn try_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
