@@ -1035,8 +1035,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Prepares `get` with a literal string key and at most one positional default.
-    /// Synthesized `TypedDict.get` overloads use fixed arities and include a general
-    /// string fallback, so we can skip unrelated keys before matching arguments.
+    /// Synthesized `TypedDict.get` overloads have fixed arities, so we can discard
+    /// those with the wrong number of parameters before matching arguments.
     fn bindings_for_get(
         &self,
         callable_type: Type<'db>,
@@ -1049,19 +1049,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Type::BoundMethod(method) = ty
                 && let receiver @ Type::TypedDict(_) = method.self_instance(db)
                 && let Type::Callable(callable) = method.func(db)
-                && key.value.len() <= Self::MAX_STRING_LITERAL_SIZE
-                && !self.collects_expected_types()
                 // An attribute named `get` can also hold another bound method.
                 && receiver.member(db, env, "get").ignore_possibly_undefined() == Some(ty)
             {
-                let key = key.value.to_str();
+                // Even overloads for other keys can affect how we infer a default, including
+                // how we expand it against other members of a union. Keep all keys in that
+                // case, and when the editor needs them for completions.
+                let key = (arity == 1
+                    && key.value.len() <= Self::MAX_STRING_LITERAL_SIZE
+                    && !self.collects_expected_types())
+                .then(|| key.value.to_str());
                 let overloads = callable.signatures(db).iter().filter(|signature| {
                     let parameters = signature.parameters();
                     parameters.len() == arity + 1
-                        && parameters[1]
-                            .annotated_type()
-                            .as_string_literal()
-                            .is_none_or(|expected| expected.value(db) == key)
+                        && key.is_none_or(|key| {
+                            parameters[1]
+                                .annotated_type()
+                                .as_string_literal()
+                                .is_none_or(|expected| expected.value(db) == key)
+                        })
                 });
                 return CallableBinding::from_overloads(ty, overloads.cloned())
                     .with_bound_type(receiver)

@@ -3309,6 +3309,28 @@ def _(u: IntX | StrX) -> None:
     reveal_type(u.setdefault("x", 1))  # revealed: int | str
 ```
 
+## `get()` with an overloaded method on another union member
+
+Both alternatives of the default are valid for `Row`. When checking `Other.get`, we expand the
+default so that each alternative can match a different overload.
+
+```py
+from typing import Protocol, TypedDict, overload
+
+class Row(TypedDict):
+    count: int
+    items: list[object]
+
+class Other(Protocol):
+    @overload
+    def get(self, key: str, default: list[int]) -> list[object]: ...
+    @overload
+    def get(self, key: str, default: int) -> list[object]: ...
+
+def get_items(row: Row | Other, flag: bool) -> list[object]:
+    return row.get("items", [1] if flag else 0)
+```
+
 ## `get()` with literal union defaults
 
 ```toml
