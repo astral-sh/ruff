@@ -1898,6 +1898,7 @@ enum KnownComparisonSemantics {
     Str,
     Bytes,
     Tuple,
+    List,
     Dict,
 }
 
@@ -2051,23 +2052,14 @@ fn class_comparison_semantics<'db>(
     let dunder = lookup_dunder(db, env, class, operator.dunder())?;
 
     if dunder.place.is_undefined() {
-        if operator == ComparisonOperator::Inequality {
-            let equality = lookup_dunder(db, env, class, "__eq__")?;
-            // `tuple.__ne__` delegates to its builtin equality implementation.
-            let tuple_equality = lookup_dunder(
-                db,
-                env,
-                KnownClass::Tuple.to_class_literal(db, env),
-                "__eq__",
-            )?;
-            if same_member_implementation(db, equality, tuple_equality) {
-                return Some(KnownComparisonSemantics::Tuple);
+        return match operator {
+            ComparisonOperator::Equality => Some(KnownComparisonSemantics::Object),
+            // Typeshed omits `__ne__` for builtins like `list`, `tuple`, and `dict` whose
+            // inequality negates equality. Custom equality remains unknown.
+            ComparisonOperator::Inequality => {
+                class_comparison_semantics(db, program, class, ComparisonOperator::Equality)
             }
-            if !equality.place.is_undefined() {
-                return None;
-            }
-        }
-        return Some(KnownComparisonSemantics::Object);
+        };
     }
 
     for (known_class, semantics) in [
@@ -2075,6 +2067,7 @@ fn class_comparison_semantics<'db>(
         (KnownClass::Str, KnownComparisonSemantics::Str),
         (KnownClass::Bytes, KnownComparisonSemantics::Bytes),
         (KnownClass::Tuple, KnownComparisonSemantics::Tuple),
+        (KnownClass::List, KnownComparisonSemantics::List),
         (KnownClass::Dict, KnownComparisonSemantics::Dict),
     ] {
         if same_member_implementation(

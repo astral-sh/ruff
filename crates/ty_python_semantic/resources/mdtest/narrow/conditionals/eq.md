@@ -2639,6 +2639,45 @@ def _(s: LiteralString | None, t: LiteralString | Any):
         reveal_type(t)  # revealed: Literal["foo"] | Any
 ```
 
+## Narrowing with lists and dictionaries
+
+By default, a list or dictionary can't compare equal to a string literal. This also applies to
+subclasses that inherit the built-in comparison methods.
+
+```py
+def equality(value: str | list[str]):
+    if value == "all":
+        reveal_type(value)  # revealed: Literal["all"]
+
+def inequality(value: str | list[str] | dict[str, str]):
+    if value != "all":
+        return
+    reveal_type(value)  # revealed: Literal["all"]
+```
+
+A list subclass can override `__eq__` and `__ne__` independently.
+
+```py
+class AlwaysEqual(list[str]):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def custom_equality(value: str | AlwaysEqual):
+    if value == "all":
+        reveal_type(value)  # revealed: Literal["all"] | AlwaysEqual
+
+class NeverUnequal(list[str]):
+    def __ne__(self, other: object) -> bool:
+        return False
+
+def custom_inequality(value: str | NeverUnequal):
+    if value == "all":
+        reveal_type(value)  # revealed: Literal["all"]
+    if value != "all":
+        return
+    reveal_type(value)  # revealed: Literal["all"] | NeverUnequal
+```
+
 ## Narrowing with tuple types
 
 We assume that tuple subclasses don't override `tuple.__eq__`, which only returns True for other
@@ -3304,6 +3343,10 @@ def broad(value: str):
 def broad_integer(value: int):
     if value == 1:
         reveal_type(value)  # revealed: int
+
+def list_union(value: str | list[str]):
+    if value == "all":
+        reveal_type(value)  # revealed: str | list[str]
 
 def inequality(value: str):
     if value != "a":
