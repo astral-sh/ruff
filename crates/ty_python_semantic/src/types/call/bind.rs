@@ -613,6 +613,45 @@ impl<'db> BindingsElement<'db> {
             .unwrap_or(CallErrorPriority::NotCallable)
     }
 
+    /// Report a single callable's errors or the highest-priority errors of a failing intersection.
+    fn report_diagnostics(
+        &self,
+        context: &CallDiagnosticContext<'_, '_, 'db, '_>,
+        node: ast::AnyNodeRef,
+        union: Option<&UnionDiagnosticContext<'db>>,
+    ) {
+        if let [item] = self.items.as_slice() {
+            if item.has_own_diagnostics() {
+                let variant = union.map(|union| CompoundDiagnostic::UnionVariant {
+                    variant: self.callable_type,
+                    union,
+                });
+                item.callable()
+                    .report_diagnostics(context, node, variant.as_ref());
+            }
+            return;
+        }
+
+        let db = context.db();
+        if self.as_result(db).is_ok() {
+            return;
+        }
+
+        let max_priority = self.error_priority(db);
+        for item in &self.items {
+            if item.error_priority(db) != max_priority || !item.has_own_diagnostics() {
+                continue;
+            }
+            let binding = item.callable();
+            let diagnostic = CompoundDiagnostic::IntersectionElement {
+                element: binding.callable_type,
+                intersection: self.callable_type,
+                union,
+            };
+            binding.report_diagnostics(context, node, Some(&diagnostic));
+        }
+    }
+
     /// Returns true if any binding in this element is callable.
     fn is_callable(&self) -> bool {
         self.items.iter().any(CallableItem::is_callable)
@@ -1615,16 +1654,10 @@ impl<'db> Bindings<'db> {
             return;
         }
 
-        if let Some(item) = self.single_item() {
-            if item.has_own_diagnostics() {
-                item.callable().report_diagnostics(context, node, None);
-            }
-        } else {
-            // Report diagnostics for each element (union variant).
-            // Each element may be a single binding or an intersection of bindings.
-            for element in &self.elements {
-                self.report_element_diagnostics(context, node, element);
-            }
+        let union =
+            (self.elements.len() > 1).then(|| UnionDiagnosticContext::new(self.callable_type()));
+        for element in &self.elements {
+            element.report_diagnostics(context, node, union.as_ref());
         }
 
         // Report deferred constructor diagnostics when the matched overload is instance-returning.
@@ -1645,70 +1678,6 @@ impl<'db> Bindings<'db> {
                 continue;
             }
             downstream_bindings.report_diagnostics_impl(context, node);
-        }
-    }
-
-    /// Report diagnostics for a single union element.
-    /// If the element is an intersection where all bindings failed, use priority hierarchy.
-    fn report_element_diagnostics(
-        &self,
-        context: &CallDiagnosticContext<'_, '_, 'db, '_>,
-        node: ast::AnyNodeRef,
-        element: &BindingsElement<'db>,
-    ) {
-        // If this element succeeded, no diagnostics to report
-        if element.as_result(context.db()).is_ok() {
-            return;
-        }
-
-        let is_union = self.elements.len() > 1;
-
-        // For intersection elements, use priority hierarchy
-        if element.is_intersection() {
-            // Find the highest priority error among bindings in this element
-            let max_priority = element.error_priority(context.db());
-
-            // Only report errors from bindings with the highest priority
-            for item in &element.items {
-                let binding = item.callable();
-                if item.error_priority(context.db()) == max_priority {
-                    if !item.has_own_diagnostics() {
-                        continue;
-                    }
-                    if is_union {
-                        // Use layered diagnostic for intersection inside a union
-                        let layered_diag = LayeredDiagnostic {
-                            union_callable_type: self.callable_type(),
-                            intersection_callable_type: element.callable_type,
-                            binding,
-                        };
-                        binding.report_diagnostics(context, node, Some(&layered_diag));
-                    } else {
-                        // Just intersection, no union context needed
-                        let intersection_diag = IntersectionDiagnostic {
-                            callable_type: element.callable_type,
-                            binding,
-                        };
-                        binding.report_diagnostics(context, node, Some(&intersection_diag));
-                    }
-                }
-            }
-        } else {
-            // Single binding in this element - report as a union variant
-            if let Some(item) = element.items.first() {
-                if !item.has_own_diagnostics() {
-                    return;
-                }
-                let binding = item.callable();
-                if element.as_result(context.db()).is_ok() {
-                    return;
-                }
-                let union_diag = UnionDiagnostic {
-                    callable_type: self.callable_type(),
-                    variant_type: element.callable_type,
-                };
-                binding.report_diagnostics(context, node, Some(&union_diag));
-            }
         }
     }
 
@@ -4897,7 +4866,7 @@ impl<'db> CallableBinding<'db> {
         &self,
         context: &CallDiagnosticContext<'_, '_, 'db, '_>,
         node: ast::AnyNodeRef,
-        compound_diag: Option<&dyn CompoundDiagnostic>,
+        compound_diag: Option<&CompoundDiagnostic<'_, 'db>>,
     ) {
         let db = context.db();
         let env = context.program_environment();
@@ -10114,7 +10083,7 @@ impl<'db> Binding<'db> {
         context: &CallDiagnosticContext<'_, '_, 'db, '_>,
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
-        compound_diag: Option<&dyn CompoundDiagnostic>,
+        compound_diag: Option<&CompoundDiagnostic<'_, 'db>>,
         matching_overload: Option<&MatchingOverloadLiteral<'db>>,
     ) {
         let mut reported_argument_errors: FxHashMap<_, SmallVec<[_; 1]>> = FxHashMap::default();
@@ -10964,7 +10933,7 @@ impl<'db> BindingError<'db> {
         context: &CallDiagnosticContext<'_, '_, 'db, '_>,
         node: ast::AnyNodeRef,
         callable_ty: Type<'db>,
-        compound_diag: Option<&dyn CompoundDiagnostic>,
+        compound_diag: Option<&CompoundDiagnostic<'_, 'db>>,
         matching_overload: Option<&MatchingOverloadLiteral<'_>>,
         source_parameter_index_offset: usize,
     ) {
@@ -11671,123 +11640,73 @@ impl<'db> BindingError<'db> {
     }
 }
 
-/// Trait for adding context about compound types (unions/intersections) to diagnostics.
-trait CompoundDiagnostic {
-    /// Adds context about any relevant compound type function types to the given diagnostic.
-    fn add_context(&self, db: &dyn Db, env: &ProgramEnvironment<'_>, diag: &mut Diagnostic);
+/// All failing variants of a call share this note. Format the union only if we emit a diagnostic.
+struct UnionDiagnosticContext<'db> {
+    ty: Type<'db>,
+    message: OnceCell<String>,
 }
 
-/// Contains additional context for union specific diagnostics.
-///
-/// This is used when a function call is inconsistent with one or more variants
-/// of a union. This can be used to attach sub-diagnostics that clarify that
-/// the error is part of a union.
-struct UnionDiagnostic<'db> {
-    /// The type of the union.
-    callable_type: Type<'db>,
-    /// The type associated with the specific union variant that failed.
-    variant_type: Type<'db>,
-}
+impl<'db> UnionDiagnosticContext<'db> {
+    fn new(ty: Type<'db>) -> Self {
+        Self {
+            ty,
+            message: OnceCell::new(),
+        }
+    }
 
-impl CompoundDiagnostic for UnionDiagnostic<'_> {
-    fn add_context(&self, db: &dyn Db, env: &ProgramEnvironment<'_>, diag: &mut Diagnostic) {
-        let sub = SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            format_args!(
-                "Union variant `{callable_ty}` is incompatible with this call site",
-                callable_ty = self.variant_type.display(db, env),
-            ),
-        );
-        diag.sub(sub);
-
-        let sub = SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            format_args!(
+    fn message(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> &str {
+        self.message.get_or_init(|| {
+            format!(
                 "Attempted to call union type `{}`",
-                self.callable_type.display(db, env)
-            ),
-        );
-        diag.sub(sub);
+                self.ty.display(db, env)
+            )
+        })
     }
 }
 
-/// Contains additional context for intersection specific diagnostics.
-///
-/// This is used when a function call is inconsistent with all elements
-/// of an intersection. This can be used to attach sub-diagnostics that clarify that
-/// the error is part of an intersection.
-struct IntersectionDiagnostic<'b, 'db> {
-    /// The type of the intersection.
-    callable_type: Type<'db>,
-    /// The specific binding that failed.
-    binding: &'b CallableBinding<'db>,
+/// Identifies the part of a compound callable that failed to bind.
+enum CompoundDiagnostic<'a, 'db> {
+    UnionVariant {
+        variant: Type<'db>,
+        union: &'a UnionDiagnosticContext<'db>,
+    },
+    IntersectionElement {
+        element: Type<'db>,
+        intersection: Type<'db>,
+        union: Option<&'a UnionDiagnosticContext<'db>>,
+    },
 }
 
-impl CompoundDiagnostic for IntersectionDiagnostic<'_, '_> {
-    fn add_context(&self, db: &dyn Db, env: &ProgramEnvironment<'_>, diag: &mut Diagnostic) {
-        let sub = SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            format_args!(
-                "Intersection element `{callable_ty}` is incompatible with this call site",
-                callable_ty = self.binding.callable_type.display(db, env),
-            ),
-        );
-        diag.sub(sub);
-
-        let sub = SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            format_args!(
-                "Attempted to call intersection type `{}`",
-                self.callable_type.display(db, env)
-            ),
-        );
-        diag.sub(sub);
-    }
-}
-
-/// Contains both union and intersection context for layered diagnostics.
-///
-/// Used when an intersection fails inside a union - we want to report both
-/// that this is a union variant AND that this is an intersection element.
-struct LayeredDiagnostic<'b, 'db> {
-    /// The type of the union.
-    union_callable_type: Type<'db>,
-    /// The type of the intersection (for intersection context).
-    intersection_callable_type: Type<'db>,
-    /// The specific binding that failed.
-    binding: &'b CallableBinding<'db>,
-}
-
-impl CompoundDiagnostic for LayeredDiagnostic<'_, '_> {
-    fn add_context(&self, db: &dyn Db, env: &ProgramEnvironment<'_>, diag: &mut Diagnostic) {
-        // Add intersection context first (more specific)
-        let sub = SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            format_args!(
-                "Intersection element `{callable_ty}` is incompatible with this call site",
-                callable_ty = self.binding.callable_type.display(db, env),
-            ),
-        );
-        diag.sub(sub);
-
-        let sub = SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            format_args!(
-                "Attempted to call intersection type `{}`",
-                self.intersection_callable_type.display(db, env)
-            ),
-        );
-        diag.sub(sub);
-
-        // Then add union context (outer layer)
-        let sub = SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            format_args!(
-                "Attempted to call union type `{}`",
-                self.union_callable_type.display(db, env)
-            ),
-        );
-        diag.sub(sub);
+impl<'db> CompoundDiagnostic<'_, 'db> {
+    /// Describe the failing member first, then the enclosing intersection and union, if any.
+    fn add_context(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, diag: &mut Diagnostic) {
+        let union = match *self {
+            Self::UnionVariant { variant, union } => {
+                diag.info(format_args!(
+                    "Union variant `{}` is incompatible with this call site",
+                    variant.display(db, env)
+                ));
+                Some(union)
+            }
+            Self::IntersectionElement {
+                element,
+                intersection,
+                union,
+            } => {
+                diag.info(format_args!(
+                    "Intersection element `{}` is incompatible with this call site",
+                    element.display(db, env)
+                ));
+                diag.info(format_args!(
+                    "Attempted to call intersection type `{}`",
+                    intersection.display(db, env)
+                ));
+                union
+            }
+        };
+        if let Some(union) = union {
+            diag.info(union.message(db, env));
+        }
     }
 }
 
