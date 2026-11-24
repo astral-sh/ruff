@@ -11,7 +11,7 @@ use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use std::cell::{LazyCell, RefCell};
 
-use super::implicit_attributes::implicit_attribute_names;
+use super::member_sources::{ClassMemberLookup, implicit_attribute_names};
 use crate::{
     Db, FxIndexMap, FxIndexSet, TypeQualifiers,
     place::{
@@ -1660,7 +1660,27 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        let code_generator = CodeGeneratorKind::from_static_class(db, self);
+        let synthesized_member = |generator| {
+            self.own_generated_member(
+                db,
+                env,
+                specialization,
+                inherited_generic_context,
+                name,
+                || generator,
+            )
+            .map(Member::definitely_declared)
+            .or_else(|| {
+                self.implicit_hash(db, env, name)
+                    .map(|inner| Member { inner })
+            })
+        };
+        let code_generator = match self.class_member_lookup(db, name) {
+            ClassMemberLookup::SynthesizedOnly => {
+                return synthesized_member(None).unwrap_or_default();
+            }
+            ClassMemberLookup::Namespace { code_generator } => code_generator,
+        };
         if code_generator.is_some_and(CodeGeneratorKind::is_dataclass_like) {
             if name == "__dataclass_fields__" {
                 // Make this class look like a subclass of the `DataClassInstance` protocol
@@ -1746,21 +1766,9 @@ impl<'db> StaticClassLiteral<'db> {
         if member.is_undefined()
             || name == "__slots__" && self.has_generated_slots(db) && !self.has_explicit_slots(db)
         {
-            if let Some(synthesized_member) = self.own_generated_member(
-                db,
-                env,
-                specialization,
-                inherited_generic_context,
-                name,
-                || code_generator,
-            ) {
-                return Member::definitely_declared(synthesized_member);
-            }
-            if let Some(hash) = self.implicit_hash(db, env, name) {
-                return Member { inner: hash };
-            }
-            // The symbol was not found in the class scope. It might still be implicitly defined in `@classmethod`s.
-            return sources.implicit_attribute(db, name, MethodDecorator::ClassMethod);
+            return synthesized_member(code_generator).unwrap_or_else(|| {
+                sources.implicit_attribute(db, name, MethodDecorator::ClassMethod)
+            });
         }
 
         // If an explicit hash is conditional, the synthesized hash fills the other paths.
@@ -3179,7 +3187,10 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        if self.is_typed_dict(db) || self.lacks_instance_storage(db, name) {
+        if !self.may_have_instance_member(db, name)
+            || self.is_typed_dict(db)
+            || self.lacks_instance_storage(db, name)
+        {
             return Place::Undefined.into();
         }
 
@@ -3219,6 +3230,9 @@ impl<'db> StaticClassLiteral<'db> {
         // - Proper diagnostics
 
         let sources = self.member_sources(db);
+        if !sources.may_define_instance_member(name) {
+            return Member::unbound();
+        }
         let body_scope = sources.scope;
         let table = &sources.table;
 
