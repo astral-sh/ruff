@@ -2043,7 +2043,9 @@ Generic callable arguments participate in fixpoint inference, allowing the infer
 ```py
 from typing import Callable
 
-def generic_pair[T](x: list[T], y: list[T], /) -> None: ...
+def generic_pair[T](x: list[T], y: list[T], /) -> T:
+    return x[0] if x else y[0]
+
 def generic_pair_with_container[T](x: T, y: list[T], /) -> None: ...
 def generic_identity_list[T](x: list[T], /) -> list[T]:
     raise NotImplementedError
@@ -2059,16 +2061,22 @@ union_list_result: list[int | str] = to_thread_like(
     reveal_type([1]),  # revealed: list[int]
 )
 
-to_thread_like(
+# TODO: These should not error once we infer a shared forwarded specialization during fixpoint inference.
+pair_result = to_thread_like(
     generic_pair,
-    reveal_type([1]),  # revealed: list[str | int]
-    reveal_type([""]),  # revealed: list[int | str]
+    # error: [invalid-argument-type]
+    reveal_type([1]),  # revealed: list[int]
+    # error: [invalid-argument-type]
+    reveal_type([""]),  # revealed: list[str]
 )
+# TODO: This should reveal `int | str`.
+reveal_type(pair_result)  # revealed: T@generic_pair
 
 to_thread_like(
     generic_pair_with_container,
     1,
-    reveal_type([""]),  # revealed: list[int | str]
+    # error: [invalid-argument-type]
+    reveal_type([""]),  # revealed: list[str]
 )
 ```
 

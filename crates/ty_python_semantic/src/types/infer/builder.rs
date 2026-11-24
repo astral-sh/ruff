@@ -8486,6 +8486,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Create a set of constraints to infer a precise type for `T`.
         let mut tuple_size_promotion_constraints = TupleSizePromotionConstraints::default();
+        let mut has_element_context = false;
 
         for elt_ty in elt_tys.clone() {
             let elt_ty_identity = elt_ty.identity(self.db());
@@ -8521,6 +8522,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // matches the behavior of other type checkers and is usually the desired behavior.
             if let Some(elt_tcx) = elt_tcx {
                 builder.add_type_mapping(elt_ty, elt_tcx, TypeVarVariance::Invariant);
+                has_element_context = true;
             }
         }
 
@@ -8569,6 +8571,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        // Record all element bounds in case we need to re-solve without type context after
+        // a failed inference attempt.
+        let mut element_bounds = [const { Vec::new() }; N];
+
         // Consecutive elements often contribute the same lower bound after literal promotion.
         // Track keys and values separately for dictionaries.
         let mut previous_evidence = [None; N];
@@ -8611,6 +8617,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         unpacked_value_ty.promote(db, env),
                     );
 
+                    if has_element_context {
+                        element_bounds[0].push(unpacked_key_ty);
+                        element_bounds[1].push(unpacked_value_ty);
+                    }
+
                     builder.infer(Type::TypeVar(key_ty), unpacked_key_ty).ok()?;
 
                     builder
@@ -8652,12 +8663,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     });
 
                 // Simplify the inference based on a non-covariant declared type.
-                if let Some(elt_tcx) =
-                    elt_tcx.filter(|_| !elt_tcx_variance[&elt_ty_identity].is_covariant())
-                    && inferred_elt_ty.is_assignable_to(db, env, elt_tcx)
-                {
-                    continue;
-                }
+                let covered_by_context = elt_tcx.is_some_and(|elt_tcx| {
+                    !elt_tcx_variance[&elt_ty_identity].is_covariant()
+                        && inferred_elt_ty.is_assignable_to(db, env, elt_tcx)
+                });
 
                 // A covariant context is an upper bound, so promotion must not widen an otherwise
                 // compatible element beyond that bound. In particular, promoting an exact float
@@ -8682,6 +8691,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     inferred_elt_ty
                 };
 
+                if has_element_context {
+                    element_bounds[i].push(inferred_type_for_typevar);
+                }
+
                 // Only exact tuples depend on the expression for tuple-size promotion.
                 // For example, a variable can block promotion even immediately after a
                 // tuple literal with the same promoted type.
@@ -8700,7 +8713,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     inferred_type_for_typevar,
                 );
 
-                if !repeated {
+                if !covered_by_context && !repeated {
                     builder
                         .infer(Type::TypeVar(elt_ty), inferred_type_for_typevar)
                         .ok()?;
@@ -8709,22 +8722,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let class_type = class.apply_specialization(db, |_| {
-            builder.build_merged_with(|current_typevar, bounds| {
-                let lower = bounds?.inference_lower()?;
+        let solve = |builder: &mut SpecializationBuilder<'db, '_>| {
+            let class_type = class.apply_specialization(db, |_| {
+                builder.build_merged_with(|current_typevar, bounds| {
+                    let lower = bounds?.inference_lower()?;
 
-                let lower = lower.promote_collection_element_type(
-                    db,
-                    env,
-                    tuple_size_promotion_constraints.allow(current_typevar.identity(self.db())),
-                    tcx.expected_type().is_none(),
-                );
+                    let lower = lower.promote_collection_element_type(
+                        db,
+                        env,
+                        tuple_size_promotion_constraints.allow(current_typevar.identity(self.db())),
+                        tcx.expected_type().is_none(),
+                    );
 
-                Some(lower)
-            })
-        });
+                    Some(lower)
+                })
+            });
 
-        Type::from(class_type).to_instance_approximation(db, env)
+            Type::from(class_type).to_instance_approximation(db, env)
+        };
+
+        let collection_ty = solve(&mut builder)?;
+
+        // If the result collection type is incompatible with the type context, re-solve without
+        // type context for more precise diagnostics.
+        if has_element_context
+            && let Some(expected) = tcx.expected_type()
+            && !collection_ty.is_assignable_to(db, env, expected)
+        {
+            let mut builder = SpecializationBuilder::new(db, env, &constraints, generic_context);
+            for (typevar, mut bounds) in elt_tys.zip(element_bounds) {
+                bounds.dedup();
+                for bound in bounds {
+                    builder.infer(Type::TypeVar(typevar), bound).ok()?;
+                }
+            }
+
+            return solve(&mut builder);
+        }
+
+        Some(collection_ty)
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.

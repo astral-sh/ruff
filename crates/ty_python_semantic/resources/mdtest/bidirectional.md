@@ -1340,11 +1340,11 @@ x2: TD | None = first([{"x": 0}, {"x": 1}])
 reveal_type(x2)  # revealed: TD
 
 # TODO: We could provide `TypedDict` key diagnostics here.
-# error: [invalid-assignment] "Object of type `TD | dict[str, int]` is not assignable to `TD`"
+# error: [invalid-assignment] "Object of type `dict[str, int] | TD` is not assignable to `TD`"
 x3: TD = first([{"y": 0}, {"x": 1}])
 
 # TODO: We could provide `TypedDict` key diagnostics here.
-# error: [invalid-assignment] "Object of type `TD | None | dict[str, int]` is not assignable to `TD | None`"
+# error: [invalid-assignment] "Object of type `dict[str, int] | TD` is not assignable to `TD | None`"
 x4: TD | None = first([{"y": 0}, {"x": 1}])
 
 # `ObjectCallback` is redundant in this union, so expanding the aliases collapses the narrowing
@@ -1724,7 +1724,7 @@ collection literals:
 import builtins
 from collections import defaultdict
 from collections.abc import Mapping
-from typing import Any, Callable, Iterable, Literal, MutableSequence, overload, Sequence
+from typing import Any, Callable, Iterable, Literal, MutableSequence, overload, Protocol, Sequence
 
 # TODO: This should be `list[Any]`.
 # revealed: list[int]
@@ -1767,6 +1767,12 @@ x11: list[Iterable[Any]] = reveal_type([[i] for i in [1, 2, 3]])
 
 # revealed: list[list[Any]]
 x12: Iterable[list[Any]] = reveal_type([[i] for i in [1, 2, 3]])
+
+class Sink[T](Protocol):
+    def append(self, item: T, /) -> None: ...
+
+# revealed: list[int | str]
+x13: Sink[int] = reveal_type(["x"])
 
 def _(dynamic: Any):
     # TODO: This should be `list[int]`.
@@ -2833,7 +2839,7 @@ def generic_type_context(values: list[int | str] | None) -> None:
 
 def widened_non_empty_fallback(values: list[int] | None) -> None:
     result = values or ["x"]
-    reveal_type(result)  # revealed: (list[int] & ~AlwaysFalsy) | list[int | str]
+    reveal_type(result)  # revealed: (list[int] & ~AlwaysFalsy) | list[str]
 
 def incompatible_collection_kind(values: set[str] | None) -> None:
     reveal_type(values or [1])  # revealed: (set[str] & ~AlwaysFalsy) | list[int]
