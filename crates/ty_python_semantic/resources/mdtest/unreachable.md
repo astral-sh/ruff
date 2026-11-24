@@ -105,8 +105,8 @@ def f():
 
 ### Reading an unchanged parameter after nested branches
 
-Both inner branches end in a call that never returns. The read of `y` must see the merged
-conditions even though neither branch assigns to `y`.
+Both inner branches end in a call that never returns. The read of `y` must see the merged conditions
+even though neither branch assigns to `y`.
 
 ```py
 from typing_extensions import Never
