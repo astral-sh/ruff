@@ -2110,6 +2110,59 @@ reveal_type(node)  # revealed: Node
 reveal_type(node.next)  # revealed: None | Node
 ```
 
+### A class used as a condition depends on a loop variable
+
+Testing the class can require resolving its base, which depends on `value`. The loop only ever
+assigns `value` its own value through a closure, so it stays `Literal[1]`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def check():
+    value = 1
+    read = lambda: value
+
+    class C[T]((lambda: type(value))()):
+        pass
+
+    cls = C
+    for _ in range(2):
+        if cls:
+            value = read()
+        else:
+            read = lambda: value
+        cls = int
+        reveal_type(value)  # revealed: Literal[1]
+```
+
+### A truthy operand short-circuits a recursive class lookup
+
+`selected` is always truthy, first as a function and then as `True`. Even though the class base
+depends on `selected`, the condition always takes the branch that sets `flag`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+selected = lambda: selected
+flag = None
+
+class Result[T](int if (lambda: bool(selected))() else object):
+    pass
+
+factory = Result
+for _ in range(2):
+    if selected or factory:  # error: [redundant-condition]
+        selected = flag = True
+    factory = type(flag)
+    reveal_type(flag)  # revealed: Literal[True]
+```
+
 ### Nested collection cycles do not panic
 
 Regression test for [#3836](https://github.com/astral-sh/ty/issues/3836).

@@ -13,6 +13,27 @@ use crate::types::{
 use ty_python_core::Truthiness;
 
 impl<'db> Type<'db> {
+    /// Whether we can test this type's truthiness without inferring more types.
+    /// In particular, a class's metaclass or an instance's `__bool__` can depend
+    /// on the very predicate we're inferring.
+    pub(super) fn has_intrinsic_truthiness(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Dynamic(_) | Type::Never | Type::FunctionLiteral(_) | Type::BoundMethod(_) => {
+                true
+            }
+            Type::LiteralValue(value) => !matches!(value.kind(), LiteralValueTypeKind::Enum(_)),
+            Type::NominalInstance(instance) => instance
+                .known_class(db)
+                .and_then(KnownClass::bool)
+                .is_some(),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|ty| ty.has_intrinsic_truthiness(db)),
+            _ => false,
+        }
+    }
+
     /// Resolves the boolean value of the type and falls back to [`Truthiness::Ambiguous`] if the type doesn't implement `__bool__` correctly.
     ///
     /// This method should only be used outside type checking or when evaluating if a type

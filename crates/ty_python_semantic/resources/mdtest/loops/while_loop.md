@@ -920,6 +920,28 @@ def wrap_method(initial: int):
     reveal_type(value)  # revealed: int | Divergent | (bound method list[int | Divergent].copy() -> list[int | Divergent])
 ```
 
+### An unreachable assignment to the loop condition
+
+The lambda in the class base reads the same variable that the loop rebinds. Since `value` starts at
+zero, the loop never runs and the class instance cannot contribute to its type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+value = 0
+
+class C[T]((lambda: type(value))()):
+    pass
+
+while value:
+    value = C()
+
+reveal_type(value)  # revealed: Literal[0]
+```
+
 ### Compound conditions in nested loops
 
 Integer arithmetic preserves the counter's type across nested loops, including when a compound

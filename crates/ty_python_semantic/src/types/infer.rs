@@ -618,8 +618,8 @@ fn cached_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>
     evaluate_predicate_truthiness(db, expression)
 }
 
-/// A widened operand can require a new metaclass lookup. If cycle recovery cleared
-/// the cached truthiness, recompute it here, outside the recovery function.
+/// Keep metaclass and special method lookups in the caller's query, where they
+/// see the operand types after cycle recovery.
 fn evaluate_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
     let ExpressionKind::Predicate { context, .. } = expression.kind(db) else {
         return Truthiness::Ambiguous;
@@ -675,10 +675,18 @@ pub(super) fn infer_expression_types_impl<'db>(
     )
     .finish_expression();
 
+    // Looking up a metaclass or a special method here can change which queries form
+    // a cycle, even if we later discard the result. Only evaluate predicates whose
+    // operands can all be tested without further inference.
     if let ExpressionKind::Predicate {
         context,
         in_loop: true,
     } = expression.kind(db)
+        && !inference.is_provisional()
+        && inference
+            .expressions
+            .values()
+            .all(|ty| ty.has_intrinsic_truthiness(db))
     {
         inference.loop_truthiness =
             Some(inference.truthiness(db, &env, expression.node_ref(db).node(&module), context));
@@ -1986,8 +1994,7 @@ pub(crate) struct ExpressionInference<'db> {
     /// The types of every expression in this region.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
-    /// A loop predicate can be tested repeatedly without a separate truthiness query.
-    /// Discard its result if cycle recovery changes any of the analyzer's inputs.
+    /// Cached truthiness for a loop predicate whose inference did not need cycle recovery.
     loop_truthiness: Option<Truthiness>,
 
     extra: Option<Box<ExpressionInferenceExtra<'db>>>,
@@ -2082,13 +2089,10 @@ impl<'db> ExpressionInference<'db> {
         previous: &ExpressionInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ExpressionInference<'db> {
-        // Different inferred operands can normalize to the same types. If only some
-        // iterations invalidate the cache, it can alternate between `Some` and `None`
-        // and prevent convergence. Give the initial empty cache a chance to fill,
-        // then keep it only as long as successive iterations agree.
-        if cycle.iteration() > 0 && self.loop_truthiness != previous.loop_truthiness {
-            self.loop_truthiness = None;
-        }
+        // Normalization can change the operands or comparison outcomes. Clear the cache
+        // even when this iteration leaves them unchanged, so it can't alternate between
+        // `Some` and `None` after the normalized types have converged.
+        self.loop_truthiness = None;
 
         if let Some(extra) = self.extra.as_mut() {
             for (binding, binding_ty) in &mut extra.bindings {
@@ -2111,11 +2115,7 @@ impl<'db> ExpressionInference<'db> {
 
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
-            let normalized = ty.cycle_normalized(db, env, previous_ty, cycle);
-            if self.loop_truthiness.is_some() && normalized != *ty {
-                self.loop_truthiness = None;
-            }
-            *ty = normalized;
+            *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -2159,13 +2159,7 @@ impl<'db> ExpressionInference<'db> {
             |expression| previous.expression_type(expression).bool(db, env),
         );
         if comparison_truthiness.iter().next().is_some() {
-            let extra = self.extra.get_or_insert_default();
-            if self.loop_truthiness.is_some()
-                && extra.comparison_truthiness != comparison_truthiness
-            {
-                self.loop_truthiness = None;
-            }
-            extra.comparison_truthiness = comparison_truthiness;
+            self.extra.get_or_insert_default().comparison_truthiness = comparison_truthiness;
         }
     }
 
