@@ -635,6 +635,28 @@ fn unspecialized_phantom_argument_respects_the_evidence_policy() -> anyhow::Resu
 }
 
 #[test]
+fn incompatible_bounds_exhaust_no_additional_paths_when_folding() {
+    let db = setup_db();
+    let db = &db;
+    let t = create_typevar(db, "T");
+    let builder = ConstraintSetBuilder::new();
+    let set = exact(db, &builder, t, known_instance(db, KnownClass::Int)).and(db, &builder, || {
+        exact(db, &builder, t, known_instance(db, KnownClass::Str))
+    });
+
+    // Visiting the two constraints and their true terminal is enough to reject the only path.
+    let budget = SolutionBudget {
+        visits: 3,
+        paths: 1,
+        type_terms: 0,
+    };
+    assert_eq!(
+        collect_paths(db, &builder, set, &[t], budget),
+        Ok(SolutionProjection::Unsatisfiable)
+    );
+}
+
+#[test]
 fn terminal_projections_need_no_paths_or_types() {
     let db = setup_db();
     let db = &db;
