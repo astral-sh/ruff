@@ -618,7 +618,7 @@ impl<'db> BindingsElement<'db> {
         &self,
         context: &CallDiagnosticContext<'_, '_, 'db, '_>,
         node: ast::AnyNodeRef,
-        union: Option<&UnionNote<'db>>,
+        union: Option<&UnionDiagnosticContext<'db>>,
     ) {
         if let [item] = self.items.as_slice() {
             if item.has_own_diagnostics() {
@@ -1654,7 +1654,8 @@ impl<'db> Bindings<'db> {
             return;
         }
 
-        let union = (self.elements.len() > 1).then(|| UnionNote::new(self.callable_type()));
+        let union =
+            (self.elements.len() > 1).then(|| UnionDiagnosticContext::new(self.callable_type()));
         for element in &self.elements {
             element.report_diagnostics(context, node, union.as_ref());
         }
@@ -11640,12 +11641,12 @@ impl<'db> BindingError<'db> {
 }
 
 /// All failing variants of a call share this note. Format the union only if we emit a diagnostic.
-struct UnionNote<'db> {
+struct UnionDiagnosticContext<'db> {
     ty: Type<'db>,
     message: OnceCell<String>,
 }
 
-impl<'db> UnionNote<'db> {
+impl<'db> UnionDiagnosticContext<'db> {
     fn new(ty: Type<'db>) -> Self {
         Self {
             ty,
@@ -11667,12 +11668,12 @@ impl<'db> UnionNote<'db> {
 enum CompoundDiagnostic<'a, 'db> {
     UnionVariant {
         variant: Type<'db>,
-        union: &'a UnionNote<'db>,
+        union: &'a UnionDiagnosticContext<'db>,
     },
     IntersectionElement {
         element: Type<'db>,
         intersection: Type<'db>,
-        union: Option<&'a UnionNote<'db>>,
+        union: Option<&'a UnionDiagnosticContext<'db>>,
     },
 }
 
