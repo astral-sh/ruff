@@ -101,3 +101,9 @@ def while_loop_mutation():
         print(letters[index])
 
 
+def comprehension_if_clause(xs):
+    return [1 for i, x in enumerate(xs) if xs[i]]  # PLR1736
+
+
+def enumerate_not_first_generator(xs, ys):
+    return [xs[i] for _ in ys for i, x in enumerate(xs)]  # PLR1736
