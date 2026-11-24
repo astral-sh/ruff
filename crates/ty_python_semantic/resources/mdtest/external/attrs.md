@@ -230,6 +230,7 @@ class Person:
         return 0
 
 person = Person()
+Person(name="Alice")  # ok
 Person(id=1)  # ok
 Person(name="Alice", id=1)  # ok
 Person(id="1")  # error: [invalid-argument-type]
