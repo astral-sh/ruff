@@ -150,14 +150,14 @@ fn cmp_fix(name1: &str, name2: &str, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
         let rules = (name1, name2);
         // Apply `D400` fixes before `D209` fixes.
         let summary_period = Rule::DocstringSummaryWithoutPeriod.name().as_str();
-        let newline_after_last_paragraph = Rule::MissingNewlineAfterLastDocstringParagraph
+        let missing_newline_after_last_paragraph = Rule::MissingNewlineAfterLastDocstringParagraph
             .name()
             .as_str();
         let if_else_instead_of_dict_get = Rule::IfElseBlockInsteadOfDictGet.name().as_str();
         let if_else_instead_of_if_exp = Rule::IfElseAssignmentToSameVariable.name().as_str();
-        if rules == (summary_period, newline_after_last_paragraph) {
+        if rules == (summary_period, missing_newline_after_last_paragraph) {
             std::cmp::Ordering::Less
-        } else if rules == (newline_after_last_paragraph, summary_period) {
+        } else if rules == (missing_newline_after_last_paragraph, summary_period) {
             std::cmp::Ordering::Greater
         }
         // Apply `IfElseBlockInsteadOfDictGet` fixes before `IfElseAssignmentToSameVariable` fixes.

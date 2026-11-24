@@ -76,7 +76,7 @@ pub(crate) fn check_tokens(
         Rule::UnescapedEscapeCharacter,
         Rule::UnescapedNullCharacter,
         Rule::UnescapedZeroWidthSpaceCharacter,
-    ]) && pylint::rules::contains_invalid_string_character(locator.contents())
+    ]) && pylint::rules::contains_unescaped_string_character(locator.contents())
     {
         let mut interpolated_string_depths: Vec<u32> = Vec::new();
         let target_version = context
@@ -114,7 +114,7 @@ pub(crate) fn check_tokens(
                 _ => interpolated_string_depths.iter().any(|depth| *depth > 0),
             };
 
-            pylint::rules::invalid_string_characters(
+            pylint::rules::unescaped_string_characters(
                 context,
                 token,
                 locator,

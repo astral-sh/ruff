@@ -14,6 +14,6 @@ pub(crate) fn suite(suite: &[Stmt], checker: &Checker) {
         flake8_pyi::rules::docstring_in_stubs(checker, suite);
     }
     if checker.is_rule_enabled(Rule::ConsecutiveGlobalOrNonlocalStatements) {
-        refurb::rules::repeated_global(checker, suite);
+        refurb::rules::consecutive_global_or_nonlocal_statements(checker, suite);
     }
 }

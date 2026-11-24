@@ -223,7 +223,9 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 pydocstyle::rules::blank_before_after_class(checker, &docstring);
             }
             if checker.is_rule_enabled(Rule::IncorrectBlankLineAfterDocstringSummary) {
-                pydocstyle::rules::blank_after_summary(checker, &docstring);
+                pydocstyle::rules::incorrect_blank_line_after_docstring_summary(
+                    checker, &docstring,
+                );
             }
             if checker.any_rule_enabled(&[
                 Rule::DocstringTabIndentation,
@@ -233,28 +235,30 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 pydocstyle::rules::indent(checker, &docstring);
             }
             if checker.is_rule_enabled(Rule::MissingNewlineAfterLastDocstringParagraph) {
-                pydocstyle::rules::newline_after_last_paragraph(checker, &docstring);
+                pydocstyle::rules::missing_newline_after_last_docstring_paragraph(
+                    checker, &docstring,
+                );
             }
             if checker.is_rule_enabled(Rule::WhitespaceAroundDocstringText) {
-                pydocstyle::rules::no_surrounding_whitespace(checker, &docstring);
+                pydocstyle::rules::whitespace_around_docstring_text(checker, &docstring);
             }
             if checker.any_rule_enabled(&[
                 Rule::MultilineDocstringSummaryOnSeparateLine,
                 Rule::MultilineDocstringSummaryOnFirstLine,
             ]) {
-                pydocstyle::rules::multi_line_summary_start(checker, &docstring);
+                pydocstyle::rules::multiline_docstring_summary_start(checker, &docstring);
             }
             if checker.is_rule_enabled(Rule::UnconventionalDocstringQuotes) {
-                pydocstyle::rules::triple_quotes(checker, &docstring);
+                pydocstyle::rules::unconventional_docstring_quotes(checker, &docstring);
             }
             if checker.is_rule_enabled(Rule::EscapeSequenceInDocstring) {
                 pydocstyle::rules::backslashes(checker, &docstring);
             }
             if checker.is_rule_enabled(Rule::DocstringSummaryWithoutPeriod) {
-                pydocstyle::rules::ends_with_period(checker, &docstring);
+                pydocstyle::rules::docstring_summary_without_period(checker, &docstring);
             }
             if checker.is_rule_enabled(Rule::NonImperativeDocstringSummary) {
-                pydocstyle::rules::non_imperative_mood(
+                pydocstyle::rules::non_imperative_docstring_summary(
                     checker,
                     &docstring,
                     &checker.settings().pydocstyle,
@@ -271,13 +275,15 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 pydocstyle::rules::no_signature(checker, &docstring);
             }
             if checker.is_rule_enabled(Rule::DocstringStartsWithLowercaseLetter) {
-                pydocstyle::rules::capitalized(checker, &docstring);
+                pydocstyle::rules::docstring_starts_with_lowercase_letter(checker, &docstring);
             }
             if checker.is_rule_enabled(Rule::DocstringStartsWithThis) {
                 pydocstyle::rules::starts_with_this(checker, &docstring);
             }
             if checker.is_rule_enabled(Rule::DocstringSummaryWithoutTerminalPunctuation) {
-                pydocstyle::rules::ends_with_punctuation(checker, &docstring);
+                pydocstyle::rules::docstring_summary_without_terminal_punctuation(
+                    checker, &docstring,
+                );
             }
             if checker.is_rule_enabled(Rule::OverloadWithDocstring) {
                 pydocstyle::rules::if_needed(checker, &docstring);

@@ -5,8 +5,8 @@ pub(crate) use imports::*;
 pub(crate) use marks::*;
 pub(crate) use parametrize::*;
 pub(crate) use patch::*;
+pub(crate) use pytest_parameter_with_default_value::*;
 pub(crate) use raises::*;
-pub(crate) use test_functions::*;
 pub(crate) use warns::*;
 
 mod assertion;
@@ -16,7 +16,7 @@ mod imports;
 mod marks;
 mod parametrize;
 mod patch;
+mod pytest_parameter_with_default_value;
 mod raises;
-mod test_functions;
 mod unittest_assert;
 mod warns;

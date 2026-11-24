@@ -607,7 +607,7 @@ pub(crate) fn percent_format_expected_sequence(
 }
 
 /// F504
-pub(crate) fn percent_format_extra_named_arguments(
+pub(crate) fn percent_format_unused_named_arguments(
     checker: &Checker,
     summary: &CFormatSummary,
     right: &Expr,
@@ -802,7 +802,7 @@ pub(crate) fn percent_format_star_requires_sequence(
 }
 
 /// F522
-pub(crate) fn string_dot_format_extra_named_arguments(
+pub(crate) fn str_format_unused_keyword_arguments(
     checker: &Checker,
     call: &ast::ExprCall,
     summary: &FormatSummary,
@@ -862,7 +862,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
 }
 
 /// F523
-pub(crate) fn string_dot_format_extra_positional_arguments(
+pub(crate) fn str_format_unused_positional_arguments(
     checker: &Checker,
     call: &ast::ExprCall,
     summary: &FormatSummary,
@@ -942,7 +942,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
 }
 
 /// F524
-pub(crate) fn string_dot_format_missing_argument(
+pub(crate) fn str_format_missing_arguments(
     checker: &Checker,
     call: &ast::ExprCall,
     summary: &FormatSummary,
@@ -982,7 +982,7 @@ pub(crate) fn string_dot_format_missing_argument(
 }
 
 /// F525
-pub(crate) fn string_dot_format_mixing_automatic(
+pub(crate) fn str_format_mixed_placeholder_numbering(
     checker: &Checker,
     call: &ast::ExprCall,
     summary: &FormatSummary,
