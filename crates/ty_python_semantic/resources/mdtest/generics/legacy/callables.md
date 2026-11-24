@@ -1975,3 +1975,36 @@ callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
 ```
+
+## Subtyping a non-generic callable
+
+One specialization of the generic function has to satisfy both the parameter and return types.
+
+```py
+from typing import Callable, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+T = TypeVar("T", bound=int)
+
+def identity(value: T, /) -> T:
+    return value
+
+static_assert(is_subtype_of(TypeOf[identity], Callable[[int], int]))
+static_assert(is_subtype_of(TypeOf[identity], Callable[[bool], bool]))
+static_assert(not is_subtype_of(TypeOf[identity], Callable[[str], str]))
+static_assert(not is_subtype_of(TypeOf[identity], Callable[[int], bool]))
+```
+
+A constrained type variable specializes to one of its declared choices. Here, passing a `bool`
+selects `int`, so the return type can be wider than the argument type.
+
+```py
+U = TypeVar("U", int, str)
+
+def choose(value: U, /) -> U:
+    return value
+
+static_assert(is_subtype_of(TypeOf[choose], Callable[[bool], int]))
+static_assert(not is_subtype_of(TypeOf[choose], Callable[[bool], bool]))
+```
