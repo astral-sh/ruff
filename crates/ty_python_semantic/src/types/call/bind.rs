@@ -68,6 +68,7 @@ use crate::types::infer::{TypeContextKind, original_class_type};
 use crate::types::known_instance::{
     FieldInstance, InternedConstraintSetSolution, MethodWrapper, MethodWrapperKind,
 };
+use crate::types::protocol_class::has_all_protocol_members_defined;
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
     PartialApplication,
@@ -3600,6 +3601,27 @@ struct OverloadFilter<'db> {
     candidates: Box<[OverloadFilterCandidate<'db>]>,
 }
 
+/// These instance types reject `object` even when combined in a parameter union.
+/// Complementary intersections could cover
+/// `object` together, and `object()` can satisfy some protocols, such as `Hashable`.
+fn parameter_excludes_object<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    parameter: Type<'db>,
+) -> bool {
+    let excludes_object = |ty| match ty {
+        Type::NominalInstance(instance) => !instance.is_object(),
+        Type::ProtocolInstance(protocol) => {
+            !has_all_protocol_members_defined(db, env, Type::object(), protocol)
+        }
+        _ => false,
+    };
+    match parameter.expand_top_level_aliases(db, env) {
+        Type::Union(union) => union.elements(db).iter().copied().all(excludes_object),
+        ty => excludes_object(ty),
+    }
+}
+
 impl<'db> OverloadFilter<'db> {
     /// Find the first prefix whose parameters accept every materialization of the arguments.
     /// Keep all candidates if no prefix covers them.
@@ -3672,6 +3694,29 @@ impl<'db> OverloadFilter<'db> {
                         }
                     }),
             );
+
+            // When all prefixes see the same arguments, a single uncovered
+            // slot rules them all out. Require a full argument tuple so
+            // dropping an empty parameter slot can only give a length mismatch.
+            if group.len() == candidates.len() - 1
+                && let Some(tuple) = top_materialized_argument_type.exact_tuple_instance_spec(db)
+                && let Some(tuple) = tuple.as_fixed_length()
+                && tuple.len() == max_slot_count
+                && tuple
+                    .elements_slice()
+                    .iter()
+                    .enumerate()
+                    .any(|(index, arg)| {
+                        arg.is_object()
+                            && group.iter().all(|candidate| {
+                                candidate.slots.get(index).is_some_and(|slot| {
+                                    parameter_excludes_object(db, env, slot.parameter)
+                                })
+                            })
+                    })
+            {
+                return candidates.len();
+            }
 
             for current in group {
                 prefix_len += 1;
