@@ -79,15 +79,15 @@ Module(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
                                     range: 43..48,
-                                    keys: [],
-                                    patterns: [],
-                                    rest: Some(
-                                        Identifier {
-                                            id: Name("_"),
-                                            range: 46..47,
-                                            node_index: NodeIndex(None),
-                                        },
-                                    ),
+                                    items: [
+                                        Rest(
+                                            Identifier {
+                                                id: Name("_"),
+                                                range: 46..47,
+                                                node_index: NodeIndex(None),
+                                            },
+                                        ),
+                                    ],
                                 },
                             ),
                             guard: None,
