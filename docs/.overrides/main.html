@@ -2,12 +2,14 @@
 
 {% block htmltitle %}
 {% if page.meta and page.meta.title %}
-<title>{{ page.meta.title }} | {{ config.site_name }}</title>
+{% set title = page.meta.title ~ " | " ~ config.site_name %}
 {% elif page.title and not page.is_homepage %}
-<title>{{ page.title | striptags }} | {{ config.site_name }}</title>
+{% set title = page.title | striptags ~ " | " ~ config.site_name %}
 {% else %}
-<title>{{ config.site_name }}</title>
+{% set title = config.site_name %}
 {% endif %}
+<title>{{ title | e }}</title>
+<meta property="og:title" content="{{ title | e }}" />
 {% endblock %}
 
 {% block extrahead %}
@@ -19,6 +21,15 @@
 <meta name="msapplication-TileColor" content="#d7ff64"/>
 <meta name="theme-color" content="#ffffff"/>
 <meta name="robots" content="index,follow"/>
+<meta property="og:type" content="website" />
+{% if page.canonical_url %}
+<meta property="og:url" content="{{ page.canonical_url | e }}" />
+{% endif %}
+{% set description = (page.meta and page.meta.description) or config.site_description %}
+<meta property="og:description" content="{{ description | e }}" />
+<meta property="og:image" content="{{ config.site_url ~ 'assets/Ruff.png' }}" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:site" content="@astral_sh" />
 <script type="application/ld+json">
     {
         "@context": "https://schema.org",
