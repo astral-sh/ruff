@@ -584,7 +584,7 @@ pub(crate) fn infer_expression_types<'db>(
 }
 
 /// A loop predicate can depend on bindings it guards in the previous iteration.
-/// Evaluate it in the caller's query to keep an extra query out of that cycle.
+/// Reuse its expression inference to keep an extra query out of that cycle.
 pub(crate) fn infer_predicate_truthiness<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
@@ -618,8 +618,8 @@ fn cached_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>
     evaluate_predicate_truthiness(db, expression)
 }
 
-/// A widened operand can require a new metaclass lookup, so evaluate truthiness after
-/// expression inference has normalized the operand types.
+/// A widened operand can require a new metaclass lookup. If cycle recovery cleared
+/// the cached truthiness, recompute it here, outside the recovery function.
 fn evaluate_predicate_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
     let ExpressionKind::Predicate { context, .. } = expression.kind(db) else {
         return Truthiness::Ambiguous;
@@ -2082,6 +2082,14 @@ impl<'db> ExpressionInference<'db> {
         previous: &ExpressionInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ExpressionInference<'db> {
+        // Different inferred operands can normalize to the same types. If only some
+        // iterations invalidate the cache, it can alternate between `Some` and `None`
+        // and prevent convergence. Give the initial empty cache a chance to fill,
+        // then keep it only as long as successive iterations agree.
+        if cycle.iteration() > 0 && self.loop_truthiness != previous.loop_truthiness {
+            self.loop_truthiness = None;
+        }
+
         if let Some(extra) = self.extra.as_mut() {
             for (binding, binding_ty) in &mut extra.bindings {
                 if let Some((_, previous_binding)) = previous.extra.as_deref().and_then(|extra| {
