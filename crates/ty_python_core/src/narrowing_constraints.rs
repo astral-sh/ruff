@@ -35,10 +35,9 @@
 use std::cmp::Ordering;
 
 use ruff_index::Idx;
-use rustc_hash::FxHashMap;
 
 use crate::ast_ids::ScopedUseId;
-use crate::interned_nodes::InternedNodes;
+use crate::interned_nodes::{BinaryConstraintCache, ConstraintId, InternedNodes};
 use crate::predicate::ScopedPredicateId;
 use crate::rank::{RankBitBox, RankBitBoxVec};
 use crate::scope::FileScopeId;
@@ -58,6 +57,10 @@ impl ScopedNarrowingConstraint {
     pub fn is_terminal(self) -> bool {
         self.0 >= Self::ALWAYS_FALSE.0
     }
+}
+
+impl ConstraintId for ScopedNarrowingConstraint {
+    const EMPTY: Self = ALWAYS_TRUE;
 }
 
 impl Idx for ScopedNarrowingConstraint {
@@ -133,14 +136,8 @@ impl NarrowingConstraints {
 pub struct NarrowingConstraintsBuilder {
     interiors: InternedNodes<ScopedNarrowingConstraint, InteriorNode>,
     interior_used: RankBitBoxVec,
-    and_cache: FxHashMap<
-        (ScopedNarrowingConstraint, ScopedNarrowingConstraint),
-        ScopedNarrowingConstraint,
-    >,
-    or_cache: FxHashMap<
-        (ScopedNarrowingConstraint, ScopedNarrowingConstraint),
-        ScopedNarrowingConstraint,
-    >,
+    and_cache: BinaryConstraintCache<ScopedNarrowingConstraint>,
+    or_cache: BinaryConstraintCache<ScopedNarrowingConstraint>,
 }
 
 impl NarrowingConstraintsBuilder {
@@ -305,8 +302,8 @@ impl NarrowingConstraintsBuilder {
         }
 
         let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
-        if let Some(cached) = self.or_cache.get(&(a, b)) {
-            return *cached;
+        if let Some(cached) = self.or_cache.get(a, b) {
+            return cached;
         }
         self.or_uncached(a, b)
     }
@@ -354,7 +351,7 @@ impl NarrowingConstraintsBuilder {
             }
         };
 
-        self.or_cache.insert((a, b), result);
+        self.or_cache.insert(a, b, result);
         result
     }
 
@@ -372,8 +369,8 @@ impl NarrowingConstraintsBuilder {
         }
 
         let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
-        if let Some(cached) = self.and_cache.get(&(a, b)) {
-            return *cached;
+        if let Some(cached) = self.and_cache.get(a, b) {
+            return cached;
         }
         self.and_uncached(a, b)
     }
@@ -437,7 +434,7 @@ impl NarrowingConstraintsBuilder {
             }
         };
 
-        self.and_cache.insert((a, b), result);
+        self.and_cache.insert(a, b, result);
         result
     }
 }
