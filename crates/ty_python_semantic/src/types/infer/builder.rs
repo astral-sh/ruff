@@ -6738,6 +6738,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut iteration = 0;
         let mut next_bindings = bindings.clone();
         let mut prev_argument_types = Cow::Borrowed(&*argument_types);
+        // Prove independence across the whole call. For example, a constructor's
+        // `__new__` and `__init__` can share a key even if neither reuses one itself.
+        let pruned = Cell::new(false);
+        let mut try_pruning = requires_overload_evaluation
+            && candidates.len() == 1
+            && self.dataclass_field_specifiers.is_empty()
+            && !self.collects_expected_types()
+            && generic_arguments.iter().all(|&index| {
+                arguments_tcx[index].as_ref().is_some_and(|contexts| {
+                    contexts.supports_independent_inference(db, self.program_environment())
+                })
+            });
 
         let (converged_builder, converged_argument_types) = loop {
             let mut next_argument_types = argument_types.clone();
@@ -6769,8 +6781,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     break (speculative_builder, next_argument_types);
                 }
                 next_bindings = bindings.clone();
+                // The first match only covered the original arguments. If inference
+                // changed them, restore the full first round before continuing.
+                if pruned.replace(false) {
+                    prev_argument_types = Cow::Borrowed(&*argument_types);
+                    iteration = 0;
+                    arguments_tcx = self.collect_call_arguments_type_context(
+                        argument_types,
+                        bindings,
+                        Some(candidates),
+                        constraints,
+                        call_expression_tcx,
+                    );
+                    try_pruning = false;
+                    continue;
+                }
             }
 
+            let mode = if iteration == 0 && try_pruning {
+                CheckTypesMode::TryProvisional(&pruned)
+            } else {
+                CheckTypesMode::Provisional
+            };
             let _ = next_bindings.check_types_impl(
                 db,
                 self.program_environment(),
@@ -6778,7 +6810,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &next_argument_types,
                 call_expression_tcx,
                 &self.dataclass_field_specifiers,
-                CheckTypesMode::Provisional,
+                mode,
             );
 
             // The number of occurrences of inferable typevars forms an upper bound for the number
@@ -13665,6 +13697,38 @@ impl CallArgumentInferenceMode {
 enum MatchingArgumentTypeContext<'db> {
     Unique(Option<ArgumentTypeContext<'db>>),
     Many(Vec<Option<ArgumentTypeContext<'db>>>),
+}
+
+impl<'db> MatchingArgumentTypeContext<'db> {
+    /// An argument is stored under the raw parameter type. If two overloads use the
+    /// same key and specialize it differently, a skipped overload can overwrite the
+    /// winner's inferred type. For example, the mapping and iterable overloads of
+    /// `dict` share a type variable for the keyword values.
+    fn supports_independent_inference(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        let Self::Many(contexts) = self else {
+            return false;
+        };
+        let mut seen = FxHashSet::default();
+        contexts.iter().all(|context| {
+            let Some(ArgumentTypeContext::Standard {
+                raw_parameter_type, ..
+            }) = context
+            else {
+                return false;
+            };
+            seen.insert(*raw_parameter_type)
+                || !crate::types::visitor::any_over_type_including_alias_arguments(
+                    db,
+                    env,
+                    *raw_parameter_type,
+                    Type::is_type_var,
+                )
+        })
+    }
 }
 
 fn is_collection_literal(expression: &ast::Expr) -> bool {

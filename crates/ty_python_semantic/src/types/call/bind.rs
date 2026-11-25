@@ -344,7 +344,7 @@ impl<'db> CallableItem<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
-        mode: CheckTypesMode,
+        mode: CheckTypesMode<'_>,
     ) {
         match self {
             CallableItem::Regular(binding) => {
@@ -545,7 +545,7 @@ impl<'db> BindingsElement<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         call_arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
-        mode: CheckTypesMode,
+        mode: CheckTypesMode<'_>,
     ) {
         for item in &mut self.items {
             item.check_types(
@@ -703,7 +703,7 @@ pub(crate) fn requires_overload_evaluation(candidates: &OverloadSet) -> bool {
 
 /// Controls the behavior of a given call to [`Bindings::check_types`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum CheckTypesMode {
+pub(crate) enum CheckTypesMode<'a> {
     /// After checking, retain only the callable bindings that contribute to the call
     /// evaluation.
     Finalize,
@@ -718,11 +718,15 @@ pub(crate) enum CheckTypesMode {
     /// type context across call arguments, and so all callable bindings should
     /// remain candidates until the final round is finalized.
     Provisional,
+
+    /// Try early selection in the first round when argument contexts are independent.
+    /// Record whether later candidates must be revisited if any input changes.
+    TryProvisional(&'a Cell<bool>),
 }
 
-impl CheckTypesMode {
+impl CheckTypesMode<'_> {
     fn is_provisional(self) -> bool {
-        matches!(self, Self::Provisional)
+        matches!(self, Self::Provisional | Self::TryProvisional(_))
     }
 }
 
@@ -1461,7 +1465,7 @@ impl<'db> Bindings<'db> {
         call_arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
-        mode: CheckTypesMode,
+        mode: CheckTypesMode<'_>,
     ) -> Result<(), CallErrorKind> {
         // Check types for each element (union variant)
         for element in &mut self.elements {
@@ -4054,7 +4058,7 @@ impl<'db> CallableBinding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         call_arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
-        mode: CheckTypesMode,
+        mode: CheckTypesMode<'_>,
     ) {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
@@ -4114,17 +4118,24 @@ impl<'db> CallableBinding<'db> {
 
         // Step 2: check the candidates in declaration order. Step 5 can discard every
         // later overload as soon as the first match covers all argument materializations.
+        let can_prune_after_first_match = matches!(
+            mode,
+            CheckTypesMode::Finalize | CheckTypesMode::TryProvisional(_)
+        ) && !should_retry_after_provisional_arity
+            // Dataclass transforms read flags from the default argument type, which
+            // depends on the contexts of all overloads, even with distinct keys.
+            && (!mode.is_provisional()
+                || !matches!(self.callable_type, Type::FunctionLiteral(f) if f.dataclass_params(db).is_some()))
+            && !call_arguments.iter().any(CallArgument::is_variadic)
+            && self
+                .matching_overloads()
+                .all(|(_, overload)| overload.supports_first_match_pruning(db, mode));
+        let defer_literal_mismatches =
+            mode == CheckTypesMode::Finalize && !should_retry_after_provisional_arity;
         let check_types = |overload: &mut Binding<'db>| {
             overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
         };
-        // Provisional inference revisits every candidate. If two overloads share a type
-        // variable, an unspecialized candidate can overwrite a sibling argument's inferred type.
-        // Signature details also need the losing candidates' specialized parameter types.
-        if mode == CheckTypesMode::Finalize && !should_retry_after_provisional_arity {
-            let can_prune_after_first_match = !call_arguments.iter().any(CallArgument::is_variadic)
-                && self
-                    .matching_overloads()
-                    .all(|(_, overload)| overload.supports_first_match_pruning());
+        if can_prune_after_first_match || defer_literal_mismatches {
             let first_match_covers_rest = |overload: &Binding<'db>| {
                 can_prune_after_first_match
                     && overload.accepts_all_argument_materializations(
@@ -4137,9 +4148,13 @@ impl<'db> CallableBinding<'db> {
             if self.check_overloads_in_order(
                 db,
                 call_arguments.as_ref(),
+                defer_literal_mismatches,
                 check_types,
                 first_match_covers_rest,
             ) {
+                if let CheckTypesMode::TryProvisional(pruned) = mode {
+                    pruned.set(true);
+                }
                 return;
             }
         } else {
@@ -4390,6 +4405,7 @@ impl<'db> CallableBinding<'db> {
         &mut self,
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
+        defer_literal_mismatches: bool,
         check_types: impl Fn(&mut Binding<'db>),
         first_match_covers_rest: impl Fn(&Binding<'db>) -> bool,
     ) -> bool {
@@ -4397,7 +4413,7 @@ impl<'db> CallableBinding<'db> {
         let mut found_match = false;
         let mut overloads = self.matching_overloads_mut().peekable();
         while let Some((_, overload)) = overloads.next() {
-            if overload.has_disjoint_literal_argument(db, arguments) {
+            if defer_literal_mismatches && overload.has_disjoint_literal_argument(db, arguments) {
                 literal_mismatches.push(overload);
                 continue;
             }
@@ -8705,12 +8721,11 @@ fn may_be_expensive_to_materialize<'db>(
     argument: Type<'db>,
 ) -> bool {
     const MAX_FIXED_TUPLE_ELEMENTS: usize = 8;
-    const MAX_GENERIC_ALIAS_VISITS: usize = 8;
+    const MAX_SPECIALIZATION_VISITS: usize = 8;
 
-    // Count generic aliases across the argument, including those reached through an
-    // instance's class. This keeps shallow containers such as `dict[str, list[int]]`
-    // eligible without materializing deeply nested specializations.
-    let generic_alias_visits = Cell::new(0);
+    // The visitor reaches a nominal instance's generic alias through its class.
+    // For protocols it visits the type arguments directly, so count the instance.
+    let specialization_visits = Cell::new(0);
     let expensive = |part: Type<'db>| match part {
         Type::TypeAlias(_)
         | Type::Recursive(_)
@@ -8718,10 +8733,10 @@ fn may_be_expensive_to_materialize<'db>(
         | Type::FunctionLiteral(_)
         | Type::BoundMethod(_)
         | Type::NewTypeInstance(_) => true,
-        Type::GenericAlias(_) => {
-            let visits = generic_alias_visits.get() + 1;
-            generic_alias_visits.set(visits);
-            visits > MAX_GENERIC_ALIAS_VISITS
+        Type::GenericAlias(_) | Type::ProtocolInstance(_) => {
+            let visits = specialization_visits.get() + 1;
+            specialization_visits.set(visits);
+            visits > MAX_SPECIALIZATION_VISITS
         }
         Type::NominalInstance(instance) => instance.own_tuple_spec(db).is_some_and(|tuple| {
             tuple.len().minimum() > MAX_FIXED_TUPLE_ELEMENTS
@@ -10134,11 +10149,27 @@ impl<'db> Binding<'db> {
     /// Partial application retains later signatures for arguments supplied in a future call.
     /// For a complete call, the shortcut requires each source argument to match one parameter
     /// directly. Unpacked elements have their own types in the full step-5 comparison.
-    fn supports_first_match_pruning(&self) -> bool {
+    fn supports_first_match_pruning(&self, db: &'db dyn Db, mode: CheckTypesMode<'_>) -> bool {
         !self.is_partial_application
             && !self.variadic_argument_matched_to_variadic_parameter
             && self.argument_matches.iter().all(|matched| {
-                matches!(matched.parameters.as_slice(), [parameter] if parameter.argument_type.is_none())
+                let [parameter] = matched.parameters.as_slice() else {
+                    return false;
+                };
+                if parameter.argument_type.is_some() {
+                    return false;
+                }
+                if !mode.is_provisional() {
+                    return true;
+                }
+                // Forwarding and unpacking can change which context an argument uses.
+                let declared = &self.signature.parameters()[parameter.index];
+                parameter.expected_type.is_none()
+                    && !declared.has_starred_annotation()
+                    && !declared
+                        .annotated_type()
+                        .as_typevar()
+                        .is_some_and(|var| var.is_paramspec(db))
             })
     }
 
@@ -12352,6 +12383,43 @@ mod tests {
     use crate::place::global_symbol;
     use crate::types::constraints::resolution::SolutionType::Resolved;
     use crate::types::generics::TypeVarInferenceSolutions;
+
+    #[test]
+    fn nested_protocols_exceed_the_materialization_limit() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+from typing import Protocol
+
+class Pair[T, U](Protocol):
+    left: T
+    right: U
+
+A = Pair[int, int]
+B = Pair[A, A]
+C = Pair[B, B]
+D = Pair[C, C]
+E = Pair[D, D]
+F = Pair[E, E]
+G = Pair[F, F]
+H = Pair[G, G]
+shallow: A
+deep: Pair[H, H]
+"#,
+        )?;
+        let db = &db;
+        let env = db.program_environment();
+        let file = system_path_to_file(db, "/src/a.py")?;
+        let file = ProgramFile::new(db, file, env.program(db));
+        let expensive = |name: &str| {
+            let ty = global_symbol(db, file, name).place.expect_type();
+            may_be_expensive_to_materialize(db, &env, ty)
+        };
+        assert!(!expensive("shallow"));
+        assert!(expensive("deep"));
+        Ok(())
+    }
 
     fn call_inference<'db>(
         db: &'db TestDb,

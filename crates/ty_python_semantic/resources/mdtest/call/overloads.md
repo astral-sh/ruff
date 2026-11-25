@@ -2882,3 +2882,94 @@ def check_object_parameter(bottom: Never, items: tuple[Never], payload: Payload)
     reveal_type(choose(items, True))  # revealed: int
     reveal_type(choose(payload, True))  # revealed: int
 ```
+
+## Argument inference with a later generic overload
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Both overloads use the same type variable. Even with a single argument, the two branches of a
+conditional can inform each other's types.
+
+```py
+from typing import Self, TypedDict, overload
+
+class Point(TypedDict):
+    x: int
+
+class Box[T]:
+    @overload
+    def __init__(self, value: T) -> None: ...
+    @overload
+    def __init__(self, value: T, *, flag: bool = ...) -> None: ...
+    def __init__(self, value, *, flag=False): ...
+
+def box(point: Point, cond: bool):
+    reveal_type(Box(point if cond else dict(x=1)))  # revealed: Box[Point]
+```
+
+A later `__init__` overload can share parameter types with `__new__`. Here the list supplies the
+type of the dictionary literal.
+
+```py
+class Batch[T]:
+    def __new__(cls, items: list[T], item: T) -> Self:
+        return super().__new__(cls)
+
+    @overload
+    def __init__(self, items: object, item: object) -> None: ...
+    @overload
+    def __init__(self, items: list[T], item: T, *, flag: bool = ...) -> None: ...
+    def __init__(self, items, item, *, flag=False): ...
+
+def batch(points: list[Point]):
+    reveal_type(Batch(points, {"x": 1}))  # revealed: Batch[Point]
+```
+
+Even when the overloads use distinct type variables, the second overload needs to supply a
+specialized type for the conditional in the next round of inference.
+
+```py
+class Label(TypedDict):
+    x: str
+
+@overload
+def choose[T: Point | Label](first: T, second: Point | T) -> T: ...
+@overload
+def choose[U](first: U, second: U | dict[str, U]) -> U: ...
+def choose(first, second):
+    return first
+
+def check(label: Label, point: Point, cond: bool):
+    reveal_type(choose(label, point if cond else dict(x=1)))  # revealed: Label | Point
+```
+
+A dataclass transform reads the default type of each flag across overloads. The later overload needs
+to infer `Literal[True]` for the flag even though the first overload matches.
+
+```py
+from dataclasses import dataclass
+from typing import Callable, Literal, dataclass_transform
+
+def identity[T](value: T) -> T:
+    return value
+
+@overload
+def record[T](*, values: list[Literal[True]], frozen: Literal[True]) -> Callable[[type[T]], type[T]]: ...
+@overload
+def record[T, U](*, values: list[U], frozen: U) -> Callable[[type[T]], type[T]]: ...
+@dataclass_transform()
+def record(**kwargs):
+    return dataclass(frozen=kwargs["frozen"])
+
+values: list[Literal[True]] = [True]
+
+@record(values=values, frozen=identity(True))
+class Record:
+    x: int
+
+def update(record: Record):
+    record.x = 1  # error: [invalid-assignment]
+```
