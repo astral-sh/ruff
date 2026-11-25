@@ -1678,7 +1678,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Whether factory_boy's metaclass removes this nested class before creating the factory.
+    /// Whether `FactoryMetaClass` removes this nested class before creating the factory.
     /// Assignments in methods can still introduce attributes with the same name.
     fn is_factory_configuration_class(
         self,
