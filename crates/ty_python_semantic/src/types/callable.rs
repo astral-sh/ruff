@@ -85,17 +85,15 @@ impl<'db> Type<'db> {
             _ => {}
         }
         let kind = self.function_like_kind(db)?;
-        let function = if kind == CallableTypeKind::FunctionLike {
-            self
-        } else {
-            self.underlying_function(db)
-        };
-        let receiver = match kind {
-            CallableTypeKind::StaticMethodLike => return Some(function),
-            CallableTypeKind::ClassMethodLike => owner
-                .filter(|owner| !owner.is_none(db))
-                .or_else(|| instance.map(|instance| instance.to_meta_type(db, env))),
-            _ => instance,
+        let (function, receiver) = match kind {
+            CallableTypeKind::StaticMethodLike => return Some(self.underlying_function(db)),
+            CallableTypeKind::ClassMethodLike => (
+                self.underlying_function(db),
+                owner
+                    .filter(|owner| !owner.is_none(db))
+                    .or_else(|| instance.map(|instance| instance.to_meta_type(db, env))),
+            ),
+            _ => (self, instance),
         };
         Some(receiver.map_or(function, |receiver| {
             Type::BoundMethod(super::BoundMethodType::from_callable(

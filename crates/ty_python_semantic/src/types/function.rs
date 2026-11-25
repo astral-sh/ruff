@@ -939,6 +939,33 @@ impl<'db> FunctionLiteral<'db> {
             .any(|overload| overload.decorators(db).contains(decorator))
     }
 
+    /// Whether every definition is explicitly or implicitly a classmethod.
+    fn is_classmethod(self, db: &'db dyn Db) -> bool {
+        if !self.overloaded {
+            return self.last_definition_is_classmethod;
+        }
+        self.all_definitions_match(db, |definition| definition.is_classmethod(db))
+    }
+
+    /// Whether every definition is explicitly or implicitly a staticmethod.
+    fn is_staticmethod(self, db: &'db dyn Db) -> bool {
+        if !self.overloaded {
+            return self.last_definition_is_staticmethod;
+        }
+        self.all_definitions_match(db, |definition| definition.is_staticmethod(db))
+    }
+
+    /// Check all overloads and the implementation. During cycle recovery, overload
+    /// discovery can return no definitions, in which case neither decorator applies.
+    fn all_definitions_match(
+        self,
+        db: &'db dyn Db,
+        predicate: impl Fn(OverloadLiteral<'db>) -> bool,
+    ) -> bool {
+        let mut definitions = self.iter_overloads_and_implementation(db);
+        definitions.next().is_some_and(&predicate) && definitions.all(predicate)
+    }
+
     /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.
     ///
     /// Checking if an overload is deprecated requires deeper call analysis.
@@ -1629,26 +1656,15 @@ impl<'db> FunctionType<'db> {
         self.literal(db).has_known_decorator(db, decorator)
     }
 
-    /// Returns true if every definition of this method uses `@classmethod`, or is implicitly a
-    /// classmethod. An inconsistently applied decorator does not affect method binding.
+    /// Whether this function acts as a classmethod after any descriptor override.
     pub(crate) fn is_classmethod(self, db: &'db dyn Db) -> bool {
-        if let Some(kind) = self.descriptor_kind(db) {
-            return kind == CallableTypeKind::ClassMethodLike;
-        }
-        let literal = self.literal(db);
-        if !literal.overloaded {
-            return literal.last_definition_is_classmethod;
-        }
-        let mut overloads = literal.iter_overloads_and_implementation(db);
-        // Overload discovery can return no definitions during cycle recovery.
-        overloads
-            .next()
-            .is_some_and(|overload| overload.is_classmethod(db))
-            && overloads.all(|overload| overload.is_classmethod(db))
+        self.descriptor_kind(db).map_or_else(
+            || self.literal(db).is_classmethod(db),
+            |kind| kind == CallableTypeKind::ClassMethodLike,
+        )
     }
 
-    /// Returns true if every definition of this method uses `@staticmethod`, or is implicitly a
-    /// static method. An inconsistently applied decorator does not affect method binding.
+    /// Whether this function acts as a staticmethod after any descriptor override.
     pub(crate) fn is_staticmethod(self, db: &'db dyn Db) -> bool {
         self.descriptor_kind(db).map_or_else(
             || self.has_staticmethod_declaration(db),
@@ -1659,16 +1675,7 @@ impl<'db> FunctionType<'db> {
     /// Whether this function was declared as a staticmethod, even if descriptor access has
     /// already exposed the ordinary function. Diagnostics can still use its declaration kind.
     pub(super) fn has_staticmethod_declaration(self, db: &'db dyn Db) -> bool {
-        let literal = self.literal(db);
-        if !literal.overloaded {
-            return literal.last_definition_is_staticmethod;
-        }
-        let mut overloads = literal.iter_overloads_and_implementation(db);
-        // Overload discovery can return no definitions during cycle recovery.
-        overloads
-            .next()
-            .is_some_and(|overload| overload.is_staticmethod(db))
-            && overloads.all(|overload| overload.is_staticmethod(db))
+        self.literal(db).is_staticmethod(db)
     }
 
     /// Returns true if this function has an implicit `self` or `cls` receiver parameter.
@@ -2118,18 +2125,9 @@ impl<'db> FunctionType<'db> {
             return kind;
         }
         let literal = self.literal(db);
-        if !literal.overloaded {
-            return if literal.last_definition_is_classmethod {
-                CallableTypeKind::ClassMethodLike
-            } else if literal.last_definition_is_staticmethod {
-                CallableTypeKind::StaticMethodLike
-            } else {
-                CallableTypeKind::FunctionLike
-            };
-        }
-        if self.is_classmethod(db) {
+        if literal.is_classmethod(db) {
             CallableTypeKind::ClassMethodLike
-        } else if self.is_staticmethod(db) {
+        } else if literal.is_staticmethod(db) {
             CallableTypeKind::StaticMethodLike
         } else {
             CallableTypeKind::FunctionLike
