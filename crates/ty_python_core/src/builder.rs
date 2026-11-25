@@ -2507,16 +2507,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    /// Returns whether accessing a name, attribute, or subscript can raise.
+    /// Returns whether accessing a name can raise.
     ///
     /// Only a definitely bound name in the current flow state is known to be safe. In particular,
     /// a builtin-looking name may be shadowed by a local binding that has not been visited yet.
-    fn place_access_can_raise(&mut self, expr: &ast::Expr, is_use: bool) -> bool {
-        let ast::Expr::Name(name) = expr else {
-            return true;
-        };
-
-        is_use
+    fn name_access_can_raise(&mut self, name: &ast::ExprName, access: PlaceAccess) -> bool {
+        access.is_use()
             && self
                 .exception_context_stack_manager
                 .has_active_exception_handler(self)
@@ -3522,16 +3518,39 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Expr::Name(ast::ExprName { ctx, .. })
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
-                // Record place effects after walking the expression. For names, this is
-                // equivalent because `walk_expr` is a no-op; for attribute/subscript places,
-                // child evaluation can introduce bindings (for example via walrus operators),
-                // and those bindings need to exist before we register parent/member associations.
-                let mut deferred_effects = None;
-                if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
-                        && let PlaceExpr::Member(member) = &mut place_expr
+                let access = match (ctx, self.current_assignment()) {
+                    (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
+                        // Record the target load now; the definition is recorded separately
+                        // after visiting the right-hand side.
+                        PlaceAccess::Use
+                    }
+                    (ast::ExprContext::Load, _) => PlaceAccess::Use,
+                    (ast::ExprContext::Store, _) => PlaceAccess::Definition,
+                    (ast::ExprContext::Del, _) => PlaceAccess::UseAndDefinition,
+                    (ast::ExprContext::Invalid, _) => PlaceAccess::Invalid,
+                };
+
+                let place_id = if let ast::Expr::Name(name) = expr {
+                    // Names have no children. Borrow the AST name and clone it only when it
+                    // becomes a new symbol in this scope.
+                    if !access.is_use() {
+                        self.ast_ids.record_expression(expr, self.current_scope());
+                    }
+                    let can_raise = self.name_access_can_raise(name, access);
+                    self.record_exception_checkpoint_if(can_raise);
+                    let (symbol, added) = self.current_place_table_mut().add_name(&name.id);
+                    let place_id = ScopedPlaceId::from(symbol);
+                    if added {
+                        self.current_use_def_map_mut().add_place(place_id);
+                    }
+                    place_id
+                } else {
+                    let mut place = PlaceExpr::try_from_expr(expr);
+                    if let Some(PlaceExpr::Member(member)) = &mut place
                         && member.is_instance_attribute_candidate()
                         && let Some(attribute) = expr.as_attribute_expr()
+                        && let Some(method_scope_id) =
+                            self.is_method_or_eagerly_executed_in_method()
                     {
                         // We specifically mark direct attribute assignments to the first
                         // parameter of a method, i.e. typically `self` or `cls`.
@@ -3556,58 +3575,44 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         }
                     }
 
-                    let (is_use, is_definition) = match (ctx, self.current_assignment()) {
-                        (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
-                            // Record the target load now; the definition is recorded separately
-                            // after visiting the right-hand side.
-                            (true, false)
-                        }
-                        (ast::ExprContext::Load, _) => (true, false),
-                        (ast::ExprContext::Store, _) => (false, true),
-                        (ast::ExprContext::Del, _) => (true, true),
-                        (ast::ExprContext::Invalid, _) => (false, false),
-                    };
-                    deferred_effects = Some((place_expr, is_use, is_definition));
-                }
+                    // Child evaluation may introduce new bindings (e.g. via a walrus), which
+                    // must exist before we register the parent/member associations.
+                    walk_expr(self, expr);
+                    if place.is_none() || !access.is_use() {
+                        self.ast_ids.record_expression(expr, self.current_scope());
+                    }
+                    self.record_exception_checkpoint();
+                    let Some(place) = place else { return };
+                    self.add_place(place)
+                };
 
-                walk_expr(self, expr);
+                if access.is_use() {
+                    let use_id = self.record_place_use(place_id, expr);
 
-                let is_use = deferred_effects
-                    .as_ref()
-                    .is_some_and(|(_, is_use, _)| *is_use);
-                if !is_use {
-                    self.ast_ids.record_expression(expr, self.current_scope());
-                }
-                let can_raise = self.place_access_can_raise(expr, is_use);
-                self.record_exception_checkpoint_if(can_raise);
-
-                if let Some((place_expr, is_use, is_definition)) = deferred_effects {
-                    let place_id = self.add_place(place_expr);
-
-                    if is_use {
-                        let use_id = self.record_place_use(place_id, expr);
-
-                        // Keep track of any uses of unannotated collection initializers.
-                        if let Some(collection_def) =
+                    // Keep track of any uses of unannotated collection initializers.
+                    if self
+                        .current_statements
+                        .last()
+                        .is_some_and(|statement| statement.constrains_collection(expr))
+                        && let Some(collection_def) =
                             self.unannotated_collection_initializer_binding(use_id)
-                            && let Some(current_statement) = self.current_statements.last_mut()
-                        {
-                            current_statement
-                                .collection_uses
-                                .push((collection_def, expr.into()));
-                        }
-                    }
-
-                    if is_definition {
-                        self.record_place_definition(place_id, expr);
-                    }
-
-                    if let Some(unpack_position) = self
-                        .current_assignment_mut()
-                        .and_then(CurrentAssignment::unpack_position_mut)
+                        && let Some(current_statement) = self.current_statements.last_mut()
                     {
-                        *unpack_position = UnpackPosition::Other;
+                        current_statement
+                            .collection_uses
+                            .push((collection_def, expr.into()));
                     }
+                }
+
+                if access.is_definition() {
+                    self.record_place_definition(place_id, expr);
+                }
+
+                if let Some(unpack_position) = self
+                    .current_assignment_mut()
+                    .and_then(CurrentAssignment::unpack_position_mut)
+                {
+                    *unpack_position = UnpackPosition::Other;
                 }
             }
             ast::Expr::List(ast::ExprList { ctx, .. })
@@ -5660,51 +5665,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     }
 
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
-        self.push_statement(CurrentStatement::default());
+        self.push_statement(CurrentStatement::new(stmt));
         self.visit_stmt_impl(stmt);
-        let mut current_statement = self.pop_statement();
-
-        // We currently only consider certain types of statements to introduce constraints
-        // on collection initializers. This restriction is mostly for performance reasons, as we
-        // want to avoid "reads" of a collection contributing to the complexity of the cycles
-        // created by full-scope collection inference.
-        current_statement
-            .collection_uses
-            .retain(|(_, use_expression)| {
-                match stmt {
-                    // A return involving the collection object.
-                    ruff_python_ast::Stmt::Return(_) => true,
-
-                    // A subscript assignment on the collection object.
-                    ruff_python_ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                        match targets.as_slice() {
-                            [ast::Expr::Subscript(ast::ExprSubscript { value, .. })] => {
-                                ExpressionNodeKey::from(value) == *use_expression
-                            }
-                            _ => false,
-                        }
-                    }
-
-                    // An annotated assignment assigning the collection object to a new binding.
-                    ruff_python_ast::Stmt::AnnAssign(_) => true,
-
-                    // A bound-method call on the collection object.
-                    ruff_python_ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
-                        match value.as_ref() {
-                            ast::Expr::Call(ast::ExprCall { func, .. }) => match func.as_ref() {
-                                ruff_python_ast::Expr::Attribute(ast::ExprAttribute {
-                                    value,
-                                    ..
-                                }) => ExpressionNodeKey::from(value) == *use_expression,
-                                _ => false,
-                            },
-                            _ => false,
-                        }
-                    }
-
-                    _ => false,
-                }
-            });
+        let current_statement = self.pop_statement();
 
         if current_statement.lambda_expressions.is_empty()
             && current_statement.collection_uses.is_empty()
@@ -6065,6 +6028,25 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 }
 
+/// The effects to record when visiting a name, attribute, or subscript.
+#[derive(Copy, Clone, Debug)]
+enum PlaceAccess {
+    Use,
+    Definition,
+    UseAndDefinition,
+    Invalid,
+}
+
+impl PlaceAccess {
+    fn is_use(self) -> bool {
+        matches!(self, Self::Use | Self::UseAndDefinition)
+    }
+
+    fn is_definition(self) -> bool {
+        matches!(self, Self::Definition | Self::UseAndDefinition)
+    }
+}
+
 /// A simple-name annotated assignment with an RHS whose declaration is already recorded.
 /// Created only by `begin_annotated_assignment`; finishing it records the value binding.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -6114,12 +6096,40 @@ impl CurrentAssignment<'_, '_> {
     }
 }
 
-#[derive(Default)]
 struct CurrentStatement<'ast, 'db> {
+    stmt: &'ast ast::Stmt,
     /// A list of lambda expressions contained in this statement.
     lambda_expressions: Vec<&'ast ast::ExprLambda>,
     /// A list of collection definitions whose uses are contained in this statement.
     collection_uses: Vec<(Definition<'db>, ExpressionNodeKey)>,
+}
+
+impl<'ast> CurrentStatement<'ast, '_> {
+    fn new(stmt: &'ast ast::Stmt) -> Self {
+        Self {
+            stmt,
+            lambda_expressions: Vec::new(),
+            collection_uses: Vec::new(),
+        }
+    }
+
+    /// Can this read constrain the type of an unannotated collection initializer?
+    /// Ignoring other reads keeps the cycles in full-scope inference small.
+    fn constrains_collection(&self, expr: &ast::Expr) -> bool {
+        match self.stmt {
+            ast::Stmt::Return(_) | ast::Stmt::AnnAssign(_) => true,
+            ast::Stmt::Assign(assign) => matches!(
+                assign.targets.as_slice(),
+                [ast::Expr::Subscript(target)] if std::ptr::eq(target.value.as_ref(), expr)
+            ),
+            ast::Stmt::Expr(stmt) => stmt
+                .value
+                .as_call_expr()
+                .and_then(|call| call.func.as_attribute_expr())
+                .is_some_and(|attr| std::ptr::eq(attr.value.as_ref(), expr)),
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
