@@ -5770,6 +5770,31 @@ def _(source: Intersection[Source[A], Source[B]]) -> None:
     reveal_type(collect(source, [consume_lists]))  # revealed: list[A] | list[B]
 ```
 
+### Return specializations in a collection literal
+
+Either list type in `Row` can hold `None`. Since `list` is invariant, `list[int | str | None]` would
+fit neither alternative. We use the type of `rows` to keep `row(None)` compatible with `Row`. When
+no specialization fits, as with `row(b"x")`, only the fresh list widens.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def row(value: T) -> tuple[list[T]]:
+    return ([value],)
+
+Row = tuple[list[int | None] | list[str | None]]
+
+def _(rows: list[Row], flag: bool):
+    compatible = [row(None)] if flag else rows
+    reveal_type(compatible)  # revealed: list[tuple[list[int | None] | list[str | None]]]
+
+    widened = [row(b"x")] if flag else rows
+    # revealed: list[tuple[list[int | None] | list[str | None]] | tuple[list[bytes]]] | list[tuple[list[int | None] | list[str | None]]]
+    reveal_type(widened)
+```
+
 ### Mutable components in inferred return types
 
 Invariant components also matter when the return annotation is just a type variable. Inferring
