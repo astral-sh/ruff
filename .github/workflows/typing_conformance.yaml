@@ -100,8 +100,6 @@ jobs:
             git rev-list --format=%s --max-count=1 old_commit
             cargo build --bin ty
             mv target/debug/ty ty-old
-            # Cargo can update the base revision's lockfile during an unlocked build.
-            git restore -- Cargo.lock
           )
 
           (
