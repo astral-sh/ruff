@@ -3,7 +3,7 @@ use ruff_text_size::Ranged;
 use smallvec::{SmallVec, smallvec};
 
 use super::{ArgumentsIter, MultiInferenceGuard, TypeInferenceBuilder};
-use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers};
+use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin};
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, DescriptorSetterDomain,
     ExplicitAttributeWriteRequirement, FallbackAttributeWriteRequirement,
@@ -661,6 +661,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     let fallback_valid = self.evaluate_instance_fallback(
                         receiver.unwrap_or(object_ty),
                         fallback,
+                        value_ty,
                         emit_diagnostics,
                     );
                     member_valid && fallback_valid
@@ -671,6 +672,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             InstanceAttributeWriteMember::Instance(fallback) => self.evaluate_instance_fallback(
                 receiver.unwrap_or(object_ty),
                 fallback,
+                value_ty,
                 emit_diagnostics,
             ),
             InstanceAttributeWriteMember::SetAttr => match setattr_result {
@@ -941,6 +943,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         &mut self,
         object_ty: Type<'db>,
         requirement: &FallbackAttributeWriteRequirement<'db>,
+        value_ty: Type<'db>,
         emit_diagnostics: bool,
     ) -> bool {
         match requirement {
@@ -953,7 +956,16 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 if !self.final_assignment_is_valid(object_ty, *qualifiers, emit_diagnostics) {
                     return false;
                 }
-                let value_ty = self.infer_value(TypeContext::from_origin(*ty, *origin), false);
+                // If the committed value already has the attribute's inferred type, we
+                // can check assignability without inferring the value again. Speculative
+                // writes still need to record the context for the eventual committed
+                // inference.
+                let value_ty =
+                    if emit_diagnostics && *origin == TypeOrigin::Inferred && value_ty == *ty {
+                        value_ty
+                    } else {
+                        self.infer_value(TypeContext::from_origin(*ty, *origin), false)
+                    };
                 let valid = self.check_type_pair(value_ty, *ty, emit_diagnostics);
                 if *possibly_missing {
                     self.report(AssignmentAttributeWriteDiagnostic::PossiblyMissing);
