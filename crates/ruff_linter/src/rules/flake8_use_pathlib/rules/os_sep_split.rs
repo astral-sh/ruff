@@ -90,8 +90,7 @@ pub(crate) fn os_sep_split(checker: &Checker, call: &ast::ExprCall) {
 
     if !checker
         .semantic()
-        .resolve_qualified_name(sep)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "sep"]))
+        .matches_qualified_name(sep, &["os", "sep"])
     {
         return;
     }

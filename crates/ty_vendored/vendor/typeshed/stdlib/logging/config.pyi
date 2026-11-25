@@ -97,8 +97,9 @@ def listen(port: int = 9030, verify: Callable[[bytes], bytes | None] | None = No
     Start up a socket server on the specified port, and listen for new
     configurations.
 
-    These will be sent as a file suitable for processing by fileConfig().
-    Returns a Thread object on which you can call start() to start the server,
+    These will be sent as a file suitable for processing by dictConfig() or
+    fileConfig(). Returns a Thread object on which you can call start() to
+    start the server,
     and which you can join() when appropriate. To stop the server, call
     stopListening().
 

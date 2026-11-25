@@ -3,10 +3,9 @@
 //!
 //! It provides the following interfaces:
 //!
-//! - [`ModuleSearchCursor::resolve_name`] which resolves a module relative to the current
-//!   position of the cursor (i.e., at some point along the individual components of a dotted
-//!   module name like `acme.tools.power`).
-//! - [`ModuleSearchCursor::list_modules`] which list modules immediately available (i.e., the
+//! - [`RootSearchPaths::resolve_name`] which resolves an absolute module name by
+//!   positioning the cursor at the parent and resolving the final component.
+//! - [`ModuleSearchCursor::list_modules`] which lists modules immediately available (i.e., the
 //!   direct sub-modules) at the current position of the cursor.
 //!
 //! The latter operation is also accessible via the free functions
@@ -30,7 +29,7 @@ use crate::module_name::ModuleName;
 use crate::path::{ModuleDirectory, ModuleDirectoryEntry, ModulePath, SearchPath};
 
 use super::{
-    CandidatePrecedence, ComponentFileFilter, ModuleNameIngredient, ModuleResolutionCandidate,
+    CandidateOrigin, ComponentFileFilter, ModuleNameIngredient, ModuleResolutionCandidate,
     ModuleResolveMode, PyTyped, ResolvedModule, ResolvedNames, ResolverContext, StubPackageIndex,
     StubPackagePaths, normalize_candidates, resolve_component, resolve_stub_package_in_search_path,
     search_paths, stub_package_index,
@@ -90,9 +89,8 @@ pub(crate) fn list_submodules<'db>(db: &'db dyn Db, module: Module<'db>) -> Modu
         _ => RootSearchPaths::Configured,
     };
 
-    ModuleSearchCursor::at_module_name_prefix(&context, module.name(db), &paths)
-        .map(|search| search.list_modules())
-        .unwrap_or_default()
+    ModuleSearchCursor::at_module_name_prefix(&context, module.name(db), paths)
+        .map_or_default(|search| search.list_modules())
 }
 
 /// Lists immediate submodules of the given name without requiring that name to be resolvable.
@@ -106,7 +104,7 @@ fn list_submodules_by_name<'db>(
     let Some(search) = ModuleSearchCursor::at_module_name_prefix(
         &context,
         name.name(db),
-        &RootSearchPaths::Configured,
+        RootSearchPaths::Configured,
     ) else {
         return ModuleListing::default();
     };
@@ -117,64 +115,47 @@ fn list_submodules_by_name<'db>(
 /// Manages state and logic for advancing through the components of a dotted
 /// module name (i.e., `acme`, `tools`, and `power` in the name `acme.tools.power`)
 /// during module resolution or enumeration.
-pub(super) struct ModuleSearchCursor<'a, 'db> {
+struct ModuleSearchCursor<'a, 'db> {
     context: &'a ResolverContext<'db>,
     position: Position<'db>,
 }
 
 impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
     /// Starts a search using configured search paths.
-    pub(super) fn with_configured_search_paths(context: &'a ResolverContext<'db>) -> Self {
+    fn with_configured_search_paths(context: &'a ResolverContext<'db>) -> Self {
         Self::with_paths(context, RootSearchPaths::Configured)
     }
 
-    /// Starts a search using only the supplied search paths.
-    pub(super) fn with_supplied_search_paths(
-        context: &'a ResolverContext<'db>,
-        search_paths: &'db [SearchPath],
-    ) -> Self {
-        Self::with_paths(context, RootSearchPaths::Supplied(search_paths))
-    }
-
-    /// Positions a search that uses the given search roots at the given (absolute)
-    /// module name prefix, such that the search can be resumed from that point.
+    /// Positions the cursor at an absolute prefix, reusing a snapshot when possible.
     fn at_module_name_prefix(
         context: &'a ResolverContext<'db>,
-        module_name_prefix: &ModuleName,
-        paths: &RootSearchPaths<'db>,
+        prefix: &ModuleName,
+        paths: RootSearchPaths<'db>,
     ) -> Option<Self> {
-        match paths {
-            RootSearchPaths::Configured => {
-                // For a search under a configured root path, we can reload search
-                // state from Salsa.
-                let key = ModuleNameIngredient::new(
-                    context.db,
-                    module_name_prefix,
-                    context.mode,
-                    context.resolver_environment,
-                );
-                Self::restore(context, key)
-            }
-            RootSearchPaths::Supplied(paths) => {
-                // Searches under supplied paths are not cached, so we have to
-                // start from the root and advance the cursor to the right position.
-                let mut cursor = Self::with_supplied_search_paths(context, paths);
-                for component in module_name_prefix.components() {
-                    cursor = cursor.advance(component)?;
-                }
-                Some(cursor)
-            }
+        // Loading a snapshot recursively loads its ancestors. Walk deeper names iteratively
+        // to bound stack usage. Supplied paths aren't part of the snapshot key.
+        const MAX_SNAPSHOT_DEPTH: usize = 16;
+        if matches!(paths, RootSearchPaths::Supplied(_))
+            || prefix.components().nth(MAX_SNAPSHOT_DEPTH).is_some()
+        {
+            return Self::with_paths(context, paths).advance_through(prefix);
         }
+
+        let key = ModuleNameIngredient::new(
+            context.db,
+            prefix,
+            context.mode,
+            context.resolver_environment,
+        );
+        Self::restore(context, key)
     }
 
-    /// Resolves a module name relative to the current position of this search's cursor.
-    pub(super) fn resolve_name(mut self, name: &ModuleName) -> Option<ResolvedNames<'db>> {
-        let mut components = name.components();
-        let last = components.next_back()?;
-        for component in components {
+    /// Advances through a prefix without materializing snapshots along the way.
+    fn advance_through(mut self, prefix: &ModuleName) -> Option<Self> {
+        for component in prefix.components() {
             self = self.advance(component)?;
         }
-        self.resolve_child(last)
+        Some(self)
     }
 
     /// Lists the modules immediately available at the cursor's current position.
@@ -482,7 +463,7 @@ fn module_search_snapshot<'db>(
         Some(parent_name) => ModuleSearchCursor::at_module_name_prefix(
             &context,
             &parent_name,
-            &RootSearchPaths::Configured,
+            RootSearchPaths::Configured,
         )?,
         None => ModuleSearchCursor::with_configured_search_paths(&context),
     };
@@ -509,7 +490,7 @@ struct CachedCandidate {
     path: ModulePath,
     module: ResolvedModule,
     py_typed: PyTyped,
-    precedence: CandidatePrecedence,
+    origin: CandidateOrigin,
 
     /// Stores the result of the symlink policy for enumeration. This prevents
     /// unnecessary cache invalidation of a `ModuleListing`, since the symlink
@@ -529,7 +510,7 @@ impl CachedCandidate {
             enumeration_allowed: candidate.directory.enumeration_allowed(db),
             module: candidate.module,
             py_typed: candidate.py_typed,
-            precedence: candidate.precedence,
+            origin: candidate.origin,
         }
     }
 
@@ -542,7 +523,7 @@ impl CachedCandidate {
             ),
             module: self.module,
             py_typed: self.py_typed,
-            precedence: self.precedence,
+            origin: self.origin,
         }
     }
 }
@@ -819,9 +800,7 @@ impl<'db> TypingModeResolver<'db> {
                 .as_ref()
                 .map(Rc::clone),
             stub_override_candidates,
-            full_search_candidates: full_search_candidates
-                .map(OnceCell::from)
-                .unwrap_or_default(),
+            full_search_candidates: full_search_candidates.map_or_default(OnceCell::from),
         };
 
         // Stop if neither search phase has candidates for this module name prefix.
@@ -990,12 +969,40 @@ impl<'db> RuntimeModeResolver<'db> {
     }
 }
 
-enum RootSearchPaths<'db> {
+pub(super) enum RootSearchPaths<'db> {
     Configured,
     Supplied(&'db [SearchPath]),
 }
 
 impl<'db> RootSearchPaths<'db> {
+    /// Resolves an absolute name using these search roots.
+    pub(super) fn resolve_name(
+        self,
+        context: &ResolverContext<'db>,
+        name: &ModuleName,
+    ) -> Option<ResolvedNames<'db>> {
+        let cursor = match name.parent() {
+            None => ModuleSearchCursor::with_paths(context, self),
+            // An extra-path stub can satisfy a typing lookup without a full search.
+            // Taking a snapshot would force both phases of the search.
+            Some(parent) if self.searches_for_stub_overrides(context) => {
+                ModuleSearchCursor::with_paths(context, self).advance_through(&parent)?
+            }
+            Some(parent) => ModuleSearchCursor::at_module_name_prefix(context, &parent, self)?,
+        };
+        cursor.resolve_child(name.last_component())
+    }
+
+    /// Whether resolution checks extra paths for stubs before searching all paths.
+    fn searches_for_stub_overrides(&self, context: &ResolverContext<'db>) -> bool {
+        if !matches!(self, Self::Configured) || !context.mode.is_typing() {
+            return false;
+        }
+        // Extra paths precede all other static paths.
+        let paths = context.resolver_environment.search_paths(context.db);
+        paths.static_paths.first().is_some_and(SearchPath::is_extra)
+    }
+
     fn resolve_root(
         &self,
         context: &ResolverContext<'db>,
@@ -1026,9 +1033,7 @@ impl<'db> RootSearchPaths<'db> {
 
         // Runtime resolution ignores stub packages, so we can pass the default value for stub
         // package paths (i.e., no stub package paths at all).
-        let stub_paths = stub_packages
-            .as_ref()
-            .map_or_else(StubPackagePaths::default, |index| index.all());
+        let stub_paths = stub_packages.as_ref().map_or_default(|index| index.all());
 
         let candidates = discover_roots(
             context,
@@ -1209,6 +1214,54 @@ mod tests {
     use crate::testing::{ModuleDebugSnapshot, TestCaseBuilder};
 
     use super::{ModuleListing, ModuleSearchCursor, list_root_modules, list_submodules};
+
+    #[test]
+    fn deep_imports_and_listings_agree() {
+        let db = TestCaseBuilder::new()
+            .with_src_files(&[("a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/child.py", "")])
+            .build()
+            .db;
+        ListingCase::for_name("a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q")
+            .expect_module("a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.child")
+            .assert(&db);
+    }
+
+    #[test]
+    fn extra_paths_only_bypass_parent_snapshots_in_typing_mode() {
+        let mut db = TestCaseBuilder::new()
+            .with_src_files(&[("acme/tools.py", "")])
+            .with_extra_path("/extra", &[("acme/tools.pyi", "")])
+            .build()
+            .db;
+        let name = ModuleName::new_static("acme.tools").unwrap();
+        for (mode, expected) in [
+            (ModuleResolveMode::Typing, "/extra/acme/tools.pyi"),
+            (ModuleResolveMode::Runtime, "/src/acme/tools.py"),
+        ] {
+            let env = db.resolver_environment();
+            let key = super::ModuleNameIngredient::new(&db, &name, mode, env);
+            let module = crate::resolve::resolve_module_query(&db, key).unwrap();
+            assert_eq!(
+                module.file(&db).unwrap().path(&db).as_system_path(),
+                Some(SystemPath::new(expected))
+            );
+
+            let events = db.take_salsa_events();
+            let parent = super::ModuleNameIngredient::new(
+                &db,
+                name.parent().unwrap(),
+                mode,
+                db.resolver_environment(),
+            );
+            let (_, snapshot) = ruff_db::testing::find_will_execute_event(
+                &db,
+                super::module_search_snapshot,
+                parent,
+                &events,
+            );
+            assert_eq!(snapshot.is_some(), mode == ModuleResolveMode::Runtime);
+        }
+    }
 
     #[test]
     fn module_search_can_be_reused_across_sibling_module_resolutions() {
@@ -1493,7 +1546,7 @@ mod tests {
         let listing = ModuleSearchCursor::at_module_name_prefix(
             &context,
             &name,
-            &super::RootSearchPaths::Configured,
+            super::RootSearchPaths::Configured,
         )
         .expect("runtime package")
         .list_modules();

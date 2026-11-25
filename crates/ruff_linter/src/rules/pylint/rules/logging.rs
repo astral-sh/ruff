@@ -43,9 +43,9 @@ use crate::rules::pyflakes::cformat::CFormatSummary;
 /// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.252", category = Category::Correctness)]
-pub(crate) struct LoggingTooFewArgs;
+pub(crate) struct LoggingTooFewArguments;
 
-impl Violation for LoggingTooFewArgs {
+impl Violation for LoggingTooFewArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Not enough arguments for `logging` format string".to_string()
@@ -85,9 +85,9 @@ impl Violation for LoggingTooFewArgs {
 /// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.252", category = Category::Correctness)]
-pub(crate) struct LoggingTooManyArgs;
+pub(crate) struct LoggingTooManyArguments;
 
-impl Violation for LoggingTooManyArgs {
+impl Violation for LoggingTooManyArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Too many arguments for `logging` format string".to_string()
@@ -163,15 +163,15 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     let num_message_args = call.arguments.args.len() - 1;
     let num_keywords = call.arguments.keywords.len();
 
-    if checker.is_rule_enabled(Rule::LoggingTooManyArgs) {
+    if checker.is_rule_enabled(Rule::LoggingTooManyArguments) {
         if summary.num_positional < num_message_args {
-            checker.report_diagnostic(LoggingTooManyArgs, call.func.range());
+            checker.report_diagnostic(LoggingTooManyArguments, call.func.range());
         }
     }
 
-    if checker.is_rule_enabled(Rule::LoggingTooFewArgs) {
+    if checker.is_rule_enabled(Rule::LoggingTooFewArguments) {
         if num_message_args > 0 && num_keywords == 0 && summary.num_positional > num_message_args {
-            checker.report_diagnostic(LoggingTooFewArgs, call.func.range());
+            checker.report_diagnostic(LoggingTooFewArguments, call.func.range());
         }
     }
 }

@@ -51,7 +51,14 @@ fn program_file(db: &dyn Db, file: File) -> ProgramFile<'_> {
         return project_program.program_file(db, file);
     };
 
-    if project.is_file_included(db, path).is_included() {
+    // Even if this file is excluded, `program_for_dependency` prefers the project's
+    // search paths over any script's. Skip the glob checks for files under a source root.
+    if project_program
+        .search_paths(db)
+        .first_party_roots()
+        .any(|root| path.starts_with(root))
+        || project.is_file_included(db, path).is_included()
+    {
         return project_program.program_file(db, file);
     }
 
@@ -151,6 +158,12 @@ impl ProjectDatabase {
         project.freeze_open_files(self);
     }
 
+    /// Skips dropping cached Salsa data when the CLI is about to exit. The remaining fields
+    /// drop normally so the uv worker pool receives its shutdown signal.
+    pub fn forget_storage_on_exit(self) {
+        std::mem::forget(self.storage);
+    }
+
     fn new<S, Strategy: MisconfigurationStrategy>(
         project_metadata: ProjectMetadata,
         system: S,
@@ -159,7 +172,6 @@ impl ProjectDatabase {
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
-        let uv_environments = UvEnvironments::new(project_metadata.use_uv());
         let mut db = Self {
             project: None,
             storage: salsa::Storage::new(if tracing::enabled!(tracing::Level::TRACE) {
@@ -176,7 +188,7 @@ impl ProjectDatabase {
                 None
             }),
             files: Files::default(),
-            uv_environments,
+            uv_environments: UvEnvironments::default(),
             system: Arc::new(system),
         };
 
@@ -220,8 +232,8 @@ impl ProjectDatabase {
 
     /// Checks the files in the project and its dependencies as per the project's check mode.
     ///
-    /// Uses current settings and environments without starting or waiting for uv. Callers that
-    /// require synchronized environments must request synchronization and apply its results first.
+    /// Uses current settings and environments without starting or waiting for uv. Returns no
+    /// diagnostics for a script while its initial environment synchronization is pending.
     ///
     /// Use [`set_check_mode`] to update the check mode.
     ///
@@ -244,6 +256,7 @@ impl ProjectDatabase {
     }
 
     /// Checks `file` using its current settings and available environment.
+    /// Reports no diagnostics for a script while its first uv sync is pending.
     ///
     /// Uses the same environment synchronization behavior as [`check`](Self::check).
     #[tracing::instrument(level = "debug", skip(self))]
@@ -770,7 +783,6 @@ pub(crate) mod testing {
     impl TestDb {
         pub fn new(project: ProjectMetadata) -> Self {
             let events = Events::default();
-            let uv_environments = UvEnvironments::new(project.use_uv());
             let mut db = Self {
                 storage: salsa::Storage::new(Some(Box::new({
                     let events = events.clone();
@@ -782,7 +794,7 @@ pub(crate) mod testing {
                 system: TestSystem::default(),
                 vendored: ty_vendored::file_system().clone(),
                 files: Files::default(),
-                uv_environments,
+                uv_environments: UvEnvironments::default(),
                 events,
                 project: None,
             };
@@ -957,12 +969,13 @@ mod tests {
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf, TestSystem};
     use ruff_db::testing::assert_function_query_was_not_run_by_name;
     use ruff_python_trivia::textwrap::dedent;
+    use salsa::plumbing::current_revision;
     use ty_module_resolver::list_modules;
     use ty_python_semantic::Db as _;
 
     use crate::db::testing::TestDb;
     use crate::watch::ChangeEvent;
-    use crate::{Db, ProjectDatabase, ProjectMetadata, UseUv};
+    use crate::{Db, ProjectDatabase, ProjectMetadata};
 
     #[test]
     fn checks_use_available_script_environment_without_running_uv() -> anyhow::Result<()> {
@@ -974,13 +987,17 @@ mod tests {
                 r"
                 # /// script
                 # dependencies = []
+                #
+                # [tool.ty]
+                # project-manager.script = 'uv'
                 # ///
+
                 import nonexistent_script_dependency
                 ",
             )
             .as_ref(),
         )?;
-        let metadata = ProjectMetadata::discover(&root, &system)?.with_use_uv(UseUv::Scripts);
+        let metadata = ProjectMetadata::discover(&root, &system)?;
         let db = ProjectDatabase::fallible(metadata, system)?;
         let file = system_path_to_file(&db, root.join("script.py"))?;
 
@@ -988,10 +1005,33 @@ mod tests {
         // available configuration; preparing the environment is the host's responsibility.
         let diagnostics = db.check();
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+        assert_eq!(diagnostics[0].id().as_str(), "import-not-found");
         let diagnostics = db.check_file(file);
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+        assert_eq!(diagnostics[0].id().as_str(), "import-not-found");
+
+        Ok(())
+    }
+
+    #[test]
+    fn unrelated_file_change_does_not_advance_revision() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let fs = system.memory_file_system().clone();
+        fs.write_files_all([
+            ("/project/main.py", ""),
+            ("/project/unrelated.log", "before"),
+        ])?;
+        let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/project"));
+        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        db.project().files(&db);
+        let revision = current_revision(&db);
+
+        fs.write_file_all("/project/unrelated.log", "after")?;
+        db.apply_changes(&[ChangeEvent::file_content_changed(SystemPathBuf::from(
+            "/project/unrelated.log",
+        ))]);
+
+        assert_eq!(current_revision(&db), revision);
 
         Ok(())
     }

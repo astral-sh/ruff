@@ -28,13 +28,19 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Example
 /// ```python
 /// obj = {"a": 1, "b": 2}
-/// for key, value in obj.items():
+/// for key, _value in obj.items():
+///     print(key)
+///
+/// for _key, value in obj.items():
 ///     print(value)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// obj = {"a": 1, "b": 2}
+/// for key in obj.keys():
+///     print(key)
+///
 /// for value in obj.values():
 ///     print(value)
 /// ```

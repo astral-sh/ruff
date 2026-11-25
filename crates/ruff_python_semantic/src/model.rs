@@ -269,6 +269,7 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
     pub fn match_typing_expr(&self, expr: &Expr, target: &str) -> bool {
         self.seen_typing()
+            && self.may_resolve_to_member(expr, target)
             && self
                 .resolve_qualified_name(expr)
                 .is_some_and(|qualified_name| {
@@ -282,21 +283,15 @@ impl<'a> SemanticModel<'a> {
         qualified_name: &QualifiedName,
         target: &str,
     ) -> bool {
-        if matches!(
-            qualified_name.segments(),
-            ["typing" | "_typeshed" | "typing_extensions", member] if *member == target
-        ) {
-            return true;
-        }
-
-        if self.typing_modules.iter().any(|module| {
-            let module = QualifiedName::user_defined(module);
-            qualified_name == &module.append_member(target)
-        }) {
-            return true;
-        }
-
-        false
+        let Some((member, module)) = qualified_name.segments().split_last() else {
+            return false;
+        };
+        *member == target
+            && (matches!(module, ["typing" | "_typeshed" | "typing_extensions"])
+                || self
+                    .typing_modules
+                    .iter()
+                    .any(|configured| configured.split('.').eq(module.iter().copied())))
     }
 
     /// Return an iterator over the set of `typing` modules allowed in the semantic model.
@@ -1172,6 +1167,36 @@ impl<'a> SemanticModel<'a> {
         })
     }
 
+    /// Returns whether `expr` resolves to exactly the given qualified-name segments.
+    #[inline]
+    pub fn matches_qualified_name(&self, expr: &Expr, target: &[&str]) -> bool {
+        let Some(&member) = target.last() else {
+            return false;
+        };
+
+        self.may_resolve_to_member(expr, member)
+            && self
+                .resolve_qualified_name(expr)
+                .is_some_and(|qualified_name| qualified_name.segments() == target)
+    }
+
+    /// Checks whether the spelling of `expr` can match the last segment of a qualified name.
+    #[inline]
+    fn may_resolve_to_member(&self, expr: &Expr, member: &str) -> bool {
+        match expr {
+            Expr::Attribute(attribute) => attribute.attr.as_str() == member,
+            // `from typing import Literal as L` allows `L` to match `Literal`.
+            // A name without a recorded binding still needs a scope lookup.
+            Expr::Name(name) => {
+                name.id.as_str() == member
+                    || self
+                        .resolve_name(name)
+                        .is_none_or(|id| self.binding(id).is_alias())
+            }
+            _ => false,
+        }
+    }
+
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported
     /// or builtin symbol.
     ///
@@ -1212,62 +1237,29 @@ impl<'a> SemanticModel<'a> {
                     return Some(QualifiedName::builtin(head.id.as_str()));
                 }
 
-                let value_name = UnqualifiedName::from_expr(value)?;
-                return Some(
-                    std::iter::once("")
-                        .chain(value_name.segments().iter().copied())
-                        .collect(),
-                );
+                return QualifiedName::builtin(head.id.as_str()).qualify(value);
             }
             Symbol::Unbound => return None,
         };
 
         match &binding.kind {
-            BindingKind::Import(Import { qualified_name }) => {
-                let unqualified_name = UnqualifiedName::from_expr(value)?;
-                let (_, tail) = unqualified_name.segments().split_first()?;
-                let resolved: QualifiedName = qualified_name
-                    .segments()
-                    .iter()
-                    .chain(tail)
-                    .copied()
-                    .collect();
-                Some(resolved)
-            }
+            BindingKind::Import(Import { qualified_name }) => qualified_name.qualify(value),
             BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
-                let value_name = UnqualifiedName::from_expr(value)?;
-                let (_, tail) = value_name.segments().split_first()?;
-
-                Some(
-                    qualified_name
-                        .segments()
-                        .iter()
-                        .take(1)
-                        .chain(tail)
-                        .copied()
-                        .collect(),
-                )
+                let head = qualified_name.segments().first()?;
+                QualifiedName::user_defined_identifier(head).qualify(value)
             }
             BindingKind::FromImport(FromImport { qualified_name }) => {
-                let value_name = UnqualifiedName::from_expr(value)?;
-                let (_, tail) = value_name.segments().split_first()?;
-
-                let resolved: QualifiedName =
-                    if qualified_name.segments().first().copied() == Some(".") {
-                        from_relative_import(
-                            self.module.qualified_name()?,
-                            qualified_name.segments(),
-                            tail,
-                        )?
-                    } else {
-                        qualified_name
-                            .segments()
-                            .iter()
-                            .chain(tail)
-                            .copied()
-                            .collect()
-                    };
-                Some(resolved)
+                if qualified_name.is_unresolved_import() {
+                    let value_name = UnqualifiedName::from_expr(value)?;
+                    let (_, tail) = value_name.segments().split_first()?;
+                    from_relative_import(
+                        self.module.qualified_name()?,
+                        qualified_name.segments(),
+                        tail,
+                    )
+                } else {
+                    qualified_name.qualify(value)
+                }
             }
             BindingKind::Builtin => {
                 if value.is_name_expr() {
@@ -1275,12 +1267,7 @@ impl<'a> SemanticModel<'a> {
                     Some(QualifiedName::builtin(head.id.as_str()))
                 } else {
                     // Ex) `dict.__dict__`
-                    let value_name = UnqualifiedName::from_expr(value)?;
-                    Some(
-                        std::iter::once("")
-                            .chain(value_name.segments().iter().copied())
-                            .collect(),
-                    )
+                    QualifiedName::builtin(head.id.as_str()).qualify(value)
                 }
             }
             BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {
@@ -1533,6 +1520,20 @@ impl<'a> SemanticModel<'a> {
     /// Return the grandparent [`Expr`] of the current [`Expr`], if any.
     pub fn current_expression_grandparent(&self) -> Option<&'a Expr> {
         self.current_expressions().nth(2)
+    }
+
+    /// Returns an [`Iterator`] over the current expression hierarchy represented as [`NodeId`],
+    /// from the current [`NodeId`] through to any parents.
+    fn current_expression_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
+        self.node_id
+            .iter()
+            .flat_map(|id| self.nodes.ancestor_ids(*id))
+            .filter(|id| self.nodes[*id].is_expression())
+    }
+
+    /// Return the [`NodeId`] of the current [`Expr`], if any.
+    pub fn current_expression_id(&self) -> Option<NodeId> {
+        self.current_expression_ids().next()
     }
 
     /// Returns an [`Iterator`] over the current statement hierarchy represented as [`NodeId`],

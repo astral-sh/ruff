@@ -1,0 +1,228 @@
+---
+source: crates/ruff_db/src/diagnostic/render/sarif.rs
+expression: value
+---
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "results": [
+        {
+          "fixes": [
+            {
+              "artifactChanges": [
+                {
+                  "artifactLocation": {
+                    "uri": "[URI]"
+                  },
+                  "replacements": [
+                    {
+                      "deletedRegion": {
+                        "endColumn": 1,
+                        "endLine": 2,
+                        "startColumn": 1,
+                        "startLine": 1
+                      }
+                    }
+                  ]
+                }
+              ],
+              "description": {
+                "text": "Remove unused import: `os`"
+              }
+            }
+          ],
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "[URI]"
+                },
+                "region": {
+                  "endColumn": 10,
+                  "endLine": 1,
+                  "startColumn": 8,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "`os` imported but unused"
+          },
+          "ruleId": "F401"
+        },
+        {
+          "fixes": [
+            {
+              "artifactChanges": [
+                {
+                  "artifactLocation": {
+                    "uri": "[URI]"
+                  },
+                  "replacements": [
+                    {
+                      "deletedRegion": {
+                        "endColumn": 10,
+                        "endLine": 6,
+                        "startColumn": 5,
+                        "startLine": 6
+                      }
+                    }
+                  ]
+                }
+              ],
+              "description": {
+                "text": "Remove assignment to unused variable `x`"
+              }
+            }
+          ],
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "[URI]"
+                },
+                "region": {
+                  "endColumn": 6,
+                  "endLine": 6,
+                  "startColumn": 5,
+                  "startLine": 6
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Local variable `x` is assigned to but never used"
+          },
+          "ruleId": "F841"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "[URI]"
+                },
+                "region": {
+                  "endColumn": 5,
+                  "endLine": 1,
+                  "startColumn": 4,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Undefined name `a`"
+          },
+          "ruleId": "F821"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "[URI]"
+                },
+                "region": {
+                  "endColumn": 26,
+                  "endLine": 12,
+                  "startColumn": 16,
+                  "startLine": 12
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Undefined name `fibonaccii`"
+          },
+          "ruleId": "F821"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://github.com/astral-sh/ty",
+          "name": "ty",
+          "rules": [
+            {
+              "defaultConfiguration": {
+                "enabled": true,
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "Documentation for `unused-import`."
+              },
+              "help": {
+                "text": "unused-import"
+              },
+              "helpUri": "https://ty.dev/rules#unused-import",
+              "id": "F401",
+              "properties": {
+                "id": "F401",
+                "kind": "example",
+                "name": "unused-import",
+                "problem.severity": "error"
+              },
+              "shortDescription": {
+                "text": "unused-import"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "enabled": true,
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "Documentation for `undefined-name`."
+              },
+              "help": {
+                "text": "undefined-name"
+              },
+              "helpUri": "https://ty.dev/rules#undefined-name",
+              "id": "F821",
+              "properties": {
+                "id": "F821",
+                "kind": "example",
+                "name": "undefined-name",
+                "problem.severity": "error"
+              },
+              "shortDescription": {
+                "text": "undefined-name"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "enabled": true,
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "Documentation for `unused-variable`."
+              },
+              "help": {
+                "text": "unused-variable"
+              },
+              "helpUri": "https://ty.dev/rules#unused-variable",
+              "id": "F841",
+              "properties": {
+                "id": "F841",
+                "kind": "example",
+                "name": "unused-variable",
+                "problem.severity": "error"
+              },
+              "shortDescription": {
+                "text": "unused-variable"
+              }
+            }
+          ],
+          "version": "[VERSION]"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

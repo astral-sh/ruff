@@ -1,6 +1,6 @@
 //! Generate Markdown documentation for applicable rules.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fmt::Write as _;
 use std::fs;
 use std::path::PathBuf;
@@ -11,12 +11,31 @@ use regex::{Captures, Regex};
 use ruff_linter::codes::RuleStatus;
 use strum::IntoEnumIterator;
 
-use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
+use ruff_linter::{FixAvailability, RULE_NAME_REDIRECTS};
 use ruff_options_metadata::{OptionEntry, OptionsMetadata};
 use ruff_workspace::options::Options;
 
 use crate::ROOT_DIR;
+
+pub(crate) fn rule_redirects() -> BTreeMap<String, String> {
+    let mut redirects = BTreeMap::new();
+    for rule in Rule::iter() {
+        if let Some(code) = rule.noqa_code() {
+            let code = code.to_string();
+            let target = format!("rules/{}.md", rule.name());
+            redirects.insert(format!("rules/{code}.md"), target.clone());
+            redirects.insert(format!("rules/{}.md", code.to_ascii_lowercase()), target);
+        }
+    }
+    for &(old_name, rule) in RULE_NAME_REDIRECTS {
+        redirects.insert(
+            format!("rules/{old_name}.md"),
+            format!("rules/{}.md", rule.name()),
+        );
+    }
+    redirects
+}
 
 #[derive(clap::Args)]
 pub(crate) struct Args {
@@ -27,137 +46,135 @@ pub(crate) struct Args {
 
 pub(crate) fn main(args: &Args) -> Result<()> {
     for rule in Rule::iter() {
-        if let Some(explanation) = rule.explanation() {
-            let mut output = String::new();
+        let explanation = rule.explanation();
+        let mut output = String::new();
 
-            let _ = writeln!(&mut output, "# {}", rule.name_and_code());
+        let _ = writeln!(&mut output, "# {}", rule.name_and_code());
 
-            let status_text = match rule.status() {
-                RuleStatus::Stable { since } => {
-                    format!(
-                        r#"Added in <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>"#
-                    )
-                }
-                RuleStatus::Preview { since } => {
-                    format!(
-                        r#"Preview (since <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>)"#
-                    )
-                }
-                RuleStatus::Deprecated { since } => {
-                    format!(
-                        r#"Deprecated (since <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>)"#
-                    )
-                }
-                RuleStatus::Removed { since } => {
-                    format!(
-                        r#"Removed (since <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>)"#
-                    )
-                }
-            };
+        let status_text = match rule.status() {
+            RuleStatus::Stable { since } => {
+                format!(
+                    r#"Added in <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>"#
+                )
+            }
+            RuleStatus::Preview { since } => {
+                format!(
+                    r#"Preview (since <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>)"#
+                )
+            }
+            RuleStatus::Deprecated { since } => {
+                format!(
+                    r#"Deprecated (since <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>)"#
+                )
+            }
+            RuleStatus::Removed { since } => {
+                format!(
+                    r#"Removed (since <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>)"#
+                )
+            }
+        };
 
-            let issue_search = format!(
-                "(%27{encoded_name}%27{code})",
-                encoded_name =
-                    url::form_urlencoded::byte_serialize(rule.name().as_str().as_bytes())
-                        .collect::<String>(),
-                code = rule
-                    .noqa_code()
-                    .map(|code| format!("%20OR%20{code}"))
-                    .unwrap_or_default(),
-            );
+        let issue_search = format!(
+            "(%27{encoded_name}%27{code})",
+            encoded_name = url::form_urlencoded::byte_serialize(rule.name().as_str().as_bytes())
+                .collect::<String>(),
+            code = rule
+                .noqa_code()
+                .map_or_default(|code| format!("%20OR%20{code}")),
+        );
 
-            let _ = writeln!(
-                &mut output,
-                r#"<small>
+        let _ = writeln!(
+            &mut output,
+            r#"<small>
 {status_text} ·
+Category: [{category}](../rules.md?category={category}) ·
 <a href="https://github.com/astral-sh/ruff/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{issue_search}" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/{file}#L{line}" target="_blank">View source</a>
 </small>
 
 "#,
-                file =
-                    url::form_urlencoded::byte_serialize(rule.file().replace('\\', "/").as_bytes())
-                        .collect::<String>(),
-                line = rule.line(),
+            category = rule.category(),
+            file = url::form_urlencoded::byte_serialize(rule.file().replace('\\', "/").as_bytes())
+                .collect::<String>(),
+            line = rule.line(),
+        );
+        if let Some(linter) = rule
+            .noqa_code()
+            .and_then(|code| Linter::parse_code(&code.to_string()).map(|(linter, _)| linter))
+            .filter(|linter| linter.url().is_some())
+        {
+            let common_prefix: String = match linter.common_prefix() {
+                "" => linter
+                    .upstream_categories()
+                    .unwrap()
+                    .iter()
+                    .map(|c| c.prefix)
+                    .join("-"),
+                prefix => prefix.to_string(),
+            };
+            let anchor = format!(
+                "{}-{}",
+                linter.name().to_lowercase(),
+                common_prefix.to_lowercase()
             );
-            if let Some(linter) = rule
-                .noqa_code()
-                .and_then(|code| Linter::parse_code(&code.to_string()).map(|(linter, _)| linter))
-                .filter(|linter| linter.url().is_some())
-            {
-                let common_prefix: String = match linter.common_prefix() {
-                    "" => linter
-                        .upstream_categories()
-                        .unwrap()
-                        .iter()
-                        .map(|c| c.prefix)
-                        .join("-"),
-                    prefix => prefix.to_string(),
-                };
-                let anchor = format!(
-                    "{}-{}",
-                    linter.name().to_lowercase(),
-                    common_prefix.to_lowercase()
-                );
 
-                let _ = write!(
-                    output,
-                    "Derived from the **[{}](../rules.md#{})** linter.",
-                    linter.name(),
-                    anchor,
-                );
-                output.push('\n');
-                output.push('\n');
-            }
+            let _ = write!(
+                output,
+                "Derived from the **[{}](../rules.md#{})** linter.",
+                linter.name(),
+                anchor,
+            );
+            output.push('\n');
+            output.push('\n');
+        }
 
-            if rule.is_deprecated() {
-                output.push_str(
-                    r"**Warning: This rule is deprecated and will be removed in a future release.**",
-                );
-                output.push('\n');
-                output.push('\n');
-            }
+        if rule.is_deprecated() {
+            output.push_str(
+                r"**Warning: This rule is deprecated and will be removed in a future release.**",
+            );
+            output.push('\n');
+            output.push('\n');
+        }
 
-            if rule.is_removed() {
-                output.push_str(
-                    r"**Warning: This rule has been removed and its documentation is only available for historical reasons.**",
-                );
-                output.push('\n');
-                output.push('\n');
-            }
+        if rule.is_removed() {
+            output.push_str(
+                r"**Warning: This rule has been removed and its documentation is only available for historical reasons.**",
+            );
+            output.push('\n');
+            output.push('\n');
+        }
 
-            let fix_availability = rule.fixable();
-            if matches!(
-                fix_availability,
-                FixAvailability::Always | FixAvailability::Sometimes
-            ) {
-                output.push_str(&fix_availability.to_string());
-                output.push('\n');
-                output.push('\n');
-            }
+        let fix_availability = rule.fixable();
+        if matches!(
+            fix_availability,
+            FixAvailability::Always | FixAvailability::Sometimes
+        ) {
+            output.push_str(&fix_availability.to_string());
+            output.push('\n');
+            output.push('\n');
+        }
 
-            if rule.is_preview() {
-                output.push_str(
-                    r"This rule is unstable and in [preview](../preview.md). The `--preview` flag is required for use.",
-                );
-                output.push('\n');
-                output.push('\n');
-            }
+        if rule.is_preview() {
+            output.push_str(
+                r"This rule is unstable and in [preview](../preview.md). The `--preview` flag is required for use.",
+            );
+            output.push('\n');
+            output.push('\n');
+        }
 
-            process_documentation(explanation.trim(), &mut output, rule.name().as_str());
+        process_documentation(explanation.trim(), &mut output, rule.name().as_str());
 
-            let filename = PathBuf::from(ROOT_DIR)
-                .join("docs")
-                .join("rules")
-                .join(&*rule.name())
-                .with_extension("md");
+        let filename = PathBuf::from(ROOT_DIR)
+            .join("docs")
+            .join("rules")
+            .join(&*rule.name())
+            .with_extension("md");
 
-            if args.dry_run {
-                println!("{output}");
-            } else {
-                fs::create_dir_all("docs/rules")?;
-                fs::write(filename, output)?;
-            }
+        if args.dry_run {
+            println!("{output}");
+        } else {
+            fs::create_dir_all("docs/rules")?;
+            fs::write(filename, output)?;
         }
     }
     Ok(())

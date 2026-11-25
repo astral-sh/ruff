@@ -243,6 +243,101 @@ reveal_type(C2().attr)  # revealed: Literal["non-data"] | bytes
 C2().attr = 1
 ```
 
+### Nested classes as descriptors
+
+Assignments and deletions through an instance invoke `__set__` and `__delete__` on the nested
+class's metaclass.
+
+```py
+class DescriptorMeta(type):
+    def __get__(cls, instance: object, owner: type | None = None) -> object:
+        return 1
+
+    def __set__(cls, instance: object, value: int) -> None: ...
+    def __delete__(cls, instance: object) -> None: ...
+
+class Base:
+    class Inner(metaclass=DescriptorMeta): ...
+
+Base().Inner = 1  # ok
+del Base().Inner  # ok
+```
+
+Reading `Base.Inner` calls the descriptor's `__get__` with `None` and `Base`. Assigning to or
+deleting `Base.Inner` would replace or remove the read-only binding in `Base`'s namespace, so ty
+rejects both operations.
+
+```py
+Base.Inner = Base.Inner  # error: [invalid-assignment]
+del Base.Inner  # error: [invalid-assignment]
+```
+
+`Child` inherits the data descriptor `Inner`, which takes precedence over instance attributes. Even
+though `Child.__init__` annotates `self.Inner` as `object`, assigning `"wrong"` passes a `str` to
+`DescriptorMeta.__set__`, whose `value` parameter requires an `int`.
+
+```py
+class Child(Base):
+    def __init__(self):
+        # TODO: explicit diagnostic that this `: object` annotation is not a valid override
+        self.Inner: object = "wrong"  # error: [invalid-assignment]
+
+Child().Inner = 1  # ok
+Child().Inner = "wrong"  # error: [invalid-assignment]
+```
+
+A data descriptor on `Meta` takes precedence over `C`'s own nested class. Reading `C.Inner` invokes
+the descriptor's getter, and assignment and deletion invoke its setter and deleter.
+
+```py
+class Meta(type):
+    class Inner(metaclass=DescriptorMeta): ...
+
+class C(metaclass=Meta):
+    class Inner: ...
+
+reveal_type(C.Inner)  # revealed: object
+C.Inner = 1  # ok
+C.Inner = "wrong"  # error: [invalid-assignment]
+del C.Inner  # ok
+```
+
+If the descriptor defines only `__get__`, the class's own nested class takes precedence. Reading the
+attribute returns that exact class object, and the binding is read-only.
+
+```py
+class GetterOnly(type):
+    def __get__(cls, instance: object, owner: type | None = None) -> int:
+        return 1
+
+class NonDataMeta(type):
+    class Inner(metaclass=GetterOnly): ...
+
+class D(metaclass=NonDataMeta):
+    class Inner: ...
+
+reveal_type(D.Inner)  # revealed: <class 'Inner'>
+D.Inner = D.Inner  # error: [invalid-assignment]
+del D.Inner  # error: [invalid-assignment]
+```
+
+If only one definition of a nested class is a data descriptor, we conservatively reject the write,
+even when both the descriptor and the class attribute accept the value.
+
+```py
+class ConditionalMeta(type):
+    if input():
+        class Inner(metaclass=DescriptorMeta): ...
+
+    else:
+        class Inner: ...
+
+class Outer(metaclass=ConditionalMeta):
+    Inner: int = 0
+
+Outer.Inner = 1  # error: [invalid-assignment]
+```
+
 ### Classes with unknown bases are not automatically descriptors
 
 When we cannot determine a class's base, we treat that base as `Unknown`. A `__get__` method written
@@ -251,7 +346,7 @@ on the class still makes it a descriptor, but we do not assume that `Unknown` su
 
 ```py
 from typing import Literal
-from unknown_module import UnknownBase  # error: [unresolved-import]
+from unknown_module import UnknownBase  # error: [import-not-found]
 
 class NotADescriptor(UnknownBase): ...
 
@@ -911,7 +1006,7 @@ respect its `str | None` annotation, and arbitrary instance attributes remain un
 descriptor = property(lambda instance: 1)
 descriptor.__doc__ = None
 descriptor.__doc__ = 1  # error: [invalid-assignment]
-descriptor.extra = 1  # error: [unresolved-attribute]
+descriptor.extra = 1  # error: [missing-attribute]
 ```
 
 ### Overriding properties in subclasses
@@ -1225,6 +1320,51 @@ class C:
     value: Recursive = 1
 
 C().value
+```
+
+### A descriptor requires a protocol containing its own attribute
+
+The descriptor's instance parameter can require the same attribute that the descriptor implements.
+Checking the enclosing class terminates, and an instance of that class satisfies the protocol.
+
+```py
+from typing import Protocol
+
+class HasItem(Protocol):
+    item: int
+
+class ItemDescriptor:
+    def __get__(self, instance: HasItem, owner: type[object]) -> int:
+        return 0
+
+    def __set__(self, instance: HasItem, value: int) -> None: ...
+
+class Holder:
+    item = ItemDescriptor()
+
+compatible: HasItem = Holder()  # ok
+```
+
+Checking a class that only annotates its attribute with the descriptor type also terminates:
+
+```py
+class AnnotationOnlyHolder:
+    item: ItemDescriptor  # ok
+```
+
+The recursive check does not make an incompatible setter acceptable:
+
+```py
+class WrongValueDescriptor:
+    def __get__(self, instance: HasItem, owner: type[object]) -> int:
+        return 0
+
+    def __set__(self, instance: HasItem, value: str) -> None: ...
+
+class WrongValueHolder:
+    item = WrongValueDescriptor()
+
+incompatible: HasItem = WrongValueHolder()  # error: [invalid-assignment]
 ```
 
 ### Recursive metaclass declarations containing dynamic types
@@ -1621,7 +1761,7 @@ class Descriptor:
 class C:
     value = Descriptor()
 
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(self) -> str:
         return "fallback"
 

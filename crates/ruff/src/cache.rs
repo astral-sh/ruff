@@ -18,15 +18,56 @@ use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_linter::package::PackageRoot;
+use ruff_linter::settings::types::PreviewMode;
 use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
+use ruff_python_ast::SourceType;
 use ruff_workspace::Settings;
 use ruff_workspace::resolver::Resolver;
+use ruff_workspace::script::{Script, should_read_script_metadata};
+
+use crate::args::ConfigArguments;
 
 /// [`Path`] that is relative to the package root in [`PackageCache`].
 pub(crate) type RelativePath = Path;
 /// [`PathBuf`] that is relative to the package root in [`PackageCache`].
 pub(crate) type RelativePathBuf = PathBuf;
+
+/// Part of the file key because an explicit Python target can override a script's
+/// requirement while leaving the project's target and package cache key unchanged.
+#[derive(Clone, Copy, CacheKey)]
+pub(crate) enum ScriptCacheMode {
+    /// Script metadata is disabled for this file.
+    MetadataDisabled,
+    /// Cache only scripts with no Ruff settings or Python requirement.
+    ProjectOnly,
+    /// A Python requirement is cacheable because it changes with the source.
+    AllowRequirements,
+}
+
+impl ScriptCacheMode {
+    pub(crate) fn new(
+        preview: PreviewMode,
+        source_type: SourceType,
+        overrides: &ConfigArguments,
+    ) -> Self {
+        if !should_read_script_metadata(preview, source_type) {
+            Self::MetadataDisabled
+        } else if overrides.overrides_script_target() {
+            Self::ProjectOnly
+        } else {
+            Self::AllowRequirements
+        }
+    }
+
+    pub(crate) fn allows(self, script: Option<&Script>) -> bool {
+        match (self, script) {
+            (Self::MetadataDisabled, _) | (_, None) => true,
+            (Self::ProjectOnly, Some(script)) => !script.declares_settings(),
+            (Self::AllowRequirements, Some(script)) => !script.has_ruff_table(),
+        }
+    }
+}
 
 #[derive(CacheKey)]
 pub(crate) struct FileCacheKey {
@@ -34,10 +75,12 @@ pub(crate) struct FileCacheKey {
     file_last_modified: FileTime,
     /// Permissions of the file before the (cached) check.
     file_permissions_mode: u32,
+    /// Files with nested configurations can share a package cache with a different preview mode.
+    script_mode: ScriptCacheMode,
 }
 
 impl FileCacheKey {
-    pub(crate) fn from_path(path: &Path) -> io::Result<FileCacheKey> {
+    pub(crate) fn from_path(path: &Path, script_mode: ScriptCacheMode) -> io::Result<FileCacheKey> {
         // Construct a cache key for the file
         let metadata = path.metadata()?;
 
@@ -52,6 +95,7 @@ impl FileCacheKey {
         Ok(FileCacheKey {
             file_last_modified: FileTime::from_last_modification_time(&metadata),
             file_permissions_mode: permissions,
+            script_mode,
         })
     }
 }
@@ -508,23 +552,41 @@ mod tests {
 
     use anyhow::Result;
     use filetime::{FileTime, set_file_mtime};
+    use indoc::indoc;
     use itertools::Itertools;
     use ruff_python_ast::SourceType;
+    use rustc_hash::FxHashMap;
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
+    use ruff_linter::UnresolvedRuleSelector;
     use ruff_linter::package::PackageRoot;
-    use ruff_linter::registry::Rule;
-    use ruff_linter::settings::LinterSettings;
     use ruff_linter::settings::flags;
-    use ruff_linter::settings::types::UnsafeFixes;
+    use ruff_linter::settings::types::{PreviewMode, UnsafeFixes};
     use ruff_python_ast::PySourceType;
-    use ruff_workspace::Settings;
+    use ruff_python_ast::PythonVersion;
+    use ruff_workspace::configuration::{Configuration, RuleSelection};
+    use ruff_workspace::resolver::Project;
+
+    use crate::args::ConfigArguments;
 
     use crate::cache::{self, ChangeData, FileCache, FileCacheData, FileCacheKey};
-    use crate::cache::{Cache, RelativePathBuf};
+    use crate::cache::{Cache, RelativePathBuf, ScriptCacheMode};
     use crate::commands::format::{FormatCommandError, FormatMode, FormatResult, format_path};
     use crate::diagnostics::{Diagnostics, lint_path};
+
+    fn test_project(root: &Path, cache_dir: PathBuf, rule: &str) -> Project {
+        let mut configuration = Configuration {
+            cache_dir: Some(cache_dir),
+            target_version: Some(PythonVersion::latest()),
+            ..Configuration::default()
+        };
+        configuration.lint.rule_selections.push(RuleSelection {
+            select: Some(vec![UnresolvedRuleSelector::cli(rule)]),
+            ..RuleSelection::default()
+        });
+        Project::resolve(configuration, root, &ConfigArguments::default()).unwrap()
+    }
 
     #[test_case("../ruff_linter/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_linter"; "ruff_linter_fixtures")]
     #[test_case("../ruff_notebook/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_notebook"; "ruff_notebook_fixtures")]
@@ -534,14 +596,10 @@ mod tests {
         let _ = fs::remove_dir_all(&cache_dir);
         cache::init(&cache_dir).unwrap();
 
-        let settings = Settings {
-            cache_dir,
-            linter: LinterSettings::for_rule(Rule::UnusedVariable),
-            ..Settings::default()
-        };
-
+        let overrides = ConfigArguments::default();
         let package_root = fs::canonicalize(package_root).unwrap();
-        let cache = Cache::open(package_root.clone(), &settings);
+        let project = test_project(&package_root, cache_dir, "F841");
+        let cache = Cache::open(package_root.clone(), &project.settings);
         assert_eq!(cache.changes.lock().unwrap().len(), 0);
 
         let mut paths = Vec::new();
@@ -572,7 +630,9 @@ mod tests {
                 let mut diagnostics = lint_path(
                     &path,
                     Some(PackageRoot::root(&package_root)),
-                    &settings.linter,
+                    &FxHashMap::default(),
+                    &project,
+                    &overrides,
                     Some(&cache),
                     flags::Noqa::Enabled,
                     flags::FixMode::Generate,
@@ -597,7 +657,7 @@ mod tests {
 
         cache.persist().unwrap();
 
-        let cache = Cache::open(package_root.clone(), &settings);
+        let cache = Cache::open(package_root.clone(), &project.settings);
         assert_ne!(cache.package.files.len(), 0);
 
         paths_with_diagnostics.sort();
@@ -621,7 +681,9 @@ mod tests {
             got_diagnostics += lint_path(
                 &path,
                 Some(PackageRoot::root(&package_root)),
-                &settings.linter,
+                &FxHashMap::default(),
+                &project,
+                &overrides,
                 Some(&cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
@@ -634,6 +696,58 @@ mod tests {
             expected_diagnostics, got_diagnostics,
             "left == {expected_diagnostics:#?}, right == {got_diagnostics:#?}",
         );
+    }
+
+    #[test]
+    fn cache_skips_only_scripts_with_ruff_tables() -> Result<()> {
+        let mut test = TestCache::new("cache_skips_only_scripts_with_ruff_tables");
+        test.project.settings.preview = PreviewMode::Enabled;
+        let cache = test.open();
+        let check = |name: &str, source: &str| -> Result<()> {
+            test.write_source_file(name, source.as_bytes());
+            assert!(test.lint_file_with_cache(name, &cache)?.inner.is_empty());
+            test.format_file_with_cache(name, &cache).unwrap();
+            Ok(())
+        };
+        check(
+            "version.py",
+            indoc! {r#"
+                # /// script
+                # requires-python = ">=3.12"
+                # ///
+                x = 1
+            "#},
+        )?;
+        check(
+            "inline.py",
+            indoc! {r#"
+                # /// script
+                # [tool.ruff]
+                # ///
+                x = 1
+            "#},
+        )?;
+        check(
+            "dependencies.py",
+            indoc! {r#"
+                # /// script
+                # dependencies = []
+                # ///
+                x = 1
+            "#},
+        )?;
+        check("ordinary.py", "")?;
+
+        cache.persist()?;
+        let files = test.open().package.files;
+        assert!(files[Path::new("version.py")].linted());
+        assert!(files[Path::new("version.py")].data.formatted);
+        assert!(!files.contains_key(Path::new("inline.py")));
+        assert!(files[Path::new("dependencies.py")].linted());
+        assert!(files[Path::new("dependencies.py")].data.formatted);
+        assert!(files[Path::new("ordinary.py")].linted());
+        assert!(files[Path::new("ordinary.py")].data.formatted);
+        Ok(())
     }
 
     #[test]
@@ -947,7 +1061,11 @@ mod tests {
 
         let Some(file_cache) = cache.get(
             Path::new("source.py"),
-            &FileCacheKey::from_path(&test_cache.package_root.join("source.py")).unwrap(),
+            &FileCacheKey::from_path(
+                &test_cache.package_root.join("source.py"),
+                ScriptCacheMode::MetadataDisabled,
+            )
+            .unwrap(),
         ) else {
             panic!("Cache entry for `source.py` is missing.");
         };
@@ -997,7 +1115,7 @@ mod tests {
 
         let Some(file_cache) = cache.get(
             Path::new("source.py"),
-            &FileCacheKey::from_path(&source_path).unwrap(),
+            &FileCacheKey::from_path(&source_path, ScriptCacheMode::MetadataDisabled).unwrap(),
         ) else {
             panic!("Cache entry for `source.py` is missing.");
         };
@@ -1008,7 +1126,7 @@ mod tests {
 
     struct TestCache {
         package_root: PathBuf,
-        settings: Settings,
+        project: Project,
     }
 
     impl TestCache {
@@ -1027,15 +1145,10 @@ mod tests {
             cache::init(&cache_dir).unwrap();
             fs::create_dir(package_root.clone()).unwrap();
 
-            let settings = Settings {
-                cache_dir,
-                linter: LinterSettings::for_rule(Rule::UndefinedExport),
-                ..Settings::default()
-            };
-
+            let project = test_project(&package_root, cache_dir, "F822");
             Self {
                 package_root,
-                settings,
+                project,
             }
         }
 
@@ -1053,7 +1166,7 @@ mod tests {
         }
 
         fn open(&self) -> Cache {
-            Cache::open(self.package_root.clone(), &self.settings)
+            Cache::open(self.package_root.clone(), &self.project.settings)
         }
 
         fn lint_file_with_cache(
@@ -1064,7 +1177,9 @@ mod tests {
             lint_path(
                 &self.package_root.join(path),
                 Some(PackageRoot::root(&self.package_root)),
-                &self.settings.linter,
+                &FxHashMap::default(),
+                &self.project,
+                &ConfigArguments::default(),
                 Some(cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
@@ -1080,7 +1195,8 @@ mod tests {
             let file_path = self.package_root.join(path);
             format_path(
                 &file_path,
-                &self.settings.formatter,
+                &self.project,
+                &ConfigArguments::default(),
                 SourceType::Python(PySourceType::Python),
                 FormatMode::Write,
                 None,
@@ -1091,7 +1207,7 @@ mod tests {
 
     impl Drop for TestCache {
         fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.settings.cache_dir);
+            let _ = fs::remove_dir_all(&self.project.settings.cache_dir);
         }
     }
 }

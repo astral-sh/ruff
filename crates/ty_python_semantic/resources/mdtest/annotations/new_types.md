@@ -175,16 +175,37 @@ def g(x: RegularCallableTypeOf[j]):
     reveal_type(x)  # revealed: (a: str) -> bytes
 ```
 
-## The name must be a string literal
+## Names passed through a variable
+
+When the name argument has type `str`, `mismatched-newtype-name` reports that ty cannot verify that
+it matches the assignment target. The assigned variable still defines a new type, and diagnostics
+display it using the assigned name.
 
 ```py
 from typing_extensions import NewType
 
 def _(name: str) -> None:
-    _ = NewType(name, int)  # error: [invalid-newtype] "The first argument to `NewType` must be a string literal"
+    UserId = NewType(name, int)  # error: [mismatched-newtype-name]
+    reveal_type(UserId(1))  # revealed: UserId
+
+    def as_user_id(value: int) -> UserId:
+        # snapshot: invalid-explicit-return
+        return value
 ```
 
-However, the literal doesn't necessarily need to be inline, as long as we infer it:
+```snapshot
+error[invalid-explicit-return]: Return type does not match returned value
+ --> src/mdtest_snippet.py:9:16
+  |
+7 |     def as_user_id(value: int) -> UserId:
+  |                                   ------ Expected `UserId` because of return type
+8 |         # snapshot: invalid-explicit-return
+9 |         return value
+  |                ^^^^^ expected `UserId`, found `int`
+```
+
+If ty infers a string literal type for the name argument, it can compare the value with the assigned
+variable:
 
 ```py
 name = "Foo"
@@ -198,14 +219,14 @@ reveal_type(Foo)  # revealed: <NewType pseudo-class 'Foo'>
 from typing_extensions import NewType
 from ty_extensions._internal import is_subtype_of
 
-# snapshot: mismatched-type-name
+# snapshot: mismatched-newtype-name
 UserId = NewType("Id", int)
 reveal_type(UserId)  # revealed: <NewType pseudo-class 'Id'>
 reveal_type(is_subtype_of(UserId, int))  # revealed: ConstraintSet[Literal[True]]
 ```
 
 ```snapshot
-warning[mismatched-type-name]: The name passed to `NewType` must match the variable it is assigned to
+warning[mismatched-newtype-name]: The name passed to `NewType` must match the variable it is assigned to
  --> src/mdtest_snippet.py:5:18
   |
 5 | UserId = NewType("Id", int)
@@ -214,13 +235,13 @@ warning[mismatched-type-name]: The name passed to `NewType` must match the varia
 
 ```py
 Id = int
-# snapshot: mismatched-type-name
+# snapshot: mismatched-newtype-name
 UsesExistingId = NewType("Id", "Id")
 UsesExistingId(1)
 ```
 
 ```snapshot
-warning[mismatched-type-name]: The name passed to `NewType` must match the variable it is assigned to
+warning[mismatched-newtype-name]: The name passed to `NewType` must match the variable it is assigned to
   --> src/mdtest_snippet.py:10:26
    |
 10 | UsesExistingId = NewType("Id", "Id")
@@ -438,7 +459,7 @@ Bing() < 3.14  # error: [unsupported-operator]
 
 ```py
 from typing import NewType
-from doesnotexist import unknown  # error: [unresolved-import]
+from doesnotexist import unknown  # error: [import-not-found]
 
 MyFloat = NewType("MyFloat", float)
 

@@ -1,6 +1,6 @@
 [package]
 name = "ruff_diagnostics"
-version = "0.0.18"
+version = "0.0.23"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -23,3 +23,6 @@ serde = { workspace = true, optional = true, features = [] }
 
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]
+
+[lints.cargo]
+redundant_homepage = "allow"

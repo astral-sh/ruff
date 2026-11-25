@@ -1,5 +1,6 @@
 use ruff_python_ast::InterpolatedStringElement;
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Operator, StringFlags};
+use ruff_python_ast::token::parenthesized_range;
+use ruff_python_ast::{self as ast, Arguments, AtomicNodeIndex, Expr, Keyword, Operator};
 
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
@@ -9,8 +10,8 @@ use crate::checkers::ast::Checker;
 use crate::preview::is_fix_f_string_logging_enabled;
 use crate::registry::Rule;
 use crate::rules::flake8_logging_format::violations::{
-    LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
-    LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
+    LoggingErrorWithExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
+    LoggingRedundantExcInfo, LoggingStrFormat, LoggingStringConcat, LoggingWarn,
 };
 use crate::{Edit, Fix};
 
@@ -35,20 +36,13 @@ fn logging_f_string(
         return;
     }
 
+    // The new positional arguments cannot follow a keyword argument.
+    if arguments.find_keyword("msg").is_some() {
+        return;
+    }
+
     let mut format_string = String::new();
     let mut args: Vec<&str> = Vec::new();
-
-    // Try to reuse the first part's quote style when building the replacement.
-    // Default to double quotes if we can't determine it.
-    let quote_str = f_string
-        .value
-        .iter()
-        .map(|part| match part {
-            ast::FStringPartRef::Literal(literal) => literal.flags.quote_str(),
-            ast::FStringPartRef::FString(f) => f.flags.quote_str(),
-        })
-        .next()
-        .unwrap_or("\"");
 
     for part in &f_string.value {
         match part {
@@ -72,7 +66,8 @@ fn logging_f_string(
                             format_string.push_str(lit.value.as_ref());
                         }
                         InterpolatedStringElement::Interpolation(interpolated) => {
-                            if interpolated.format_spec.is_some()
+                            if interpolated.debug_text.is_some()
+                                || interpolated.format_spec.is_some()
                                 || !matches!(
                                     interpolated.conversion,
                                     ruff_python_ast::ConversionFlag::None
@@ -98,15 +93,29 @@ fn logging_f_string(
         return;
     }
 
-    let replacement = format!(
-        "{q}{format_string}{q}, {args}",
-        q = quote_str,
-        format_string = format_string,
-        args = args.join(", ")
-    );
+    let format_string = checker
+        .generator()
+        .expr(&Expr::StringLiteral(ast::ExprStringLiteral {
+            value: ast::StringLiteralValue::single(ast::StringLiteral {
+                value: Box::from(format_string),
+                range: TextRange::default(),
+                node_index: AtomicNodeIndex::NONE,
+                flags: checker.default_string_flags(),
+            }),
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+        }));
 
-    let fix = Fix::safe_edit(Edit::range_replacement(replacement, msg.range()));
-    diagnostic.set_fix(fix);
+    // Leaving the parentheses around the replacement would turn the message into a tuple.
+    let target =
+        parenthesized_range(msg.into(), arguments.into(), checker.tokens()).unwrap_or(msg.range());
+
+    let replacement = format!("{format_string}, {}", args.join(", "));
+
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        replacement,
+        target,
+    )));
 }
 
 /// Returns `true` if the attribute is a reserved attribute on the `logging` module's `LogRecord`
@@ -158,11 +167,11 @@ fn check_msg(checker: &Checker, msg: &Expr, arguments: &Arguments, msg_pos: usiz
         }
         // Check for .format() calls.
         Expr::Call(ast::ExprCall { func, .. })
-            if checker.is_rule_enabled(Rule::LoggingStringFormat) =>
+            if checker.is_rule_enabled(Rule::LoggingStrFormat) =>
         {
             if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                 if attr == "format" && value.is_literal_expr() {
-                    checker.report_diagnostic(LoggingStringFormat, msg.range());
+                    checker.report_diagnostic(LoggingStrFormat, msg.range());
                 }
             }
         }
@@ -291,7 +300,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // G201, G202
-    if checker.any_rule_enabled(&[Rule::LoggingExcInfo, Rule::LoggingRedundantExcInfo]) {
+    if checker.any_rule_enabled(&[Rule::LoggingErrorWithExcInfo, Rule::LoggingRedundantExcInfo]) {
         if !checker.semantic().in_exception_handler() {
             return;
         }
@@ -301,7 +310,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         if let LoggingCallType::LevelCall(logging_level) = logging_call_type {
             match logging_level {
                 LoggingLevel::Error => {
-                    checker.report_diagnostic_if_enabled(LoggingExcInfo, range);
+                    checker.report_diagnostic_if_enabled(LoggingErrorWithExcInfo, range);
                 }
                 LoggingLevel::Exception => {
                     checker.report_diagnostic_if_enabled(LoggingRedundantExcInfo, exc_info.range());

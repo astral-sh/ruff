@@ -1,0 +1,80 @@
+name: Set up the Ruff workspace
+description: Install uv and optionally add a locked Ruff dependency group to PATH.
+
+inputs:
+  group:
+    description: Dependency group from the workflow revision to put on PATH.
+    required: false
+  python-version:
+    description: Python version for uv to use.
+    required: false
+  activate-environment:
+    description: Create and activate a virtual environment in the checkout.
+    default: "false"
+  enable-cache:
+    description: Enable the uv cache for the checkout (true, false, or auto).
+    default: "false"
+  cache-python:
+    description: Include uv-managed Python installations in the cache.
+    default: "false"
+  save-cache:
+    description: Save the uv cache after the job (true, false, or auto).
+    default: "auto"
+
+runs:
+  using: composite
+  steps:
+    - name: Select the uv release archive
+      id: release
+      shell: bash
+      run: |
+        case "$RUNNER_OS/$RUNNER_ARCH" in
+          Linux/X64)
+            uv_version="0.13.10"
+            uv_checksum="bf65ac1a0af10f92c522d91ac096c7c0a39657647b155577e7836c2cbbb4526c"
+            ;;
+          Linux/ARM64)
+            uv_version="0.13.10"
+            uv_checksum="14590f644805a6234ffe071154340669e38137f38e60aa9629690119704107d2"
+            ;;
+          macOS/ARM64)
+            uv_version="0.13.10"
+            uv_checksum="e419bf07533bdbf48795fc793601c834dd79db57a8c49ce8e25cfe3a8639958d"
+            ;;
+          Windows/X64)
+            uv_version="0.13.10"
+            uv_checksum="297b3881fe1adfb922becc2c1613202abb41dc83ea5ff43d472aa087ca1f8683"
+            ;;
+          *)
+            echo "Unsupported uv runner: $RUNNER_OS/$RUNNER_ARCH" >&2
+            exit 1
+            ;;
+        esac
+        {
+          echo "version=$uv_version"
+          echo "checksum=$uv_checksum"
+        } >> "$GITHUB_OUTPUT"
+
+    - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+      with:
+        version: ${{ steps.release.outputs.version }}
+        checksum: ${{ steps.release.outputs.checksum }}
+        python-version: ${{ inputs.python-version }}
+        activate-environment: ${{ inputs.activate-environment }}
+        enable-cache: ${{ inputs.enable-cache }}
+        cache-python: ${{ inputs.cache-python }}
+        save-cache: ${{ inputs.save-cache }}
+        working-directory: ${{ (inputs.enable-cache != 'false' || inputs.activate-environment == 'true') && github.workspace || github.action_path }}
+        tool-bin-dir: ${{ inputs.group && format('{0}/.venv/{1}', github.action_path, runner.os == 'Windows' && 'Scripts' || 'bin') || '' }}
+
+    - name: Install the toolchain group
+      if: inputs.group != ''
+      shell: bash
+      # Use the workflow revision's lockfile, including in jobs without a checkout.
+      working-directory: ${{ github.action_path }}/../../..
+      env:
+        TOOLCHAIN_GROUP: ${{ inputs.group }}
+        UV_PROJECT_ENVIRONMENT: ${{ github.action_path }}/.venv
+      run: |
+        # Keep executables on PATH independent of the writable uv cache.
+        uv sync --locked --only-group "$TOOLCHAIN_GROUP" --python "${UV_PYTHON:-3}" --link-mode copy

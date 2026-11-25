@@ -29,8 +29,8 @@ use crate::{
         place_from_bindings,
     },
     place_load::{
-        ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceLoadMode, PlaceLoadResolutionStep,
-        PlaceLoadSourceKind, resolve_place_load,
+        ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolutionProcedure, PlaceLoadResolutionStep,
+        PlaceLoadSourceKind,
     },
     types::{
         Type, TypeContext,
@@ -400,30 +400,22 @@ fn place_condition_definition_info<'db>(
     let mut info = ConditionDefinitionInfo::default();
     let index = semantic_index(db, file);
     if let Some(scope) = index.try_expression_scope_id(expression)
-        && let Some(place) = PlaceExpr::try_from_expr(expression)
+        && let Some(place_expr) = PlaceExpr::try_from_expr(expression)
     {
         let scope = scope.to_scope_id(db, file);
         let env = ProgramEnvironment::from_scope(scope);
-        let resolution = resolve_place_load(
+        let procedure = PlaceLoadResolutionProcedure::new(
             db,
             index,
             scope,
-            place,
+            &place_expr,
             PlaceLoadMode::AtExpression(expression.into()),
         );
-        for step in resolution {
+        for step in procedure {
             let source = match step {
                 PlaceLoadResolutionStep::Source(source) => source,
                 PlaceLoadResolutionStep::MemberResolutionCondition(prefixes) => {
-                    let use_def = use_def_map(db, prefixes.scope());
-                    if prefixes.iter().any(|prefix| {
-                        let bindings = match prefix {
-                            PlaceExprPrefixLoad::AtUse(id) => use_def.bindings_at_use(id),
-                            PlaceExprPrefixLoad::AllReachable(id) => use_def.reachable_bindings(id),
-                            PlaceExprPrefixLoad::DefinitelyBound => return true,
-                        };
-                        !place_from_bindings(db, &env, bindings).place.is_undefined()
-                    }) {
+                    if prefixes.has_bound_prefix(db, &env, None) {
                         break;
                     }
                     continue;
@@ -569,7 +561,7 @@ fn definition_reachability<'db>(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _| ConditionDefinitionInfo::default(),
+    cycle_initial = |_, _, _, _| ConditionDefinitionInfo::default(),
     heap_size = ruff_memory_usage::heap_size
 )]
 fn resolved_condition_definition_info<'db>(
@@ -598,7 +590,7 @@ fn resolved_condition_definition_info<'db>(
 /// traversal and boundness analysis so repeated conditions do not rescan all those bindings.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| (ConditionDefinitionInfo::default(), false),
+    cycle_initial = |_, _, _, _, _| (ConditionDefinitionInfo::default(), false),
     heap_size = ruff_memory_usage::heap_size
 )]
 fn owning_scope_condition_definition_info<'db>(
@@ -631,7 +623,7 @@ fn owning_scope_condition_definition_info<'db>(
 /// can be quadratic in the number of assignments, even when the per-definition traversal is cached.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| ConditionDefinitionInfo::default(),
+    cycle_initial = |_, _, _, _, _| ConditionDefinitionInfo::default(),
     heap_size = ruff_memory_usage::heap_size
 )]
 // Salsa copies this attribute to both the query wrapper and its inner function. The wrapper
@@ -655,7 +647,7 @@ fn name_condition_definition_info<'db>(
 /// to. Taking that type from the caller avoids re-entering inference of the use-site scope.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _, _| ConditionDefinitionInfo::default(),
+    cycle_initial = |_, _, _, _, _, _| ConditionDefinitionInfo::default(),
     heap_size = ruff_memory_usage::heap_size
 )]
 // Salsa copies this attribute to both the query wrapper and its inner function. The wrapper
@@ -691,7 +683,7 @@ fn attribute_condition_definition_info<'db>(
 /// callers do not depend directly on another file's syntax tree. Cyclic aliases recover as `false`.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _| false,
+    cycle_initial = |_, _, _, _| false,
     heap_size = ruff_memory_usage::heap_size
 )]
 fn definition_contains_special_cased_condition<'db>(
@@ -794,6 +786,9 @@ fn definition_contains_special_cased_condition<'db>(
     // A version guard can select a different function signature without changing the fact that
     // the function object is always truthy. Only definitions with a source expression above
     // inherit the provenance of their guards.
+    if definition.has_folded_environment_guard(db, &module) {
+        return true;
+    }
     let reachability = definition_reachability(db, definition.scope(db), definition.place(db))
         .get(&definition)
         .copied()
@@ -833,7 +828,7 @@ fn definition_contains_special_cased_condition<'db>(
 /// All three branches contribute, regardless of the configured environment's truthiness.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| false,
+    cycle_initial = |_, _, _, _, _| false,
     heap_size = ruff_memory_usage::heap_size
 )]
 fn reachability_contains_special_cased_condition<'db>(
@@ -867,7 +862,7 @@ fn reachability_contains_special_cased_condition<'db>(
 /// definitions can share the same guard, and recover as `false` if the guard refers to the definition.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| false,
+    cycle_initial = |_, _, _, _, _| false,
     heap_size = ruff_memory_usage::heap_size
 )]
 fn predicate_contains_special_cased_condition<'db>(
@@ -876,9 +871,9 @@ fn predicate_contains_special_cased_condition<'db>(
     predicate: ScopedPredicateId,
 ) -> bool {
     let expression = match use_def_map(db, scope).predicates()[predicate].node {
-        PredicateNode::Expression { expression, .. }
-        | PredicateNode::Condition(expression)
-        | PredicateNode::IsNonEmptyIterable(expression) => expression,
+        PredicateNode::Expression(expression) | PredicateNode::IsNonEmptyIterable(expression) => {
+            expression
+        }
         PredicateNode::Pattern(pattern) => pattern.subject(db),
         PredicateNode::SubjectElementPattern(element) => element.pattern.subject(db),
         // These predicates describe implicit control flow rather than a tested value. In

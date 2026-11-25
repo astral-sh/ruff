@@ -17,9 +17,11 @@ use crate::{
     types::{
         ClassBase, ClassLiteral, ClassType, LintDiagnosticGuard, Parameters, Signature, Type,
         binding_type,
+        callable::CallableTypeKind,
         diagnostic::{AbstractMethodAnnotationPolicy, abstract_method_span},
-        function::{AbstractMethodKind, FunctionDecorators},
+        function::AbstractMethodKind,
         infer::{function_known_decorators, infer_definition_types},
+        typevar::TypeVarDomain,
     },
 };
 
@@ -252,7 +254,7 @@ impl<'db> ClassType<'db> {
     /// The value of the map is a struct containing information about the abstract method.
     // Inferring class members can call constructors that query abstractness again.
     // Start with no abstract methods while resolving these cycles.
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size, cycle_initial=|_, _, _| FxIndexMap::default())]
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size, cycle_initial=|_, _, _, _| FxIndexMap::default())]
     pub(in crate::types) fn abstract_methods(
         self,
         db: &'db dyn Db,
@@ -332,7 +334,8 @@ impl<'db> ClassType<'db> {
             });
 
             for (symbol_id, bindings_iterator) in use_def_map.all_end_of_scope_symbol_bindings() {
-                let name = place_table.symbol(symbol_id).name();
+                let symbol = place_table.symbol(symbol_id);
+                let name = symbol.name();
                 // Avoid inferring signatures for methods that cannot introduce abstractness.
                 // Inspect all reachable definitions: an earlier overload can be abstract even
                 // when the final implementation is concrete.
@@ -341,7 +344,11 @@ impl<'db> ClassType<'db> {
                     && use_def_map
                         .reachable_symbol_bindings(symbol_id)
                         .filter_map(|binding| binding.binding.definition())
-                        .all(|definition| !might_be_explicitly_abstract(db, definition))
+                        .all(|definition| {
+                            // A function definition always declares the symbol. Other bindings
+                            // can alias abstract methods and still need regular inference.
+                            symbol.is_declared() && !might_be_explicitly_abstract(db, definition)
+                        })
                 {
                     continue;
                 }
@@ -376,12 +383,66 @@ impl<'db> ClassType<'db> {
     }
 }
 
+/// Returns `true` if we can cheaply rule out any overload of the decorator turning
+/// a concrete member into an explicitly abstract one.
+///
+/// This check is only an optimization. If every decorator passes, abstract-method
+/// discovery can skip inferring the decorated member's type. When proving concreteness
+/// would be expensive, we can conservatively return `false` and let inference proceed.
+///
+/// To check whether a class can be instantiated, ty looks for abstract methods throughout
+/// its MRO. Skipping inference for methods with identity decorators sped up checks of
+/// usort and Fixit (LibCST's `@mark_no_op`) and Flask-PyMongo (`@pymongo._csot.apply`).
+/// Recognizing that both overloads of `contextlib.contextmanager` return a `Callable`
+/// also sped up checks of code that instantiates Click's `CliRunner`.
+pub(super) fn decorator_preserves_concreteness<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    decorator: Type<'db>,
+) -> bool {
+    let signatures = match decorator {
+        Type::FunctionLiteral(function) if function.known(db).is_none() => function.signature(db),
+        Type::Callable(callable) if callable.kind(db) == CallableTypeKind::Regular => {
+            callable.signatures(db)
+        }
+        _ => return false,
+    };
+
+    // Specializing a nominal instance or a callable cannot produce a function literal,
+    // bound method, or property carrying `@abstractmethod`.
+    let stays_concrete = |ty| matches!(ty, Type::NominalInstance(_) | Type::Callable(_));
+
+    signatures.overloads.iter().all(|signature| {
+        let Type::TypeVar(variable) = signature.return_ty else {
+            return stays_concrete(signature.return_ty);
+        };
+
+        // If the decorator is generic in `T` and takes `f: T`, we infer `T` from the
+        // member itself. With `f: Callable[..., T]`, the decorated function's return
+        // type would supply `T` and could be the type of an abstract method.
+        //
+        // Inference can also select a constraint or fall back to a bound or default.
+        let typevar = variable.typevar(db);
+        variable.domain(db) == TypeVarDomain::Type
+            && signature
+                .generic_context
+                .is_some_and(|context| context.contains(db, variable.identity(db)))
+            && signature
+                .parameters()
+                .get_positional(0)
+                .is_some_and(|parameter| parameter.annotated_type() == signature.return_ty)
+            && !typevar.is_constrained(db)
+            && typevar.upper_bound(db, env).is_none_or(stays_concrete)
+            && typevar.default_type(db, env).is_none_or(stays_concrete)
+    })
+}
+
 /// Whether a binding could resolve to a method marked with `@abstractmethod`.
 ///
 /// Keep the definition dependency in this query so unrelated edits to a superclass's module do
 /// not invalidate abstract-method discovery for all of its subclasses. Use cached decorator
 /// metadata to avoid reloading ASTs that were discarded after checking their files.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true)]
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| true)]
 fn might_be_explicitly_abstract<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
     let DefinitionKind::Function(function) = definition.kind(db) else {
         return true;
@@ -389,11 +450,7 @@ fn might_be_explicitly_abstract<'db>(db: &'db dyn Db, definition: Definition<'db
     if !function.has_decorators() {
         return false;
     }
-    let decorators = function_known_decorators(db, definition);
-    decorators
-        .known_decorators()
-        .contains(FunctionDecorators::ABSTRACT_METHOD)
-        || decorators.has_unknown_decorators()
+    function_known_decorators(db, definition).may_produce_abstract_method()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]

@@ -49,6 +49,7 @@ mod script_preparation;
 mod semantic_tokens;
 mod signature_help;
 mod type_hierarchy;
+mod will_rename_files;
 mod workspace_folders;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -86,6 +87,7 @@ use lsp_types::{
     WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticRequest,
     WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
 };
+use lsp_types::{FileRename, WillRenameFilesRequest};
 #[cfg(feature = "test-uv")]
 use ruff_db::system::System as _;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, SystemVirtualPath, TestSystem};
@@ -1025,6 +1027,10 @@ impl TestServer {
         )
     }
 
+    pub(crate) fn will_rename_files(&mut self, files: Vec<FileRename>) -> Option<WorkspaceEdit> {
+        self.send_request_await::<WillRenameFilesRequest>(lsp_types::RenameFilesParams { files })
+    }
+
     /// Send a `textDocument/diagnostic` request for the document at the given path.
     pub(crate) fn document_diagnostic_request(
         &mut self,
@@ -1350,16 +1356,23 @@ impl TestServerBuilder {
         self
     }
 
-    /// Enable uv integration using the uv executable on the test process's PATH.
+    /// Use the uv executable on the test process's PATH.
     #[cfg(feature = "test-uv")]
-    pub(crate) fn with_real_uv(mut self, use_uv: UseUv) -> Result<Self> {
+    pub(crate) fn with_real_uv(mut self) -> Result<Self> {
         let uv = OsSystem::default().which("uv")?;
         self.env_vars
             .extend(uv_test_env_vars().map(|(name, value)| (name.to_owned(), Some(value))));
-        Ok(self.with_use_uv(use_uv).with_env_var("UV", uv.as_str()))
+        Ok(self.with_env_var("UV", uv.as_str()))
     }
 
-    /// Configure which uv integrations the test server enables.
+    /// Select uv as the script project manager in the editor configuration.
+    pub(crate) fn with_uv_script_manager(mut self) -> Self {
+        let options = self.initialization_options.get_or_insert_with(|| json!({}));
+        options["configuration"]["project-manager"]["script"] = json!("uv");
+        self
+    }
+
+    /// Set the legacy `experimental.useUv` editor option.
     pub(crate) fn with_use_uv(mut self, use_uv: UseUv) -> Self {
         self.initialization_options.get_or_insert_with(|| json!({}))["experimental"]["useUv"] =
             json!(use_uv);

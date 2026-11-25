@@ -79,14 +79,14 @@ pub(crate) fn check(
     show_syntax_errors: bool,
     supports_related_information: bool,
 ) -> DiagnosticsMap {
-    let settings = query.settings();
+    let project_settings = query.project_settings();
     let document_path = query.virtual_file_path();
 
     // If the document is excluded, return an empty list of diagnostics.
     if is_document_excluded_for_linting(
         &document_path,
-        &settings.file_resolver,
-        &settings.linter,
+        &project_settings.file_resolver,
+        &project_settings.linter,
         query.text_document_language_id(),
     ) {
         return DiagnosticsMap::default();
@@ -118,7 +118,7 @@ pub(crate) fn check(
         document_uri: &document_uri,
         notebook: query.as_notebook(),
         supports_related_information,
-        settings,
+        settings: project_settings,
     };
 
     let mut diagnostics_map = DiagnosticsMap::default();
@@ -170,9 +170,21 @@ fn check_python(
     query: &DocumentQuery,
     source_type: ruff_python_ast::PySourceType,
 ) -> CheckResult<'_> {
-    let settings = query.settings();
     let document_path = query.virtual_file_path();
     let source_kind = query.make_python_source_kind(source_type);
+    let settings = match query.settings() {
+        Ok(settings) => settings,
+        Err(error) => {
+            return CheckResult {
+                diagnostics: vec![error.clone()],
+                suppression_edits: Vec::new(),
+                document: CheckedDocument::Python {
+                    index: LineIndex::from_source_text(source_kind.source_code()),
+                    source: source_kind,
+                },
+            };
+        }
+    };
 
     let file_path = query.file_path();
     let package = if let Some(file_path) = &file_path {
@@ -238,8 +250,9 @@ fn check_python(
         &directives.noqa_line_for,
         stylist.line_ending(),
         &suppressions,
+        // A script can disable lint preview, making rule names invalid in its suppressions.
         if is_human_readable_names_enabled(settings.linter.preview)
-            && !settings.output_prefer_rule_codes
+            && !query.project_settings().output_prefer_rule_codes
         {
             SuppressionKind::Ignore
         } else {
@@ -264,7 +277,7 @@ fn check_toml<'a>(
     document: &'a TextDocument,
     source_type: TomlSourceType,
 ) -> CheckResult<'a> {
-    let settings = query.settings();
+    let settings = query.project_settings();
     let diagnostics = if settings
         .linter
         .rules
@@ -393,6 +406,7 @@ fn to_lsp_diagnostic(
             match diagnostic.severity() {
                 // Map lint diagnostics without codes to warning, like in `severity`.
                 _ if diagnostic.id().is_lint() => lsp_types::DiagnosticSeverity::Warning,
+                ruff_db::diagnostic::Severity::Hint => lsp_types::DiagnosticSeverity::Hint,
                 ruff_db::diagnostic::Severity::Info => lsp_types::DiagnosticSeverity::Information,
                 ruff_db::diagnostic::Severity::Warning => lsp_types::DiagnosticSeverity::Warning,
                 ruff_db::diagnostic::Severity::Error => lsp_types::DiagnosticSeverity::Error,

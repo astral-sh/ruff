@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     hash::{DefaultHasher, Hash, Hasher},
     path::Path,
 };
@@ -9,25 +9,21 @@ use serde::{Serialize, Serializer, ser::SerializeSeq};
 
 use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 
-use super::FileResolver;
+use super::{FileResolver, Renderer};
 
-pub(super) struct GitlabRenderer<'a> {
+pub struct GitlabRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> GitlabRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+    pub fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
         Self { resolver, config }
     }
 }
 
-impl GitlabRenderer<'_> {
-    pub(super) fn render(
-        &self,
-        f: &mut std::fmt::Formatter,
-        diagnostics: &[Diagnostic],
-    ) -> std::fmt::Result {
+impl Renderer for GitlabRenderer<'_> {
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         write!(
             f,
             "{}",
@@ -62,44 +58,45 @@ impl Serialize for SerializedMessages<'_> {
     {
         let mut s = serializer.serialize_seq(Some(self.diagnostics.len()))?;
         let mut fingerprints = HashSet::<u64>::with_capacity(self.diagnostics.len());
+        let mut last_fingerprints = HashMap::new();
 
         for diagnostic in self.diagnostics {
-            let location = diagnostic
-                .primary_span()
-                .map(|span| {
-                    let file = span.file();
-                    let positions = if self.resolver.is_notebook(file) {
-                        // We can't give a reasonable location for the structured formats,
-                        // so we show one that's clearly a fallback
-                        Default::default()
-                    } else {
-                        let diagnostic_source = file.diagnostic_source(self.resolver);
-                        let source_code = diagnostic_source.as_source_code();
-                        span.range()
-                            .map(|range| Positions {
-                                begin: source_code.line_column(range.start()),
-                                end: source_code.line_column(range.end()),
-                            })
-                            .unwrap_or_default()
-                    };
+            let span = diagnostic.primary_span_ref();
+            let location = span.map_or_default(|span| {
+                let file = span.file();
+                let positions = if self.resolver.is_notebook(file) {
+                    // We can't give a reasonable location for the structured formats,
+                    // so we show one that's clearly a fallback
+                    Default::default()
+                } else {
+                    let diagnostic_source = file.diagnostic_source(self.resolver);
+                    let source_code = diagnostic_source.as_source_code();
+                    span.range().map_or_default(|range| Positions {
+                        begin: source_code.line_column(range.start()),
+                        end: source_code.line_column(range.end()),
+                    })
+                };
 
-                    let path = self.project_dir.as_ref().map_or_else(
-                        || file.relative_path(self.resolver).display().to_string(),
-                        |project_dir| relativize_path_to(file.path(self.resolver), project_dir),
-                    );
+                let path = self.project_dir.as_ref().map_or_else(
+                    || file.relative_path(self.resolver).display().to_string(),
+                    |project_dir| relativize_path_to(file.path(self.resolver), project_dir),
+                );
 
-                    Location { path, positions }
-                })
-                .unwrap_or_default();
+                Location { path, positions }
+            });
 
-            let mut message_fingerprint = fingerprint(diagnostic, &location.path, 0);
-
-            // Make sure that we do not get a fingerprint that is already in use
-            // by adding in the previously generated one.
-            while fingerprints.contains(&message_fingerprint) {
+            // For the same rule and file, every fingerprint through the last one
+            // we emitted is still in use. Resume there, checking for collisions
+            // with fingerprints from other rules and files.
+            let path = span.map(|span| span.file().path(self.resolver));
+            let last = last_fingerprints
+                .entry((diagnostic.name(), path))
+                .or_insert(0);
+            let mut message_fingerprint = fingerprint(diagnostic, &location.path, *last);
+            while !fingerprints.insert(message_fingerprint) {
                 message_fingerprint = fingerprint(diagnostic, &location.path, message_fingerprint);
             }
-            fingerprints.insert(message_fingerprint);
+            *last = message_fingerprint;
 
             let description = diagnostic.concise_message();
             let check_name = if self.config.preview && !self.config.prefer_rule_codes {
@@ -108,7 +105,7 @@ impl Serialize for SerializedMessages<'_> {
                 diagnostic.secondary_code_or_id()
             };
             let severity = match diagnostic.severity() {
-                Severity::Info => "info",
+                Severity::Hint | Severity::Info => "info",
                 Severity::Warning => "minor",
                 Severity::Error => "major",
                 // Another option here is `blocker`
@@ -184,9 +181,8 @@ fn relativize_path_to<P: AsRef<Path>, R: AsRef<Path>>(path: P, project_root: R) 
 
 #[cfg(test)]
 mod tests {
-    use crate::diagnostic::{
-        DiagnosticFormat,
-        render::tests::{create_diagnostics, create_syntax_error_diagnostics},
+    use crate::diagnostic::render::tests::{
+        DiagnosticFormat, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     const FINGERPRINT_FILTERS: [(&str, &str); 1] = [(

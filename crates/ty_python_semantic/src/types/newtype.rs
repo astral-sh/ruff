@@ -55,7 +55,7 @@ impl<'db> NewType<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|db, _, self_: NewType<'db>| NewTypeBase::ClassType(ClassType::object(
+        cycle_initial=|db, _, _, self_: NewType<'db>| NewTypeBase::ClassType(ClassType::object(
             db,
             &ProgramEnvironment::from_definition(self_.definition(db)),
         )),

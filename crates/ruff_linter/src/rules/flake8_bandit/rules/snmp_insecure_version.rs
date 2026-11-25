@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr, Int};
 use ruff_text_size::Ranged;
 
@@ -43,17 +44,15 @@ impl Violation for SnmpInsecureVersion {
 }
 
 /// S508
-pub(crate) fn snmp_insecure_version(checker: &Checker, call: &ast::ExprCall) {
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["pysnmp", "hlapi", .., "CommunityData"]
-            )
-        })
-    {
+pub(crate) fn snmp_insecure_version(
+    checker: &Checker,
+    call: &ast::ExprCall,
+    qualified_name: &QualifiedName,
+) {
+    if matches!(
+        qualified_name.segments(),
+        ["pysnmp", "hlapi", .., "CommunityData"]
+    ) {
         if let Some(keyword) = call.arguments.find_keyword("mpModel") {
             if matches!(
                 keyword.value,

@@ -498,8 +498,9 @@ fn is_default_pytest_test_file(db: &dyn Db, file: ProgramFile<'_>) -> bool {
 #[cfg(test)]
 mod tests {
     use insta::assert_snapshot;
+    use ruff_db::diagnostic::render::{FullRenderer, Renderer};
     use ruff_db::diagnostic::{
-        Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
+        Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity,
     };
     use ruff_db::files::{FileRange, system_path_to_file};
     use ruff_db::parsed::parsed_module;
@@ -1320,13 +1321,10 @@ mark: MarkGenerator
             })
             .collect::<Vec<_>>();
 
-        DisplayDiagnostics::new(
-            db,
-            &DisplayDiagnosticConfig::new("ty").context(0),
-            &diagnostics,
-        )
-        .to_string()
-        .replace('\\', "/")
+        FullRenderer::new(db, &DisplayDiagnosticConfig::new("ty").context(0))
+            .display(&diagnostics)
+            .to_string()
+            .replace('\\', "/")
     }
 
     fn program_file<'db>(db: &'db TestDb, path: &str) -> ProgramFile<'db> {

@@ -241,3 +241,57 @@ def function_with_unpack_and_missing_arg_doc_should_fail(query: str, **kwargs: U
     Args:
         **kwargs: keyword arguments
     """
+
+
+# regression test for https://github.com/astral-sh/ruff/issues/29535.
+# reStructuredText requires `*` to be escaped with a backslash.
+def escaped_stars_numpy(x, *args, **kwargs):
+    r"""Do something.
+
+    Parameters
+    ----------
+    x : int
+        The value.
+    \*args : tuple
+        Variable arguments.
+    \*\*kwargs : dict
+        Keyword arguments.
+    """
+
+
+def escaped_stars_numpy_missing(x, *args, **kwargs):
+    r"""Do something.
+
+    Parameters
+    ----------
+    \*\*kwargs : dict
+        Keyword arguments.
+    """
+
+
+def escaped_stars_google(x, *args, **kwargs):
+    r"""Do something.
+
+    Args:
+        x: the value
+        \*args: variable arguments
+        \*\*kwargs: keyword arguments
+    """
+
+
+def escaped_stars_google_missing(x, *args, **kwargs):
+    r"""Do something.
+
+    Args:
+        \*\*kwargs: keyword arguments
+    """
+
+
+def escaped_stars_non_raw(x, *args, **kwargs):
+    """Do something.
+
+    Args:
+        x: the value
+        \\*args: variable arguments
+        \\*\\*kwargs: keyword arguments
+    """

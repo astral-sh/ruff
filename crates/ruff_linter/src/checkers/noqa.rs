@@ -16,7 +16,7 @@ use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
-use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
+use crate::rules::ruff::rules::{UnusedRules, UnusedSuppressionComment};
 use crate::settings::LinterSettings;
 use crate::suppression::Suppressions;
 use crate::{Edit, Fix, Locator};
@@ -106,9 +106,9 @@ pub(crate) fn check_noqa(
     }
 
     // Only migrate directives that don't require RUF100 cleanup first.
-    let check_unused_noqa = context.is_rule_enabled(Rule::UnusedNOQA)
+    let check_unused_noqa = context.is_rule_enabled(Rule::UnusedSuppressionComment)
         && analyze_directives
-        && !exemption.includes(Rule::UnusedNOQA);
+        && !exemption.includes(Rule::UnusedSuppressionComment);
     let check_noqa_comment =
         context.is_rule_enabled(Rule::NoqaComments) && !exemption.enumerates(Rule::NoqaComments);
 
@@ -129,9 +129,9 @@ pub(crate) fn check_noqa(
                     if check_unused_noqa && matches.is_empty() {
                         let edit = delete_comment(all.range(), locator);
                         let mut diagnostic = context.report_diagnostic(
-                            UnusedNOQA {
-                                codes: None,
-                                kind: ruff::rules::UnusedNOQAKind::Noqa,
+                            UnusedSuppressionComment {
+                                rules: None,
+                                kind: ruff::rules::UnusedSuppressionKind::Noqa,
                             },
                             all.range(),
                         );
@@ -160,12 +160,12 @@ pub(crate) fn check_noqa(
                     for original_code in codes.iter().map(Code::as_str) {
                         let code = get_redirect_target(original_code).unwrap_or(original_code);
                         if seen_codes.insert(original_code) {
-                            if Rule::UnusedNOQA
+                            if Rule::UnusedSuppressionComment
                                 .noqa_code()
                                 .is_some_and(|noqa_code| noqa_code == code)
                             {
                                 self_ignore = true;
-                                if context.is_rule_enabled(Rule::UnusedNOQA) {
+                                if context.is_rule_enabled(Rule::UnusedSuppressionComment) {
                                     valid_codes.push(original_code);
                                 } else {
                                     disabled_codes.push(original_code);
@@ -234,13 +234,13 @@ pub(crate) fn check_noqa(
                             )
                         };
                         let mut diagnostic = context.report_diagnostic(
-                            UnusedNOQA {
-                                codes: Some(UnusedCodes {
+                            UnusedSuppressionComment {
+                                rules: Some(UnusedRules {
                                     disabled: &disabled_codes,
                                     duplicated: &duplicated_codes,
                                     unmatched: &unmatched_codes,
                                 }),
-                                kind: ruff::rules::UnusedNOQAKind::Noqa,
+                                kind: ruff::rules::UnusedSuppressionKind::Noqa,
                             },
                             codes.range(),
                         );
@@ -265,8 +265,10 @@ pub(crate) fn check_noqa(
     // Diagnostics for unused/invalid range suppressions
     suppressions.check_suppressions(context, locator);
 
-    if context.is_rule_enabled(Rule::RedirectedNOQA) && !exemption.includes(Rule::RedirectedNOQA) {
-        ruff::rules::redirected_noqa(context, &noqa_directives);
+    if context.is_rule_enabled(Rule::RenamedRuleInSuppressionComment)
+        && !exemption.includes(Rule::RenamedRuleInSuppressionComment)
+    {
+        ruff::rules::renamed_rule_in_suppression_comment(context, &noqa_directives);
         ruff::rules::redirected_file_noqa(context, &file_noqa_directives);
     }
 
@@ -279,10 +281,10 @@ pub(crate) fn check_noqa(
         );
     }
 
-    if context.is_rule_enabled(Rule::InvalidRuleCode)
-        && !exemption.enumerates(Rule::InvalidRuleCode)
+    if context.is_rule_enabled(Rule::UnknownRuleInSuppressionComment)
+        && !exemption.enumerates(Rule::UnknownRuleInSuppressionComment)
     {
-        ruff::rules::invalid_noqa_code(
+        ruff::rules::unknown_rule_in_noqa(
             context,
             &file_noqa_directives,
             &noqa_directives,

@@ -224,7 +224,7 @@ help: Replace rule code with name
   |
 1 | # snapshot: rule-codes-in-suppression-comments
   - # ruff:ignore[PGH001]
-2 + # ruff:ignore[suspicious-eval-usage]
+2 + # ruff:ignore[eval]
 3 | value = 1
   |
 ```

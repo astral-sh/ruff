@@ -82,7 +82,7 @@ new_module: 3.11-
 ```py
 from old_module import OldClass
 
-# error: [unresolved-import] "Cannot resolve imported module `new_module`"
+# error: [import-not-found] "Cannot resolve imported module `new_module`"
 from new_module import NewClass
 ```
 

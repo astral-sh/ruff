@@ -5,19 +5,23 @@ use crate::{
     Db, FxOrderSet,
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-        DivergentFlags, GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type,
-        TypeContext, TypeMapping, TypeRecursionContext, TypingModule, UnionType, VarianceTerm,
+        DivergentFlags, GenericContext, KnownClass, KnownInstanceType, MaterializationKind,
+        RecursiveType, Type, TypeContext, TypeMapping, TypeRecursionContext, TypingModule,
+        UnionType, VarianceTerm,
         cyclic::CycleDetector,
         definition_expression_type,
         display::qualified_name_components_from_scope,
-        generics::{ApplySpecialization, Specialization, bind_typevar},
+        factory_name_argument,
+        generics::{
+            AliasPolicy, ApplySpecialization, Specialization, bind_typevar,
+            walk_specialization_types,
+        },
         variance::{VarianceInferable, VarianceOrigin},
         visitor,
     },
 };
 use ty_python_core::{
     definition::{Definition, DefinitionKind},
-    scope::ScopeId,
     semantic_index,
 };
 
@@ -30,7 +34,7 @@ impl<'db> Type<'db> {
     /// without entering another type. For example, `type A = int | A` is invalid, but
     /// `type A = int | list[A]` is a valid recursive alias.
     pub(super) fn has_unguarded_alias_cycle(self, db: &'db dyn Db) -> bool {
-        AliasCycleSummary::from_type(db, self).cycle.is_some()
+        AliasCycleSummary::from_type(db, self, None).cycle.is_some()
     }
 }
 
@@ -39,14 +43,19 @@ impl<'db> Type<'db> {
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
 pub(super) struct AliasCycleSummary<'db> {
     /// The divergent marker or unbound reference that closes an unguarded cycle.
-    pub(super) cycle: Option<Type<'db>>,
+    cycle: Option<Type<'db>>,
     typevars: Box<[BoundTypeVarInstance<'db>]>,
 }
 
 impl<'db> AliasCycleSummary<'db> {
-    pub(super) fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
+    /// Inspect a body without specializing it; `scope` resolves variables in an open graph body.
+    pub(super) fn from_type(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        scope: Option<RecursiveType<'db>>,
+    ) -> Self {
         let mut typevars = FxOrderSet::default();
-        let cycle = Self::collect(db, ty, &mut typevars);
+        let cycle = Self::collect(db, ty, &mut typevars, scope);
         Self {
             cycle,
             typevars: typevars.into_iter().collect(),
@@ -57,10 +66,24 @@ impl<'db> AliasCycleSummary<'db> {
         db: &'db dyn Db,
         ty: Type<'db>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        scope: Option<RecursiveType<'db>>,
     ) -> Option<Type<'db>> {
         match ty {
-            // A bare reference is unguarded: recursive binders do not introduce a container.
-            Type::RecursiveVar(_) => Some(ty),
+            Type::RecursiveVar(variable) => {
+                let Some(scope) = scope else {
+                    return Some(ty);
+                };
+                let recursive = scope.reference(db, variable);
+                let summary = recursive.cycle_summary(db);
+                summary.cycle.or_else(|| {
+                    summary.collect_exposed_arguments(
+                        db,
+                        recursive.arguments(db),
+                        typevars,
+                        Some(scope),
+                    )
+                })
+            }
             Type::TypeAlias(alias) => {
                 // Inspect the definition independently of its arguments. Nested applications like
                 // `Recursive[Recursive[int]]` can be finite even when `Recursive` has growing
@@ -75,14 +98,14 @@ impl<'db> AliasCycleSummary<'db> {
                         .map(|context| context.default_specialization(db, None))
                 });
 
-                summary.collect_exposed_arguments(db, specialization, typevars)
+                summary.collect_exposed_arguments(db, specialization, typevars, scope)
             }
             Type::Recursive(recursive) => {
                 let summary = recursive.cycle_summary(db);
                 if summary.cycle.is_some() {
                     return summary.cycle;
                 }
-                summary.collect_exposed_arguments(db, recursive.arguments(db), typevars)
+                summary.collect_exposed_arguments(db, recursive.arguments(db), typevars, scope)
             }
             Type::TypeVar(typevar) => {
                 typevars.insert(typevar);
@@ -91,12 +114,12 @@ impl<'db> AliasCycleSummary<'db> {
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .find_map(|&element| Self::collect(db, element, typevars)),
+                .find_map(|&element| Self::collect(db, element, typevars, scope)),
             Type::Intersection(intersection) => intersection
                 .positive(db)
                 .iter()
                 .chain(intersection.negative(db))
-                .find_map(|&element| Self::collect(db, element, typevars)),
+                .find_map(|&element| Self::collect(db, element, typevars, scope)),
             Type::Divergent(divergent)
                 if divergent.flags.contains(DivergentFlags::FROM_TYPE_ALIAS) =>
             {
@@ -112,13 +135,14 @@ impl<'db> AliasCycleSummary<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        scope: Option<RecursiveType<'db>>,
     ) -> Option<Type<'db>> {
         self.typevars.iter().find_map(|&typevar| {
             if let Some(argument) =
                 specialization.and_then(|specialization| specialization.get(db, typevar))
                 && argument != Type::TypeVar(typevar)
             {
-                Self::collect(db, argument, typevars)
+                Self::collect(db, argument, typevars, scope)
             } else {
                 typevars.insert(typevar);
                 None
@@ -142,13 +166,12 @@ impl<'db> AliasCycleRecovery<'_, 'db> {
         }
         match ty {
             Type::TypeAlias(alias) => self.visitor.visit(db, ty, || {
-                let value = apply_type_alias_specialization(
-                    db,
-                    alias.raw_value_type(db),
-                    alias.generic_context(db),
-                    alias.specialization(db),
-                    self.context,
-                );
+                let value = alias.raw_value_type(db);
+                let value = alias
+                    .specialization_or_default(db)
+                    .map_or(value, |specialization| {
+                        apply_type_alias_specialization(db, value, specialization, self.context)
+                    });
                 self.recover(db, value)
             }),
             Type::Recursive(recursive) => self.visitor.visit(db, ty, || {
@@ -174,7 +197,7 @@ pub struct PEP695TypeAliasType<'db> {
     pub name: Name,
 
     #[returns(copy)]
-    rhs_scope: ScopeId<'db>,
+    definition: Definition<'db>,
 
     #[returns(copy)]
     pub(super) specialization: Option<Specialization<'db>>,
@@ -197,13 +220,16 @@ fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 #[salsa::tracked]
 impl<'db> PEP695TypeAliasType<'db> {
-    fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        let scope = self.rhs_scope(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        semantic_index(db, scope.program_file(db)).expect_single_definition(type_alias_stmt_node)
-    }
-
     /// The RHS type of a PEP-695 style type alias with specialization applied.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, id, _, _| Type::divergent_alias(id),
+        cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
+            let env = ProgramEnvironment::from_definition(alias.definition(db));
+            value.cycle_normalized(db, &env, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         TypeAliasType::PEP695(self).specialized_value_type(db, None)
     }
@@ -212,21 +238,19 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent_alias(id),
+        cycle_initial=|_, id, _, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
-            let env = ProgramEnvironment::from_scope(alias.rhs_scope(db));
+            let env = ProgramEnvironment::from_definition(alias.definition(db));
             value.cycle_normalized(db, &env, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(super) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
-        let scope = self.rhs_scope(db);
-        let program_file = scope.program_file(db);
-        let python_file = program_file.python_file(db);
-        let module = parsed_module(db, python_file).load(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
-
+        let DefinitionKind::TypeAlias(type_alias_stmt_node) = definition.kind(db) else {
+            return Type::unknown();
+        };
+        let module = parsed_module(db, definition.python_file(db)).load(db);
         definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
     }
 
@@ -248,7 +272,7 @@ impl<'db> PEP695TypeAliasType<'db> {
                 PEP695TypeAliasType::new(
                     db,
                     self.name(db),
-                    self.rhs_scope(db),
+                    self.definition(db),
                     Some(specialization),
                     self.materialization_kind(db),
                 )
@@ -256,24 +280,29 @@ impl<'db> PEP695TypeAliasType<'db> {
         }
     }
 
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        let scope = self.rhs_scope(db);
-        let program_file = scope.program_file(db);
-        let python_file = program_file.python_file(db);
-        let parsed = parsed_module(db, python_file).load(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
-
-        type_alias_stmt_node
-            .node(&parsed)
-            .type_params
-            .as_ref()
-            .map(|type_params| {
-                let index = semantic_index(db, program_file);
-                let definition = index.expect_single_definition(type_alias_stmt_node);
-                GenericContext::from_type_params(db, index, definition, type_params)
-            })
+        let definition = self.definition(db);
+        let DefinitionKind::TypeAlias(type_alias_stmt_node) = definition.kind(db) else {
+            return None;
+        };
+        let parsed = parsed_module(db, definition.python_file(db)).load(db);
+        let type_params = type_alias_stmt_node.node(&parsed).type_params.as_ref()?;
+        let index = semantic_index(db, definition.program_file(db));
+        GenericContext::from_type_params(db, index, definition, type_params)
     }
+}
+
+/// Find the `name` and `value` arguments to `TypeAliasType`. If either is supplied
+/// twice, use the positional argument for error recovery.
+pub(super) fn type_alias_arguments(arguments: &ast::Arguments) -> Option<(&ast::Expr, &ast::Expr)> {
+    let name = factory_name_argument(arguments)?;
+    let value = arguments.args.get(1).or_else(|| {
+        arguments
+            .find_keyword("value")
+            .map(|keyword| &keyword.value)
+    })?;
+    Some((name, value))
 }
 
 /// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.
@@ -314,6 +343,15 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// The value type of this manual type alias.
     ///
     /// Computed lazily from the definition with specialization applied.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, id, _, _| Type::divergent_alias(id),
+        cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
+            let env = ProgramEnvironment::from_definition(alias.definition(db));
+            value.cycle_normalized(db, &env, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         TypeAliasType::ManualPEP695(self).specialized_value_type(db, None)
     }
@@ -324,7 +362,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent_alias(id),
+        cycle_initial=|_, id, _, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_definition(alias.definition(db));
             value.cycle_normalized(db, &env, *previous, cycle)
@@ -341,8 +379,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         let ast::Expr::Call(call) = value_node else {
             return Type::unknown();
         };
-        // The value is the second positional argument to TypeAliasType(name, value).
-        let Some(value_arg) = call.arguments.find_argument_value("value", 1) else {
+        let Some((_, value_arg)) = type_alias_arguments(&call.arguments) else {
             return Type::unknown();
         };
         definition_expression_type(db, definition, value_arg)
@@ -367,7 +404,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         )
     }
 
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let definition = self.definition(db);
         let file = definition.program_file(db);
@@ -403,24 +440,17 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
             variables.insert(typevar);
         }
 
-        (!variables.is_empty()).then(|| GenericContext::from_typevar_instances(db, &env, variables))
+        GenericContext::try_from_typevar_instances(db, &env, variables)
     }
 }
 
 fn apply_type_alias_specialization<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
-    generic_context: Option<GenericContext<'db>>,
-    specialization: Option<Specialization<'db>>,
+    specialization: Specialization<'db>,
     recursion_context: Option<&TypeRecursionContext<'db>>,
 ) -> Type<'db> {
-    let Some(generic_context) = generic_context else {
-        return ty;
-    };
-
-    let env = ProgramEnvironment::from_program(generic_context.program(db));
-    let specialization =
-        specialization.unwrap_or_else(|| generic_context.default_specialization(db, None));
+    let env = ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
     let type_mapping = match specialization.materialization_kind(db) {
         None => TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(specialization)),
         Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
@@ -437,12 +467,43 @@ fn apply_type_alias_specialization<'db>(
     )
 }
 
+/// Reuse the substitution for repeated references to the same specialized alias. Keeping the
+/// inferred body in the key leaves its inference and unguarded cycle recovery in the caller.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, id, _, _, _| Type::divergent(id),
+    cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, specialization: Specialization<'db>, _| {
+        let env = ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
+        value.cycle_normalized_impl(db, &env, *previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn specialize_alias_body<'db>(
+    db: &'db dyn Db,
+    specialization: Specialization<'db>,
+    value: Type<'db>,
+) -> Type<'db> {
+    apply_type_alias_specialization(db, value, specialization, None)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum TypeAliasType<'db> {
     /// A type alias defined using the PEP 695 `type` statement.
     PEP695(PEP695TypeAliasType<'db>),
     /// A type alias defined by manually instantiating the PEP 695 `types.TypeAliasType`.
     ManualPEP695(ManualPEP695TypeAliasType<'db>),
+}
+
+/// Visit an alias's type arguments without evaluating its value.
+/// This includes arguments for parameters that the alias's value does not use.
+pub(super) fn walk_type_alias_arguments<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    type_alias: TypeAliasType<'db>,
+    visitor: &V,
+) {
+    if let Some(specialization) = type_alias.specialization(db) {
+        walk_specialization_types(db, specialization, visitor);
+    }
 }
 
 pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -471,7 +532,7 @@ impl<'db> TypeAliasType<'db> {
     fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, id, _, ()| AliasCycleSummary { cycle: Some(Type::divergent_alias(id)), ..AliasCycleSummary::default() },
+            cycle_initial=|_, id, _, _, ()| AliasCycleSummary { cycle: Some(Type::divergent_alias(id)), ..AliasCycleSummary::default() },
             heap_size=ruff_memory_usage::heap_size
         )]
         fn cycle_summary<'db>(
@@ -479,7 +540,7 @@ impl<'db> TypeAliasType<'db> {
             alias: TypeAliasType<'db>,
             (): (),
         ) -> AliasCycleSummary<'db> {
-            AliasCycleSummary::from_type(db, alias.raw_value_type(db))
+            AliasCycleSummary::from_type(db, alias.raw_value_type(db), None)
         }
 
         cycle_summary(db, self.unspecialized(db), ())
@@ -525,7 +586,7 @@ impl<'db> TypeAliasType<'db> {
         db: &'db dyn Db,
         context: Option<&TypeRecursionContext<'db>>,
     ) -> Type<'db> {
-        if let Some(cycle) = AliasCycleSummary::from_type(db, Type::TypeAlias(self)).cycle {
+        if let Some(cycle) = AliasCycleSummary::from_type(db, Type::TypeAlias(self), None).cycle {
             let env = ProgramEnvironment::from_definition(self.definition(db));
             return AliasCycleRecovery {
                 env: &env,
@@ -536,13 +597,16 @@ impl<'db> TypeAliasType<'db> {
             .recover(db, Type::TypeAlias(self))
             .unwrap_or(cycle);
         }
-        apply_type_alias_specialization(
-            db,
-            self.raw_value_type(db),
-            self.generic_context(db),
-            self.specialization(db),
-            context,
-        )
+        let value = self.raw_value_type(db);
+        let Some(specialization) = self.specialization_or_default(db) else {
+            return value;
+        };
+        match context {
+            Some(context) => {
+                apply_type_alias_specialization(db, value, specialization, Some(context))
+            }
+            None => specialize_alias_body(db, specialization, value),
+        }
     }
 
     /// Resolve this alias while preserving active recursion guards.
@@ -566,12 +630,7 @@ impl<'db> TypeAliasType<'db> {
         let Some(materialization_kind) = self.materialization_kind(db) else {
             return value_type;
         };
-        let env = match alias {
-            TypeAliasType::PEP695(alias) => ProgramEnvironment::from_scope(alias.rhs_scope(db)),
-            TypeAliasType::ManualPEP695(alias) => {
-                ProgramEnvironment::from_definition(alias.definition(db))
-            }
-        };
+        let env = ProgramEnvironment::from_definition(alias.definition(db));
         value_type.materialize(
             db,
             materialization_kind,
@@ -586,7 +645,7 @@ impl<'db> TypeAliasType<'db> {
     /// without losing its materialization polarity.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, alias: TypeAliasType<'db>, _| Type::TypeAlias(alias),
+        cycle_initial=|_, _, _, alias: TypeAliasType<'db>, _| Type::TypeAlias(alias),
         heap_size=ruff_memory_usage::heap_size
     )]
     fn materialized_value_type(
@@ -616,7 +675,7 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(PEP695TypeAliasType::new(
                 db,
                 alias.name(db),
-                alias.rhs_scope(db),
+                alias.definition(db),
                 None,
                 None,
             )),
@@ -653,7 +712,7 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(PEP695TypeAliasType::new(
                 db,
                 alias.name(db),
-                alias.rhs_scope(db),
+                alias.definition(db),
                 alias.specialization(db),
                 materialization_kind,
             )),
@@ -691,6 +750,14 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
+    fn specialization_or_default(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+        let context = self.generic_context(db)?;
+        Some(
+            self.specialization(db)
+                .unwrap_or_else(|| context.default_specialization(db, None)),
+        )
+    }
+
     /// Apply a mapping, retaining the alias's identity when its mapped body is unchanged.
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
@@ -703,6 +770,29 @@ impl<'db> TypeAliasType<'db> {
         match type_mapping {
             TypeMapping::ApplyRecursiveSubstitution(_) => {
                 Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
+            }
+            TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                ..,
+                AliasPolicy::Preserve,
+            )) => Type::TypeAlias(self.apply_specialization(db, |context| {
+                self.specialization(db)
+                    .unwrap_or_else(|| context.default_specialization(db, None))
+                    .apply_type_mapping_impl(db, type_mapping, &[], visitor)
+            })),
+            TypeMapping::FreshenBoundTypeVars { .. } => {
+                visitor.visit(db, ty, type_mapping, || {
+                    // Stored arguments account for the alias's own parameters, but its
+                    // definition can also capture outer typevars. Expand only when those
+                    // captures change; changing arguments alone must retain the alias.
+                    let raw = self.raw_value_type(db);
+                    let mapped = raw.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                    if mapped == raw || mapped == ty {
+                        Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
+                    } else {
+                        self.value_type_with_recursion(db, visitor.recursion_context)
+                            .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                    }
+                })
             }
             TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => ty,
             TypeMapping::EagerExpansion if self.materialization_kind(db).is_some() => self
@@ -741,25 +831,28 @@ impl<'db> TypeAliasType<'db> {
                 // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
                 // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
                 // will detect the cycle and return the fallback value.
-                let mapped = visitor.visit(db, ty, type_mapping, || {
-                    self.value_type_with_recursion(db, visitor.recursion_context)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                });
+                visitor.visit(db, ty, type_mapping, || {
+                    let mapped = self
+                        .value_type_with_recursion(db, visitor.recursion_context)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
 
-                // If the type mapping does not result in any change to this type alias, keep the
-                // alias node instead of eagerly expanding it. A recursive backedge also returns
-                // the alias itself, and fully static aliases must retain their original identity.
-                if mapped == ty
-                    || self.value_type_with_recursion(db, visitor.recursion_context) == mapped
-                {
-                    ty
-                } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
-                    && self.is_recursive(db)
-                {
-                    Type::TypeAlias(self.with_materialization_kind(db, Some(*materialization_kind)))
-                } else {
-                    mapped
-                }
+                    // If the type mapping does not result in any change to this type alias, keep the
+                    // alias node instead of eagerly expanding it. A recursive backedge also returns
+                    // the alias itself, and fully static aliases must retain their original identity.
+                    if mapped == ty
+                        || self.value_type_with_recursion(db, visitor.recursion_context) == mapped
+                    {
+                        ty
+                    } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
+                        && self.is_recursive(db)
+                    {
+                        Type::TypeAlias(
+                            self.with_materialization_kind(db, Some(*materialization_kind)),
+                        )
+                    } else {
+                        mapped
+                    }
+                })
             }
         }
     }
@@ -782,7 +875,7 @@ impl<'db> TypeAliasType<'db> {
             Self::PEP695(alias) => Self::PEP695(PEP695TypeAliasType::new(
                 db,
                 alias.name(db),
-                alias.rhs_scope(db),
+                alias.definition(db),
                 Some(mapped),
                 alias.materialization_kind(db),
             )),
@@ -836,7 +929,7 @@ impl<'db> TypeAliasType<'db> {
     /// formal `T` still describes `list[T]`, not the specialized `list[int]`.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
+        cycle_initial=|_, _, _, _, _| VarianceTerm::BIVARIANT,
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(in crate::types) fn variance_equation(

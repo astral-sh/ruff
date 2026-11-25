@@ -504,6 +504,37 @@ impl<'db> Type<'db> {
             return Ok(special_case);
         }
 
+        // Keep the element type for repeated iteration over the same type. Failures
+        // need the full method bindings for diagnostics, which we don't want to retain.
+        #[salsa::tracked(
+            returns(copy),
+            cycle_result=|_, _, _, _| None,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn iteration_element_type<'db>(
+            db: &'db dyn Db,
+            program: ty_python_core::Program<'db>,
+            iterable: Type<'db>,
+        ) -> Option<Type<'db>> {
+            iterable
+                .try_iteration_element_type(db, &ProgramEnvironment::from_program(program))
+                .ok()
+        }
+
+        let element = match iteration_element_type(db, env.program(db), self) {
+            Some(element) => element,
+            None => self.try_iteration_element_type(db, env)?,
+        };
+        Ok(Cow::Owned(TupleSpec::homogeneous(element)))
+    }
+
+    /// Resolve synchronous iteration, including the fallback to `__getitem__`.
+    fn try_iteration_element_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Result<Type<'db>, IterationError<'db>> {
+        let mode = EvaluationMode::Sync;
         let try_call_dunder_getitem = || {
             self.try_call_dunder(
                 db,
@@ -541,15 +572,13 @@ impl<'db> Type<'db> {
             Ok(iterator) => {
                 // `__iter__` is definitely bound and calling it succeeds.
                 // See what calling `__next__` on the object returned by `__iter__` gives us...
-                try_call_dunder_next_on_iterator(iterator)
-                    .map(|ty| Cow::Owned(TupleSpec::homogeneous(ty)))
-                    .map_err(
-                        |dunder_next_error| IterationError::IterReturnsInvalidIterator {
-                            iterator,
-                            dunder_error: dunder_next_error,
-                            mode,
-                        },
-                    )
+                try_call_dunder_next_on_iterator(iterator).map_err(|dunder_next_error| {
+                    IterationError::IterReturnsInvalidIterator {
+                        iterator,
+                        dunder_error: dunder_next_error,
+                        mode,
+                    }
+                })
             }
 
             // `__iter__` is possibly unbound...
@@ -570,12 +599,12 @@ impl<'db> Type<'db> {
                                 // and the type returned by the `__getitem__` method.
                                 //
                                 // No diagnostic is emitted; iteration will always succeed!
-                                Cow::Owned(TupleSpec::homogeneous(UnionType::from_two_elements(
+                                UnionType::from_two_elements(
                                     db,
                                     env,
                                     dunder_next_return,
                                     dunder_getitem_return_type,
-                                )))
+                                )
                             })
                             .map_err(|dunder_getitem_error| {
                                 IterationError::PossiblyUnboundIterAndGetitemError {
@@ -604,13 +633,13 @@ impl<'db> Type<'db> {
             }
 
             // There's no `__iter__` method. Try `__getitem__` instead...
-            Err(CallDunderError::MethodNotAvailable) => try_call_dunder_getitem()
-                .map(|ty| Cow::Owned(TupleSpec::homogeneous(ty)))
-                .map_err(
-                    |dunder_getitem_error| IterationError::UnboundIterAndGetitemError {
+            Err(CallDunderError::MethodNotAvailable) => {
+                try_call_dunder_getitem().map_err(|dunder_getitem_error| {
+                    IterationError::UnboundIterAndGetitemError {
                         dunder_getitem_error,
-                    },
-                ),
+                    }
+                })
+            }
         }
     }
 }

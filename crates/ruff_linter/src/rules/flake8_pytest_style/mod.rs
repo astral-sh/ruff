@@ -20,7 +20,7 @@ mod tests {
     use super::types;
 
     #[test_case(
-        Rule::PytestParameterWithDefaultArgument,
+        Rule::PytestParameterWithDefaultValue,
         Path::new("is_pytest_test.py"),
         Settings::default(),
         "is_pytest_test"
@@ -41,7 +41,7 @@ mod tests {
         "PT001_parentheses"
     )]
     #[test_case(
-        Rule::PytestFixturePositionalArgs,
+        Rule::PytestFixturePositionalArguments,
         Path::new("PT002.py"),
         Settings::default(),
         "PT002"
@@ -214,7 +214,7 @@ mod tests {
         "PT018"
     )]
     #[test_case(
-        Rule::PytestFixtureParamWithoutValue,
+        Rule::PytestFixtureParameterWithoutValue,
         Path::new("PT019.py"),
         Settings::default(),
         "PT019"
@@ -277,7 +277,7 @@ mod tests {
         "PT025"
     )]
     #[test_case(
-        Rule::PytestUseFixturesWithoutParameters,
+        Rule::PytestUseFixturesWithoutArguments,
         Path::new("PT026.py"),
         Settings::default(),
         "PT026"
@@ -295,7 +295,7 @@ mod tests {
         "PT027_1"
     )]
     #[test_case(
-        Rule::PytestParameterWithDefaultArgument,
+        Rule::PytestParameterWithDefaultValue,
         Path::new("PT028.py"),
         Settings::default(),
         "PT028"

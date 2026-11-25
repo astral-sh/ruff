@@ -25,7 +25,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unresolved_i
 ## package/subpackage/subsubpackage/__init__.py
 
 ```
-1 | from ....foo import add  # error: [unresolved-import]
+1 | from ....foo import add  # error: [import-not-found]
 2 | 
 3 | stat = add(10, 15)
 ```
@@ -33,10 +33,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unresolved_i
 # Diagnostics
 
 ```
-error[unresolved-import]: Cannot resolve imported module `....foo`
+error[import-not-found]: Cannot resolve imported module `....foo`
  --> src/package/subpackage/subsubpackage/__init__.py:1:10
   |
-1 | from ....foo import add  # error: [unresolved-import]
+1 | from ....foo import add  # error: [import-not-found]
   |          ^^^
 help: The module can be resolved if the number of leading dots is reduced
 help: Did you mean `...foo`?

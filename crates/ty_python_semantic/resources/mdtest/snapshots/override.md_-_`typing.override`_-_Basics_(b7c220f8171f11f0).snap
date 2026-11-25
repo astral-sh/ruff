@@ -147,18 +147,18 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/override.md
 132 | class LiskovViolatingButNotOverrideViolating(Parent):
 133 |     @override
 134 |     @property
-135 |     def foo(self) -> int: ...  # error: [invalid-property-type-override]
+135 |     def foo(self) -> int: ...  # error: [incompatible-property-override]
 136 |     @override
-137 |     def my_property1(self) -> int: ...  # error: [invalid-property-type-override]
+137 |     def my_property1(self) -> int: ...  # error: [incompatible-property-override]
 138 | 
 139 |     # Class and static methods can override each other when "bound" signatures match,
 140 |     # but here, we deliberately add a new parameter to introduce a Liskov violation
 141 |     @staticmethod
 142 |     @override
-143 |     def class_method1(x: int) -> int: ...  # error: [invalid-method-override]
+143 |     def class_method1(x: int) -> int: ...  # error: [incompatible-method-override]
 144 |     @classmethod
 145 |     @override
-146 |     def static_method1(cls, x: int) -> int: ...  # error: [invalid-method-override]
+146 |     def static_method1(cls, x: int) -> int: ...  # error: [incompatible-method-override]
 147 | 
 148 | # Diagnostic edge case: `override` is very far away from the method definition in the source code:
 149 | 
@@ -316,10 +316,10 @@ info: No `lossy2` definitions were found on any superclasses of `Invalid`
 ```
 
 ```
-error[invalid-property-type-override]: Invalid override of attribute `foo`
+error[incompatible-property-override]: Invalid override of attribute `foo`
    --> src/mdtest_snippet.pyi:135:9
     |
-135 |     def foo(self) -> int: ...  # error: [invalid-property-type-override]
+135 |     def foo(self) -> int: ...  # error: [incompatible-property-override]
     |         ^^^ Read type `int` is not assignable to inherited read type `() -> Unknown`
     |
    ::: src/mdtest_snippet.pyi:11:9
@@ -330,10 +330,10 @@ error[invalid-property-type-override]: Invalid override of attribute `foo`
 ```
 
 ```
-error[invalid-property-type-override]: Invalid override of attribute `my_property1`
+error[incompatible-property-override]: Invalid override of attribute `my_property1`
    --> src/mdtest_snippet.pyi:137:9
     |
-137 |     def my_property1(self) -> int: ...  # error: [invalid-property-type-override]
+137 |     def my_property1(self) -> int: ...  # error: [incompatible-property-override]
     |         ^^^^^^^^^^^^ Read type `() -> int` is not assignable to inherited read type `int`
     |
    ::: src/mdtest_snippet.pyi:13:9
@@ -344,10 +344,10 @@ error[invalid-property-type-override]: Invalid override of attribute `my_propert
 ```
 
 ```
-error[invalid-method-override]: Invalid override of method `class_method1`
+error[incompatible-method-override]: Invalid override of method `class_method1`
    --> src/mdtest_snippet.pyi:143:9
     |
-143 |     def class_method1(x: int) -> int: ...  # error: [invalid-method-override]
+143 |     def class_method1(x: int) -> int: ...  # error: [incompatible-method-override]
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.class_method1`
     |
    ::: src/mdtest_snippet.pyi:20:9
@@ -362,10 +362,10 @@ info: This violates the Liskov Substitution Principle
 ```
 
 ```
-error[invalid-method-override]: Invalid override of method `static_method1`
+error[incompatible-method-override]: Invalid override of method `static_method1`
    --> src/mdtest_snippet.pyi:146:9
     |
-146 |     def static_method1(cls, x: int) -> int: ...  # error: [invalid-method-override]
+146 |     def static_method1(cls, x: int) -> int: ...  # error: [incompatible-method-override]
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.static_method1`
     |
    ::: src/mdtest_snippet.pyi:22:9

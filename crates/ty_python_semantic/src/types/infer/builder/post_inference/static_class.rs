@@ -4,12 +4,13 @@ use ruff_db::{diagnostic::Annotation, source::source_text};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::{self as ast, PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashSet;
+use rustc_hash::FxHashMap;
 
 use crate::attribute_assignments;
 use crate::{
     TypeQualifiers,
     place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
+    reachability::binding_reachability,
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, DisplaySettings,
         KnownClass, KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, SpecialFormType,
@@ -24,18 +25,18 @@ use crate::{
         definition_expression_type,
         diagnostic::{
             ABSTRACT_METHOD_IN_FINAL_CLASS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION,
-            DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO,
-            INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_BASE, INVALID_DATACLASS,
+            DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
+            INVALID_ASSIGNMENT, INVALID_BASE, INVALID_DATACLASS, INVALID_DATACLASS_FIELD_ORDER,
             INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE,
-            INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
-            SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
-            report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
-            report_duplicate_bases, report_inconsistent_generic_bases,
-            report_instance_layout_conflict, report_invalid_attribute_assignment,
-            report_invalid_named_tuple_field_qualifier, report_invalid_or_unsupported_base,
-            report_invalid_total_ordering, report_invalid_type_param_order,
-            report_invalid_typevar_default_reference, report_missing_type_arguments,
-            report_named_tuple_field_with_leading_underscore,
+            INVALID_PROTOCOL, INVALID_TYPE_FORM, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
+            SHADOWED_TYPE_VARIABLE, SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS,
+            UNKNOWN_ARGUMENT, report_bad_frozen_dataclass_inheritance,
+            report_conflicting_metaclass_from_bases, report_duplicate_bases,
+            report_inconsistent_generic_bases, report_instance_layout_conflict,
+            report_invalid_attribute_assignment, report_invalid_named_tuple_field_qualifier,
+            report_invalid_or_unsupported_base, report_invalid_total_ordering,
+            report_invalid_type_param_order, report_invalid_typevar_default_reference,
+            report_missing_type_arguments, report_named_tuple_field_with_leading_underscore,
             report_namedtuple_field_without_default_after_field_with_default,
             report_shadowed_type_variable,
             report_subclass_of_class_with_non_callable_init_subclass, report_unsupported_base,
@@ -44,7 +45,8 @@ use crate::{
         function::KnownFunction,
         generics::enclosing_generic_contexts,
         infer::builder::post_inference::typed_dict::validate_typed_dict_class,
-        infer_definition_types,
+        infer_definition_types, inferred_declaration,
+        member::class_member_with_symbol,
         mro::StaticMroErrorKind,
         overrides,
         special_form::TypeQualifier,
@@ -141,16 +143,12 @@ fn check_class_slots<'db>(
 /// [metaclass]: https://docs.python.org/3/reference/datamodel.html#metaclasses
 pub(crate) fn check_static_class_definitions<'db>(
     context: &InferContext<'db, '_>,
-    ty: Type<'db>,
+    class: StaticClassLiteral<'db>,
     class_node: &ast::StmtClassDef,
     index: &SemanticIndex<'db>,
     file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
-
-    let Type::ClassLiteral(ClassLiteral::Static(class)) = ty else {
-        return;
-    };
 
     // Check that the class does not have a cyclic definition
     if let Some(inheritance_cycle) = class.inheritance_cycle(context.db()) {
@@ -386,8 +384,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                     if let ast::Expr::Subscript(node) = node {
                         let source = source_text(db, context.file());
                         // The parser can recover a type parameter list without a closing bracket.
-                        if let Some(type_params) = source[type_params.range()].strip_prefix('[')
-                            && let Some(type_params) = type_params.strip_suffix(']')
+                        if let Some(type_params) =
+                            source[type_params.range()].strip_circumfix('[', ']')
                             && type_params == &source[node.slice.range()]
                         {
                             diagnostic.help("Remove the type parameters from the `Protocol` base");
@@ -538,7 +536,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // Check that the class's MRO is resolvable
     let mut inconsistent_generic_bases = false;
-    match class.try_mro(db, None) {
+    match class.try_mro_ancestors(db, None) {
         Err(mro_error) => match mro_error.reason() {
             StaticMroErrorKind::DuplicateBases(duplicates) => {
                 for duplicate in duplicates {
@@ -865,18 +863,17 @@ pub(crate) fn check_static_class_definitions<'db>(
         ));
     }
 
-    if let (Some(legacy), Some(inherited)) = (
-        class.legacy_generic_context(db),
-        class.inherited_legacy_generic_context(db),
-    ) {
-        if !inherited.is_subset_of(db, legacy)
-            && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class_node)
-        {
-            builder.into_diagnostic(
-                "`Generic` base class must include all type \
-                    variables used in other base classes",
-            );
-        }
+    if class.has_explicit_legacy_generic_base(db)
+        && let Some(inherited) = class.inherited_legacy_generic_context(db)
+        && class
+            .legacy_generic_context(db)
+            .is_none_or(|legacy| !inherited.is_subset_of(db, legacy))
+        && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class_node)
+    {
+        builder.into_diagnostic(
+            "`Generic` base class must include all type \
+                variables used in other base classes",
+        );
     }
 
     // Check that no type parameter with a default follows a TypeVarTuple.
@@ -926,8 +923,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             {
                 report_invalid_type_param_order(
                     context,
-                    class,
-                    class_node,
+                    &expanded_base_entries,
                     state.typevar_with_default,
                     &state.invalid_later_tvars,
                 );
@@ -973,46 +969,47 @@ pub(crate) fn check_static_class_definitions<'db>(
                 }
             }
         }
+    }
 
-        let scope = class.body_scope(db).scope(db);
-        if let Some(parent) = scope.parent() {
-            // Check that the class's own type parameters don't shadow
-            // type variables from enclosing scopes (by name).
-            if let Some(generic_context) = class.generic_context(db) {
-                for self_typevar in generic_context.variables(db) {
-                    let name = self_typevar.typevar(db).name(db);
-                    for enclosing in enclosing_generic_contexts(db, index, parent) {
-                        if let Some(other_typevar) = enclosing.binds_named_typevar(db, name) {
-                            report_shadowed_type_variable(
-                                context,
-                                name,
-                                "class",
-                                &class_node.name.id,
-                                class.header_range(db),
-                                self_typevar.kind(db),
-                                other_typevar,
-                            );
-                        }
-                    }
-                }
-            }
-
-            // Check that the class's base classes don't reference type
-            // variables from enclosing scopes (by identity).
-            for base_typevar in class.typevars_referenced_in_bases(db) {
-                let typevar = base_typevar.typevar(db);
+    if context.is_lint_enabled(&SHADOWED_TYPE_VARIABLE)
+        && let Some(parent) = class.body_scope(db).scope(db).parent()
+    {
+        // Check that the class's own type parameters don't shadow
+        // type variables from enclosing scopes (by name).
+        if let Some(generic_context) = class.generic_context(db) {
+            for self_typevar in generic_context.variables(db) {
+                let name = self_typevar.typevar(db).name(db);
                 for enclosing in enclosing_generic_contexts(db, index, parent) {
-                    if let Some(other_typevar) = enclosing.binds_typevar(db, typevar) {
+                    if let Some(other_typevar) = enclosing.binds_named_typevar(db, name) {
                         report_shadowed_type_variable(
                             context,
-                            typevar.name(db),
+                            name,
                             "class",
                             &class_node.name.id,
                             class.header_range(db),
-                            base_typevar.kind(db),
+                            self_typevar.kind(db),
                             other_typevar,
                         );
                     }
+                }
+            }
+        }
+
+        // Check that the class's base classes don't reference type
+        // variables from enclosing scopes (by identity).
+        for base_typevar in class.typevars_referenced_in_bases(db) {
+            let typevar = base_typevar.typevar(db);
+            for enclosing in enclosing_generic_contexts(db, index, parent) {
+                if let Some(other_typevar) = enclosing.binds_typevar(db, typevar) {
+                    report_shadowed_type_variable(
+                        context,
+                        typevar.name(db),
+                        "class",
+                        &class_node.name.id,
+                        class.header_range(db),
+                        base_typevar.kind(db),
+                        other_typevar,
+                    );
                 }
             }
         }
@@ -1096,7 +1093,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                 }
 
                 let report = |range: TextRange| {
-                    let Some(builder) = context.report_lint(&DATACLASS_FIELD_ORDER, range) else {
+                    let Some(builder) = context.report_lint(&INVALID_DATACLASS_FIELD_ORDER, range)
+                    else {
                         return false;
                     };
                     builder.into_diagnostic(format_args!(
@@ -1139,6 +1137,9 @@ pub(crate) fn check_static_class_definitions<'db>(
     // (16) Check for Final-qualified declarations without a value.
     check_class_final_without_value(context, class, index);
 
+    // (17) Check inferred ClassVar types against the class's type parameters.
+    check_inferred_classvars(context, class, index);
+
     if let Some(protocol) = class.into_protocol_class(db) {
         protocol.validate_members(context);
         protocol.validate_type_parameter_variance(context);
@@ -1151,6 +1152,81 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     class.validate_members(context);
+}
+
+/// All specializations share one class namespace. Check the stored type after the whole class
+/// body is known because a bare `ClassVar` can be declared separately or inherited.
+fn check_inferred_classvars<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    index: &SemanticIndex<'db>,
+) {
+    let db = context.db();
+    if !context.is_lint_enabled(&INVALID_TYPE_FORM) {
+        return;
+    }
+    let Some(generic_context) = class.generic_context(db) else {
+        return;
+    };
+    let env = context.program_environment();
+    let body_scope = class.body_scope(db);
+    let scope_id = body_scope.file_scope_id(db);
+    let table = index.place_table(scope_id);
+    let use_def = index.use_def_map(scope_id);
+    for (symbol_id, bindings) in use_def.all_end_of_scope_symbol_bindings() {
+        let symbol = table.symbol(symbol_id);
+        if !symbol.is_local() || !symbol.is_bound() {
+            continue;
+        }
+        let member = class_member_with_symbol(db, body_scope, Some(symbol_id)).inner;
+        let Place::Defined(stored) = member.place else {
+            continue;
+        };
+        if !member.is_class_var() || stored.origin.is_declared() {
+            continue;
+        }
+        let ty = stored.public_type(db, env);
+        if !ty.depends_on_type_parameters(db, env, generic_context) {
+            continue;
+        }
+
+        for binding in bindings {
+            let Some(definition) = binding.binding.definition() else {
+                continue;
+            };
+            if !definition.kind(db).is_user_visible()
+                || binding_reachability(db, use_def, &binding).is_always_false()
+                || !binding_type(db, definition).depends_on_type_parameters(
+                    db,
+                    env,
+                    generic_context,
+                )
+            {
+                continue;
+            }
+            // Another branch can supply an explicit ClassVar type, which is checked at its
+            // annotation. Report only assignments that contribute an inferred type here.
+            let is_inferred = if let Some(own) = inferred_declaration(db, definition).declared() {
+                own.inner_type().is_none()
+            } else {
+                let prior =
+                    place_from_declarations(db, env, use_def.declarations_at_binding(definition));
+                prior.first_declaration.is_none() || prior.has_qualifier_only_declaration
+            };
+            if is_inferred
+                && let Some(builder) = context.report_lint(
+                    &INVALID_TYPE_FORM,
+                    definition.focus_range(db, context.module()),
+                )
+            {
+                builder.into_diagnostic(format_args!(
+                    "Inferred `ClassVar` type `{}` depends on a type parameter of `{}`",
+                    ty.display(db, env),
+                    class.name(db)
+                ));
+            }
+        }
+    }
 }
 
 /// Returns whether the same default-before-required field pair already violates an ancestor's
@@ -1211,6 +1287,54 @@ fn has_inherited_dataclass_field_order_violation<'db>(
         })
 }
 
+/// Names a metaclass declares or assigns on its instances, shared by all its classes.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn metaclass_namespace_members<'db>(
+    db: &'db dyn Db,
+    metaclass: ClassType<'db>,
+) -> Box<[(Name, bool)]> {
+    let mut members = FxHashMap::default();
+    for metaclass in metaclass
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|class| class.static_class_literal(db).map(|(literal, _)| literal))
+    {
+        let body_scope = metaclass.body_scope(db);
+        let metaclass_index = semantic_index(db, body_scope.program_file(db));
+        let body_scope_id = body_scope.file_scope_id(db);
+        let metaclass_table = metaclass_index.place_table(body_scope_id);
+        let metaclass_use_def = metaclass_index.use_def_map(body_scope_id);
+
+        for (symbol_id, _) in metaclass_use_def.all_end_of_scope_symbol_declarations() {
+            members
+                .entry(metaclass_table.symbol(symbol_id).name().clone())
+                .or_insert(false);
+        }
+
+        for function_scope in attribute_scopes(db, body_scope) {
+            for member in metaclass_index.place_table(function_scope).members() {
+                if let Some(name) = member.as_instance_attribute() {
+                    // A method-scope member may only be declared, as in `cls.attr: int`.
+                    // Only an assignment such as `cls.attr: int = 1` writes a value onto the
+                    // newly created class object, potentially overwriting a class-body value.
+                    let is_assigned =
+                        attribute_assignments(db, body_scope, name).any(|(bindings, _)| {
+                            bindings
+                                .into_iter()
+                                .any(|binding| binding.binding.definition().is_some())
+                        });
+                    let name = Name::new(name);
+                    *members.entry(name).or_default() |= is_assigned;
+                }
+            }
+        }
+    }
+
+    let mut members: Vec<_> = members.into_iter().collect();
+    members.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+    members.into_boxed_slice()
+}
+
 /// Check compatibility between class namespace values and attributes populated by its metaclass.
 ///
 /// A binding in a class body is passed through the namespace used to construct the class object
@@ -1243,52 +1367,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
         return;
     };
 
-    // Metaclass-populated members are generally sparse, while class namespaces such as enums can
-    // be large. Collect possible members first rather than probing the metaclass for every binding.
-    let mut metaclass_instance_members = FxHashSet::default();
-    let mut metaclass_assigned_members = FxHashSet::default();
-    for metaclass in metaclass
-        .iter_mro(db)
-        .filter_map(ClassBase::into_class)
-        .filter_map(|class| class.static_class_literal(db).map(|(literal, _)| literal))
-    {
-        let body_scope = metaclass.body_scope(db);
-        let metaclass_index = semantic_index(db, body_scope.program_file(db));
-        let body_scope_id = body_scope.file_scope_id(db);
-        let metaclass_table = metaclass_index.place_table(body_scope_id);
-        let metaclass_use_def = metaclass_index.use_def_map(body_scope_id);
-
-        for (symbol_id, _) in metaclass_use_def.all_end_of_scope_symbol_declarations() {
-            metaclass_instance_members.insert(metaclass_table.symbol(symbol_id).name().clone());
-        }
-
-        for function_scope in attribute_scopes(db, body_scope) {
-            for member in metaclass_index.place_table(function_scope).members() {
-                if let Some(name) = member.as_instance_attribute() {
-                    // A method-scope member may only be declared, as in `cls.attr: int`.
-                    // Only an assignment such as `cls.attr: int = 1` writes a value onto the
-                    // newly created class object, potentially overwriting a class-body value.
-                    let is_assigned =
-                        attribute_assignments(db, body_scope, name).any(|(bindings, _)| {
-                            bindings
-                                .into_iter()
-                                .any(|binding| binding.binding.definition().is_some())
-                        });
-                    let name = Name::new(name);
-                    if is_assigned {
-                        metaclass_assigned_members.insert(name.clone());
-                    }
-                    metaclass_instance_members.insert(name);
-                }
-            }
-        }
-    }
-
-    #[expect(
-        clippy::iter_over_hash_type,
-        reason = "each metaclass member is checked independently"
-    )]
-    for name in metaclass_instance_members {
+    for (name, is_assigned) in metaclass_namespace_members(db, metaclass) {
         let Some(symbol_id) = table.symbol_id(name.as_str()) else {
             continue;
         };
@@ -1334,7 +1413,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
 
         // A declaration on the metaclass constrains class-object access, but does not itself
         // populate a replacement value into the constructed class's namespace.
-        if !metaclass_assigned_members.contains(name.as_str()) {
+        if !is_assigned {
             continue;
         }
 

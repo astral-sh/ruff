@@ -9,21 +9,20 @@ use ignore::Error;
 use log::{debug, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use ruff_linter::message::create_panic_diagnostic;
+use ruff_linter::message::{RenderContext, create_panic_diagnostic};
 use ruff_python_ast::{SourceType, TomlSourceType};
 use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::Diagnostic;
 use ruff_db::panic::catch_unwind;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
+use ruff_linter::settings::flags;
 use ruff_linter::settings::types::UnsafeFixes;
-use ruff_linter::settings::{LinterSettings, flags};
 use ruff_linter::{IOError, Violation, fs, warn_user_once};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::TextRange;
 use ruff_workspace::resolver::{
-    PyprojectConfig, ResolvedFile, match_exclusion, project_files_in_path,
+    Project, ResolvedFile, RootProject, match_exclusion, project_files_in_path,
 };
 
 use crate::args::ConfigArguments;
@@ -33,7 +32,7 @@ use crate::diagnostics::Diagnostics;
 /// Run the linter over a collection of files.
 pub(crate) fn check(
     files: &[PathBuf],
-    pyproject_config: &PyprojectConfig,
+    root_project: &RootProject,
     config_arguments: &ConfigArguments,
     cache: flags::Cache,
     noqa: flags::Noqa,
@@ -42,7 +41,7 @@ pub(crate) fn check(
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
-    let (mut paths, resolver) = project_files_in_path(files, pyproject_config, config_arguments)?;
+    let (mut paths, resolver) = project_files_in_path(files, root_project, config_arguments)?;
     debug!("Identified files to lint in: {:?}", start.elapsed());
 
     // Filter out paths for file types not supported for linting
@@ -89,7 +88,8 @@ pub(crate) fn check(
                     .and_then(|parent| package_roots.get(parent))
                     .and_then(|package| *package);
 
-                let settings = resolver.resolve(path);
+                let project = resolver.resolve_with_path(path);
+                let settings = &project.settings;
 
                 if (settings.file_resolver.force_exclude || !resolved_file.is_root())
                     && match_exclusion(
@@ -109,7 +109,9 @@ pub(crate) fn check(
                 lint_path(
                     path,
                     package,
-                    &settings.linter,
+                    &package_roots,
+                    project,
+                    config_arguments,
                     cache,
                     noqa,
                     fix_mode,
@@ -177,9 +179,11 @@ pub(crate) fn check(
             |a, b| (a.0 + b.0, a.1 + b.1),
         );
 
-    all_diagnostics
-        .inner
-        .sort_by(Diagnostic::ruff_start_ordering);
+    let context = RenderContext::new(&all_diagnostics.notebook_indexes);
+    all_diagnostics.inner.sort_by(|a, b| {
+        a.rendering_sort_key(&context)
+            .cmp(&b.rendering_sort_key(&context))
+    });
 
     // Store the caches.
     caches.persist()?;
@@ -192,17 +196,30 @@ pub(crate) fn check(
 
 /// Wraps [`lint_path`](crate::diagnostics::lint_path) in a [`catch_unwind`](std::panic::catch_unwind) and emits
 /// a diagnostic if the linting the file panics.
+#[expect(clippy::too_many_arguments)]
 fn lint_path(
     path: &Path,
     package: Option<PackageRoot<'_>>,
-    settings: &LinterSettings,
+    package_roots: &FxHashMap<&Path, Option<PackageRoot<'_>>>,
+    project: &Project,
+    overrides: &ConfigArguments,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
     unsafe_fixes: UnsafeFixes,
 ) -> Result<Diagnostics> {
     let result = catch_unwind(|| {
-        crate::diagnostics::lint_path(path, package, settings, cache, noqa, fix_mode, unsafe_fixes)
+        crate::diagnostics::lint_path(
+            path,
+            package,
+            package_roots,
+            project,
+            overrides,
+            cache,
+            noqa,
+            fix_mode,
+            unsafe_fixes,
+        )
     });
 
     match result {
@@ -224,13 +241,15 @@ mod test {
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
-    use ruff_db::diagnostic::{DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics};
-    use ruff_linter::message::EmitterContext;
+    use ruff_db::diagnostic::DisplayDiagnosticConfig;
+    use ruff_db::diagnostic::render::{ConciseRenderer, Renderer};
+    use ruff_linter::UnresolvedRuleSelector;
+    use ruff_linter::message::RenderContext;
     use ruff_linter::registry::Rule;
+    use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
-    use ruff_linter::settings::{LinterSettings, flags};
-    use ruff_workspace::Settings;
-    use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
+    use ruff_workspace::configuration::{Configuration, RuleSelection};
+    use ruff_workspace::resolver::{Project, PyprojectDiscoveryStrategy, RootProject};
 
     use crate::args::ConfigArguments;
 
@@ -260,18 +279,25 @@ mod test {
         // Configure
         let snapshot = format!("{}_{}", rule_code.name(), path);
         // invalid pyproject.toml is not active by default
-        let settings = Settings {
-            linter: LinterSettings::for_rules(vec![rule_code, Rule::InvalidPyprojectToml]),
-            ..Settings::default()
+        let mut configuration = Configuration::default();
+        configuration.lint.rule_selections.push(RuleSelection {
+            select: Some(vec![
+                UnresolvedRuleSelector::cli("E902"),
+                UnresolvedRuleSelector::cli("RUF200"),
+            ]),
+            ..RuleSelection::default()
+        });
+        let overrides = ConfigArguments::default();
+        let root_project = RootProject {
+            strategy: PyprojectDiscoveryStrategy::Fixed,
+            project: Project::resolve(configuration, tempdir.path(), &overrides)?,
         };
-        let pyproject_config =
-            PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, settings, None);
 
         // Run
         let diagnostics = check(
             &[tempdir.path().to_path_buf()],
-            &pyproject_config,
-            &ConfigArguments::default(),
+            &root_project,
+            &overrides,
             flags::Cache::Disabled,
             flags::Noqa::Disabled,
             flags::FixMode::Generate,
@@ -279,15 +305,10 @@ mod test {
         )
         .unwrap();
 
-        let config = DisplayDiagnosticConfig::new("ruff")
-            .format(DiagnosticFormat::Concise)
-            .hide_severity(true);
-        let messages = DisplayDiagnostics::new(
-            &EmitterContext::new(&FxHashMap::default()),
-            &config,
-            &diagnostics.inner,
-        )
-        .to_string();
+        let config = DisplayDiagnosticConfig::new("ruff").hide_severity(true);
+        let messages = ConciseRenderer::new(&RenderContext::new(&FxHashMap::default()), &config)
+            .display(&diagnostics.inner)
+            .to_string();
 
         insta::with_settings!({
             omit_expression => true,

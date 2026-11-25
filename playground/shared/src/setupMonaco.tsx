@@ -2,7 +2,18 @@
  * Non-rendering component that loads the Monaco editor themes.
  */
 
-import { Monaco } from "@monaco-editor/react";
+import { loader, type Monaco } from "@monaco-editor/react";
+import * as monaco from "monaco-editor";
+import EditorWorker from "monaco-editor/editor/editor.worker?worker";
+import JsonWorker from "monaco-editor/languages/features/json/json.worker?worker";
+
+self.MonacoEnvironment = {
+  getWorker(_, label) {
+    return label === "json" ? new JsonWorker() : new EditorWorker();
+  },
+};
+
+loader.config({ monaco });
 
 export const WHITE = "#ffffff";
 export const RADIATE = "#d7ff64";
@@ -40,7 +51,7 @@ export function setupMonaco(
   defineTomlLanguage(monaco);
   defineCommentsLanguage(monaco);
 
-  monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+  monaco.json.jsonDefaults.setDiagnosticsOptions({
     schemas: [settingsSchema],
   });
 }

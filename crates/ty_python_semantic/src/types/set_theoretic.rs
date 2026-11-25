@@ -1,6 +1,7 @@
 use crate::ProgramEnvironment;
-use itertools::Either;
+use itertools::{Either, Itertools};
 use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 
 use std::convert::Infallible;
 
@@ -10,8 +11,8 @@ use crate::place::{
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
 use crate::types::{
-    ApplyTypeMappingVisitor, InstanceProjection, PromotionKind, PromotionMode, Type, TypeContext,
-    TypeMapping, TypePair, TypeQualifiers,
+    ApplyTypeMappingVisitor, InstanceProjection, LiteralValueType, PromotionKind, PromotionMode,
+    RecursiveTypeNormalizer, Type, TypeContext, TypeMapping, TypePair, TypeQualifiers,
 };
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet, Program};
@@ -30,6 +31,50 @@ pub struct UnionType<'db> {
     /// If `Yes`, union literal widening is performed early.
     #[returns(copy)]
     pub(crate) recursively_defined: RecursivelyDefined,
+}
+
+// Whole-input memoization pays for its key on wider unions, where the individual
+// ordered redundancy comparisons would otherwise be repeated quadratically.
+const WIDE_UNION: usize = 8;
+
+#[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
+struct OrderedUnionInput<'db> {
+    #[returns(copy)]
+    program: Program<'db>,
+    #[returns(deref)]
+    elements: Box<[Type<'db>]>,
+    #[returns(copy)]
+    unpack_aliases: bool,
+    #[returns(copy)]
+    recursively_defined: RecursivelyDefined,
+}
+
+impl<'db> OrderedUnionInput<'db> {
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None while the normalization query is resolving a cycle"
+    )]
+    fn normalize(self, db: &'db dyn Db) -> Type<'db> {
+        fn build<'db>(db: &'db dyn Db, input: OrderedUnionInput<'db>) -> Type<'db> {
+            let env = ProgramEnvironment::from_program(input.program(db));
+            let mut builder = UnionBuilder::new(db, &env).unpack_aliases(input.unpack_aliases(db));
+            for &ty in input.elements(db) {
+                builder.add_in_place(ty);
+            }
+            builder
+                .or_recursively_defined(input.recursively_defined(db))
+                .build()
+        }
+
+        // A provisional redundancy check can drop a union member on one iteration and retain it
+        // on the next. Build the union in the caller when normalization participates in a cycle.
+        #[salsa::tracked(returns(copy), cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn normalized<'db>(db: &'db dyn Db, input: OrderedUnionInput<'db>) -> Option<Type<'db>> {
+            Some(build(db, input))
+        }
+
+        normalized(db, self).unwrap_or_else(|| build(db, self))
+    }
 }
 
 pub(crate) fn walk_union<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -62,6 +107,17 @@ impl<'db> UnionType<'db> {
         T: Into<Type<'db>>,
     {
         let mut iter_elements = elements.into_iter();
+        if iter_elements.size_hint().0 >= WIDE_UNION {
+            let elements = iter_elements.map(Into::into).collect::<Box<[_]>>();
+            return OrderedUnionInput::new(
+                db,
+                env.program(db),
+                elements,
+                true,
+                RecursivelyDefined::No,
+            )
+            .normalize(db);
+        }
 
         if let Some(first) = iter_elements.next() {
             if let Some(second) = iter_elements.next() {
@@ -80,6 +136,49 @@ impl<'db> UnionType<'db> {
         }
     }
 
+    /// Normalize the types of a place across bindings, declarations, or narrowing alternatives.
+    pub(crate) fn normalize_place_types(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        types: &[Type<'db>],
+    ) -> Type<'db> {
+        // Most reads see one binding. The builder still needs to expand aliases,
+        // normalize literals and unions, and turn `Top[Divergent]` into plain `object`.
+        if let [ty] = types
+            && !matches!(
+                ty,
+                Type::Union(_) | Type::TypeAlias(_) | Type::LiteralValue(_) | Type::Divergent(_)
+            )
+        {
+            ty.assert_not_recursive_var();
+            return *ty;
+        }
+
+        // Successive reads often merge the same few bindings. Even two inputs can
+        // require quadratic work if one is a wide union. Bound the key size so a
+        // series of conditional assignments doesn't retain a growing list at each use.
+        if types.len() <= WIDE_UNION
+            && types.iter().any(
+                |ty| matches!(ty, Type::Union(union) if union.elements(db).len() >= WIDE_UNION),
+            )
+        {
+            return OrderedUnionInput::new(
+                db,
+                env.program(db),
+                types,
+                true,
+                RecursivelyDefined::No,
+            )
+            .normalize(db);
+        }
+
+        let mut builder = UnionBuilder::new(db, env);
+        for &ty in types {
+            builder.add_in_place(ty);
+        }
+        builder.build()
+    }
+
     /// Create a union type `A | B` from two elements `A` and `B`.
     pub fn from_two_elements(
         db: &'db dyn Db,
@@ -89,7 +188,7 @@ impl<'db> UnionType<'db> {
     ) -> Type<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_initial=|_, id, _, _| Type::divergent(id),
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
                 result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
             },
@@ -106,6 +205,24 @@ impl<'db> UnionType<'db> {
         union_from_two_elements(db, TypePair::new(db, env.program(db), a, b))
     }
 
+    /// Normalize a pair without unpacking aliases. Repeated annotations often share the
+    /// same operand types even when their enclosing function signatures differ.
+    pub(crate) fn from_two_elements_leave_aliases(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> Type<'db> {
+        OrderedUnionInput::new(
+            db,
+            env.program(db),
+            [left, right].as_slice(),
+            false,
+            RecursivelyDefined::No,
+        )
+        .normalize(db)
+    }
+
     /// Create a union from a list of elements without unpacking type aliases.
     pub(crate) fn from_elements_leave_aliases<I, T>(
         db: &'db dyn Db,
@@ -116,11 +233,47 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
+        let mut elements = elements.into_iter().map(Into::into).peekable();
+        let (min, max) = elements.size_hint();
+        // Iterating a homogeneous tuple can supply one element that is itself a wide union.
+        // Normalizing it still compares the members of that union against each other.
+        if min >= WIDE_UNION
+            || (max == Some(1)
+                && matches!(elements.peek(), Some(Type::Union(union)) if union.elements(db).len() >= WIDE_UNION))
+        {
+            let elements = elements.collect::<Box<[_]>>();
+            return OrderedUnionInput::new(
+                db,
+                env.program(db),
+                elements,
+                false,
+                RecursivelyDefined::No,
+            )
+            .normalize(db);
+        }
         let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
         for element in elements {
-            builder.add_in_place(element.into());
+            builder.add_in_place(element);
         }
         builder.build()
+    }
+
+    /// Returns `true` if the union contains exactly the provided type as a member.
+    ///
+    /// Note that this method constructs and Salsa-memoizes an index for large unions to avoid
+    /// repeated linear scans.
+    pub(super) fn contains_member(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+        fn element_set<'db>(db: &'db dyn Db, union: UnionType<'db>) -> FxHashSet<Type<'db>> {
+            union.elements(db).iter().copied().collect()
+        }
+
+        let elements = self.elements(db);
+        if elements.len() >= WIDE_UNION {
+            element_set(db, self).contains(&ty)
+        } else {
+            elements.contains(&ty)
+        }
     }
 
     /// Returns `true` if any direct element of this union is a type alias.
@@ -142,7 +295,7 @@ impl<'db> UnionType<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_initial=|_, id, _, _, _| Type::divergent(id),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, program| {
             result.cycle_normalized(db, &ProgramEnvironment::from_program(program), *previous, cycle)
         },
@@ -325,6 +478,22 @@ impl<'db> UnionType<'db> {
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty);
             if &new_ty != ty {
+                if elements.len() >= WIDE_UNION {
+                    let mapped = elements[..i]
+                        .iter()
+                        .copied()
+                        .chain(std::iter::once(new_ty))
+                        .chain(iter.map(|(_, element)| transform_fn(element)))
+                        .collect::<Box<[_]>>();
+                    return OrderedUnionInput::new(
+                        db,
+                        env.program(db),
+                        mapped,
+                        false,
+                        self.recursively_defined(db),
+                    )
+                    .normalize(db);
+                }
                 let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
                 for prev in &elements[..i] {
                     builder.add_in_place(*prev);
@@ -560,27 +729,36 @@ impl<'db> UnionType<'db> {
         }
     }
 
-    pub(crate) fn recursive_type_normalized_impl(
+    pub(super) fn normalize_recursive(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        div: Type<'db>,
+        normalizer: &mut RecursiveTypeNormalizer<'_, 'db>,
         nested: bool,
     ) -> Option<Type<'db>> {
+        let env = normalizer.env;
+        let div = normalizer.div;
         let mut builder = UnionBuilder::new(db, env)
             .unpack_aliases(false)
             .cycle_recovery(true)
             .or_recursively_defined(self.recursively_defined(db));
+        let elements = self.elements(db);
+        // During cycle recovery the builder only deduplicates nominal instances.
+        // A structural substitution can leave duplicates, so check for those too.
+        let mut unchanged = elements.len() >= WIDE_UNION && {
+            let mut seen = FxHashSet::default();
+            elements
+                .iter()
+                .all(|ty| ty.is_nominal_instance() && seen.insert(*ty))
+        };
         let mut empty = true;
-        for ty in self.elements(db) {
-            if nested {
+        for (index, ty) in elements.iter().enumerate() {
+            let normalized = if nested {
                 // list[T | Divergent] => list[Divergent]
-                let ty = ty.recursive_type_normalized_impl(db, env, div, nested)?;
+                let ty = ty.normalize_recursive(db, normalizer, nested)?;
                 if ty.same_divergent_marker(div) {
                     return Some(ty);
                 }
-                builder.add_in_place(ty);
-                empty = false;
+                ty
             } else {
                 // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
                 // e.g. T | Divergent == T | (T | (T | (T | ...))) == T
@@ -588,12 +766,23 @@ impl<'db> UnionType<'db> {
                     builder = builder.or_recursively_defined(RecursivelyDefined::Yes);
                     continue;
                 }
-                builder.add_in_place(
-                    ty.recursive_type_normalized_impl(db, env, div, nested)
-                        .unwrap_or(div),
-                );
-                empty = false;
+                ty.normalize_recursive(db, normalizer, nested)
+                    .unwrap_or(div)
+            };
+            if unchanged {
+                if normalized == *ty {
+                    continue;
+                }
+                for previous in &elements[..index] {
+                    builder.add_in_place(*previous);
+                }
+                unchanged = false;
             }
+            builder.add_in_place(normalized);
+            empty = false;
+        }
+        if unchanged {
+            return Some(Type::Union(self));
         }
         if empty {
             builder.add_in_place(div);
@@ -623,7 +812,7 @@ impl<'db> UnionType<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum KnownUnion {
     Float,   // `int | float`
     Complex, // `int | float | complex`
@@ -649,7 +838,27 @@ impl KnownUnion {
         }
     }
 
+    /// Returns the normalized union for this program's numeric classes.
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None when the union participates in a cycle"
+    )]
     pub(crate) fn to_type<'db>(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        // Promotion can request the same union for every element of a collection. As with other
+        // unions, normalize in the caller if a built-in class is still being resolved in a cycle.
+        #[salsa::tracked(returns(copy), cycle_result=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn numeric_union<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            union: KnownUnion,
+        ) -> Option<Type<'db>> {
+            Some(union.build(db, &ProgramEnvironment::from_program(program)))
+        }
+
+        numeric_union(db, env.program(db), self).unwrap_or_else(|| self.build(db, env))
+    }
+
+    fn build<'db>(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self {
             KnownUnion::Float => UnionType::from_two_elements(
                 db,
@@ -941,6 +1150,20 @@ impl<'db> IntersectionType<'db> {
         builder.build()
     }
 
+    /// Return the literal if this intersection consists of a dynamic type and a literal,
+    /// as in `Any & Literal["a"]`.
+    fn gradual_literal(self, db: &'db dyn Db) -> Option<LiteralValueType<'db>> {
+        match self.iter_positive(db).collect_tuple()? {
+            (Type::Dynamic(_), Type::LiteralValue(literal))
+            | (Type::LiteralValue(literal), Type::Dynamic(_))
+                if self.negative(db).is_empty() =>
+            {
+                Some(literal)
+            }
+            _ => None,
+        }
+    }
+
     /// Return the compact enum-complement view of this intersection, if it has one.
     pub(crate) fn enum_complement(
         self,
@@ -1045,7 +1268,7 @@ impl<'db> IntersectionType<'db> {
     ) -> Type<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_initial=|_, id, _, _| Type::divergent(id),
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
                 result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
             },
@@ -1059,6 +1282,33 @@ impl<'db> IntersectionType<'db> {
         }
 
         intersection_from_two_elements(db, TypePair::new(db, env.program(db), a, b))
+    }
+
+    /// Create `positive & ~negative` directly so the positive operand can prune branches
+    /// while distributing the complement.
+    pub(crate) fn from_positive_and_negative(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        positive: Type<'db>,
+        negative: Type<'db>,
+    ) -> Type<'db> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, id, _, _| Type::divergent(id),
+            cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
+                result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
+            },
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn difference<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
+            let env = ProgramEnvironment::from_program(types.program(db));
+            IntersectionBuilder::new(db, &env)
+                .add_positive(types.first(db))
+                .add_negative(types.second(db))
+                .build()
+        }
+
+        difference(db, TypePair::new(db, env.program(db), positive, negative))
     }
 
     pub(crate) fn recursive_type_normalized_impl(
@@ -1180,6 +1430,21 @@ impl<'db> IntersectionType<'db> {
             builder.add_negative_in_place(*ty);
         }
         builder.build()
+    }
+
+    /// Filter-map the positive members and intersect the results. Return `None` if no members
+    /// map successfully or the intersection exceeds the expansion budget.
+    pub(crate) fn bounded_filter_map_positive(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        transform_fn: impl FnMut(Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        let mapped: SmallVec<[_; 1]> = self.iter_positive(db).filter_map(transform_fn).collect();
+        if mapped.is_empty() {
+            return None;
+        }
+        Self::bounded_from_elements(db, env, mapped.iter().copied())
     }
 
     /// Compute the `__class__` type for class-backed protocols and `TypedDict` instances,

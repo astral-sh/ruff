@@ -100,11 +100,9 @@ fn is_open(func: &Expr, semantic: &SemanticModel) -> Option<Kind> {
     let ast::ExprCall {
         func: value_func, ..
     } = value.as_call_expr()?;
-    let qualified_name = semantic.resolve_qualified_name(value_func)?;
-    match qualified_name.segments() {
-        ["pathlib", "Path"] => Some(Kind::Pathlib),
-        _ => None,
-    }
+    semantic
+        .matches_qualified_name(value_func, &["pathlib", "Path"])
+        .then_some(Kind::Pathlib)
 }
 
 /// Returns the mode argument, if present.

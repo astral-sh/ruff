@@ -219,8 +219,8 @@ config_path = {config_path:?}
             },
             version = query.version(),
             client_settings = snapshot.client_settings(),
-            config_path = query.settings().path(),
-            settings = query.settings(),
+            config_path = query.project_settings().path(),
+            settings = query.project_settings(),
         )?;
     } else {
         writeln!(

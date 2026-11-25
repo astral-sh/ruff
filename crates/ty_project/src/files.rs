@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
+use get_size2::{GetSize, GetSizeTracker};
 use parking_lot::{Mutex, MutexGuard};
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use salsa::{Durability, Setter};
@@ -21,7 +22,7 @@ use crate::db::Db;
 /// so no query can be depending on the contents of the indexed files before that. All subsequent mutations to
 /// the indexed files must go through `IndexedMut`, which uses the Salsa setter `project.set_file_set` to
 /// ensure that Salsa always knows when the set of indexed files have changed.
-#[derive(Debug, get_size2::GetSize)]
+#[derive(Debug)]
 pub struct IndexedFiles {
     // This mutex is intentionally non-poisoning: Salsa cancellation can unwind while the lazy
     // index is being built. Indexing only transitions to `Indexed` after a complete walk, so the
@@ -112,6 +113,17 @@ impl IndexedFiles {
             indexed,
             did_change: false,
         })
+    }
+}
+
+// TODO: Restore the `GetSize` derive when we update `get-size2` to 0.12.
+impl GetSize for IndexedFiles {
+    fn get_heap_size(&self) -> usize {
+        self.state.lock().get_heap_size()
+    }
+
+    fn get_heap_size_with_tracker<T: GetSizeTracker>(&self, tracker: T) -> (usize, T) {
+        self.state.lock().get_heap_size_with_tracker(tracker)
     }
 }
 
@@ -267,6 +279,7 @@ impl IndexedMut<'_> {
 
     pub(super) fn set_diagnostics(&mut self, diagnostics: Vec<Diagnostic>) {
         self.inner_mut().diagnostics = diagnostics;
+        self.did_change = true;
     }
 
     fn inner_mut(&mut self) -> &mut IndexedInner {

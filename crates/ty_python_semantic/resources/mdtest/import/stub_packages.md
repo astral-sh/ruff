@@ -77,7 +77,7 @@ class Foo:
 `main.py`:
 
 ```py
-from foo import Foo  # error: [unresolved-import]
+from foo import Foo  # error: [import-not-found]
 
 reveal_type(Foo().name)  # revealed: Unknown
 ```
@@ -544,7 +544,7 @@ class Hexagon: ...
 
 ```py
 from shapes.polygons.pentagon import Pentagon
-from shapes.polygons.hexagon import Hexagon  # error: [unresolved-import]
+from shapes.polygons.hexagon import Hexagon  # error: [import-not-found]
 
 reveal_type(Pentagon().sides)  # revealed: int
 reveal_type(Hexagon().area)  # revealed: Unknown

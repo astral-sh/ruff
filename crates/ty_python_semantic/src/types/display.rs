@@ -3,7 +3,7 @@
 use crate::ProgramEnvironment;
 use crate::types::typevar::TypeVarSet;
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::hash_map::Entry;
 use std::fmt::{self, Display, Formatter, Write};
 use std::rc::Rc;
@@ -46,6 +46,7 @@ use ty_python_core::semantic_index;
 
 /// Bound display expansion even when recursive specialization keeps changing the signature.
 const MAX_SIGNATURE_DISPLAY_DEPTH: usize = 4;
+const MAX_TUPLE_DISPLAY_ELEMENTS: usize = 256;
 
 /// A named item that can be either a class or a type alias.
 ///
@@ -154,6 +155,8 @@ pub struct DisplaySettings<'db> {
     visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
     /// Callable signatures can refer back to the same lambda through its lazy return type.
     visited_callable_types: Rc<FxHashSet<CallableType<'db>>>,
+    /// Tuple elements left to display in the current outermost tuple.
+    tuple_element_budget: Option<Rc<Cell<usize>>>,
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
     hide_return_type: bool,
@@ -174,6 +177,18 @@ impl<'db> DisplaySettings<'db> {
             multiline: false,
             ..self.clone()
         }
+    }
+
+    /// Returns settings for displaying this tuple's elements if they fit in the remaining budget.
+    /// Nested tuples share the budget because the same child can appear many times.
+    fn for_tuple_elements(&self, tuple: &TupleSpec<'db>) -> Option<Self> {
+        let mut settings = self.singleline();
+        let budget = settings
+            .tuple_element_budget
+            .get_or_insert_with(|| Rc::new(Cell::new(MAX_TUPLE_DISPLAY_ELEMENTS)));
+        let count = tuple.fixed_elements().len() + usize::from(tuple.is_variadic());
+        budget.set(budget.get().checked_sub(count)?);
+        Some(settings)
     }
 
     #[must_use]
@@ -1578,6 +1593,16 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {
                         return f.write_str("bound method `ConstraintSet.with_detailed_display`");
                     }
+                    KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_) => {
+                        return f.write_str(
+                            "bound method `ConstraintSet.is_trivially_always_satisfied`",
+                        );
+                    }
+                    KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_) => {
+                        return f.write_str(
+                            "bound method `ConstraintSet.is_trivially_never_satisfied`",
+                        );
+                    }
                 };
 
                 f.write_char('<')?;
@@ -1823,7 +1848,7 @@ impl<'db> BoundTypeVarIdentity<'db> {
     fn display_with(self, db: &'db dyn Db, settings: DisplaySettings<'db>) -> impl Display {
         std::fmt::from_fn(move |f| {
             f.write_str(self.identity.name(db))?;
-            let binding_context = self.binding_context;
+            let binding_context = self.binding_context(db);
             if let Some(binding_context_name) = binding_context.name(db)
                 && let Some(definition) = binding_context.definition()
                 && !settings.active_scopes.contains(&definition)
@@ -1867,6 +1892,10 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
         f.with_type(KnownClass::Tuple.to_class_literal(db, self.env))
             .write_str("tuple")?;
         f.write_char('[')?;
+        let Some(settings) = self.settings.for_tuple_elements(self.tuple) else {
+            f.set_invalid_type_annotation();
+            return f.write_str("...]");
+        };
         match self.tuple {
             TupleSpec::Fixed(tuple) => {
                 let elements = tuple.elements_slice();
@@ -1874,7 +1903,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     f.write_str("()")?;
                 } else {
                     elements
-                        .display_with(db, self.env, self.settings.singleline())
+                        .display_with(db, self.env, settings)
                         .fmt_detailed(f)?;
                 }
             }
@@ -1897,7 +1926,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                 if !tuple.prefix_elements().is_empty() {
                     tuple
                         .prefix_elements()
-                        .display_with(db, self.env, self.settings.singleline())
+                        .display_with(db, self.env, settings.clone())
                         .fmt_detailed(f)?;
                     f.write_str(", ")?;
                 }
@@ -1905,7 +1934,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     VariableSegment::TypeVarTuple(typevar) => {
                         f.write_char('*')?;
                         Type::TypeVar(typevar)
-                            .display_with(db, self.env, self.settings.singleline())
+                            .display_with(db, self.env, settings.clone())
                             .fmt_detailed(f)?;
                     }
                     VariableSegment::Homogeneous(variable) => {
@@ -1919,7 +1948,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                             f.write_char('[')?;
                         }
                         variable
-                            .display_with(db, self.env, self.settings.singleline())
+                            .display_with(db, self.env, settings.clone())
                             .fmt_detailed(f)?;
                         f.write_str(", ...")?;
                         if !tuple.prefix_elements().is_empty()
@@ -1933,7 +1962,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     f.write_str(", ")?;
                     tuple
                         .suffix_elements()
-                        .display_with(db, self.env, self.settings.singleline())
+                        .display_with(db, self.env, settings)
                         .fmt_detailed(f)?;
                 }
             }
@@ -2830,8 +2859,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                 // Write parameter with range tracking
                 let param_name = parameter
                     .display_name()
-                    .map(|name| name.to_string())
-                    .unwrap_or_default();
+                    .map_or_default(|name| name.to_string());
                 parameter
                     .display_with(db, display.env, display.settings.singleline())
                     .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
@@ -3246,6 +3274,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             })
         };
         let mut condensed_types = vec![];
+        let mut seen_literals = FxHashSet::default();
         let mut condensed_element_count = 0usize;
         let mut subclass_of_types = vec![];
         let mut numeric_tower_element_count = 0usize;
@@ -3256,7 +3285,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
             } else if let Some(literals) = self.condensable_literals(element) {
                 condensed_element_count += 1;
                 for literal in literals {
-                    if !condensed_types.contains(&literal) {
+                    if seen_literals.insert(literal) {
                         condensed_types.push(literal);
                     }
                 }
@@ -3869,7 +3898,12 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 f.write_str("<special-form '")?;
                 f.with_type(Type::SpecialForm(SpecialFormType::Protocol))
                     .write_str("typing.Protocol")?;
-                generic_context.display(db).fmt_detailed(f)?;
+                DisplayOptionalGenericContext {
+                    generic_context: generic_context.as_ref(),
+                    db,
+                    hide_unused_self: false,
+                }
+                .fmt_detailed(f)?;
                 f.write_str("'>")
             }
             KnownInstanceType::SubscriptedGeneric(generic_context) => {
@@ -3877,7 +3911,12 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 f.write_str("<special-form '")?;
                 f.with_type(Type::SpecialForm(SpecialFormType::Generic))
                     .write_str("typing.Generic")?;
-                generic_context.display(db).fmt_detailed(f)?;
+                DisplayOptionalGenericContext {
+                    generic_context: generic_context.as_ref(),
+                    db,
+                    hide_unused_self: false,
+                }
+                .fmt_detailed(f)?;
                 f.write_str("'>")
             }
             KnownInstanceType::TypeAliasType(alias) => {
@@ -3929,12 +3968,14 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
             KnownInstanceType::ConstraintSet(interned_set) => {
                 f.with_type(ty).write_str("ConstraintSet")?;
                 let constraints = ConstraintSetBuilder::new();
-                let set = constraints.load(db, self.env, interned_set.constraints(db));
+                let set = constraints
+                    .unlimited()
+                    .load(db, self.env, interned_set.constraints(db));
                 if interned_set.detailed_display(db) {
                     write!(f, "[{}]", set.display(db, self.env))
-                } else if set.is_always_satisfied(db, self.env, TypeVarSet::None) {
+                } else if set.is_always_satisfied(db, self.env, TypeVarSet::All) {
                     f.write_str("[Literal[True]]")
-                } else if set.is_never_satisfied(db, self.env, TypeVarSet::None) {
+                } else if set.is_never_satisfied(db, self.env, TypeVarSet::All) {
                     f.write_str("[Literal[False]]")
                 } else {
                     f.write_str("[bool]")
@@ -3972,7 +4013,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 f.with_type(KnownClass::UnionType.to_class_literal(db, self.env))
                     .write_str("types.UnionType")?;
                 f.write_str(" special-form")?;
-                if let Ok(ty) = union.union_type(db) {
+                if let Ok(ty) = union.union_type(db, self.env) {
                     f.write_str(" '")?;
                     ty.display(db, self.env).fmt_detailed(f)?;
                     f.write_char('\'')?;

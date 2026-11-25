@@ -1,7 +1,39 @@
-use std::hash::Hash;
+use std::hash::{BuildHasher, Hash};
 
 use ruff_index::{FrozenIndexVec, IndexVec, newtype_index};
-use rustc_hash::FxHashMap;
+use rustc_hash::FxBuildHasher;
+
+/// A slice of 32-bit IDs stored at the narrowest width that fits every entry.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+pub(super) enum PackedIds<T> {
+    U8(Box<[u8]>),
+    U16(Box<[u16]>),
+    Full(Box<[T]>),
+}
+
+impl<T: Copy + Into<u32>> From<Vec<T>> for PackedIds<T> {
+    fn from(ids: Vec<T>) -> Self {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "the largest ID fits in the selected integer width"
+        )]
+        match ids.iter().copied().map(Into::into).max().unwrap_or(0) {
+            0..=0xff => Self::U8(ids.into_iter().map(|id| id.into() as u8).collect()),
+            0x100..=0xffff => Self::U16(ids.into_iter().map(|id| id.into() as u16).collect()),
+            _ => Self::Full(ids.into_boxed_slice()),
+        }
+    }
+}
+
+impl<T: Copy + From<u32>> PackedIds<T> {
+    pub(super) fn get(&self, index: usize) -> T {
+        match self {
+            Self::U8(ids) => T::from(u32::from(ids[index])),
+            Self::U16(ids) => T::from(u32::from(ids[index])),
+            Self::Full(ids) => ids[index],
+        }
+    }
+}
 
 /// Compact immutable key-value entries stored in key order.
 ///
@@ -20,10 +52,6 @@ impl<K, V> FrozenMap<K, V> {
     ) -> impl DoubleEndedIterator<Item = (&K, &mut V)> + ExactSizeIterator + std::iter::FusedIterator
     {
         self.into_iter()
-    }
-
-    pub(crate) fn keys(&self) -> impl DoubleEndedIterator<Item = &K> + ExactSizeIterator {
-        self.0.iter().map(|(key, _)| key)
     }
 
     pub fn values(&self) -> impl DoubleEndedIterator<Item = &V> + ExactSizeIterator {
@@ -51,6 +79,14 @@ impl<K: Ord, V, S> From<std::collections::HashMap<K, V, S>> for FrozenMap<K, V> 
 }
 
 impl<K: Ord, V> FrozenMap<K, V> {
+    /// Freeze entries that are already in strictly increasing key order.
+    ///
+    /// Duplicate or unsorted keys would make lookups by binary search unreliable.
+    pub fn from_sorted(entries: Vec<(K, V)>) -> Self {
+        debug_assert!(entries.windows(2).all(|w| w[0].0 < w[1].0));
+        Self(entries.into_boxed_slice())
+    }
+
     /// Creates a frozen map from entries with unique keys.
     pub(crate) fn from_entries(mut entries: Vec<(K, V)>) -> Self {
         entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
@@ -137,28 +173,7 @@ fn sort_and_deduplicate<K: Ord, V>(mut entries: Vec<(K, V)>) -> Vec<(K, V)> {
     entries
 }
 
-fn index_values<K, V>(
-    entries: impl IntoIterator<Item = (K, V)>,
-) -> (Vec<(K, FrozenValueIndex)>, IndexVec<FrozenValueIndex, V>)
-where
-    V: Copy + Eq + Hash,
-{
-    let mut values = IndexVec::new();
-    let mut value_indices = FxHashMap::default();
-    let entries = entries
-        .into_iter()
-        .map(|(key, value)| {
-            let index = *value_indices
-                .entry(value)
-                .or_insert_with(|| values.push(value));
-            (key, index)
-        })
-        .collect();
-
-    (entries, values)
-}
-
-/// Compact immutable key-value entries that deduplicate repeated values.
+/// Compact immutable key-value entries that can share repeated values.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct FrozenValueMap<K, V> {
     entries: FrozenMap<K, FrozenValueIndex>,
@@ -166,6 +181,40 @@ pub struct FrozenValueMap<K, V> {
 }
 
 impl<K, V> FrozenValueMap<K, V> {
+    /// Freeze entries in strictly increasing key order. Assigning value indices in
+    /// that order gives equal maps the same representation for Salsa comparisons.
+    pub fn from_sorted(entries: impl IntoIterator<Item = (K, V)>) -> Self
+    where
+        K: Ord,
+        V: Copy + Eq + Hash,
+    {
+        // Keep only the most recent index per hash bucket. This costs 1 KiB of
+        // scratch space and avoids allocating and growing a hash table per scope.
+        // A collision can leave extra copies of a value in the finished map.
+        let mut recent = [None; 256];
+        let entries = entries.into_iter();
+        let mut values = IndexVec::with_capacity(entries.size_hint().0.min(16));
+        let entries = entries
+            .map(|(key, value)| {
+                let bucket = FxBuildHasher.hash_one(value).to_le_bytes()[0];
+                let slot = &mut recent[usize::from(bucket)];
+                let index = match *slot {
+                    Some(index) if values[index] == value => index,
+                    _ => {
+                        let index = values.push(value);
+                        *slot = Some(index);
+                        index
+                    }
+                };
+                (key, index)
+            })
+            .collect();
+        Self {
+            entries: FrozenMap::from_sorted(entries),
+            values: values.into(),
+        }
+    }
+
     pub fn get(&self, key: &K) -> Option<&V>
     where
         K: Ord,
@@ -189,12 +238,7 @@ impl<K, V> FrozenValueMap<K, V> {
         V: Copy + Eq + Hash,
         F: FnMut(K, V) -> V,
     {
-        let (entries, values) =
-            index_values(self.iter().map(|(key, value)| (key, map(key, value))));
-        *self = Self {
-            entries: FrozenMap(entries.into_boxed_slice()),
-            values: values.into(),
-        };
+        *self = Self::from_sorted(self.iter().map(|(key, value)| (key, map(key, value))));
     }
 }
 
@@ -204,30 +248,7 @@ where
     V: Copy + Eq + Hash,
 {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let source_entries = sort_and_deduplicate(iter.into_iter().collect());
-
-        let (entries, values) = index_values(source_entries);
-
-        Self {
-            entries: FrozenMap(entries.into_boxed_slice()),
-            values: values.into(),
-        }
-    }
-}
-
-impl<K, V, S> From<std::collections::HashMap<K, V, S>> for FrozenValueMap<K, V>
-where
-    K: Ord,
-    V: Copy + Eq + Hash,
-{
-    fn from(map: std::collections::HashMap<K, V, S>) -> Self {
-        let (mut entries, values) = index_values(map);
-        entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
-
-        Self {
-            entries: FrozenMap(entries.into_boxed_slice()),
-            values: values.into(),
-        }
+        Self::from_sorted(sort_and_deduplicate(iter.into_iter().collect()))
     }
 }
 
@@ -284,7 +305,25 @@ impl<K> Default for FrozenSet<K> {
 
 #[cfg(test)]
 mod tests {
-    use super::{FrozenMap, FrozenValueMap};
+    use std::assert_matches;
+
+    use super::{FrozenMap, FrozenValueMap, PackedIds};
+
+    #[test]
+    fn packed_ids_preserve_values_at_width_boundaries() {
+        let pack = |max| {
+            let ids = PackedIds::from(vec![max, 0]);
+            assert_eq!(ids.get(0), max);
+            assert_eq!(ids.get(1), 0);
+            ids
+        };
+
+        assert_matches!(pack(255), PackedIds::U8(_));
+        assert_matches!(pack(256), PackedIds::U16(_));
+        assert_matches!(pack(65_535), PackedIds::U16(_));
+        assert_matches!(pack(65_536), PackedIds::Full(_));
+        assert_matches!(pack(u32::MAX), PackedIds::Full(_));
+    }
 
     #[test]
     fn frozen_map_preserves_last_value_for_duplicate_keys() {
@@ -320,6 +359,35 @@ mod tests {
         assert_eq!(
             map.iter().collect::<Vec<_>>(),
             vec![(1, [2; 4]), (2, [1; 4]), (3, [1; 4])]
+        );
+    }
+
+    #[test]
+    fn frozen_value_map_preserves_values_on_hash_collisions() {
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        struct Value(u8);
+
+        impl std::hash::Hash for Value {
+            fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+                state.write_u8(0);
+            }
+        }
+
+        let a = Value(1);
+        let b = Value(2);
+        let entries = [(0, a), (1, a), (2, b), (3, a)];
+        let mut map = FrozenValueMap::from_sorted(entries);
+        assert_eq!(map.values.len(), 3);
+        assert!(map.iter().eq(entries));
+        for (key, value) in entries {
+            assert_eq!(map.get(&key), Some(&value));
+        }
+
+        // Cycle normalization can assign different types to nodes that shared a value.
+        map.map_values(|key, value| if key == 1 { b } else { value });
+        assert_eq!(
+            map,
+            FrozenValueMap::from_sorted([(0, a), (1, b), (2, b), (3, a)])
         );
     }
 

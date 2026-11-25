@@ -297,19 +297,19 @@ class Base:
 NoBody = types.new_class("NoBody", (Base,))
 instance = NoBody()
 reveal_type(instance.base_attr)  # revealed: int
-instance.missing_attr  # error: [unresolved-attribute]
+instance.missing_attr  # error: [missing-attribute]
 
 # With exec_body=None: same as no exec_body
 NoBodyExplicit = types.new_class("NoBodyExplicit", (Base,), exec_body=None)
 instance_explicit = NoBodyExplicit()
 reveal_type(instance_explicit.base_attr)  # revealed: int
-instance_explicit.missing_attr  # error: [unresolved-attribute]
+instance_explicit.missing_attr  # error: [missing-attribute]
 
 # With exec_body=None passed positionally: same as no exec_body
 NoBodyPositional = types.new_class("NoBodyPositional", (Base,), None, None)
 instance_positional = NoBodyPositional()
 reveal_type(instance_positional.base_attr)  # revealed: int
-instance_positional.missing_attr  # error: [unresolved-attribute]
+instance_positional.missing_attr  # error: [missing-attribute]
 
 # With exec_body: namespace is dynamic, so any attribute access returns Unknown
 def body(ns):

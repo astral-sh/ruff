@@ -2,6 +2,7 @@
 //! with some helper symbols
 
 use ruff_db::diagnostic::LintName;
+use strum::{EnumCount, VariantArray};
 use strum_macros::EnumIter;
 
 pub use codes::Rule;
@@ -230,7 +231,7 @@ pub trait RuleNamespace: Sized {
     fn url(&self) -> Option<&'static str>;
 }
 
-#[derive(is_macro::Is, Copy, Clone)]
+#[derive(is_macro::Is, Copy, Clone, strum_macros::EnumCount)]
 pub enum LintSource {
     Ast,
     Io,
@@ -244,17 +245,37 @@ pub enum LintSource {
     Toml,
 }
 
+impl LintSource {
+    /// Returns all rules checked by this lint source. The sets are built at compile time so
+    /// the linter can skip a pass when its set has no overlap with the enabled rules.
+    pub(crate) const fn rule_set(self) -> &'static RuleSet {
+        static RULES: [RuleSet; LintSource::COUNT] = {
+            let mut groups = [const { RuleSet::empty() }; LintSource::COUNT];
+            let mut remaining = Rule::VARIANTS;
+            while let [rule, rest @ ..] = remaining {
+                let group = &mut groups[rule.lint_source() as usize];
+                *group = RuleSet::from_rule(*rule).union(group);
+                remaining = rest;
+            }
+            groups
+        };
+        &RULES[self as usize]
+    }
+}
+
 impl Rule {
     /// The source for the diagnostic (either the AST, the filesystem, or the
     /// physical lines).
     pub const fn lint_source(&self) -> LintSource {
         match self {
-            Rule::InvalidPyprojectToml | Rule::RuleCodesInSelectors => LintSource::Toml,
+            Rule::InvalidPyprojectToml | Rule::RenamedRule | Rule::RuleCodesInSelectors => {
+                LintSource::Toml
+            }
             Rule::BlanketNOQA
             | Rule::NoqaComments
-            | Rule::RedirectedNOQA
+            | Rule::RenamedRuleInSuppressionComment
             | Rule::RuleCodesInSuppressionComments
-            | Rule::UnusedNOQA => LintSource::Noqa,
+            | Rule::UnusedSuppressionComment => LintSource::Noqa,
             Rule::BidirectionalUnicode
             | Rule::BlankLineWithWhitespace
             | Rule::DocLineTooLong
@@ -267,18 +288,18 @@ impl Rule {
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::BlanketTypeIgnore
             | Rule::BlankLineAfterDecorator
-            | Rule::BlankLineBetweenMethods
-            | Rule::BlankLinesAfterFunctionOrClass
-            | Rule::BlankLinesBeforeNestedDefinition
-            | Rule::BlankLinesTopLevel
+            | Rule::MissingBlankLineBeforeMethod
+            | Rule::MissingBlankLinesAfterTopLevelDefinition
+            | Rule::MissingBlankLineBeforeNestedDefinition
+            | Rule::MissingBlankLinesBeforeTopLevelDefinition
             | Rule::CommentedOutCode
             | Rule::EmptyComment
             | Rule::ExtraneousParentheses
-            | Rule::InvalidCharacterBackspace
-            | Rule::InvalidCharacterEsc
-            | Rule::InvalidCharacterNul
-            | Rule::InvalidCharacterSub
-            | Rule::InvalidCharacterZeroWidthSpace
+            | Rule::UnescapedBackspaceCharacter
+            | Rule::UnescapedEscapeCharacter
+            | Rule::UnescapedNullCharacter
+            | Rule::UnescapedSubstituteCharacter
+            | Rule::UnescapedZeroWidthSpaceCharacter
             | Rule::InvalidTodoCapitalization
             | Rule::InvalidTodoTag
             | Rule::LineContainsFixme
@@ -294,11 +315,11 @@ impl Rule {
             | Rule::MultiLineImplicitStringConcatenation
             | Rule::MultipleStatementsOnOneLineColon
             | Rule::MultipleStatementsOnOneLineSemicolon
-            | Rule::ProhibitedTrailingComma
+            | Rule::UnnecessaryTrailingComma
             | Rule::ShebangLeadingWhitespace
-            | Rule::ShebangMissingExecutableFile
+            | Rule::ExecutableFileWithoutShebang
             | Rule::ShebangMissingPython
-            | Rule::ShebangNotExecutable
+            | Rule::NonExecutableFileWithShebang
             | Rule::ShebangNotFirstLine
             | Rule::SingleLineImplicitStringConcatenation
             | Rule::TabIndentation
@@ -342,24 +363,24 @@ impl Rule {
             | Rule::TooFewSpacesBeforeInlineComment
             | Rule::UnexpectedIndentation
             | Rule::UnexpectedIndentationComment
-            | Rule::UnexpectedSpacesAroundKeywordParameterEquals
+            | Rule::UnexpectedSpacesAroundArgumentOrParameterEquals
             | Rule::WhitespaceAfterOpenBracket
             | Rule::WhitespaceBeforeCloseBracket
-            | Rule::WhitespaceBeforeParameters
+            | Rule::WhitespaceBeforeOpenBracket
             | Rule::WhitespaceBeforePunctuation => LintSource::LogicalLines,
             _ => LintSource::Ast,
         }
     }
 
-    /// Return the URL for the rule documentation, if it exists.
-    pub fn url(&self) -> Option<String> {
-        self.explanation().is_some().then(|| {
-            format!(
-                "{}/rules/{name}",
-                env!("CARGO_PKG_HOMEPAGE"),
-                name = self.name()
-            )
-        })
+    /// Return the URL for the rule documentation.
+    pub fn url(&self) -> String {
+        // Every rule has documentation. Calling `explanation()` here would retain all
+        // documentation strings in binaries that only need the URLs.
+        format!(
+            "{}/rules/{name}",
+            env!("CARGO_PKG_HOMEPAGE"),
+            name = self.name()
+        )
     }
 
     pub fn name(&self) -> LintName {
@@ -396,16 +417,18 @@ impl Rule {
 /// Pairs of checks that shouldn't be enabled together.
 pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
     (
-        Rule::BlankLineBeforeClass,
-        Rule::IncorrectBlankLineBeforeClass,
-        "`incorrect-blank-line-before-class` (D203) and `blank-line-before-class` (D211) are \
-         incompatible. Ignoring `incorrect-blank-line-before-class`.",
+        Rule::BlankLineBeforeClassDocstring,
+        Rule::IncorrectBlankLineBeforeClassDocstring,
+        "`incorrect-blank-line-before-class-docstring` (D203) and \
+         `blank-line-before-class-docstring` (D211) are incompatible. \
+         Ignoring `incorrect-blank-line-before-class-docstring`.",
     ),
     (
-        Rule::MultiLineSummaryFirstLine,
-        Rule::MultiLineSummarySecondLine,
-        "`multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are \
-         incompatible. Ignoring `multi-line-summary-second-line`.",
+        Rule::MultilineDocstringSummaryOnSeparateLine,
+        Rule::MultilineDocstringSummaryOnFirstLine,
+        "`multiline-docstring-summary-on-separate-line` (D212) and \
+         `multiline-docstring-summary-on-first-line` (D213) are incompatible. \
+         Ignoring `multiline-docstring-summary-on-first-line`.",
     ),
 ];
 
@@ -485,7 +508,7 @@ mod tests {
     fn documentation() {
         for rule in Rule::iter() {
             assert!(
-                rule.explanation().is_some(),
+                !rule.explanation().trim().is_empty(),
                 "Rule {} is missing documentation",
                 rule.name()
             );

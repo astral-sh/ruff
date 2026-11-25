@@ -199,7 +199,7 @@ impl<'a> DescriptionBuilder<'a> {
 
     fn finish(mut self) -> String {
         if self.continuation_lines.is_empty() {
-            return self.inline.map_or_else(String::new, str::to_string);
+            return self.inline.map_or_default(str::to_string);
         }
 
         let continuation_indent = self

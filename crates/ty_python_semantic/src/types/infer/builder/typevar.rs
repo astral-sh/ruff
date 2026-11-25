@@ -7,6 +7,7 @@ use crate::{
         diagnostic::{
             INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMSPEC, INVALID_TYPE_VARIABLE_BOUND,
             INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
+            MISMATCHED_PARAMSPEC_NAME, MISMATCHED_TYPEVAR_NAME, MISMATCHED_TYPEVARTUPLE_NAME,
             report_mismatched_type_name,
         },
         infer::{
@@ -976,13 +977,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+        let name_param = name_param_ty
+            .resolve_string_literal(db)
+            .map(|name| name.value(db));
+        if name_param.is_none()
+            && !name_param_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+        {
             return error(
                 &self.context,
-                "The first argument to `TypeVarTuple` must be a string literal",
+                "The first argument to `TypeVarTuple` must be a string",
                 call_expr,
             );
-        };
+        }
         let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
 
         let ast::Expr::Name(ast::ExprName {
@@ -996,15 +1002,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        if name_param != target_name {
+        if name_param != Some(target_name.as_str()) {
             report_mismatched_type_name(
                 &self.context,
+                &MISMATCHED_TYPEVARTUPLE_NAME,
                 name_param_node
                     .map(Ranged::range)
                     .unwrap_or_else(|| call_expr.range()),
                 "TypeVarTuple",
                 target_name,
-                Some(name_param),
+                name_param,
                 name_param_ty,
             );
         }
@@ -1229,13 +1236,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+        let name_param = name_param_ty
+            .resolve_string_literal(db)
+            .map(|name| name.value(db));
+        if name_param.is_none()
+            && !name_param_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+        {
             return error(
                 &self.context,
-                "The first argument to `ParamSpec` must be a string literal",
+                "The first argument to `ParamSpec` must be a string",
                 call_expr,
             );
-        };
+        }
         let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
 
         let ast::Expr::Name(ast::ExprName {
@@ -1249,15 +1261,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        if name_param != target_name {
+        if name_param != Some(target_name.as_str()) {
             report_mismatched_type_name(
                 &self.context,
+                &MISMATCHED_PARAMSPEC_NAME,
                 name_param_node
                     .map(Ranged::range)
                     .unwrap_or_else(|| call_expr.range()),
                 "ParamSpec",
                 target_name,
-                Some(name_param),
+                name_param,
                 name_param_ty,
             );
         }
@@ -1472,13 +1485,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+        let name_param = name_param_ty
+            .resolve_string_literal(db)
+            .map(|name| name.value(db));
+        if name_param.is_none()
+            && !name_param_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
+        {
             return error(
                 &self.context,
-                "The first argument to `TypeVar` must be a string literal.",
+                "The first argument to `TypeVar` must be a string",
                 call_expr,
             );
-        };
+        }
         let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
 
         let ast::Expr::Name(ast::ExprName {
@@ -1492,15 +1510,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        if name_param != target_name {
+        if name_param != Some(target_name.as_str()) {
             report_mismatched_type_name(
                 &self.context,
+                &MISMATCHED_TYPEVAR_NAME,
                 name_param_node
                     .map(Ranged::range)
                     .unwrap_or_else(|| call_expr.range()),
                 "TypeVar",
                 target_name,
-                Some(name_param),
+                name_param,
                 name_param_ty,
             );
         }
@@ -1583,11 +1602,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Inference of bounds, constraints, and defaults must be deferred, to avoid cycles. So we
         // only check presence/absence/number here.
 
-        let num_constraints = arguments.args.len().saturating_sub(1);
+        let constraints = arguments.args.get(1..).unwrap_or_default();
 
-        let bound_or_constraints = match (has_bound, num_constraints) {
-            (false, 0) => None,
-            (true, 0) => Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
+        let bound_or_constraints = match (has_bound, constraints) {
+            (false, []) => None,
+            (true, []) => Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
             (true, _) => {
                 return error(
                     &self.context,
@@ -1595,12 +1614,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     call_expr,
                 );
             }
-            (_, 1) => {
-                return error(
-                    &self.context,
-                    "A `TypeVar` cannot have exactly one constraint",
-                    &arguments.args[1],
-                );
+            (false, [constraint]) => {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS, constraint)
+                {
+                    builder.into_diagnostic("A `TypeVar` cannot have exactly one constraint");
+                }
+                return KnownClass::TypeVar.to_instance(db, env);
             }
             (false, _) => Some(TypeVarBoundOrConstraintsEvaluation::LazyConstraints),
         };

@@ -32,7 +32,7 @@ use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, ScopeKind};
 use ty_python_semantic::{
     Db as SemanticDb, FixtureExposure, FixtureNameSource, ImportAliasResolution,
     ResolvedDefinition, SemanticModel, fixture_bindings_for_parameter,
-    fixture_exposures_for_definition, pytest_global_plugin_files,
+    fixture_exposures_for_definition, pytest_global_plugin_files, pytest_registered_plugin_files,
 };
 
 /// Salsa snapshots coordinate clone and drop through shared state. For cached files that don't
@@ -166,6 +166,13 @@ fn references_for_search(
                 pytest_global_plugin_files(db, program)
                     .iter()
                     .map(|file| file.file(db)),
+            );
+            // Fixtures in plugins registered through `pytest_plugins` can request the target
+            // fixture, and those plugins can be outside the project.
+            files.extend(
+                pytest_registered_plugin_files(db, file)
+                    .iter()
+                    .map(|plugin| plugin.file(db)),
             );
             files.remove(&source_file);
             files.into_iter().collect()

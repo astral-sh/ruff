@@ -7,43 +7,72 @@ use std::marker::PhantomData;
 use itertools::Either;
 use salsa::plumbing::AsId;
 
+use crate::types::Type;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintSetBuilder, ConstraintSetStorage, Node, NodeId,
-    SourceOrderId, max_constructor_and_typevar_depth, wobble_index,
+    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintSetStorage, ConstructionBudget, Node, NodeId,
+    ProjectionError, SourceOrderId, max_constructor_and_typevar_depth, wobble_index,
 };
-use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain};
-use crate::types::{ApplyTypeMappingVisitor, Type, TypeContext, TypeMapping};
+use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain, TypeVarSet};
 use crate::{Db, ProgramEnvironment};
 
-/// The _provenance_ of a BDD constraint.
-///
-/// Most bounds come from specific relationships found at the call site — for instance, the
-/// relationship between the argument type and parameter annotation when invoking a generic
-/// function. These bounds express actual user intent, and are called _evidence_ bounds.
-///
-/// Other bounds are background limitations on which specializations are valid — for instance, a
-/// typevar's declared `bound_or_constraints`. These are called _validity_ bounds. Importantly, we
-/// don't want to choose a validity bound as a solution unless we have no other choice. There is
-/// often an evidence bound that is a better choice.
-///
-/// When we derive a new constraint from both an evidence constraint and a validity constraint, we
-/// produce a _mixed_ constraint. Sometimes we will need to treat that derived constraint the same
-/// as a validity constraint; other times we will need to treat it like an evidence constraint.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) enum ConstraintProvenance {
-    Validity,
-    Mixed,
-    Evidence,
+/// The solver policy for handling unspecialized type variables as inference evidence.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::SalsaValue)]
+pub(super) enum UnspecializedTypeVarPolicy {
+    Retain,
+    Ignore,
 }
+
+impl UnspecializedTypeVarPolicy {
+    fn should_retain_constraint<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bound: Option<Type<'db>>,
+    ) -> bool {
+        match self {
+            UnspecializedTypeVarPolicy::Retain => true,
+            UnspecializedTypeVarPolicy::Ignore => {
+                bound.is_none_or(|bound| !bound.has_unspecialized_type_var(db, env))
+            }
+        }
+    }
+}
+
+bitflags::bitflags! {
+    /// The _provenance_ of a BDD constraint.
+    ///
+    /// Most bounds come from specific relationships found at the call site. For example, the
+    /// relationship between the argument type and parameter annotation when invoking a generic
+    /// function is an _inferred_ bound. On the other hand, the relationship between the return type
+    /// of the function and the declared type of the call expression is a _declared_ bound. Both
+    /// inferred and declared bounds are types of _evidence_ bounds, as they express actual
+    /// user intent, although the solver may prefer one source of evidence over another based on
+    /// heuristics.
+    ///
+    /// Other bounds are background limitations on which specializations are valid, such as a
+    /// typevar's declared `bound_or_constraints`. These are called _validity_ bounds. Importantly, we
+    /// don't want to choose a validity bound as a solution unless we have no other choice, as there is
+    /// often an evidence bound that is a better choice.
+    ///
+    /// Derived constraints retain the union of their inputs' provenance.
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::SalsaValue)]
+    pub(crate) struct ConstraintProvenance: u8 {
+        const INFERRED = 1 << 0;
+        const DECLARED = 1 << 1;
+        const VALIDITY = 1 << 2;
+    }
+}
+
+impl get_size2::GetSize for ConstraintProvenance {}
 
 impl ConstraintProvenance {
     /// Returns the provenance of a constraint derived from two existing constraints.
     pub(super) const fn derived(left: Self, right: Self) -> Self {
-        match (left, right) {
-            (Self::Evidence, Self::Evidence) => Self::Evidence,
-            (Self::Validity, Self::Validity) => Self::Validity,
-            _ => Self::Mixed,
-        }
+        left.union(right)
+    }
+
+    pub(super) const fn is_evidence(self) -> bool {
+        self.intersects(Self::INFERRED.union(Self::DECLARED))
     }
 
     /// Returns the provenance of a bound produced by simplifying two existing bounds.
@@ -70,14 +99,25 @@ impl ConstraintProvenance {
 
 pub(super) struct UnsatisfiableBound;
 
-/// One condition that can be checked by an interior node in a constraint set BDD
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+/// One condition that can be checked by an interior node in a constraint set BDD.
+///
+/// When adding a new kind of constraint, choose whether to add it to `Constraint` or
+/// [`AtomicConstraint`] based on how it participates in solving:
+///
+/// - Add a variant to [`AtomicConstraint`] if it directly restricts typevar solutions. These
+///   constraints are recorded as true or false in
+///   [`PathAssignments`][super::paths::PathAssignments] and can be antecedents or consequents in a
+///   [`SequentMap`][super::sequents::SequentMap]. Both `T ≤ int` and `T ≤ U` are atomic: an atomic
+///   constraint can mention multiple typevars.
+/// - Add a variant to [`Constraint`] if it needs its own interpretation during BDD traversal
+///   instead of being recorded as an ordinary path assignment. For example, an existential
+///   constraint quantifies a body with local typevars. The atomic constraints found inside the
+///   existential body, and in its surrounding context, are merged together into a single set of
+///   path assignments. The existential itself is not recorded on the path. This custom behavior
+///   makes `Constraint` the right place for it.
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum Constraint<'db> {
-    ConcreteLower(ConcreteLowerBound<'db>),
-    ConcreteUpper(ConcreteUpperBound<'db>),
-    ConcreteEquivalence(ConcreteEquivalenceBound<'db>),
-    TypeVarRange(TypeVarRangeBound<'db>),
-    TypeVarEquivalence(TypeVarEquivalenceBound<'db>),
+    Atomic(AtomicConstraint<'db>),
 }
 
 impl<'db> Constraint<'db> {
@@ -91,24 +131,70 @@ impl<'db> Constraint<'db> {
         Node::new_constraint(storage, constraint_id)
     }
 
-    pub(super) fn new_nodes(
+    pub(super) fn new_nodes<I, C>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        constraints: impl IntoIterator<Item = Result<Self, UnsatisfiableBound>>,
-    ) -> (NodeId, Option<SourceOrderId>) {
+        constraints: I,
+        budget: &ConstructionBudget,
+    ) -> Result<(NodeId, Option<SourceOrderId>), ProjectionError>
+    where
+        I: IntoIterator<Item = Result<C, UnsatisfiableBound>>,
+        C: Into<Self>,
+    {
         let (mut node, mut source_order) = (ALWAYS_TRUE, None);
         for constraint in constraints {
             let Ok(constraint) = constraint else {
-                return (ALWAYS_FALSE, None);
+                return Ok((ALWAYS_FALSE, None));
             };
+            let constraint = constraint.into();
             let (constraint_node, constraint_source_order) = constraint.new_node(db, env, storage);
-            node = node.and(storage, constraint_node);
+            node = node.and(storage, constraint_node, budget)?;
             source_order = storage.ordered_source_order(source_order, constraint_source_order);
         }
-        (node, source_order)
+        Ok((node, source_order))
     }
 
+    pub(super) fn display<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
+        holds: Option<bool>,
+    ) -> impl Display + 'a {
+        std::fmt::from_fn(move |f| match self {
+            Constraint::Atomic(atomic) => atomic.display(db, env, holds).fmt(f),
+        })
+    }
+}
+
+/// An atomic [`Constraint`]. These are the constraints that directly restrict solutions for
+/// typevars. They are allowed to appear in a [`SequentMap`][super::sequents::SequentMap], and are
+/// the elements of the BDD paths that are discovered via
+/// [`PathAssignments`][super::paths::PathAssignments].
+///
+/// When a relation collects or derives an atom, every variable that receives a bound must
+/// be inferable in that relation's scope. This includes both endpoints of `TypeVarRange` and
+/// `TypeVarEquivalence`. A concrete bound constrains only its subject. Its type expression can
+/// reference caller-fixed variables. For example, `U ≤ T` with fixed `U` is a `ConcreteLower`
+/// with subject `T` and bound `Type::TypeVar(U)`.
+///
+/// See [`Constraint`] to choose whether new kinds of constraint belong here or in `Constraint`.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) enum AtomicConstraint<'db> {
+    ConcreteLower(ConcreteLowerBound<'db>),
+    ConcreteUpper(ConcreteUpperBound<'db>),
+    ConcreteEquivalence(ConcreteEquivalenceBound<'db>),
+    TypeVarRange(TypeVarRangeBound<'db>),
+    TypeVarEquivalence(TypeVarEquivalenceBound<'db>),
+}
+
+impl<'db> From<AtomicConstraint<'db>> for Constraint<'db> {
+    fn from(atomic: AtomicConstraint<'db>) -> Constraint<'db> {
+        Constraint::Atomic(atomic)
+    }
+}
+
+impl<'db> AtomicConstraint<'db> {
     /// Returns the constraints that model the requirement that `bound` must be assignable to
     /// `typevar`. Union lower bounds are broken apart into separate constraints. Returns no
     /// constraints when the relationship always holds (e.g. when comparing a typevar with itself).
@@ -117,6 +203,7 @@ impl<'db> Constraint<'db> {
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> impl Iterator<Item = Result<Self, UnsatisfiableBound>> {
         let choose_lower_bound = move |bound: Type<'db>| {
             let bound = Self::normalize_bound(db, typevar, bound);
@@ -149,27 +236,15 @@ impl<'db> Constraint<'db> {
                     Some(Err(UnsatisfiableBound))
                 }
 
-                // Otherwise we construct the correct lower-bound constraint.
-
-                // Comparing two typevars
-                Type::TypeVar(lower) if typevar.domain(db) == lower.domain(db) => {
-                    let constraint = TypeVarRangeBound::new(db, provenance, lower, typevar).into();
-                    Some(Ok(constraint))
-                }
-                Type::TypeVar(_) => Some(Err(UnsatisfiableBound)),
-
-                // Comparing a paramspec with a callable type
-                Type::Callable(_) if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
-                    let constraint = ConcreteLowerBound::new(provenance, typevar, bound).into();
-                    Some(Ok(constraint))
-                }
-
-                // Cannot compare a paramspec with a non-callable type
-                _ if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
+                _ if !Self::bound_has_compatible_domain(db, typevar, bound) => {
                     Some(Err(UnsatisfiableBound))
                 }
 
-                // Comparing a typevar with a type
+                Type::TypeVar(lower) if lower.is_inferable(db, inferable) => {
+                    let constraint = TypeVarRangeBound::new(db, provenance, lower, typevar).into();
+                    Some(Ok(constraint))
+                }
+
                 _ => {
                     let constraint = ConcreteLowerBound::new(provenance, typevar, bound).into();
                     Some(Ok(constraint))
@@ -206,6 +281,7 @@ impl<'db> Constraint<'db> {
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> impl Iterator<Item = Result<Self, UnsatisfiableBound>> {
         let choose_upper_bound = move |bound: Type<'db>| {
             let bound = Self::normalize_bound(db, typevar, bound);
@@ -226,27 +302,15 @@ impl<'db> Constraint<'db> {
                     None
                 }
 
-                // Otherwise we construct the correct upper-bound constraint.
-
-                // Comparing two typevars
-                Type::TypeVar(upper) if typevar.domain(db) == upper.domain(db) => {
-                    let constraint = TypeVarRangeBound::new(db, provenance, typevar, upper).into();
-                    Some(Ok(constraint))
-                }
-                Type::TypeVar(_) => Some(Err(UnsatisfiableBound)),
-
-                // Comparing a paramspec with a callable type
-                Type::Callable(_) if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
-                    let constraint = ConcreteUpperBound::new(provenance, typevar, bound).into();
-                    Some(Ok(constraint))
-                }
-
-                // Cannot compare a paramspec with a non-callable type
-                _ if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
+                _ if !Self::bound_has_compatible_domain(db, typevar, bound) => {
                     Some(Err(UnsatisfiableBound))
                 }
 
-                // Comparing a typevar with a type
+                Type::TypeVar(upper) if upper.is_inferable(db, inferable) => {
+                    let constraint = TypeVarRangeBound::new(db, provenance, typevar, upper).into();
+                    Some(Ok(constraint))
+                }
+
                 _ => {
                     let constraint = ConcreteUpperBound::new(provenance, typevar, bound).into();
                     Some(Ok(constraint))
@@ -284,6 +348,7 @@ impl<'db> Constraint<'db> {
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> impl Iterator<Item = Result<Self, UnsatisfiableBound>> {
         let is_same_typevar = |element: &Type<'db>| {
             element
@@ -301,8 +366,8 @@ impl<'db> Constraint<'db> {
 
         if bound_refers_to_typevar {
             return Either::Left(std::iter::chain(
-                Self::new_lower_bound(db, provenance, typevar, bound),
-                Self::new_upper_bound(db, env, provenance, typevar, bound),
+                Self::new_lower_bound(db, provenance, typevar, bound, inferable),
+                Self::new_upper_bound(db, env, provenance, typevar, bound, inferable),
             ));
         }
 
@@ -312,30 +377,16 @@ impl<'db> Constraint<'db> {
             // have an equivalence bound that is the typevar being constrained.
             Type::TypeVar(bound_typevar) if typevar.is_same_typevar_as(db, bound_typevar) => None,
 
-            // Otherwise we construct the correct equivalence constraint.
+            _ if !Self::bound_has_compatible_domain(db, typevar, normalized_bound) => {
+                Some(Err(UnsatisfiableBound))
+            }
 
-            // Comparing two typevars
-            Type::TypeVar(bound_typevar) if typevar.domain(db) == bound_typevar.domain(db) => {
+            Type::TypeVar(bound_typevar) if bound_typevar.is_inferable(db, inferable) => {
                 let constraint =
                     TypeVarEquivalenceBound::new(db, provenance, typevar, bound_typevar).into();
                 Some(Ok(constraint))
             }
-            Type::TypeVar(_) => Some(Err(UnsatisfiableBound)),
 
-            // Comparing a paramspec with a callable type
-            Type::Callable(_) if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
-                // We already normalized the callable into a paramspec_value above
-                let constraint =
-                    ConcreteEquivalenceBound::new(provenance, typevar, normalized_bound).into();
-                Some(Ok(constraint))
-            }
-
-            // Cannot compare a paramspec with a non-callable type
-            _ if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
-                Some(Err(UnsatisfiableBound))
-            }
-
-            // Comparing a typevar with a type
             _ => {
                 let constraint =
                     ConcreteEquivalenceBound::new(provenance, typevar, normalized_bound).into();
@@ -345,12 +396,32 @@ impl<'db> Constraint<'db> {
         Either::Right(constraint.into_iter())
     }
 
+    /// A `ParamSpec` can be bounded only by another `ParamSpec` or a captured signature.
+    fn bound_has_compatible_domain(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        bound: Type<'db>,
+    ) -> bool {
+        match bound {
+            Type::TypeVar(other) => typevar.domain(db) == other.domain(db),
+            Type::Callable(_) => true,
+            _ => typevar.domain(db) != TypeVarDomain::ParameterSignature,
+        }
+    }
+
     fn normalize_bound(
         db: &'db dyn Db,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
     ) -> Type<'db> {
         match bound {
+            // For `type Id[T] = T`, the bound `S <= Id[R]` relates two type variables.
+            // Storing the alias as a concrete bound would hide that relationship from the solver.
+            Type::TypeAlias(_)
+                if let resolved @ Type::TypeVar(_) = bound.resolve_type_alias(db) =>
+            {
+                resolved
+            }
             Type::Callable(callable) if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
                 if let [signature] = callable.signatures(db).overloads.as_slice()
                     && signature.generic_context.is_none()
@@ -368,75 +439,118 @@ impl<'db> Constraint<'db> {
 
     pub(super) fn provenance(self) -> ConstraintProvenance {
         match self {
-            Constraint::ConcreteLower(this) => this.provenance,
-            Constraint::ConcreteUpper(this) => this.provenance,
-            Constraint::ConcreteEquivalence(this) => this.provenance,
-            Constraint::TypeVarRange(this) => this.provenance,
-            Constraint::TypeVarEquivalence(this) => this.provenance,
+            AtomicConstraint::ConcreteLower(this) => this.provenance,
+            AtomicConstraint::ConcreteUpper(this) => this.provenance,
+            AtomicConstraint::ConcreteEquivalence(this) => this.provenance,
+            AtomicConstraint::TypeVarRange(this) => this.provenance,
+            AtomicConstraint::TypeVarEquivalence(this) => this.provenance,
         }
+    }
+
+    /// Whether this constraint provides useful inference evidence.
+    pub(super) fn provides_candidate_evidence(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bound: Option<Type<'db>>,
+        unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
+    ) -> bool {
+        // Validity bounds are never used as inference evidence.
+        if self.provenance().contains(ConstraintProvenance::VALIDITY) {
+            return false;
+        }
+
+        unspecialized_type_var_policy.should_retain_constraint(db, env, bound)
+    }
+
+    /// Whether this constraint provides a useful bound to the solver.
+    pub(super) fn provides_candidate_bound(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bound: Option<Type<'db>>,
+        unspecialized_type_var_policy: UnspecializedTypeVarPolicy,
+    ) -> bool {
+        // Validity constraints are retained even if they contain unspecialized type variables.
+        if self.provenance().contains(ConstraintProvenance::VALIDITY) {
+            return true;
+        }
+
+        unspecialized_type_var_policy.should_retain_constraint(db, env, bound)
     }
 
     pub(super) fn with_provenance(mut self, provenance: ConstraintProvenance) -> Self {
         match &mut self {
-            Constraint::ConcreteLower(this) => this.provenance = provenance,
-            Constraint::ConcreteUpper(this) => this.provenance = provenance,
-            Constraint::ConcreteEquivalence(this) => this.provenance = provenance,
-            Constraint::TypeVarRange(this) => this.provenance = provenance,
-            Constraint::TypeVarEquivalence(this) => this.provenance = provenance,
+            AtomicConstraint::ConcreteLower(this) => this.provenance = provenance,
+            AtomicConstraint::ConcreteUpper(this) => this.provenance = provenance,
+            AtomicConstraint::ConcreteEquivalence(this) => this.provenance = provenance,
+            AtomicConstraint::TypeVarRange(this) => this.provenance = provenance,
+            AtomicConstraint::TypeVarEquivalence(this) => this.provenance = provenance,
         }
         self
     }
 
-    pub(super) fn is_reflexive_typevar_relation(self, db: &'db dyn Db) -> bool {
+    /// Detect self-relations that hold for every specialization, such as `T & X ≤ T` or
+    /// `T ≤ T | X`. Propagation can introduce these even though the constraint constructors
+    /// discard them. Retaining them as inference evidence can produce a self-referential solution.
+    pub(super) fn is_trivial_self_relation(self, db: &'db dyn Db) -> bool {
+        let is_same_typevar = |typevar: BoundTypeVarInstance<'db>, bound: Type<'db>| {
+            bound
+                .as_typevar()
+                .is_some_and(|bound| typevar.is_same_typevar_as(db, bound))
+        };
         match self {
-            Constraint::TypeVarRange(this) => this.left.is_same_typevar_as(db, this.right),
-            Constraint::TypeVarEquivalence(this) => this.left.is_same_typevar_as(db, this.right),
-            Constraint::ConcreteLower(_)
-            | Constraint::ConcreteUpper(_)
-            | Constraint::ConcreteEquivalence(_) => false,
+            AtomicConstraint::TypeVarRange(this) => this.left.is_same_typevar_as(db, this.right),
+            AtomicConstraint::TypeVarEquivalence(this) => {
+                this.left.is_same_typevar_as(db, this.right)
+            }
+            AtomicConstraint::ConcreteLower(this) => match this.bound {
+                Type::Intersection(intersection) => intersection
+                    .iter_positive(db)
+                    .any(|element| is_same_typevar(this.typevar, element)),
+                bound => is_same_typevar(this.typevar, bound),
+            },
+            AtomicConstraint::ConcreteUpper(this) => match this.bound {
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .any(|element| is_same_typevar(this.typevar, *element)),
+                bound => is_same_typevar(this.typevar, bound),
+            },
+            AtomicConstraint::ConcreteEquivalence(this) => {
+                is_same_typevar(this.typevar, this.bound)
+            }
         }
     }
 
     pub(super) fn provides_lower(self) -> bool {
         matches!(
             self,
-            Constraint::ConcreteLower(_)
-                | Constraint::ConcreteEquivalence(_)
-                | Constraint::TypeVarRange(_)
-                | Constraint::TypeVarEquivalence(_)
+            AtomicConstraint::ConcreteLower(_)
+                | AtomicConstraint::ConcreteEquivalence(_)
+                | AtomicConstraint::TypeVarRange(_)
+                | AtomicConstraint::TypeVarEquivalence(_)
         )
     }
 
     pub(super) fn provides_upper(self) -> bool {
         matches!(
             self,
-            Constraint::ConcreteUpper(_)
-                | Constraint::ConcreteEquivalence(_)
-                | Constraint::TypeVarRange(_)
-                | Constraint::TypeVarEquivalence(_)
+            AtomicConstraint::ConcreteUpper(_)
+                | AtomicConstraint::ConcreteEquivalence(_)
+                | AtomicConstraint::TypeVarRange(_)
+                | AtomicConstraint::TypeVarEquivalence(_)
         )
     }
 
-    pub(super) fn provides_bound_for(
-        self,
-        db: &'db dyn Db,
-        bound_typevar: BoundTypeVarInstance<'db>,
-    ) -> bool {
-        match self {
-            Constraint::ConcreteLower(bound) => bound.typevar.is_same_typevar_as(db, bound_typevar),
-            Constraint::ConcreteUpper(bound) => bound.typevar.is_same_typevar_as(db, bound_typevar),
-            Constraint::ConcreteEquivalence(bound) => {
-                bound.typevar.is_same_typevar_as(db, bound_typevar)
-            }
-            Constraint::TypeVarRange(bound) => {
-                bound.left.is_same_typevar_as(db, bound_typevar)
-                    || bound.right.is_same_typevar_as(db, bound_typevar)
-            }
-            Constraint::TypeVarEquivalence(bound) => {
-                bound.left.is_same_typevar_as(db, bound_typevar)
-                    || bound.right.is_same_typevar_as(db, bound_typevar)
-            }
-        }
+    /// The variables that receive bounds from this constraint.
+    pub(super) fn subjects(self) -> impl Iterator<Item = BoundTypeVarInstance<'db>> {
+        let (first, second) = match self.operands() {
+            ConstraintOperands::Concrete(typevar, _) => (typevar, None),
+            ConstraintOperands::TypeVarRange(bound) => (bound.left, Some(bound.right)),
+            ConstraintOperands::TypeVarEquivalence(bound) => (bound.left, Some(bound.right)),
+        };
+        std::iter::once(first).chain(second)
     }
 
     pub(super) fn lower_bound_for(
@@ -445,20 +559,20 @@ impl<'db> Constraint<'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<Type<'db>> {
         match self {
-            Constraint::ConcreteLower(bound) => bound
+            AtomicConstraint::ConcreteLower(bound) => bound
                 .typevar
                 .is_same_typevar_as(db, bound_typevar)
                 .then_some(bound.bound),
-            Constraint::ConcreteUpper(_) => None,
-            Constraint::ConcreteEquivalence(bound) => bound
+            AtomicConstraint::ConcreteUpper(_) => None,
+            AtomicConstraint::ConcreteEquivalence(bound) => bound
                 .typevar
                 .is_same_typevar_as(db, bound_typevar)
                 .then_some(bound.bound),
-            Constraint::TypeVarRange(bound) => bound
+            AtomicConstraint::TypeVarRange(bound) => bound
                 .right
                 .is_same_typevar_as(db, bound_typevar)
                 .then_some(Type::TypeVar(bound.left)),
-            Constraint::TypeVarEquivalence(bound) => {
+            AtomicConstraint::TypeVarEquivalence(bound) => {
                 bound.other_typevar(db, bound_typevar).map(Type::TypeVar)
             }
         }
@@ -470,84 +584,45 @@ impl<'db> Constraint<'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<Type<'db>> {
         match self {
-            Constraint::ConcreteLower(_) => None,
-            Constraint::ConcreteUpper(bound) => bound_typevar
+            AtomicConstraint::ConcreteLower(_) => None,
+            AtomicConstraint::ConcreteUpper(bound) => bound_typevar
                 .is_same_typevar_as(db, bound.typevar)
                 .then_some(bound.bound),
-            Constraint::ConcreteEquivalence(bound) => bound_typevar
+            AtomicConstraint::ConcreteEquivalence(bound) => bound_typevar
                 .is_same_typevar_as(db, bound.typevar)
                 .then_some(bound.bound),
-            Constraint::TypeVarRange(bound) => bound_typevar
+            AtomicConstraint::TypeVarRange(bound) => bound_typevar
                 .is_same_typevar_as(db, bound.left)
                 .then_some(Type::TypeVar(bound.right)),
-            Constraint::TypeVarEquivalence(bound) => {
+            AtomicConstraint::TypeVarEquivalence(bound) => {
                 bound.other_typevar(db, bound_typevar).map(Type::TypeVar)
             }
         }
     }
 
-    pub(super) fn as_concrete(self) -> Option<(BoundTypeVarInstance<'db>, Type<'db>)> {
+    pub(super) fn operands(self) -> ConstraintOperands<'db> {
         match self {
-            Constraint::ConcreteLower(this) => Some((this.typevar, this.bound)),
-            Constraint::ConcreteUpper(this) => Some((this.typevar, this.bound)),
-            Constraint::ConcreteEquivalence(this) => Some((this.typevar, this.bound)),
-            Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => None,
+            Self::ConcreteLower(this) => ConstraintOperands::Concrete(this.typevar, this.bound),
+            Self::ConcreteUpper(this) => ConstraintOperands::Concrete(this.typevar, this.bound),
+            Self::ConcreteEquivalence(this) => {
+                ConstraintOperands::Concrete(this.typevar, this.bound)
+            }
+            Self::TypeVarRange(this) => ConstraintOperands::TypeVarRange(this),
+            Self::TypeVarEquivalence(this) => ConstraintOperands::TypeVarEquivalence(this),
+        }
+    }
+
+    pub(super) fn as_concrete(self) -> Option<(BoundTypeVarInstance<'db>, Type<'db>)> {
+        match self.operands() {
+            ConstraintOperands::Concrete(typevar, bound) => Some((typevar, bound)),
+            ConstraintOperands::TypeVarRange(_) | ConstraintOperands::TypeVarEquivalence(_) => None,
         }
     }
 
     pub(crate) fn bound_depth(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> (u16, u16) {
-        match self {
-            Constraint::ConcreteLower(this) => {
-                max_constructor_and_typevar_depth(db, env, this.bound)
-            }
-            Constraint::ConcreteUpper(this) => {
-                max_constructor_and_typevar_depth(db, env, this.bound)
-            }
-            Constraint::ConcreteEquivalence(this) => {
-                max_constructor_and_typevar_depth(db, env, this.bound)
-            }
-            Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => (0, 0),
-        }
-    }
-
-    pub(super) fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        match self {
-            Constraint::ConcreteLower(this) => {
-                this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
-            }
-            Constraint::ConcreteUpper(this) => {
-                this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
-            }
-            Constraint::ConcreteEquivalence(this) => {
-                this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
-            }
-            Constraint::TypeVarRange(this) => {
-                this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
-            }
-            Constraint::TypeVarEquivalence(this) => {
-                this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
-            }
-        }
-    }
-
-    pub(super) fn types(self) -> impl Iterator<Item = Type<'db>> {
-        let types = match self {
-            Constraint::ConcreteLower(this) => [Type::TypeVar(this.typevar), this.bound],
-            Constraint::ConcreteUpper(this) => [Type::TypeVar(this.typevar), this.bound],
-            Constraint::ConcreteEquivalence(this) => [Type::TypeVar(this.typevar), this.bound],
-            Constraint::TypeVarRange(this) => [Type::TypeVar(this.left), Type::TypeVar(this.right)],
-            Constraint::TypeVarEquivalence(this) => {
-                [Type::TypeVar(this.left), Type::TypeVar(this.right)]
-            }
-        };
-        types.into_iter()
+        self.as_concrete().map_or((0, 0), |(_, bound)| {
+            max_constructor_and_typevar_depth(db, env, bound)
+        })
     }
 
     pub(super) fn display<'a>(
@@ -557,16 +632,22 @@ impl<'db> Constraint<'db> {
         holds: Option<bool>,
     ) -> impl Display + 'a {
         std::fmt::from_fn(move |f| match self {
-            Constraint::ConcreteLower(this) => this.display(db, env, holds).fmt(f),
-            Constraint::ConcreteUpper(this) => this.display(db, env, holds).fmt(f),
-            Constraint::ConcreteEquivalence(this) => this.display(db, env, holds).fmt(f),
-            Constraint::TypeVarRange(this) => this.display(db, holds).fmt(f),
-            Constraint::TypeVarEquivalence(this) => this.display(db, holds).fmt(f),
+            AtomicConstraint::ConcreteLower(this) => this.display(db, env, holds).fmt(f),
+            AtomicConstraint::ConcreteUpper(this) => this.display(db, env, holds).fmt(f),
+            AtomicConstraint::ConcreteEquivalence(this) => this.display(db, env, holds).fmt(f),
+            AtomicConstraint::TypeVarRange(this) => this.display(db, holds).fmt(f),
+            AtomicConstraint::TypeVarEquivalence(this) => this.display(db, holds).fmt(f),
         })
     }
 }
 
-pub(super) trait ProvidesConcreteBound<'db>: Copy + Into<Constraint<'db>> {
+pub(super) enum ConstraintOperands<'db> {
+    Concrete(BoundTypeVarInstance<'db>, Type<'db>),
+    TypeVarRange(TypeVarRangeBound<'db>),
+    TypeVarEquivalence(TypeVarEquivalenceBound<'db>),
+}
+
+pub(super) trait ProvidesConcreteBound<'db>: Copy + Into<AtomicConstraint<'db>> {
     fn provenance(self) -> ConstraintProvenance;
     fn typevar(self) -> BoundTypeVarInstance<'db>;
     fn bound(self) -> Type<'db>;
@@ -582,7 +663,7 @@ pub(super) trait ProvidesConcreteUpperBound<'db>: ProvidesConcreteBound<'db> {
     fn into_upper_bound(self) -> ConcreteUpperBound<'db>;
 }
 
-pub(super) trait ProvidesTypeVarBound<'db>: Copy + Into<Constraint<'db>> {
+pub(super) trait ProvidesTypeVarBound<'db>: Copy + Into<AtomicConstraint<'db>> {
     fn provenance(self) -> ConstraintProvenance;
     fn left(self) -> BoundTypeVarInstance<'db>;
     fn right(self) -> BoundTypeVarInstance<'db>;
@@ -595,9 +676,8 @@ pub(super) trait ProvidesTypeVarEquivalenceBound<'db>:
 {
 }
 
-/// Restricts a single typevar so that a concrete lower bound is assignable to it. (A concrete type
-/// is not a bare typevar. [`TypeVarRangeBound`] is used to model an assignability relationship
-/// between two typevars.)
+/// Restricts a single typevar so that a concrete lower bound is assignable to it.
+/// A caller-fixed type variable is a concrete bound.
 ///
 /// The bound will never be a union type, since union lower bounds can be broken apart into
 /// separate constraints for each union element.
@@ -624,34 +704,6 @@ impl<'db> ConcreteLowerBound<'db> {
         }
     }
 
-    fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let env = visitor.env;
-        let subject =
-            Type::TypeVar(self.typevar).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let bound = self
-            .bound
-            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let mut storage = builder.storage.borrow_mut();
-        match subject {
-            Type::TypeVar(typevar) => {
-                let applied = Constraint::new_lower_bound(db, self.provenance, typevar, bound);
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            _ => storage.load(
-                db,
-                env,
-                &bound.when_constraint_set_assignable_to_owned(db, env, subject),
-            ),
-        }
-    }
-
     fn display<'a>(
         self,
         db: &'db dyn Db,
@@ -674,9 +726,9 @@ impl<'db> ConcreteLowerBound<'db> {
     }
 }
 
-impl<'db> From<ConcreteLowerBound<'db>> for Constraint<'db> {
-    fn from(bound: ConcreteLowerBound<'db>) -> Constraint<'db> {
-        Constraint::ConcreteLower(bound)
+impl<'db> From<ConcreteLowerBound<'db>> for AtomicConstraint<'db> {
+    fn from(bound: ConcreteLowerBound<'db>) -> AtomicConstraint<'db> {
+        AtomicConstraint::ConcreteLower(bound)
     }
 }
 
@@ -713,9 +765,8 @@ impl<'db> ProvidesConcreteLowerBound<'db> for ConcreteLowerBound<'db> {
     }
 }
 
-/// Restricts a single typevar so that it is assignable to a concrete upper bound. (A concrete type
-/// is not a bare typevar. [`TypeVarRangeBound`] is used to model an assignability relationship
-/// between two typevars.)
+/// Restricts a single typevar so that it is assignable to a concrete upper bound, which may be a
+/// caller-fixed type variable.
 ///
 /// The bound will never be an intersection type, since intersection upper bounds can be broken
 /// apart into separate constraints for each intersection element.
@@ -742,34 +793,6 @@ impl<'db> ConcreteUpperBound<'db> {
         }
     }
 
-    fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let env = visitor.env;
-        let subject =
-            Type::TypeVar(self.typevar).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let bound = self
-            .bound
-            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let mut storage = builder.storage.borrow_mut();
-        match subject {
-            Type::TypeVar(typevar) => {
-                let applied = Constraint::new_upper_bound(db, env, self.provenance, typevar, bound);
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            _ => storage.load(
-                db,
-                env,
-                &subject.when_constraint_set_assignable_to_owned(db, env, bound),
-            ),
-        }
-    }
-
     fn display<'a>(
         self,
         db: &'db dyn Db,
@@ -792,9 +815,9 @@ impl<'db> ConcreteUpperBound<'db> {
     }
 }
 
-impl<'db> From<ConcreteUpperBound<'db>> for Constraint<'db> {
-    fn from(bound: ConcreteUpperBound<'db>) -> Constraint<'db> {
-        Constraint::ConcreteUpper(bound)
+impl<'db> From<ConcreteUpperBound<'db>> for AtomicConstraint<'db> {
+    fn from(bound: ConcreteUpperBound<'db>) -> AtomicConstraint<'db> {
+        AtomicConstraint::ConcreteUpper(bound)
     }
 }
 
@@ -831,9 +854,7 @@ impl<'db> ProvidesConcreteUpperBound<'db> for ConcreteUpperBound<'db> {
     }
 }
 
-/// Restricts a single typevar so that it is equivalent to some concrete type. (A concrete type is
-/// not a bare typevar. [`TypeVarEquivalenceBound`] is used to model an equivalence relationship
-/// between two typevars.)
+/// Restricts a single typevar to a concrete type, which may be a caller-fixed type variable.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ConcreteEquivalenceBound<'db> {
     pub(super) provenance: ConstraintProvenance,
@@ -854,35 +875,6 @@ impl<'db> ConcreteEquivalenceBound<'db> {
             typevar,
             bound,
             _phantom: PhantomData,
-        }
-    }
-
-    fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let env = visitor.env;
-        let subject =
-            Type::TypeVar(self.typevar).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let bound = self
-            .bound
-            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let mut storage = builder.storage.borrow_mut();
-        match subject {
-            Type::TypeVar(typevar) => {
-                let applied =
-                    Constraint::new_equivalence_bound(db, env, self.provenance, typevar, bound);
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            _ => storage.load(
-                db,
-                env,
-                &subject.when_constraint_set_equivalent_to_owned(db, env, bound),
-            ),
         }
     }
 
@@ -908,9 +900,9 @@ impl<'db> ConcreteEquivalenceBound<'db> {
     }
 }
 
-impl<'db> From<ConcreteEquivalenceBound<'db>> for Constraint<'db> {
-    fn from(bound: ConcreteEquivalenceBound<'db>) -> Constraint<'db> {
-        Constraint::ConcreteEquivalence(bound)
+impl<'db> From<ConcreteEquivalenceBound<'db>> for AtomicConstraint<'db> {
+    fn from(bound: ConcreteEquivalenceBound<'db>) -> AtomicConstraint<'db> {
+        AtomicConstraint::ConcreteEquivalence(bound)
     }
 }
 
@@ -990,37 +982,6 @@ impl<'db> TypeVarRangeBound<'db> {
         }
     }
 
-    fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let env = visitor.env;
-        let left = Type::TypeVar(self.left).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let right =
-            Type::TypeVar(self.right).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let mut storage = builder.storage.borrow_mut();
-        match (left, right) {
-            (Type::TypeVar(left_typevar), _) => {
-                let applied =
-                    Constraint::new_upper_bound(db, env, self.provenance, left_typevar, right);
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            (_, Type::TypeVar(right_typevar)) => {
-                let applied = Constraint::new_lower_bound(db, self.provenance, right_typevar, left);
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            _ => storage.load(
-                db,
-                env,
-                &left.when_constraint_set_assignable_to_owned(db, env, right),
-            ),
-        }
-    }
-
     fn display(self, db: &'db dyn Db, holds: Option<bool>) -> impl Display {
         let range_prefix = match holds {
             Some(true) => "",
@@ -1038,9 +999,9 @@ impl<'db> TypeVarRangeBound<'db> {
     }
 }
 
-impl<'db> From<TypeVarRangeBound<'db>> for Constraint<'db> {
-    fn from(bound: TypeVarRangeBound<'db>) -> Constraint<'db> {
-        Constraint::TypeVarRange(bound)
+impl<'db> From<TypeVarRangeBound<'db>> for AtomicConstraint<'db> {
+    fn from(bound: TypeVarRangeBound<'db>) -> AtomicConstraint<'db> {
+        AtomicConstraint::TypeVarRange(bound)
     }
 }
 
@@ -1137,48 +1098,6 @@ impl<'db> TypeVarEquivalenceBound<'db> {
         TypeVarEquivalenceDirectedView(self, true)
     }
 
-    fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let env = visitor.env;
-        let left = Type::TypeVar(self.left).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let right =
-            Type::TypeVar(self.right).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let mut storage = builder.storage.borrow_mut();
-        match (left, right) {
-            (Type::TypeVar(left_typevar), _) => {
-                let applied = Constraint::new_equivalence_bound(
-                    db,
-                    env,
-                    self.provenance,
-                    left_typevar,
-                    right,
-                );
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            (_, Type::TypeVar(right_typevar)) => {
-                let applied = Constraint::new_equivalence_bound(
-                    db,
-                    env,
-                    self.provenance,
-                    right_typevar,
-                    left,
-                );
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            _ => storage.load(
-                db,
-                env,
-                &left.when_constraint_set_equivalent_to_owned(db, env, right),
-            ),
-        }
-    }
-
     fn display(self, db: &'db dyn Db, holds: Option<bool>) -> impl Display {
         let equality_sign = match holds {
             Some(true) => "=",
@@ -1196,18 +1115,18 @@ impl<'db> TypeVarEquivalenceBound<'db> {
     }
 }
 
-impl<'db> From<TypeVarEquivalenceBound<'db>> for Constraint<'db> {
-    fn from(bound: TypeVarEquivalenceBound<'db>) -> Constraint<'db> {
-        Constraint::TypeVarEquivalence(bound)
+impl<'db> From<TypeVarEquivalenceBound<'db>> for AtomicConstraint<'db> {
+    fn from(bound: TypeVarEquivalenceBound<'db>) -> AtomicConstraint<'db> {
+        AtomicConstraint::TypeVarEquivalence(bound)
     }
 }
 
 #[derive(Clone, Copy)]
 pub(super) struct TypeVarEquivalenceDirectedView<'db>(TypeVarEquivalenceBound<'db>, bool);
 
-impl<'db> From<TypeVarEquivalenceDirectedView<'db>> for Constraint<'db> {
-    fn from(bound: TypeVarEquivalenceDirectedView<'db>) -> Constraint<'db> {
-        Constraint::TypeVarEquivalence(bound.0)
+impl<'db> From<TypeVarEquivalenceDirectedView<'db>> for AtomicConstraint<'db> {
+    fn from(bound: TypeVarEquivalenceDirectedView<'db>) -> AtomicConstraint<'db> {
+        AtomicConstraint::TypeVarEquivalence(bound.0)
     }
 }
 

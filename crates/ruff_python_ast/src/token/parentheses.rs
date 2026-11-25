@@ -22,6 +22,8 @@ pub fn parentheses_iterator<'a>(
         // from our search range. Otherwise, we risk matching on calls, like `func(x)`, for which
         // the open and close parentheses are part of the `Arguments` node.
         // The closing parenthesis may be missing in an incomplete call.
+        // Parameter defaults follow a parameter name, and tuple elements are separated by commas,
+        // so their parents' parentheses cannot be mistaken for parentheses around the expression.
         if parent.is_arguments()
             && let Some((last, remaining)) = after_tokens.split_last()
             && last.kind() == TokenKind::Rpar

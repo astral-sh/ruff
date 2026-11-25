@@ -24,6 +24,11 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// prefixed with an underscore, or some other value that adheres to the
 /// [`lint.dummy-variable-rgx`] pattern.
 ///
+/// This rule ignores the following variables, which debuggers and traceback
+/// tools read from the function's local variables at runtime:
+/// `__tracebackhide__`, `__traceback_hide__`, `__traceback_info__`,
+/// `__traceback_supplement__`, and `__debuggerskip__`.
+///
 /// ## Example
 /// ```python
 /// def foo():

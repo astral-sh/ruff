@@ -40,6 +40,7 @@ pub use uv::{
     uv_test_env_vars,
 };
 
+pub mod baseline;
 mod db;
 mod files;
 pub mod glob;
@@ -185,9 +186,10 @@ pub struct CollectReporter(std::sync::Mutex<Vec<Diagnostic>>);
 impl CollectReporter {
     pub fn into_sorted(self, db: &dyn Db) -> Vec<Diagnostic> {
         let mut diagnostics = self.0.into_inner().unwrap();
+        let resolver: &dyn ruff_db::Db = db;
         diagnostics.sort_by(|left, right| {
-            left.rendering_sort_key(db)
-                .cmp(&right.rendering_sort_key(db))
+            left.rendering_sort_key(&resolver)
+                .cmp(&right.rendering_sort_key(&resolver))
         });
         diagnostics
     }
@@ -408,15 +410,15 @@ impl Project {
         path: &SystemPath,
         workspace: uv::UvWorkspace,
     ) -> Result<ProjectReloadResult, ProjectMetadataError> {
-        let mut metadata = self.metadata(db).rediscover(db.system(), path, workspace)?;
-        if let Err(error) = metadata.apply_configuration_files(db.system()) {
-            let error = anyhow::Error::new(error);
-            tracing::error!(
-                "Failed to apply configuration files, \
-                continuing without applying them: {error:#}"
-            );
-        }
+        let metadata = self.metadata(db).rediscover(db.system(), path, workspace)?;
+        Ok(self.apply_rediscovered_metadata(db, metadata))
+    }
 
+    fn apply_rediscovered_metadata(
+        self,
+        db: &mut dyn Db,
+        metadata: ProjectMetadata,
+    ) -> ProjectReloadResult {
         metadata.try_add_project_root(db);
         let merged_options = metadata.to_merged_options();
 
@@ -455,7 +457,7 @@ impl Project {
         );
 
         tracing::debug!("Reloading project after structural change");
-        Ok(self.reload(db, metadata, settings, settings_diagnostics))
+        self.reload(db, metadata, settings, settings_diagnostics)
     }
 
     /// Reload the project after its metadata or settings have changed.
@@ -546,6 +548,15 @@ impl Project {
             .into_par_iter()
             .for_each_with_project_db(db, |db, file| {
                 db.unwind_if_revision_cancelled();
+
+                if db.uv_environments().is_initialization_pending(db, file) {
+                    tracing::debug!(
+                        "Deferring diagnostics for `{}` until its first uv sync completes",
+                        file.path(db)
+                    );
+                    reporter.report_checked_file(db, file, &[]);
+                    return;
+                }
 
                 let check_file_span =
                     tracing::debug_span!(parent: &project_span, "check_file", ?file);
@@ -766,6 +777,13 @@ impl Project {
     ///
     /// This is a no-op if the project files haven't been indexed yet.
     fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<Diagnostic>) {
+        // Check before acquiring a mutable index, which cancels pending queries.
+        match self.file_set(db).get() {
+            Index::Lazy(_) => return,
+            Index::Indexed(index) if index.diagnostics() == diagnostics => return,
+            Index::Indexed(_) => {}
+        }
+
         let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
             return;
         };
@@ -819,6 +837,16 @@ impl Project {
         }
     }
 
+    /// Returns the scripts whose uv environments need preparing at startup or after a reload.
+    pub fn scripts_to_synchronize(self, db: &dyn Db) -> Vec<File> {
+        // Discovering scripts reads every project file. Keep the index lazy when
+        // no environment synchronization will be requested.
+        if self.metadata(db).script_uv_override() == Some(false) {
+            return Vec::new();
+        }
+        self.script_files(db).iter().collect()
+    }
+
     fn reload_files(self, db: &mut dyn Db) {
         tracing::debug!("Reloading files for project `{}`", self.name(db));
 
@@ -849,6 +877,7 @@ impl Project {
             .iter()
             .map(OptionDiagnostic::to_diagnostic)
             .chain(uv_diagnostic)
+            .chain(baseline::settings_diagnostic(db))
             .collect()
     }
 }
@@ -873,7 +902,7 @@ impl ScriptFiles<'_> {
 }
 
 fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
-    if !db.should_check_file(file) {
+    if !db.should_check_file(file) || db.uv_environments().is_initialization_pending(db, file) {
         return Vec::new();
     }
 
@@ -886,8 +915,9 @@ fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 ///
 /// Scripts with invalid configuration still produce configuration diagnostics and retain a program
 /// for editor operations, but their semantic diagnostics must not be reported.
+/// Call this outside Salsa queries because uv initialization progress is untracked.
 pub fn should_check_semantics(db: &dyn Db, file: File) -> bool {
-    if !db.should_check_file(file) {
+    if !db.should_check_file(file) || db.uv_environments().is_initialization_pending(db, file) {
         return false;
     }
 
@@ -1025,7 +1055,10 @@ pub(crate) fn check_file_impl(
             diagnostics.extend(dependency_diagnostic);
             Ok(diagnostics.into_boxed_slice())
         }) {
-            Ok(result) => result,
+            Ok(result) => result.map(|mut diagnostics| {
+                baseline::demote_diagnostics(*db, source_file, &mut diagnostics);
+                diagnostics
+            }),
             Err(diagnostic) => Ok(Box::new([diagnostic])),
         }
     }
@@ -1215,6 +1248,24 @@ mod tests {
             vec![] as Vec<String>
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn explicit_file_under_an_excluded_directory() -> ruff_db::system::Result<()> {
+        let root = SystemPathBuf::from("/project");
+        let path = root.join("dist/keep.py");
+        let mut db = TestDb::new(ProjectMetadata::new("test", root.clone()));
+        let project = db.project();
+        db.write_file(&path, "")?;
+        let file = system_path_to_file(&db, &path).unwrap();
+
+        project.set_included_paths(&mut db, vec![root, path]);
+        assert!(project.files(&db).contains(file));
+
+        project.set_force_exclude(&mut db, true);
+        project.reload_files(&mut db);
+        assert!(!project.files(&db).contains(file));
         Ok(())
     }
 

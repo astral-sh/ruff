@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 fuzz = "fuzz:main"
+generate-fuzz-corpus = "fuzz:generate_corpus"
 
 [build-system]
 requires = ["flit-core>=3.12,<5"]
@@ -27,7 +28,7 @@ dev = ["mypy", "ruff", "ty"]
 name = "fuzz"
 
 [tool.mypy]
-files = "fuzz.py"
+files = ["fuzz.py", "prepare_corpus.py"]
 pretty = true
 strict = true
 warn_unreachable = true
@@ -40,7 +41,7 @@ return-type-inference = "always"
 [tool.ty.rules]
 blanket-ignore-comment = "error"
 missing-type-argument = "error"
-unsound-return-statement = "error"
+unsound-return = "error"
 unsound-yield = "error"
 unsupported-dynamic-base = "error"
 division-by-zero = "error"

@@ -9,7 +9,8 @@ use crate::{
     types::{
         BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
         KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Parameters,
-        PropertyInstanceType, Signature, SubclassOfType, Type, TypeContext, TypeMapping,
+        PropertyInstanceType, SelfTypeVarOrigin, Signature, SubclassOfType, Type, TypeContext,
+        TypeMapping,
         class::{DynamicClassHeaderAnchor, DynamicClassScopeOffset, dynamic_class_header_range},
         definition_expression_type,
         member::Member,
@@ -30,26 +31,22 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     name: &str,
-    instance_ty: Type<'db>,
+    class: ClassType<'db>,
     fields: impl Iterator<Item = NamedTupleField<'db>>,
     inherited_generic_context: Option<GenericContext<'db>>,
 ) -> Option<Type<'db>> {
+    let instance_ty = Type::instance(db, env, class);
+    let origin = SelfTypeVarOrigin::Class(class.class_literal(db));
     match name {
         "__new__" => {
             // __new__(cls, field1, field2, ...) -> Self
             let self_typevar = BoundTypeVarInstance::synthetic_self(
                 db,
+                origin,
                 instance_ty,
                 BindingContext::Synthetic(env.program(db)),
             );
             let self_ty = Type::TypeVar(self_typevar);
-
-            let variables = inherited_generic_context
-                .iter()
-                .flat_map(|ctx| ctx.variables(db))
-                .chain(std::iter::once(self_typevar));
-
-            let generic_context = GenericContext::from_typevar_instances(db, env, variables);
 
             // CPython generates namedtuple `__new__` as `(_cls, field1, ...)` so field names like
             // `cls` remain usable as keyword arguments at call sites.
@@ -64,10 +61,11 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             }));
 
             let signature = Signature::new_generic(
-                Some(generic_context),
+                inherited_generic_context,
                 Parameters::standard(parameters),
                 self_ty,
-            );
+            )
+            .with_inferable_self(db, env, self_typevar);
             Some(Type::function_like_callable(db, signature))
         }
         "__match_args__" => {
@@ -93,14 +91,16 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                 return None;
             }
 
-            // _replace(self, *, field1=..., field2=...) -> Self
-            let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+            // _replace(self, /, *, field1=..., field2=...) -> Self
+            let self_typevar = BoundTypeVarInstance::synthetic_self(
                 db,
+                origin,
                 instance_ty,
                 BindingContext::Synthetic(env.program(db)),
-            ));
+            );
+            let self_ty = Type::TypeVar(self_typevar);
 
-            let first_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
+            let first_parameter = Parameter::positional_only(Some(Name::new_static("self")))
                 .with_annotated_type(self_ty);
 
             let parameters = std::iter::once(first_parameter).chain(fields.map(|field| {
@@ -110,7 +110,8 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                     .with_definition(field.definition)
             }));
 
-            let signature = Signature::new(Parameters::standard(parameters), self_ty);
+            let signature = Signature::new(Parameters::standard(parameters), self_ty)
+                .with_inferable_self(db, env, self_typevar);
             Some(Type::function_like_callable(db, signature))
         }
         "__init__" => {
@@ -248,7 +249,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     #[salsa::tracked(
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
-        cycle_initial=|db, _, self_: DynamicNamedTupleLiteral<'db>| Mro::from_error(
+        cycle_initial=|db, _, _, self_: DynamicNamedTupleLiteral<'db>| Mro::from_error(
             db,
             &ProgramEnvironment::from_scope(self_.scope(db)),
             ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(self_)),
@@ -398,6 +399,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                                 db,
                                 env,
                                 &TypeMapping::ReplaceSelf {
+                                    new_origin: SelfTypeVarOrigin::Class(self.into()),
                                     new_upper_bound: instance_ty,
                                 },
                                 TypeContext::default(),
@@ -412,7 +414,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             db,
             env,
             name,
-            instance_ty,
+            ClassType::NonGeneric(self.into()),
             self.fields(db).iter().cloned(),
             None,
         );
@@ -430,6 +432,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                     db,
                     env,
                     &TypeMapping::ReplaceSelf {
+                        new_origin: SelfTypeVarOrigin::Class(self.into()),
                         new_upper_bound: instance_ty,
                     },
                     TypeContext::default(),
@@ -441,7 +444,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     fn spec(self, db: &'db dyn Db) -> NamedTupleSpec<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|db, _, _| NamedTupleSpec::unknown(db),
+            cycle_initial=|db, _, _, _| NamedTupleSpec::unknown(db),
             heap_size=ruff_memory_usage::heap_size
         )]
         fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> NamedTupleSpec<'db> {

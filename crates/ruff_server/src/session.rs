@@ -294,7 +294,7 @@ mod tests {
         let mut session = Session {
             index: Index::default(),
             position_encoding: PositionEncoding::default(),
-            global_settings: options.into_settings(client),
+            global_settings: options.into_settings(client, None),
             workspace_trust,
             resolved_client_capabilities: Arc::default(),
             request_queue: RequestQueue::new(),

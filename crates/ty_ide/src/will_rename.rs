@@ -1,0 +1,2469 @@
+//! Computes source edits for Python file and package directory renames.
+//!
+//! ## Overview
+//!
+//! [`will_rename_files`] maps filesystem renames to module names, then computes edits for import
+//! statements and references in indexed project files.
+//!
+//! EXAMPLE:
+//!
+//! When `pkg/old.py` is renamed to `pkg/new.py`, the following code:
+//!
+//! ```python
+//! from pkg import old
+//! print(old.C)
+//! ```
+//!
+//! is updated like so:
+//!
+//! ```python
+//! from pkg import new
+//! print(new.C)
+//! ```
+//!
+//! [`will_rename_files`] computes edits over all files in parallel using [`edits_for_file`]. That
+//! computes edits for a single file in two AST passes:
+//!
+//! 1. [`ImportStatementVisitor`] computes import statement edits and records which import
+//!    definitions change their bound names. For example, `from pkg import old` becoming
+//!    `from pkg import new` records the import definition's `old` to `new` change. Conversely,
+//!    an import statement that uses an explicit alias (e.g. `from pkg import new as old`)
+//!    preserves the bound name, so it produces no such mapping.
+//! 2. [`ModuleReferenceVisitor`] updates references to those definitions, using reaching
+//!    definitions to distinguish them from unrelated bindings with the same spelling. It also
+//!    updates module attributes, such as `pkg.old` becoming `pkg.new`.
+//!
+//! Function bodies can reference imports that appear later in the file. The first pass therefore
+//! collects all bound name changes before the second pass computes reference edits. Both passes'
+//! edits are combined to produce the final result.
+//!
+//! ## Terminology
+//!
+//! Below is the anatomy of the two types of import statement.
+//!
+//! A "plain" import statement:
+//!
+//! ```text
+//!              Alias
+//!        +---------------+
+//! import pkg.old as stable
+//!        |          |
+//!        |          explicit alias
+//!        imported name
+//! ```
+//!
+//! and an "import-from" statement:
+//!
+//! ```text
+//!                       Alias
+//!                   +-----------+
+//! from ..pkg import old as stable
+//!      | |            |      |
+//!      | module name  |      explicit alias
+//!      |              imported name
+//!      |
+//!      import level
+//! ```
+//!
+//! From there, we can layer on a few additional terms.
+//!
+//! | Term | Meaning | Example |
+//! | --- | --- | --- |
+//! | Bound name | A name introduced by an import. | `stable` in both diagrams. |
+//! | Module reference | The use of a module in an expression. | `old` in `old.C`; `pkg.old` in `pkg.old.C`. |
+//! | Re-export | A name that a module imports from elsewhere and makes available through its own namespace. | `facade.py`: `from pkg import old`; elsewhere: `from facade import old`. |
+//! | Imported name edit | Replacement of an imported name. | `import old` → `import new`, `import pkg.old` → `import pkg.new` |
+//! | Module name edit | Replacement of the module name in an import-from statement. | `from old import C` → `from new import C`. |
+//! | Bound name change | Change to a bound name caused by an imported name edit. | `old` → `new`; no bound name change for an explicit alias like `as stable`. |
+//! | Reference edit | Replacement at a module reference. | `old.C` → `new.C`. |
+//! | Source edit | Source range and replacement text. | Range of `old`, replacement `new`. |
+//!
+//! The above terms are used consistently throughout this module.
+
+use std::borrow::Cow;
+
+use crate::RangedValue;
+use itertools::Itertools;
+use rayon::prelude::*;
+use ruff_db::files::{File, FileError, FileRange, directory_listing, system_path_to_file};
+use ruff_db::source::source_text;
+use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_python_ast::statement_visitor::{self, StatementVisitor};
+use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
+use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_trivia::NameMatcher;
+use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::{FxHashMap, FxHashSet};
+use ty_module_resolver::{
+    Module, ModuleName, ModuleResolveMode, ResolverEnvironment, ResolverFile, file_to_module,
+    resolve_module_confident, resolve_real_module_confident, search_paths,
+};
+use ty_project::{Db, parallel::ParallelIteratorExt};
+use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_semantic::types::Type;
+use ty_python_semantic::{DefinitionResolution, HasType, SemanticModel};
+
+/// Computes source edits for a batch of Python file and package directory renames.
+///
+/// The following types of rename request are not yet supported:
+///
+/// - A request that changes a module parent (e.g., renaming `a.old` to `b.new` or `new`)
+/// - A request that moves a package directory to a different filesystem parent
+/// - A request that renames an `__init__.py` or `__init__.pyi` file
+/// - A request that changes the extension of a module (e.g., from `.py` to `.pyi`)
+/// - A request that renames one directory of a namespace package spread across multiple search
+///   paths
+/// - Requests in a batch that give multiple modules the same new import name
+///
+/// When a rename batch contains both supported and unsupported requests, the unsupported requests
+/// are skipped while the supported ones produce edits as normal.
+///
+/// The returned edits refer to the original files and source ranges. The caller must sort the edits
+/// and handle duplicates and overlaps before applying them.
+///
+/// ## Unsupported edits
+///
+/// Even for supported renames, some occurrences are not updated:
+///
+/// - Name references supplied by star imports, such as `from pkg import *`. Whether the renamed
+///   binding remains exported depends on `__all__`, visibility rules, and further re-exports.
+/// - Names in `global` and `nonlocal` scope declarations, and references whose resolution crosses
+///   those declarations. A scope declaration also governs writes of unrelated values, so changing
+///   it requires a coordinated symbol rename across scopes.
+/// - Names and attributes being assigned to or deleted. Assignments may replace the imported value,
+///   and ordinary read lookup can fall back to an outer binding that a deletion would not affect.
+///   Receiver expressions can still be updated.
+/// - Names in ordinary strings, including `__all__` entries and dynamic imports (although module
+///   references in string annotations are supported). Such strings can be computed at runtime,
+///   and matching their text does not establish that they refer to the renamed module or binding.
+///
+/// Other edits may still be returned, so an import can be updated while a reference to its old
+/// name remains unchanged.
+///
+/// Additionally, an ambiguous imported name is left unchanged even when other names in the same
+/// import-from statement are updated. For example, suppose we rename `old.py` to `new.py` and
+/// `other.py` to `another.py`:
+///
+/// ```python
+/// # facade.py
+/// import old
+/// import other
+/// if flag:
+///     old = 0
+///
+/// # use.py
+/// from facade import other, old
+/// ```
+///
+/// In the import from `facade`, `old` may or may not refer to the renamed module, so it is left
+/// unchanged. The import becomes `from facade import another, old`.
+pub fn will_rename_files(db: &dyn Db, renames: &[FileRename]) -> Vec<FileRenameEdit> {
+    let module_name_changes = ModuleNameChanges::new(db, renames);
+    if module_name_changes.is_empty() {
+        return Vec::new();
+    }
+
+    let files: Vec<_> = db.project().files(db).iter().collect();
+    files
+        .into_par_iter()
+        .map_with_db(db, |db, file| {
+            edits_for_file(db, file, &module_name_changes)
+        })
+        .flatten()
+        .collect()
+}
+
+/// One file or directory rename in a batch.
+pub struct FileRename {
+    /// The source path before the rename.
+    pub old_path: SystemPathBuf,
+    /// The destination path, which need not exist yet.
+    pub new_path: SystemPathBuf,
+}
+
+/// A replacement and the file range containing it.
+pub type FileRenameEdit = RangedValue<String>;
+
+/// Maps old module names to new module names for supported renames.
+struct ModuleNameChanges<'db> {
+    /// Tracks old and new name information for each module or package in the rename batch.
+    module_renames: FxHashMap<&'db ModuleName, ModuleRename>,
+    /// Whether the batch contains package directory renames.
+    ///
+    /// File renames match only exact module names. When this is false, a lookup for `pkg.sub.module`
+    /// can skip checking its package prefixes `pkg.sub` and `pkg` for renames.
+    has_package_renames: bool,
+    // The old name components that change across the batch. For example, renaming `app/tools/old.py`
+    // to `app/tools/new.py` and `app/legacy/util/` to `app/legacy/shared/` records `old` and `util`.
+    renamed_module_name_components: FxHashSet<&'db str>,
+    // Text matchers used to skip source files that cannot contain these components.
+    renamed_component_matchers: Vec<NameMatcher<'db>>,
+}
+
+impl<'db> ModuleNameChanges<'db> {
+    fn new(db: &'db dyn Db, renames: &[FileRename]) -> Self {
+        let module_renames = validate_renames(db, renames);
+        let has_package_renames = module_renames
+            .values()
+            .any(|rename| matches!(rename, ModuleRename::Package(_)));
+        let renamed_module_name_components: FxHashSet<&'db str> = module_renames
+            .keys()
+            .map(|name| name.last_component())
+            .collect();
+        let renamed_component_matchers = renamed_module_name_components
+            .iter()
+            .map(|&component| NameMatcher::new(component))
+            .collect();
+        Self {
+            module_renames,
+            has_package_renames,
+            renamed_module_name_components,
+            renamed_component_matchers,
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.module_renames.is_empty()
+    }
+
+    /// Returns the new name of a resolved module affected by this batch.
+    ///
+    /// An exact file rename takes precedence over any directory rename that matches a prefix of the
+    /// same module name. Otherwise, a matching directory rename replaces the package prefix of the
+    /// module name and keeps its suffix (e.g., `pkg.old.helpers` becomes `pkg.new.helpers`).
+    fn new_module_name(
+        &self,
+        model: &SemanticModel<'db>,
+        module: Module<'db>,
+    ) -> Option<Cow<'_, ModuleName>> {
+        let name = module.name(model.db());
+
+        if let Some(ModuleRename::File(new_name)) = self.module_renames.get(name) {
+            return Some(Cow::Borrowed(new_name));
+        }
+
+        if !self.has_package_renames {
+            return None;
+        }
+
+        // Walk from the full name toward its parents. Use the longest matching prefix whose
+        // renamed directory supplies the resolved module.
+        for prefix in name.ancestors() {
+            let Some(ModuleRename::Package(rename)) = self.module_renames.get(&prefix) else {
+                continue;
+            };
+
+            if !rename.moves_module(model, module) {
+                continue;
+            }
+
+            let Some(suffix) = name.relative_to(&prefix) else {
+                return Some(Cow::Borrowed(&rename.new_prefix));
+            };
+
+            return Some(Cow::Owned(rename.new_prefix.join(&suffix)));
+        }
+
+        None
+    }
+
+    fn is_renamed_component(&self, component: &str) -> bool {
+        self.renamed_module_name_components.contains(component)
+    }
+
+    /// Returns whether the source may need edits for these module name changes.
+    fn may_affect_source(&self, source: &str) -> bool {
+        self.renamed_component_matchers
+            .iter()
+            .any(|matcher| matcher.may_match(source))
+    }
+}
+
+/// A validated file or package directory rename.
+enum ModuleRename {
+    File(ModuleName),
+    Package(PackageRename),
+}
+
+struct PackageRename {
+    /// The source directory whose modules and subpackages move with this rename.
+    old_directory: SystemPathBuf,
+    /// The destination package name, which replaces the old prefix in affected module names.
+    new_prefix: ModuleName,
+}
+
+impl PackageRename {
+    /// Returns whether the module resolves entirely within the directory being renamed.
+    ///
+    /// For instance, this is false when the rename targets only one directory of a namespace package
+    /// split across several locations.
+    fn moves_module<'db>(&self, model: &SemanticModel<'db>, module: Module<'db>) -> bool {
+        let db = model.db();
+        let environment = model.program_file().resolver_environment(db);
+        let Some(target) = resolve_module_for_rename(db, environment, module.name(db)) else {
+            return false;
+        };
+
+        if let Some(file) = target.module.file(db) {
+            return file
+                .path(db)
+                .as_system_path()
+                .is_some_and(|path| path.starts_with(&self.old_directory));
+        }
+
+        target.package_directories(db).is_some_and(|directories| {
+            directories
+                .iter()
+                .all(|path| path.starts_with(&self.old_directory))
+        })
+    }
+}
+
+/// Computes edits for one candidate file in two AST passes.
+///
+/// 1. [`ImportStatementVisitor`] extracts source edits and bound name changes from import
+///    statements.
+/// 2. [`ModuleReferenceVisitor`] computes edits to each reference to an imported module.
+///    Reaching definitions determine which module references need updating after a bound name change.
+///
+/// Computing import statement edits first lets us base reference edits on the bound name changes,
+/// accounting for explicit aliases and re-exports. A rejected imported name edit leaves its bound
+/// name unchanged.
+fn edits_for_file(
+    db: &dyn Db,
+    file: File,
+    module_name_changes: &ModuleNameChanges<'_>,
+) -> Vec<FileRenameEdit> {
+    let program_file = db.program_file(file);
+    let source = source_text(db, file);
+    if !module_name_changes.may_affect_source(&source) {
+        return Vec::new();
+    }
+
+    let parsed_module = ruff_db::parsed::parsed_module(db, program_file.python_file(db)).load(db);
+    let root = AnyNodeRef::from(parsed_module.syntax());
+    let model = SemanticModel::new(db, program_file);
+    let mut analyzer = ImportAnalyzer::new(db, module_name_changes);
+
+    let import_statement_changes = {
+        let mut import_statement_visitor = ImportStatementVisitor::new(&model, &mut analyzer);
+        import_statement_visitor.visit_body(parsed_module.suite());
+        import_statement_visitor.changes
+    };
+
+    let mut module_reference_visitor = ModuleReferenceVisitor::new(
+        db,
+        &model,
+        &source,
+        &import_statement_changes.bound_name_changes,
+        &mut analyzer,
+    );
+    root.visit_source_order(&mut module_reference_visitor);
+
+    let mut edits = import_statement_changes.edits;
+    edits.extend(module_reference_visitor.edits);
+    edits
+}
+
+/// Computes imported name and module name edits, and records bound name changes.
+///
+/// For example, renaming `pkg.old` to `pkg.new` changes
+///
+/// ```python
+/// import pkg.old
+/// ```
+///
+/// to
+///
+/// ```python
+/// import pkg.new
+/// ```
+///
+/// and
+///
+/// ```python
+/// from pkg.old import C
+/// ```
+///
+/// to
+///
+/// ```python
+/// from pkg.new import C
+/// ```
+///
+/// For the moment, the computed edits never change the form of an import statement. For instance,
+/// we never introduce an explicit alias where there wasn't one before, or change the import level in
+/// a relative import.
+///
+/// The visitor shares an [`ImportAnalyzer`] with the reference pass to reuse
+/// analysis as to how an import's bound name changes.
+struct ImportStatementVisitor<'a, 'db> {
+    model: &'a SemanticModel<'db>,
+    analyzer: &'a mut ImportAnalyzer<'db>,
+    changes: ImportStatementChanges<'db>,
+}
+
+impl<'a, 'db> ImportStatementVisitor<'a, 'db> {
+    fn new(model: &'a SemanticModel<'db>, analyzer: &'a mut ImportAnalyzer<'db>) -> Self {
+        Self {
+            model,
+            analyzer,
+            changes: ImportStatementChanges::default(),
+        }
+    }
+
+    /// Computes imported name edits for a plain import statement, such as `import old` to `import new`.
+    fn edit_plain_import(&mut self, statement: &ast::StmtImport) {
+        for alias in &statement.names {
+            if let EditDecision::Yes(new_imported_name) = self
+                .analyzer
+                .should_edit_imported_name_for_plain_import(self.model, alias)
+            {
+                self.record_imported_name_edit(alias, new_imported_name);
+            }
+        }
+    }
+
+    /// Computes imported name and module name edits for an import-from statement.
+    ///
+    /// For example, `from pkg import old` becomes `from pkg import new`, and
+    /// `from pkg.old import C` becomes `from pkg.new import C`.
+    fn edit_import_from(&mut self, statement: &ast::StmtImportFrom) {
+        let Some(resolved_module) = self.model.resolve_module(
+            statement.module.as_ref().map(ast::Identifier::as_str),
+            statement.level,
+        ) else {
+            return;
+        };
+
+        let import_from_module_edit = self.import_from_module_edit(statement, resolved_module);
+
+        for alias in &statement.names {
+            if let EditDecision::Yes(new_imported_name) = self
+                .analyzer
+                .should_edit_imported_name_for_import_from(self.model, alias, resolved_module)
+            {
+                self.record_imported_name_edit(alias, new_imported_name);
+            }
+        }
+
+        // An import-from statement may still have a module name edit when no imported names change.
+        if let Some(import_from_module_edit) = import_from_module_edit {
+            self.changes.edits.push(import_from_module_edit);
+        }
+    }
+
+    /// Constructs a module name edit while preserving the import level.
+    fn import_from_module_edit(
+        &self,
+        statement: &ast::StmtImportFrom,
+        resolved_module: Module<'db>,
+    ) -> Option<FileRenameEdit> {
+        // This module name is independent of the import level; the leading dots are stored
+        // separately in `statement.level`.
+        let old_module_name = statement.module.as_ref()?;
+
+        let absolute_new_module_name = self
+            .analyzer
+            .module_name_changes
+            .new_module_name(self.model, resolved_module)?;
+
+        let written_component_count = old_module_name.as_str().split('.').count();
+        let omitted_component_count = absolute_new_module_name
+            .components()
+            .count()
+            .saturating_sub(written_component_count);
+
+        // A relative import needs no edit when it omits all renamed components (e.g.,
+        // `from .helpers import C` inside `pkg/old/` when that directory becomes `pkg/new/`).
+        if absolute_new_module_name
+            .components()
+            .skip(omitted_component_count)
+            .eq(old_module_name.as_str().split('.'))
+        {
+            return None;
+        }
+
+        let replacement = absolute_new_module_name
+            .components()
+            .skip(omitted_component_count)
+            .join(".");
+
+        Some(self.source_edit(old_module_name.range, replacement))
+    }
+
+    /// Records an imported name edit and any resulting bound name change.
+    ///
+    /// For example, renaming `pkg/old.py` to `pkg/new.py` changes the imported name `pkg.old` in
+    /// `import pkg.old` to `pkg.new`, but keeps the bound name `pkg`. Conversely, the same rename
+    /// changes the imported name `old` in `from pkg import old` to `new` and also changes the bound
+    /// name.
+    fn record_imported_name_edit(&mut self, alias: &ast::Alias, new_imported_name: String) {
+        if let Some(new_bound_name) = bound_name_replacement(alias, &new_imported_name) {
+            let definition =
+                ty_python_core::semantic_index(self.model.db(), self.model.program_file())
+                    .expect_single_definition(alias);
+            self.changes
+                .bound_name_changes
+                .insert(definition, new_bound_name.to_owned());
+        }
+
+        self.changes
+            .edits
+            .push(self.source_edit(alias.name.range, new_imported_name));
+    }
+
+    /// Constructs a source edit, such as replacing the imported name `old` with `new`.
+    fn source_edit(&self, range: TextRange, replacement: String) -> FileRenameEdit {
+        RangedValue {
+            range: FileRange::new(self.model.file(), range),
+            value: replacement,
+        }
+    }
+}
+
+impl<'a> StatementVisitor<'a> for ImportStatementVisitor<'a, '_> {
+    fn visit_stmt(&mut self, statement: &'a ast::Stmt) {
+        match statement {
+            ast::Stmt::Import(statement) => self.edit_plain_import(statement),
+            ast::Stmt::ImportFrom(statement) => self.edit_import_from(statement),
+            _ => statement_visitor::walk_stmt(self, statement),
+        }
+    }
+}
+
+/// Returns the new bound name if changing the imported name also changes its binding.
+fn bound_name_replacement<'name>(
+    alias: &ast::Alias,
+    new_imported_name: &'name str,
+) -> Option<&'name str> {
+    if alias.asname.is_some() {
+        return None;
+    }
+
+    // `import pkg.old` binds `pkg`, while `from pkg import old` binds `old`.
+    // The first component of the imported name gives the bound name in both cases.
+    let old_bound_name = first_component(alias.name.as_str());
+    let new_bound_name = first_component(new_imported_name);
+    (old_bound_name != new_bound_name).then_some(new_bound_name)
+}
+
+/// Retrieves the first component of an imported name: `pkg` for `pkg.old`, or `old` for `old`.
+fn first_component(imported_name: &str) -> &str {
+    imported_name
+        .split_once('.')
+        .map(|(first, _)| first)
+        .unwrap_or(imported_name)
+}
+
+type BoundNameChanges<'db> = FxHashMap<Definition<'db>, String>;
+
+#[derive(Default)]
+struct ImportStatementChanges<'db> {
+    /// Source edits to imported names and module names.
+    edits: Vec<FileRenameEdit>,
+    /// Maps import definitions to new bound names for reference edits.
+    bound_name_changes: BoundNameChanges<'db>,
+}
+
+/// Determines how file renames affect imported names and their bindings.
+///
+/// Bound name analysis follows re-exports and is cached by import definition.
+struct ImportAnalyzer<'db> {
+    db: &'db dyn Db,
+    module_name_changes: &'db ModuleNameChanges<'db>,
+    bound_name_decisions_by_import: FxHashMap<Definition<'db>, EditDecision>,
+    import_definitions_in_progress: FxHashSet<Definition<'db>>,
+    import_cycle_detected: bool,
+}
+
+impl<'db> ImportAnalyzer<'db> {
+    fn new(db: &'db dyn Db, module_name_changes: &'db ModuleNameChanges<'db>) -> Self {
+        Self {
+            db,
+            module_name_changes,
+            bound_name_decisions_by_import: FxHashMap::default(),
+            import_definitions_in_progress: FxHashSet::default(),
+            import_cycle_detected: false,
+        }
+    }
+
+    /// Chooses an imported name edit for a plain import statement (e.g., `pkg.old` to `pkg.new`
+    /// in the statement `import pkg.old`).
+    fn should_edit_imported_name_for_plain_import(
+        &self,
+        model: &SemanticModel<'db>,
+        alias: &ast::Alias,
+    ) -> EditDecision {
+        let Some(resolved_module) = model.resolve_module(Some(alias.name.as_str()), 0) else {
+            return EditDecision::No;
+        };
+
+        let Some(new_module_name) = self
+            .module_name_changes
+            .new_module_name(model, resolved_module)
+        else {
+            return EditDecision::No;
+        };
+
+        EditDecision::replace_if_changed(alias.name.as_str(), new_module_name.as_str())
+    }
+
+    /// Chooses an imported name edit for an import-from statement, including re-exports.
+    ///
+    /// For example, renaming `pkg.old` can change the imported name `old` in both
+    /// `from pkg import old` and `from facade import old` when `facade` re-exports `old`.
+    fn should_edit_imported_name_for_import_from(
+        &mut self,
+        model: &SemanticModel<'db>,
+        alias: &ast::Alias,
+        resolved_module: Module<'db>,
+    ) -> EditDecision {
+        if !self
+            .module_name_changes
+            .is_renamed_component(alias.name.as_str())
+        {
+            return EditDecision::No;
+        }
+
+        if let Some(imported_module) =
+            self.directly_imported_submodule(model, alias, resolved_module)
+        {
+            let Some(new_module_name) = self
+                .module_name_changes
+                .new_module_name(model, imported_module)
+            else {
+                return EditDecision::No;
+            };
+
+            return EditDecision::replace_if_changed(
+                alias.name.as_str(),
+                new_module_name.last_component(),
+            );
+        }
+
+        self.should_edit_module_member(model, resolved_module, alias.name.as_str())
+    }
+
+    /// Identifies an imported name that resolves to a direct submodule.
+    ///
+    /// For example, `old` in `from pkg import old` when it resolves to `pkg/old.py`.
+    fn directly_imported_submodule(
+        &self,
+        model: &SemanticModel<'db>,
+        alias: &ast::Alias,
+        resolved_module: Module<'db>,
+    ) -> Option<Module<'db>> {
+        let db = self.db;
+        let module_name = resolved_module.name(db);
+        let imported_module = resolved_module_for_node(model, alias)?;
+        let imported_module_name = imported_module.name(db);
+
+        if alias.name.as_str() != imported_module_name.last_component()
+            || imported_module_name.parent().as_ref() != Some(module_name)
+        {
+            return None;
+        }
+
+        // Without a package definition for `old`, `from pkg import old` imports `pkg.old`
+        // directly (for example, when `pkg/__init__.py` is empty).
+        if model
+            .definitions_for_module_global(resolved_module, alias.name.as_str())
+            .is_none()
+        {
+            return Some(imported_module);
+        }
+
+        // In `pkg/__init__.py`, `from . import old` imports `pkg.old` directly and defines
+        // the package's `old` bound name. Resolving that name as a re-export would analyze
+        // the same import again.
+        if file_to_module(db, model.program_file().resolver_file(db))
+            .is_some_and(|importing_module| importing_module.name(db) == module_name)
+        {
+            return Some(imported_module);
+        }
+
+        None
+    }
+
+    /// Decides whether to edit `bound_name` when it is imported from `resolved_module`
+    /// (e.g., `old` in `from facade import old`) or accessed as an attribute
+    /// (e.g., `old` in `facade.old`).
+    ///
+    /// This follows import definitions through re-exports. An explicit alias preserves the bound
+    /// name even when the imported name changes.
+    ///
+    /// A `Yes` decision requires every possible definition to produce the same replacement; `No`
+    /// requires every definition to preserve the name. Otherwise, the method returns `Omit`.
+    /// For example:
+    ///
+    /// ```python
+    /// # facade.py
+    /// if flag:
+    ///     from pkg import old
+    /// else:
+    ///     old = 1
+    /// ```
+    ///
+    /// Renaming `pkg.old` to `pkg.new` changes the imported name to `new`, but the assignment
+    /// keeps `old`. Neither name works in both branches, so the method returns `Omit` for `old`.
+    ///
+    /// Missing definitions and disagreements between a stub and its runtime module also lead to
+    /// `Omit`. If a cycle is detected, this method returns `Omit` without caching the affected
+    /// bound name changes.
+    fn should_edit_module_member(
+        &mut self,
+        model: &SemanticModel<'db>,
+        resolved_module: Module<'db>,
+        bound_name: &str,
+    ) -> EditDecision {
+        // A cycle in one name must not affect the next name in the same import statement.
+        if self.import_definitions_in_progress.is_empty() {
+            self.import_cycle_detected = false;
+        }
+
+        let db = self.db;
+        let decision = self.should_edit_member_in_module(model, resolved_module, bound_name);
+        if decision == EditDecision::Omit {
+            return decision;
+        }
+
+        // A stub can expose a different bound name;
+        // propagate only those changes that both facets agree on.
+        if let Some(runtime_module) =
+            resolve_real_module_confident(db, resolver_environment(db), resolved_module.name(db))
+            && runtime_module.file(db) != resolved_module.file(db)
+            && self.should_edit_member_in_module(model, runtime_module, bound_name) != decision
+        {
+            return EditDecision::Omit;
+        }
+
+        decision
+    }
+
+    fn should_edit_member_in_module(
+        &mut self,
+        model: &SemanticModel<'db>,
+        module: Module<'db>,
+        bound_name: &str,
+    ) -> EditDecision {
+        let Some(resolution) = model.definitions_for_module_global(module, bound_name) else {
+            return EditDecision::Omit;
+        };
+        let mut builder = EditDecisionBuilder::new(&resolution);
+
+        for &definition in resolution.definitions() {
+            if builder.edit_is_omitted() {
+                break;
+            }
+            builder.add(self.should_edit_arbitrary_definition(definition));
+        }
+
+        builder.finish()
+    }
+
+    fn should_edit_arbitrary_definition(&mut self, definition: Definition<'db>) -> EditDecision {
+        let db = self.db;
+        // An import in a non-indexed file keeps its bound name.
+        if !db.project().files(db).contains(definition.file(db)) {
+            return EditDecision::No;
+        }
+
+        let parsed_module = ruff_db::parsed::parsed_module(db, definition.python_file(db)).load(db);
+        let model = SemanticModel::new(db, definition.program_file(db));
+
+        match definition.kind(db) {
+            DefinitionKind::Import(import) => {
+                let alias = import.alias(&parsed_module);
+                self.should_edit_import_definition(definition, alias, |analyzer| {
+                    analyzer.should_edit_imported_name_for_plain_import(&model, alias)
+                })
+            }
+            DefinitionKind::ImportFrom(import) => {
+                let statement = import.import(&parsed_module);
+                let alias = import.alias(&parsed_module);
+                self.should_edit_import_definition(definition, alias, |analyzer| {
+                    let Some(resolved_module) = model.resolve_module(
+                        statement.module.as_ref().map(ast::Identifier::as_str),
+                        statement.level,
+                    ) else {
+                        return EditDecision::Omit;
+                    };
+
+                    analyzer.should_edit_imported_name_for_import_from(
+                        &model,
+                        alias,
+                        resolved_module,
+                    )
+                })
+            }
+            DefinitionKind::StarImport(_) | DefinitionKind::ImportFromSubmodule(_) => {
+                EditDecision::Omit
+            }
+            _ => EditDecision::No,
+        }
+    }
+
+    /// Determines and caches whether the bound name introduced by an import definition changes.
+    ///
+    /// Revisiting a definition while its analysis is in progress detects a cycle. Cyclic results
+    /// are not cached because their outcome can depend on where the analysis started.
+    fn should_edit_import_definition(
+        &mut self,
+        import_definition: Definition<'db>,
+        alias: &ast::Alias,
+        should_edit_imported_name: impl FnOnce(&mut Self) -> EditDecision,
+    ) -> EditDecision {
+        if self.import_cycle_detected {
+            return EditDecision::Omit;
+        }
+
+        if let Some(decision) = self.bound_name_decisions_by_import.get(&import_definition) {
+            return decision.clone();
+        }
+
+        if !self
+            .import_definitions_in_progress
+            .insert(import_definition)
+        {
+            self.import_cycle_detected = true;
+            return EditDecision::Omit;
+        }
+
+        let imported_name_decision = should_edit_imported_name(self);
+        self.import_definitions_in_progress
+            .remove(&import_definition);
+        if self.import_cycle_detected {
+            return EditDecision::Omit;
+        }
+
+        let decision = match imported_name_decision {
+            EditDecision::Yes(new_imported_name) => {
+                bound_name_replacement(alias, &new_imported_name)
+                    .map(|name| EditDecision::Yes(name.to_owned()))
+                    .unwrap_or(EditDecision::No)
+            }
+            // An omitted imported name edit leaves the binding unchanged.
+            EditDecision::No | EditDecision::Omit => EditDecision::No,
+        };
+        self.bound_name_decisions_by_import
+            .insert(import_definition, decision.clone());
+        decision
+    }
+}
+
+/// Computes reference edits for renamed modules.
+///
+/// For example, when `from pkg import old` becomes `from pkg import new`,
+/// this visitor computes an edit to change a module reference such as
+///
+/// ```python
+/// old.C
+/// ```
+///
+/// to
+///
+/// ```python
+/// new.C
+/// ```
+///
+/// It also rewrites module references through attributes: renaming `pkg.old`
+/// to `pkg.new` can change `pkg.old.C` to `pkg.new.C`.
+///
+/// For module references through names, reaching definitions connect each
+/// reference to the bound name changes recorded by [`ImportStatementVisitor`].
+/// For module references through attributes, the visitor uses module types and, when the receiver
+/// defines the attribute, [`ImportAnalyzer`] to decide whether and how to edit it.
+struct ModuleReferenceVisitor<'a, 'db> {
+    db: &'db dyn Db,
+    model: &'a SemanticModel<'db>,
+    source: &'a str,
+    bound_name_changes: &'a BoundNameChanges<'db>,
+    analyzer: &'a mut ImportAnalyzer<'db>,
+    edits: Vec<FileRenameEdit>,
+}
+
+impl<'a, 'db> ModuleReferenceVisitor<'a, 'db> {
+    fn new(
+        db: &'db dyn Db,
+        model: &'a SemanticModel<'db>,
+        source: &'a str,
+        bound_name_changes: &'a BoundNameChanges<'db>,
+        analyzer: &'a mut ImportAnalyzer<'db>,
+    ) -> Self {
+        Self {
+            db,
+            model,
+            source,
+            bound_name_changes,
+            analyzer,
+            edits: Vec::new(),
+        }
+    }
+
+    /// Chooses a reference edit for a name by considering the definitions that connect that name
+    /// to a bound name change from an import statement.
+    fn edit_name_reference(&mut self, name: &ast::ExprName) {
+        let Some(resolution) = self.model.reaching_definitions(name) else {
+            return;
+        };
+
+        if resolution.crosses_scope_declaration() {
+            // Renaming a name declared `global` or `nonlocal` also requires updating its
+            // declaration and writes; this is not yet supported.
+            return;
+        }
+
+        let mut builder = EditDecisionBuilder::new(&resolution);
+
+        for &definition in resolution.definitions() {
+            if builder.edit_is_omitted() {
+                break;
+            }
+            let decision = if matches!(definition.kind(self.db), DefinitionKind::StarImport(_)) {
+                // Module references introduced by star imports such as `from pkg import *`
+                // are unsupported.
+                EditDecision::Omit
+            } else if let Some(replacement) = self.bound_name_changes.get(&definition) {
+                EditDecision::Yes(replacement.clone())
+            } else {
+                EditDecision::No
+            };
+            builder.add(decision);
+        }
+
+        self.record_reference_edit(name.range(), builder.finish());
+    }
+
+    /// Chooses a reference edit for an attribute such as `pkg.old`.
+    ///
+    /// Both the attribute and its receiver must resolve to modules.
+    /// For attributes defined in the receiver's module, [`ImportAnalyzer`] determines
+    /// whether their names change.
+    fn edit_attribute_reference(&mut self, attribute: &ast::ExprAttribute) {
+        if !attribute.ctx.is_load() {
+            // Do not rewrite an attribute name that is assigned to or deleted.
+            // The visitor still traverses the receiver, so renaming `pkg.old` to `pkg.new`
+            // can change `pkg.old.VALUE = 1` to `pkg.new.VALUE = 1`.
+            return;
+        }
+
+        let Some(attribute_module) = resolved_module_for_node(self.model, attribute) else {
+            return;
+        };
+        let old_module_name = attribute_module.name(self.db);
+        let Some(new_module_name) = self
+            .analyzer
+            .module_name_changes
+            .new_module_name(self.model, attribute_module)
+        else {
+            return;
+        };
+        let Some(receiver_module) = resolved_module_for_node(self.model, &*attribute.value) else {
+            return;
+        };
+
+        let attribute_name = attribute.attr.as_str();
+
+        // Computes a necessary condition for rewriting a direct submodule reference.
+        //
+        // Consider this example (when we're renaming `pkg/old.py` to `pkg/new.py`):
+        //
+        // ```python
+        // holder.old = pkg.old # A
+        // print(holder.old)    # B
+        // ```
+        //
+        // For A, we want to rewrite `pkg.old` to `pkg.new`. There, `pkg.old`
+        // (the old module name) relative to `pkg` (the receiver) is `old`
+        // (the attribute name), so the attribute does indeed match the
+        // old module name and we should rewrite it.
+        //
+        // For B, we do not want to rewrite `holder.old` to `holder.new`, even though
+        // `holder.old` refers to the `pkg.old` module. There, `pkg.old` relative to
+        // `holder` is `None`, so the attribute does
+        // not match the old module name and we do not rewrite it.
+        let attribute_matches_old_module_name = old_module_name
+            .relative_to(receiver_module.name(self.db))
+            .is_some_and(|relative_name| relative_name.as_str() == attribute_name);
+
+        let decision = if self
+            .model
+            .definitions_for_module_global(receiver_module, attribute.attr.as_str())
+            .is_some()
+        {
+            self.analyzer.should_edit_module_member(
+                self.model,
+                receiver_module,
+                attribute.attr.as_str(),
+            )
+        } else if attribute_matches_old_module_name {
+            EditDecision::replace_if_changed(
+                attribute.attr.as_str(),
+                new_module_name.last_component(),
+            )
+        } else {
+            EditDecision::No
+        };
+
+        self.record_reference_edit(attribute.attr.range, decision);
+    }
+
+    /// Computes reference edits in string annotations, such as `value: 'old.C'`.
+    ///
+    /// Ordinary strings in `__all__ = ["old"]` or `importlib.import_module("pkg.old")`
+    /// are left unchanged.
+    fn edit_string_annotation_references(&mut self, string: &ast::ExprStringLiteral) {
+        // Skip strings that cannot mention a renamed component of an old module name before
+        // `SemanticModel::enter_string_annotation` queries the inferred types for the enclosing scope.
+        if !self
+            .analyzer
+            .module_name_changes
+            .may_affect_source(&self.source[string.range()])
+        {
+            return;
+        }
+
+        let Some((ast, model)) = self.model.enter_string_annotation(string) else {
+            return;
+        };
+        let mut visitor = ModuleReferenceVisitor::new(
+            self.db,
+            &model,
+            self.source,
+            self.bound_name_changes,
+            self.analyzer,
+        );
+        visitor.visit_expr(ast.expr());
+        self.edits.extend(visitor.edits);
+    }
+
+    /// Records a module reference edit.
+    fn record_reference_edit(&mut self, range: TextRange, decision: EditDecision) {
+        let EditDecision::Yes(replacement) = decision else {
+            return;
+        };
+        self.edits.push(RangedValue {
+            range: FileRange::new(self.model.file(), range),
+            value: replacement,
+        });
+    }
+}
+
+impl<'a> SourceOrderVisitor<'a> for ModuleReferenceVisitor<'a, '_> {
+    fn visit_expr(&mut self, expr: &'a ast::Expr) {
+        match expr {
+            ast::Expr::Name(name)
+                if name.ctx.is_load()
+                    && !self.bound_name_changes.is_empty()
+                    && self
+                        .analyzer
+                        .module_name_changes
+                        .is_renamed_component(name.id.as_str()) =>
+            {
+                self.edit_name_reference(name);
+            }
+            ast::Expr::Attribute(attribute)
+                if self
+                    .analyzer
+                    .module_name_changes
+                    .is_renamed_component(attribute.attr.as_str()) =>
+            {
+                self.edit_attribute_reference(attribute);
+            }
+            ast::Expr::StringLiteral(string) => {
+                self.edit_string_annotation_references(string);
+                return;
+            }
+            _ => {}
+        }
+        source_order::walk_expr(self, expr);
+    }
+}
+
+/// Combines edit decisions for a name's reachable definitions.
+///
+/// The edit is omitted when the definitions disagree or their resolution is incomplete. For
+/// example, if branches execute `from a import x` and `from b import x`, renaming `a.x` to `a.y`
+/// and `b.x` to `b.z` rewrites both imported names but leaves the module reference in a subsequent
+/// `print(x)` unchanged: neither `y` nor `z` works for both branches. Such partial results can
+/// require manual fixes.
+///
+/// Possible unboundness alone does not prevent edits: a conditional import can still establish
+/// the same replacement wherever the name is bound.
+struct EditDecisionBuilder {
+    decision: Option<EditDecision>,
+}
+
+impl EditDecisionBuilder {
+    fn new(resolution: &DefinitionResolution<'_>) -> Self {
+        Self {
+            decision: if resolution.identifies_all_bindings() {
+                None
+            } else {
+                Some(EditDecision::Omit)
+            },
+        }
+    }
+
+    fn edit_is_omitted(&self) -> bool {
+        self.decision == Some(EditDecision::Omit)
+    }
+
+    fn add(&mut self, decision: EditDecision) {
+        match &self.decision {
+            None => self.decision = Some(decision),
+            Some(previous) if previous != &decision => self.decision = Some(EditDecision::Omit),
+            Some(_) => {}
+        }
+    }
+
+    fn finish(self) -> EditDecision {
+        self.decision.unwrap_or(EditDecision::Omit)
+    }
+}
+
+#[derive(Clone, Eq, PartialEq)]
+enum EditDecision {
+    /// Preserve the imported name or module reference.
+    No,
+    /// Replace the imported name or module reference with this value.
+    Yes(String),
+    /// We cannot determine whether or how to change the name, so omit its edit.
+    Omit,
+}
+
+impl EditDecision {
+    /// Returns `Yes` if the names differ, or `No` if they match.
+    fn replace_if_changed(old: &str, new: &str) -> Self {
+        if old != new {
+            return Self::Yes(new.to_string());
+        }
+        Self::No
+    }
+}
+
+/// Returns the module name mappings for supported renames in a batch.
+fn validate_renames<'db>(
+    db: &'db dyn Db,
+    renames: &[FileRename],
+) -> FxHashMap<&'db ModuleName, ModuleRename> {
+    let mut module_renames = FxHashMap::default();
+    let mut destinations = FxHashMap::default();
+    let cwd = db.system().current_directory();
+
+    for rename in renames {
+        let old_path = SystemPath::absolute(&rename.old_path, cwd);
+        let new_path = SystemPath::absolute(&rename.new_path, cwd);
+        let destination = match system_path_to_file(db, &old_path) {
+            Ok(file) => {
+                let Some((old, new)) = validate_file_rename(db, file, &old_path, &new_path) else {
+                    continue;
+                };
+                module_renames.insert(old, ModuleRename::File(new));
+                new_path
+            }
+            Err(FileError::IsADirectory) => {
+                let Some((old, new)) = validate_package_rename(db, &old_path, &new_path) else {
+                    continue;
+                };
+                module_renames.insert(old, ModuleRename::Package(new));
+                new_path
+            }
+            Err(FileError::NotFound) => continue,
+        };
+
+        if renames.len() > 1 {
+            // Check every name a destination can have under the configured search roots. For
+            // example, with `/src` and `/` as search roots, `/src/new.py` can collide as `src.new`
+            // even if its rename rewrites imports to use `new`.
+            for name in module_names_for_path(db, &destination) {
+                destinations
+                    .entry(name)
+                    .and_modify(|is_conflicting| *is_conflicting = true)
+                    .or_insert(false);
+            }
+        }
+    }
+
+    // Drop every mapping whose destination import name is shared with another rename.
+    module_renames.retain(|_, rename| {
+        let new_name = match rename {
+            ModuleRename::File(name) => name,
+            ModuleRename::Package(rename) => &rename.new_prefix,
+        };
+        destinations.get(new_name) != Some(&true)
+    });
+
+    module_renames
+}
+
+/// Maps a supported file rename to distinct old and new module names.
+fn validate_file_rename<'db>(
+    db: &'db dyn Db,
+    file: File,
+    old_path: &SystemPath,
+    new_path: &SystemPath,
+) -> Option<(&'db ModuleName, ModuleName)> {
+    let resolver_environment = resolver_environment(db);
+    let extension = old_path.extension()?;
+
+    if !matches!(extension, "py" | "pyi")
+        || new_path.extension() != Some(extension)
+        || old_path.file_stem() == Some("__init__")
+        || new_path.file_stem() == Some("__init__")
+    {
+        return None;
+    }
+
+    let old_module_name =
+        file_to_module(db, ResolverFile::new(db, file, resolver_environment))?.name(db);
+
+    // A runtime module and its stub share a module name. Renaming only the stub
+    // must not redirect imports while the runtime module remains at its old path.
+    let target = resolve_module_for_rename(db, resolver_environment, old_module_name)?;
+    if target.module.file(db) != Some(file) {
+        return None;
+    }
+
+    let new_module_name = module_name_for_path(db, new_path)?;
+    if *old_module_name == new_module_name || old_module_name.parent() != new_module_name.parent() {
+        return None;
+    }
+
+    let destination_dir = new_path.parent()?;
+    let package_name = new_path.file_stem()?;
+    let package_dir = destination_dir.join(package_name);
+    if directory_listing(db, destination_dir)
+        .is_ok_and(|listing| listing.entry_is_directory(db, destination_dir, package_name))
+        && directory_listing(db, &package_dir)
+            .is_ok_and(|listing| listing.entry_is_file(db, &package_dir, "__init__.py"))
+    {
+        // Skip edits when a sibling package would shadow the renamed module.
+        return None;
+    }
+
+    Some((old_module_name, new_module_name))
+}
+
+/// Maps a supported package rename to its preferred old and new module names.
+fn validate_package_rename<'db>(
+    db: &'db dyn Db,
+    old_directory: &SystemPath,
+    new_directory: &SystemPath,
+) -> Option<(&'db ModuleName, PackageRename)> {
+    let new_parent_directory = new_directory.parent()?;
+    let new_basename = new_directory.file_name()?;
+
+    if old_directory.parent() != Some(new_parent_directory) {
+        return None;
+    }
+
+    if !directory_listing(db, new_parent_directory)
+        .is_ok_and(|listing| listing.file_type(new_basename).is_none())
+    {
+        return None;
+    }
+
+    let environment = resolver_environment(db);
+    let old_module_name = package_name_for_directory(db, old_directory)?;
+    let target = resolve_module_for_rename(db, environment, &old_module_name)?;
+    let directories = target.package_directories(db)?;
+
+    // Reject packages supplied by another directory or spread across search paths
+    // (because moving one portion of a namespace still leaves its old name importable).
+    if !matches!(directories.as_slice(), [directory] if directory.as_path() == old_directory) {
+        return None;
+    }
+
+    let new_module_name = package_name_for_directory(db, new_directory)?;
+
+    // Reject destination names already supplied by another module, even on a different search path.
+    if resolve_module_confident(db, environment, &new_module_name).is_some()
+        || resolve_real_module_confident(db, environment, &new_module_name).is_some()
+    {
+        return None;
+    }
+
+    Some((
+        target.module.name(db),
+        PackageRename {
+            old_directory: old_directory.to_path_buf(),
+            new_prefix: new_module_name,
+        },
+    ))
+}
+
+/// Derives a package name from the first applicable search path, preserving the directory's
+/// basename.
+fn package_name_for_directory(db: &dyn Db, directory: &SystemPath) -> Option<ModuleName> {
+    let basename = directory.file_name()?;
+
+    for search_path in search_paths(db, resolver_environment(db), ModuleResolveMode::Typing)
+        .filter(|search_path| !search_path.is_standard_library())
+    {
+        // A search root has no package name of its own; renaming it needs search-path updates.
+        if search_path.as_system_path() == Some(directory) {
+            return None;
+        }
+
+        let Some(module_name) = search_path.module_name_for_system_path(directory) else {
+            continue;
+        };
+
+        // Reject directories normalized to a different import name (e.g.,
+        // `foo-stubs` to `foo`).
+        if module_name.last_component() != basename {
+            return None;
+        }
+
+        return Some(module_name);
+    }
+
+    None
+}
+
+/// Derives a module name from the first applicable search path, without requiring the path to exist.
+fn module_name_for_path(db: &dyn Db, path: &SystemPath) -> Option<ModuleName> {
+    module_names_for_path(db, path).next()
+}
+
+fn module_names_for_path<'a>(
+    db: &'a dyn Db,
+    path: &'a SystemPath,
+) -> impl Iterator<Item = ModuleName> + 'a {
+    search_paths(db, resolver_environment(db), ModuleResolveMode::Typing)
+        .filter(|search_path| !search_path.is_standard_library())
+        .filter_map(move |search_path| search_path.module_name_for_system_path(path))
+}
+
+/// Locates a renamed module, preferring its runtime implementation over its typing definition.
+fn resolve_module_for_rename<'db>(
+    db: &'db dyn ty_module_resolver::Db,
+    resolver_environment: ResolverEnvironment<'db>,
+    module_name: &ModuleName,
+) -> Option<RenameTarget<'db>> {
+    resolve_real_module_confident(db, resolver_environment, module_name)
+        .map(|module| RenameTarget {
+            module,
+            mode: ModuleResolveMode::Runtime,
+        })
+        .or_else(|| {
+            resolve_module_confident(db, resolver_environment, module_name).map(|module| {
+                RenameTarget {
+                    module,
+                    mode: ModuleResolveMode::Typing,
+                }
+            })
+        })
+}
+
+/// A module selected for renaming and the resolution mode that selected it.
+struct RenameTarget<'db> {
+    module: Module<'db>,
+    mode: ModuleResolveMode,
+}
+
+impl RenameTarget<'_> {
+    /// Returns the package's directories using the mode that selected this rename target.
+    ///
+    /// Returns `None` for single-file modules.
+    fn package_directories(&self, db: &dyn ty_module_resolver::Db) -> Option<Vec<SystemPathBuf>> {
+        self.module.package_directories(db, self.mode)
+    }
+}
+
+fn resolver_environment(db: &dyn Db) -> ResolverEnvironment<'_> {
+    db.project().program(db).resolver_environment(db)
+}
+
+/// Returns the module represented by a node's inferred type, if it is a module literal.
+fn resolved_module_for_node<'db, T: HasType>(
+    model: &SemanticModel<'db>,
+    node: &T,
+) -> Option<Module<'db>> {
+    let Type::ModuleLiteral(literal) = node.inferred_type(model)? else {
+        return None;
+    };
+    Some(literal.module(model.db()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use insta::assert_snapshot;
+    use ruff_db::Db as _;
+    use ruff_db::diagnostic::{
+        Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, LintName, Severity,
+    };
+    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemVirtualPath};
+    use ruff_python_ast::PythonVersion;
+    use ruff_python_trivia::textwrap::dedent;
+    use ruff_text_size::Ranged;
+    use ty_module_resolver::{FallibleStrategy, SearchPathSettings};
+    use ty_project::{ProjectMetadata, TestDb};
+
+    #[test]
+    fn rewrites_alias_names_and_preserves_asnames_in_a_plain_import() {
+        let sources = &[
+            ("/pkg/__init__.py", ""),
+            ("/pkg/old.py", ""),
+            (
+                "/use.py",
+                "
+                import pkg.old
+                import pkg.old as stable
+                print(stable)
+                ",
+            ),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/pkg/old.py", "/pkg/new.py")], sources), @"
+        info[file-rename]: Rename edits (2)
+         --> use.py:2:8
+          |
+        2 | import pkg.old
+          |        ------- pkg.new
+        3 | import pkg.old as stable
+          |        ------- pkg.new
+        4 | print(stable)
+          |
+        ");
+    }
+
+    #[test]
+    fn rewrites_module_fields_and_alias_names_in_an_import_from() {
+        let sources = &[
+            ("/pkg/__init__.py", ""),
+            ("/pkg/old.py", "class C: ..."),
+            (
+                "/use.py",
+                "
+                from pkg.old import C
+                from pkg import old
+                print(C, old)
+                ",
+            ),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/pkg/old.py", "/pkg/new.py")], sources), @"
+        info[file-rename]: Rename edits (3)
+         --> use.py:2:6
+          |
+        2 | from pkg.old import C
+          |      ------- pkg.new
+        3 | from pkg import old
+          |                 --- new
+        4 | print(C, old)
+          |          --- new
+        ");
+    }
+
+    #[test]
+    fn preserves_import_levels_in_relative_import_from_statements() {
+        let sources = &[
+            ("/pkg/__init__.py", ""),
+            ("/pkg/old.py", "class C: ..."),
+            (
+                "/pkg/use.py",
+                "
+                from .old import C
+                from . import old
+                print(C, old.C)
+                ",
+            ),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/pkg/old.py", "/pkg/new.py")], sources), @"
+        info[file-rename]: Rename edits (3)
+         --> pkg/use.py:2:7
+          |
+        2 | from .old import C
+          |       --- new
+        3 | from . import old
+          |               --- new
+        4 | print(C, old.C)
+          |          --- new
+        ");
+    }
+
+    #[test]
+    fn renames_a_regular_package() {
+        let sources = &[
+            ("/old/__init__.py", ""),
+            ("/old/helpers.py", "VALUE = 1"),
+            (
+                "/use.py",
+                "
+                import old.helpers
+                print(old.helpers.VALUE)
+                ",
+            ),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/old", "/new")], sources), @"
+        info[file-rename]: Rename edits (2)
+         --> use.py:2:8
+          |
+        2 | import old.helpers
+          |        ----------- new.helpers
+        3 | print(old.helpers.VALUE)
+          |       --- new
+        ");
+    }
+
+    #[test]
+    fn renames_a_nested_namespace_package_and_preserves_relative_import_targets() {
+        let sources = &[
+            ("/outer/old/helpers.py", "VALUE = 1"),
+            (
+                "/outer/old/use.py",
+                "
+                from .helpers import VALUE
+                from ..old.helpers import VALUE as value_from_parent
+                ",
+            ),
+            (
+                "/use.py",
+                "
+                import outer.old.helpers
+                print(outer.old.helpers.VALUE)
+                ",
+            ),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/outer/old", "/outer/new")], sources), @"
+        info[file-rename]: Rename edits (3)
+         --> outer/old/use.py:3:8
+          |
+        2 | from .helpers import VALUE
+        3 | from ..old.helpers import VALUE as value_from_parent
+          |        ----------- new.helpers
+          |
+         ::: use.py:2:8
+          |
+        2 | import outer.old.helpers
+          |        ----------------- outer.new.helpers
+        3 | print(outer.old.helpers.VALUE)
+          |             --- new
+        ");
+    }
+
+    #[test]
+    fn renames_use_roots_in_configured_order() {
+        let mut db = test_db(&[
+            ("/project/src/old_pkg/__init__.py", ""),
+            ("/project/src/old_file.py", ""),
+            (
+                "/project/use.py",
+                "
+                import src.old_pkg
+                import src.old_file
+                ",
+            ),
+        ]);
+
+        // Using `/project` keeps `src` in the import names; `/project/src` would drop it.
+        set_search_paths(
+            &mut db,
+            &SearchPathSettings::new(vec!["/project".into(), "/project/src".into()]),
+        );
+
+        let renames = file_renames(&[
+            ("/project/src/old_pkg", "/project/src/new_pkg"),
+            ("/project/src/old_file.py", "/project/src/new_file.py"),
+        ]);
+        let edits = will_rename_files(&db, &renames);
+
+        assert_snapshot!(render_edits(&db, edits), @"
+        info[file-rename]: Rename edits (2)
+         --> project/use.py:2:8
+          |
+        2 | import src.old_pkg
+          |        ----------- src.new_pkg
+        3 | import src.old_file
+          |        ------------ src.new_file
+        ");
+    }
+
+    #[test]
+    fn renames_a_runtime_package_with_separate_stubs() {
+        let mut db = test_db(&[
+            ("/stubs/old/__init__.pyi", ""),
+            ("/stubs/old/helpers.pyi", "VALUE: int"),
+            ("/src/old/__init__.py", ""),
+            ("/src/old/helpers.py", "VALUE = 1"),
+            (
+                "/src/use.py",
+                "
+                import old.helpers
+                print(old.helpers.VALUE)
+                ",
+            ),
+        ]);
+        set_search_paths(
+            &mut db,
+            &SearchPathSettings::new(vec!["/stubs".into(), "/src".into()]),
+        );
+
+        let stub_renames = file_renames(&[("/stubs/old", "/stubs/new")]);
+        assert!(will_rename_files(&db, &stub_renames).is_empty());
+
+        let runtime_renames = file_renames(&[("/src/old", "/src/new")]);
+        let edits = will_rename_files(&db, &runtime_renames);
+
+        assert_snapshot!(render_edits(&db, edits), @"
+        info[file-rename]: Rename edits (2)
+         --> src/use.py:2:8
+          |
+        2 | import old.helpers
+          |        ----------- new.helpers
+        3 | print(old.helpers.VALUE)
+          |       --- new
+        ");
+    }
+
+    #[test]
+    fn renames_typing_only_descendants_of_a_package() {
+        let sources = &[
+            ("/old/__init__.py", ""),
+            ("/old/only_types.pyi", "class C: ..."),
+            ("/use.py", "from old.only_types import C"),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/old", "/new")], sources), @"
+        info[file-rename]: Rename edits (1)
+         --> use.py:1:6
+          |
+        1 | from old.only_types import C
+          |      -------------- new.only_types
+        ");
+    }
+
+    #[test]
+    fn rewrites_module_references_in_string_annotations() {
+        let sources = &[
+            ("/pkg/__init__.py", ""),
+            ("/pkg/old.py", "class C: ..."),
+            (
+                "/use.py",
+                "
+                import pkg.old
+                from pkg import old
+                from typing import Annotated
+                value: 'old.C'
+                metadata: 'Annotated[int, lambda old=old.C: old, [old for old in (old,)]]'
+                shadowed: 'Annotated[int, lambda pkg=pkg.old: pkg.old]'
+                runtime = 'old.C'
+                ",
+            ),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/pkg/old.py", "/pkg/new.py")], sources), @"
+        info[file-rename]: Rename edits (6)
+         --> use.py:2:8
+          |
+        2 | import pkg.old
+          |        ------- pkg.new
+        3 | from pkg import old
+          |                 --- new
+        4 | from typing import Annotated
+        5 | value: 'old.C'
+          |         --- new
+        6 | metadata: 'Annotated[int, lambda old=old.C: old, [old for old in (old,)]]'
+          |                                      --- new                      --- new
+        7 | shadowed: 'Annotated[int, lambda pkg=pkg.old: pkg.old]'
+          |                                          --- new
+        8 | runtime = 'old.C'
+          |
+        ");
+    }
+
+    #[test]
+    fn rewrites_imports_for_multiple_module_renames() {
+        let sources = &[
+            ("/old.py", ""),
+            ("/other.py", ""),
+            ("/first.py", "import old"),
+            ("/second.py", "import other"),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/old.py", "/new.py"), ("/other.py", "/another.py")], sources), @"
+        info[file-rename]: Rename edits (2)
+         --> first.py:1:8
+          |
+        1 | import old
+          |        --- new
+          |
+         ::: second.py:1:8
+          |
+        1 | import other
+          |        ----- another
+        ");
+    }
+
+    #[test]
+    fn edits_only_indexed_project_files() {
+        let mut db = test_db(&[
+            ("/old.py", ""),
+            (
+                "/included.py",
+                "
+                from not_a_candidate import old
+                import old as independent
+                print(old, independent)
+                ",
+            ),
+            ("/not_a_candidate.py", "import old\n"),
+        ]);
+        let not_indexed = system_path_to_file(&db, "/not_a_candidate.py").unwrap();
+        let virtual_path = SystemVirtualPath::new("untitled:consumer.py");
+        db.write_virtual_file(virtual_path, "import old");
+        let virtual_file = db.files().virtual_file(&db, virtual_path).file();
+
+        db.project()
+            .set_included_paths(&mut db, vec!["/old.py".into(), "/included.py".into()]);
+        db.project().open_file(&mut db, not_indexed);
+        db.project().open_file(&mut db, virtual_file);
+
+        let rename = file_renames(&[("/old.py", "/new.py")]);
+        let edits = will_rename_files(&db, &rename);
+        assert_snapshot!(render_edits(&db, edits), @"
+        info[file-rename]: Rename edits (1)
+         --> included.py:3:8
+          |
+        2 | from not_a_candidate import old
+        3 | import old as independent
+          |        --- new
+        4 | print(old, independent)
+          |
+        ");
+    }
+
+    #[test]
+    fn possibly_unbound_module_references_are_rewritten() {
+        let sources = &[
+            ("/old.py", ""),
+            (
+                "/use.py",
+                "
+                def f(flag):
+                    if flag:
+                        import old
+                    return old
+                ",
+            ),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/old.py", "/new.py")], sources), @"
+        info[file-rename]: Rename edits (2)
+         --> use.py:4:16
+          |
+        2 | def f(flag):
+        3 |     if flag:
+        4 |         import old
+          |                --- new
+        5 |     return old
+          |            --- new
+        ");
+    }
+
+    #[test]
+    fn rewrites_references_only_when_import_definitions_agree() {
+        let sources = &[
+            ("/a/__init__.py", ""),
+            ("/a/x.py", ""),
+            ("/b/__init__.py", ""),
+            ("/b/x.py", ""),
+            (
+                "/use.py",
+                "
+                if flag: from a import x
+                else: from b import x
+                print(x)
+                ",
+            ),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/a/x.py", "/a/y.py"), ("/b/x.py", "/b/y.py")], sources), @"
+        info[file-rename]: Rename edits (3)
+         --> use.py:2:24
+          |
+        2 | if flag: from a import x
+          |                        - y
+        3 | else: from b import x
+          |                     - y
+        4 | print(x)
+          |       - y
+        ");
+        assert_snapshot!(rename_edits(&[("/a/x.py", "/a/y.py"), ("/b/x.py", "/b/z.py")], sources), @"
+        info[file-rename]: Rename edits (2)
+         --> use.py:2:24
+          |
+        2 | if flag: from a import x
+          |                        - y
+        3 | else: from b import x
+          |                     - z
+        4 | print(x)
+          |
+        ");
+    }
+
+    #[test]
+    fn propagates_bound_name_changes_transitively_through_explicit_reexports() {
+        let sources = &[
+            ("/pkg/__init__.py", ""),
+            ("/pkg/old.py", ""),
+            ("/facade.py", "from pkg import old"),
+            ("/bridge.py", "from facade import old"),
+            ("/stable.py", "from pkg import old as old"),
+            (
+                "/use.py",
+                "
+                from bridge import old
+                import bridge, stable
+                print(old, bridge.old, stable.old)
+                ",
+            ),
+            (
+                "/star.py",
+                "
+                from bridge import *
+                old
+                ",
+            ),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/pkg/old.py", "/pkg/new.py")], sources), @"
+        info[file-rename]: Rename edits (6)
+         --> bridge.py:1:20
+          |
+        1 | from facade import old
+          |                    --- new
+          |
+         ::: facade.py:1:17
+          |
+        1 | from pkg import old
+          |                 --- new
+          |
+         ::: stable.py:1:17
+          |
+        1 | from pkg import old as old
+          |                 --- new
+          |
+         ::: use.py:2:20
+          |
+        2 | from bridge import old
+          |                    --- new
+        3 | import bridge, stable
+        4 | print(old, bridge.old, stable.old)
+          |       --- new     --- new
+        ");
+    }
+
+    #[test]
+    fn propagates_multiple_names_from_the_same_reexport_statement() {
+        let sources = &[
+            ("/old.py", ""),
+            ("/other.py", ""),
+            ("/facade.py", "import old, other"),
+            ("/use.py", "from facade import old, other"),
+        ];
+
+        assert_snapshot!(rename_edits(&[
+            ("/old.py", "/new.py"),
+            ("/other.py", "/another.py"),
+        ], sources), @"
+        info[file-rename]: Rename edits (4)
+         --> facade.py:1:8
+          |
+        1 | import old, other
+          |        ---  ----- another
+          |        |
+          |        new
+          |
+         ::: use.py:1:20
+          |
+        1 | from facade import old, other
+          |                    ---  ----- another
+          |                    |
+          |                    new
+        ");
+    }
+
+    #[test]
+    fn reexport_cycles_do_not_suppress_independent_edits() {
+        let sources = &[
+            ("/old.py", ""),
+            ("/other.py", ""),
+            (
+                "/a.py",
+                "
+                import old
+                from b import old, other
+                from safe import old as independent
+                print(old, other, independent)
+                ",
+            ),
+            (
+                "/b.py",
+                "
+                from a import old
+                import other
+                ",
+            ),
+            ("/safe.py", "import old"),
+            ("/use.py", "from a import old, other"),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/old.py", "/new.py"), ("/other.py", "/another.py")], sources), @"
+        info[file-rename]: Rename edits (7)
+         --> a.py:2:8
+          |
+        2 | import old
+          |        --- new
+        3 | from b import old, other
+          |                    ----- another
+        4 | from safe import old as independent
+          |                  --- new
+        5 | print(old, other, independent)
+          |            ----- another
+          |
+         ::: b.py:3:8
+          |
+        2 | from a import old
+        3 | import other
+          |        ----- another
+          |
+         ::: safe.py:1:8
+          |
+        1 | import old
+          |        --- new
+          |
+         ::: use.py:1:20
+          |
+        1 | from a import old, other
+          |                    ----- another
+        ");
+    }
+
+    #[test]
+    fn ambiguous_imported_names_do_not_suppress_independent_edits() {
+        let sources = &[
+            ("/old.py", ""),
+            ("/other.py", ""),
+            (
+                "/facade.py",
+                "
+                import other
+                if flag: import old
+                else: import other as old
+                ",
+            ),
+            (
+                "/use.py",
+                "
+                import facade
+                from bridge import other as indirect
+                from facade import other, old
+                print(other, old, indirect)
+                ",
+            ),
+            ("/bridge.py", "from facade import old, other"),
+        ];
+
+        assert_snapshot!(rename_edits(&[
+            ("/old.py", "/new.py"),
+            ("/other.py", "/another.py"),
+            ("/facade.py", "/renamed.py"),
+        ], sources), @"
+        info[file-rename]: Rename edits (10)
+         --> bridge.py:1:6
+          |
+        1 | from facade import old, other
+          |      ------ renamed     ----- another
+          |
+         ::: facade.py:2:8
+          |
+        2 | import other
+          |        ----- another
+        3 | if flag: import old
+          |                 --- new
+        4 | else: import other as old
+          |              ----- another
+          |
+         ::: use.py:2:8
+          |
+        2 | import facade
+          |        ------ renamed
+        3 | from bridge import other as indirect
+          |                    ----- another
+        4 | from facade import other, old
+          |      ------        ----- another
+          |      |
+          |      renamed
+        5 | print(other, old, indirect)
+          |       ----- another
+        ");
+    }
+
+    #[test]
+    fn preserves_assigned_attribute_names() {
+        let sources = &[
+            ("/pkg/__init__.py", ""),
+            ("/pkg/old.py", ""),
+            ("/holder.py", ""),
+            (
+                "/use.py",
+                "
+                import pkg.old
+                import holder
+                pkg.new = 42
+
+                # This reads pkg.old to find the object whose VALUE attribute is assigned.
+                pkg.old.VALUE = 1
+
+                # This assigns the old attribute; only the right side reads pkg.old.
+                pkg.old = pkg.old
+
+                holder.old = pkg.old
+                print(holder.old)
+                ",
+            ),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/pkg/old.py", "/pkg/new.py")], sources), @"
+        info[file-rename]: Rename edits (4)
+          --> use.py:2:8
+           |
+         2 | import pkg.old
+           |        ------- pkg.new
+         3 | import holder
+         4 | pkg.new = 42
+         5 |
+         6 | # This reads pkg.old to find the object whose VALUE attribute is assigned.
+         7 | pkg.old.VALUE = 1
+           |     --- new
+         8 |
+         9 | # This assigns the old attribute; only the right side reads pkg.old.
+        10 | pkg.old = pkg.old
+           |               --- new
+        11 |
+        12 | holder.old = pkg.old
+           |                  --- new
+        13 | print(holder.old)
+           |
+        ");
+    }
+
+    #[test]
+    fn reassignments_prevent_dependent_reference_rewrites() {
+        let sources = &[
+            ("/old.py", ""),
+            (
+                "/use.py",
+                "
+                import old
+                print(old)
+                if flag:
+                    old = 0
+                print(old)
+                del old
+                ",
+            ),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/old.py", "/new.py")], sources), @"
+        info[file-rename]: Rename edits (2)
+         --> use.py:2:8
+          |
+        2 | import old
+          |        --- new
+        3 | print(old)
+          |       --- new
+        4 | if flag:
+        5 |     old = 0
+        6 | print(old)
+        7 | del old
+          |
+        ");
+    }
+
+    #[test]
+    fn ignores_deletion_targets() {
+        let sources = &[
+            ("/old.py", ""),
+            ("/list.py", ""),
+            (
+                "/use.py",
+                "
+                import old
+                import list
+                if flag:
+                    del old
+                    del list
+                print(old)
+                del list
+                ",
+            ),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/old.py", "/new.py"), ("/list.py", "/renamed.py")], sources), @"
+        info[file-rename]: Rename edits (3)
+         --> use.py:2:8
+          |
+        2 | import old
+          |        --- new
+        3 | import list
+          |        ---- renamed
+        4 | if flag:
+        5 |     del old
+        6 |     del list
+        7 | print(old)
+          |       --- new
+        8 | del list
+          |
+        ");
+    }
+
+    #[test]
+    fn ignores_references_crossing_scope_declarations() {
+        let sources = &[
+            ("/old.py", ""),
+            (
+                "/use.py",
+                "
+                import old
+
+                def affected():
+                    global old
+                    print(old)
+
+                def sibling():
+                    return old
+
+                def outer():
+                    import old
+
+                    def inner():
+                        nonlocal old
+                        import old
+
+                        class Eager:
+                            value = old
+
+                        print(old)
+                ",
+            ),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/old.py", "/new.py")], sources), @"
+        info[file-rename]: Rename edits (4)
+          --> use.py:2:8
+           |
+         2 | import old
+           |        --- new
+         3 |
+         4 | def affected():
+         5 |     global old
+         6 |     print(old)
+         7 |
+         8 | def sibling():
+         9 |     return old
+           |            --- new
+        10 |
+        11 | def outer():
+        12 |     import old
+           |            --- new
+        13 |
+        14 |     def inner():
+        15 |         nonlocal old
+        16 |         import old
+           |                --- new
+        17 |
+        18 |         class Eager:
+        19 |             value = old
+        20 |
+        21 |         print(old)
+           |
+        ");
+    }
+
+    #[test]
+    fn runtime_file_rename_controls_edits_when_a_stub_exists() {
+        let sources = &[
+            ("/pkg/__init__.py", ""),
+            ("/pkg/old.py", ""),
+            ("/pkg/old.pyi", ""),
+            (
+                "/use.py",
+                "
+                from pkg import old
+                print(old)
+                ",
+            ),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/pkg/old.pyi", "/pkg/new.pyi")], sources), @"No edits");
+        let runtime_edits = rename_edits(&[("/pkg/old.py", "/pkg/new.py")], sources);
+        assert_snapshot!(runtime_edits, @"
+        info[file-rename]: Rename edits (2)
+         --> use.py:2:17
+          |
+        2 | from pkg import old
+          |                 --- new
+        3 | print(old)
+          |       --- new
+        ");
+        assert_eq!(
+            rename_edits(
+                &[
+                    ("/pkg/old.py", "/pkg/new.py"),
+                    ("/pkg/old.pyi", "/pkg/new.pyi"),
+                ],
+                sources,
+            ),
+            runtime_edits,
+        );
+    }
+
+    #[test]
+    fn conflicting_runtime_and_stub_bound_name_changes_prevent_reference_rewrites() {
+        let sources = &[
+            ("/pkg/__init__.py", "from . import old as old\n"),
+            ("/pkg/__init__.pyi", "from . import old\n"),
+            ("/pkg/old.py", ""),
+            (
+                "/use.py",
+                "
+                import pkg
+                print(pkg.old)
+                ",
+            ),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/pkg/old.py", "/pkg/new.py")], sources), @"
+        info[file-rename]: Rename edits (2)
+         --> pkg/__init__.py:1:15
+          |
+        1 | from . import old as old
+          |               --- new
+          |
+         ::: pkg/__init__.pyi:1:15
+          |
+        1 | from . import old
+          |               --- new
+        ");
+    }
+
+    #[test]
+    #[expect(
+        clippy::unicode_not_nfc,
+        reason = "The snapshot preserves the non-normalized identifier spelling."
+    )]
+    fn identifier_prefilters_preserve_unicode_identifier_matches() {
+        let sources = &[
+            ("/K·b.py", "class C: ..."),
+            (
+                "/use.py",
+                "
+                import \u{212a}·b
+                print(\u{212a}·b)
+                value: '\u{212a}·b.C'
+                ",
+            ),
+        ];
+
+        assert_snapshot!(rename_edits(&[("/K·b.py", "/new.py")], sources), @"
+        info[file-rename]: Rename edits (3)
+         --> use.py:2:8
+          |
+        2 | import K·b
+          |        --- new
+        3 | print(K·b)
+          |       --- new
+        4 | value: 'K·b.C'
+          |         --- new
+        ");
+    }
+
+    #[test]
+    fn omits_package_renames_with_a_shadowed_destination() {
+        assert_no_edits(
+            &[("/old", "/new")],
+            &[
+                ("/old/helpers.py", ""),
+                ("/new.py", ""),
+                ("/use.py", "import old.helpers"),
+            ],
+        );
+    }
+
+    #[test]
+    fn omits_package_and_file_renames_with_the_same_import_name() {
+        let mut db = test_db(&[
+            ("/src/old_pkg/__init__.py", ""),
+            ("/other/old_file.py", ""),
+            ("/src/use.py", "import old_pkg, old_file"),
+        ]);
+        set_search_paths(
+            &mut db,
+            &SearchPathSettings::new(vec!["/src".into(), "/other".into()]),
+        );
+
+        // Both destinations are importable as `new`, even though their filesystem paths differ.
+        let renames = file_renames(&[
+            ("/src/old_pkg", "/src/new"),
+            ("/other/old_file.py", "/other/new.py"),
+        ]);
+        let edits = will_rename_files(&db, &renames);
+
+        assert_eq!(render_edits(&db, edits), "No edits");
+    }
+
+    #[test]
+    fn omits_renames_of_one_portion_of_a_namespace_package() {
+        let mut db = test_db(&[
+            ("/old/left.py", ""),
+            ("/extra/old/right.py", ""),
+            ("/use.py", "import old.left"),
+        ]);
+        let mut search_paths = SearchPathSettings::new(vec!["/".into()]);
+        search_paths.extra_paths = vec!["/extra".into()];
+        set_search_paths(&mut db, &search_paths);
+
+        let renames = file_renames(&[("/old", "/new")]);
+        assert!(will_rename_files(&db, &renames).is_empty());
+    }
+
+    #[test]
+    fn omits_renames_that_change_the_module_parent() {
+        let sources = &[
+            ("/a/__init__.py", ""),
+            ("/a/old.py", ""),
+            ("/use.py", "from a import old"),
+        ];
+
+        assert_no_edits(&[("/a/old.py", "/b/new.py")], sources);
+    }
+
+    #[test]
+    fn omits_renames_of_package_initializers() {
+        let sources = &[("/old/__init__.py", ""), ("/use.py", "import old")];
+
+        assert_no_edits(&[("/old/__init__.py", "/new.py")], sources);
+    }
+
+    #[test]
+    fn omits_renames_whose_destination_is_shadowed_by_a_sibling_package() {
+        let sources = &[
+            ("/old.py", "VALUE = 1"),
+            ("/new/__init__.py", "VALUE = 2"),
+            ("/use.py", "import old\nprint(old.VALUE)"),
+        ];
+
+        assert_no_edits(&[("/old.py", "/new.py")], sources);
+    }
+
+    #[test]
+    fn preserves_unresolved_alias_names_in_a_plain_import() {
+        let sources = &[
+            ("/a/__init__.py", ""),
+            ("/a/old.py", ""),
+            ("/use.py", "import a.old.missing"),
+        ];
+
+        assert_no_edits(&[("/a/old.py", "/a/new.py")], sources);
+    }
+
+    #[test]
+    fn unsupported_file_renames_do_not_suppress_independent_edits() {
+        let sources = &[
+            ("/unsupported.py", ""),
+            ("/old.py", ""),
+            ("/use.py", "import old, unsupported"),
+        ];
+
+        assert_snapshot!(rename_edits(&[
+                ("/unsupported.py", "/renamed.pyi"),
+                ("/old.py", "/new.py"),
+            ], sources), @"
+        info[file-rename]: Rename edits (1)
+         --> use.py:1:8
+          |
+        1 | import old, unsupported
+          |        --- new
+        ");
+    }
+
+    /// Computes rename edits and shows their ranges and replacements in the original sources.
+    fn rename_edits(renames: &[(&str, &str)], sources: &[(&str, &str)]) -> String {
+        let db = test_db(sources);
+        let renames = file_renames(renames);
+        let edits = will_rename_files(&db, &renames);
+        render_edits(&db, edits)
+    }
+
+    fn render_edits(db: &TestDb, mut edits: Vec<FileRenameEdit>) -> String {
+        if edits.is_empty() {
+            return "No edits".to_string();
+        }
+        edits.sort_by(|left, right| {
+            left.range
+                .file()
+                .path(db)
+                .as_ref()
+                .cmp(right.range.file().path(db).as_ref())
+                .then_with(|| left.range.start().cmp(&right.range.start()))
+                .then_with(|| left.range.end().cmp(&right.range.end()))
+                .then_with(|| left.value.cmp(&right.value))
+        });
+        let mut diagnostic = Diagnostic::new(
+            DiagnosticId::Lint(LintName::of("file-rename")),
+            Severity::Info,
+            format!("Rename edits ({})", edits.len()),
+        );
+        let mut context = 0;
+        for edit in edits {
+            // Keep unchanged lines visible so omissions can be reviewed alongside replacements.
+            context = context.max(source_text(db, edit.range.file()).as_str().lines().count());
+            diagnostic.annotate(Annotation::secondary(edit.range.into()).message(edit.value));
+        }
+        diagnostic
+            .display(db, &DisplayDiagnosticConfig::new("ty").context(context))
+            .to_string()
+            .replace('\\', "/")
+    }
+
+    fn file_renames(paths: &[(&str, &str)]) -> Vec<FileRename> {
+        paths
+            .iter()
+            .map(|&(old_path, new_path)| FileRename {
+                old_path: old_path.into(),
+                new_path: new_path.into(),
+            })
+            .collect()
+    }
+
+    /// Asserts that the rename batch produces no source edits.
+    #[track_caller]
+    fn assert_no_edits(renames: &[(&str, &str)], sources: &[(&str, &str)]) {
+        assert_eq!(rename_edits(renames, sources), "No edits");
+    }
+
+    fn test_db(files: &[(&str, &str)]) -> TestDb {
+        let mut db = TestDb::new(ProjectMetadata::new("test", "/".into()));
+        db.set_python_version(PythonVersion::latest_ty());
+        db.write_files(files.iter().map(|(path, source)| (path, dedent(source))))
+            .unwrap();
+        db
+    }
+
+    fn set_search_paths(db: &mut TestDb, search_paths: &SearchPathSettings) {
+        let mut settings = db.project().program_settings(db).clone();
+        settings.search_paths = search_paths
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+            .unwrap();
+        db.project().update_program(db, settings);
+    }
+}

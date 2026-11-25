@@ -1,7 +1,8 @@
 use crate::{
     Db, ProgramEnvironment,
     types::{
-        BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, StaticClassLiteral, Type,
+        BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, SelfTypeVarOrigin,
+        StaticClassLiteral, Type,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
     },
 };
@@ -20,6 +21,7 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> Type<'db> {
         Type::TypeVar(BoundTypeVarInstance::synthetic_self(
             db,
+            SelfTypeVarOrigin::Class(self.into()),
             Type::instance(db, env, self.identity_specialization(db)),
             BindingContext::Definition(self.definition(db)),
         ))

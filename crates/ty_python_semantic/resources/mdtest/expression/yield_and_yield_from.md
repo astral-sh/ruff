@@ -304,7 +304,7 @@ def persons(f: bool) -> Generator[None, None, Person]:
     if f:
         return {"name": "Bob"}
     else:
-        # error: [invalid-return-type]
+        # error: [invalid-explicit-return]
         # error: [invalid-argument-type]
         return {"name": 42}
 ```
@@ -427,7 +427,7 @@ def invalid_yield() -> GeneratorAlias[int]:
 
 def invalid_return() -> GeneratorAlias[int]:
     yield 42
-    return "foo"  # error: [invalid-return-type]
+    return "foo"  # error: [invalid-explicit-return]
 
 type NestedGeneratorAlias[T] = GeneratorAlias[T]
 
@@ -438,7 +438,7 @@ type IteratorAlias[T] = Iterator[T]
 
 def invalid_iterator_return() -> IteratorAlias[int]:
     yield 42
-    return "foo"  # error: [invalid-return-type]
+    return "foo"  # error: [invalid-explicit-return]
 
 def aliased_iterator(inner: Generator[int, str, None]) -> IteratorAlias[int]:
     yield from inner
@@ -481,7 +481,7 @@ def recursive_generator(inner: Generator[str, bytes, None]) -> RecursiveGenerato
     # snapshot: invalid-yield
     yield "bad"
     yield from inner  # error: [invalid-yield]
-    return 42  # error: [invalid-return-type]
+    return 42  # error: [invalid-explicit-return]
 ```
 
 ```snapshot
@@ -581,11 +581,11 @@ error[invalid-yield]: Yield expression type does not match annotation
 ```py
 from typing import AsyncGenerator, Generator
 
-def returns_str() -> str:  # error: [invalid-return-type]
+def returns_str() -> str:  # error: [invalid-generator-return-type]
     x = yield 1
     reveal_type(x)  # revealed: Unknown
 
-def sync_returns_async_generator() -> AsyncGenerator[int, str]:  # error: [invalid-return-type]
+def sync_returns_async_generator() -> AsyncGenerator[int, str]:  # error: [invalid-generator-return-type]
     x = yield 1
     reveal_type(x)  # revealed: str
 ```
@@ -595,14 +595,14 @@ def sync_returns_async_generator() -> AsyncGenerator[int, str]:  # error: [inval
 ```py
 from typing import Generator
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def invalid_generator1() -> Generator[int, None, str]:
     yield 1
 
 def invalid_generator2() -> Generator[int, None, None]:
     yield 1
 
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return "done"
 ```
 
@@ -649,23 +649,23 @@ error[invalid-yield]: Send type does not match annotation
 from typing import Generator
 
 def non_gen() -> Generator[int, int, None]:
-    # snapshot: invalid-return-type
+    # snapshot: invalid-explicit-return
     return 1
 
 reveal_type(non_gen)  # revealed: def non_gen() -> Generator[int, int, None]
 ```
 
 ```snapshot
-error[invalid-return-type]: Return type does not match returned value
+error[invalid-explicit-return]: Return type does not match returned value
  --> src/mdtest_snippet.py:5:12
   |
 3 | def non_gen() -> Generator[int, int, None]:
   |                  ------------------------- Expected `Generator[int, int, None]` because of return type
-4 |     # snapshot: invalid-return-type
+4 |     # snapshot: invalid-explicit-return
 5 |     return 1
   |            ^ expected `Generator[int, int, None]`, found `Literal[1]`
 info: type `Literal[1]` is not assignable to protocol `Generator[int, int, None]`
-info: └── protocol member `__iter__` is not defined on type `Literal[1]`
+info: └── protocol member `__next__` is not defined on type `Literal[1]`
 ```
 
 ## *Unsound* yield expressions

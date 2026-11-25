@@ -1,32 +1,15 @@
 use insta::assert_debug_snapshot;
 
-use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
-use ruff_python_trivia::{BackwardsTokenizer, SimpleTokenKind};
-use ruff_python_trivia::{CommentRanges, SimpleToken, SimpleTokenizer, lines_after, lines_before};
+use ruff_python_trivia::{
+    SimpleToken, SimpleTokenKind, SimpleTokenizer, lines_after, lines_before,
+};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 struct TokenizationTestCase {
-    source: &'static str,
-    range: TextRange,
     tokens: Vec<SimpleToken>,
 }
 
 impl TokenizationTestCase {
-    fn assert_reverse_tokenization(&self) {
-        let mut backwards = self.tokenize_reverse();
-
-        // Re-reverse to get the tokens in forward order.
-        backwards.reverse();
-
-        assert_eq!(&backwards, &self.tokens);
-    }
-
-    fn tokenize_reverse(&self) -> Vec<SimpleToken> {
-        let parsed = parse_unchecked(self.source, ParseOptions::from(Mode::Module));
-        let comment_ranges = CommentRanges::from(parsed.tokens());
-        BackwardsTokenizer::new(self.source, self.range, &comment_ranges).collect()
-    }
-
     fn tokens(&self) -> &[SimpleToken] {
         &self.tokens
     }
@@ -35,11 +18,7 @@ impl TokenizationTestCase {
 fn tokenize_range(source: &'static str, range: TextRange) -> TokenizationTestCase {
     let tokens: Vec<_> = SimpleTokenizer::new(source, range).collect();
 
-    TokenizationTestCase {
-        source,
-        range,
-        tokens,
-    }
+    TokenizationTestCase { tokens }
 }
 
 fn tokenize(source: &'static str) -> TokenizationTestCase {
@@ -53,7 +32,6 @@ fn tokenize_trivia() {
     let test_case = tokenize(source);
 
     assert_debug_snapshot!(test_case.tokens());
-    test_case.assert_reverse_tokenization();
 }
 
 #[test]
@@ -63,7 +41,6 @@ fn tokenize_parentheses() {
     let test_case = tokenize(source);
 
     assert_debug_snapshot!(test_case.tokens());
-    test_case.assert_reverse_tokenization();
 }
 
 #[test]
@@ -73,31 +50,26 @@ fn tokenize_comma() {
     let test_case = tokenize(source);
 
     assert_debug_snapshot!(test_case.tokens());
-    test_case.assert_reverse_tokenization();
 }
 
 #[test]
 fn tokenize_eq() {
-    // Should tokenize as `==`, then `=`, regardless of whether we're lexing forwards or
-    // backwards.
+    // Should tokenize as `==`, then `=`.
     let source = "===";
 
     let test_case = tokenize(source);
 
     assert_debug_snapshot!(test_case.tokens());
-    test_case.assert_reverse_tokenization();
 }
 
 #[test]
 fn tokenize_not_eq() {
-    // Should tokenize as `!=`, then `=`, regardless of whether we're lexing forwards or
-    // backwards.
+    // Should tokenize as `!=`, then `=`.
     let source = "!==";
 
     let test_case = tokenize(source);
 
     assert_debug_snapshot!(test_case.tokens());
-    test_case.assert_reverse_tokenization();
 }
 
 #[test]
@@ -107,7 +79,6 @@ fn tokenize_continuation() {
     let test_case = tokenize(source);
 
     assert_debug_snapshot!(test_case.tokens());
-    test_case.assert_reverse_tokenization();
 }
 
 #[test]
@@ -117,7 +88,6 @@ fn tokenize_operators() {
     let test_case = tokenize(source);
 
     assert_debug_snapshot!(test_case.tokens());
-    test_case.assert_reverse_tokenization();
 }
 
 #[test]
@@ -127,8 +97,6 @@ fn tokenize_invalid_operators() {
     let test_case = tokenize(source);
 
     assert_debug_snapshot!(test_case.tokens());
-
-    // note: not reversible: [other, bogus, bogus] vs [bogus, bogus, other]
 }
 
 #[test]
@@ -137,7 +105,6 @@ fn tricky_unicode() {
 
     let test_case = tokenize(source);
     assert_debug_snapshot!(test_case.tokens());
-    test_case.assert_reverse_tokenization();
 }
 
 #[test]
@@ -146,7 +113,6 @@ fn identifier_ending_in_non_start_char() {
 
     let test_case = tokenize(source);
     assert_debug_snapshot!(test_case.tokens());
-    test_case.assert_reverse_tokenization();
 }
 
 #[test]
@@ -155,8 +121,6 @@ fn string_with_kind() {
 
     let test_case = tokenize(source);
     assert_debug_snapshot!(test_case.tokens());
-
-    // note: not reversible: [other, bogus] vs [bogus, other]
 }
 
 #[test]
@@ -165,8 +129,6 @@ fn string_with_byte_kind() {
 
     let test_case = tokenize(source);
     assert_debug_snapshot!(test_case.tokens());
-
-    // note: not reversible: [other, bogus] vs [bogus, other]
 }
 
 #[test]
@@ -191,8 +153,6 @@ fn string_with_invalid_kind() {
 
     let test_case = tokenize(source);
     assert_debug_snapshot!(test_case.tokens());
-
-    // note: not reversible: [other, bogus] vs [bogus, other]
 }
 
 #[test]
@@ -201,7 +161,6 @@ fn identifier_starting_with_string_kind() {
 
     let test_case = tokenize(source);
     assert_debug_snapshot!(test_case.tokens());
-    test_case.assert_reverse_tokenization();
 }
 
 #[test]
@@ -210,8 +169,6 @@ fn ignore_word_with_only_id_continuing_chars() {
 
     let test_case = tokenize(source);
     assert_debug_snapshot!(test_case.tokens());
-
-    // note: not reversible: [other, bogus, bogus] vs [bogus, bogus, other]
 }
 
 #[test]
@@ -221,7 +178,6 @@ fn tokenize_multichar() {
     let test_case = tokenize(source);
 
     assert_debug_snapshot!(test_case.tokens());
-    test_case.assert_reverse_tokenization();
 }
 
 #[test]
@@ -231,7 +187,6 @@ fn tokenize_substring() {
     let test_case = tokenize_range(source, TextRange::new(TextSize::new(14), source.text_len()));
 
     assert_debug_snapshot!(test_case.tokens());
-    test_case.assert_reverse_tokenization();
 }
 
 #[test]
@@ -243,7 +198,6 @@ fn tokenize_slash() {
     let test_case = tokenize(source);
 
     assert_debug_snapshot!(test_case.tokens());
-    test_case.assert_reverse_tokenization();
 }
 
 #[test]
@@ -255,80 +209,23 @@ fn tokenize_bogus() {
     let test_case = tokenize(source);
 
     assert_debug_snapshot!(test_case.tokens());
-    assert_debug_snapshot!("Reverse", test_case.tokenize_reverse());
 }
 
 #[test]
-fn single_quoted_multiline_string_containing_comment() {
-    let test_case = tokenize(
-        r"'This string contains a hash looking like a comment\
-# This is not a comment'",
+fn bogus_token_stays_within_requested_range() {
+    let source = "a!<<bbbb";
+    let range = TextRange::new(1.into(), 4.into());
+    let tokens: Vec<_> = SimpleTokenizer::new(source, range)
+        .map(|token| (token.kind, token.range))
+        .collect();
+
+    assert_eq!(
+        tokens,
+        [
+            (SimpleTokenKind::Other, TextRange::new(1.into(), 2.into())),
+            (SimpleTokenKind::Bogus, TextRange::new(2.into(), 4.into())),
+        ]
     );
-
-    assert_debug_snapshot!(test_case.tokenize_reverse());
-}
-
-#[test]
-fn single_quoted_multiline_string_implicit_concatenation() {
-    let test_case = tokenize(
-        r#"'This string contains a hash looking like a comment\
-# This is' "not_a_comment""#,
-    );
-
-    assert_debug_snapshot!(test_case.tokenize_reverse());
-}
-
-#[test]
-fn triple_quoted_multiline_string_containing_comment() {
-    let test_case = tokenize(
-        r"'''This string contains a hash looking like a comment
-# This is not a comment'''",
-    );
-
-    assert_debug_snapshot!(test_case.tokenize_reverse());
-}
-
-#[test]
-fn comment_containing_triple_quoted_string() {
-    let test_case = tokenize("'''leading string''' # a comment '''not a string'''");
-
-    assert_debug_snapshot!(test_case.tokenize_reverse());
-}
-
-#[test]
-fn comment_containing_single_quoted_string() {
-    let test_case = tokenize("'leading string' # a comment 'not a string'");
-
-    assert_debug_snapshot!(test_case.tokenize_reverse());
-}
-
-#[test]
-fn string_followed_by_multiple_comments() {
-    let test_case =
-        tokenize(r#"'a string # containing a hash " # and another hash ' # finally a comment"#);
-
-    assert_debug_snapshot!(test_case.tokenize_reverse());
-}
-
-#[test]
-fn string_with_escaped_quote() {
-    let test_case = tokenize(r"'a string \' # containing a hash ' # finally a comment");
-
-    assert_debug_snapshot!(test_case.tokenize_reverse());
-}
-
-#[test]
-fn string_with_double_escaped_backslash() {
-    let test_case = tokenize(r"'a string \\' # a comment '");
-
-    assert_debug_snapshot!(test_case.tokenize_reverse());
-}
-
-#[test]
-fn empty_string_literal() {
-    let test_case = tokenize(r"'' # a comment '");
-
-    assert_debug_snapshot!(test_case.tokenize_reverse());
 }
 
 #[test]
@@ -403,22 +300,4 @@ fn lines_after_with_comment_only_line() {
         lines_after(TextSize::new(6), "a = 20\n# some comment\nb = 10"),
         1
     );
-}
-
-#[test]
-fn test_previous_token_simple() {
-    let cases = &["x = (", "x = ( ", "x = (\n"];
-    for source in cases {
-        let token = BackwardsTokenizer::up_to(source.text_len(), source, &[])
-            .skip_trivia()
-            .next()
-            .unwrap();
-        assert_eq!(
-            token,
-            SimpleToken {
-                kind: SimpleTokenKind::LParen,
-                range: TextRange::new(TextSize::new(4), TextSize::new(5)),
-            }
-        );
-    }
 }

@@ -84,3 +84,178 @@ help: Replace with `a`
 20 + if 1 + (bool(a)):  # SIM208
 21 |     pass
    |
+
+SIM208 [*] Use `x in y` instead of `not (not x in y)`
+  --> SIM208.py:24:7
+   |
+23 | # https://github.com/astral-sh/ruff/issues/30414
+24 | print(not not x in y)  # SIM208
+   |       ^^^^^^^^^^^^^^
+25 | print(not not x not in y)  # SIM208
+26 | print(not not x is y)  # SIM208
+   |
+help: Replace with `x in y`
+   |
+23 | # https://github.com/astral-sh/ruff/issues/30414
+   - print(not not x in y)  # SIM208
+24 + print(x in y)  # SIM208
+25 | print(not not x not in y)  # SIM208
+   |
+
+SIM208 [*] Use `x not in y` instead of `not (not x not in y)`
+  --> SIM208.py:25:7
+   |
+23 | # https://github.com/astral-sh/ruff/issues/30414
+24 | print(not not x in y)  # SIM208
+25 | print(not not x not in y)  # SIM208
+   |       ^^^^^^^^^^^^^^^^^^
+26 | print(not not x is y)  # SIM208
+27 | print(not not x is not y)  # SIM208
+   |
+help: Replace with `x not in y`
+   |
+24 | print(not not x in y)  # SIM208
+   - print(not not x not in y)  # SIM208
+25 + print(x not in y)  # SIM208
+26 | print(not not x is y)  # SIM208
+   |
+
+SIM208 [*] Use `x is y` instead of `not (not x is y)`
+  --> SIM208.py:26:7
+   |
+24 | print(not not x in y)  # SIM208
+25 | print(not not x not in y)  # SIM208
+26 | print(not not x is y)  # SIM208
+   |       ^^^^^^^^^^^^^^
+27 | print(not not x is not y)  # SIM208
+28 | print(not not bool(x))  # SIM208
+   |
+help: Replace with `x is y`
+   |
+25 | print(not not x not in y)  # SIM208
+   - print(not not x is y)  # SIM208
+26 + print(x is y)  # SIM208
+27 | print(not not x is not y)  # SIM208
+   |
+
+SIM208 [*] Use `x is not y` instead of `not (not x is not y)`
+  --> SIM208.py:27:7
+   |
+25 | print(not not x not in y)  # SIM208
+26 | print(not not x is y)  # SIM208
+27 | print(not not x is not y)  # SIM208
+   |       ^^^^^^^^^^^^^^^^^^
+28 | print(not not bool(x))  # SIM208
+29 | print(not not x in y in z)  # SIM208
+   |
+help: Replace with `x is not y`
+   |
+26 | print(not not x is y)  # SIM208
+   - print(not not x is not y)  # SIM208
+27 + print(x is not y)  # SIM208
+28 | print(not not bool(x))  # SIM208
+   |
+
+SIM208 [*] Use `bool(x)` instead of `not (not bool(x))`
+  --> SIM208.py:28:7
+   |
+26 | print(not not x is y)  # SIM208
+27 | print(not not x is not y)  # SIM208
+28 | print(not not bool(x))  # SIM208
+   |       ^^^^^^^^^^^^^^^
+29 | print(not not x in y in z)  # SIM208
+   |
+help: Replace with `bool(x)`
+   |
+27 | print(not not x is not y)  # SIM208
+   - print(not not bool(x))  # SIM208
+28 + print(bool(x))  # SIM208
+29 | print(not not x in y in z)  # SIM208
+   |
+
+SIM208 [*] Use `x in y in z` instead of `not (not x in y in z)`
+  --> SIM208.py:29:7
+   |
+27 | print(not not x is not y)  # SIM208
+28 | print(not not bool(x))  # SIM208
+29 | print(not not x in y in z)  # SIM208
+   |       ^^^^^^^^^^^^^^^^^^^
+30 |
+31 | # These may not be `bool`, so the fix still wraps them in `bool(...)`.
+   |
+help: Replace with `x in y in z`
+   |
+28 | print(not not bool(x))  # SIM208
+   - print(not not x in y in z)  # SIM208
+29 + print(x in y in z)  # SIM208
+30 |
+   |
+
+SIM208 [*] Use `x == y` instead of `not (not x == y)`
+  --> SIM208.py:32:7
+   |
+31 | # These may not be `bool`, so the fix still wraps them in `bool(...)`.
+32 | print(not not x == y)  # SIM208
+   |       ^^^^^^^^^^^^^^
+33 | print(not not x == y in z)  # SIM208
+   |
+help: Replace with `x == y`
+   |
+31 | # These may not be `bool`, so the fix still wraps them in `bool(...)`.
+   - print(not not x == y)  # SIM208
+32 + print(bool(x == y))  # SIM208
+33 | print(not not x == y in z)  # SIM208
+   |
+
+SIM208 [*] Use `x == y in z` instead of `not (not x == y in z)`
+  --> SIM208.py:33:7
+   |
+31 | # These may not be `bool`, so the fix still wraps them in `bool(...)`.
+32 | print(not not x == y)  # SIM208
+33 | print(not not x == y in z)  # SIM208
+   |       ^^^^^^^^^^^^^^^^^^^
+help: Replace with `x == y in z`
+   |
+32 | print(not not x == y)  # SIM208
+   - print(not not x == y in z)  # SIM208
+33 + print(bool(x == y in z))  # SIM208
+34 |
+   |
+
+SIM208 Use `x` instead of `not (not x)`
+  --> SIM208.py:38:11
+   |
+36 | def shadowed_bool(bool):
+37 |     # No fix: the operand needs a `bool(...)` wrapper, but `bool` is shadowed.
+38 |     print(not not x)  # SIM208
+   |           ^^^^^^^^^
+39 |     # No fix: this `bool(...)` call is not the builtin, so it may not return a `bool`.
+40 |     print(not not bool(x))  # SIM208
+   |
+help: Replace with `x`
+
+SIM208 Use `bool(x)` instead of `not (not bool(x))`
+  --> SIM208.py:40:11
+   |
+38 |     print(not not x)  # SIM208
+39 |     # No fix: this `bool(...)` call is not the builtin, so it may not return a `bool`.
+40 |     print(not not bool(x))  # SIM208
+   |           ^^^^^^^^^^^^^^^
+41 |     # Fixed: the operand is always a `bool`, so no wrapper is needed.
+42 |     print(not not x in y)  # SIM208
+   |
+help: Replace with `bool(x)`
+
+SIM208 [*] Use `x in y` instead of `not (not x in y)`
+  --> SIM208.py:42:11
+   |
+40 |     print(not not bool(x))  # SIM208
+41 |     # Fixed: the operand is always a `bool`, so no wrapper is needed.
+42 |     print(not not x in y)  # SIM208
+   |           ^^^^^^^^^^^^^^
+help: Replace with `x in y`
+   |
+41 |     # Fixed: the operand is always a `bool`, so no wrapper is needed.
+   -     print(not not x in y)  # SIM208
+42 +     print(x in y)  # SIM208
+   |

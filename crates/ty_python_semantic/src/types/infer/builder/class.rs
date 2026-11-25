@@ -1,8 +1,10 @@
 use crate::Db;
 use crate::ProgramEnvironment;
+use crate::place::TypeOrigin;
 use crate::types::{
-    CallArguments, DataclassParams, KnownClass, KnownInstanceType, SpecialFormType,
-    StaticClassLiteral, SubclassOfType, Type, TypeContext, TypingModule, UnionType,
+    CallArguments, DataclassParams, DeclaredType, KnownClass, KnownInstanceType, SpecialFormType,
+    StaticClassLiteral, SubclassOfType, Type, TypeContext, TypeQualifiers, TypingModule, UnionType,
+    class::StaticClassHeader,
     function::{KnownFunction, OverloadLiteral},
     infer::{
         TypeInferenceBuilder,
@@ -18,6 +20,7 @@ use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
 enum ClassDecoratorApplication<'db> {
     Ordinary(Option<(Type<'db>, ClassDecoratorResult<'db>)>),
     DataclassTransform,
+    RuntimeCheckable,
 }
 
 enum ClassDecoratorResult<'db> {
@@ -173,16 +176,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     db,
                     &name.id,
                     body_scope,
-                    maybe_known_class,
+                    StaticClassHeader {
+                        known: maybe_known_class,
+                        dataclass_params,
+                        has_explicit_bases,
+                        has_explicit_metaclass,
+                    },
                     deprecated,
                     type_check_only,
-                    dataclass_params,
                     dataclass_transformer_params,
                     total_ordering,
                     !class_node.decorator_list.is_empty(),
                     class_node.type_params.is_some(),
-                    has_explicit_bases,
-                    has_explicit_metaclass,
                 )),
             }
         };
@@ -192,6 +197,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // For ordinary decorators that still apply to the original class, precompute the call so
         // the second pass can reuse it if no inner decorator has changed the binding.
         for &(decorator_ty, decorator) in decorator_types_and_nodes.iter().rev() {
+            if decorator_ty
+                .as_function_literal()
+                .is_some_and(|function| function.is_known(db, KnownFunction::RuntimeCheckable))
+            {
+                decorators_to_apply.push((
+                    decorator_ty,
+                    decorator,
+                    ClassDecoratorApplication::RuntimeCheckable,
+                ));
+                continue;
+            }
+
             if !metadata_applies_to_original_class {
                 decorators_to_apply.push((
                     decorator_ty,
@@ -251,36 +268,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             if decorator_ty.as_function_literal().is_some_and(|function| {
                 matches!(
                     function.known(db),
-                    Some(
-                        KnownFunction::Final
-                            | KnownFunction::DisjointBase
-                            | KnownFunction::RuntimeCheckable
-                    )
+                    Some(KnownFunction::Final | KnownFunction::DisjointBase)
                 )
             }) {
                 continue;
             }
 
             if let Type::FunctionLiteral(f) = decorator_ty {
-                // We do not yet detect or flag `@dataclass_transform` applied to more than one
-                // overload, or an overload and the implementation both. Nevertheless, this is not
-                // allowed. We do not try to treat the offenders intelligently -- just use the
-                // params of the last seen usage of `@dataclass_transform`.
-                //
                 // In class-decorator position, dataclass-transform metadata shapes the
                 // original class object. We keep it metadata-only here because the call path
                 // uses synthetic dataclass-transform return types to model decorator factories;
                 // treating this as an ordinary replacement-returning class decorator would
                 // conflate those two cases.
-                let transformer_params = f
-                    .iter_overloads_and_implementation(db)
-                    .rev()
-                    .find_map(|overload| overload.dataclass_transformer_params(db));
-                if let Some(transformer_params) = transformer_params {
-                    dataclass_params = Some(DataclassParams::from_transformer_params(
-                        db,
-                        transformer_params,
-                    ));
+                if let Some(params) = f.dataclass_params(db) {
+                    dataclass_params = Some(params);
                     // We only model the metadata of this application, but its selected overload
                     // can still be deprecated. Avoid resolving the call when no overload is
                     // deprecated: the decorator's annotations may depend on this class.
@@ -324,7 +325,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
         }
 
-        let mut inferred_ty = infer_original_class_ty(
+        let original_class_ty = infer_original_class_ty(
             deprecated,
             type_check_only,
             dataclass_params,
@@ -332,15 +333,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             total_ordering,
         );
 
-        let original_class_ty = inferred_ty;
-        let mut undecorated_ty = None;
+        // Class-body lookups need the original class even if the decorators currently
+        // preserve it. Cycle recovery can widen the public binding to a union.
+        if !decorator_list.is_empty() {
+            self.undecorated_type = Some(original_class_ty);
+        }
 
         // In the second pass, apply class decorators from inner to outer and use their return types
         // to update the public binding. `original_class_ty` remains the class object whose body and
         // metadata were inferred above.
+        let mut inferred_ty = original_class_ty;
         for (decorator_ty, decorator_node, application) in decorators_to_apply {
             let precomputed_result = match application {
                 ClassDecoratorApplication::Ordinary(precomputed_result) => precomputed_result,
+                ClassDecoratorApplication::RuntimeCheckable => {
+                    // Protocol bases can be deferred, so validate this identity decorator after
+                    // inference. Retain its input in case an inner decorator replaced the class.
+                    self.defer_decorator_call(decorator_node, inferred_ty);
+                    continue;
+                }
                 ClassDecoratorApplication::DataclassTransform => {
                     if let ClassDecoratorResult::Success {
                         deprecated_functions,
@@ -406,20 +417,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     decorated_ty,
                 )
             } else {
-                // Only record an undecorated type once a decorator actually replaces the public
-                // binding. If all decorators preserve the class, there is no alternate class type
-                // to expose.
-                undecorated_ty.get_or_insert(inferred_ty);
                 decorated_ty
             };
         }
 
-        self.undecorated_type = undecorated_ty;
-
+        // A decorator can replace a nested class with a writable value, including another class.
+        let qualifiers = if self.scope().scope(db).kind().is_class()
+            && type_retains_original_class(db, env, original_class_ty, inferred_ty)
+        {
+            TypeQualifiers::NESTED_CLASS
+        } else {
+            TypeQualifiers::empty()
+        };
         self.add_declaration_with_binding(
             class_node.into(),
             definition,
-            &DeclaredAndInferredType::are_the_same_type(inferred_ty),
+            &DeclaredAndInferredType::FromDeclaration(DeclaredType::new(
+                Some(inferred_ty),
+                TypeOrigin::Inferred,
+                qualifiers,
+            )),
         );
 
         // if there are type parameters, then the keywords and bases are within that scope
@@ -541,10 +558,10 @@ fn class_decorator_preserves_class_binding<'db>(
 
     match decorated_class {
         Type::ClassLiteral(decorated_literal) => {
-            let decorated_definition = decorated_literal.definition(db);
             decorated_literal == original_literal
-                || decorated_definition.is_some()
-                    && decorated_definition == original_literal.definition(db)
+                || decorated_literal
+                    .definition(db)
+                    .is_some_and(|definition| Some(definition) == original_literal.definition(db))
         }
         Type::SubclassOf(subclass_of) => subclass_of
             .subclass_of()

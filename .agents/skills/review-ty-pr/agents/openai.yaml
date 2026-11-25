@@ -1,4 +1,0 @@
-interface:
-  display_name: "Review ty PR"
-  short_description: "Nitpicky, evidence-backed reviews of ty PRs"
-  default_prompt: "Use $review-ty-pr to perform a thorough, deliberately nitpicky review of this ty pull request."

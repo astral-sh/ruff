@@ -33,12 +33,12 @@ pub(crate) fn check_tokens(
     let comment_ranges = indexer.comment_ranges();
 
     if context.any_rule_enabled(&[
-        Rule::BlankLineBetweenMethods,
-        Rule::BlankLinesTopLevel,
+        Rule::MissingBlankLineBeforeMethod,
+        Rule::MissingBlankLinesBeforeTopLevelDefinition,
         Rule::TooManyBlankLines,
         Rule::BlankLineAfterDecorator,
-        Rule::BlankLinesAfterFunctionOrClass,
-        Rule::BlankLinesBeforeNestedDefinition,
+        Rule::MissingBlankLinesAfterTopLevelDefinition,
+        Rule::MissingBlankLineBeforeNestedDefinition,
     ]) {
         BlankLinesChecker::new(locator, stylist, source_type, cell_offsets, context)
             .check_lines(tokens);
@@ -71,12 +71,13 @@ pub(crate) fn check_tokens(
     }
 
     if context.any_rule_enabled(&[
-        Rule::InvalidCharacterBackspace,
-        Rule::InvalidCharacterSub,
-        Rule::InvalidCharacterEsc,
-        Rule::InvalidCharacterNul,
-        Rule::InvalidCharacterZeroWidthSpace,
-    ]) {
+        Rule::UnescapedBackspaceCharacter,
+        Rule::UnescapedSubstituteCharacter,
+        Rule::UnescapedEscapeCharacter,
+        Rule::UnescapedNullCharacter,
+        Rule::UnescapedZeroWidthSpaceCharacter,
+    ]) && pylint::rules::contains_unescaped_string_character(locator.contents())
+    {
         let mut interpolated_string_depths: Vec<u32> = Vec::new();
         let target_version = context
             .settings()
@@ -113,7 +114,7 @@ pub(crate) fn check_tokens(
                 _ => interpolated_string_depths.iter().any(|depth| *depth > 0),
             };
 
-            pylint::rules::invalid_string_characters(
+            pylint::rules::unescaped_string_characters(
                 context,
                 token,
                 locator,
@@ -148,7 +149,7 @@ pub(crate) fn check_tokens(
     if context.any_rule_enabled(&[
         Rule::MissingTrailingComma,
         Rule::TrailingCommaOnBareTuple,
-        Rule::ProhibitedTrailingComma,
+        Rule::UnnecessaryTrailingComma,
     ]) {
         flake8_commas::rules::trailing_commas(context, tokens, locator, indexer);
     }
@@ -162,8 +163,8 @@ pub(crate) fn check_tokens(
     }
 
     if context.any_rule_enabled(&[
-        Rule::ShebangNotExecutable,
-        Rule::ShebangMissingExecutableFile,
+        Rule::NonExecutableFileWithShebang,
+        Rule::ExecutableFileWithoutShebang,
         Rule::ShebangLeadingWhitespace,
         Rule::ShebangNotFirstLine,
         Rule::ShebangMissingPython,

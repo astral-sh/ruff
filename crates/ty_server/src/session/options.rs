@@ -99,17 +99,24 @@ impl InitializationOptions {
         }
     }
 
-    pub(crate) fn use_uv(&self, system: &dyn System) -> UseUv {
+    /// Returns the uv mode that overrides editor, project, and script settings.
+    /// Untrusted workspaces always force [`UseUv::Off`]. In a trusted workspace,
+    /// this returns the mode from `TY_UV`, or `None` if the variable is unset.
+    pub(super) fn uv_override(&self, system: &dyn System) -> Option<RangedValue<UseUv>> {
         if self.workspace_trust == WorkspaceTrust::Untrusted {
-            return UseUv::Off;
+            Some(RangedValue::new(UseUv::Off, ValueSource::Editor))
+        } else {
+            UseUv::from_system(system).map(RangedValue::cli)
         }
+    }
 
+    pub(super) fn experimental_use_uv(&self) -> Option<RangedValue<UseUv>> {
         self.options
             .global
             .experimental
             .as_ref()
             .and_then(|experimental| experimental.use_uv)
-            .unwrap_or_else(|| UseUv::from_system(system))
+            .map(|mode| RangedValue::new(mode, ValueSource::Editor))
     }
 }
 
@@ -216,8 +223,7 @@ impl GlobalOptions {
     pub(crate) fn into_settings(self) -> GlobalSettings {
         let experimental = self
             .experimental
-            .map(Experimental::into_settings)
-            .unwrap_or_default();
+            .map_or_default(Experimental::into_settings);
 
         GlobalSettings {
             diagnostic_mode: self.diagnostic_mode.unwrap_or_default(),
@@ -287,6 +293,7 @@ impl WorkspaceOptions {
                 match TyOptions::deserialize_with(
                     ValueSource::Editor,
                     serde::de::value::MapDeserializer::new(map.0.into_iter()),
+                    ty_python_semantic::default_lint_registry(),
                 ) {
                     Ok(options) => Some(options),
                     Err(error) => {
@@ -345,12 +352,10 @@ impl WorkspaceOptions {
             disable_language_services: self.disable_language_services.unwrap_or_default(),
             inlay_hints: self
                 .inlay_hints
-                .map(InlayHintOptions::into_settings)
-                .unwrap_or_default(),
+                .map_or_default(InlayHintOptions::into_settings),
             completions: self
                 .completions
-                .map(CompletionOptions::into_settings)
-                .unwrap_or_default(),
+                .map_or_default(CompletionOptions::into_settings),
             configuration_file,
             override_options,
             fallback_options,
@@ -404,6 +409,7 @@ impl Combine for ConfigurationMap {
 pub struct InlayHintOptions {
     variable_types: Option<bool>,
     call_argument_names: Option<bool>,
+    return_types: Option<bool>,
 }
 
 impl InlayHintOptions {
@@ -411,6 +417,7 @@ impl InlayHintOptions {
         InlayHintSettings {
             variable_types: self.variable_types.unwrap_or(true),
             call_argument_names: self.call_argument_names.unwrap_or(true),
+            return_types: self.return_types.unwrap_or(true),
         }
     }
 }
@@ -501,6 +508,7 @@ impl Combine for DiagnosticMode {
 pub struct Experimental {
     /// Controls which uv integrations ty uses.
     ///
+    /// Deprecated for script environments. Set `project-manager.script` in the ty configuration instead.
     /// This setting is resolved during initialization. Changing it requires restarting the server.
     /// All uv integrations are disabled in untrusted workspaces.
     pub use_uv: Option<UseUv>,

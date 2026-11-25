@@ -12,19 +12,20 @@ use crate::rules::{
 pub(crate) fn deferred_scopes(checker: &Checker) {
     if !checker.any_rule_enabled(&[
         Rule::AsyncioDanglingTask,
-        Rule::BadStaticmethodArgument,
+        Rule::BadStaticmethodParameter,
         Rule::BuiltinAttributeShadowing,
-        Rule::FunctionCallInDataclassDefaultArgument,
+        Rule::FunctionCallInDataclassFieldDefault,
         Rule::GlobalVariableNotAssigned,
         Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
-        Rule::InvalidFirstArgumentNameForClassMethod,
-        Rule::InvalidFirstArgumentNameForMethod,
+        Rule::ClassMethodReceiverNotNamedCls,
+        Rule::InstanceMethodReceiverNotNamedSelf,
         Rule::MethodReceiverDefault,
         Rule::MutableClassDefault,
-        Rule::MutableDataclassDefault,
-        Rule::NoSelfUse,
-        Rule::RedefinedArgumentFromLocal,
+        Rule::MutableDataclassFieldDefault,
+        Rule::MethodWithoutParameters,
+        Rule::UnusedSelf,
+        Rule::RedefinedParameterFromLocal,
         Rule::RedefinedWhileUnused,
         Rule::RuntimeImportInTypeCheckingBlock,
         Rule::SingledispatchMethod,
@@ -36,16 +37,16 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::TypingOnlyThirdPartyImport,
         Rule::UndefinedLocal,
         Rule::UnusedAnnotation,
-        Rule::UnusedClassMethodArgument,
-        Rule::UnusedFunctionArgument,
+        Rule::UnusedClassMethodParameter,
+        Rule::UnusedFunctionParameter,
         Rule::UnusedImport,
-        Rule::UnusedLambdaArgument,
-        Rule::UnusedMethodArgument,
+        Rule::UnusedLambdaParameter,
+        Rule::UnusedMethodParameter,
         Rule::UnusedPrivateProtocol,
         Rule::UnusedPrivateTypeAlias,
         Rule::UnusedPrivateTypedDict,
         Rule::UnusedPrivateTypeVar,
-        Rule::UnusedStaticMethodArgument,
+        Rule::UnusedStaticMethodParameter,
         Rule::UnusedUnpackedVariable,
         Rule::UnusedVariable,
         Rule::UnnecessaryFutureImport,
@@ -100,8 +101,8 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             pylint::rules::swap_with_temporary_variable(checker, scope_id, scope);
         }
 
-        if checker.is_rule_enabled(Rule::RedefinedArgumentFromLocal) {
-            pylint::rules::redefined_argument_from_local(checker, scope_id, scope);
+        if checker.is_rule_enabled(Rule::RedefinedParameterFromLocal) {
+            pylint::rules::redefined_parameter_from_local(checker, scope_id, scope);
         }
 
         if checker.is_rule_enabled(Rule::ImportShadowedByLoopVar) {
@@ -139,14 +140,14 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                     checker, scope_id, scope, class_def,
                 );
             }
-            if checker.is_rule_enabled(Rule::FunctionCallInDataclassDefaultArgument) {
-                ruff::rules::function_call_in_dataclass_default(checker, class_def, scope_id);
+            if checker.is_rule_enabled(Rule::FunctionCallInDataclassFieldDefault) {
+                ruff::rules::function_call_in_dataclass_field_default(checker, class_def, scope_id);
             }
             if checker.is_rule_enabled(Rule::MutableClassDefault) {
                 ruff::rules::mutable_class_default(checker, class_def);
             }
-            if checker.is_rule_enabled(Rule::MutableDataclassDefault) {
-                ruff::rules::mutable_dataclass_default(checker, class_def);
+            if checker.is_rule_enabled(Rule::MutableDataclassFieldDefault) {
+                ruff::rules::mutable_dataclass_field_default(checker, class_def);
             }
         }
 
@@ -165,12 +166,14 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                             && !binding.is_nonlocal()
                             && !binding.is_global()
                             && !checker.settings().dummy_variable_rgx.is_match(name)
+                            // semi-standard names read from frame locals at runtime by some tools
                             && !matches!(
                                 name,
-                                "__tracebackhide__"
-                                    | "__traceback_info__"
-                                    | "__traceback_supplement__"
-                                    | "__debuggerskip__"
+                                "__tracebackhide__" // used by pytest, IPython
+                                    | "__traceback_hide__" // used by Django, Sentry, Werkzeug
+                                    | "__traceback_info__" // used by Zope
+                                    | "__traceback_supplement__" // used by Zope
+                                    | "__debuggerskip__" // used by IPython debugger
                             )
                         {
                             return Some((name, binding));
@@ -196,13 +199,13 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
 
             if !checker.source_type.is_stub() {
                 if checker.any_rule_enabled(&[
-                    Rule::UnusedClassMethodArgument,
-                    Rule::UnusedFunctionArgument,
-                    Rule::UnusedLambdaArgument,
-                    Rule::UnusedMethodArgument,
-                    Rule::UnusedStaticMethodArgument,
+                    Rule::UnusedClassMethodParameter,
+                    Rule::UnusedFunctionParameter,
+                    Rule::UnusedLambdaParameter,
+                    Rule::UnusedMethodParameter,
+                    Rule::UnusedStaticMethodParameter,
                 ]) {
-                    flake8_unused_arguments::rules::unused_arguments(checker, scope);
+                    flake8_unused_arguments::rules::unused_parameters(checker, scope);
                 }
             }
         }
@@ -244,8 +247,12 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         }
 
         if scope.kind.is_function() {
-            if checker.is_rule_enabled(Rule::NoSelfUse) {
-                pylint::rules::no_self_use(checker, scope_id, scope);
+            if checker.is_rule_enabled(Rule::MethodWithoutParameters) {
+                pylint::rules::method_without_parameters(checker, scope);
+            }
+
+            if checker.is_rule_enabled(Rule::UnusedSelf) {
+                pylint::rules::unused_self(checker, scope_id, scope);
             }
 
             if checker.is_rule_enabled(Rule::TooManyLocals) {
@@ -260,15 +267,15 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                 pylint::rules::singledispatchmethod_function(checker, scope);
             }
 
-            if checker.is_rule_enabled(Rule::BadStaticmethodArgument) {
-                pylint::rules::bad_staticmethod_argument(checker, scope);
+            if checker.is_rule_enabled(Rule::BadStaticmethodParameter) {
+                pylint::rules::bad_staticmethod_parameter(checker, scope);
             }
 
             if checker.any_rule_enabled(&[
-                Rule::InvalidFirstArgumentNameForClassMethod,
-                Rule::InvalidFirstArgumentNameForMethod,
+                Rule::ClassMethodReceiverNotNamedCls,
+                Rule::InstanceMethodReceiverNotNamedSelf,
             ]) {
-                pep8_naming::rules::invalid_first_argument_name(checker, scope);
+                pep8_naming::rules::method_receiver_name(checker, scope);
             }
 
             if checker.is_rule_enabled(Rule::MethodReceiverDefault) {

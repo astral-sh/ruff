@@ -474,7 +474,7 @@ resolve to an unknown third class that inherits from `X` and overrides `__radd__
 not. Thus, the correct answer here for the `reveal_type` is `int | Unknown`.
 
 ```py
-from does_not_exist import Foo  # error: [unresolved-import]
+from does_not_exist import Foo  # error: [import-not-found]
 
 reveal_type(Foo)  # revealed: Unknown
 

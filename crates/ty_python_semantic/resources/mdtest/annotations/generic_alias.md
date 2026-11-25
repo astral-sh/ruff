@@ -36,7 +36,7 @@ reveal_type(Strings)  # revealed: GenericAlias
 However, using such a `GenericAlias` instance in a type expression is currently not supported:
 
 ```py
-# error: [invalid-type-form] "Variable of type `GenericAlias` is not allowed in a parameter annotation"
+# error: [invalid-type-form] "Variable `Strings` cannot be used as a type"
 def _(strings: Strings) -> None:
     reveal_type(strings)  # revealed: Unknown
 ```
@@ -52,8 +52,8 @@ from typing import Any, Type, TypeAlias
 Modern: TypeAlias = type[Any]
 Legacy: TypeAlias = Type[Any]
 
-Modern.missing  # error: [unresolved-attribute]
-Legacy.missing  # error: [unresolved-attribute]
+Modern.missing  # error: [missing-attribute]
+Legacy.missing  # error: [missing-attribute]
 
 reveal_type(Modern.__name__)  # revealed: str
 reveal_type(Legacy.__name__)  # revealed: str
@@ -76,8 +76,8 @@ alias object `type[int]`.
 Integers = type[int]
 LegacyIntegers = Type[int]
 
-Integers.bit_length  # error: [unresolved-attribute]
-LegacyIntegers.bit_length  # error: [unresolved-attribute]
+Integers.bit_length  # error: [missing-attribute]
+LegacyIntegers.bit_length  # error: [missing-attribute]
 ```
 
 When these aliases are used as annotations, their inhabitants can be arbitrary class objects.

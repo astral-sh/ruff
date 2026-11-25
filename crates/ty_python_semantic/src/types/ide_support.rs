@@ -8,6 +8,7 @@ use crate::types::call::bind::CheckTypesMode;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::infer::infer_definition_types;
 use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
     CallDunderError, ClassBase, ClassLiteral, KnownClass, KnownFunction, KnownUnion,
@@ -37,6 +38,26 @@ pub use unused_binding_support::{UnusedBinding, unused_bindings};
 
 static CLASS_MATCHER: LazyLock<NameMatcher<'static>> =
     LazyLock::new(|| NameMatcher::keyword("class"));
+
+/// Returns the inferred return type of an unannotated function.
+pub fn inlay_hint_return_type<'db>(
+    model: &SemanticModel<'db>,
+    function: &ast::StmtFunctionDef,
+) -> Option<Type<'db>> {
+    // TODO: Remove the async check once return-type inference supports async functions,
+    // using the awaited return type for the hint instead of the coroutine type.
+    if function.returns.is_some() || function.is_async {
+        return None;
+    }
+    let db = model.db();
+    let definition = function.definition(model);
+    let function_type = infer_definition_types(db, definition).function_type(definition)?;
+    let signature = function_type.signature_with_inferred_return_type(db);
+    let [overload] = signature.overloads.as_slice() else {
+        return None;
+    };
+    (!overload.return_ty.is_unknown()).then_some(overload.return_ty)
+}
 
 /// Get the primary definition kind for a name expression within a specific file.
 /// Returns the first definition kind that is reachable for this name in its scope.
@@ -956,6 +977,9 @@ pub struct CallSignatureDetails<'db> {
 /// A single displayed parameter in a callable signature for IDE support.
 #[derive(Debug, Clone)]
 pub struct CallSignatureParameter<'db> {
+    /// The parameter's source definition, such as the field that supplies a constructor parameter.
+    pub definition: Option<Definition<'db>>,
+
     /// The rendered label of the parameter as shown in the signature.
     pub label: String,
 
@@ -1061,6 +1085,7 @@ fn displayed_parameters_for_signature<'db>(
                 parameter_to_displayed_parameter_mapping[parameter_index] =
                     Some(displayed_parameters.len());
                 displayed_parameters.push(CallSignatureParameter {
+                    definition: parameter.definition(),
                     label,
                     name,
                     ty: apply_specialization(parameter.annotated_type()),
@@ -1095,6 +1120,7 @@ fn displayed_parameters_for_signature<'db>(
 
             (
                 vec![CallSignatureParameter {
+                    definition: None,
                     label,
                     name,
                     ty: Type::TypeVar(typevar),
@@ -1151,7 +1177,7 @@ pub fn call_signature_details<'db>(
             &call_arguments,
             TypeContext::default(),
             &[],
-            CheckTypesMode::Finalize,
+            CheckTypesMode::SignatureDetails,
         );
 
         // Extract signature details from all callable bindings

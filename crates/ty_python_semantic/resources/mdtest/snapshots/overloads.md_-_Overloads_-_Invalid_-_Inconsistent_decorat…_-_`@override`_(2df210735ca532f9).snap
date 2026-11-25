@@ -37,7 +37,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 22 |     def method(self, x: int) -> int: ...
 23 |     @overload
 24 |     @override
-25 |     # error: [invalid-overload]
+25 |     # error: [misplaced-overload-decorator]
 26 |     def method(self, x: str) -> str: ...
 27 |     def method(self, x: int | str) -> int | str:
 28 |         return x
@@ -45,7 +45,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 30 | class Sub3(Base):
 31 |     @overload
 32 |     @override
-33 |     # error: [invalid-overload]
+33 |     # error: [misplaced-overload-decorator]
 34 |     def method(self, x: int) -> int: ...
 35 |     @overload
 36 |     def method(self, x: str) -> str: ...
@@ -76,21 +76,21 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 18 |     def method(self, x: int) -> int: ...
 19 |     @overload
 20 |     @override
-21 |     # error: [invalid-overload]
+21 |     # error: [misplaced-overload-decorator]
 22 |     def method(self, x: str) -> str: ...
 ```
 
 # Diagnostics
 
 ```
-error[invalid-overload]: `@override` decorator should be applied only to the overload implementation
+error[misplaced-overload-decorator]: `@override` decorator should be applied only to the overload implementation
   --> src/mdtest_snippet.py:26:9
    |
 23 |     @overload
    |     ---------
 24 |     @override
    |     ---------
-25 |     # error: [invalid-overload]
+25 |     # error: [misplaced-overload-decorator]
 26 |     def method(self, x: str) -> str: ...
    |         ^^^^^^
 27 |     def method(self, x: int | str) -> int | str:
@@ -99,14 +99,14 @@ error[invalid-overload]: `@override` decorator should be applied only to the ove
 ```
 
 ```
-error[invalid-overload]: `@override` decorator should be applied only to the overload implementation
+error[misplaced-overload-decorator]: `@override` decorator should be applied only to the overload implementation
   --> src/mdtest_snippet.py:34:9
    |
 31 |     @overload
    |     ---------
 32 |     @override
    |     ---------
-33 |     # error: [invalid-overload]
+33 |     # error: [misplaced-overload-decorator]
 34 |     def method(self, x: int) -> int: ...
    |         ^^^^^^
 35 |     @overload
@@ -117,7 +117,7 @@ error[invalid-overload]: `@override` decorator should be applied only to the ove
 ```
 
 ```
-error[invalid-overload]: `@override` decorator should be applied only to the first overload
+error[misplaced-overload-decorator]: `@override` decorator should be applied only to the first overload
   --> src/mdtest_snippet.pyi:22:9
    |
 17 | /     @overload
@@ -126,7 +126,7 @@ error[invalid-overload]: `@override` decorator should be applied only to the fir
 19 |       @overload
 20 |       @override
    |       ---------
-21 |       # error: [invalid-overload]
+21 |       # error: [misplaced-overload-decorator]
 22 |       def method(self, x: str) -> str: ...
    |           ^^^^^^
 

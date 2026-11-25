@@ -113,8 +113,8 @@ fn benchmark_default_rules(criterion: &mut Criterion) {
 
 /// Disables IO based rules because they are a source of flakiness
 fn disable_io_rules(rules: &mut RuleTable) {
-    rules.disable(Rule::ShebangMissingExecutableFile);
-    rules.disable(Rule::ShebangNotExecutable);
+    rules.disable(Rule::ExecutableFileWithoutShebang);
+    rules.disable(Rule::NonExecutableFileWithShebang);
 }
 
 fn benchmark_all_rules(criterion: &mut Criterion) {

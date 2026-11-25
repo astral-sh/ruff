@@ -24,8 +24,8 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, IntersectionBuilder,
-    KnownClass, MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictType,
-    TypingModule, UnionType, determine_upper_bound,
+    KnownClass, MemberLookupPolicy, SelfTypeVarOrigin, Type, TypeContext, TypeMapping,
+    TypeVarVariance, TypedDictType, TypingModule, UnionType, determine_self_class,
 };
 use crate::{Db, FxIndexMap};
 use ty_python_core::definition::Definition;
@@ -1013,8 +1013,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         synthesize_typed_dict_method(db, &env, typed_dict, name, || {
             TypedDictFields::Dynamic(self.items(db))
         })
-        .map(Member::definitely_declared)
-        .unwrap_or_default()
+        .map_or_default(Member::definitely_declared)
     }
 
     /// Look up a class-level member by name (including superclasses).
@@ -1067,7 +1066,12 @@ pub(in crate::types) fn synthesized_typed_dict_class_member<'db>(
         TypingModule::Typing,
         lookup_policy,
         name,
-        || Type::TypedDict(typed_dict),
+        || {
+            (
+                SelfTypeVarOrigin::SynthesizedTypedDict,
+                Type::TypedDict(typed_dict),
+            )
+        },
     )
 }
 
@@ -1104,7 +1108,13 @@ pub(super) fn typed_dict_class_member<'db>(
         module,
         lookup_policy,
         name,
-        || determine_upper_bound(db, env, class, ClassBase::is_typed_dict),
+        || {
+            let self_class = determine_self_class(db, class, ClassBase::is_typed_dict);
+            (
+                SelfTypeVarOrigin::Class(self_class.class_literal(db)),
+                Type::instance(db, env, self_class),
+            )
+        },
     )
 }
 
@@ -1115,12 +1125,14 @@ fn typed_dict_inherited_class_member<'db>(
     module: TypingModule,
     lookup_policy: MemberLookupPolicy,
     name: &str,
-    new_upper_bound: impl FnOnce() -> Type<'db>,
+    replacement_self: impl FnOnce() -> (SelfTypeVarOrigin<'db>, Type<'db>),
 ) -> PlaceAndQualifiers<'db> {
     let fallback_member = typed_dict_fallback_class_member(db, env, module, lookup_policy, name)
         .map_type(|ty| {
+            let (new_origin, new_upper_bound) = replacement_self();
             let mapping = TypeMapping::ReplaceSelf {
-                new_upper_bound: new_upper_bound(),
+                new_origin,
+                new_upper_bound,
             };
             ty.apply_type_mapping(db, env, &mapping, TypeContext::default())
         });

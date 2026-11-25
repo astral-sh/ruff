@@ -28,7 +28,7 @@ jobs:
     steps:
       - name: "Get pre-commit token"
         id: token
-        uses: open-security-tools/ost-simple-sts@88f85462c7e9c9e2fb2745bd5ce4ee163aec0420 # v0.0.5
+        uses: astral-sh/github-actions/simple-token-service@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
         with:
           exchange-url: ${{ secrets.RELEASES_STS_API_URL }}/exchange
           audience: ${{ secrets.RELEASES_STS_API_URL }}
@@ -47,3 +47,23 @@ jobs:
               workflow_id: 'main.yml',
               ref: 'main',
             })
+
+      - name: Get VS Code extension token
+        if: ${{ !cancelled() && !fromJson(inputs.plan).announcement_is_prerelease }}
+        id: vscode-token
+        uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
+        with:
+          exchange-url: ${{ secrets.RELEASES_STS_API_URL }}/exchange
+          audience: ${{ secrets.RELEASES_STS_API_URL }}
+          repository: astral-sh/ruff-vscode
+          permissions: |
+            actions: write
+
+      - name: Prepare extension release
+        if: ${{ !cancelled() && steps.vscode-token.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ steps.vscode-token.outputs.token }}
+          RUFF_VERSION: ${{ fromJson(inputs.plan).releases[0].app_version }}
+        run: |
+          gh workflow run release-prepare.yml --repo astral-sh/ruff-vscode \
+            -f ruff-version="$RUFF_VERSION" -f auto-promote=true

@@ -34,6 +34,9 @@ use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 /// ## Example
 ///
 /// ```python
+/// from dataclasses import dataclass
+///
+///
 /// @dataclass
 /// class C:
 ///     a = 1
@@ -42,6 +45,7 @@ use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 /// Use instead:
 ///
 /// ```python
+/// from dataclasses import dataclass
 /// from typing import ClassVar
 ///
 ///

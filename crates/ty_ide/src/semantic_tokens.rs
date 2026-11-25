@@ -441,7 +441,10 @@ impl<'db> SemanticTokenVisitor<'db> {
                     };
 
                     if let Some((type_var, is_cls)) = type_var
-                        && matches!(type_var.typevar(db).kind(db), TypeVarKind::TypingSelf)
+                        && matches!(
+                            type_var.typevar(db).kind(db),
+                            TypeVarKind::TypingSelf { .. }
+                        )
                     {
                         let kind = if is_cls {
                             SemanticTokenType::ClsParameter
@@ -828,6 +831,10 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
         let expecting_docstring = self.expecting_docstring;
         self.expecting_docstring = false;
         match stmt {
+            // These branches bypass `walk_stmt` and its range check. Unlike assignments,
+            // they never make the next statement eligible to be a docstring.
+            ast::Stmt::FunctionDef(_) | ast::Stmt::ClassDef(_) | ast::Stmt::ImportFrom(_)
+                if !self.enter_node(stmt.into()).is_traverse() => {}
             ast::Stmt::FunctionDef(func) => {
                 // Visit decorator expressions
                 for decorator in &func.decorator_list {

@@ -409,7 +409,7 @@ pub(crate) fn symbols_for_file(db: &dyn Db, file: ProgramFile<'_>) -> FlatSymbol
 /// returned doesn't include children.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, _, _| FlatSymbols::default(),
+    cycle_initial=|_, _, _, _| FlatSymbols::default(),
     heap_size=ruff_memory_usage::heap_size,
 )]
 pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: ProgramFile<'_>) -> FlatSymbols {

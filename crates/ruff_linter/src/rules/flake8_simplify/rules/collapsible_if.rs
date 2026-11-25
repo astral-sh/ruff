@@ -207,7 +207,6 @@ impl<'a> From<&NestedIf<'a>> for AnyNodeRef<'a> {
 fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf<'_>> {
     let ast::StmtIf {
         test,
-        body,
         elif_else_clauses,
         ..
     } = stmt_if;
@@ -227,7 +226,7 @@ fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf<'_>> {
 
     // The nested if must be the only child, otherwise there is at least one more statement that
     // only depends on the outer condition
-    if body.len() > 1 {
+    if nested_if.body().len() > 1 {
         return None;
     }
 

@@ -1,6 +1,7 @@
 use std::num::NonZeroUsize;
 
 use crate::session::Session;
+use crossbeam::channel::TrySendError;
 
 mod task;
 mod thread;
@@ -46,29 +47,37 @@ impl Scheduler {
 
     /// Dispatches a `task` by either running it as a blocking function or
     /// executing it on a background thread pool.
-    pub(super) fn dispatch(&mut self, task: task::Task, session: &mut Session, client: Client) {
+    pub(super) fn dispatch(
+        &mut self,
+        task: task::Task,
+        session: &mut Session,
+        client: &Client,
+    ) -> Result<(), TrySendError<()>> {
         match task {
             Task::Sync(SyncTask { func }) => {
-                func(session, &client);
+                func(session, client);
             }
             Task::Background(BackgroundTaskBuilder {
                 schedule,
                 builder: func,
+                ..
             }) => {
-                let static_func = func(session);
-                let task = move || static_func(&client);
-                match schedule {
+                let job = match schedule {
                     BackgroundSchedule::Worker => {
-                        self.background_pool.spawn(ThreadPriority::Worker, task);
+                        self.background_pool.spawn(ThreadPriority::Worker)
                     }
-                    BackgroundSchedule::LatencySensitive => self
-                        .background_pool
-                        .spawn(ThreadPriority::LatencySensitive, task),
+                    BackgroundSchedule::LatencySensitive => {
+                        self.background_pool.spawn(ThreadPriority::LatencySensitive)
+                    }
                     BackgroundSchedule::Fmt => {
-                        self.fmt_pool.spawn(ThreadPriority::LatencySensitive, task);
+                        self.fmt_pool.spawn(ThreadPriority::LatencySensitive)
                     }
-                }
+                }?;
+                let task = func(session);
+                let client = client.clone();
+                job.run(move || task(&client))?;
             }
         }
+        Ok(())
     }
 }
