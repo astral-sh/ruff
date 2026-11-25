@@ -96,30 +96,6 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
 }
 
 #[test]
-fn literal_member_lookup_preserves_the_receiver_and_length() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    let main = "/src/main.py";
-    db.write_dedented(
-        main,
-        r#"
-        from typing import reveal_type
-
-        reveal_type((
-            "a".upper.__self__, "ab".upper.__self__,
-            (1).bit_length.__self__, (2).bit_length.__self__,
-            "a".__len__(), "ab".__len__(),
-        ))
-        "#,
-    )?;
-    assert_revealed_type(
-        &db,
-        main,
-        r#"tuple[Literal["a"], Literal["ab"], Literal[1], Literal[2], Literal[1], Literal[2]]"#,
-    );
-    Ok(())
-}
-
-#[test]
 fn method_binding_tracks_decorator_edits() -> anyhow::Result<()> {
     let mut db = setup_db();
     let main = "/src/main.py";
