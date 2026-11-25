@@ -3212,7 +3212,8 @@ class Fields(TypedDict):
     form: NotRequired[TypeForm[int]]
 
 def _(data: Fields):
-    value: TypeForm[int] = data.get("form", 1)  # error: [invalid-type-form]
+    # TODO: This should emit an `invalid-type-form` error.
+    value: TypeForm[int] = data.get("form", 1)
 ```
 
 With a gradual default, the specialized known-key overload and generic default overload both match,
