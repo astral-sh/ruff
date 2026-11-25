@@ -2052,6 +2052,57 @@ def _(list_int: list[int], list_any: list[Any], int_str: tuple[int, str], int_an
     reveal_type(f(*(list_int, any_any)))  # revealed: Unknown
 ```
 
+### `Never` arguments
+
+`Never` is fully static and assignable to `bytes`, so the first overload covers the argument even
+when its type is an alias for `Never`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Never, overload
+
+@overload
+def convert(value: bytes) -> str: ...
+@overload
+def convert(value: None) -> None: ...
+def convert(value: bytes | None) -> str | None:
+    return None if value is None else value.decode()
+
+type Bottom = Never
+type OtherBottom = Bottom | Never
+
+def check(value: Never, alias: Bottom, nested: OtherBottom):
+    reveal_type(convert(value))  # revealed: str
+    reveal_type(convert(alias))  # revealed: str
+    reveal_type(convert(nested))  # revealed: str
+```
+
+### `Never` arguments and parameters in different positions
+
+When `x` is `Never`, the second argument still has to match `y`. The first overload accepts `Never`
+for `y` but cannot accept every materialization of `Any`.
+
+```py
+from typing import Any, Never, overload
+
+@overload
+def f(x: object, y: Never) -> int: ...
+@overload
+def f(x: bytes, y: str) -> str: ...
+def f(x, y):
+    return y
+
+def check(bottom: Never, dynamic: Any):
+    reveal_type(f(bottom, bottom))  # revealed: int
+    reveal_type(f(*(bottom, bottom)))  # revealed: int
+    reveal_type(f(bottom, dynamic))  # revealed: Unknown
+    reveal_type(f(*(bottom, dynamic)))  # revealed: Unknown
+```
+
 ### `LiteralString` and `str`
 
 `overloaded.pyi`:
@@ -2266,6 +2317,27 @@ from overloaded import f
 
 def _(args: tuple[int, ...]):
     reveal_type(f(*args, flag=""))  # revealed: Unknown
+```
+
+### Unpacking a variable-length tuple ending in `Never`
+
+When the tuple has two elements, `Never` matches either type of `y`. The first overload accepts only
+one argument, so the call remains ambiguous.
+
+```py
+from typing import Never, overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: int, y: bytes) -> str: ...
+@overload
+def f(x: int, y: str) -> str: ...
+def f(x, y=None):
+    return x if y is None else str(y)
+
+def check(args: tuple[*tuple[int, ...], Never]):
+    reveal_type(f(*args))  # revealed: Unknown
 ```
 
 ### Required tuple elements before a later positional argument

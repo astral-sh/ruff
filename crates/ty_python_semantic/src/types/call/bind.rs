@@ -3628,9 +3628,7 @@ impl<'db> OverloadFilter<'db> {
 
         // Each overload adds its parameter types to the same prefix. Keep the builders so
         // earlier parameters don't need to be compared for redundancy again at every step.
-        let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db, env))
-            .take(max_slot_count)
-            .collect::<Vec<_>>();
+        let mut union_parameter_types = Vec::with_capacity(max_slot_count);
 
         // Variadic contributions come from the entire candidate set. Only the ordinary
         // argument types can change between prefixes, through contextual inference.
@@ -3659,22 +3657,24 @@ impl<'db> OverloadFilter<'db> {
                 }
             }
 
+            // Every argument slot occurs in at least one candidate. Even an empty union
+            // (`Never`) occupies a position in the tuple.
             let top_materialized_argument_type = Type::heterogeneous_tuple(
                 db,
                 env,
                 union_argument_type_builders
                     .into_iter()
-                    .filter_map(|builder| {
-                        if builder.is_empty() {
-                            None
-                        } else {
-                            Some(builder.build())
-                        }
-                    }),
+                    .map(UnionBuilder::build),
             );
 
             for current in group {
                 prefix_len += 1;
+                // Only include parameter slots seen in this prefix, even if a later
+                // overload matches more parameters to an unpacked argument.
+                if current.slots.len() > union_parameter_types.len() {
+                    union_parameter_types
+                        .resize_with(current.slots.len(), || UnionBuilder::new(db, env));
+                }
                 for (builder, slot) in union_parameter_types.iter_mut().zip(&current.slots) {
                     builder.add_in_place(slot.parameter);
                 }
@@ -3684,7 +3684,6 @@ impl<'db> OverloadFilter<'db> {
                     env,
                     union_parameter_types
                         .iter()
-                        .filter(|builder| !builder.is_empty())
                         .cloned()
                         .map(UnionBuilder::build),
                 );
