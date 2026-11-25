@@ -518,6 +518,91 @@ def foo() -> str:
 }
 
 #[test]
+fn recursive_constructor_inference_after_reverting_base_class_edit() -> Result<()> {
+    let base = "\
+from api import Box
+
+class Stage[A, B, C]:
+    def peek(self) -> tuple[A, B, C]: ...
+
+type Cycle[A, B, C] = Stage[A, B, C] | tuple[Cycle[A, B, C]]
+
+class Node: ...
+";
+    let api = "\
+from typing import Self
+from base import Cycle, Stage
+
+class Box[T, U, V = U](Stage[V, U, T]):
+    def __new__(cls, x: T, y: U, z: V = ...) -> Self: ...
+    def get(self) -> tuple[T, U, V]: ...
+";
+    let client = "\
+from typing import reveal_type
+from api import Box
+from base import Node
+
+def f(x: int, y: tuple[Node, type], z: Node) -> None:
+    item = Box(x, y, z)
+    reveal_type(item.get())
+";
+    let initial_api = api.replace("tuple[T, U, V]", "Cycle[V, T, U]");
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file("src/ty.toml", "[environment]\npython-version = '3.13'")?
+        .with_file("src/base.pyi", base)?
+        .with_file("src/api.pyi", &initial_api)?
+        .with_file("src/client.py", client)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document("src/base.pyi", base, 1);
+    server.open_text_document("src/api.pyi", &initial_api, 1);
+    server.open_text_document("src/client.py", client, 1);
+
+    // Skipping Self validation for Box, whose variance is inferred, caused a debug
+    // assertion to fail when we removed the recursive method from Stage. Rechecking
+    // the constructor after each edit is necessary to reproduce the failure.
+    let mut report = server.document_diagnostic_request("src/client.py", None);
+    let edits = [
+        ("src/api.pyi", format!("{api}    attr: Box[T, U, V]\n")),
+        ("src/api.pyi", api.replace("x: T, y: U", "x: U, y: T")),
+        ("src/client.py", client.replace("Box(x, y, z)", "Box(x, z)")),
+        (
+            "src/base.pyi",
+            base.replace(
+                "peek(self) -> tuple[A, B, C]",
+                "get(self) -> tuple[Box[A, B, C], B, C]",
+            ),
+        ),
+        (
+            "src/api.pyi",
+            api.replace("tuple[T, U, V]", "Cycle[T, U, V]"),
+        ),
+        ("src/base.pyi", base.to_string()),
+    ];
+    for (version, (file, text)) in (2..).zip(edits) {
+        server.change_text_document(
+            file,
+            vec![
+                lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                    TextDocumentContentChangeWholeDocument { text },
+                ),
+            ],
+            version,
+        );
+        report = server.document_diagnostic_request("src/client.py", None);
+    }
+    let snapshot = condensed_document_diagnostic_snapshot(report);
+    assert!(
+        snapshot
+            .contains("Revealed type: `Stage[int, Node, Node] | tuple[Cycle[int, Node, Node]]`"),
+        "{snapshot}"
+    );
+    Ok(())
+}
+
+#[test]
 fn document_diagnostic_caching_changed() -> Result<()> {
     let _filter = filter_result_id();
 
