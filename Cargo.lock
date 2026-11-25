@@ -1285,7 +1285,6 @@ dependencies = [
  "hashbrown 0.17.1",
  "indexmap",
  "ordermap",
- "parking_lot 0.12.5",
  "smallvec",
  "thin-vec",
 ]
@@ -2330,16 +2329,6 @@ checksum = "30d5b2194ed13191c1999ae0704b7839fb18384fa22e49b57eeaa97d79ce40da"
 dependencies = [
  "libc",
  "winapi",
-]
-
-[[package]]
-name = "parking_lot"
-version = "0.12.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93857453250e3077bd71ff98b6a65ea6621a19bb0f559a85248955ac12c45a1a"
-dependencies = [
- "lock_api 0.4.14",
- "parking_lot_core 0.9.12",
 ]
 
 [[package]]
@@ -3935,7 +3924,7 @@ dependencies = [
  "intrusive-collections",
  "inventory",
  "ordermap",
- "parking_lot 0.13.0",
+ "parking_lot",
  "portable-atomic",
  "rustc-hash",
  "salsa-macro-rules",
@@ -4185,7 +4174,7 @@ dependencies = [
  "normalize-line-endings",
  "os_pipe",
  "serde_json",
- "similar 3.2.0",
+ "similar 3.2.1",
  "snapbox-macros",
  "wait-timeout",
  "windows-sys 0.61.2",
@@ -4848,7 +4837,7 @@ dependencies = [
  "insta",
  "notify",
  "ordermap",
- "parking_lot 0.12.5",
+ "parking_lot",
  "pep440_rs",
  "rayon",
  "regex",
