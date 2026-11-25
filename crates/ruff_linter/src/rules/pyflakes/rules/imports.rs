@@ -71,11 +71,20 @@ pub(crate) fn import_shadowed_by_loop_var(checker: &Checker, scope_id: ScopeId, 
                 continue;
             }
 
-            // If the bindings are in different forks, abort.
+            // If the bindings are in different forks, abort. A loop variable nested in a
+            // branch below the import (or vice versa) still shadows it, as in:
+            // ```python
+            // from os import path
+            //
+            // if condition:
+            //     for path in paths:
+            //         ...
+            // ```
             if shadowed.source.is_none_or(|left| {
-                binding
-                    .source
-                    .is_none_or(|right| !checker.semantic().same_branch(left, right))
+                binding.source.is_none_or(|right| {
+                    let semantic = checker.semantic();
+                    !(semantic.dominates(left, right) || semantic.dominates(right, left))
+                })
             }) {
                 continue;
             }
