@@ -1417,69 +1417,56 @@ impl<'db> UseDefMap<'db> {
         &self,
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
-        self.declarations_iterator(
-            self.retained_declarations_at_binding(binding)
-                .unwrap_or_else(|| ALWAYS_UNDECLARED_DECLARATIONS.as_slice()),
-            BoundnessAnalysis::BasedOnUnboundVisibility,
-        )
+        self.declaration_sources_at_binding(binding)
+            .unwrap_or_else(|| DeclarationSources {
+                map: self,
+                live: ALWAYS_UNDECLARED_DECLARATIONS.as_slice(),
+            })
+            .declarations()
     }
 
-    /// Returns the declarations and possible imported `Final` qualifiers reaching this binding.
+    /// Returns the declarations and imports reaching this binding in its own scope.
     ///
-    /// Both come from the same retained state. If the binding has no entry, its place was
-    /// unbound and undeclared in this scope. Declarations in other scopes can still apply.
-    pub fn declarations_and_imports_at_binding(
+    /// A missing entry means that the place was unbound and undeclared here. Declarations
+    /// in other scopes, including annotations inherited from a base class, can still apply.
+    pub fn declaration_sources_at_binding(
         &self,
         binding: Definition<'db>,
-    ) -> Option<(
-        DeclarationsIterator<'_, 'db>,
-        ImportedFinalCandidatesIterator<'_, 'db>,
-    )> {
-        let declarations = self.retained_declarations_at_binding(binding)?;
-        Some((
-            self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility),
-            self.imported_final_candidates_iterator(declarations),
-        ))
-    }
-
-    fn retained_declarations_at_binding(
-        &self,
-        binding: Definition<'db>,
-    ) -> Option<&[LiveDeclaration]> {
+    ) -> Option<DeclarationSources<'_, 'db>> {
         let definitions = self.definitions_by_definition.get(&binding)?;
-        Some(
-            &self.interned_declarations[definitions
-                .declarations
-                .expect("binding definition should have retained declarations")],
-        )
+        let id = definitions
+            .declarations
+            .expect("binding definition should have retained declarations");
+        Some(DeclarationSources {
+            map: self,
+            live: &self.interned_declarations[id],
+        })
     }
 
-    pub fn end_of_scope_declarations<'map>(
-        &'map self,
+    /// Returns the declarations and imports that reach the end of this scope.
+    pub fn end_of_scope_declaration_sources(
+        &self,
         place: ScopedPlaceId,
-    ) -> DeclarationsIterator<'map, 'db> {
-        match place {
-            ScopedPlaceId::Symbol(symbol) => self.end_of_scope_symbol_declarations(symbol),
-            ScopedPlaceId::Member(member) => self.end_of_scope_member_declarations(member),
+    ) -> DeclarationSources<'_, 'db> {
+        let state = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].end_of_scope,
+            ScopedPlaceId::Member(member) => self.extra().member_states[member].end_of_scope,
+        };
+        DeclarationSources {
+            map: self,
+            live: &self.interned_declarations[state.declarations_id()],
         }
     }
 
-    pub fn end_of_scope_symbol_declarations<'map>(
-        &'map self,
-        symbol: ScopedSymbolId,
-    ) -> DeclarationsIterator<'map, 'db> {
-        let place_state_id = self.symbol_states[symbol].end_of_scope;
-        let declarations = &self.interned_declarations[place_state_id.declarations_id()];
-        self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
+    pub fn end_of_scope_declarations(&self, place: ScopedPlaceId) -> DeclarationsIterator<'_, 'db> {
+        self.end_of_scope_declaration_sources(place).declarations()
     }
 
-    fn end_of_scope_member_declarations<'map>(
-        &'map self,
-        member: ScopedMemberId,
-    ) -> DeclarationsIterator<'map, 'db> {
-        let place_state_id = self.extra().member_states[member].end_of_scope;
-        let declarations = &self.interned_declarations[place_state_id.declarations_id()];
-        self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
+    pub fn end_of_scope_symbol_declarations(
+        &self,
+        symbol: ScopedSymbolId,
+    ) -> DeclarationsIterator<'_, 'db> {
+        self.end_of_scope_declarations(symbol.into())
     }
 
     pub fn reachable_symbol_declarations(
@@ -1513,13 +1500,8 @@ impl<'db> UseDefMap<'db> {
         &self,
         place: ScopedPlaceId,
     ) -> ImportedFinalCandidatesIterator<'_, 'db> {
-        let place_state_id = match place {
-            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].end_of_scope,
-            ScopedPlaceId::Member(member) => self.extra().member_states[member].end_of_scope,
-        };
-        self.imported_final_candidates_iterator(
-            &self.interned_declarations[place_state_id.declarations_id()],
-        )
+        self.end_of_scope_declaration_sources(place)
+            .imported_final_candidates()
     }
 
     /// Imports that may contribute a `Final` qualifier anywhere in the scope.
@@ -1724,6 +1706,27 @@ impl<'map, 'db> NarrowingEvaluator<'map, 'db> {
 
     pub fn narrowing_constraints(&self) -> &'map NarrowingConstraints {
         &self.constraint_tables.narrowing_constraints
+    }
+}
+
+/// Declarations and imports live at the same point in control flow.
+///
+/// An import can contribute a qualifier without declaring a type. Each iterator reads
+/// the same history independently, so consuming one never skips entries in the other.
+#[derive(Clone, Copy)]
+pub struct DeclarationSources<'map, 'db> {
+    map: &'map UseDefMap<'db>,
+    live: &'map [LiveDeclaration],
+}
+
+impl<'map, 'db> DeclarationSources<'map, 'db> {
+    pub fn declarations(self) -> DeclarationsIterator<'map, 'db> {
+        self.map
+            .declarations_iterator(self.live, BoundnessAnalysis::BasedOnUnboundVisibility)
+    }
+
+    pub fn imported_final_candidates(self) -> ImportedFinalCandidatesIterator<'map, 'db> {
+        self.map.imported_final_candidates_iterator(self.live)
     }
 }
 

@@ -38,8 +38,8 @@ use crate::diagnostic::format_enumeration;
 use crate::place::{
     DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers, TypeOrigin,
     loop_header_reachability, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol, place_from_bindings_with_reachability_cache,
-    place_from_declarations_with_reachability_cache,
+    module_type_implicit_global_symbol, place_from_binding_declarations,
+    place_from_bindings_with_reachability_cache,
 };
 use crate::place_load::{
     ConstraintKeys, ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolver, PlaceLoadSourceKind,
@@ -1670,62 +1670,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let place_id = binding.place(db);
         let place = place_table.place(place_id);
         let env = self.program_environment();
-        let is_import = binding.kind(db).is_import();
-
-        let resolve = |(declarations, imported_final_candidates)| {
-            let mut declared = place_from_declarations_with_reachability_cache(
-                db,
-                env,
-                declarations,
-                self.reachability_cache(),
-            );
-            let has_final_declaration = declared.qualifiers().contains(TypeQualifiers::FINAL);
-            if !is_import {
-                declared = declared.with_imported_final_for_assignment(
-                    db,
-                    env,
-                    imported_final_candidates,
-                    self.reachability_cache(),
-                );
-            }
-            (declared, has_final_declaration)
-        };
-
         let owner = place_id
             .as_symbol()
             .and_then(|symbol| self.forwarded_assignment_owner(file_scope_id, symbol));
         let is_local = owner.is_none();
-        let (declared, mut has_final_declaration) = if let Some((owner_scope, owner_symbol)) = owner
-        {
-            let owner_use_def = self.index.use_def_map(owner_scope);
-            resolve((
-                owner_use_def.end_of_scope_symbol_declarations(owner_symbol),
-                owner_use_def.end_of_scope_imported_final_candidates(owner_symbol.into()),
-            ))
+        let is_import = binding.kind(db).is_import();
+        let resolve = |sources| {
+            place_from_binding_declarations(db, env, sources, is_import, self.reachability_cache())
+        };
+        let declared = if let Some((scope, symbol)) = owner {
+            let mut declared = resolve(
+                self.index
+                    .use_def_map(scope)
+                    .end_of_scope_declaration_sources(symbol.into()),
+            );
+            if !is_import && let Some(local) = use_def.declaration_sources_at_binding(binding) {
+                declared = declared.with_forwarding_scope(&resolve(local));
+            }
+            declared
         } else {
             use_def
-                .declarations_and_imports_at_binding(binding)
+                .declaration_sources_at_binding(binding)
                 .map_or_default(resolve)
         };
-        let mut qualifier_only = declared.is_qualifier_only();
+
+        let has_final_declaration = declared.has_final_declaration();
+        let qualifier_only = declared.is_qualifier_only();
         let (mut place_and_quals, conflicting) = declared.into_place_and_conflicting_declarations();
-
-        // Imports into `global` and `nonlocal` names retain their qualifiers in the forwarding
-        // scope, while the owner's declarations continue to supply the declared type.
-        if !is_local
-            && !is_import
-            && let Some(local) = use_def.declarations_and_imports_at_binding(binding)
-        {
-            let (local_declared, local_final_declaration) = resolve(local);
-            has_final_declaration |= local_final_declaration;
-            let local_place = local_declared.ignore_conflicting_declarations();
-
-            place_and_quals.qualifiers |= local_place.qualifiers;
-            if place_and_quals.place.is_undefined() {
-                place_and_quals.place = local_place.place;
-                qualifier_only = local_declared.is_qualifier_only();
-            }
-        }
 
         if let Some(conflicting) = conflicting {
             // TODO point out the conflicting declarations in the diagnostic?

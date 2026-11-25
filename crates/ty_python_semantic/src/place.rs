@@ -29,7 +29,7 @@ use ty_python_core::reachability_constraints::{
 };
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
-    BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
+    BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis, DeclarationSources,
     DeclarationWithConstraint, DeclarationsIterator, ImportedFinalCandidatesIterator, ProgramFile,
     Truthiness, global_scope, place_table, use_def_map,
 };
@@ -895,18 +895,33 @@ pub(crate) fn place_from_declarations<'db>(
     place_from_declarations_impl(db, env, declarations, RequiresExplicitReExport::No, None)
 }
 
-pub(crate) fn place_from_declarations_with_reachability_cache<'db>(
+/// Resolve the declarations and imported qualifiers that constrain a binding.
+/// An import replaces previous imports. For other bindings, an imported `Final`
+/// can supply an expected type if there is no annotation.
+pub(crate) fn place_from_binding_declarations<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    declarations: DeclarationsIterator<'_, 'db>,
+    sources: DeclarationSources<'_, 'db>,
+    is_import: bool,
     reachability_cache: &ReachabilityEvaluationCache<'db>,
 ) -> PlaceFromDeclarationsResult<'db> {
-    place_from_declarations_impl(
+    let declared = place_from_declarations_impl(
         db,
         env,
-        declarations,
+        sources.declarations(),
         RequiresExplicitReExport::No,
         Some(reachability_cache),
+    );
+    if is_import {
+        return declared;
+    }
+    declared.with_imported_final_impl(
+        db,
+        env,
+        sources.imported_final_candidates(),
+        RequiresExplicitReExport::No,
+        Some(reachability_cache),
+        true,
     )
 }
 
@@ -920,7 +935,8 @@ type DeclaredTypeAndConflictingTypes<'db> = (
 pub(crate) struct PlaceFromDeclarationsResult<'db> {
     /// A reachable declaration can supply qualifiers without specifying a type.
     place: Option<DefinedPlace<'db, Option<Type<'db>>>>,
-    qualifiers: TypeQualifiers,
+    declared_qualifiers: TypeQualifiers,
+    imported_qualifiers: TypeQualifiers,
     conflicting_types: Option<Box<indexmap::set::Slice<Type<'db>>>>,
     /// At least one reachable declaration supplies qualifiers without a type, even if other
     /// declarations of the same place specify a type.
@@ -932,7 +948,11 @@ pub(crate) struct PlaceFromDeclarationsResult<'db> {
 
 impl<'db> PlaceFromDeclarationsResult<'db> {
     pub(crate) fn qualifiers(&self) -> TypeQualifiers {
-        self.qualifiers
+        self.declared_qualifiers | self.imported_qualifiers
+    }
+
+    pub(crate) fn has_final_declaration(&self) -> bool {
+        self.declared_qualifiers.contains(TypeQualifiers::FINAL)
     }
 
     pub(crate) fn is_qualifier_only(&self) -> bool {
@@ -957,24 +977,20 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
         )
     }
 
-    /// Also use an imported `Final`'s source type to constrain an assignment when the target has
-    /// no declared type. An existing annotation always takes precedence over that source type.
+    /// For a `global` or `nonlocal` assignment, keep qualifiers from both scopes.
+    /// The owner supplies the type and any conflicting declarations. Fall back to
+    /// the forwarding scope's type only when the owner has no declaration.
     #[must_use]
-    pub(crate) fn with_imported_final_for_assignment(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        candidates: ImportedFinalCandidatesIterator<'_, 'db>,
-        reachability_cache: &ReachabilityEvaluationCache<'db>,
-    ) -> Self {
-        self.with_imported_final_impl(
-            db,
-            env,
-            candidates,
-            RequiresExplicitReExport::No,
-            Some(reachability_cache),
-            true,
-        )
+    pub(crate) fn with_forwarding_scope(self, local: &Self) -> Self {
+        let source = if self.place.is_some() { &self } else { local };
+        Self {
+            place: source.place,
+            first_declaration: source.first_declaration,
+            has_qualifier_only_declaration: source.has_qualifier_only_declaration,
+            declared_qualifiers: self.declared_qualifiers | local.declared_qualifiers,
+            imported_qualifiers: self.imported_qualifiers | local.imported_qualifiers,
+            conflicting_types: self.conflicting_types,
+        }
     }
 
     /// This can be called cross-module, so resolve imports through semantic queries without
@@ -1028,7 +1044,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
                 continue;
             }
 
-            self.qualifiers.insert(TypeQualifiers::FINAL);
+            self.imported_qualifiers.insert(TypeQualifiers::FINAL);
 
             // Public lookup must still regard this symbol as undeclared. Only assignment
             // inference without an annotation needs the imported source type as a constraint.
@@ -1082,7 +1098,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
             .map_or(Place::Undefined, |place| {
                 Place::Defined(place.with_type(place.ty.unwrap_or_else(Type::unknown)))
             })
-            .with_qualifiers(self.qualifiers)
+            .with_qualifiers(self.qualifiers())
     }
 
     pub(crate) fn into_place_and_conflicting_declarations(
@@ -2326,7 +2342,8 @@ fn place_from_declarations_impl<'db>(
                     .with_definedness(boundness)
                     .with_provenance(provenance),
             ),
-            qualifiers: declared.qualifiers(),
+            declared_qualifiers: declared.qualifiers(),
+            imported_qualifiers: TypeQualifiers::empty(),
             conflicting_types: conflicting,
             has_qualifier_only_declaration,
             first_declaration,
