@@ -493,8 +493,9 @@ def replace_global() -> None:
 
 ### Imported `Final` qualifiers apply to class members
 
-An imported `Final` qualifier prevents subclass overrides and assignments through the class object
-or its instances. An earlier class-member annotation retains its declared type.
+An imported `Final` qualifier prevents reassignment in the class body, subclass overrides, and
+assignments through the class object or its instances. An earlier class-member annotation retains
+its declared type.
 
 `source.py`:
 
@@ -518,6 +519,11 @@ class Derived(Base):
 
 Base.VALUE = 3  # error: [invalid-assignment]
 Base().VALUE = 4  # error: [invalid-assignment]
+
+class Unannotated:
+    from source import VALUE
+
+    VALUE = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `VALUE` is not allowed"
 ```
 
 ### Conditional imports preserve `Final` qualifiers

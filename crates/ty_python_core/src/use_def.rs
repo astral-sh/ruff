@@ -1418,30 +1418,39 @@ impl<'db> UseDefMap<'db> {
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
         self.declarations_iterator(
-            self.retained_declarations_at_binding(binding),
+            self.retained_declarations_at_binding(binding)
+                .unwrap_or_else(|| ALWAYS_UNDECLARED_DECLARATIONS.as_slice()),
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
 
-    /// Imports that may contribute a `Final` qualifier at this binding.
+    /// Returns the declarations and possible imported `Final` qualifiers reaching this binding.
     ///
-    /// These imports do not declare a type. Whether their source is actually `Final` is
-    /// determined during type inference.
-    pub fn imported_final_candidates_at_binding(
+    /// Both come from the same retained state. If the binding has no entry, its place was
+    /// unbound and undeclared in this scope. Declarations in other scopes can still apply.
+    pub fn declarations_and_imports_at_binding(
         &self,
         binding: Definition<'db>,
-    ) -> ImportedFinalCandidatesIterator<'_, 'db> {
-        self.imported_final_candidates_iterator(self.retained_declarations_at_binding(binding))
+    ) -> Option<(
+        DeclarationsIterator<'_, 'db>,
+        ImportedFinalCandidatesIterator<'_, 'db>,
+    )> {
+        let declarations = self.retained_declarations_at_binding(binding)?;
+        Some((
+            self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility),
+            self.imported_final_candidates_iterator(declarations),
+        ))
     }
 
-    fn retained_declarations_at_binding(&self, binding: Definition<'db>) -> &[LiveDeclaration] {
-        self.definitions_by_definition.get(&binding).map_or_else(
-            || ALWAYS_UNDECLARED_DECLARATIONS.as_slice(),
-            |definitions| {
-                &self.interned_declarations[definitions
-                    .declarations
-                    .expect("binding definition should have retained declarations")]
-            },
+    fn retained_declarations_at_binding(
+        &self,
+        binding: Definition<'db>,
+    ) -> Option<&[LiveDeclaration]> {
+        let definitions = self.definitions_by_definition.get(&binding)?;
+        Some(
+            &self.interned_declarations[definitions
+                .declarations
+                .expect("binding definition should have retained declarations")],
         )
     }
 

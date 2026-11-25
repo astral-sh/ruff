@@ -1444,15 +1444,16 @@ mod tests {
                     DefinitionKind::AnnotatedAssignment(_)
                 );
             }
+            let (declarations, mut candidates) = use_def
+                .declarations_and_imports_at_binding(assignment)
+                .unwrap();
             assert_eq!(
-                use_def
-                    .declarations_at_binding(assignment)
+                declarations
                     .map(|declaration| declaration.declaration)
                     .collect::<Vec<_>>(),
                 [declaration.map_or(DefinitionState::Undefined, DefinitionState::Defined)]
             );
 
-            let mut candidates = use_def.imported_final_candidates_at_binding(assignment);
             assert_matches!(
                 candidates
                     .next()
@@ -1481,6 +1482,11 @@ mod tests {
             .first_public_binding(global_table.symbol_id("x").expect("symbol exists"))
             .unwrap();
         assert_matches!(binding.kind(&db), DefinitionKind::Assignment(_));
+        assert!(
+            use_def
+                .declarations_and_imports_at_binding(binding)
+                .is_none()
+        );
     }
 
     #[test]
