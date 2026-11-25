@@ -880,6 +880,53 @@ def fallback(x: object) -> int: ...
 Result([], fallback).get().bit_length()  # ok
 ```
 
+### A callback and the assignment both bound a covariant parameter
+
+In both calls, `Narrow` satisfies the callback and the declared type of the result. There is no need
+to use the default for `T`.
+
+```pyi
+from collections.abc import Callable, Mapping
+from typing import Any, Self, assert_type
+
+Narrow = Mapping[str, int] | Mapping[str, str]
+Wide = Mapping[str, Any] | int | str
+
+class Box[T = int]:
+    def __new__(cls, cb: Callable[[T], None]) -> Self: ...
+    def get(self) -> T: ...
+
+def f(narrow: Callable[[Narrow], None], wide: Callable[[Wide], None]) -> None:
+    a: Box[Wide] = Box(narrow)
+    b: Box[Narrow] = Box(wide)
+    assert_type(a, Box[Narrow])
+    assert_type(b, Box[Narrow])
+```
+
+### Two callback parameters bound the same type variable
+
+The callback requires `T` to satisfy both `Left | None` and `Right`. The order of the resulting
+intersection determines which `__setitem__` signature supplies the type of `s`.
+
+```pyi
+from collections.abc import Callable
+from typing import Self
+
+class Box[T]:
+    def __new__(cls, cb: Callable[[T, T], None]) -> Self: ...
+    def get(self) -> T: ...
+
+class Left:
+    def __setitem__(self, key: int, value: Callable[[object], str]) -> None: ...
+
+class Right:
+    def __setitem__(self, key: int, value: Callable[[str], str]) -> None: ...
+
+def f(cb: Callable[[Left | None, Right], None]) -> None:
+    item = Box(cb).get()
+    item[0] = lambda s: s.upper()
+```
+
 ### Constructing through `type(self)`
 
 Calling a constructor through `type(self)` preserves the current `Self` specialization. The class's

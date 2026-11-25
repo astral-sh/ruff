@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
 
 use indexmap::map::Slice;
+use itertools::Itertools;
 use ruff_index::Idx;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -1182,8 +1183,8 @@ impl<'db, 'budget> SolutionWalker<'db, 'budget> {
     /// choosing `C[T]` satisfies both. Adding the upper bound can derive constraints
     /// for every partial specialization of `C[T]`.
     ///
-    /// Keep those constraints when they can reorder alternative solutions or when
-    /// specializing the receiver can introduce upper bounds on inferred parameters.
+    /// Keep those constraints when they can reorder alternative solutions or change
+    /// how we combine upper bounds on the receiver's inferred type parameters.
     fn can_skip_self_bound(
         &self,
         db: &'db dyn Db,
@@ -1241,12 +1242,27 @@ impl<'db, 'budget> SolutionWalker<'db, 'budget> {
         support.is_complete()
             && support.iter().filter(|&id| id != self_id).all(|id| {
                 let var = storage.typevar_data(id);
-                !var.is_inferable(db, self.inferable)
-                    || upper
-                        .bound
-                        .variance_of(db, env, var.identity(db))
-                        .evaluate(db)
-                        .is_covariant()
+                if !var.is_inferable(db, self.inferable) {
+                    return true;
+                }
+
+                // Even for covariant T, validating Self can derive another copy of an
+                // upper bound on T with different provenance. With multiple upper bounds,
+                // this can change which type we infer or how we order an intersection.
+                // Match the candidate solver, which ignores substituted constraints
+                // and deduplicates upper bounds by provenance and type.
+                let mut upper_bounds = path.positive_constraints().filter_map(|(id, _)| {
+                    let constraint = storage.atomic_constraint_data(id);
+                    let bound = constraint.upper_bound_for(db, var)?;
+                    (!path.constraint_is_substituted(id))
+                        .then_some((constraint.provenance(), bound))
+                });
+                upper
+                    .bound
+                    .variance_of(db, env, var.identity(db))
+                    .evaluate(db)
+                    .is_covariant()
+                    && upper_bounds.all_equal()
             })
     }
 
