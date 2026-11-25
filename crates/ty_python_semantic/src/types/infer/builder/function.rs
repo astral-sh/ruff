@@ -1286,43 +1286,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Option<Type<'db>> {
         let env = self.program_environment();
         let db = self.db();
-        let file = self.program_file();
+        let scope = self.scope().file_scope_id(db);
+        let function = self.index.scope(scope).node().as_function()?;
+        let function_node = function.node(self.module());
 
-        let function_scope_id = self.scope();
-        let function_scope = function_scope_id.scope(db);
-        let function = function_scope.node().as_function()?;
-
-        let parent_file_scope_id = function_scope.parent()?;
-        let mut parent_scope_id = parent_file_scope_id.to_scope_id(db, file);
-
-        // Skip type parameter scopes, if the method itself is generic.
-        if parent_scope_id.is_annotation(db) {
-            let parent_scope = parent_scope_id.scope(db);
-            parent_scope_id = parent_scope.parent()?.to_scope_id(db, file);
-        }
-
-        // Return early if this is not a method inside a class.
-        let class = parent_scope_id.scope(db).node().as_class()?;
-
-        let method_definition = self.index.expect_single_definition(function);
-        let DefinitionKind::Function(function_definition) = method_definition.kind(db) else {
-            return None;
-        };
-
-        if function_definition
-            .node(self.module())
+        if function_node
             .parameters
-            .index(parameter.name())
-            .is_none_or(|index| index != 0)
+            .iter_non_variadic_params()
+            .next()
+            .is_none_or(|first| first.parameter.name() != parameter.name())
         {
             return None;
         }
 
-        let function_node = function_definition.node(self.module());
+        let class_definition = self.index.class_definition_of_method(scope)?;
+        let method_definition = self.index.expect_single_definition(function);
         let receiver_kind =
             MethodReceiverKind::from_function(db, method_definition, function_node)?;
-
-        let class_definition = self.index.expect_single_definition(class);
         let class_literal = original_class_type(db, class_definition)?;
         let typing_self = typing_self(db, self.scope(), Some(method_definition), class_literal);
         match receiver_kind {
