@@ -121,6 +121,8 @@ Never edit snapshot files or inline snapshot bodies manually. Regenerate them by
 
 ## Writing mdtests
 
+- To check an inferred type, use `reveal_type` without an import, as in `reveal_type(1)  # revealed: Literal[1]`. The mdtest harness checks that ty displays exactly the type written after `# revealed:`. Reserve `assert_type` for tests of the directive itself or of type equivalence that the displayed type alone cannot establish.
+
 - Write mdtests as readable, literate specifications, and minimize the context a reader must hold in mind. Prefer short, focused code blocks, and define types, fixtures, and helpers close to the assertions that use them. Sections and subsections can be long when they develop a coherent topic through many short examples interspersed with prose. Do not split a subsection, or flag it in review, solely because of its length. Give independent scenarios separate sibling Markdown test headings at the same level; only introduce child headings if any existing code beneath their parent is first moved into child sections. When scenarios need shared setup, interleave short prose-and-code blocks under the same heading.
 
 - Code blocks for the same file within a section are concatenated into one file. For inline snapshots, keep each example's code block close to its `# snapshot` block. Ideally, any given code block only has one snapshot in it, but one codeblock containing several snapshots is also acceptable. Repeating a short, independent function definition, including one with the same name, is fine if it keeps the code triggering a snapshot close to the snapshot demonstrating the expected diagnostic on that code. Reuse shared setup when clearer, and check that repeated names do not affect other examples.
