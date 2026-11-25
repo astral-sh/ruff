@@ -4185,7 +4185,7 @@ dependencies = [
  "normalize-line-endings",
  "os_pipe",
  "serde_json",
- "similar 3.2.0",
+ "similar 3.2.1",
  "snapbox-macros",
  "wait-timeout",
  "windows-sys 0.61.2",
