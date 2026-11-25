@@ -246,8 +246,8 @@
 //! [`SemanticIndexBuilder`](crate::builder::SemanticIndexBuilder), e.g. where it
 //! visits a `StmtIf` node.
 
-use std::collections::hash_map::Entry;
-use std::hash::{Hash as _, Hasher as _};
+use hashbrown::hash_table::Entry;
+use std::hash::{BuildHasher as _, Hash as _, Hasher as _};
 use std::ops::Index;
 use std::rc::Rc;
 use std::sync::{Arc, LazyLock};
@@ -255,7 +255,7 @@ use std::sync::{Arc, LazyLock};
 use ruff_index::{FrozenIndexVec, Idx, IndexVec, newtype_index};
 use ruff_python_ast::NodeIndex;
 use ruff_text_size::TextRange;
-use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHasher};
 use smallvec::SmallVec;
 use thin_vec::ThinVec;
 
@@ -348,11 +348,13 @@ struct PlaceStateInterner {
     interned_bindings: RetainedBindingsBuilder,
     interned_ids_by_bindings: hashbrown::HashTable<InternedBindingsId>,
     interned_declarations: RetainedDeclarationsBuilder,
-    interned_ids_by_declarations: FxHashMap<Declarations, InternedDeclarationsId>,
+    interned_ids_by_declarations: hashbrown::HashTable<InternedDeclarationsId>,
     // Undeclared states are common and can be interned by their dense constraint IDs.
     undeclared_declarations_by_constraint:
         IndexVec<ScopedReachabilityConstraintId, Option<InternedDeclarationsId>>,
     // These values are extremely common, so avoid repeatedly hashing their small vectors.
+    empty_bindings: Option<InternedBindingsId>,
+    empty_declarations: Option<InternedDeclarationsId>,
     always_unbound_bindings: Option<InternedBindingsId>,
     always_undeclared_declarations: Option<InternedDeclarationsId>,
 }
@@ -363,17 +365,22 @@ impl PlaceStateInterner {
             interned_bindings: RetainedBindingsBuilder::with_capacity(bindings),
             interned_ids_by_bindings: hashbrown::HashTable::with_capacity(bindings),
             interned_declarations: RetainedDeclarationsBuilder::with_capacity(declarations),
-            interned_ids_by_declarations: FxHashMap::with_capacity_and_hasher(
-                declaration_map,
-                FxBuildHasher,
-            ),
+            interned_ids_by_declarations: hashbrown::HashTable::with_capacity(declaration_map),
             undeclared_declarations_by_constraint: IndexVec::new(),
+            empty_bindings: None,
+            empty_declarations: None,
             always_unbound_bindings: None,
             always_undeclared_declarations: None,
         }
     }
 
     fn intern_bindings(&mut self, bindings: &Bindings) -> InternedBindingsId {
+        // Reachable places with no explicit bindings share an empty slice.
+        if bindings.as_slice().is_empty() {
+            return *self
+                .empty_bindings
+                .get_or_insert_with(|| self.interned_bindings.push(bindings));
+        }
         if bindings.is_always_unbound() {
             if let Some(interned_id) = self.always_unbound_bindings {
                 return interned_id;
@@ -386,16 +393,16 @@ impl PlaceStateInterner {
 
         // The retained representation discards the unbound narrowing constraint, so it isn't
         // part of the interned identity.
-        let hash = Self::hash_bindings(bindings.as_slice());
+        let hash = Self::hash(bindings.as_slice());
         let interned_bindings = &mut self.interned_bindings;
         let entry = self.interned_ids_by_bindings.entry(
             hash,
             |id| interned_bindings.get(*id) == bindings.as_slice(),
-            |id| Self::hash_bindings(interned_bindings.get(*id)),
+            |id| Self::hash(interned_bindings.get(*id)),
         );
         match entry {
-            hashbrown::hash_table::Entry::Occupied(entry) => *entry.get(),
-            hashbrown::hash_table::Entry::Vacant(entry) => {
+            Entry::Occupied(entry) => *entry.get(),
+            Entry::Vacant(entry) => {
                 let interned_id = interned_bindings.push(bindings);
                 entry.insert(interned_id);
                 interned_id
@@ -403,19 +410,24 @@ impl PlaceStateInterner {
         }
     }
 
-    fn hash_bindings(live_bindings: &[LiveBinding]) -> u64 {
+    fn hash<T: std::hash::Hash>(values: &[T]) -> u64 {
         let mut hasher = FxHasher::default();
-        live_bindings.hash(&mut hasher);
+        values.hash(&mut hasher);
         hasher.finish()
     }
 
-    fn intern_declarations(&mut self, declarations: Declarations) -> InternedDeclarationsId {
+    fn intern_declarations(&mut self, declarations: &Declarations) -> InternedDeclarationsId {
+        if declarations.as_slice().is_empty() {
+            return *self
+                .empty_declarations
+                .get_or_insert_with(|| self.interned_declarations.push(declarations));
+        }
         if declarations.is_always_undeclared() {
             if let Some(interned_id) = self.always_undeclared_declarations {
                 return interned_id;
             }
 
-            let interned_id = self.interned_declarations.push(&declarations);
+            let interned_id = self.interned_declarations.push(declarations);
             self.always_undeclared_declarations = Some(interned_id);
             return interned_id;
         }
@@ -434,15 +446,21 @@ impl PlaceStateInterner {
                 return interned_id;
             }
 
-            let interned_id = self.interned_declarations.push(&declarations);
+            let interned_id = self.interned_declarations.push(declarations);
             self.undeclared_declarations_by_constraint[reachability_constraint] = Some(interned_id);
             return interned_id;
         }
 
-        match self.interned_ids_by_declarations.entry(declarations) {
+        let interned = &mut self.interned_declarations;
+        let entry = self.interned_ids_by_declarations.entry(
+            Self::hash(declarations.as_slice()),
+            |id| interned.get(*id) == declarations.as_slice(),
+            |id| Self::hash(interned.get(*id)),
+        );
+        match entry {
             Entry::Occupied(entry) => *entry.get(),
             Entry::Vacant(entry) => {
-                let interned_id = self.interned_declarations.push(entry.key());
+                let interned_id = interned.push(declarations);
                 entry.insert(interned_id);
                 interned_id
             }
@@ -452,7 +470,7 @@ impl PlaceStateInterner {
     fn intern_place_state(
         &mut self,
         bindings: &Bindings,
-        declarations: Declarations,
+        declarations: &Declarations,
     ) -> InternedPlaceStateId {
         InternedPlaceStateId(
             self.intern_bindings(bindings),
@@ -463,14 +481,14 @@ impl PlaceStateInterner {
     fn retain_place_state(
         &mut self,
         bindings: &Bindings,
-        declarations: Declarations,
+        declarations: &Declarations,
     ) -> InternedPlaceStateId {
         // Other retained declarations rarely repeat. Keep the compact IDs without hashing every
         // declaration vector to find the occasional duplicate.
         let declarations_id = if declarations.undeclared_reachability_constraint().is_some() {
             self.intern_declarations(declarations)
         } else {
-            self.interned_declarations.push(&declarations)
+            self.interned_declarations.push(declarations)
         };
         InternedPlaceStateId(self.intern_bindings(bindings), declarations_id)
     }
@@ -910,8 +928,8 @@ impl ScopeReachability {
 /// identical tables can share storage without sharing the scope-specific data they reference.
 #[derive(Default)]
 pub(super) struct UseDefMapInterner {
-    bindings: FxHashSet<Arc<RetainedBindings>>,
-    declarations: FxHashSet<Arc<RetainedDeclarations>>,
+    bindings: hashbrown::HashTable<(u64, Arc<RetainedBindings>)>,
+    declarations: hashbrown::HashTable<(u64, Arc<RetainedDeclarations>)>,
     stub_layouts: FxHashMap<SmallVec<[bool; 8]>, StubParameterLayout>,
 }
 
@@ -1018,15 +1036,22 @@ impl UseDefMapInterner {
         Arc::new(map)
     }
 
+    /// Hash each scope's table once, even when the interner grows.
     fn intern_table<T: Eq + std::hash::Hash>(
-        values: &mut FxHashSet<Arc<T>>,
+        values: &mut hashbrown::HashTable<(u64, Arc<T>)>,
         value: Arc<T>,
     ) -> Arc<T> {
-        if let Some(existing) = values.get(value.as_ref()) {
-            Arc::clone(existing)
-        } else {
-            values.insert(Arc::clone(&value));
-            value
+        let hash = FxBuildHasher.hash_one(value.as_ref());
+        match values.entry(
+            hash,
+            |(stored_hash, existing)| *stored_hash == hash && *existing == value,
+            |(stored_hash, _)| *stored_hash,
+        ) {
+            Entry::Occupied(entry) => Arc::clone(&entry.get().1),
+            Entry::Vacant(entry) => {
+                entry.insert((hash, Arc::clone(&value)));
+                value
+            }
         }
     }
 }
@@ -3673,23 +3698,22 @@ impl<'db> UseDefMapBuilder<'db> {
                 .map(|(use_id, bindings)| (use_id, place_state_interner.intern_bindings(&bindings)))
                 .collect(),
         );
-        let symbol_states = self
+        let end_of_scope_symbols = self
             .symbol_states
             .into_iter()
-            .map(|state| Rc::unwrap_or_clone(state.state))
+            .map(|pending| {
+                place_state_interner
+                    .retain_place_state(pending.state.bindings(), pending.state.declarations())
+            })
             .collect();
-        let member_states = self
+        let end_of_scope_members = self
             .member_states
             .into_iter()
-            .map(|state| Rc::unwrap_or_clone(state.state))
+            .map(|pending| {
+                place_state_interner
+                    .intern_place_state(pending.state.bindings(), pending.state.declarations())
+            })
             .collect();
-        let end_of_scope_symbols = Self::intern_place_states(
-            symbol_states,
-            PlaceState::into_parts,
-            &mut place_state_interner,
-        );
-        let end_of_scope_members =
-            Self::intern_end_of_scope_members(member_states, &mut place_state_interner);
         let symbol_states = Self::intern_reachable_place_states(
             end_of_scope_symbols,
             self.reachable_symbol_definitions,
@@ -3818,7 +3842,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 {
                     end_of_scope.declarations_id()
                 } else {
-                    place_state_interner.intern_declarations(declarations)
+                    place_state_interner.intern_declarations(&declarations)
                 };
                 RetainedPlaceStates {
                     end_of_scope,
@@ -3860,7 +3884,7 @@ impl<'db> UseDefMapBuilder<'db> {
         {
             let bindings = place_state_interner.intern_bindings(&bindings);
             let declarations = declarations
-                .map(|declarations| place_state_interner.intern_declarations(declarations));
+                .map(|declarations| place_state_interner.intern_declarations(&declarations));
             interned_ids_by_definition.push((
                 definition,
                 DefinitionsAtDefinition {
@@ -3871,49 +3895,6 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         FrozenMap::from_entries(interned_ids_by_definition)
-    }
-
-    fn intern_place_states<I: Idx, T>(
-        place_states: IndexVec<I, T>,
-        get_parts: impl Fn(T) -> (Bindings, Declarations),
-        place_state_interner: &mut PlaceStateInterner,
-    ) -> IndexVec<I, InternedPlaceStateId> {
-        let mut interned_ids_by_place = IndexVec::with_capacity(place_states.len());
-
-        for place_state in place_states {
-            let (bindings, declarations) = get_parts(place_state);
-            let interned_id = place_state_interner.retain_place_state(&bindings, declarations);
-            interned_ids_by_place.push(interned_id);
-        }
-
-        interned_ids_by_place
-    }
-
-    fn intern_end_of_scope_members(
-        end_of_scope_members: IndexVec<ScopedMemberId, PlaceState>,
-        place_state_interner: &mut PlaceStateInterner,
-    ) -> IndexVec<ScopedMemberId, InternedPlaceStateId> {
-        let mut interned_ids_by_member = IndexVec::with_capacity(end_of_scope_members.len());
-        let mut interned_ids_by_place_state =
-            FxHashMap::with_capacity_and_hasher(end_of_scope_members.len(), FxBuildHasher);
-
-        for place_state in end_of_scope_members {
-            let interned_id = match interned_ids_by_place_state.entry(place_state) {
-                Entry::Occupied(entry) => *entry.get(),
-                Entry::Vacant(entry) => {
-                    let place_state = entry.key();
-                    let interned_id = place_state_interner.intern_place_state(
-                        place_state.bindings(),
-                        place_state.declarations().clone(),
-                    );
-                    entry.insert(interned_id);
-                    interned_id
-                }
-            };
-            interned_ids_by_member.push(interned_id);
-        }
-
-        interned_ids_by_member
     }
 
     fn intern_enclosing_snapshots(
