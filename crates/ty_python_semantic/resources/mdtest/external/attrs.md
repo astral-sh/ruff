@@ -362,7 +362,6 @@ reveal_type(User1.__init__)  # revealed: (self: User1, /) -> None
 # error: [unknown-argument]
 user = User1(id=1, name="Alice")
 reveal_type(user.id)  # revealed: int
-# TODO: This should reveal `Unknown`.
 reveal_type(user.name)  # revealed: Any
 
 # TODO: Report an invalid argument type for `id`.
