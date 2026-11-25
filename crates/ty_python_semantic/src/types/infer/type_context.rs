@@ -15,6 +15,10 @@ pub(crate) enum TypeContextKind {
         prefer: bool,
     },
 
+    /// The type of another operand in a boolean or conditional expression. A fresh
+    /// collection can use the peer's element types without being assignable to the peer.
+    CollectionPeer,
+
     /// A constraint originating from inference evidence.
     ///
     /// During generic call inference, constraints inferred from call arguments are provided as
@@ -103,8 +107,9 @@ impl<'db> TypeContext<'db> {
     pub(crate) fn should_prefer_expected_type(self) -> bool {
         match self.kind {
             TypeContextKind::Expected { prefer } => prefer,
-            // Preserve a solution inferred from other arguments in the previous fixpoint round.
-            TypeContextKind::Inferred => true,
+            // Preserve the type inferred from a peer or from other arguments in the
+            // previous fixpoint round.
+            TypeContextKind::CollectionPeer | TypeContextKind::Inferred => true,
             TypeContextKind::Validity => false,
         }
     }

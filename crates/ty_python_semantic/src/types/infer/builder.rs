@@ -109,8 +109,8 @@ use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{
     StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TruthinessAnalyzer,
-    TypeAndRange, TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
-    nearest_enclosing_function, original_class_type,
+    TypeAndRange, TypeContextKind, TypeExpressionFlags, infer_statement_types,
+    nearest_enclosing_class, nearest_enclosing_function, original_class_type,
 };
 use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
 use crate::types::member::{class_body_declaration_from_bases, inherited_class_body_declaration};
@@ -6944,7 +6944,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(peer_ty) = peer_ty
             && prefer_collection_literal_peer_context(db, env, tcx)
         {
-            TypeContext::preference(Some(peer_ty))
+            TypeContext::new(Some(peer_ty), TypeContextKind::CollectionPeer)
         } else {
             return infer_expression(self, tcx);
         };
@@ -8571,8 +8571,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        // Record all element bounds in case we need to re-solve without type context after
-        // a failed inference attempt.
+        // Keep the element bounds for a retry if the collection doesn't fit its target.
+        // In `xs or [None]`, the fresh list can hold both elements of `xs` and `None`
+        // even if the resulting list type isn't assignable to the type of `xs`.
+        let retry_target = tcx
+            .expected_type()
+            .filter(|_| has_element_context && tcx.kind() != TypeContextKind::CollectionPeer);
         let mut element_bounds = [const { Vec::new() }; N];
 
         // Consecutive elements often contribute the same lower bound after literal promotion.
@@ -8617,7 +8621,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         unpacked_value_ty.promote(db, env),
                     );
 
-                    if has_element_context {
+                    if retry_target.is_some() {
                         element_bounds[0].push(unpacked_key_ty);
                         element_bounds[1].push(unpacked_value_ty);
                     }
@@ -8691,7 +8695,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     inferred_elt_ty
                 };
 
-                if has_element_context {
+                if retry_target.is_some() {
                     element_bounds[i].push(inferred_type_for_typevar);
                 }
 
@@ -8745,8 +8749,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // If the result collection type is incompatible with the type context, re-solve without
         // type context for more precise diagnostics.
-        if has_element_context
-            && let Some(expected) = tcx.expected_type()
+        if let Some(expected) = retry_target
             && !collection_ty.is_assignable_to(db, env, expected)
         {
             let mut builder = SpecializationBuilder::new(db, env, &constraints, generic_context);

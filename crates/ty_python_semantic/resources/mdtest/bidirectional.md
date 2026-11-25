@@ -2772,7 +2772,8 @@ def _(flag: bool):
 ## Collection literals in boolean and conditional expressions
 
 When a boolean or conditional expression combines a fresh collection literal with another operand,
-the other operand can provide type context for the literal:
+the other operand can provide type context for the literal. The fresh collection can include
+additional element types without widening the type of an existing collection.
 
 ```py
 from collections.abc import Mapping
@@ -2838,8 +2839,14 @@ def generic_type_context(values: list[int | str] | None) -> None:
     reveal_type(preserve_partially_specialized(values or []))  # revealed: list[Unknown | int]
 
 def widened_non_empty_fallback(values: list[int] | None) -> None:
-    result = values or ["x"]
-    reveal_type(result)  # revealed: (list[int] & ~AlwaysFalsy) | list[str]
+    result = values or [None]
+    reveal_type(result)  # revealed: (list[int] & ~AlwaysFalsy) | list[int | None]
+    result.append(1)  # ok
+    result.append(None)  # error: [invalid-argument-type]
+
+def nested_dict_fallback(rows: list[dict[Key, int]] | None) -> None:
+    for row in rows or [{"foo": "missing"}]:
+        row["bar"] = 1  # ok
 
 def incompatible_collection_kind(values: set[str] | None) -> None:
     reveal_type(values or [1])  # revealed: (set[str] & ~AlwaysFalsy) | list[int]

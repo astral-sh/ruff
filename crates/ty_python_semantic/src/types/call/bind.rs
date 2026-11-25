@@ -6809,7 +6809,7 @@ impl<'db> CallInference<'_, 'db> {
             let expected_return = self.call_expression_tcx.expected_type().filter(|_| {
                 matches!(
                     self.call_expression_tcx.kind(),
-                    TypeContextKind::Expected { .. }
+                    TypeContextKind::Expected { .. } | TypeContextKind::CollectionPeer
                 )
             });
 
