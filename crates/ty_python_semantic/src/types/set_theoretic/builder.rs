@@ -47,7 +47,6 @@ use super::RecursivelyDefined;
 use super::generic_gradual_intersections::{GenericIntersection, generic_gradual_intersection};
 use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
-use crate::types::tuple::TupleSpec;
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownBoundMethodType,
@@ -624,6 +623,55 @@ enum ReduceResult<'db> {
     /// The given `Type` can stand-in for the entire `UnionElement` for further union
     /// simplification checks.
     Type(Type<'db>),
+}
+
+/// Tags that can distinguish a fixed-length tuple from other members of a union.
+struct TupleTags<'db> {
+    leading_literal: Option<LiteralValueType<'db>>,
+    first_class: Option<(usize, ClassLiteral<'db>)>,
+}
+
+impl<'db> TupleTags<'db> {
+    /// Find the tags once per incoming tuple. Registry entries often store a class
+    /// object at the same position even when their first element is a plain `str`.
+    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        let spec = ty.exact_tuple_instance_spec(db)?;
+        let elements = spec.as_fixed_length()?.elements_slice();
+        let leading_literal = elements.first()?.as_literal_value();
+        let first_class = elements
+            .iter()
+            .enumerate()
+            .find_map(|(i, ty)| ty.as_class_literal().map(|class| (i, class)));
+
+        (leading_literal.is_some() || first_class.is_some()).then_some(Self {
+            leading_literal,
+            first_class,
+        })
+    }
+
+    /// Return true if a tag proves that neither tuple subsumes the other.
+    fn rules_out_redundancy(&self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        let Some(spec) = other.exact_tuple_instance_spec(db) else {
+            return false;
+        };
+        let Some(tuple) = spec.as_fixed_length() else {
+            return false;
+        };
+        let elements = tuple.elements_slice();
+
+        // Distinct class objects are disjoint even when one class inherits from the other.
+        if let Some((index, class)) = self.first_class
+            && let Some(Type::ClassLiteral(other)) = elements.get(index)
+            && class != *other
+        {
+            return true;
+        }
+
+        matches!(
+            (self.leading_literal, elements.first()),
+            (Some(tag), Some(Type::LiteralValue(other))) if tag.is_disjoint_from(db, *other)
+        )
+    }
 }
 
 /// Removals to apply if the incoming type is added to the union or merged with an
@@ -1272,21 +1320,7 @@ impl<'db> UnionBuilder<'db> {
         // unpacking them.
         let should_simplify_full = !ty.is_alias_like() && !self.cycle_recovery;
 
-        // Look for a class object once per incoming tuple. Registries often have
-        // a different class at the same position in every entry.
-        let tuple_class = if should_simplify_full
-            && !self.elements.is_empty()
-            && let Some(TupleSpec::Fixed(tuple)) = ty.exact_tuple_instance_spec(db).as_deref()
-        {
-            tuple
-                .elements_slice()
-                .iter()
-                .enumerate()
-                .find_map(|(i, ty)| ty.as_class_literal().map(|class| (i, class)))
-        } else {
-            None
-        };
-
+        let mut tuple_tags = None;
         let mut ty_negated: Option<Type> = None;
         let mut reductions = UnionReductions::default();
 
@@ -1392,17 +1426,6 @@ impl<'db> UnionBuilder<'db> {
             }
 
             if should_simplify_full && !element_type.is_alias_like() {
-                // Distinct class objects rule out redundancy in both directions,
-                // even when one class inherits from the other.
-                if let Some((index, class)) = tuple_class
-                    && let Some(TupleSpec::Fixed(other)) =
-                        element_type.exact_tuple_instance_spec(db).as_deref()
-                    && let Some(Type::ClassLiteral(other_class)) = other.elements_slice().get(index)
-                    && class != *other_class
-                {
-                    continue;
-                }
-
                 if let (Type::NominalInstance(left), Type::NominalInstance(right)) =
                     (ty, element_type)
                     && left.has_unrelated_class(db, right)
@@ -1410,15 +1433,9 @@ impl<'db> UnionBuilder<'db> {
                     continue;
                 }
 
-                // Disjoint leading literals distinguish tagged tuples. Only inspect
-                // the tags when we would otherwise check both directions for redundancy.
-                if let Some(left) = ty.exact_tuple_instance_spec(db)
-                    && let Some(left) = left.as_fixed_length()
-                    && let Some(Type::LiteralValue(tag)) = left.elements_slice().first()
-                    && let Some(right) = element_type.exact_tuple_instance_spec(db)
-                    && let Some(right) = right.as_fixed_length()
-                    && let Some(Type::LiteralValue(other)) = right.elements_slice().first()
-                    && tag.is_disjoint_from(db, *other)
+                // Look up the incoming tuple's tags only on the first full comparison.
+                if let Some(tags) = tuple_tags.get_or_insert_with(|| TupleTags::from_type(db, ty))
+                    && tags.rules_out_redundancy(db, element_type)
                 {
                     continue;
                 }
