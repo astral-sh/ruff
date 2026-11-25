@@ -1363,8 +1363,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn flow_restore(&mut self, state: FlowSnapshot) {
-        self.current_use_def_map_mut().restore(state);
+    /// Resumes another path and returns the state of the path we're leaving.
+    fn flow_restore(&mut self, state: FlowSnapshot) -> FlowSnapshot {
+        self.current_use_def_map_mut().restore(state)
     }
 
     fn flow_merge(&mut self, state: FlowSnapshot) {
@@ -3207,15 +3208,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let (predicate, narrowing_id) = self.record_expression_narrowing_constraint(if_expr);
         let reachability_constraint = self.record_reachability_constraint_id(narrowing_id);
-        let included_path = self.flow_snapshot();
-
-        self.flow_restore(filtered_out);
+        let included_path = self.flow_restore(filtered_out);
         self.record_negated_narrowing_constraint(predicate, narrowing_id);
         self.record_negated_reachability_constraint(reachability_constraint);
-        let filtered_out = self.flow_snapshot();
-
-        self.flow_restore(included_path);
-        filtered_out
+        self.flow_restore(included_path)
     }
 
     fn declare_parameters(&mut self, parameters: &'ast ast::Parameters, is_stub_body: bool) {
@@ -3790,8 +3786,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut()
             .record_range_reachability(body.range(), in_type_checking_block);
         self.visit_expr_with_context(body, context);
-        let post_body = self.flow_snapshot();
-        self.flow_restore(falsy);
+        let post_body = self.flow_restore(falsy);
 
         self.record_negated_narrowing_constraint(predicate, predicate_id);
         self.record_negated_reachability_constraint(reachability_constraint);
@@ -3861,9 +3856,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                     // This path reaches the current operand and then short-circuits.
                     self.record_negated_reachability_constraint(reachability_constraint);
-                    snapshots.push(self.flow_snapshot());
-
-                    self.flow_restore(continuation);
+                    snapshots.push(self.flow_restore(continuation));
                 }
                 self.record_narrowing_constraint_id_for_places(predicate_id, &possibly_narrowed);
                 // The continuation carries the conditions that led to this operand. Named
@@ -4595,12 +4588,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 });
 
                 for (clause_test, clause_body) in elif_else_clauses {
-                    // snapshot after every block except the last; the last one will just become
-                    // the state that we merge the other snapshots into
-                    post_clauses.push(self.flow_snapshot());
-                    // we can only take an elif/else branch if none of the previous ones were
-                    // taken
-                    self.flow_restore(falsy);
+                    // Save this branch for the merge and resume the path where no test
+                    // has succeeded yet.
+                    post_clauses.push(self.flow_restore(falsy));
 
                     self.record_negated_narrowing_constraint(last_predicate, last_narrowing_id);
                     self.record_negated_reachability_constraint(last_reachability_constraint);
@@ -4939,11 +4929,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if let Some((after_iter, non_empty_range_constraint)) =
                         non_empty_range_constraint
                     {
-                        let post_loop_body = self.flow_snapshot();
-                        self.flow_restore(after_iter);
+                        let post_loop_body = self.flow_restore(after_iter);
                         self.record_negated_reachability_constraint(non_empty_range_constraint);
-                        let no_iteration = self.flow_snapshot();
-                        self.flow_restore(post_loop_body);
+                        let no_iteration = self.flow_restore(post_loop_body);
                         self.flow_merge(no_iteration);
                     } else {
                         self.flow_merge(pre_loop);
@@ -5103,17 +5091,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         let guard_predicate_id = self.record_narrowing_constraint(guard_predicate);
                         let guard_reachability_constraint =
                             self.record_reachability_constraint_id(guard_predicate_id);
-                        let guard_success = self.flow_snapshot();
-
-                        self.flow_restore(falsy);
+                        let guard_success = self.flow_restore(falsy);
                         self.record_negated_narrowing_constraint(
                             guard_predicate,
                             guard_predicate_id,
                         );
                         self.record_negated_reachability_constraint(guard_reachability_constraint);
-                        let match_success_guard_failure = self.flow_snapshot();
-                        self.flow_restore(guard_success);
-                        match_success_guard_failure
+                        self.flow_restore(guard_success)
                     });
 
                     self.visit_body(&case.body);
@@ -5184,26 +5168,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let try_block_snapshots = self.exception_context_stack_manager.end_try_suite();
 
                 if !handlers.is_empty() {
-                    // Save the state immediately *after* visiting the `try` block
-                    // but *before* we prepare for visiting the `except` block(s).
-                    //
-                    // We will revert to this state prior to visiting the `else` block,
-                    // as there necessarily must have been 0 `except` blocks executed
-                    // if we hit the `else` block.
-                    let post_try_block_state = self.flow_snapshot();
-
-                    // Prepare for visiting the `except` block(s). If the `try` suite contained no
-                    // exception checkpoints, its handlers are unreachable.
+                    // Resume the first checkpoint, keeping the normal exit from the try suite
+                    // for the else suite. If nothing could raise, start the handlers on an
+                    // unreachable copy of that exit instead.
                     let mut try_block_snapshots = try_block_snapshots.into_iter();
-                    if let Some(first_snapshot) = try_block_snapshots.next() {
-                        self.flow_restore(first_snapshot);
+                    let post_try_block_state = if let Some(first) = try_block_snapshots.next() {
+                        let normal_exit = self.flow_restore(first);
                         for snapshot in try_block_snapshots {
                             self.flow_merge(snapshot);
                         }
+                        normal_exit
                     } else {
-                        self.flow_restore(post_try_block_state.clone());
+                        let normal_exit = self.flow_restore(self.flow_snapshot());
                         self.mark_unreachable();
-                    }
+                        normal_exit
+                    };
 
                     let pre_except_state = (handlers.len() > 1).then(|| self.flow_snapshot());
 
@@ -5211,7 +5190,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         if i > 0
                             && let Some(state) = &pre_except_state
                         {
-                            self.flow_restore(state.clone());
+                            // Save the previous handler's exit before starting this one.
+                            post_except_states.push(self.flow_restore(state.clone()));
                         }
 
                         let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
@@ -5250,13 +5230,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         if let Some(symbol) = symbol {
                             self.delete_binding(symbol.into());
                         }
-                        // Each `except` block is mutually exclusive with all other `except` blocks.
-                        post_except_states.push(self.flow_snapshot());
                     }
 
                     // If we get to the `else` block, we know that 0 of the `except` blocks can have been executed,
                     // and the entire `try` block must have been executed:
-                    self.flow_restore(post_try_block_state);
+                    post_except_states.push(self.flow_restore(post_try_block_state));
                 }
 
                 self.visit_body(orelse);
@@ -5309,7 +5287,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if has_deferred_terminal_context_manager_exit
                         && let Some(snapshot) = terminal_snapshots.next()
                     {
-                        let normal_pre_finally_state = self.flow_snapshot();
                         let continuation = self.current_use_def_map().reachability;
                         self.current_reachability_constraints_mut()
                             .mark_used(continuation);
@@ -5322,7 +5299,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 is_positive: true,
                             }));
 
-                        self.flow_restore(snapshot);
+                        let normal_pre_finally_state = self.flow_restore(snapshot);
                         for snapshot in terminal_snapshots {
                             self.flow_merge(snapshot);
                         }
@@ -5341,8 +5318,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             );
 
                         if finalbody.is_empty() {
-                            let terminal_snapshot = self.flow_snapshot();
-                            self.flow_restore(normal_pre_finally_state);
+                            let terminal_snapshot = self.flow_restore(normal_pre_finally_state);
                             self.exception_context_stack_manager
                                 .propagate_deferred_terminal_context_manager_exit(
                                     terminal_snapshot,
@@ -5380,8 +5356,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 terminal_reachability,
                                 terminal_narrowing,
                             );
-                        let terminal_snapshot = self.flow_snapshot();
-                        self.flow_restore(post_finally_state);
+                        let terminal_snapshot = self.flow_restore(post_finally_state);
                         self.exception_context_stack_manager
                             .propagate_deferred_terminal_context_manager_exit(terminal_snapshot);
 
@@ -5788,8 +5763,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 if let Some(previous_alternatives) = successful_alternatives.take() {
                     self.flow_merge(previous_alternatives);
                 }
-                successful_alternatives = Some(self.flow_snapshot());
-                self.flow_restore(remaining_alternatives);
+                successful_alternatives = Some(self.flow_restore(remaining_alternatives));
                 self.record_negated_reachability_constraint(selected_alternative);
             }
 
