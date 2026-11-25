@@ -1608,6 +1608,39 @@ This is the step 5 of the overload call evaluation algorithm which specifies tha
 
 This is only performed if the previous step resulted in more than one matching overload.
 
+### Protocols and an argument of type `Any`
+
+The first two overloads of `read` cannot cover `object` together, so the last one still contributes
+to the result. The first overload of `select` accepts `object()` through `Hashable`.
+
+```py
+from collections.abc import Hashable
+from typing import Any, Protocol, overload
+
+class Readable(Protocol):
+    def read(self) -> str: ...
+
+@overload
+def read(value: Readable | str) -> str: ...
+@overload
+def read(value: bytes) -> str: ...
+@overload
+def read(value: object) -> int: ...
+def read(value: object) -> str | int:
+    raise NotImplementedError
+
+@overload
+def select(value: Hashable) -> str: ...
+@overload
+def select(value: bytes) -> int: ...
+def select(value: object) -> str | int:
+    raise NotImplementedError
+
+def _(value: Any):
+    reveal_type(read(value))  # revealed: Unknown
+    reveal_type(select(value))  # revealed: str
+```
+
 ### Single list argument
 
 `overloaded.pyi`:
