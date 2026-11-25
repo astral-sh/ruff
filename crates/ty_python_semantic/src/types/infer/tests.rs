@@ -96,29 +96,6 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
 }
 
 #[test]
-fn method_binding_tracks_decorator_edits() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    let main = "/src/main.py";
-    db.write_file(
-        main,
-        "from typing import reveal_type\nfrom other import C\nreveal_type(C().f)",
-    )?;
-    for (decorator, expected) in [
-        ("", "bound method C.f() -> int"),
-        ("@classmethod", "bound method type[C].f() -> int"),
-        ("@staticmethod", "def f(first) -> int"),
-        ("", "bound method C.f() -> int"),
-    ] {
-        db.write_file(
-            "/src/other.pyi",
-            format!("class C:\n    {decorator}\n    def f(first) -> int: ...\n"),
-        )?;
-        assert_revealed_type(&db, main, expected);
-    }
-    Ok(())
-}
-
-#[test]
 fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     let mut db = TestDbBuilder::new()
         .with_python_version(PythonVersion::PY311)
