@@ -79,6 +79,14 @@ impl<K: Ord, V, S> From<std::collections::HashMap<K, V, S>> for FrozenMap<K, V> 
 }
 
 impl<K: Ord, V> FrozenMap<K, V> {
+    /// Freeze entries that are already in strictly increasing key order.
+    ///
+    /// Duplicate or unsorted keys would make lookups by binary search unreliable.
+    pub fn from_sorted(entries: Vec<(K, V)>) -> Self {
+        debug_assert!(entries.windows(2).all(|w| w[0].0 < w[1].0));
+        Self(entries.into_boxed_slice())
+    }
+
     /// Creates a frozen map from entries with unique keys.
     pub(crate) fn from_entries(mut entries: Vec<(K, V)>) -> Self {
         entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
@@ -165,27 +173,6 @@ fn sort_and_deduplicate<K: Ord, V>(mut entries: Vec<(K, V)>) -> Vec<(K, V)> {
     entries
 }
 
-fn index_values<K, V>(
-    entries: impl IntoIterator<Item = (K, V)>,
-) -> (Vec<(K, FrozenValueIndex)>, IndexVec<FrozenValueIndex, V>)
-where
-    V: Copy + Eq + Hash,
-{
-    let mut values = IndexVec::new();
-    let mut value_indices = FxHashMap::default();
-    let entries = entries
-        .into_iter()
-        .map(|(key, value)| {
-            let index = *value_indices
-                .entry(value)
-                .or_insert_with(|| values.push(value));
-            (key, index)
-        })
-        .collect();
-
-    (entries, values)
-}
-
 /// Compact immutable key-value entries that deduplicate repeated values.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct FrozenValueMap<K, V> {
@@ -194,6 +181,30 @@ pub struct FrozenValueMap<K, V> {
 }
 
 impl<K, V> FrozenValueMap<K, V> {
+    /// Freeze entries in strictly increasing key order. Assigning value indices in
+    /// that order gives equal maps the same representation for Salsa comparisons.
+    pub fn from_sorted(entries: impl IntoIterator<Item = (K, V)>) -> Self
+    where
+        K: Ord,
+        V: Copy + Eq + Hash,
+    {
+        let mut values = IndexVec::new();
+        let mut value_indices = FxHashMap::default();
+        let entries = entries
+            .into_iter()
+            .map(|(key, value)| {
+                let index = *value_indices
+                    .entry(value)
+                    .or_insert_with(|| values.push(value));
+                (key, index)
+            })
+            .collect();
+        Self {
+            entries: FrozenMap::from_sorted(entries),
+            values: values.into(),
+        }
+    }
+
     pub fn get(&self, key: &K) -> Option<&V>
     where
         K: Ord,
@@ -217,12 +228,7 @@ impl<K, V> FrozenValueMap<K, V> {
         V: Copy + Eq + Hash,
         F: FnMut(K, V) -> V,
     {
-        let (entries, values) =
-            index_values(self.iter().map(|(key, value)| (key, map(key, value))));
-        *self = Self {
-            entries: FrozenMap(entries.into_boxed_slice()),
-            values: values.into(),
-        };
+        *self = Self::from_sorted(self.iter().map(|(key, value)| (key, map(key, value))));
     }
 }
 
@@ -232,30 +238,7 @@ where
     V: Copy + Eq + Hash,
 {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let source_entries = sort_and_deduplicate(iter.into_iter().collect());
-
-        let (entries, values) = index_values(source_entries);
-
-        Self {
-            entries: FrozenMap(entries.into_boxed_slice()),
-            values: values.into(),
-        }
-    }
-}
-
-impl<K, V, S> From<std::collections::HashMap<K, V, S>> for FrozenValueMap<K, V>
-where
-    K: Ord,
-    V: Copy + Eq + Hash,
-{
-    fn from(map: std::collections::HashMap<K, V, S>) -> Self {
-        let (mut entries, values) = index_values(map);
-        entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
-
-        Self {
-            entries: FrozenMap(entries.into_boxed_slice()),
-            values: values.into(),
-        }
+        Self::from_sorted(sort_and_deduplicate(iter.into_iter().collect()))
     }
 }
 

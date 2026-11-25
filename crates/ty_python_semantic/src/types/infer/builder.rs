@@ -105,6 +105,7 @@ use crate::types::generics::{
 use crate::types::infer::builder::binary_expressions::{
     BinaryInferenceState, has_in_place_operator,
 };
+use crate::types::infer::builder::expression_map::ExpressionMap;
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{
@@ -181,6 +182,7 @@ mod class;
 mod dict;
 mod dynamic_class;
 mod enum_call;
+mod expression_map;
 mod final_attribute;
 mod function;
 mod imports;
@@ -314,7 +316,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     region: InferenceRegion<'db>,
 
     /// The types of every expression in this region.
-    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expressions: ExpressionMap<'db>,
 
     /// Truthiness overrides for evaluating comparison chains directly as conditions.
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for why these are stored
@@ -632,7 +634,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             called_functions: FxIndexSet::default(),
             legacy_aliases: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
-            expressions: FxHashMap::default(),
+            expressions: ExpressionMap::default(),
             comparison_truthiness: FxHashMap::default(),
             expression_cache: None,
             reachability_cache: OnceCell::new(),
@@ -719,7 +721,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.extend_expression_types(inference.expressions.iter().copied());
+        self.extend_sorted(inference.expressions.iter().as_slice());
         self.declarations.extend(inference.declarations(definition));
 
         if self.region.collects_bindings() {
@@ -808,7 +810,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.extend_expression_types(inference.expressions.iter().copied());
+        self.extend_sorted(inference.expressions.iter().as_slice());
         self.declarations.extend(inference.declarations());
 
         if self.region.collects_bindings() {
@@ -856,6 +858,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Merge a frozen region's entries, which have unique keys in ascending order.
+    ///
+    /// Append a disjoint range directly when no truthiness overrides need clearing.
+    fn extend_sorted(&mut self, entries: &[(ExpressionNodeKey, Type<'db>)]) {
+        if self.comparison_truthiness.is_empty() {
+            self.expressions.extend_sorted(entries);
+        } else {
+            self.extend_expression_types(entries.iter().copied());
+        }
+    }
+
     /// Replacing an expression's type also replaces any truthiness override. A newly inferred
     /// comparison may no longer need an override, so extending the sparse map alone is not enough.
     fn extend_expression_types(
@@ -874,7 +887,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Merges expression results without claiming bindings owned by their enclosing statement.
     fn extend_expression_without_bindings(&mut self, inference: &ExpressionInference<'db>) {
-        self.extend_expression_types(inference.expressions.iter().copied());
+        self.extend_sorted(inference.expressions.iter().as_slice());
 
         if let Some(extra) = &inference.extra {
             self.legacy_aliases
@@ -911,7 +924,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.extend_expression_types(inference.expressions.iter().map(|(key, ty)| (*key, *ty)));
+        self.extend_expression_types(inference.expressions.iter());
         self.comparison_truthiness.extend(
             inference
                 .comparison_truthiness
@@ -1151,7 +1164,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn try_expression_type(&self, expr: &ast::Expr) -> Option<Type<'db>> {
         self.expressions
-            .get(&expr.into())
+            .get(expr.into())
             .copied()
             .or(self.fallback_type())
     }
@@ -12781,7 +12794,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         StatementInferenceInner {
-            expressions: FrozenMap::from(expressions),
+            expressions: expressions.freeze(),
             #[cfg(debug_assertions)]
             scope,
             bindings: bindings.into_boxed_slice(),
@@ -12854,7 +12867,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         FunctionDecoratorInference {
             legacy_aliases: legacy_aliases.into_iter().collect(),
             deferred_name_loads: FrozenSet::from(deferred_name_loads),
-            expression_types: FrozenMap::from(expressions),
+            expression_types: expressions.freeze(),
             bindings: bindings.into_boxed_slice(),
             called_functions: called_functions
                 .into_iter()
@@ -13016,7 +13029,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         DefinitionInference {
-            expressions: FrozenMap::from(expressions),
+            expressions: expressions.freeze(),
             #[cfg(debug_assertions)]
             scope,
             types: DefinitionTypes::from_parts(
@@ -13147,7 +13160,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         ScopeInference {
-            expressions: FrozenValueMap::from(expressions),
+            expressions: FrozenValueMap::from_sorted(expressions.into_sorted()),
             extra,
         }
     }
@@ -13288,7 +13301,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "speculative `TypeInferenceBuilder` should only be used for expression inference"
         );
 
-        self.extend_expression_types(expressions);
+        self.extend_expression_types(expressions.freeze().iter().copied());
         self.comparison_truthiness.extend(comparison_truthiness);
         self.context.extend(&context);
         self.extend_cycle_recovery(cycle_recovery);
@@ -13418,7 +13431,7 @@ enum ExpressionCacheEntry<'db> {
 /// that is otherwise performed for Salsa results.
 struct FullExpressionCacheEntry<'db> {
     legacy_aliases: FxIndexSet<Definition<'db>>,
-    expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expressions: ExpressionMap<'db>,
     comparison_truthiness: FxHashMap<ExpressionNodeKey, Truthiness>,
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
     collection_use_constraints: CollectionUseConstraints<'db>,
@@ -13436,7 +13449,7 @@ struct FullExpressionCacheEntry<'db> {
 impl<'db> FullExpressionCacheEntry<'db> {
     fn expression_type(&self, expression: ExpressionNodeKey) -> Type<'db> {
         self.expressions
-            .get(&expression)
+            .get(expression)
             .copied()
             .or(self.cycle_recovery)
             .unwrap_or_else(Type::unknown)
@@ -13444,7 +13457,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
 
     fn is_single_expression(&self, expression: ExpressionNodeKey, ty: Type<'db>) -> bool {
         self.expressions.len() == 1
-            && self.expressions.get(&expression) == Some(&ty)
+            && self.expressions.get(expression) == Some(&ty)
             && !self.has_extra()
     }
 
@@ -13494,7 +13507,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
         });
 
         ExpressionInference {
-            expressions: FrozenMap::from(self.expressions),
+            expressions: self.expressions.freeze(),
             extra,
             #[cfg(debug_assertions)]
             scope: self.scope,
