@@ -717,27 +717,12 @@ pub(crate) enum CheckTypesMode {
     /// Generic call inference may perform fixpoint iteration in order to unify
     /// type context across call arguments, and so all callable bindings should
     /// remain candidates until the final round is finalized.
-    Provisional {
-        /// The editor collects expected argument types from every candidate, including
-        /// later overloads specialized by a sibling argument.
-        collect_expected_types: bool,
-    },
+    Provisional,
 }
 
 impl CheckTypesMode {
     fn is_provisional(self) -> bool {
-        matches!(self, Self::Provisional { .. })
-    }
-
-    /// The editor can use parameter types from later overloads even after the call has a winner.
-    fn needs_all_overload_specializations(self) -> bool {
-        match self {
-            Self::Finalize => false,
-            Self::SignatureDetails => true,
-            Self::Provisional {
-                collect_expected_types,
-            } => collect_expected_types,
-        }
+        matches!(self, Self::Provisional)
     }
 }
 
@@ -4129,18 +4114,17 @@ impl<'db> CallableBinding<'db> {
 
         // Step 2: check the candidates in declaration order. Step 5 can discard every
         // later overload as soon as the first match covers all argument materializations.
-        let can_prune_after_first_match = !mode.needs_all_overload_specializations()
-            && !should_retry_after_provisional_arity
-            && !call_arguments.iter().any(CallArgument::is_variadic)
-            && self
-                .matching_overloads()
-                .all(|(_, overload)| overload.supports_first_match_pruning());
-        let defer_literal_mismatches =
-            mode == CheckTypesMode::Finalize && !should_retry_after_provisional_arity;
         let check_types = |overload: &mut Binding<'db>| {
             overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
         };
-        if can_prune_after_first_match || defer_literal_mismatches {
+        // Provisional inference revisits every candidate. If two overloads share a type
+        // variable, an unspecialized candidate can overwrite a sibling argument's inferred type.
+        // Signature details also need the losing candidates' specialized parameter types.
+        if mode == CheckTypesMode::Finalize && !should_retry_after_provisional_arity {
+            let can_prune_after_first_match = !call_arguments.iter().any(CallArgument::is_variadic)
+                && self
+                    .matching_overloads()
+                    .all(|(_, overload)| overload.supports_first_match_pruning());
             let first_match_covers_rest = |overload: &Binding<'db>| {
                 can_prune_after_first_match
                     && overload.accepts_all_argument_materializations(
@@ -4153,7 +4137,6 @@ impl<'db> CallableBinding<'db> {
             if self.check_overloads_in_order(
                 db,
                 call_arguments.as_ref(),
-                defer_literal_mismatches,
                 check_types,
                 first_match_covers_rest,
             ) {
@@ -4407,7 +4390,6 @@ impl<'db> CallableBinding<'db> {
         &mut self,
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
-        defer_literal_mismatches: bool,
         check_types: impl Fn(&mut Binding<'db>),
         first_match_covers_rest: impl Fn(&Binding<'db>) -> bool,
     ) -> bool {
@@ -4415,7 +4397,7 @@ impl<'db> CallableBinding<'db> {
         let mut found_match = false;
         let mut overloads = self.matching_overloads_mut().peekable();
         while let Some((_, overload)) = overloads.next() {
-            if defer_literal_mismatches && overload.has_disjoint_literal_argument(db, arguments) {
+            if overload.has_disjoint_literal_argument(db, arguments) {
                 literal_mismatches.push(overload);
                 continue;
             }
@@ -8715,15 +8697,20 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
 /// The first-match shortcut may inspect positions that the full overload filter would discard.
 /// Avoid forcing a lazy base or function signature, expanding an alias, or rebuilding a
-/// wide union. Materializing a short `tuple[int, str]` takes bounded work. For nested
-/// tuples, each `t = (t, t)` doubles the number of leaf elements to materialize.
+/// wide union. Repeatedly nesting `tuple[T, T]` or `dict[T, T]` doubles the number
+/// of leaf types to materialize at each level, even when both occurrences of `T` are shared.
 fn may_be_expensive_to_materialize<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     argument: Type<'db>,
 ) -> bool {
     const MAX_FIXED_TUPLE_ELEMENTS: usize = 8;
+    const MAX_GENERIC_ALIAS_VISITS: usize = 8;
 
+    // Count generic aliases across the argument, including those reached through an
+    // instance's class. This keeps shallow containers such as `dict[str, list[int]]`
+    // eligible without materializing deeply nested specializations.
+    let generic_alias_visits = Cell::new(0);
     let expensive = |part: Type<'db>| match part {
         Type::TypeAlias(_)
         | Type::Recursive(_)
@@ -8731,6 +8718,11 @@ fn may_be_expensive_to_materialize<'db>(
         | Type::FunctionLiteral(_)
         | Type::BoundMethod(_)
         | Type::NewTypeInstance(_) => true,
+        Type::GenericAlias(_) => {
+            let visits = generic_alias_visits.get() + 1;
+            generic_alias_visits.set(visits);
+            visits > MAX_GENERIC_ALIAS_VISITS
+        }
         Type::NominalInstance(instance) => instance.own_tuple_spec(db).is_some_and(|tuple| {
             tuple.len().minimum() > MAX_FIXED_TUPLE_ELEMENTS
                 || tuple.iter_element_types(db).any(|element| match element {

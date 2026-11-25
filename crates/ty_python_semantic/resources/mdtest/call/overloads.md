@@ -2815,6 +2815,15 @@ select_generic_payload(1, {"name": "generic"}, 1)
 select_generic_payload(1, {"extra": None}, "plain dictionary")
 ```
 
+The mapping and iterable overloads of `dict` share a type variable for keyword values. The mapping's
+value type guides inference of the dictionary literal passed as `extra`.
+
+```py
+def extend(payloads: dict[str, Payload]):
+    result = dict(payloads, extra={"name": "extra", "count": 1})
+    reveal_type(result)  # revealed: dict[str, Payload]
+```
+
 ```py
 from typing import SupportsRound, overload
 
