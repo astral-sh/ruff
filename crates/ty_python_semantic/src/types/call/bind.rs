@@ -4143,6 +4143,7 @@ impl<'db> CallableBinding<'db> {
                         env,
                         constraints,
                         call_arguments.as_ref(),
+                        mode,
                     )
             };
             if self.check_overloads_in_order(
@@ -8711,14 +8712,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 }
 
+/// Keep all candidates when checking a later overload can affect recursive member
+/// inference, or when the first-match shortcut would be expensive.
+///
 /// The first-match shortcut may inspect positions that the full overload filter would discard.
 /// Avoid forcing a lazy base or function signature, expanding an alias, or rebuilding a
 /// wide union. Repeatedly nesting `tuple[T, T]` or `dict[T, T]` doubles the number
 /// of leaf types to materialize at each level, even when both occurrences of `T` are shared.
-fn may_be_expensive_to_materialize<'db>(
+fn requires_full_overload_check<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     argument: Type<'db>,
+    mode: CheckTypesMode<'_>,
 ) -> bool {
     const MAX_FIXED_TUPLE_ELEMENTS: usize = 8;
     const MAX_SPECIALIZATION_VISITS: usize = 8;
@@ -8726,13 +8731,36 @@ fn may_be_expensive_to_materialize<'db>(
     // The visitor reaches a nominal instance's generic alias through its class.
     // For protocols it visits the type arguments directly, so count the instance.
     let specialization_visits = Cell::new(0);
-    let expensive = |part: Type<'db>| match part {
+    let needs_full_check = |part: Type<'db>| match part {
         Type::TypeAlias(_)
         | Type::Recursive(_)
         | Type::RecursiveVar(_)
         | Type::FunctionLiteral(_)
         | Type::BoundMethod(_)
         | Type::NewTypeInstance(_) => true,
+        // A later overload can infer a type variable from a member whose definition
+        // depends on this call. The argument type itself need not change, so the
+        // usual retry can't detect the cycle. Even a stub can inherit such members.
+        Type::Divergent(_)
+        | Type::ProtocolInstance(_)
+        | Type::ModuleLiteral(_)
+        | Type::TypedDict(_)
+        | Type::EnumComplement(_)
+            if mode.is_provisional() =>
+        {
+            true
+        }
+        Type::LiteralValue(literal) if mode.is_provisional() => {
+            matches!(literal.kind(), LiteralValueTypeKind::Enum(_))
+        }
+        Type::ClassLiteral(class) if mode.is_provisional() => {
+            !class.file(db).path(db).is_vendored_path()
+        }
+        Type::GenericAlias(alias)
+            if mode.is_provisional() && !alias.origin(db).file(db).path(db).is_vendored_path() =>
+        {
+            true
+        }
         Type::GenericAlias(_) | Type::ProtocolInstance(_) => {
             let visits = specialization_visits.get() + 1;
             specialization_visits.set(visits);
@@ -8751,9 +8779,9 @@ fn may_be_expensive_to_materialize<'db>(
     };
     // Materializing a type variable also materializes its bound, constraints, and default.
     // Stop at a second bounded variable because bounds can refer back to one another.
-    let expensive_attribute = |attribute| {
+    let check_attribute = |attribute| {
         any_over_type(db, env, attribute, false, |part| {
-            expensive(part)
+            needs_full_check(part)
                 || part
                     .as_typevar()
                     .is_some_and(|var| !var.typevar(db).is_simple(db))
@@ -8761,22 +8789,22 @@ fn may_be_expensive_to_materialize<'db>(
     };
     any_over_type(db, env, argument, false, |part| {
         let Type::TypeVar(var) = part else {
-            return expensive(part);
+            return needs_full_check(part);
         };
         let var = var.typevar(db);
         if var.is_simple(db) {
             return false;
         }
-        let expensive_bound = match var.bound_or_constraints(db, env) {
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => expensive_attribute(bound),
+        let check_bound = match var.bound_or_constraints(db, env) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => check_attribute(bound),
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
                 .elements(db)
                 .iter()
                 .copied()
-                .any(expensive_attribute),
+                .any(check_attribute),
             None => false,
         };
-        expensive_bound || var.default_type(db, env).is_some_and(expensive_attribute)
+        check_bound || var.default_type(db, env).is_some_and(check_attribute)
     })
 }
 
@@ -10227,12 +10255,14 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
         constraints: &ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
+        mode: CheckTypesMode<'_>,
     ) -> bool {
         let constraints = constraints.unlimited();
         self.overload_filter_slots(db, arguments).all(|slot| {
             // Every materialization of an instance is an object and still occupies a tuple
             // slot, regardless of its type arguments or the base of a `NewType`.
-            if slot.parameter.is_object()
+            if !mode.is_provisional()
+                && slot.parameter.is_object()
                 && matches!(
                     slot.argument,
                     Type::NominalInstance(_) | Type::NewTypeInstance(_)
@@ -10242,7 +10272,7 @@ impl<'db> Binding<'db> {
             }
 
             if !definitely_contributes_to_overload_filter_tuple(db, slot.parameter)
-                || may_be_expensive_to_materialize(db, env, slot.argument)
+                || requires_full_overload_check(db, env, slot.argument, mode)
             {
                 return false;
             }
@@ -12414,7 +12444,7 @@ deep: Pair[H, H]
         let file = ProgramFile::new(db, file, env.program(db));
         let expensive = |name: &str| {
             let ty = global_symbol(db, file, name).place.expect_type();
-            may_be_expensive_to_materialize(db, &env, ty)
+            requires_full_overload_check(db, &env, ty, CheckTypesMode::Finalize)
         };
         assert!(!expensive("shallow"));
         assert!(expensive("deep"));

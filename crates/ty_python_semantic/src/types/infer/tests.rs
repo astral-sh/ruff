@@ -238,6 +238,58 @@ fn expected_types_are_collected_only_for_open_files() -> anyhow::Result<()> {
 }
 
 #[test]
+fn recursive_overloads_report_the_same_error_with_the_dependency_closed() -> anyhow::Result<()> {
+    // The calls to `choose` make inference of `A.x` and `B.x` mutually recursive.
+    // With no argument to `A`, `x` is an integer, so `upper` must be diagnosed.
+    let source = r#"
+        from typing import Protocol, overload
+
+        class HasX[T](Protocol):
+            @property
+            def x(self) -> T: ...
+
+        @overload
+        def choose[T](x: HasX[T], y: T) -> T: ...
+        @overload
+        def choose[U](x: U | HasX[U], y: U) -> U | tuple[U]: ...
+        def choose[T](x: object, y: T) -> T | tuple[T]:
+            return y if hasattr(x, "x") else (y,)
+
+        class A:
+            def __init__(self, b: "B | None" = None):
+                self.x = choose(b.x, b) if b is not None else 1
+
+        class B:
+            def __init__(self, a: A):
+                self.x = choose(a, a)
+    "#;
+
+    for open in [false, true] {
+        let mut db = TestDbBuilder::new()
+            .with_python_version(PythonVersion::PY312)
+            .build()?;
+        db.write_dedented("src/model.py", source)?;
+        db.write_file("src/use.py", "from model import A\nA().x.upper()\n")?;
+        let file = system_path_to_file(&db, "src/use.py")?;
+        db.open_file(file);
+        if open {
+            let model = system_path_to_file(&db, "src/model.py")?;
+            db.open_file(model);
+        }
+
+        let diagnostics = check_types(&db, program_file(&db, file));
+        assert_eq!(diagnostics.len(), 1, "open={open}, {diagnostics:#?}");
+        assert_eq!(
+            diagnostics[0].id(),
+            DiagnosticId::lint("missing-union-attribute"),
+            "open={open}"
+        );
+    }
+
+    Ok(())
+}
+
+#[test]
 fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
     assert!(
         std::mem::size_of::<DefinitionTypes>()
