@@ -1,5 +1,70 @@
 # Changelog
 
+## 0.17.7
+
+Released on 2026-11-25.
+
+### Preview features
+
+- Add PEP 723 script support to `ruff check --add-noqa` and `--add-ignore` ([#30835](https://github.com/astral-sh/ruff/pull/30835))
+- Add PEP 723 script support to `ruff check --show-settings` ([#30836](https://github.com/astral-sh/ruff/pull/30836))
+- Add PEP 723 script support to `ruff format` ([#30607](https://github.com/astral-sh/ruff/pull/30607))
+- Support PEP 723 script configuration in the LSP ([#30584](https://github.com/astral-sh/ruff/pull/30584))
+- Support PEP 723 script settings in Ruff check ([#29768](https://github.com/astral-sh/ruff/pull/29768))
+
+### Bug fixes
+
+- Escape diagnostic messages and paths in GitHub Actions and Azure Pipelines output ([#30831](https://github.com/astral-sh/ruff/pull/30831))
+- Preserve parentheses when simplifying nested dictionary unpacking (PIE804) ([#30629](https://github.com/astral-sh/ruff/pull/30629))
+- Retain global preview mode in Ruff settings and the server ([#30576](https://github.com/astral-sh/ruff/pull/30576))
+- \[`fastapi`\] Don't depend on other fixes being applied (`FAST002`) ([#29678](https://github.com/astral-sh/ruff/pull/29678))
+- \[`flake8-bugbear`\] Detect jumps in nested branches (`B012`) ([#30421](https://github.com/astral-sh/ruff/pull/30421))
+- \[`pylint`\] Check additional comprehension clauses (`PLR1736`) ([#30320](https://github.com/astral-sh/ruff/pull/30320))
+
+### Rule changes
+
+- Recognize `frozendict.fromkeys` as immutable ([#30890](https://github.com/astral-sh/ruff/pull/30890))
+- Rename 12 exception and logging rules ([#30475](https://github.com/astral-sh/ruff/pull/30475))
+- Rename 17 rules for expressions and control flow ([#30479](https://github.com/astral-sh/ruff/pull/30479))
+- Rename 17 rules for library and builtin usage ([#30482](https://github.com/astral-sh/ruff/pull/30482))
+- Rename 17 rules for source layout, imports, and directives ([#30477](https://github.com/astral-sh/ruff/pull/30477))
+- Rename 19 additional documentation rules ([#30544](https://github.com/astral-sh/ruff/pull/30544))
+- Rename 20 `pydocstyle` rules ([#30465](https://github.com/astral-sh/ruff/pull/30465))
+- Rename 25 rules for definitions, naming, and typing ([#30476](https://github.com/astral-sh/ruff/pull/30476))
+- Rename 60 additional lint rules ([#30660](https://github.com/astral-sh/ruff/pull/30660))
+- Use Python API spellings in 11 rule names ([#30471](https://github.com/astral-sh/ruff/pull/30471))
+- \[`fastapi`\] Avoid false positive for `Depends` shortcut (`FAST003`) ([#30570](https://github.com/astral-sh/ruff/pull/30570))
+- \[`ruff`\] Clarify that `invalid-rule-code` also applies to rule names (`RUF102`) ([#30657](https://github.com/astral-sh/ruff/pull/30657))
+
+### CLI
+
+- Include rule names in warning and error messages ([#30575](https://github.com/astral-sh/ruff/pull/30575))
+
+### Documentation
+
+- Add OpenGraph unfurl image to docs ([#22839](https://github.com/astral-sh/ruff/pull/22839))
+- \[`pyupgrade`\] Clarify `UP006` fix safety ([#30843](https://github.com/astral-sh/ruff/pull/30843))
+- \[`ruff`\] Make examples error out-of-the-box (`RUF026`, `RUF032`, `RUF039`, `RUF041`, `RUF045`, `RUF055`, `RUF064`) ([#30581](https://github.com/astral-sh/ruff/pull/30581))
+- fix(docs): use dark colors for the rule legend ([#30754](https://github.com/astral-sh/ruff/pull/30754))
+
+### Other changes
+
+- Revert "[ty] Resolve diagnostic colors once per run of identically st… ([#30818](https://github.com/astral-sh/ruff/pull/30818))
+
+### Contributors
+
+- [@SohamShrivastava](https://github.com/SohamShrivastava)
+- [@cwkang1998](https://github.com/cwkang1998)
+- [@Wimpykid1a](https://github.com/Wimpykid1a)
+- [@shehryaur](https://github.com/shehryaur)
+- [@baltasarblanco](https://github.com/baltasarblanco)
+- [@DrSkyle](https://github.com/DrSkyle)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@ntBre](https://github.com/ntBre)
+- [@MANOGNYA24](https://github.com/MANOGNYA24)
+- [@cheeto734](https://github.com/cheeto734)
+- [@hector2394](https://github.com/hector2394)
+
 ## 0.17.6
 
 Released on 2026-11-19.
