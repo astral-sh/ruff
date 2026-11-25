@@ -542,48 +542,6 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
     }
 }
 
-/// Can we specialize this class's MRO by copying the leading type arguments?
-///
-/// C3 compares class identities and keeps the first path to each ancestor. If
-/// every base forwards a prefix of its parameters or fixes its argument to
-/// `Any`, the same is true of every ancestor, even in a diamond.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| false)]
-fn forwards_mro_arguments<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
-    use super::KnownInstanceType::{SubscriptedGeneric, SubscriptedProtocol};
-
-    let Some(context) = class.generic_context(db) else {
-        return false;
-    };
-    class.explicit_bases(db).iter().all(|edge| match *edge {
-        Type::KnownInstance(SubscriptedGeneric(_) | SubscriptedProtocol(_)) => true,
-        Type::GenericAlias(base) => {
-            let parent = base.origin(db);
-            let spec = base.specialization(db);
-            let args = spec.types(db);
-            let mut params = context.variables(db);
-            let parent_context = spec.generic_context(db);
-            // Collection[T] inherits Container[Any], which is independent of T.
-            let constant = args == [Type::any()]
-                && parent_context
-                    .variables(db)
-                    .all(|v| !v.is_paramspec(db) && !v.is_typevartuple(db));
-            let prefix = params.clone().take(args.len()).map(Type::TypeVar);
-            spec.materialization_kind(db).is_none()
-                && spec.tuple(db).is_none()
-                && parent.generic_context(db) == Some(parent_context)
-                && parent_context.len(db) == args.len()
-                && params.all(|v| v.typevar(db).is_simple(db))
-                && (constant
-                    || (prefix.eq(args.iter().copied())
-                        && parent_context
-                            .variables(db)
-                            .all(|v| v.typevar(db).is_simple(db))))
-                && forwards_mro_arguments(db, parent)
-        }
-        _ => false,
-    })
-}
-
 #[salsa::tracked]
 impl<'db> GenericAlias<'db> {
     /// Resolve this alias's ancestors in MRO order with its type arguments applied.
@@ -606,37 +564,8 @@ impl<'db> GenericAlias<'db> {
     ) -> Result<Box<[ClassBase<'db>]>, Box<StaticMroError<'db>>> {
         let origin = self.origin(db);
         tracing::trace!("GenericAlias::try_mro_ancestors: {}", origin.name(db));
-        // For example, list[str] has the same ancestor order as list[int],
-        // with MutableSequence[str] in place of MutableSequence[int].
-        let spec = self.specialization(db);
-        if origin.known(db).is_some()
-            && spec.materialization_kind(db).is_none()
-            && spec.tuple_runtime_element_specialization(db) == spec
-            && origin.generic_context(db) == Some(spec.generic_context(db))
-            && forwards_mro_arguments(db, origin)
-            && let Ok(bases) = origin.try_mro_ancestors(db, None)
-        {
-            let args = spec.types(db);
-            let mapped = bases.iter().map(|&base| match base {
-                ClassBase::Class(ClassType::Generic(alias)) => {
-                    let original = alias.specialization(db);
-                    let types = original.types(db);
-                    if types == [Type::any()] {
-                        return Some(base);
-                    }
-                    let context = original.generic_context(db);
-                    let prefix = args.get(..types.len())?;
-                    let spec = context.specialize(db, prefix);
-                    Some(ClassBase::Class(
-                        Self::new(db, alias.origin(db), spec).into(),
-                    ))
-                }
-                ClassBase::Generic | ClassBase::Protocol | ClassBase::Class(_) => Some(base),
-                _ => None,
-            });
-            if let Some(bases) = mapped.collect::<Option<_>>() {
-                return Ok(bases);
-            }
+        if let Some(ancestors) = self.try_specialize_origin_mro(db) {
+            return Ok(ancestors);
         }
         Mro::ancestors_of_static_class(
             db,
@@ -645,6 +574,82 @@ impl<'db> GenericAlias<'db> {
             origin.explicit_bases(db),
         )
         .map_err(Box::new)
+    }
+
+    /// Reuse a known class's unspecialized MRO to compute this alias's ancestors.
+    ///
+    /// For example, in the MRO of `list[str]`, `MutableSequence[_T]` becomes
+    /// `MutableSequence[str]` while `Container[Any]` stays unchanged.
+    ///
+    /// Returns `None` if the class or specialization requires a fresh C3 merge.
+    fn try_specialize_origin_mro(self, db: &'db dyn Db) -> Option<Box<[ClassBase<'db>]>> {
+        let origin = self.origin(db);
+        let specialization = self.specialization(db);
+        if origin.known(db).is_none()
+            || specialization.materialization_kind(db).is_some()
+            || specialization.tuple_runtime_element_specialization(db) != specialization
+            || origin.generic_context(db) != Some(specialization.generic_context(db))
+            || !origin.can_specialize_mro_by_prefix(db)
+        {
+            return None;
+        }
+
+        let ancestors = origin.try_mro_ancestors(db, None).ok()?;
+        let arguments = specialization.types(db);
+        ancestors
+            .iter()
+            .map(|&base| match base {
+                ClassBase::Class(ClassType::Generic(alias)) => {
+                    let original = alias.specialization(db);
+                    let types = original.types(db);
+                    if types == [Type::any()] {
+                        return Some(base);
+                    }
+                    let prefix = arguments.get(..types.len())?;
+                    let specialized = original.generic_context(db).specialize(db, prefix);
+                    Some(ClassBase::Class(
+                        Self::new(db, alias.origin(db), specialized).into(),
+                    ))
+                }
+                ClassBase::Generic | ClassBase::Protocol | ClassBase::Class(_) => Some(base),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Whether this base takes the subclass's leading type parameters in order
+    /// or fixes its sole argument to `Any`.
+    ///
+    /// For example, `Mapping[K, V]` forwards just `K` to `Collection[K]`.
+    /// `Collection[K]` in turn inherits `Container[Any]` regardless of `K`.
+    ///
+    /// We only forward ordinary type variables without bounds, constraints, or
+    /// defaults. A fixed `Any` also works when the base's parameter has a default.
+    fn has_prefix_or_any_arguments(self, db: &'db dyn Db, subclass: GenericContext<'db>) -> bool {
+        let specialization = self.specialization(db);
+        let context = specialization.generic_context(db);
+        let arguments = specialization.types(db);
+        let parameters = subclass.variables(db);
+        if specialization.materialization_kind(db).is_some()
+            || specialization.tuple(db).is_some()
+            || self.origin(db).generic_context(db) != Some(context)
+            || context.len(db) != arguments.len()
+            || !parameters.clone().all(|v| v.typevar(db).is_simple(db))
+        {
+            return false;
+        }
+
+        if arguments == [Type::any()] {
+            return context
+                .variables(db)
+                .all(|v| !v.is_paramspec(db) && !v.is_typevartuple(db));
+        }
+
+        parameters
+            .take(arguments.len())
+            .map(Type::TypeVar)
+            .eq(arguments.iter().copied())
+            && context.variables(db).all(|v| v.typevar(db).is_simple(db))
     }
 
     /// Compose each type argument's variance with its formal parameter's variance. Inferred
@@ -3675,7 +3680,6 @@ mod tests {
             KnownClass::Tuple,
         ] {
             let origin = class.try_to_class_literal(&db, &env).unwrap();
-            assert!(forwards_mro_arguments(&db, origin), "{class:?}");
             let context = origin.generic_context(&db).unwrap();
             let args = [Type::int_literal(1), Type::int_literal(2)];
             let spec = if class == KnownClass::Tuple {
@@ -3684,11 +3688,11 @@ mod tests {
                 context.specialize(&db, &args[..context.len(&db)])
             };
             let alias = GenericAlias::new(&db, origin, spec);
-            let actual = alias.try_mro_ancestors(&db).unwrap();
+            let actual = alias.try_specialize_origin_mro(&db).unwrap();
             let expected =
                 Mro::ancestors_of_static_class(&db, origin, Some(spec), origin.explicit_bases(&db))
                     .unwrap();
-            assert_eq!(actual, &expected);
+            assert_eq!(actual, expected, "{class:?}");
             assert!(actual.iter().any(|base| matches!(
                 base,
                 ClassBase::Class(ClassType::Generic(parent))
@@ -3732,7 +3736,7 @@ mod tests {
                 .as_static()
                 .unwrap();
             assert_eq!(
-                forwards_mro_arguments(&db, class),
+                class.can_specialize_mro_by_prefix(&db),
                 name == "Fixed",
                 "{name}"
             );

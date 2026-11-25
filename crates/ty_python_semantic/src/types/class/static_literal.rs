@@ -920,6 +920,30 @@ impl<'db> StaticClassLiteral<'db> {
         .map_err(Box::as_ref)
     }
 
+    /// Whether every generic ancestor takes a prefix of this class's type arguments
+    /// or a single fixed `Any`.
+    ///
+    /// Checking each direct base recursively suffices even in a diamond. C3 compares
+    /// class identities and keeps the leftmost path's specialization, so changing the
+    /// arguments cannot change which path supplies an ancestor.
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| false)]
+    pub(super) fn can_specialize_mro_by_prefix(self, db: &'db dyn Db) -> bool {
+        let Some(context) = self.generic_context(db) else {
+            return false;
+        };
+        self.explicit_bases(db).iter().all(|base| match *base {
+            Type::KnownInstance(
+                KnownInstanceType::SubscriptedGeneric(_)
+                | KnownInstanceType::SubscriptedProtocol(_),
+            ) => true,
+            Type::GenericAlias(base) => {
+                base.has_prefix_or_any_arguments(db, context)
+                    && base.origin(db).can_specialize_mro_by_prefix(db)
+            }
+            _ => false,
+        })
+    }
+
     /// Resolve ancestors in MRO order without specializing a synthetic tuple base with its fields.
     fn try_class_metadata_ancestors(
         self,
