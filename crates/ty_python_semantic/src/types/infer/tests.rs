@@ -1582,6 +1582,29 @@ fn parameter_default_presence_invalidates_caller() -> anyhow::Result<()> {
 }
 
 #[test]
+fn instance_classification_tracks_ancestor_edits() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let main = "/src/main.py";
+    db.write_file(main, "from other import C\ndef f(value: C): pass\n")?;
+    for base in ["object", "Any", "TypedDict", "object"] {
+        db.write_file(
+            "/src/other.pyi",
+            format!(
+                "from typing import Any, TypedDict\nclass Base({base}): ...\nclass C(Base): ...\n"
+            ),
+        )?;
+        let value = get_symbol(&db, main, &["f"], "value").expect_type();
+        if base == "TypedDict" {
+            assert_matches!(value, Type::TypedDict(_));
+        } else {
+            assert_matches!(value, Type::NominalInstance(instance)
+                if instance.inherits_from_explicit_any() == (base == "Any"));
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn inherited_writes_follow_changes_to_frozen_bases() -> anyhow::Result<()> {
     let mut db = setup_db();
     let path = "/src/main.py";

@@ -9,6 +9,7 @@ use std::marker::PhantomData;
 
 use itertools::Itertools;
 
+use super::class::ClassInstanceFlags;
 use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView, StructuralMemberPriority};
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
@@ -67,32 +68,48 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         class: ClassType<'db>,
     ) -> Self {
-        match class.class_literal(db) {
+        let literal = class.class_literal(db);
+        match literal {
             // Dynamic classes created via `type()` don't have special instance types.
             ClassLiteral::Dynamic(_)
             | ClassLiteral::DynamicNamedTuple(_)
-            | ClassLiteral::DynamicEnum(_) => {
-                Type::NominalInstance(NominalInstanceType::from_class(db, class))
-            }
+            | ClassLiteral::DynamicEnum(_) => Type::NominalInstance(
+                NominalInstanceType::from_class(db, class, literal.instance_flags(db)),
+            ),
             // Functional TypedDicts return a TypedDict instance type.
             ClassLiteral::DynamicTypedDict(_) => Type::typed_dict(class),
-            ClassLiteral::Static(class_literal) => match class_literal.known(db) {
-                Some(KnownClass::Tuple) => {
-                    Type::tuple(TupleType::new(db, env, &builtin_tuple_spec(db, class)))
-                }
-                Some(KnownClass::Object) => Type::object(),
-                _ => class_literal
-                    .is_typed_dict(db)
-                    .then(|| Type::typed_dict(class))
-                    .or_else(|| {
-                        class.into_protocol_class(db).map(|protocol_class| {
+            ClassLiteral::Static(class_literal) => {
+                let header = class_literal.header(db);
+                match header.known {
+                    Some(KnownClass::Tuple) => {
+                        Type::tuple(TupleType::new(db, env, &builtin_tuple_spec(db, class)))
+                    }
+                    Some(KnownClass::Object) => Type::object(),
+                    // Known classes declare their classification, and classes without bases
+                    // cannot inherit from Any, Protocol or TypedDict.
+                    known
+                        if known.map_or(!header.has_explicit_bases, |known| {
+                            !known.is_protocol() && !known.is_typed_dict_subclass()
+                        }) =>
+                    {
+                        Type::NominalInstance(NominalInstanceType::from_class(
+                            db,
+                            class,
+                            ClassInstanceFlags::empty(),
+                        ))
+                    }
+                    _ => {
+                        let flags = class_literal.classification_flags(db, header);
+                        if flags.contains(ClassInstanceFlags::TYPED_DICT) {
+                            Type::typed_dict(class)
+                        } else if let Some(protocol_class) = class.into_protocol_class(db) {
                             Self::ProtocolInstance(ProtocolInstanceType::from_class(protocol_class))
-                        })
-                    })
-                    .unwrap_or_else(|| {
-                        Type::NominalInstance(NominalInstanceType::from_class(db, class))
-                    }),
-            },
+                        } else {
+                            Type::NominalInstance(NominalInstanceType::from_class(db, class, flags))
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -243,9 +260,9 @@ fn excludes_ancestor<'db>(
 }
 
 impl<'db> NominalInstanceType<'db> {
-    fn from_class(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+    fn from_class(db: &'db dyn Db, class: ClassType<'db>, flags: ClassInstanceFlags) -> Self {
         Self(NominalInstanceInner::NonTuple(
-            NominalInstanceClass::from_class(db, class),
+            NominalInstanceClass::from_class(db, class, flags),
         ))
     }
 
@@ -1640,8 +1657,8 @@ enum NominalInstanceClass<'db> {
 }
 
 impl<'db> NominalInstanceClass<'db> {
-    fn from_class(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        if class.class_literal(db).inherits_from_explicit_any(db) {
+    fn from_class(db: &'db dyn Db, class: ClassType<'db>, flags: ClassInstanceFlags) -> Self {
+        if flags.contains(ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY) {
             Self::InheritsFromExplicitAny(ExplicitAnyInstanceClass::new(db, class))
         } else {
             Self::Plain(class)

@@ -722,18 +722,6 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Return whether this class directly or indirectly inherits from an explicit `Any` base.
-    pub(super) fn inherits_from_explicit_any(self, db: &'db dyn Db) -> bool {
-        if let Some(class) = self.as_static()
-            && (class.known(db).is_some() || !class.has_explicit_bases(db))
-        {
-            return false;
-        }
-
-        self.instance_flags(db)
-            .contains(ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY)
-    }
-
     /// Returns the metaclass of this class.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         match self {
@@ -2178,18 +2166,11 @@ impl<'db> ClassType<'db> {
                 enum_lit.instance_member(db, env, name)
             }
             Self::NonGeneric(ClassLiteral::Static(class)) => {
-                if class.is_typed_dict(db) {
-                    return Place::Undefined.into();
-                }
                 class.instance_member(db, env, None, name)
             }
             Self::Generic(generic) => {
                 let class_literal = generic.origin(db);
                 let specialization = Some(generic.specialization(db));
-
-                if class_literal.is_typed_dict(db) {
-                    return Place::Undefined.into();
-                }
 
                 // MRO lookup already specializes each member in the class that defines it.
                 // Applying the receiver's specialization again would also substitute type
