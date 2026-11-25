@@ -3592,6 +3592,34 @@ struct OverloadFilterCandidate<'db> {
     slots: Box<[OverloadFilterSlot<'db>]>,
 }
 
+impl<'db> OverloadFilterCandidate<'db> {
+    /// Returns true for parameter types that exclude `object` even when unioned together.
+    ///
+    /// Complementary intersections can cover `object` together, and `object()` satisfies
+    /// some protocols, such as `Hashable`.
+    fn excludes_object_at(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        index: usize,
+    ) -> bool {
+        let Some(slot) = self.slots.get(index) else {
+            return false;
+        };
+        let excludes_object = |ty| match ty {
+            Type::NominalInstance(instance) => !instance.is_object(),
+            Type::ProtocolInstance(protocol) => {
+                !has_all_protocol_members_defined(db, env, Type::object(), protocol)
+            }
+            _ => false,
+        };
+        match slot.parameter.expand_top_level_aliases(db, env) {
+            Type::Union(union) => union.elements(db).iter().copied().all(excludes_object),
+            ty => excludes_object(ty),
+        }
+    }
+}
+
 /// The specialized argument and parameter types that affect step 5 of overload resolution.
 #[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
 struct OverloadFilter<'db> {
@@ -3599,27 +3627,6 @@ struct OverloadFilter<'db> {
     program: Program<'db>,
     #[returns(deref)]
     candidates: Box<[OverloadFilterCandidate<'db>]>,
-}
-
-/// These instance types reject `object` even when combined in a parameter union.
-/// Complementary intersections could cover
-/// `object` together, and `object()` can satisfy some protocols, such as `Hashable`.
-fn parameter_excludes_object<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    parameter: Type<'db>,
-) -> bool {
-    let excludes_object = |ty| match ty {
-        Type::NominalInstance(instance) => !instance.is_object(),
-        Type::ProtocolInstance(protocol) => {
-            !has_all_protocol_members_defined(db, env, Type::object(), protocol)
-        }
-        _ => false,
-    };
-    match parameter.expand_top_level_aliases(db, env) {
-        Type::Union(union) => union.elements(db).iter().copied().all(excludes_object),
-        ty => excludes_object(ty),
-    }
 }
 
 impl<'db> OverloadFilter<'db> {
@@ -3637,6 +3644,41 @@ impl<'db> OverloadFilter<'db> {
 
         // A provisional type can change which prefix covers the arguments on the next iteration.
         cached(db, self).unwrap_or_else(|| self.compute_covering_prefix_len(db))
+    }
+
+    /// Returns true if one argument rules out every prefix that omits the last overload.
+    ///
+    /// For example, consider overloads accepting `str`, `bytes`, and `object`, in that order.
+    /// The top materialization of `Any` is `object`. Neither `str` nor `str | bytes` covers
+    /// it, so we can keep all three overloads without building the union.
+    ///
+    /// `arguments` is the fixed-length tuple of top materializations for `group`.
+    fn can_rule_out_shorter_prefixes(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        group: &[OverloadFilterCandidate<'db>],
+        arguments: &TupleSpec<'db>,
+        max_slot_count: usize,
+    ) -> bool {
+        // Contextual inference can give the same argument different types in other groups.
+        if group.len() != self.candidates(db).len() - 1 {
+            return false;
+        }
+
+        // Both tuples omit empty slots. If every argument slot is present, a prefix that
+        // omits a parameter slot fails on length, and all other prefixes align by index.
+        let arguments = arguments.fixed_elements();
+        if arguments.len() != max_slot_count {
+            return false;
+        }
+
+        arguments.enumerate().any(|(index, argument)| {
+            argument.is_object()
+                && group
+                    .iter()
+                    .all(|candidate| candidate.excludes_object_at(db, env, index))
+        })
     }
 
     fn compute_covering_prefix_len(self, db: &'db dyn Db) -> usize {
@@ -3681,43 +3723,19 @@ impl<'db> OverloadFilter<'db> {
                 }
             }
 
-            let top_materialized_argument_type = Type::heterogeneous_tuple(
-                db,
-                env,
+            let argument_types = TupleSpec::heterogeneous(
                 union_argument_type_builders
                     .into_iter()
-                    .filter_map(|builder| {
-                        if builder.is_empty() {
-                            None
-                        } else {
-                            Some(builder.build())
-                        }
-                    }),
+                    .filter(|builder| !builder.is_empty())
+                    .map(UnionBuilder::build),
             );
 
-            // When all prefixes see the same arguments, a single uncovered
-            // slot rules them all out. Require a full argument tuple so
-            // dropping an empty parameter slot can only give a length mismatch.
-            if group.len() == candidates.len() - 1
-                && let Some(tuple) = top_materialized_argument_type.exact_tuple_instance_spec(db)
-                && let Some(tuple) = tuple.as_fixed_length()
-                && tuple.len() == max_slot_count
-                && tuple
-                    .elements_slice()
-                    .iter()
-                    .enumerate()
-                    .any(|(index, arg)| {
-                        arg.is_object()
-                            && group.iter().all(|candidate| {
-                                candidate.slots.get(index).is_some_and(|slot| {
-                                    parameter_excludes_object(db, env, slot.parameter)
-                                })
-                            })
-                    })
-            {
+            if self.can_rule_out_shorter_prefixes(db, env, group, &argument_types, max_slot_count) {
                 return candidates.len();
             }
 
+            let top_materialized_argument_type =
+                Type::tuple(TupleType::new(db, env, &argument_types));
             for current in group {
                 prefix_len += 1;
                 for (builder, slot) in union_parameter_types.iter_mut().zip(&current.slots) {
