@@ -619,6 +619,16 @@ impl PlaceState {
         }
     }
 
+    /// Applies a pending join to the current constraint of each live binding.
+    pub(super) fn map_narrowing_constraints(
+        &mut self,
+        mut apply: impl FnMut(ScopedNarrowingConstraint) -> ScopedNarrowingConstraint,
+    ) {
+        for binding in &mut self.bindings.live_bindings {
+            binding.narrowing_constraint = apply(binding.narrowing_constraint);
+        }
+    }
+
     /// Add the given constraint to live bindings selected by definition ID.
     pub(super) fn record_narrowing_constraint_for_bindings(
         &mut self,
