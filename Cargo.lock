@@ -4826,7 +4826,7 @@ dependencies = [
  "insta",
  "notify",
  "ordermap",
- "parking_lot 0.12.5",
+ "parking_lot 0.13.0",
  "pep440_rs",
  "rayon",
  "regex",

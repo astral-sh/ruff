@@ -163,7 +163,7 @@ mimalloc = { version = "0.1.52", default-features = false, features = ["v2"] }
 natord = { version = "1.0.9", default-features = false }
 notify = { version = "8.0.0", default-features = false, features = ["macos_fsevent"] }
 ordermap = { version = "1.0.0", default-features = false, features = ["std"] }
-parking_lot = { version = "0.12.4", default-features = false }
+parking_lot = { version = "0.13.0", default-features = false }
 path-absolutize = { version = "4.0.0", default-features = false }
 path-slash = { version = "0.2.1", default-features = false }
 pathdiff = { version = "0.2.1", default-features = false }
