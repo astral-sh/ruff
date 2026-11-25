@@ -2507,16 +2507,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    /// Returns whether accessing a name, attribute, or subscript can raise.
+    /// Returns whether accessing a name can raise.
     ///
     /// Only a definitely bound name in the current flow state is known to be safe. In particular,
     /// a builtin-looking name may be shadowed by a local binding that has not been visited yet.
-    fn place_access_can_raise(&mut self, expr: &ast::Expr, is_use: bool) -> bool {
-        let ast::Expr::Name(name) = expr else {
-            return true;
-        };
-
-        is_use
+    fn name_access_can_raise(&mut self, name: &ast::ExprName, access: PlaceAccess) -> bool {
+        access.is_use()
             && self
                 .exception_context_stack_manager
                 .has_active_exception_handler(self)
@@ -3522,25 +3518,25 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Expr::Name(ast::ExprName { ctx, .. })
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
-                let (is_use, is_definition) = match (ctx, self.current_assignment()) {
+                let access = match (ctx, self.current_assignment()) {
                     (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
                         // Record the target load now; the definition is recorded separately
                         // after visiting the right-hand side.
-                        (true, false)
+                        PlaceAccess::Use
                     }
-                    (ast::ExprContext::Load, _) => (true, false),
-                    (ast::ExprContext::Store, _) => (false, true),
-                    (ast::ExprContext::Del, _) => (true, true),
-                    (ast::ExprContext::Invalid, _) => (false, false),
+                    (ast::ExprContext::Load, _) => PlaceAccess::Use,
+                    (ast::ExprContext::Store, _) => PlaceAccess::Definition,
+                    (ast::ExprContext::Del, _) => PlaceAccess::UseAndDefinition,
+                    (ast::ExprContext::Invalid, _) => PlaceAccess::Invalid,
                 };
 
                 let place_id = if let ast::Expr::Name(name) = expr {
                     // Names have no children. Borrow the AST name and clone it only when it
                     // becomes a new symbol in this scope.
-                    if !is_use {
+                    if !access.is_use() {
                         self.ast_ids.record_expression(expr, self.current_scope());
                     }
-                    let can_raise = self.place_access_can_raise(expr, is_use);
+                    let can_raise = self.name_access_can_raise(name, access);
                     self.record_exception_checkpoint_if(can_raise);
                     let (symbol, added) = self.current_place_table_mut().add_name(&name.id);
                     let place_id = ScopedPlaceId::from(symbol);
@@ -3582,7 +3578,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // Child evaluation may introduce new bindings (e.g. via a walrus), which
                     // must exist before we register the parent/member associations.
                     walk_expr(self, expr);
-                    if place.is_none() || !is_use {
+                    if place.is_none() || !access.is_use() {
                         self.ast_ids.record_expression(expr, self.current_scope());
                     }
                     self.record_exception_checkpoint();
@@ -3590,7 +3586,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.add_place(place)
                 };
 
-                if is_use {
+                if access.is_use() {
                     let use_id = self.record_place_use(place_id, expr);
 
                     // Keep track of any uses of unannotated collection initializers.
@@ -3608,7 +3604,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                 }
 
-                if is_definition {
+                if access.is_definition() {
                     self.record_place_definition(place_id, expr);
                 }
 
@@ -6029,6 +6025,25 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             .node()
             .as_function()
             .is_some_and(|func| func.node(self.module).parameters.includes(name))
+    }
+}
+
+/// The effects to record when visiting a name, attribute, or subscript.
+#[derive(Copy, Clone, Debug)]
+enum PlaceAccess {
+    Use,
+    Definition,
+    UseAndDefinition,
+    Invalid,
+}
+
+impl PlaceAccess {
+    fn is_use(self) -> bool {
+        matches!(self, Self::Use | Self::UseAndDefinition)
+    }
+
+    fn is_definition(self) -> bool {
+        matches!(self, Self::Definition | Self::UseAndDefinition)
     }
 }
 
