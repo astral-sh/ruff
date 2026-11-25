@@ -1006,6 +1006,8 @@ jobs:
           git rev-list --format=%s --max-count=1 old_commit
           cargo build --profile=profiling --bin=ty
           mv target/profiling/ty ty-old
+          # Cargo can update the base revision's lockfile during an unlocked build.
+          git restore -- Cargo.lock
 
           git checkout --detach "$GITHUB_SHA"
 
