@@ -338,3 +338,55 @@ class Guest:
         # TODO: Recognize the generated `__attrs_init__` without an explicit `init=False`.
         self.__attrs_init__(name="Guest")  # error: [missing-attribute]
 ```
+
+## Unannotated fields
+
+attrs supports field definitions without annotations. In this case, the `type` argument can be used
+to declare the field type.
+
+In this example, fields without a `type=` declaration have the type `Unknown`.
+
+```py
+import attr
+
+@attr.s
+class User1:
+    id = attr.ib(type=int)
+    name = attr.ib()
+
+# TODO: Include the unannotated fields in the constructor signature.
+reveal_type(User1.__init__)  # revealed: (self: User1, /) -> None
+
+# TODO: No error here.
+# error: [unknown-argument]
+# error: [unknown-argument]
+user = User1(id=1, name="Alice")
+reveal_type(user.id)  # revealed: int
+reveal_type(user.name)  # revealed: Any
+
+# TODO: Report an invalid argument type for `id`.
+# error: [unknown-argument]
+# error: [unknown-argument]
+User1(id="1", name="Alice")
+```
+
+Unannotated fields also work with modern decorators. A field can declare a union type and a default.
+
+```py
+from attrs import define, field
+
+@define
+class User2:
+    name = field()
+    id = attr.ib(type=int | None, default=None)
+
+# TODO: Include the unannotated fields in the constructor signature.
+reveal_type(User2.__init__)  # revealed: (self: User2, /) -> None
+
+# TODO: No error here.
+# error: [unknown-argument]
+# error: [unknown-argument]
+user = User2(name="Alice", id=12)
+# TODO: This should reveal `int | None`.
+reveal_type(user.id)  # revealed: Any
+```
