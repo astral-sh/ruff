@@ -741,16 +741,24 @@ impl<'db> UnionType<'db> {
             .unpack_aliases(false)
             .cycle_recovery(true)
             .or_recursively_defined(self.recursively_defined(db));
+        let elements = self.elements(db);
+        // During cycle recovery the builder only deduplicates nominal instances.
+        // A structural substitution can leave duplicates, so check for those too.
+        let mut unchanged = elements.len() >= WIDE_UNION && {
+            let mut seen = FxHashSet::default();
+            elements
+                .iter()
+                .all(|ty| ty.is_nominal_instance() && seen.insert(*ty))
+        };
         let mut empty = true;
-        for ty in self.elements(db) {
-            if nested {
+        for (index, ty) in elements.iter().enumerate() {
+            let normalized = if nested {
                 // list[T | Divergent] => list[Divergent]
                 let ty = ty.normalize_recursive(db, normalizer, nested)?;
                 if ty.same_divergent_marker(div) {
                     return Some(ty);
                 }
-                builder.add_in_place(ty);
-                empty = false;
+                ty
             } else {
                 // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
                 // e.g. T | Divergent == T | (T | (T | (T | ...))) == T
@@ -758,12 +766,23 @@ impl<'db> UnionType<'db> {
                     builder = builder.or_recursively_defined(RecursivelyDefined::Yes);
                     continue;
                 }
-                builder.add_in_place(
-                    ty.normalize_recursive(db, normalizer, nested)
-                        .unwrap_or(div),
-                );
-                empty = false;
+                ty.normalize_recursive(db, normalizer, nested)
+                    .unwrap_or(div)
+            };
+            if unchanged {
+                if normalized == *ty {
+                    continue;
+                }
+                for previous in &elements[..index] {
+                    builder.add_in_place(*previous);
+                }
+                unchanged = false;
             }
+            builder.add_in_place(normalized);
+            empty = false;
+        }
+        if unchanged {
+            return Some(Type::Union(self));
         }
         if empty {
             builder.add_in_place(div);
