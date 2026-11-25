@@ -2348,6 +2348,21 @@ def _():
     x2: list[str] | list[int] = make_list()
     reveal_type(x2)  # revealed: list[int]
 
+def default[T](x: T | None = None) -> T | int:
+    return 0 if x is None else x
+
+def _(value: Any):
+    # TODO: We should infer the narrower `int` here.
+    x1: int | str = default()
+    reveal_type(x1)  # revealed: int | str
+
+    # TODO: This should also be `int`.
+    x2: int | str = default(None)
+    reveal_type(x2)  # revealed: int | str
+
+    x3: int | str = default(value)
+    reveal_type(x3)  # revealed: int | str
+
 def empty[T = int]() -> list[T]:
     return []
 
