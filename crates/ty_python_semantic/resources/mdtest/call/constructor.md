@@ -1176,6 +1176,21 @@ reveal_type(empty)  # revealed: EmptyMap[Never, Unknown]
 empty["key"] = 1  # error: [invalid-assignment]
 ```
 
+Even if `T` has a `Never` bound, the annotation on `box` still determines the type of `U`.
+
+```py
+class Box[T: Never, U]:
+    x: T
+    y: U
+
+    def __new__(cls) -> Self:
+        return super().__new__(cls)
+
+box: Box[Any, str] | None = Box()
+reveal_type(box)  # revealed: Box[Any, str]
+box.y = 42  # error: [invalid-assignment]
+```
+
 When the constructor receives no arguments, either callback signature in the annotation is possible.
 
 ```py
@@ -1187,6 +1202,72 @@ class Handler[**P]:
 
 handler: Handler[[str]] | Handler[[int]] = Handler()
 reveal_type(handler)  # revealed: Handler[(str, /)] | Handler[(int, /)]
+```
+
+### Inferring the leaf type of a recursive constructor argument
+
+Both calls accept `int` as the leaf type. The empty list can hold trees of integers, and the
+callback only needs to accept integers.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from typing import Self
+
+type Tree[T] = T | list[Tree[T]]
+
+class Pair:
+    def __new__[T](cls, left: Tree[T], right: Tree[T]) -> Self:
+        return super().__new__(cls)
+
+Pair([], [1])
+
+class Traversal:
+    def __new__[T](cls, tree: Tree[T], value: T, visit: Callable[[T], None]) -> Self:
+        return super().__new__(cls)
+
+def visit(x: int) -> None: ...
+
+Traversal([1], 1, visit)
+```
+
+### Calling the constructor from within `__new__`
+
+The class returns an instance of `C`, so it cannot serve as a callback that returns a number.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from typing import Self, final
+
+class C:
+    def __new__[T: (int, float)](cls, callback: Callable[[T], T] | None = None) -> Self:
+        if callback is None:
+            # error: [invalid-argument-type]
+            # error: [invalid-argument-type]
+            C(cls)
+        return super().__new__(cls)
+```
+
+Since `Bag` is final, a list of `Self` instances is a valid argument to `Bag`.
+
+```py
+@final
+class Bag:
+    def __new__(cls, bags: list["Bag"]) -> Self:
+        obj = super().__new__(cls)
+        if not bags:
+            items = [obj]
+            Bag(items)
+        return obj
 ```
 
 ### An unpacked tuple before a keyword-only constructor parameter

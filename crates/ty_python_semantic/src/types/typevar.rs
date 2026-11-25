@@ -987,26 +987,34 @@ impl<'db> TypeVarNonceGenerator<'db> {
         }
     }
 
+    /// Whether the call is inside the given definition, including nested scopes.
+    pub(super) fn call_is_within(&self, db: &'db dyn Db, definition: Definition<'db>) -> bool {
+        self.call_site_scope.is_some_and(|scope| {
+            let file = scope.program_file(db);
+            definition.program_file(db) == file
+                && enclosing_binding_contexts(semantic_index(db, file), scope.file_scope_id(db))
+                    .any(|enclosing| enclosing == BindingContext::Definition(definition))
+        })
+    }
+
     pub(crate) fn should_freshen(
         &self,
         db: &'db dyn Db,
         generic_context: GenericContext<'db>,
     ) -> bool {
         // Only an unmerged context from an enclosing definition represents a recursive call.
-        let matches_enclosing = self.call_site_scope.is_some_and(|scope| {
+        if self.call_site_scope.is_some() {
             let mut contexts = generic_context
                 .variables(db)
                 .map(|typevar| typevar.binding_context(db));
-            let Some(first @ BindingContext::Definition(definition)) = contexts.next() else {
-                return false;
-            };
-            let file = scope.program_file(db);
-            definition.program_file(db) == file
+            if let Some(first @ BindingContext::Definition(definition)) = contexts.next()
+                && self.call_is_within(db, definition)
                 && contexts.all(|other| other == first)
-                && enclosing_binding_contexts(semantic_index(db, file), scope.file_scope_id(db))
-                    .any(|enclosing| enclosing == first)
-        });
-        matches_enclosing || !self.seen.borrow_mut().insert(generic_context)
+            {
+                return true;
+            }
+        }
+        !self.seen.borrow_mut().insert(generic_context)
     }
 
     pub(crate) fn next(&self) -> TypeVarNonce {

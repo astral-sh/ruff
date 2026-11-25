@@ -5,7 +5,7 @@ use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::generics::{AliasPolicy, GenericContext, Specialization};
+use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Signature};
 use crate::types::typevar::{TypeVarFreshening, TypeVarNonceGenerator};
 use crate::types::visitor::any_over_type_expanding_aliases;
@@ -207,14 +207,24 @@ impl<'db> ConstructorBinding<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
+        nonce_generator: &TypeVarNonceGenerator<'db>,
     ) {
+        // Within `__new__`, a supplied argument can contain the same `Self` as the
+        // implicit receiver, even if the other parameter annotations do not.
+        if let [overload] = self.entry.overloads.as_mut_slice()
+            && let Some(context) = &mut overload.constructor_context
+            && context.kind == ConstructorCallableKind::New
+            && let Some(definition) = overload.signature.definition
+        {
+            context.recursive_new = nonce_generator.call_is_within(db, definition);
+        }
         self.entry.match_parameters(db, env, arguments);
 
         // We don't know at this point whether we'll need to check downstream constructors or not
         // (since we can't resolve return types yet), so we match parameters for all downstream
         // constructors; this may be needed for argument type contexts.
         if let Some(downstream) = self.downstream_constructor.as_mut() {
-            downstream.match_parameters_in_place(db, env, arguments);
+            downstream.match_parameters_in_place(db, env, arguments, nonce_generator);
         }
     }
 
@@ -736,6 +746,7 @@ impl<'db> ConstructorBinding<'db> {
 pub(super) struct ConstructorContext<'db> {
     instance_type: Type<'db>,
     kind: ConstructorCallableKind,
+    recursive_new: bool,
 }
 
 impl<'db> ConstructorContext<'db> {
@@ -743,6 +754,7 @@ impl<'db> ConstructorContext<'db> {
         Self {
             instance_type,
             kind,
+            recursive_new: false,
         }
     }
 
@@ -826,7 +838,7 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Option<Signature<'db>> {
         let context = self.constructor_context?;
-        if context.kind() != ConstructorCallableKind::New {
+        if context.kind() != ConstructorCallableKind::New || context.recursive_new {
             return None;
         }
         let instance = context.instance_type();
@@ -843,11 +855,12 @@ impl<'db> Binding<'db> {
             return None;
         }
 
-        let receiver_instance = if nominal.is_definition_generic(db) {
-            signature.generic_new_receiver(db, env, nominal, returned)?
-        } else {
-            instance
-        };
+        if nominal.is_definition_generic(db)
+            && !signature.can_bind_generic_new_receiver(db, env, nominal, returned)
+        {
+            return None;
+        }
+
         // A later constructor projection can still use the stored signature's `Self` return.
         let signature = signature.clone().with_return_type(instance);
 
@@ -864,7 +877,7 @@ impl<'db> Binding<'db> {
             return signature.with_unused_self_upper_bound(db, env);
         }
 
-        signature.bind_unused_self(db, env, receiver_instance)
+        signature.bind_unused_self(db, env, instance)
     }
 
     /// Is a type variable returned from a constructor method a representation of the self type?
@@ -959,38 +972,39 @@ impl<'db> Binding<'db> {
 }
 
 impl<'db> Signature<'db> {
-    /// Returns the instance to bind to a generic allocator's `cls` argument before inference.
+    /// Whether binding `cls` early preserves inference for a generic class.
     ///
     /// For example, `Child[K, V]` can inherit `__new__(cls, *args: Any, **kwargs: Any) -> Self`
     /// from `Base[K, V]`. If both classes use `K` and `V` invariantly, matching the receiver
     /// against the bound of `Self` relates each type variable to itself. A covariant parameter
     /// or a base such as `Base[K | V, V]` can supply additional constraints.
-    fn generic_new_receiver(
+    fn can_bind_generic_new_receiver(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         receiver: NominalInstanceType<'db>,
         self_typevar: BoundTypeVarInstance<'db>,
-    ) -> Option<Type<'db>> {
+    ) -> bool {
         if self
             .parameters()
             .iter()
             .skip(1)
             .any(|parameter| parameter.annotated_type() != Type::any())
         {
-            return None;
+            return false;
         }
-        let self_bound = self_typevar
+        let Some(self_bound) = self_typevar
             .typevar(db)
             .upper_bound(db, env)
-            .and_then(Type::as_nominal_instance)?;
-        let receiver_instance = receiver;
+            .and_then(Type::as_nominal_instance)
+        else {
+            return false;
+        };
         let (ClassType::Generic(receiver), ClassType::Generic(bound)) =
             (receiver.class(db, env), self_bound.class(db, env))
         else {
-            return None;
+            return false;
         };
-        let mut instance = Type::NominalInstance(receiver_instance);
         let receiver = receiver.specialization(db);
         let bound = bound.specialization(db);
         let arguments = receiver.types(db);
@@ -1001,15 +1015,18 @@ impl<'db> Signature<'db> {
                 .chain(bound.generic_context(db).variables(db))
                 .any(|parameter| parameter.variance(db) != TypeVarVariance::Invariant)
         {
-            return None;
+            return false;
         }
 
         // Apart from `Self`, every signature variable must be a distinct class argument.
         // A fixed upper bound such as `Hashable` is fine. Dependent bounds can tie two
-        // arguments together, and defaults, constraints and variadics have their own inference rules.
-        let variables = self.generic_context?;
+        // arguments together. Binding a `Never` argument early can also discard the expected
+        // type's constraints on other arguments. Leave both cases to the solver.
+        let Some(variables) = self.generic_context else {
+            return false;
+        };
         if variables.len(db) != arguments.len() + 1 {
-            return None;
+            return false;
         }
         for variable in variables
             .variables(db)
@@ -1020,32 +1037,20 @@ impl<'db> Signature<'db> {
                 || variable.is_typevartuple(db)
                 || variable.default_type(db).is_some()
             {
-                return None;
+                return false;
             }
             match variable.typevar(db).bound_or_constraints(db, env) {
                 None => {}
-                Some(TypeVarBoundOrConstraints::Constraints(_)) => return None,
-                Some(TypeVarBoundOrConstraints::UpperBound(upper)) if upper.is_never() => {
-                    // Matching `cls` normally infers `Never` even when the call has no arguments.
-                    // Keep that evidence on the receiver so the return type can still use a
-                    // specialization from the call's expected type.
-                    instance = instance.substitute_one_typevar(
-                        db,
-                        env,
-                        variable,
-                        Type::Never,
-                        AliasPolicy::Expand,
-                    );
-                }
+                Some(TypeVarBoundOrConstraints::Constraints(_)) => return false,
                 Some(TypeVarBoundOrConstraints::UpperBound(upper)) => {
                     if any_over_type_expanding_aliases(db, env, upper, |ty| {
                         ty.is_type_var() || ty.is_never()
                     }) {
-                        return None;
+                        return false;
                     }
                 }
             }
         }
-        Some(instance)
+        true
     }
 }

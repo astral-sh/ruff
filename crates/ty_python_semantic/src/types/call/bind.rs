@@ -376,13 +376,14 @@ impl<'db> CallableItem<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
+        nonce_generator: &TypeVarNonceGenerator<'db>,
     ) {
         match self {
             CallableItem::Regular(binding) => {
                 binding.match_parameters(db, env, arguments);
             }
             CallableItem::Constructor(binding) => {
-                binding.match_parameters(db, env, arguments);
+                binding.match_parameters(db, env, arguments, nonce_generator);
             }
         }
     }
@@ -1403,7 +1404,7 @@ impl<'db> Bindings<'db> {
     ) -> Self {
         let nonce_generator = TypeVarNonceGenerator::new(self.call_site_scope);
         self.freshen_generic_contexts_in_place(db, env, &nonce_generator);
-        self.match_parameters_in_place(db, env, arguments);
+        self.match_parameters_in_place(db, env, arguments, &nonce_generator);
         self
     }
 
@@ -1412,9 +1413,10 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
+        nonce_generator: &TypeVarNonceGenerator<'db>,
     ) {
         for item in self.iter_callable_items_mut() {
-            item.match_parameters(db, env, arguments);
+            item.match_parameters(db, env, arguments, nonce_generator);
         }
     }
 
@@ -9855,17 +9857,27 @@ impl<'db> Binding<'db> {
         }
         let constraints = &ConstraintSetBuilder::new();
         let arguments = arguments.with_self(binding.bound_type);
+        // Binding `Self` early removes it from the generic context. In that
+        // case, use the same signature to infer sibling hints.
+        let projected;
+        let signature = if self.constructor_context.is_some()
+            && Some(self.inference?.generic_context(db)) != self.signature.generic_context
+        {
+            projected = self.new_inference_signature(db, env)?;
+            &projected
+        } else {
+            &self.signature
+        };
         let call = CallInference {
             return_ty: self.unspecialized_return_type(db),
-            inferable_typevars: self.inferable_typevars,
-            ..CallInference::new(db, env, self, &self.signature, &arguments, tcx)
+            ..CallInference::new(db, env, self, signature, &arguments, tcx)
         };
         let mut ambiguous = FxHashSet::default();
         let mut siblings = self.argument_matches.to_vec();
         let mut recursive = FxHashSet::default();
         for (matched, argument) in siblings.iter_mut().zip(arguments.iter()) {
             matched.parameters.retain(|param| {
-                let parameter = &self.signature.parameters()[param.index];
+                let parameter = &signature.parameters()[param.index];
                 let Some(actual) =
                     argument.matched_type(parameter.argument_context_type(), param.argument_type)
                 else {
