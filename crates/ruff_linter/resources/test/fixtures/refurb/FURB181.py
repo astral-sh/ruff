@@ -64,3 +64,14 @@ hashed = (
     )
     .hex()
 )
+
+# parenthesized expressions (https://github.com/astral-sh/ruff/issues/30424)
+digest = (
+    hashlib.sha256(b"hello")
+    .digest()
+).hex()
+
+(sha256().digest()).hex()
+(sha256().digest)().hex()
+((sha256().digest()).hex)()
+(sha256()).digest().hex()

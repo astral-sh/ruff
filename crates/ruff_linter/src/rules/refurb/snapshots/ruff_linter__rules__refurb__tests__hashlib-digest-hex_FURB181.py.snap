@@ -317,3 +317,92 @@ help: Replace with `.hexdigest()`
 62 | )
    |
 note: This is an unsafe fix and may change runtime behavior
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:69:10
+   |
+68 |   # parenthesized expressions (https://github.com/astral-sh/ruff/issues/30424)
+69 |   digest = (
+   |  __________^
+70 | |     hashlib.sha256(b"hello")
+71 | |     .digest()
+72 | | ).hex()
+   | |_______^
+73 |
+74 |   (sha256().digest()).hex()
+   |
+help: Replace with `.hexdigest()`
+   |
+70 |     hashlib.sha256(b"hello")
+   -     .digest()
+   - ).hex()
+71 +     .hexdigest()
+72 + )
+73 |
+   |
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:74:1
+   |
+72 | ).hex()
+73 |
+74 | (sha256().digest()).hex()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+75 | (sha256().digest)().hex()
+76 | ((sha256().digest()).hex)()
+   |
+help: Replace with `.hexdigest()`
+   |
+73 |
+   - (sha256().digest()).hex()
+74 + (sha256().hexdigest())
+75 | (sha256().digest)().hex()
+   |
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:75:1
+   |
+74 | (sha256().digest()).hex()
+75 | (sha256().digest)().hex()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+76 | ((sha256().digest()).hex)()
+77 | (sha256()).digest().hex()
+   |
+help: Replace with `.hexdigest()`
+   |
+74 | (sha256().digest()).hex()
+   - (sha256().digest)().hex()
+75 + (sha256().hexdigest)()
+76 | ((sha256().digest()).hex)()
+   |
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:76:1
+   |
+74 | (sha256().digest()).hex()
+75 | (sha256().digest)().hex()
+76 | ((sha256().digest()).hex)()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+77 | (sha256()).digest().hex()
+   |
+help: Replace with `.hexdigest()`
+   |
+75 | (sha256().digest)().hex()
+   - ((sha256().digest()).hex)()
+76 + (sha256().hexdigest())
+77 | (sha256()).digest().hex()
+   |
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:77:1
+   |
+75 | (sha256().digest)().hex()
+76 | ((sha256().digest()).hex)()
+77 | (sha256()).digest().hex()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Replace with `.hexdigest()`
+   |
+76 | ((sha256().digest()).hex)()
+   - (sha256()).digest().hex()
+77 + (sha256()).hexdigest()
+   |
