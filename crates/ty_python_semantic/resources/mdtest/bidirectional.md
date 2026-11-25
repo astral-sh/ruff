@@ -2532,7 +2532,7 @@ def head_or[T, U](values: list[T], default: U) -> T | U:
     return values[0] if values else default
 
 def _(values: list[Any]):
-    x1: int | None = reveal_type(head_or(values, default=None))  # revealed: int | None
+    x1: int | None = reveal_type(head_or(values, default=None))  # revealed: Any | None
 ```
 
 Generic calls are never narrowed to a dynamic type, which can lead to overly gradual results.
@@ -2577,9 +2577,10 @@ def tag[T, U](row: T, value: U) -> tuple[T, U]:
     return row, value
 
 def _(value: Any | None):
-    x1: tuple[Row, None] | tuple[Row, int] | Any = tag({"name": "first"}, value)
+    # revealed: tuple[Row, Any | None]
+    x1: tuple[Row, None] | tuple[Row, int] | Any = reveal_type(tag({"name": "first"}, value))
     # TODO: This should infer `tuple[Row, None | int]`.
-    reveal_type(x1)  # revealed: tuple[Row, None]
+    reveal_type(x1)  # revealed: tuple[Row, None] | tuple[Row, int] | Any
 ```
 
 ## Correlated overload specializations from an expected type

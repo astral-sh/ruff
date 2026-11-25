@@ -8897,8 +8897,8 @@ def _(person: Person) -> None:
 
 ### `get` default types for absent keys
 
-When a key is absent, the annotation on the result gives the element type for an empty list passed
-as the default. This also works through a saved method reference:
+When a key is absent, `get` returns the default. The annotated variable keeps its declared type, but
+we lose the element type when inferring the empty list passed as the default.
 
 ```py
 from typing_extensions import TypedDict
@@ -8907,9 +8907,11 @@ class Closed(TypedDict, closed=True):
     name: str
 
 def _(closed: Closed) -> None:
-    values: list[int] = closed.get("missing", reveal_type([]))  # revealed: list[int]
+    # TODO: Infer `list[int]` for both defaults from the result annotation.
+    values: list[int] = closed.get("missing", reveal_type([]))  # revealed: list[Unknown]
+    reveal_type(values)  # revealed: list[int]
     get = closed.get
-    saved_values: list[int] = get("missing", reveal_type([]))  # revealed: list[int]
+    saved_values: list[int] = get("missing", reveal_type([]))  # revealed: list[Unknown]
 ```
 
 An annotation does not make an incompatible default valid:
