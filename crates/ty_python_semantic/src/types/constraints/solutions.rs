@@ -1246,16 +1246,15 @@ impl<'db, 'budget> SolutionWalker<'db, 'budget> {
                     return true;
                 }
 
-                // Even for covariant T, validating Self can derive another copy of an
-                // upper bound on T with different provenance. With multiple upper bounds,
-                // this can change which type we infer or how we order an intersection.
-                // Match the candidate solver, which ignores substituted constraints
-                // and deduplicates upper bounds by provenance and type.
+                // Validating Self can derive another copy of an upper bound on T
+                // with different provenance. If the bounds differ, this can change
+                // which type we infer or how we order an intersection. If all bounds
+                // name the same type, there's no intersection to compute.
                 let mut upper_bounds = path.positive_constraints().filter_map(|(id, _)| {
-                    let constraint = storage.atomic_constraint_data(id);
-                    let bound = constraint.upper_bound_for(db, var)?;
-                    (!path.constraint_is_substituted(id))
-                        .then_some((constraint.provenance(), bound))
+                    let bound = storage
+                        .atomic_constraint_data(id)
+                        .upper_bound_for(db, var)?;
+                    (!path.constraint_is_substituted(id)).then_some(bound)
                 });
                 upper
                     .bound
