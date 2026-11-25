@@ -1774,6 +1774,15 @@ impl<'db> StaticClassLiteral<'db> {
             ));
         }
 
+        // The specifier remains available inside the class body for decorators like
+        // `@field.validator`. Hide it after class creation so instance lookup uses
+        // the field's value type without also including the specifier type.
+        if let Some(symbol) = symbol
+            && attrs::unannotated_field(db, self, symbol).is_some()
+        {
+            return Member::unbound();
+        }
+
         if member.is_undefined()
             || name == "__slots__" && self.has_generated_slots(db) && !self.has_explicit_slots(db)
         {
@@ -2951,6 +2960,7 @@ impl<'db> StaticClassLiteral<'db> {
             self.has_dataclass_param(db, own_field_policy, DataclassFlags::KW_ONLY)
         });
         let is_attrs = attrs::is_attrs_class(db, self);
+        let mut explicit_fields = false;
         let mut kw_only_sentinel_field_seen = false;
         let mut field_declarations = Vec::new();
         let mut decorated_defaults = attrs::DecoratedDefaults::new();
@@ -2971,8 +2981,9 @@ impl<'db> StaticClassLiteral<'db> {
             }
 
             // Field contents come from the declarations live at end of scope, but field order is
-            // anchored to the first reachable annotated declaration in the class body.
-            let Some(first_declaration_order) = use_def
+            // anchored to the first reachable annotation or, for an unannotated attrs field,
+            // the field specifier assignment.
+            let annotation_order = use_def
                 .reachable_symbol_declarations(symbol_id)
                 .first_reachable_declaration_order(db, |declaration| {
                     declaration.is_defined_and(|declaration| {
@@ -2981,23 +2992,31 @@ impl<'db> StaticClassLiteral<'db> {
                             DefinitionKind::AnnotatedAssignment(..)
                         )
                     })
-                })
-            else {
+                });
+            let (order, inferred) = if let Some(order) = annotation_order {
+                (order, None)
+            } else if let Some((order, definition, ty)) =
+                attrs::unannotated_field(db, self, symbol_id)
+            {
+                // Apply the default collection rule of `attrs.define` to all attrs decorators.
+                explicit_fields = true;
+                (order, Some((definition, ty)))
+            } else {
                 continue;
             };
 
-            let result = place_from_declarations(db, &env, declarations.clone());
-            field_declarations.push((first_declaration_order, symbol_id, result));
+            let result = place_from_declarations(db, &env, declarations);
+            field_declarations.push((order, symbol_id, result, inferred));
         }
 
-        field_declarations
-            .sort_unstable_by_key(|(first_declaration_order, _, _)| *first_declaration_order);
+        field_declarations.sort_unstable_by_key(|(order, ..)| *order);
 
         let mut attributes = FxIndexMap::default();
         let mut class_variables = Vec::new();
-        for (_, symbol_id, result) in field_declarations {
+        for (_, symbol_id, result, inferred) in field_declarations {
             let symbol = table.symbol(symbol_id);
-            let first_declaration = result.first_declaration;
+            let (binding, inferred_ty) = inferred.unzip();
+            let first_declaration = result.first_declaration.or(binding);
             let attr = result.ignore_conflicting_declarations();
             if attr.is_class_var() {
                 if field_policy.is_dataclass_like() || field_policy.is_pydantic() {
@@ -3006,11 +3025,12 @@ impl<'db> StaticClassLiteral<'db> {
                 continue;
             }
 
-            if let Some(attr_ty) = attr.place.ignore_possibly_undefined() {
+            if let Some(attr_ty) = attr.place.ignore_possibly_undefined().or(inferred_ty) {
                 // Annotation-only declarations in stubs also act as bindings for attribute
                 // lookup, but they do not supply field defaults.
                 let mut default_ty = if field_policy == CodeGeneratorKind::TypedDict
                     || (self.file(db).is_stub(db)
+                        && binding.is_none()
                         && !first_declaration.is_some_and(|definition| {
                             matches!(
                                 definition.kind(db),
@@ -3060,6 +3080,8 @@ impl<'db> StaticClassLiteral<'db> {
                     kw_only = field.kw_only(db);
                     alias.clone_from(field.alias(db));
                     converter = field.converter(db);
+                } else if explicit_fields {
+                    continue;
                 } else if field_policy.is_dataclass_like()
                     && result.is_qualifier_only()
                     && attr.qualifiers.contains(TypeQualifiers::FINAL)
@@ -3293,6 +3315,11 @@ impl<'db> StaticClassLiteral<'db> {
             );
             let qualifier_only = declarations.is_qualifier_only();
             let declared_and_qualifiers = declarations.ignore_conflicting_declarations();
+            if declared_and_qualifiers.place.is_undefined()
+                && let Some((_, _, ty)) = attrs::unannotated_field(db, self, symbol_id)
+            {
+                return Member::definitely_declared(ty);
+            }
 
             match declared_and_qualifiers {
                 PlaceAndQualifiers {

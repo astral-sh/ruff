@@ -65,7 +65,7 @@ use crate::types::class::{
 };
 use crate::types::constraints::{CandidateSolutions, ConstraintSetBuilder, Solutions};
 use crate::types::context::{InferContext, InferContextResult};
-use crate::types::dedicated::pydantic;
+use crate::types::dedicated::{attrs, pydantic};
 use crate::types::diagnostic::{
     self, ABSTRACT_CLASS_INSTANTIATION, AssignmentDeclaration, CONFLICTING_DECLARATIONS,
     CYCLIC_TYPE_ALIAS_DEFINITION, DYNAMIC_FUNCTION_DECORATOR_RETURN, GeneratorMismatchKind,
@@ -3714,7 +3714,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // for a legacy TypeVar creation; check for that.
                     let callable_type = self.infer_callee(&call_expr.func);
 
-                    let ty = if let Some(namedtuple_kind) =
+                    let ty = if let Some(function) = callable_type.as_function_literal()
+                        && attrs::field_instance_kind(self.db(), function).is_attrs()
+                    {
+                        self.setup_dataclass_field_specifiers();
+                        let ty = self.infer_call_expression_impl(call_expr, callable_type, tcx);
+                        self.dataclass_field_specifiers.clear();
+                        ty
+                    } else if let Some(namedtuple_kind) =
                         NamedTupleKind::from_type(self.db(), callable_type)
                     {
                         self.infer_namedtuple_call_expression(

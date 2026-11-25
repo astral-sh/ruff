@@ -4,14 +4,15 @@ use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
 use rustc_hash::FxHashSet;
 use ty_python_core::{
-    DeclarationsIterator, ast_ids::HasScopedUseId, definition::DefinitionKind,
-    place::ScopedPlaceId, use_def_map,
+    DeclarationsIterator, ScopedDefinitionId, ast_ids::HasScopedUseId, definition::Definition,
+    definition::DefinitionKind, place::ScopedPlaceId, symbol::ScopedSymbolId, use_def_map,
 };
 
+use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{FieldInstance, FieldInstanceKind};
 use crate::types::{
-    BoundTypeVarInstance, DataclassFlags, FunctionType, GenericContext, KnownFunction, Parameter,
-    Parameters, Signature, StaticClassLiteral, Type, TypeVarVariance,
+    BoundTypeVarInstance, DataclassFlags, FunctionType, GenericContext, KnownFunction,
+    KnownInstanceType, Parameter, Parameters, Signature, StaticClassLiteral, Type, TypeVarVariance,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -33,6 +34,62 @@ pub(in crate::types) fn is_known_decorator<'db>(
     matches!(
         decorator.known(db),
         Some(KnownFunction::AttrAttrs | KnownFunction::AttrsDefine | KnownFunction::AttrsFrozen)
+    )
+}
+
+pub(in crate::types) fn unannotated_field<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+    symbol: ScopedSymbolId,
+) -> Option<(ScopedDefinitionId, Definition<'db>, Type<'db>)> {
+    if !is_attrs_class(db, class) {
+        return None;
+    }
+    let binding = use_def_map(db, class.body_scope(db))
+        .end_of_scope_symbol_bindings(symbol)
+        .exactly_one()
+        .ok()?;
+    let definition = binding.binding.definition()?;
+    let ty = field_type(db, definition)?;
+    Some((binding.binding_order, definition, ty))
+}
+
+#[salsa::tracked(returns(copy))]
+fn field_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Option<Type<'db>> {
+    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+        return None;
+    };
+    if assignment.unpack().is_some() {
+        return None;
+    }
+    let module = parsed_module(db, definition.python_file(db)).load(db);
+    let call = assignment.value(&module).as_call_expr()?;
+    let Type::KnownInstance(KnownInstanceType::Field(field)) =
+        crate::types::binding_type(db, definition)
+    else {
+        return None;
+    };
+    if !field.kind(db).is_attrs() {
+        return None;
+    }
+    // Interpret the already inferred argument as a type. String forward references
+    // would require separate inference as annotations.
+    if let Some(keyword) = call.arguments.find_keyword("type") {
+        let ty = crate::types::definition_expression_type(db, definition, &keyword.value);
+        if !ty.is_none(db) {
+            return Some(
+                ty.in_type_expression(db, definition.scope(db), None, InferenceFlags::empty())
+                    .unwrap_or_else(|_| Type::unknown()),
+            );
+        }
+    }
+    let env = ProgramEnvironment::from_scope(definition.scope(db));
+    Some(
+        field
+            .converter(db)
+            .map(|(_, output)| output)
+            .or_else(|| field.default_type(db).map(|ty| ty.promote(db, &env)))
+            .unwrap_or_else(Type::unknown),
     )
 }
 

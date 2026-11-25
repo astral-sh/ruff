@@ -354,20 +354,13 @@ class User1:
     id = attr.ib(type=int)
     name = attr.ib()
 
-# TODO: Include the unannotated fields in the constructor signature.
-reveal_type(User1.__init__)  # revealed: (self: User1, /) -> None
+reveal_type(User1.__init__)  # revealed: (self: User1, /, id: int, name: Unknown) -> None
 
-# TODO: No error here.
-# error: [unknown-argument]
-# error: [unknown-argument]
 user = User1(id=1, name="Alice")
 reveal_type(user.id)  # revealed: int
-reveal_type(user.name)  # revealed: Any
+reveal_type(user.name)  # revealed: Unknown
 
-# TODO: Report an invalid argument type for `id`.
-# error: [unknown-argument]
-# error: [unknown-argument]
-User1(id="1", name="Alice")
+User1(id="1", name="Alice")  # error: [invalid-argument-type]
 ```
 
 Unannotated fields also work with modern decorators. A field can declare a union type and a default.
@@ -380,13 +373,8 @@ class User2:
     name = field()
     id = attr.ib(type=int | None, default=None)
 
-# TODO: Include the unannotated fields in the constructor signature.
-reveal_type(User2.__init__)  # revealed: (self: User2, /) -> None
+reveal_type(User2.__init__)  # revealed: (self: User2, /, name: Unknown, id: int | None = ...) -> None
 
-# TODO: No error here.
-# error: [unknown-argument]
-# error: [unknown-argument]
 user = User2(name="Alice", id=12)
-# TODO: This should reveal `int | None`.
-reveal_type(user.id)  # revealed: Any
+reveal_type(user.id)  # revealed: int | None
 ```
