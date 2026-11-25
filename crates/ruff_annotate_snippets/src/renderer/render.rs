@@ -2403,8 +2403,9 @@ pub(crate) fn char_width(ch: char) -> usize {
     // just accept that sometimes the code line will be longer than desired.
     match ch {
         '\t' => 4,
-        // `normalize_whitespace` displays each of these characters in one column
-        // so that an underline can point to it.
+        // Keep the following list in sync with `rustc_errors::emitter::OUTPUT_REPLACEMENTS`. These
+        // are control points that we replace before printing with a visible codepoint for the sake
+        // of being able to point at them with underlines.
         '\u{0000}' | '\u{0001}' | '\u{0002}' | '\u{0003}' | '\u{0004}' | '\u{0005}'
         | '\u{0006}' | '\u{0007}' | '\u{0008}' | '\u{000B}' | '\u{000C}' | '\u{000D}'
         | '\u{000E}' | '\u{000F}' | '\u{0010}' | '\u{0011}' | '\u{0012}' | '\u{0013}'
@@ -2565,9 +2566,57 @@ impl DisplaySuggestion {
 }
 
 // We replace some characters so the CLI output is always consistent and underlines aligned.
-// Keep these replacements in sync with `char_width`.
+// Keep the following list in sync with `rustc_span::char_width`.
+const OUTPUT_REPLACEMENTS: &[(char, &str)] = &[
+    // In terminals without Unicode support the following will be garbled, but in *all* terminals
+    // the underlying codepoint will be as well. We could gate this replacement behind a "unicode
+    // support" gate.
+    ('\0', "␀"),
+    ('\u{0001}', "␁"),
+    ('\u{0002}', "␂"),
+    ('\u{0003}', "␃"),
+    ('\u{0004}', "␄"),
+    ('\u{0005}', "␅"),
+    ('\u{0006}', "␆"),
+    ('\u{0007}', "␇"),
+    ('\u{0008}', "␈"),
+    ('\t', "    "), // We do our own tab replacement
+    ('\u{000b}', "␋"),
+    ('\u{000c}', "␌"),
+    ('\u{000d}', "␍"),
+    ('\u{000e}', "␎"),
+    ('\u{000f}', "␏"),
+    ('\u{0010}', "␐"),
+    ('\u{0011}', "␑"),
+    ('\u{0012}', "␒"),
+    ('\u{0013}', "␓"),
+    ('\u{0014}', "␔"),
+    ('\u{0015}', "␕"),
+    ('\u{0016}', "␖"),
+    ('\u{0017}', "␗"),
+    ('\u{0018}', "␘"),
+    ('\u{0019}', "␙"),
+    ('\u{001a}', "␚"),
+    ('\u{001b}', "␛"),
+    ('\u{001c}', "␜"),
+    ('\u{001d}', "␝"),
+    ('\u{001e}', "␞"),
+    ('\u{001f}', "␟"),
+    ('\u{007f}', "␡"),
+    ('\u{200d}', ""), // Replace ZWJ for consistent terminal output of grapheme clusters.
+    ('\u{202a}', "�"), // The following unicode text flow control characters are inconsistently
+    ('\u{202b}', "�"), // supported across CLIs and can cause confusion due to the bytes on disk
+    ('\u{202c}', "�"), // not corresponding to the visible source code, so we replace them always.
+    ('\u{202d}', "�"),
+    ('\u{202e}', "�"),
+    ('\u{2066}', "�"),
+    ('\u{2067}', "�"),
+    ('\u{2068}', "�"),
+    ('\u{2069}', "�"),
+];
+
 pub(crate) fn normalize_whitespace(s: &str) -> Cow<'_, str> {
-    // All non-ASCII characters we replace start with 0xE2 in UTF-8.
+    // All non-ASCII characters in OUTPUT_REPLACEMENTS start with 0xE2 in UTF-8.
     let mut may_need_replacement = false;
     for byte in s.bytes() {
         let control = byte.is_ascii_control() && byte != b'\n';
@@ -2580,48 +2629,12 @@ pub(crate) fn normalize_whitespace(s: &str) -> Cow<'_, str> {
     let mut normalized = None;
     let mut start = 0;
     for (i, ch) in s.char_indices() {
-        // Skip the match for the common case of printable ASCII between replacements.
         if ch.is_ascii_graphic() || ch == ' ' {
             continue;
         }
-        let replacement = match ch {
-            '\0' => "␀",
-            '\u{0001}' => "␁",
-            '\u{0002}' => "␂",
-            '\u{0003}' => "␃",
-            '\u{0004}' => "␄",
-            '\u{0005}' => "␅",
-            '\u{0006}' => "␆",
-            '\u{0007}' => "␇",
-            '\u{0008}' => "␈",
-            '\t' => "    ",
-            '\u{000b}' => "␋",
-            '\u{000c}' => "␌",
-            '\u{000d}' => "␍",
-            '\u{000e}' => "␎",
-            '\u{000f}' => "␏",
-            '\u{0010}' => "␐",
-            '\u{0011}' => "␑",
-            '\u{0012}' => "␒",
-            '\u{0013}' => "␓",
-            '\u{0014}' => "␔",
-            '\u{0015}' => "␕",
-            '\u{0016}' => "␖",
-            '\u{0017}' => "␗",
-            '\u{0018}' => "␘",
-            '\u{0019}' => "␙",
-            '\u{001a}' => "␚",
-            '\u{001b}' => "␛",
-            '\u{001c}' => "␜",
-            '\u{001d}' => "␝",
-            '\u{001e}' => "␞",
-            '\u{001f}' => "␟",
-            '\u{007f}' => "␡",
-            // Remove the zero-width joiner for consistent rendering of grapheme clusters.
-            '\u{200d}' => "",
-            // Terminals differ in how they render these bidirectional formatting characters.
-            '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}' => "�",
-            _ => continue,
+        let replacement = match OUTPUT_REPLACEMENTS.binary_search_by_key(&ch, |(k, _)| *k) {
+            Ok(index) => OUTPUT_REPLACEMENTS[index].1,
+            Err(_) => continue,
         };
         // Allow for the first replacement so a single expanded character needs no reallocation.
         let output = normalized.get_or_insert_with(|| {
@@ -2865,7 +2878,15 @@ fn newline_count(body: &str) -> usize {
 mod test {
     use alloc::borrow::Cow;
 
-    use super::{newline_count, normalize_whitespace};
+    use super::{OUTPUT_REPLACEMENTS, newline_count, normalize_whitespace};
+    use snapbox::IntoData;
+
+    #[test]
+    fn normalization_covers_all_output_replacements() {
+        for &(ch, replacement) in OUTPUT_REPLACEMENTS {
+            assert_eq!(normalize_whitespace(&ch.to_string()), replacement);
+        }
+    }
 
     #[test]
     fn normalization_preserves_text_between_replacements() {
@@ -2873,14 +2894,32 @@ mod test {
             normalize_whitespace("\u{200d}α\t\u{001b}\nβ\u{007f}\u{202e}γ"),
             "α    ␛\nβ␡�γ"
         );
-        assert_eq!(normalize_whitespace("\u{200d}"), "");
-        assert_eq!(normalize_whitespace("\u{2066}"), "�");
     }
 
     #[test]
     fn printable_text_with_matching_lead_bytes_stays_borrowed() {
         let text = "© →";
         assert!(matches!(normalize_whitespace(text), Cow::Borrowed(_)));
+    }
+
+    fn format_replacements(replacements: Vec<(char, &str)>) -> String {
+        replacements
+            .into_iter()
+            .map(|r| format!("    {r:?}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[test]
+    /// The [`OUTPUT_REPLACEMENTS`] array must be sorted (for binary search to
+    /// work) and must contain no duplicate entries
+    fn ensure_output_replacements_is_sorted() {
+        let mut expected = OUTPUT_REPLACEMENTS.to_owned();
+        expected.sort_by_key(|r| r.0);
+        expected.dedup_by_key(|r| r.0);
+        let expected = format_replacements(expected);
+        let actual = format_replacements(OUTPUT_REPLACEMENTS.to_owned());
+        snapbox::assert_data_eq!(actual, expected.into_data().raw());
     }
 
     #[test]
