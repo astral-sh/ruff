@@ -4,7 +4,7 @@ use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
 };
 use ruff_db::files::File;
-use ruff_db::source::{is_notebook, source_text};
+use ruff_db::source::{SourceText, is_notebook, source_text};
 use ruff_python_ast::script::ScriptTag;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use ruff_text_size::{Ranged, TextRange};
@@ -251,6 +251,12 @@ pub(crate) fn inline_script_options(db: &dyn Db, file: File) -> Option<&Options>
 /// Most files have no script tag. Boxing keeps the cached result compact when it is `None`.
 #[salsa::tracked(returns(as_deref))]
 pub fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
+    let source = script_tag_source(db, file)?;
+    ScriptTag::parse(&source).map(Box::new)
+}
+
+/// The source read by the project walker when looking for inline script metadata.
+pub(super) fn script_tag_source(db: &dyn SourceDb, file: File) -> Option<SourceText> {
     let path = file.path(db);
     if path.is_vendored_path() {
         return None;
@@ -261,8 +267,7 @@ pub fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
         return None;
     }
 
-    let source = source_text(db, file);
-    ScriptTag::parse(&source).map(Box::new)
+    Some(source_text(db, file))
 }
 
 /// Parses a script's inline metadata. Edits that move an option must invalidate its diagnostic

@@ -542,9 +542,17 @@ impl Project {
         let open_files = self.open_files(db);
         let check_start = ruff_db::Instant::now();
 
-        let files: Vec<_> = (&files).into_iter().collect();
+        let mut roots: Vec<_> = (&files).into_iter().collect();
+        if matches!(files, ProjectFiles::Indexed(_)) && ruff_db::Db::files(db).is_frozen() {
+            // In a one-shot check, indexing has just cached the sources we scanned
+            // for script tags. Use their lengths without any extra filesystem reads.
+            parallel::distribute_large_files(&mut roots, rayon::current_num_threads(), |file| {
+                let source = script::script_tag_source(db, file)?;
+                source.read_error().is_none().then(|| source.len())
+            });
+        }
 
-        files
+        roots
             .into_par_iter()
             .for_each_with_project_db(db, |db, file| {
                 db.unwind_if_revision_cancelled();
