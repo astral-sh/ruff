@@ -12077,15 +12077,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // accumulating prior types cannot affect inference.
         let track_peer_types = values.iter().skip(1).any(is_collection_literal)
             && prefer_collection_literal_peer_context(self.db(), self.program_environment(), tcx);
-        self.infer_chained_boolean_types(
+        let can_widen = matches!(op, ast::BoolOp::Or) && tcx.expected_type().is_none();
+        let mut fallback = None;
+        let result = self.infer_chained_boolean_types(
             *op,
             track_peer_types,
             values.iter().enumerate(),
             |(_, value)| is_collection_literal(value),
             |builder, (index, value), peer_ty| {
                 let ty = if index == values.len() - 1 {
-                    builder
-                        .infer_expression_with_collection_literal_peer_context(value, tcx, peer_ty)
+                    let ty = builder
+                        .infer_expression_with_collection_literal_peer_context(value, tcx, peer_ty);
+                    if can_widen {
+                        fallback = Some(ty);
+                    }
+                    ty
                 } else {
                     builder.infer_maybe_standalone_expression_with_collection_literal_peer_context(
                         value, tcx, peer_ty,
@@ -12094,8 +12100,61 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 (ty, value.range())
             },
-        )
-        .value_type
+        );
+        if let Some(fallback) = fallback {
+            self.widen_or_fallback(result.value_type, fallback)
+        } else {
+            result.value_type
+        }
+    }
+
+    /// An empty fallback can make `(s or "").split()` select both the `str`
+    /// and `LiteralString` overloads. Widen the inferred result to the builtin
+    /// so those overloads do not see separate union members.
+    fn widen_or_fallback(&self, result: Type<'db>, fallback: Type<'db>) -> Type<'db> {
+        let db = self.db();
+        let Type::Union(union) = result else {
+            return result;
+        };
+        let [left, right] = union.elements(db) else {
+            return result;
+        };
+        let guarded = if *right == fallback {
+            *left
+        } else if *left == fallback {
+            *right
+        } else {
+            return result;
+        };
+        let Type::Intersection(guarded) = guarded else {
+            return result;
+        };
+        if !guarded.negative(db).iter().copied().eq([Type::AlwaysFalsy]) {
+            return result;
+        }
+
+        let builtin = match fallback.as_literal_value_kind() {
+            Some(LiteralValueTypeKind::LiteralString) => Some(KnownClass::Str),
+            Some(LiteralValueTypeKind::String(value)) => {
+                value.value(db).is_empty().then_some(KnownClass::Str)
+            }
+            Some(LiteralValueTypeKind::Bytes(value)) => {
+                value.value(db).is_empty().then_some(KnownClass::Bytes)
+            }
+            Some(LiteralValueTypeKind::Int(value)) => {
+                (value.as_i64() == 0).then_some(KnownClass::Int)
+            }
+            _ => None,
+        };
+        let Some(builtin) = builtin else {
+            return result;
+        };
+        let widened = builtin.to_instance(db, self.program_environment());
+        if guarded.positive(db).iter().copied().eq([widened]) {
+            widened
+        } else {
+            result
+        }
     }
 
     /// Computes the output of a chain of (one) boolean operation, consuming as input an iterator
