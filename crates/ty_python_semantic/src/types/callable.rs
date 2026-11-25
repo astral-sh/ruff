@@ -44,10 +44,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(super) fn is_classmethod(self, db: &'db dyn Db) -> bool {
-        self.function_like_kind(db) == Some(CallableTypeKind::ClassMethodLike)
-    }
-
     /// Returns the function exposed by descriptor access or a bound method's `__func__`.
     pub(super) fn underlying_function(self, db: &'db dyn Db) -> Type<'db> {
         match self {
@@ -89,24 +85,25 @@ impl<'db> Type<'db> {
             _ => {}
         }
         let kind = self.function_like_kind(db)?;
-        let receiver = match kind {
+        let (function, receiver) = match kind {
             CallableTypeKind::StaticMethodLike => return Some(self.underlying_function(db)),
-            CallableTypeKind::ClassMethodLike => owner
-                .filter(|owner| !owner.is_none(db))
-                .or_else(|| instance.map(|instance| instance.to_meta_type(db, env))),
-            _ => instance,
+            CallableTypeKind::ClassMethodLike => (
+                self.underlying_function(db),
+                owner
+                    .filter(|owner| !owner.is_none(db))
+                    .or_else(|| instance.map(|instance| instance.to_meta_type(db, env))),
+            ),
+            _ => (self, instance),
         };
-        Some(receiver.map_or_else(
-            || self.underlying_function(db),
-            |receiver| {
-                Type::BoundMethod(super::BoundMethodType::from_callable(
-                    db,
-                    self,
-                    env.program(db),
-                    receiver,
-                ))
-            },
-        ))
+        Some(receiver.map_or(function, |receiver| {
+            Type::BoundMethod(super::BoundMethodType::from_callable(
+                db,
+                function,
+                env.program(db),
+                receiver,
+                kind,
+            ))
+        }))
     }
 
     /// Return a type that represents the "contract" that a callable must satisfy when attempting
