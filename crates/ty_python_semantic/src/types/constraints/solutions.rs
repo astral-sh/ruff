@@ -22,7 +22,7 @@ use crate::types::constraints::{
     SolutionViolation, SolutionViolationKind, continue_if_ok,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
-use crate::types::variance::VarianceInferable;
+use crate::types::variance::TypeVarVariance;
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type, UnionType, any_over_type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
@@ -1238,40 +1238,70 @@ impl<'db, 'budget> SolutionWalker<'db, 'budget> {
         }
 
         let support = storage.constraint_support(upper_id.into_inner());
-        support.is_complete()
-            && support.iter().filter(|&id| id != self_id).all(|id| {
-                let var = storage.typevar_data(id);
-                if !var.is_inferable(db, self.inferable) {
-                    return true;
-                }
+        if !support.is_complete() {
+            return false;
+        }
+        let mut inferred = support
+            .iter()
+            .filter(|&id| id != self_id)
+            .map(|id| storage.typevar_data(id))
+            .filter(|var| var.is_inferable(db, self.inferable))
+            .peekable();
+        if inferred.peek().is_none() {
+            return true;
+        }
 
-                // Require concrete lower-bound evidence from the call site and
-                // agreement among all active bounds. Otherwise, validating Self
-                // can change the inferred type (e.g. with Any <= T <= bool).
-                let mut solution = None;
-                let mut has_lower_evidence = false;
-                for (id, _) in path.positive_constraints() {
-                    if path.constraint_is_substituted(id) {
-                        continue;
-                    }
-                    let constraint = storage.atomic_constraint_data(id);
-                    let lower = constraint.lower_bound_for(db, var);
-                    has_lower_evidence |= lower.is_some() && constraint.provenance().is_evidence();
-                    for bound in lower.into_iter().chain(constraint.upper_bound_for(db, var)) {
-                        if *solution.get_or_insert(bound) != bound {
-                            return false;
-                        }
+        // For C[T, U] with its own parameters in order, we can read each
+        // parameter's declared variance directly. Keep full validation when
+        // covariance depends on inference through possibly recursive members.
+        let Type::NominalInstance(instance) = upper.bound else {
+            return false;
+        };
+        let Some(alias) = instance.class(db, env).into_generic_alias() else {
+            return false;
+        };
+        let specialization = alias.specialization(db);
+        let arguments = specialization.types(db);
+        if specialization.tuple(db).is_some()
+            || specialization.materialization_kind(db).is_some()
+            || !specialization
+                .generic_context(db)
+                .variables(db)
+                .map(Type::TypeVar)
+                .eq(arguments.iter().copied())
+        {
+            return false;
+        }
+
+        inferred.all(|var| {
+            if !arguments.contains(&Type::TypeVar(var))
+                || var.typevar(db).explicit_variance(db) != Some(TypeVarVariance::Covariant)
+            {
+                return false;
+            }
+
+            // Require concrete lower-bound evidence from the call site and
+            // agreement among all active bounds. Otherwise, validating Self
+            // can change the inferred type (e.g. with Any <= T <= bool).
+            let mut solution = None;
+            let mut has_lower_evidence = false;
+            for (id, _) in path.positive_constraints() {
+                if path.constraint_is_substituted(id) {
+                    continue;
+                }
+                let constraint = storage.atomic_constraint_data(id);
+                let lower = constraint.lower_bound_for(db, var);
+                has_lower_evidence |= lower.is_some() && constraint.provenance().is_evidence();
+                for bound in lower.into_iter().chain(constraint.upper_bound_for(db, var)) {
+                    if *solution.get_or_insert(bound) != bound {
+                        return false;
                     }
                 }
-                has_lower_evidence
-                    && solution
-                        .is_some_and(|ty| ty.is_fully_static(db, env) && !ty.has_typevar(db, env))
-                    && upper
-                        .bound
-                        .variance_of(db, env, var.identity(db))
-                        .evaluate(db)
-                        .is_covariant()
-            })
+            }
+            has_lower_evidence
+                && solution
+                    .is_some_and(|ty| ty.is_fully_static(db, env) && !ty.has_typevar(db, env))
+        })
     }
 
     fn validate_constrained(
