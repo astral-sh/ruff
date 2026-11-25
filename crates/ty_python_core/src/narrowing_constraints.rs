@@ -117,7 +117,7 @@ impl NarrowingConstraints {
         self.used_interiors.is_empty()
     }
 
-    pub fn get_interior_node(&self, id: ScopedNarrowingConstraint) -> InteriorNode {
+    pub fn get_interior_node(&self, id: ScopedNarrowingConstraint) -> &InteriorNode {
         debug_assert!(!id.is_terminal());
         let raw_index = id.0 as usize;
         if let Some(used_indices) = &self.used_indices {
@@ -125,9 +125,9 @@ impl NarrowingConstraints {
                 used_indices.get_bit(raw_index).unwrap_or(false),
                 "all used narrowing constraints should have been marked as used",
             );
-            self.used_interiors[used_indices.rank(raw_index) as usize]
+            &self.used_interiors[used_indices.rank(raw_index) as usize]
         } else {
-            self.used_interiors[raw_index]
+            &self.used_interiors[raw_index]
         }
     }
 }
