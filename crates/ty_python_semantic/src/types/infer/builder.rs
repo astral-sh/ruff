@@ -6423,6 +6423,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return None;
             }
 
+            let is_unrelated_to_target_ty = |ty: Type<'db>| {
+                ty.as_nominal_instance()
+                    .zip(target_ty.as_nominal_instance())
+                    .is_some_and(|(ty, target)| ty.has_unrelated_class(db, target))
+            };
+
+            // Skip any target members that are unrelated to the return type, and so cannot be
+            // used to specialize it, even if partially.
+            if should_retry_union && target_ty.is_nominal_instance() {
+                let mut all_unrelated = true;
+                bindings.visit_overload_set(&overload_candidates, &mut |overload, _| {
+                    all_unrelated = all_unrelated && is_unrelated_to_target_ty(overload.return_ty);
+                });
+
+                if all_unrelated {
+                    return None;
+                }
+            }
+
             // Attempt to infer the argument types using the target type context.
             let attempt = try_infer(target_ty)?;
             let return_ty = attempt.0.return_type(db, env);
@@ -6456,17 +6475,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // that our expansion targets are too narrow and retry against the wider union, hence
             // why we keep track of it here.
             if should_retry_union
-                && compatible_ty != expected_ty
                 && return_ty.is_assignable_to(db, env, eligible_union.unwrap_or(expected_ty))
                 // Note that in some cases, a given member provides no useful constraints to the
                 // call, leading to an unspecialized inference result which should not be
-                // considered evidence to widen the call. Hence we ignore results that are entirely
-                // disjoint from the member being narrowed to.
+                // considered evidence to widen the call. Hence we ignore results which cannot
+                // have been specialized by the target member.
                 //
-                // TODO: Though it often correctly avoids unnecessary widening in practice,
-                // disjointness is not exactly the correct operation to check here. A narrowing
-                // attempt may produce unspecialized results while not being disjoint from the
-                // target type, e.g., if the target type is an arbitrary non-final class.
+                // TODO: Though these checks often avoid unnecessary widening in practice,
+                // neither disjointness nor unrelatedness is the correct operation to check here.
+                // The inferred return type may remain unspecialized despite being related to
+                // the target type, e.g., if the target type is an arbitrary subtype of the
+                // declared return type.
+                && !is_unrelated_to_target_ty(return_ty)
                 && !return_ty.is_disjoint_from(db, env, target_ty)
             {
                 wide_matches.push(return_ty);

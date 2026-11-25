@@ -2390,6 +2390,7 @@ ignored:
 
 ```py
 class Other: ...
+class BytesList(list[bytes]): ...
 
 x1: list[int] | list[str] | None = list()
 reveal_type(x1)  # revealed: list[int] | list[str]
@@ -2397,11 +2398,14 @@ reveal_type(x1)  # revealed: list[int] | list[str]
 x2: list[int] | list[str] | Other = list()
 reveal_type(x2)  # revealed: list[int] | list[str]
 
-x3: list[int] | None = reveal_type(head([[]]))  # revealed: list[int]
-x4: list[int] | None = reveal_type(max([], []))  # revealed: list[int]
+x3: list[int] | list[str] | BytesList = list()
+reveal_type(x3)  # revealed: list[int] | list[str]
+
+x4: list[int] | None = reveal_type(head([[]]))  # revealed: list[int]
+x5: list[int] | Other = reveal_type(head([[]]))  # revealed: list[int]
 
 # TODO: This should also infer `list[int]`.
-x5: list[int] | Other = reveal_type(head([[]]))  # revealed: list[int] | Other
+x6: list[int] | BytesList = reveal_type(head([[]]))  # revealed: list[int] | BytesList
 ```
 
 If multiple alternatives are inferred for a given type variable during fixpoint iteration, however,
