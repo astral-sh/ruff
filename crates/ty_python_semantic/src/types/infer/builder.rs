@@ -6431,11 +6431,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Some(attempt);
             }
 
-            // Keep track of individual narrowing attempts that failed to be narrowed to the chosen
-            // union member, but are still assignable to the full declared union.
+            // If we fail to narrow to the chosen union member but the resulting type is assignable
+            // to the full declared union, the inference attempt may have exposed gradual argument
+            // evidence or an unconstrained type variable that was hidden by other attempts.
+            //
+            // For example, a gradual argument type can lead to overly narrow results when
+            // expanding a call across individual members of the declared union:
+            //
+            // ```py
+            // def combine[T, U](x: T, y: U) -> T | U: ...
+            //
+            // def _(a: Any):
+            //     x: int | None = combine(a, None)
+            // ```
+            //
+            // A naive expansion of the call above would produce `None`, as the gradual argument
+            // can materialize to `Never` to permit the narrowing to a single union member. While
+            // this is a valid specialization for the call under gradual assignability, it is
+            // overly aggressive and generally unsound.
+            //
+            // Notice that when attempting to narrow to `int`, we infer the wider type `Any | None`
+            // due to the concrete `None` argument. If this newly discovered inference does not
+            // end up being redundant with other narrowing attempts, we later use it as evidence
+            // that our expansion targets are too narrow and retry against the wider union, hence
+            // why we keep track of it here.
             if should_retry_union
                 && compatible_ty != expected_ty
                 && return_ty.is_assignable_to(db, env, eligible_union.unwrap_or(expected_ty))
+                // Note that in some cases, a given member provides no useful constraints to the
+                // call, leading to an unspecialized inference result which should not be
+                // considered evidence to widen the call. Hence we ignore results that are entirely
+                // disjoint from the member being narrowed to.
+                //
+                // TODO: Though it often correctly avoids unnecessary widening in practice,
+                // disjointness is not exactly the correct operation to check here. A narrowing
+                // attempt may produce unspecialized results while not being disjoint from the
+                // target type, e.g., if the target type is an arbitrary non-final class.
+                && !return_ty.is_disjoint_from(db, env, target_ty)
             {
                 wide_matches.push(return_ty);
             }
@@ -6465,23 +6497,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // union, preventing a single `Any` member from leading to less precise results.
             eligible_union.filter(|ty| ty.is_union())
         } else if !wide_matches.is_empty() {
-            // A gradual argument type can lead to overly narrow results when expanding a call
-            // across individual members of the declared union:
-            //
-            // ```py
-            // def combine[T, U](x: T, y: U) -> T | U: ...
-            //
-            // def _(a: Any):
-            //     x: int | None = combine(a, None)
-            // ```
-            //
-            // A naive expansion of the call above would produce `None`, as the gradual argument
-            // can materialize to `Never` to permit the narrowing to a single union member. While
-            // this is a valid specialization for the call under gradual assignability, it is
-            // overly aggressive and generally unsound. Notice that when attempting to narrow to
-            // `int`, we infer the wider type `Any | None` due to the concrete `None` argument.
-            // We use this newly discovered inference as evidence that our expansion targets are
-            // too narrow, and so fall back to inferring against the entire union.
+            // If any narrowing attempt exposed wider inference evidence that is not redundant
+            // with other narrowing attempts, we retry against the full union.
             //
             // Note that in principle we should instead fall back to performing a _rank-2_
             // expansion here, that is, to narrow to every two-member subset of the union, but
@@ -6511,7 +6528,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(target) = retry_target
             && let Some(attempt) = try_infer(target)
-            // Avoid using unspecialized inference results as evidence for a retry.
+            // If the solver performed a diagnostic fallback during the retry attempt, we prefer
+            // the individual member specializations.
             && (narrowed.is_empty() || !attempt.0.ignored_declared_constraints())
             && attempt
                 .0

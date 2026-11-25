@@ -2381,6 +2381,12 @@ reveal_type(x1)  # revealed: list[int] | list[str]
 
 x2: list[int] | list[str] | Other = list()
 reveal_type(x2)  # revealed: list[int] | list[str]
+
+x3: list[int] | None = reveal_type(head([[]]))  # revealed: list[int]
+x4: list[int] | None = reveal_type(max([], []))  # revealed: list[int]
+
+# TODO: This should also infer `list[int]`.
+x5: list[int] | Other = reveal_type(head([[]]))  # revealed: list[int] | Other
 ```
 
 If multiple alternatives are inferred for a given type variable during fixpoint iteration, however,
