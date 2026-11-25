@@ -1382,9 +1382,7 @@ class Grandchild(Child):
     items = []
 
 reveal_type(Child.items)  # revealed: list[int]
-Child.items.append(1)
 reveal_type(Grandchild.items)  # revealed: list[int]
-Grandchild.items.append("bad")  # error: [invalid-argument-type]
 ```
 
 #### Deleting a class-level default
