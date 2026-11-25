@@ -927,6 +927,44 @@ def f(cb: Callable[[Left | None, Right], None]) -> None:
     item[0] = lambda s: s.upper()
 ```
 
+### A callback supplies a gradual lower bound and a concrete upper bound
+
+The callback accepts a `bool` and returns `Any`. The default `bool` satisfies both bounds.
+
+```pyi
+from collections.abc import Callable
+from typing import Any, Self, assert_type
+
+class Box[T = bool]:
+    def __new__(cls, callback: Callable[[T], T]) -> Self: ...
+    def get(self) -> T: ...
+
+def f(callback: Callable[[bool], Any]) -> None:
+    value = Box(callback).get()
+    assert_type(value, bool)
+    if value is True:
+        value()  # error: [not-callable]
+```
+
+### Two constructor parameters share a constrained type variable
+
+Both lists have element type `X`. For either choice of `X`, the list of values from the first
+parameter fits one arm of the return type.
+
+```pyi
+from typing import Any, Self
+
+class Pair[T, U]:
+    def __new__(cls, xs: list[T], ys: list[U], extra: U) -> Self: ...
+    def first(self) -> tuple[T, ...]: ...
+    def second(self) -> U: ...
+
+def f[X: (bool, int)](xs: list[X], extra: Any) -> list[bool] | list[int]:
+    pair = Pair(xs, xs, extra)
+    result = list(pair.first())
+    return result
+```
+
 ### Constructing through `type(self)`
 
 Calling a constructor through `type(self)` preserves the current `Self` specialization. The class's

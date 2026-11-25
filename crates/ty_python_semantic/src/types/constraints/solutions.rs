@@ -3,7 +3,6 @@ use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
 
 use indexmap::map::Slice;
-use itertools::Itertools;
 use ruff_index::Idx;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -1183,8 +1182,8 @@ impl<'db, 'budget> SolutionWalker<'db, 'budget> {
     /// choosing `C[T]` satisfies both. Adding the upper bound can derive constraints
     /// for every partial specialization of `C[T]`.
     ///
-    /// Keep those constraints when they can reorder alternative solutions or change
-    /// how we combine upper bounds on the receiver's inferred type parameters.
+    /// These constraints can reorder alternative solutions or change the inferred
+    /// type arguments, even when each parameter has only one distinct upper bound.
     fn can_skip_self_bound(
         &self,
         db: &'db dyn Db,
@@ -1246,22 +1245,32 @@ impl<'db, 'budget> SolutionWalker<'db, 'budget> {
                     return true;
                 }
 
-                // Validating Self can derive another copy of an upper bound on T
-                // with different provenance. If the bounds differ, this can change
-                // which type we infer or how we order an intersection. If all bounds
-                // name the same type, there's no intersection to compute.
-                let mut upper_bounds = path.positive_constraints().filter_map(|(id, _)| {
-                    let bound = storage
-                        .atomic_constraint_data(id)
-                        .upper_bound_for(db, var)?;
-                    (!path.constraint_is_substituted(id)).then_some(bound)
-                });
-                upper
-                    .bound
-                    .variance_of(db, env, var.identity(db))
-                    .evaluate(db)
-                    .is_covariant()
-                    && upper_bounds.all_equal()
+                // Require concrete lower-bound evidence from the call site and
+                // agreement among all active bounds. Otherwise, validating Self
+                // can change the inferred type (e.g. with Any <= T <= bool).
+                let mut solution = None;
+                let mut has_lower_evidence = false;
+                for (id, _) in path.positive_constraints() {
+                    if path.constraint_is_substituted(id) {
+                        continue;
+                    }
+                    let constraint = storage.atomic_constraint_data(id);
+                    let lower = constraint.lower_bound_for(db, var);
+                    has_lower_evidence |= lower.is_some() && constraint.provenance().is_evidence();
+                    for bound in lower.into_iter().chain(constraint.upper_bound_for(db, var)) {
+                        if *solution.get_or_insert(bound) != bound {
+                            return false;
+                        }
+                    }
+                }
+                has_lower_evidence
+                    && solution
+                        .is_some_and(|ty| ty.is_fully_static(db, env) && !ty.has_typevar(db, env))
+                    && upper
+                        .bound
+                        .variance_of(db, env, var.identity(db))
+                        .evaluate(db)
+                        .is_covariant()
             })
     }
 

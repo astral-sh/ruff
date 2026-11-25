@@ -1727,6 +1727,46 @@ def use(items: Items):
 }
 
 #[test]
+fn constructor_inference_tracks_recursive_return_type_edits() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY312)
+        .build()?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from typing import reveal_type
+        from api import Box
+
+        def f(value: int):
+            reveal_type(Box(value).get()[0])
+        "#,
+    )?;
+
+    // The constructor leaves U unconstrained. Querying its variance while solving for Self
+    // can panic when the recursive annotation is reverted.
+    for (first, expected) in [
+        ("T", "int"),
+        ("Box[T, U]", "Box[int, Unknown]"),
+        ("T", "int"),
+    ] {
+        db.write_dedented(
+            "/src/api.pyi",
+            &format!(
+                r#"
+                from typing import Self
+
+                class Box[T, U]:
+                    def __new__(cls, value: T) -> Self: ...
+                    def get(self) -> tuple[{first}, U]: ...
+                "#
+            ),
+        )?;
+        assert_revealed_type(&db, "/src/main.py", expected);
+    }
+    Ok(())
+}
+
+#[test]
 fn field_specifier_default_value_invalidates_caller() -> anyhow::Result<()> {
     let mut db = setup_db();
     let field_source = r#"from typing import Any
