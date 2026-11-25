@@ -4688,7 +4688,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let declared_ty = annotated.inner_type();
             let value_ty = value.as_ref().map(|value| {
-                self.infer_maybe_standalone_expression(value, TypeContext::preference(declared_ty))
+                self.infer_maybe_standalone_expression(
+                    value,
+                    TypeContext::annotated_assignment(declared_ty),
+                )
             });
 
             // If we have an annotated assignment like `self.attr: int = 1`, we still need to
@@ -5108,7 +5111,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let inferred_ty = self.infer_maybe_standalone_expression(
                 value,
-                TypeContext::preference(declared.inner_type()),
+                TypeContext::annotated_assignment(declared.inner_type()),
             );
             let inferred_ty = if is_pep_613_type_alias && target.is_name_expr() {
                 // Alias type inference emits the diagnostic, but this runtime value is
@@ -6198,7 +6201,72 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .filter_map(|(index, is_generic)| is_generic.then_some(index))
             .collect();
 
-        // If the type context is a union, attempt to narrow to a specific element.
+        // This method is faced with the difficult task of determining which subset of the type
+        // context to provide to the given generic call when the type context forms a union type.
+        // Naively, you might assume that the entire union would provide the most information to
+        // the constraint solver, and thus allow us to choose the most compatible specialization.
+        // For simple calls, this seems to work well:
+        //
+        // ```py
+        // def _(i: int):
+        //     x: int | None = copy(i)
+        // ```
+        //
+        // In the above example, providing the entire union to the constraint solver generates the
+        // constraints `int <: T@copy <: int | None`, when combined with the argument constraints.
+        // The constraint solver then chooses the solution `T = int`, which seems clearly the
+        // intended specialization for the call. The problem, of course, arises with expressions
+        // that require type context:
+        //
+        // ```py
+        // class A(TypedDict):
+        //     x: list[int]
+        //
+        // class B(TypedDict):
+        //     x: list[str]
+        //
+        // class C(TypedDict):
+        //     x: float
+        //
+        // def make_list[T](x: T) -> list[T]: ...
+        //
+        // def _():
+        //     x: list[A] | list[B] | list[C] = make_list({"x": []})
+        //     reveal_type(x)  # revealed: list[A] | list[B]
+        // ```
+        //
+        // In the above example, providing the union as type context for the call would allow us
+        // to infer `A | B` for the dictionary literal. However, this leads to an unsatisfiable set
+        // of constraints `((T = A) OR (T = B) OR (T = C)) AND (A | B <: T)`, as we have lost the
+        // correlation between the dictionary literal type and the member of the type context it
+        // was inferred against.
+        //
+        // Instead, we treat each member of the type context as a distinct instantiation of the
+        // generic call using that member as type context, allowing us to validate the dictionary
+        // literal against each candidate `TypedDict` separately. We thus validate two distinct
+        // specializations, `T = A` and `T = B`, allowing us to infer `list[A] | list[B]` for
+        // the call expression. We term this process a _rank-1 expansion_.
+        //
+        // Unfortunately, the rank-1 expansion may not be enough to choose a compatible
+        // specialization. Instead, we may need to infer the call against an arbitrary subset of
+        // the union:
+        //
+        // ```py
+        // def make_list_pair[T, U](x: T, y: U) -> list[T] | list[U]: ...
+        //
+        // def _(f: float):
+        //     x: list[A] | list[B] | list[C] = make_list_pair({"x": []}, {"x": f})
+        //     reveal_type(x)  # revealed: list[A] | list[B] | list[C]
+        // ```
+        //
+        // Notice that the above example requires a _rank-2_ expansion to infer the union of the
+        // two valid specializations for the call, `list[A] | list[C]` and `list[B] | list[C]`.
+        //
+        // However, performing expansion attempts to arbitrarily sized subsets of the union
+        // is unfeasible in practice due to combinatorial explosion, and so if the rank-1 expansion
+        // fails we simply fall back to inferring against the entire union (i.e., the rank-n
+        // expansion). This can lead to less correlated results for generic calls that themselves
+        // return a union.
         let narrow_targets = call_expression_tcx
             .narrow_targets(db, env)
             // We only need to attempt narrowing on generic calls, otherwise the type
@@ -6266,24 +6334,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             };
 
-        let mut try_narrow = |target_ty: Type<'db>| {
-            // Preserve results that were already inferred directly in a previous round of iteration,
-            // even if they aren't strictly compatible with a single member of the union, to avoid
-            // unnecessary narrowing.
-            //
-            // For performance reasons, we cannot perform narrowing attempts for each subset of
-            // the target union. However, inference attempts with partial or even disjoint type
-            // context may allow a nested generic call to return a valid result that spans multiple
-            // members of the full target union without explicitly providing that subset of the
-            // union as type context, which we take advantage of here.
-            let compatible_ty = if call_expression_tcx.is_inferred() {
-                call_expression_tcx.expected_type()?
-            } else {
-                target_ty
-            };
+        // TODO: For performance reasons, we currently only perform a full union retry for generic
+        // calls in an annotated assignment. This can lead to overly narrow inference results
+        // for generic calls in other contexts.
+        let should_retry_union = call_expression_tcx.is_from_annotated_assignment();
 
-            // Short-circuit if there is no overload with a matching return type.
-            if !bindings.satisfies(|overload| {
+        // Prefer narrowing to concrete subsets of the declared union, unless a dynamic member was
+        // inferred directly in a previous round of fixpoint iteration.
+        let is_eligible = |ty: &Type<'db>| call_expression_tcx.is_inferred() || !ty.is_dynamic();
+        let eligible_targets = narrow_targets.iter().copied().filter(is_eligible);
+        let eligible_union = if should_retry_union && !narrow_targets.iter().all(is_eligible) {
+            Some(UnionType::from_elements(db, env, eligible_targets.clone()))
+        } else {
+            None
+        };
+
+        let is_compatible_target = |target| {
+            bindings.satisfies(|overload| {
                 let inferable = overload
                     .signature
                     .generic_context
@@ -6292,24 +6359,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 overload
                     .return_ty
-                    .when_assignable_to_owned(db, env, compatible_ty, inferable)
+                    .when_assignable_to_owned(db, env, target, inferable)
                     .query(|_, when| !when.is_never_satisfied(db, env, inferable))
-            }) {
-                return None;
-            }
+            })
+        };
 
-            let target_tcx = call_expression_tcx.with_expected_type(Some(target_ty));
-
-            let mut speculative_bindings = bindings.clone();
+        let mut try_infer = |target_ty| {
             let mut speculative_builder = self.speculate();
+            let mut speculative_bindings = bindings.clone();
             let mut speculative_argument_types = argument_types.clone();
 
-            // Attempt to infer the argument types using the target type context.
             infer_and_check_argument_types(
                 &mut speculative_builder,
                 &mut speculative_argument_types,
                 &mut speculative_bindings,
-                target_tcx,
+                call_expression_tcx.with_expected_type(Some(target_ty)),
                 true,
             )
             .ok()?;
@@ -6320,14 +6384,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return None;
             }
 
-            if !speculative_bindings
-                .return_type(db, env)
-                .is_assignable_to(db, env, compatible_ty)
-            {
-                return None;
-            }
-
-            // Successfully inferred a result compatible with the type context.
             Some((
                 speculative_bindings,
                 speculative_argument_types,
@@ -6335,14 +6391,113 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ))
         };
 
-        let mut narrowed = narrow_targets
-            .iter()
-            // Skip dynamic members, unless they were already inferred directly in a previous round of
-            // fixpoint iteration.
-            .filter(|ty| call_expression_tcx.is_inferred() || !ty.is_dynamic())
+        let mut wide_matches = Vec::new();
+        let mut is_compatible_with_expected_ty = None;
+        let mut try_narrow = |target_ty: Type<'db>| {
+            // Preserve results that were already inferred directly in a previous round of iteration,
+            // even if they aren't strictly compatible with a single member of the union, to avoid
+            // unnecessary narrowing.
+            //
+            // For performance reasons, we cannot perform narrowing attempts to arbitrary subsets
+            // of the target union. However, inference attempts with partial or even disjoint type
+            // context may allow a nested generic call to return a valid result that spans multiple
+            // members of the full target union without explicitly providing that subset of the
+            // union as type context, which we take advantage of here.
+            let expected_ty = call_expression_tcx.expected_type()?;
+            let compatible_ty = if call_expression_tcx.is_inferred() {
+                expected_ty
+            } else {
+                target_ty
+            };
+
+            // If there is a possibility that we will retry inference against the full declared
+            // union, we must attempt to narrow to all eligible members whenever the call's return
+            // type is compatible with the full union.
+            let return_matches_target = if should_retry_union {
+                *is_compatible_with_expected_ty
+                    .get_or_insert_with(|| is_compatible_target(expected_ty))
+            } else {
+                is_compatible_target(compatible_ty)
+            };
+            if !return_matches_target {
+                return None;
+            }
+
+            let is_unrelated_to_target_ty = |ty: Type<'db>| {
+                ty.as_nominal_instance()
+                    .zip(target_ty.as_nominal_instance())
+                    .is_some_and(|(ty, target)| ty.has_unrelated_class(db, target))
+            };
+
+            // Skip any target members that are unrelated to the return type, and so cannot be
+            // used to specialize it, even if partially.
+            if should_retry_union && target_ty.is_nominal_instance() {
+                let mut all_unrelated = true;
+                bindings.visit_overload_set(&overload_candidates, &mut |overload, _| {
+                    all_unrelated = all_unrelated && is_unrelated_to_target_ty(overload.return_ty);
+                });
+
+                if all_unrelated {
+                    return None;
+                }
+            }
+
+            // Attempt to infer the argument types using the target type context.
+            let attempt = try_infer(target_ty)?;
+            let return_ty = attempt.0.return_type(db, env);
+            if return_ty.is_assignable_to(db, env, compatible_ty) {
+                // Successfully inferred a result compatible with the type context.
+                return Some(attempt);
+            }
+
+            // If we fail to narrow to the chosen union member but the resulting type is assignable
+            // to the full declared union, the inference attempt may have exposed gradual argument
+            // evidence or an unconstrained type variable that was hidden by other attempts.
+            //
+            // For example, a gradual argument type can lead to overly narrow results when
+            // expanding a call across individual members of the declared union:
+            //
+            // ```py
+            // def combine[T, U](x: T, y: U) -> T | U: ...
+            //
+            // def _(a: Any):
+            //     x: int | None = combine(a, None)
+            // ```
+            //
+            // A naive expansion of the call above would produce `None`, as the gradual argument
+            // can materialize to `Never` to permit the narrowing to a single union member. While
+            // this is a valid specialization for the call under gradual assignability, it is
+            // overly aggressive and generally unsound.
+            //
+            // Notice that when attempting to narrow to `int`, we infer the wider type `Any | None`
+            // due to the concrete `None` argument. If this newly discovered inference does not
+            // end up being redundant with other narrowing attempts, we later use it as evidence
+            // that our expansion targets are too narrow and retry against the wider union, hence
+            // why we keep track of it here.
+            if should_retry_union
+                && return_ty.is_assignable_to(db, env, eligible_union.unwrap_or(expected_ty))
+                // Note that in some cases, a given member provides no useful constraints to the
+                // call, leading to an unspecialized inference result which should not be
+                // considered evidence to widen the call. Hence we ignore results which cannot
+                // have been specialized by the target member.
+                //
+                // TODO: Though these checks often avoid unnecessary widening in practice,
+                // neither disjointness nor unrelatedness is the correct operation to check here.
+                // The inferred return type may remain unspecialized despite being related to
+                // the target type, e.g., if the target type is an arbitrary subtype of the
+                // declared return type.
+                && !is_unrelated_to_target_ty(return_ty)
+                && !return_ty.is_disjoint_from(db, env, target_ty)
+            {
+                wide_matches.push(return_ty);
+            }
+            None
+        };
+
+        let mut narrowed = eligible_targets
             // Avoid expanding a very large union of literals.
             .filter(|ty| !should_group_literals || !is_concrete_literal(ty))
-            .filter_map(|ty| try_narrow(*ty))
+            .filter_map(&mut try_narrow)
             .collect::<Vec<_>>();
 
         // Note that we do not attempt to narrow to arbitrary subsets of the target union
@@ -6355,6 +6510,53 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(result) = try_narrow(UnionType::from_elements(db, env, literal_targets))
         {
             narrowed.push(result);
+        }
+
+        let retry_target = if narrowed.is_empty() {
+            // We also perform a single narrowing attempt to the concrete subset of the declared
+            // union, preventing a single `Any` member from leading to less precise results.
+            eligible_union.filter(|ty| ty.is_union())
+        } else if !wide_matches.is_empty() {
+            // If any narrowing attempt exposed wider inference evidence that is not redundant
+            // with other narrowing attempts, we retry against the full union.
+            //
+            // Note that in principle we should instead fall back to performing a _rank-2_
+            // expansion here, that is, to narrow to every two-member subset of the union, but
+            // we avoid doing so for performance reasons.
+            let expansion_results = UnionType::from_elements(
+                db,
+                env,
+                narrowed
+                    .iter()
+                    .map(|(bindings, _, _)| bindings.return_type(db, env)),
+            );
+
+            // Inferring a call against multiple members of the declared union can result in the
+            // same concrete type for each attempt. As such, we only perform the retry if we
+            // discovered new inference evidence from a given narrowing attempt.
+            if wide_matches
+                .into_iter()
+                .any(|ty| !ty.is_redundant_with(db, env, expansion_results))
+            {
+                eligible_union.or(call_expression_tcx.expected_type())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        if let Some(target) = retry_target
+            && let Some(attempt) = try_infer(target)
+            // If the solver performed a diagnostic fallback during the retry attempt, we prefer
+            // the individual member specializations.
+            && (narrowed.is_empty() || !attempt.0.ignored_declared_constraints())
+            && attempt
+                .0
+                .return_type(db, env)
+                .is_assignable_to(db, env, target)
+        {
+            narrowed = vec![attempt];
         }
 
         let mut narrowed = narrowed.into_iter();

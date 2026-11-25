@@ -2240,20 +2240,65 @@ def _(a: int, b: str, c: int | str):
     # for performance reasons.
     x9: int | str | None = head(lst(c))
     reveal_type(x9)  # revealed: int | str | None
+
+class Base: ...
+class Left(Base): ...
+class Right(Base): ...
+
+def choose_head[T, U](values: list[T], fallback: list[U]) -> T | U:
+    return head(values) if values else head(fallback)
+
+def _(a: Left, b: Right, c: Right | None):
+    x1: Left | Right = choose_head(lst(a), lst(a))
+    reveal_type(x1)  # revealed: Left
+
+    x2: Left | Right = choose_head(lst(a), lst(b))
+    reveal_type(x2)  # revealed: Left | Right
+
+    x3: Base | None = choose_head(lst(a), lst(b))
+    reveal_type(x3)  # revealed: Base
+
+    x4: Base | None = choose_head(lst(a), lst(c))
+    reveal_type(x4)  # revealed: Base | None
 ```
 
-Generic calls are never narrowed to a dynamic type, which can lead to overly narrow or gradual types
-in the presence of unconstrained or dynamic arguments. Instead, the full declared union is preferred
-over a dynamic member:
+A single declared member can provide context to multiple matching union arms in the return type of a
+given call:
 
 ```py
-def head_or[T, U](values: list[T], default: U) -> T | U:
-    return values[0] if values else default
+def list_of_either[T, U](x: T, y: U) -> list[T] | list[U]:
+    return [x] if x else [y]
 
-def _(values: list[Any]):
-    result: str | Any = reveal_type(head_or(list(values), default=0))  # revealed: str | Any | Literal[0]
+def _(ints: list[int]):
+    x1: list[list[int]] | list[list[str]] = list_of_either([], ints)
+    reveal_type(x1)  # revealed: list[list[int]]
+```
 
-items: Any | list[int] = reveal_type(list())  # revealed: list[int]
+Narrowing also allows more precisely correlated results to be inferred for covariant types:
+
+```py
+from typing import TypedDict
+
+class A(TypedDict):
+    x: list[int]
+
+class B(TypedDict):
+    x: list[str]
+
+def make_pair[T](x: T) -> tuple[T, T]:
+    return x, x
+
+def maybe_make_pair[T](x: T) -> tuple[T, T] | None:
+    raise NotImplementedError
+
+# revealed: tuple[A, A] | tuple[B, B]
+x1: tuple[A, A | B] | tuple[B, A | B] = reveal_type(make_pair({"x": []}))
+
+# TODO: Narrowing to arbitrary sized subsets of the declared union would allow us to infer
+# the more precise `tuple[A, A] | tuple[B, B] | None` here.
+# error: [invalid-assignment]
+# revealed: tuple[A | B, A | B] | None
+x2: tuple[A, A | B] | tuple[B, A | B] | None = reveal_type(maybe_make_pair({"x": []}))
 ```
 
 When a generic call is narrowed to a single element of the union, any diagnostics emitted use the
@@ -2285,8 +2330,9 @@ x2: list[A] | list[dict[str, int]] = lst(reveal_type({"value": 1}))  # revealed:
 reveal_type(x2)  # revealed: list[A] | list[dict[str, int]]
 ```
 
-If inferring a generic call against a member of the declared type produces a wider return type, that
-member is excluded from the result.
+If inferring a generic call against a member of the declared type produces a wider return type, we
+fall back to inferring against the entire declared union instead of inferring an overly narrow
+result:
 
 ```py
 def make_list[U = str]() -> list[U] | list[int]:
@@ -2296,10 +2342,70 @@ def _():
     x1 = make_list()
     reveal_type(x1)  # revealed: list[str] | list[int]
 
-    # TODO: Ideally this would return the same result as the unannotated case, but it's
-    # not clear which result is more desirable.
+    # TODO: We infer against the union `list[str] | list[int]` here, but the constraint solver
+    # chooses the narrower solution. Ideally this would return the same result as the
+    # unannotated case.
     x2: list[str] | list[int] = make_list()
     reveal_type(x2)  # revealed: list[int]
+
+def default[T](x: T | None = None) -> T | int:
+    return 0 if x is None else x
+
+def _(value: Any):
+    # TODO: We should infer the narrower `int` here.
+    x1: int | str = default()
+    reveal_type(x1)  # revealed: int | str
+
+    # TODO: This should also be `int`.
+    x2: int | str = default(None)
+    reveal_type(x2)  # revealed: int | str
+
+    x3: int | str = default(value)
+    reveal_type(x3)  # revealed: int | str
+
+def empty[T = int]() -> list[T]:
+    return []
+
+def _(items: list[list[int]]):
+    x1 = head([*items, empty()])
+    reveal_type(x1)  # revealed: list[int]
+
+    x2: list[int] | list[str] = head([*items, empty()])
+    reveal_type(x2)  # revealed: list[int] | list[str]
+```
+
+This applies even if the narrowing attempt only partially specialized the generic call:
+
+```py
+def head_or_empty[T, U](items: list[U]) -> list[T] | U:
+    return items[0] if items else []
+
+def _(item: Any):
+    x1: list[int] | str = head_or_empty([item])
+    reveal_type(x1)  # revealed: list[int] | str
+```
+
+However, if a given narrowing attempt does not contribute any useful constraints to the call, it is
+ignored:
+
+```py
+class Other: ...
+class BytesList(list[bytes]): ...
+
+x1: list[int] | list[str] | None = list()
+reveal_type(x1)  # revealed: list[int] | list[str]
+
+x2: list[int] | list[str] | Other = list()
+reveal_type(x2)  # revealed: list[int] | list[str]
+
+x3: list[int] | list[str] | BytesList = list()
+reveal_type(x3)  # revealed: list[int] | list[str]
+
+x4: list[int] | None = reveal_type(head([[]]))  # revealed: list[int]
+x5: list[int] | Other = reveal_type(head([[]]))  # revealed: list[int]
+
+# TODO: This should also infer `list[int]`.
+x6: list[int] | BytesList = reveal_type(head([[]]))  # revealed: list[int] | BytesList
 ```
 
 If multiple alternatives are inferred for a given type variable during fixpoint iteration, however,
@@ -2320,6 +2426,9 @@ def _(ints: list[int]):
 Dynamic types inferred from arguments are also preserved.
 
 ```py
+def head_or[T, U](values: list[T], default: U) -> T | U:
+    return values[0] if values else default
+
 def _(values: list[Any]):
     x = choose(head_or(list(values), default=None), None)
     reveal_type(x)  # revealed: Any | None
@@ -2344,6 +2453,79 @@ x2: tuple[list[str] | list[int]] = wrap_tuple((
     # TODO: This should remain `list[str] | list[int]`.
     reveal_type(make_list()),  # revealed: list[int]
 ))
+```
+
+## Narrowing generic calls with gradual types
+
+When inferring a generic call with gradual arguments, we avoid inferring overly narrow results that
+only succeed under gradual assignability.
+
+```py
+from typing import Any
+
+def first_or_none[T](items: list[T]) -> T | None:
+    raise NotImplementedError
+
+def _(value: Any):
+    x1: int | None = reveal_type(first_or_none([value]))  # revealed: int | None
+    x2: list[int | None] = [reveal_type(first_or_none([value]))]  # revealed: int | None
+
+    x3: int | None
+    # TODO: We should infer `Any | None` here.
+    x3 = reveal_type(first_or_none([value]))  # revealed: None
+
+def head_or[T, U](values: list[T], default: U) -> T | U:
+    return values[0] if values else default
+
+def _(values: list[Any]):
+    x1: int | None = reveal_type(head_or(values, default=None))  # revealed: int | None
+```
+
+Generic calls are never narrowed to a dynamic type, which can lead to overly gradual results.
+Instead, the full declared union is preferred over a dynamic member:
+
+```py
+x1: Any | list[int] = reveal_type(list())  # revealed: list[int]
+
+def _(values: list[Any]):
+    x2: str | Any = reveal_type(head_or(list(values), default=0))  # revealed: str | Any | Literal[0]
+```
+
+A single dynamic member is also ignored if the call is compatible with the concrete subset of the
+declared type:
+
+```py
+from typing import TypedDict
+
+def list_of_either[T, U](x: T, y: U) -> list[T] | list[U]:
+    raise NotImplementedError
+
+class Row(TypedDict):
+    name: str
+
+class Message(TypedDict):
+    text: str
+
+type RowsOrMessages = list[Row] | list[Message] | Any
+
+# revealed: list[Row] | list[Message]
+x1: RowsOrMessages = reveal_type(list_of_either({"name": "first"}, {"text": "hello"}))
+
+# revealed: list[dict[str, int]]
+x2: RowsOrMessages = reveal_type(list_of_either({"name": 0}, {"text": 0}))
+```
+
+If a gradual argument prevents narrowing to individual members of the union, the call is still
+inferred against the concrete subset of the union if compatible:
+
+```py
+def tag[T, U](row: T, value: U) -> tuple[T, U]:
+    return row, value
+
+def _(value: Any | None):
+    x1: tuple[Row, None] | tuple[Row, int] | Any = tag({"name": "first"}, value)
+    # TODO: This should infer `tuple[Row, None | int]`.
+    reveal_type(x1)  # revealed: tuple[Row, None]
 ```
 
 ## Correlated overload specializations from an expected type
