@@ -1198,6 +1198,147 @@ fn benchmark_nested_generic_constructor_arguments(criterion: &mut Criterion) {
             &code,
         );
     }
+
+    // Keep the attribute unannotated. An explicit `: object` lets the solver prefer the expected
+    // type in nested calls, which can mask repeated growth of the type arguments of A and B.
+    let attr = "
+            class Example:
+                tree = object()
+
+                def update(self):
+                    self.tree";
+
+    for (suffix, field, target) in [
+        ("inferred_attribute", "", attr),
+        // Adding a writable `value` makes `Tree` invariant in `T`.
+        ("inferred_attribute_invariant", "value: T", attr),
+        ("annotated", "", "tree: Tree[A[Any] | int | None]"),
+        ("annotated_any", "", "tree: Tree[A[Any] | Any | int | None]"),
+    ] {
+        let code = format!(
+            r#"
+            from typing import Any
+
+            class Tree[T]:
+                {field}
+                def __init__(self, *xs: "T | Tree[T]"): ...
+
+            class A[T](Tree[T]): ...
+            class B[T](Tree[T]): ...
+
+            {target} = Tree(Tree(Tree(A(), B()), None), None)
+        "#
+        );
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[nested_generic_constructor_arguments_{suffix}]"),
+            &code,
+        );
+    }
+
+    // A inherits the constructor. A and B forward T, specialize K differently, and
+    // introduce a type parameter that doesn't occur in Tree.
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[nested_generic_constructor_arguments_inferred_attribute_inherited]",
+        &format!(
+            r#"
+            class Tree[T, K]:
+                def __init__(self, *xs: "T | Tree[T, K]"): ...
+
+            class A[T, Tag](Tree[T, int]): ...
+            class B[T, Tag](Tree[T, bool]): ...
+
+            {attr} = Tree(Tree(A(A(), B()), None), None)
+        "#
+        ),
+    );
+
+    // In Bokeh's Either constructor, the literal union comes from a fixed sibling.
+    // Solving again without the nested call is expensive even though no hint can grow.
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[nested_generic_constructor_arguments_literal_union]",
+        r#"
+        from typing import Literal
+
+        class Property[G]:
+            get: G
+
+        class Either[G, S]:
+            values: tuple[G, S]
+
+            def __init__[A, B](self: "Either[A | B, A | B]", x: type[Property[A]], y: Property[B]): ...
+
+        type Marker = Literal[
+            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p"
+        ]
+        MarkerType = Property[Marker]
+        Either(MarkerType, Property[str]())
+        "#,
+    );
+}
+
+/// Each additional argument allows more inference passes. Using the whole list as
+/// context for its own elements can add a layer of `list` on every pass.
+fn benchmark_generic_list_arguments(criterion: &mut Criterion) {
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[generic_intersection_arguments]",
+        "
+        from ty_extensions import Intersection
+
+        def first[T](*xs: Intersection[T, list[T]]) -> T:
+            return xs[0]
+
+        first([], [], [], [], [], [], [], [], [], [])
+        ",
+    );
+
+    // The union is inside the tuple, so the argument can't be restricted to list[T].
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[tuple_with_ambiguous_list_arguments]",
+        "
+        def f[T](*xs: tuple[T | list[T]]) -> None: ...
+
+        f(([1],), ([1],), ([1],), ([1],), ([1],), ([1],), ([1],), ([1],), ([1],))
+        ",
+    );
+
+    // Even when the tuple arguments don't get the combined hint, a list[T]
+    // sibling can pass it back to them on the next inference pass.
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[tuple_with_ambiguous_list_arguments_and_sibling]",
+        r#"
+        def f[T](out: list[T], *xs: tuple[T | list[T]]) -> T:
+            return out[0]
+
+        f([], ([1],), (["s"],), ([],), ([],), ([],), ([],), ([],), ([],), ([],), ([],))
+        "#,
+    );
+
+    // The typed lists can't both match list[T] with the same T. Even a
+    // nonempty literal can pass a growing hint to its siblings.
+    for (suffix, value) in [
+        ("", "[]"),
+        ("_nested", "[[1]]"),
+        ("_conditional", "[[1]] if flag else 0"),
+    ] {
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[conflicting_list_arguments{suffix}]"),
+            &format!(
+                "
+                def f[T](*xs: T | list[T]) -> None: ...
+
+                def _(a: list[int], b: list[str], flag: bool):
+                    f(a, b, {value}, {value}, {value}, {value}, {value}, {value})
+                "
+            ),
+        );
+    }
 }
 
 /// Regression benchmark for ty#4269: inherited receiver binding with nested type variables.
@@ -3121,6 +3262,7 @@ criterion_group!(
     benchmark_many_protocol_members_mismatch,
     benchmark_inherited_recursive_protocol,
     benchmark_nested_generic_constructor_arguments,
+    benchmark_generic_list_arguments,
     benchmark_nested_recursive_protocol_receiver,
     benchmark_materialized_recursive_protocol_overload,
     benchmark_materialized_recursive_protocol_subtyping,
