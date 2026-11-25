@@ -1678,6 +1678,23 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
+    /// Whether factory_boy's metaclass removes this nested class before creating the factory.
+    /// Assignments in methods can still introduce attributes with the same name.
+    fn is_factory_configuration_class(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        qualifiers: TypeQualifiers,
+    ) -> bool {
+        qualifiers.contains(TypeQualifiers::NESTED_CLASS)
+            && matches!(name, "Meta" | "Params")
+            && self.metaclass(db).to_class_type(db).is_some_and(|meta| {
+                meta.iter_mro(db)
+                    .filter_map(ClassBase::into_class)
+                    .any(|base| base.is_known(db, KnownClass::FactoryMetaClass))
+            })
+    }
+
     /// Returns the inferred type of the class member named `name`. Only bound members
     /// or those marked as `ClassVars` are considered.
     ///
@@ -1835,6 +1852,10 @@ impl<'db> StaticClassLiteral<'db> {
                     .inner
                     .or_fall_back_to(db, env, || Place::declared(hash).into()),
             };
+        }
+
+        if self.is_factory_configuration_class(db, name, member.qualifiers()) {
+            return sources.implicit_attribute(db, name, MethodDecorator::ClassMethod);
         }
 
         // For dataclass-like classes, `KW_ONLY` sentinel fields are not real
@@ -3329,6 +3350,10 @@ impl<'db> StaticClassLiteral<'db> {
                         }),
                     qualifiers,
                 } => {
+                    if self.is_factory_configuration_class(db, name, qualifiers) {
+                        return sources.implicit_attribute(db, name, MethodDecorator::None);
+                    }
+
                     // For the purpose of finding instance attributes, ignore `ClassVar`
                     // declarations:
                     if qualifiers.contains(TypeQualifiers::CLASS_VAR) {

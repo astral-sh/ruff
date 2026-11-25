@@ -285,6 +285,8 @@ pub enum KnownModule {
     DjangoDbModelsFields,
     #[strum(serialize = "django.db.models.fields.related")]
     DjangoDbModelsFieldsRelated,
+    #[strum(serialize = "factory.base")]
+    FactoryBase,
     #[strum(serialize = "pydantic.config")]
     PydanticConfig,
     #[strum(serialize = "pydantic.fields")]
@@ -349,6 +351,7 @@ impl KnownModule {
             Self::DjangoDbModelsBase => "django.db.models.base",
             Self::DjangoDbModelsFields => "django.db.models.fields",
             Self::DjangoDbModelsFieldsRelated => "django.db.models.fields.related",
+            Self::FactoryBase => "factory.base",
             Self::PydanticConfig => "pydantic.config",
             Self::PydanticFields => "pydantic.fields",
             Self::PydanticFunctionalValidators => "pydantic.functional_validators",
@@ -388,6 +391,7 @@ impl KnownModule {
             | Self::DjangoDbModelsBase
             | Self::DjangoDbModelsFields
             | Self::DjangoDbModelsFieldsRelated
+            | Self::FactoryBase
             | Self::PydanticConfig
             | Self::PydanticFields
             | Self::PydanticFunctionalValidators
