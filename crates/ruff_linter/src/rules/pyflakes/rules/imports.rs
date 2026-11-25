@@ -51,16 +51,17 @@ impl Violation for ImportShadowedByLoopVar {
 
 /// F402
 pub(crate) fn import_shadowed_by_loop_var(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
+    let semantic = checker.semantic();
     for (name, binding_id) in scope.bindings() {
-        for shadow in checker.semantic().shadowed_bindings(scope_id, binding_id) {
+        for shadow in semantic.shadowed_bindings(scope_id, binding_id) {
             // If the shadowing binding isn't a loop variable, abort.
-            let binding = &checker.semantic().bindings[shadow.binding_id()];
+            let binding = &semantic.bindings[shadow.binding_id()];
             if !binding.kind.is_loop_var() {
                 continue;
             }
 
             // If the shadowed binding isn't an import, abort.
-            let shadowed = &checker.semantic().bindings[shadow.shadowed_id()];
+            let shadowed = &semantic.bindings[shadow.shadowed_id()];
             if !matches!(
                 shadowed.kind,
                 BindingKind::Import(..)
@@ -71,8 +72,8 @@ pub(crate) fn import_shadowed_by_loop_var(checker: &Checker, scope_id: ScopeId, 
                 continue;
             }
 
-            // If the bindings are in different forks, abort. A loop variable nested in a
-            // branch below the import (or vice versa) still shadows it, as in:
+            // Abort unless one binding's branch contains the other's. A loop variable nested
+            // in a branch below the import (or vice versa) still shadows it, as in:
             // ```python
             // from os import path
             //
@@ -82,7 +83,6 @@ pub(crate) fn import_shadowed_by_loop_var(checker: &Checker, scope_id: ScopeId, 
             // ```
             if shadowed.source.is_none_or(|left| {
                 binding.source.is_none_or(|right| {
-                    let semantic = checker.semantic();
                     !(semantic.dominates(left, right) || semantic.dominates(right, left))
                 })
             }) {

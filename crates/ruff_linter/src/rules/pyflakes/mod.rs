@@ -2653,6 +2653,18 @@ mod tests {
         ",
             &[Rule::ImportShadowedByLoopVar],
         );
+        // The import can also be the more deeply nested of the two bindings.
+        flakes(
+            r"
+        import os
+        if os.name:
+            import fu
+            fu.bar()
+        for fu in ():
+            pass
+        ",
+            &[Rule::ImportShadowedByLoopVar],
+        );
     }
 
     #[test]
