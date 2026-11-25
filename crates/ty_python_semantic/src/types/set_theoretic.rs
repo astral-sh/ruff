@@ -233,7 +233,21 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        let mut elements = elements.into_iter().map(Into::into).peekable();
+        Self::normalize_leave_aliases(
+            db,
+            env,
+            elements.into_iter().map(Into::into),
+            RecursivelyDefined::No,
+        )
+    }
+
+    fn normalize_leave_aliases(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        elements: impl Iterator<Item = Type<'db>>,
+        recursively_defined: RecursivelyDefined,
+    ) -> Type<'db> {
+        let mut elements = elements.peekable();
         let (min, max) = elements.size_hint();
         // Iterating a homogeneous tuple can supply one element that is itself a wide union.
         // Normalizing it still compares the members of that union against each other.
@@ -247,7 +261,7 @@ impl<'db> UnionType<'db> {
                 env.program(db),
                 elements,
                 false,
-                RecursivelyDefined::No,
+                recursively_defined,
             )
             .normalize(db);
         }
@@ -255,7 +269,7 @@ impl<'db> UnionType<'db> {
         for element in elements {
             builder.add_in_place(element);
         }
-        builder.build()
+        builder.or_recursively_defined(recursively_defined).build()
     }
 
     /// Returns `true` if the union contains exactly the provided type as a member.
@@ -436,24 +450,23 @@ impl<'db> UnionType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        let map = |ty: &Type<'db>| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
         if !type_mapping.can_preserve_set_structure() {
-            return self.map_leave_aliases(db, visitor.env, |ty| {
-                ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            });
+            return self.map_leave_aliases(db, visitor.env, map);
         }
         let (mapped, expanded) = visitor.track_alias_expansion(|| {
-            self.map_changed_elements(db, |ty| {
-                ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            })
-            .map(|mapped| mapped.collect::<Box<[_]>>())
+            self.map_changed_elements(db, map)
+                .map(|mapped| mapped.collect::<Box<[_]>>())
         });
         let Some(mapped) = mapped else {
             return Type::Union(self);
         };
+        let recursive = self.recursively_defined(db);
         if expanded {
-            return self.normalize_mapped_elements(db, visitor.env, mapped.into_iter());
+            Self::normalize_leave_aliases(db, visitor.env, mapped.into_iter(), recursive)
+        } else {
+            Type::Union(Self::new(db, mapped, recursive))
         }
-        Type::Union(Self::new(db, mapped, self.recursively_defined(db)))
     }
 
     /// Apply a transformation function to all elements of the union,
@@ -480,32 +493,7 @@ impl<'db> UnionType<'db> {
         let Some(mapped) = self.map_changed_elements(db, transform_fn) else {
             return Type::Union(self);
         };
-        self.normalize_mapped_elements(db, env, mapped)
-    }
-
-    fn normalize_mapped_elements(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        mapped: impl Iterator<Item = Type<'db>>,
-    ) -> Type<'db> {
-        if self.elements(db).len() >= WIDE_UNION {
-            return OrderedUnionInput::new(
-                db,
-                env.program(db),
-                mapped.collect::<Box<[_]>>(),
-                false,
-                self.recursively_defined(db),
-            )
-            .normalize(db);
-        }
-        mapped
-            .fold(
-                UnionBuilder::new(db, env).unpack_aliases(false),
-                UnionBuilder::add,
-            )
-            .or_recursively_defined(self.recursively_defined(db))
-            .build()
+        Self::normalize_leave_aliases(db, env, mapped, self.recursively_defined(db))
     }
 
     /// Return the mapped elements only if at least one element changed.
@@ -1368,15 +1356,9 @@ impl<'db> IntersectionType<'db> {
                     .iter()
                     .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
                     .collect::<FxOrderSet<_>>();
-                let mut negative = NegativeIntersectionElements::default();
-                for element in self.negative(db) {
-                    negative.insert(element.apply_type_mapping_impl(
-                        db,
-                        &type_mapping.flip(),
-                        tcx,
-                        visitor,
-                    ));
-                }
+                let negative = self
+                    .negative(db)
+                    .map(|ty| ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor));
                 (positive, negative)
             });
             if expanded {

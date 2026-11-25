@@ -270,17 +270,27 @@ class PairBox(Generic[T]):
         PairBox((value, "wrong"))  # error: [invalid-argument-type]
 ```
 
-Both constructor parameters use the same specialization of `Choice`, which captures the class
-parameter. In the second parameter, `tuple[int | str | bytes]` already covers the expanded
-`tuple[int | str]`.
+Both parameters use `Choice[int | str]`, which expands to `int | str` because the captured class
+parameter is bounded by `int`. The first parameter still excludes `tuple[int]`. In the second,
+`tuple[int | str | bytes]` covers the narrower tuple.
 
 ```py
+from ty_extensions import Intersection, Not
+
 N = TypeVar("N", bound=int)
 
 class Choices(Generic[N]):
     Choice = TypeAliasType("Choice", N | U, type_params=(U,))
 
-    def __init__(self, first: Choice[int | str], rest: tuple[Choice[int | str]] | tuple[int | str | bytes]) -> None: ...
+    def __init__(
+        self,
+        first: Intersection[tuple[Choice[int | str]], Not[tuple[int]]],
+        rest: tuple[Choice[int | str]] | tuple[int | str | bytes],
+    ) -> None: ...
     def check(self) -> None:
-        Choices(1, None)  # error: [invalid-argument-type] "Expected `tuple[int | str | bytes]`, found `None`"
+        Choices(("text",), (b"bytes",))  # ok
+        Choices(
+            (1,),  # error: [invalid-argument-type]
+            None,  # error: [invalid-argument-type] "Expected `tuple[int | str | bytes]`, found `None`"
+        )
 ```

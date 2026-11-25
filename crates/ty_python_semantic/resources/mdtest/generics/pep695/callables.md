@@ -1510,30 +1510,22 @@ class Right[T](Protocol):
         raise NotImplementedError
 ```
 
-A method can also accept an intersection with its own protocol.
-
-```py
-from ty_extensions import Intersection
-
-class Both[T](Protocol):
-    def combine[U](self, other: Intersection[Left[U], Both[U]]) -> T:
-        other.extra()  # ok
-        raise NotImplementedError
-```
-
 ## Comparing inherited recursive generic protocol methods
 
 `Left` and `Right` inherit the same generic method, but `Left.combine` returns a list and
-`Right.combine` returns a set. Both protocols therefore remain in the method's parameter union.
+`Right.combine` returns a set. The method accepts either protocol for `other` and excludes `Right`
+from `left_only`.
 
 ```py
 from __future__ import annotations
 
 from typing import Protocol
+from ty_extensions import Intersection, Not
 
 class Combines[T](Protocol):
-    def combine[U](self, other: Left[U] | Right[U]) -> T:
+    def combine[U](self, other: Left[U] | Right[U], left_only: Intersection[Left[U], Not[Right[U]]]) -> T:
         reveal_type(other)  # revealed: Left[U@combine] | Right[U@combine]
+        reveal_type(left_only)  # revealed: Left[U@combine] & ~Right[U@combine]
         raise NotImplementedError
 
 class Left[T](Combines[list[T]], Protocol): ...
