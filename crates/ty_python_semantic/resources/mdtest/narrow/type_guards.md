@@ -81,7 +81,7 @@ class _:
     def _(self, /, *, a) -> TypeGuard[str]: ...
     @classmethod
     def _(cls) -> TypeIs[str]: ...  # error: [invalid-type-guard-definition] "`TypeIs` function must have a parameter to narrow"
-    @classmethod
+    @classmethod  # error: [invalid-argument-type] "Argument to class `classmethod` is incorrect"
     def _() -> TypeIs[str]: ...  # error: [invalid-type-guard-definition] "`TypeIs` function must have a parameter to narrow"
     @staticmethod
     # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"

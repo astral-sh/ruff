@@ -8,6 +8,7 @@ use crate::{
         DynamicType, IntersectionBuilder, KnownClass, KnownInstanceType, ParamSpecAttrKind,
         SpecialFormType, SubclassOfInner, SubclassOfType, Type, TypeContext,
         TypeVarBoundOrConstraints, TypeVarKind, UnionBuilder, UnionType, UnionTypeInstance,
+        call::CallArguments,
         callable::CallableTypeKind,
         constraints::ConstraintSetBuilder,
         context::InferContext,
@@ -596,7 +597,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
+        for (index, (decorator_ty, decorator_node)) in
+            decorator_types_and_nodes.iter().rev().enumerate()
+        {
             let descriptor_kind = match decorator_ty {
                 Type::ClassLiteral(class) => match class.known(db) {
                     Some(KnownClass::Staticmethod) => Some(CallableTypeKind::StaticMethodLike),
@@ -631,6 +634,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     wrap(inferred_ty)
                 };
                 if let Some(wrapped) = wrapped {
+                    // Wrapping skips the `classmethod(...)` call, which checks that the wrapped
+                    // callable accepts the class as its first positional argument. When the
+                    // classmethod applies directly to this definition, `check_decorator_calls`
+                    // performs that check after inference. Otherwise it wraps the result of
+                    // another decorator, so we check that result here:
+                    //
+                    // ```python
+                    // @classmethod
+                    // @returns_zero_argument_callable
+                    // def f(cls): ...
+                    // ```
+                    if kind == CallableTypeKind::ClassMethodLike
+                        && index > 0
+                        && decorator_ty
+                            .try_call(
+                                db,
+                                self.program_environment(),
+                                &CallArguments::positional([inferred_ty]),
+                            )
+                            .is_err()
+                    {
+                        self.defer_decorator_call(decorator_node, inferred_ty);
+                    }
                     inferred_ty = wrapped;
                     continue;
                 }
