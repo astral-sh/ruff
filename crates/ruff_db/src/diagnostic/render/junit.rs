@@ -156,18 +156,19 @@ fn write_failure_case<W: std::io::Write>(
                     .write_empty()?;
                 Ok(())
             })?;
+        let message = xml_string(case.message);
         let description = if let Some(location) = case.location {
             Cow::Owned(format!(
-                "line {}, col {}, {}",
-                location.line, location.column, case.message
+                "line {}, col {}, {message}",
+                location.line, location.column
             ))
         } else {
-            Cow::Borrowed(case.message)
+            Cow::Borrowed(message.as_str())
         };
         writer
             .create_element("failure")
-            .with_attribute(("message", xml_string(case.message).as_str()))
-            .write_text_content(BytesText::new(&xml_string(&description)))?;
+            .with_attribute(("message", message.as_str()))
+            .write_text_content(BytesText::new(&description))?;
         Ok(())
     })?;
     Ok(())
