@@ -7409,7 +7409,9 @@ impl<'db> Type<'db> {
                 } else {
                     // Solve exact receiver constraints before checking the other arguments, but
                     // retain the receiver itself for call inference and receiver diagnostics.
-                    let overloads = signature.overloads.iter().flat_map(|overload| {
+                    let mut binding =
+                        CallableBinding::with_capacity(self, signature.overloads.len());
+                    for overload in &signature.overloads {
                         if overload.has_receiver_determined_method_typevar(db, env)
                             && let Some(specialized) = overload.specialize_for_bound_receiver(
                                 db,
@@ -7418,19 +7420,19 @@ impl<'db> Type<'db> {
                                 bound_method.typing_self_type(db),
                             )
                         {
-                            specialized.overloads
-                        } else if let Some(specialized) =
-                            overload.with_unused_self_upper_bound(db, env)
-                        {
-                            smallvec_inline![specialized]
+                            for specialized in specialized.overloads {
+                                binding.push_overload(specialized);
+                            }
                         } else {
-                            smallvec_inline![overload.clone()]
+                            binding.push_overload(
+                                overload
+                                    .with_unused_self_upper_bound(db, env)
+                                    .unwrap_or_else(|| overload.clone()),
+                            );
                         }
-                    });
+                    }
 
-                    CallableBinding::from_overloads(self, overloads)
-                        .with_bound_type(self_instance)
-                        .into()
+                    binding.with_bound_type(self_instance).into()
                 }
             }
 
