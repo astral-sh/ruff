@@ -4099,12 +4099,23 @@ impl<'db> CallableBinding<'db> {
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) {
-        // If this callable is a bound method, prepend the self instance onto the arguments list
-        // before checking.
-        let bound_arguments = arguments.with_self(self.bound_type);
-
+        // Positional matches only need the receiver's position. Avoid cloning the arguments
+        // to prepend it until an overload needs the full argument matcher.
+        let positional = arguments.iter().all(|argument| {
+            matches!(
+                argument,
+                CallArgument::Positional(_) | CallArgument::Synthetic(_)
+            )
+        });
+        let count = arguments.len() + usize::from(self.bound_type.is_some());
+        let mut bound_arguments = None;
         for overload in &mut self.overloads {
-            overload.match_parameters(db, env, bound_arguments.as_ref());
+            if positional && overload.try_match_positional_prefix(count) {
+                continue;
+            }
+            let arguments =
+                bound_arguments.get_or_insert_with(|| arguments.with_self(self.bound_type));
+            overload.match_parameters(db, env, arguments.as_ref());
         }
     }
 
@@ -10092,6 +10103,33 @@ impl<'db> Binding<'db> {
             .cloned()
             .unwrap_or_else(|| self.signature.freshen_bound_typevars(db, env, delta));
         self.return_ty = self.initial_return_type(db);
+    }
+
+    /// A positional prefix followed only by defaulted parameters maps directly by index.
+    /// Variadic parameters have no defaults and always go through the full matcher.
+    fn try_match_positional_prefix(&mut self, count: usize) -> bool {
+        let parameters = self.signature.parameters();
+        if count > parameters.len()
+            || !parameters.iter().take(count).all(Parameter::is_positional)
+            || !parameters.iter().skip(count).all(Parameter::has_default)
+        {
+            return false;
+        }
+
+        self.argument_matches = (0..count)
+            .map(|index| MatchedArgument {
+                parameters: smallvec![MatchedParameter {
+                    index,
+                    argument_type: None,
+                    expected_type: None,
+                    provenance: InvalidArgumentTypeProvenance::Argument,
+                }],
+                matched: true,
+            })
+            .collect();
+        self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
+        self.variadic_argument_matched_to_variadic_parameter = false;
+        true
     }
 
     fn match_parameters(
