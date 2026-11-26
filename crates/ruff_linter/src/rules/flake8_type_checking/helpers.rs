@@ -3,7 +3,7 @@ use std::cmp::Reverse;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
-use ruff_python_ast::token::parenthesized_range;
+use ruff_python_ast::token::{TokenKind, parenthesized_range};
 use ruff_python_ast::visitor::transformer::{Transformer, walk_expr};
 use ruff_python_ast::{
     self as ast, Decorator, Expr, ExprContext, Operator, PythonVersion, StringLiteralFlags,
@@ -423,7 +423,29 @@ pub(crate) fn unquote_annotation_string(
     annotation_expr: &ast::ExprStringLiteral,
     checker: &Checker,
 ) -> Edit {
-    let fix_string = annotation_expr.value.to_string();
+    let mut fix_string = annotation_expr.value.to_string();
+
+    // A trailing comment would swallow the code after the annotation
+    // (e.g. `"int # comment" | None`), so end the annotation with a newline.
+    let ends_with_comment = checker
+        .tokens()
+        .iter()
+        .rev()
+        .find(|token| {
+            !matches!(
+                token.kind(),
+                TokenKind::Newline | TokenKind::NonLogicalNewline | TokenKind::EndOfFile
+            )
+        })
+        .is_some_and(|token| token.kind().is_comment());
+    if ends_with_comment {
+        fix_string.truncate(fix_string.trim_end().len());
+        fix_string.push_str(checker.stylist().line_ending().as_str());
+    }
+
+    let is_complex = checker
+        .parsed_type_annotation()
+        .is_some_and(|parsed| matches!(parsed.kind(), AnnotationKind::Complex));
 
     let fix_string = if (fix_string.contains('\n') || fix_string.contains('\r'))
         && parenthesized_range(
@@ -433,11 +455,10 @@ pub(crate) fn unquote_annotation_string(
             checker.source_tokens(),
         )
         .is_none()
-        // Node ranges in complex annotations (e.g. `"""\nint\n"""`) don't match their tokens,
-        // so always add parentheses.
-        && (checker
-            .parsed_type_annotation()
-            .is_some_and(|parsed| matches!(parsed.kind(), AnnotationKind::Complex))
+        // Inner parentheses don't help if a comment follows them. And node ranges in complex
+        // annotations (e.g. `"""\nint\n"""`) don't match their tokens. Always add parentheses.
+        && (ends_with_comment
+            || is_complex
             || parenthesized_range(
                 // Check for parentheses inside the string """(...)"""
                 expr.into(),
