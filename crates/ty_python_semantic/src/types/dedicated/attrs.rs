@@ -60,6 +60,7 @@ pub(in crate::types) fn field_metadata_type<'db>(
             .unwrap_or_else(Type::unknown);
         Some(Type::homogeneous_tuple(db, env, attribute))
     } else {
+        // Allow reads of `__attrs_attrs__` on values typed as `AttrsInstance`.
         protocol_metadata_type(db, class)
     }
 }
