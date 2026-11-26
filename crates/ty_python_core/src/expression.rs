@@ -156,7 +156,7 @@ pub struct Expression<'db> {
 impl get_size2::GetSize for Expression<'_> {}
 
 impl<'db> Expression<'db> {
-    pub fn new(
+    pub(crate) fn new(
         db: &'db dyn Db,
         scope_id: ScopeId<'db>,
         node_ref: AstNodeRef<ast::Expr>,
