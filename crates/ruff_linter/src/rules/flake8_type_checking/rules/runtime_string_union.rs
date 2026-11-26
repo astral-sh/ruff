@@ -135,7 +135,11 @@ pub(crate) fn runtime_string_union(
         Strategy::RemoveQuotes => unquote_annotation_string(expr, annotation_expr, checker),
     };
 
-    let applicability = if checker.comment_ranges().intersects(edit.range()) {
+    // A comment inside a quoted annotation is absent from the source's comment ranges.
+    // Removing the quotes can comment out trailing union members or assignment values.
+    let applicability = if annotation_expr.value.to_string().contains('#')
+        || checker.comment_ranges().intersects(edit.range())
+    {
         Applicability::Unsafe
     } else {
         Applicability::Safe
