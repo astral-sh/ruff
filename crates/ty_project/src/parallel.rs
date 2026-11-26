@@ -84,7 +84,12 @@ pub(super) fn distribute_large_files<T: Copy>(
     workers: usize,
     size: impl Fn(T) -> Option<usize>,
 ) {
-    if workers <= 1 || files.len() <= workers {
+    // Source length is only a rough proxy for cost, so give several files
+    // a head start in each range. If these are at least half the files,
+    // they also account for at least half the source bytes.
+    let ranges = workers.next_power_of_two();
+    let count = 4 * ranges;
+    if workers <= 1 || count >= files.len().div_ceil(2) {
         return;
     }
 
@@ -110,12 +115,19 @@ pub(super) fn distribute_large_files<T: Copy>(
         return;
     }
 
-    // Allow a few expensive checks per range. Source length is only a rough
-    // proxy, so the slowest file may be well outside the first batch.
-    let ranges = workers.next_power_of_two();
-    let count = (4 * ranges).min(files.len());
-    ranked.sort_unstable_by_key(|&(i, _, bytes)| (Reverse(bytes), i));
+    let priority = |&(i, _, bytes): &(usize, T, usize)| (Reverse(bytes), i);
+    ranked.select_nth_unstable_by_key(count, priority);
     let (early, rest) = ranked.split_at_mut(count);
+
+    // Leave the bulk of the work in its original order. Starting most of
+    // the expensive checks together can increase contention even if it
+    // shortens the wait for the last file.
+    let early_bytes: usize = early.iter().map(|&(_, _, bytes)| bytes).sum();
+    if early_bytes >= total - early_bytes {
+        return;
+    }
+
+    early.sort_unstable_by_key(priority);
     rest.sort_unstable_by_key(|&(i, _, _)| i);
     let mut rest = rest.iter().map(|&(_, file, _)| file);
     distribute(early, files, ranges, &mut rest);
@@ -129,7 +141,7 @@ fn distribute<T: Copy>(
     ranges: usize,
     rest: &mut impl Iterator<Item = T>,
 ) {
-    if ranges == 1 || output.len() < 2 {
+    if ranges == 1 {
         let order = early.iter().map(|&(_, file, _)| file).chain(rest);
         for (slot, file) in output.iter_mut().zip(order) {
             *slot = file;
@@ -139,9 +151,10 @@ fn distribute<T: Copy>(
 
     // Send one file from each pair to each half. Always give the larger file
     // to the lighter half. Both lists stay sorted by descending size.
-    let (pairs, last) = early.as_chunks::<2>();
+    let (pairs, remainder) = early.as_chunks::<2>();
+    debug_assert!(remainder.is_empty());
     let mut left = Vec::with_capacity(pairs.len());
-    let mut right = Vec::with_capacity(pairs.len() + last.len());
+    let mut right = Vec::with_capacity(pairs.len());
     let (mut left_bytes, mut right_bytes) = (0, 0);
     for &[large, small] in pairs {
         let (a, b) = if left_bytes <= right_bytes {
@@ -154,7 +167,6 @@ fn distribute<T: Copy>(
         left_bytes += a.2;
         right_bytes += b.2;
     }
-    right.extend_from_slice(last);
 
     let (first, second) = output.split_at_mut(output.len() / 2);
     distribute(&left, first, ranges / 2, rest);
@@ -165,54 +177,57 @@ mod tests {
     use super::distribute_large_files;
 
     #[test]
-    fn heavy_items_lead_distinct_recursive_ranges() {
-        let mut roots = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 21];
-        distribute_large_files(&mut roots, 3, Some);
-        // Recursive bisection splits 11 into 5 + 6 and then 2 + 3, 3 + 3.
-        let mut heads = [roots[0], roots[2], roots[5], roots[8]];
+    fn large_files_lead_each_range_and_ordinary_files_keep_their_order() {
+        let mut files: Vec<_> = (0..67).collect();
+        distribute_large_files(&mut files, 3, |i| {
+            Some(if i == 66 { 2500 } else { 100 + i })
+        });
+
+        // Bisection splits 67 into 33 + 34, then 16 + 17 and 17 + 17.
+        let mut heads = [files[0], files[16], files[33], files[50]];
         heads.sort_unstable();
-        assert_eq!(heads, [8, 9, 10, 21]);
-        roots.sort_unstable();
-        assert_eq!(roots, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 21]);
-    }
-
-    #[test]
-    fn avoids_cost_lookups_for_single_worker_and_small_projects() {
-        for (len, workers) in [(0, 4), (6, 1), (4, 4)] {
-            let mut roots: Vec<_> = (0..len).collect();
-            let original = roots.clone();
-            distribute_large_files(&mut roots, workers, |_| unreachable!());
-            assert_eq!(roots, original);
-        }
-    }
-
-    #[test]
-    fn preserves_order_when_the_longest_wait_fits_in_one_share() {
-        let mut files = [1, 9, 8, 7, 4, 6, 5, 3, 2];
-        distribute_large_files(&mut files, 2, Some);
-        assert_eq!(files, [1, 9, 8, 7, 4, 6, 5, 3, 2]);
-    }
-
-    #[test]
-    fn preserves_the_order_of_ordinary_files() {
-        let mut files: Vec<_> = (0..35).collect();
-        distribute_large_files(&mut files, 3, |i| Some(if i == 34 { 1000 } else { i }));
-        let ordinary: Vec<_> = files.iter().copied().filter(|&i| i < 19).collect();
-        assert!(ordinary.into_iter().eq(0..19));
-        for start in [0, 8, 17, 26] {
+        assert_eq!(heads, [63, 64, 65, 66]);
+        for start in [0, 16, 33, 50] {
             let early = &files[start..start + 4];
-            assert!(early.iter().all(|&i| i >= 19));
+            assert!(early.iter().all(|&i| i >= 51));
             assert!(early.is_sorted_by(|x, y| x > y));
         }
+        assert!(files.iter().copied().filter(|&i| i < 51).eq(0..51));
         files.sort_unstable();
-        assert!(files.into_iter().eq(0..35));
+        assert!(files.into_iter().eq(0..67));
     }
 
     #[test]
-    fn missing_hints_preserve_order() {
-        let mut roots = [4, 1, 2, 3, 0];
-        let original = roots;
-        distribute_large_files(&mut roots, 3, |x| (x != 2).then_some(x));
-        assert_eq!(roots, original);
+    fn single_worker_and_small_checks_skip_size_lookups() {
+        for (len, workers) in [(0, 4), (64, 1), (32, 3)] {
+            let mut files: Vec<_> = (0..len).collect();
+            distribute_large_files(&mut files, workers, |_| unreachable!());
+            assert!(files.into_iter().eq(0..len));
+        }
+    }
+
+    #[test]
+    fn short_estimated_wait_preserves_order() {
+        let mut files: Vec<_> = (0..64).collect();
+        distribute_large_files(&mut files, 4, Some);
+        assert!(files.into_iter().eq(0..64));
+    }
+
+    #[test]
+    fn preserves_order_if_priority_files_dominate_the_check() {
+        let mut files: Vec<_> = (0..64).collect();
+        distribute_large_files(&mut files, 4, |i| Some(if i == 63 { 1000 } else { 1 }));
+        assert!(files.into_iter().eq(0..64));
+    }
+
+    #[test]
+    fn missing_size_preserves_order() {
+        let mut files: Vec<_> = (0..64).collect();
+        distribute_large_files(&mut files, 4, |i| match i {
+            0 => Some(1000),
+            63 => None,
+            _ => Some(i),
+        });
+        assert!(files.into_iter().eq(0..64));
     }
 }
