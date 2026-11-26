@@ -11449,6 +11449,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.db(),
             self.program_environment(),
             self.index,
+            self.program_file(),
             self.scope(),
             source_place.place(),
             mode,
