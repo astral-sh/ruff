@@ -85,6 +85,15 @@ package = "ty_python_semantic"
 # Keep APIs used by targets outside Hawk's workspace analysis.
 
 [[override]]
+lint = "hawk::dead_public"
+crate = "ty"
+item = "run"
+kind = "function"
+target = 'cfg(all(target_os = "linux", target_arch = "x86_64"))'
+level = "expect"
+reason = "the ty binary uses this entry point on targets without allocator setup"
+
+[[override]]
 lint = "hawk::unnecessary_public"
 crate = "ruff_python_codegen"
 item = "generator::Generator::<'a>::unparse_suite"
