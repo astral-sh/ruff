@@ -1,5 +1,4 @@
-use crate::Db;
-use crate::ProgramEnvironment;
+use crate::{Db, Program, ProgramEnvironment};
 use compact_str::CompactString;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
@@ -47,6 +46,29 @@ fn is_union_type_operand(ty: Type<'_>) -> bool {
                     | KnownInstanceType::Sentinel(_)
             )
     )
+}
+
+/// Whether `class` might define or inherit the in-place method for `op`.
+///
+/// Literals of the same class share this lookup. If the method exists, we still bind
+/// it to each literal separately.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+pub(super) fn has_in_place_operator<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    class: KnownClass,
+    op: ast::Operator,
+) -> bool {
+    let env = &ProgramEnvironment::from_program(program);
+    class
+        .to_class_literal(db, env)
+        .find_name_in_mro_with_policy(
+            db,
+            env,
+            op.in_place_dunder(),
+            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+        )
+        .is_none_or(|member| !member.is_undefined())
 }
 
 /// Repeated conditional concatenation can double the number of tuple alternatives at each step.
@@ -325,7 +347,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let update_ty = self.speculate_without_diagnostics().infer_expression(
             update,
-            TypeContext::declared(Some(Type::TypedDict(update_context_typed_dict))),
+            TypeContext::preference(Some(Type::TypedDict(update_context_typed_dict))),
         );
         let env = self.program_environment();
 
@@ -343,9 +365,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Handle `TypedDict |= value` before the normal `__ior__` path runs.
     ///
-    /// The normal path's bidirectional inference would emit spurious typed-dict diagnostics
-    /// (e.g., `missing-typed-dict-key`, `invalid-key`) when the RHS doesn't exactly match
-    /// the `TypedDict` schema. We probe here to decide the outcome without those side effects.
+    /// The normal path's bidirectional inference would report missing or unknown constructor keys
+    /// when the RHS doesn't exactly match the `TypedDict` schema. We probe here to decide the
+    /// outcome without those side effects.
     ///
     /// Returns `Some` after handling either a compatible or incompatible operand.
     pub(super) fn try_infer_typed_dict_pep_584_augmented_assignment(
@@ -372,7 +394,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .try_typed_dict_pep_584_dunder(value_expr, typed_dict, typed_dict, "__ior__")
             .is_some()
         {
-            infer_value_ty(self, TypeContext::declared(Some(typed_dict_ty)));
+            infer_value_ty(self, TypeContext::preference(Some(typed_dict_ty)));
             return Some(typed_dict_ty);
         }
 
@@ -384,7 +406,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             infer_value_ty(
                 self,
-                TypeContext::declared(Some(Type::TypedDict(update_patch))),
+                TypeContext::preference(Some(Type::TypedDict(update_patch))),
             );
             return Some(typed_dict_ty);
         }
@@ -885,8 +907,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         LiteralValueTypeKind::Bytes(rhs),
                         ast::Operator::Add,
                     ) => {
-                        let bytes = [lhs.value(db), rhs.value(db)].concat();
-                        Some(Type::bytes_literal(db, &bytes))
+                        let lhs = lhs.value(db);
+                        let rhs = rhs.value(db);
+                        let new_length = lhs.len().saturating_add(rhs.len());
+                        let ty = if new_length <= Self::MAX_STRING_LITERAL_SIZE {
+                            Type::bytes_literal(db, &[lhs, rhs].concat())
+                        } else {
+                            KnownClass::Bytes.to_instance(db, env)
+                        };
+                        Some(ty)
                     }
 
                     (

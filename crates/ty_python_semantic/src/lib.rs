@@ -4,16 +4,17 @@
 )]
 use crate::lint::{LintRegistry, LintRegistryBuilder};
 use crate::suppression::{
-    BLANKET_IGNORE_COMMENT, IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT,
-    UNUSED_TYPE_IGNORE_COMMENT,
+    BLANKET_IGNORE_COMMENT, INVALID_IGNORE_COMMENT, RENAMED_RULE_IN_IGNORE_COMMENT,
+    UNKNOWN_RULE_IN_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT,
 };
 use crate::types::check_types;
 pub use db::Db;
 pub(crate) use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use diagnostic::inferred_python_version_source_annotation;
 pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
+pub use place::definitions::DefinitionResolution;
 use ruff_db::PythonFile;
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
@@ -33,11 +34,13 @@ use ty_python_core::definition::docstring_from_body;
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
-    BindingWithConstraints, DeclarationsIterator, FileScopeId, attribute_scopes, semantic_index,
+    BindingWithConstraints, DeclarationsIterator, FileScopeId, receiver_attribute_places,
+    semantic_index,
 };
 pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
     SitePackagesDiscoveryError, SitePackagesPaths, SysPrefixPathOrigin,
+    VirtualEnvironmentCandidates,
 };
 pub use types::ide_support::{
     ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, TypeHierarchyClass,
@@ -48,7 +51,7 @@ pub use types::ide_support::{
 pub use types::{
     DisplaySettings, FixtureBinding, FixtureExposure, FixtureNameSource, ProgramEnvironment,
     PytestTest, TypeQualifiers, fixture_bindings_for_parameter, fixture_exposures_for_definition,
-    pytest_global_plugin_files, pytest_tests_in_file,
+    pytest_global_plugin_files, pytest_registered_plugin_files, pytest_tests_in_file,
 };
 
 mod db;
@@ -87,11 +90,16 @@ pub fn default_lint_registry() -> &'static LintRegistry {
 }
 
 /// Register all known semantic lints.
-fn register_lints(registry: &mut LintRegistryBuilder) {
+pub fn register_lints(registry: &mut LintRegistryBuilder) {
     types::register_lints(registry);
     registry.register_lint(&UNUSED_IGNORE_COMMENT);
     registry.register_lint(&UNUSED_TYPE_IGNORE_COMMENT);
-    registry.register_lint(&IGNORE_COMMENT_UNKNOWN_RULE);
+    registry.register_lint(&UNKNOWN_RULE_IN_IGNORE_COMMENT);
+    registry.register_alias(
+        LintName::of("ignore-comment-unknown-rule"),
+        &UNKNOWN_RULE_IN_IGNORE_COMMENT,
+    );
+    registry.register_lint(&RENAMED_RULE_IN_IGNORE_COMMENT);
     registry.register_lint(&INVALID_IGNORE_COMMENT);
     registry.register_lint(&BLANKET_IGNORE_COMMENT);
 }
@@ -178,9 +186,7 @@ pub(crate) fn attribute_assignments<'db, 's>(
 > + use<'s, 'db> {
     let index = semantic_index(db, class_body_scope.program_file(db));
 
-    attribute_scopes(db, class_body_scope).filter_map(move |function_scope_id| {
-        let place_table = index.place_table(function_scope_id);
-        let member = place_table.member_id_by_instance_attribute_name(name)?;
+    receiver_attribute_places(db, class_body_scope, name).map(move |(function_scope_id, member)| {
         let use_def = index.use_def_map(function_scope_id);
         let assignments = use_def
             .reachable_member_bindings(member)
@@ -189,7 +195,7 @@ pub(crate) fn attribute_assignments<'db, 's>(
                     .binding
                     .is_defined_and(|definition| definition.kind(db).is_loop_header())
             });
-        Some((assignments, function_scope_id))
+        (assignments, function_scope_id)
     })
 }
 
@@ -205,14 +211,12 @@ pub(crate) fn attribute_declarations<'db, 's>(
 ) -> impl Iterator<Item = (DeclarationsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
     let index = semantic_index(db, class_body_scope.program_file(db));
 
-    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
-        let place_table = index.place_table(function_scope_id);
-        let member = place_table.member_id_by_instance_attribute_name(name)?;
+    receiver_attribute_places(db, class_body_scope, name).map(|(function_scope_id, member)| {
         let use_def = index.use_def_map(function_scope_id);
-        Some((
+        (
             use_def.reachable_member_declarations(member),
             function_scope_id,
-        ))
+        )
     })
 }
 
@@ -267,7 +271,11 @@ pub fn check_file(db: &dyn Db, file: ProgramFile<'_>) -> Result<Box<[Diagnostic]
 
     diagnostics.extend(check_types(db, file));
 
-    diagnostics.sort_unstable_by(|a, b| a.rendering_sort_key(db).cmp(&b.rendering_sort_key(db)));
+    let resolver: &dyn ruff_db::Db = db;
+    diagnostics.sort_unstable_by(|a, b| {
+        a.rendering_sort_key(&resolver)
+            .cmp(&b.rendering_sort_key(&resolver))
+    });
 
     Ok(diagnostics.into_boxed_slice())
 }

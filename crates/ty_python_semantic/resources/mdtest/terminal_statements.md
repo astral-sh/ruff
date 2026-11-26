@@ -996,12 +996,12 @@ from typing import NoReturn
 import sys
 
 # TODO: this is currently not yet supported
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def _() -> NoReturn:
     3 + sys.exit(1)
 
 # TODO: this is currently not yet supported
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def _() -> NoReturn:
     3 if sys.exit(1) else 4
 ```
@@ -1274,7 +1274,7 @@ if bool(input()):
     Example().method()  # error: [no-matching-overload]
 
 reveal_type(value)  # revealed: Literal[1, "reachable"]
-value.bit_count()  # error: [unresolved-attribute]
+value.bit_count()  # error: [missing-union-attribute]
 ```
 
 ### Possibly unresolved diagnostics
@@ -1416,7 +1416,7 @@ def _() -> NoReturn:
     f(3)
 
 # This should be an error because of implicitly returning `None`
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def _() -> NoReturn:
     f("")
 ```

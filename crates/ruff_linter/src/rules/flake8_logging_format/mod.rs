@@ -36,13 +36,13 @@ mod tests {
             &settings::LinterSettings {
                 logger_objects: vec!["logging_setup.logger".to_string()],
                 ..settings::LinterSettings::for_rules(vec![
-                    Rule::LoggingStringFormat,
+                    Rule::LoggingStrFormat,
                     Rule::LoggingPercentFormat,
                     Rule::LoggingStringConcat,
                     Rule::LoggingFString,
                     Rule::LoggingWarn,
                     Rule::LoggingExtraAttrClash,
-                    Rule::LoggingExcInfo,
+                    Rule::LoggingErrorWithExcInfo,
                     Rule::LoggingRedundantExcInfo,
                 ])
             },

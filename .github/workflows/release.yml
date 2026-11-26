@@ -6,7 +6,7 @@
 #
 # CI that:
 #
-# * checks for a Git Tag that looks like a release
+# * reads the release version from crates/ruff/Cargo.toml
 # * builds artifacts with dist (archives, installers, hashes)
 # * uploads those artifacts to temporary workflow zip
 # * on success, uploads the artifacts to a GitHub Release
@@ -17,36 +17,17 @@
 name: Release
 permissions: {}
 
-# This task will run whenever you workflow_dispatch with a tag that looks like a version
-# like "1.0.0", "v0.1.0-prerelease.1", "my-app/0.1.0", "releases/v1.0.0", etc.
-# Various formats will be parsed into a VERSION and an optional PACKAGE_NAME, where
-# PACKAGE_NAME must be the name of a Cargo package in your workspace, and VERSION
-# must be a Cargo-style SemVer Version (must have at least major.minor.patch).
-#
-# If PACKAGE_NAME is specified, then the announcement will be for that
-# package (erroring out if it doesn't have the given version or isn't dist-able).
-#
-# If PACKAGE_NAME isn't specified, then the announcement will be for all
-# (dist-able) packages in the workspace with that version (this mode is
-# intended for workspaces with only one dist-able package, or with all dist-able
-# packages versioned/released in lockstep).
-#
-# If you push multiple tags at once, separate instances of this workflow will
-# spin up, creating an independent announcement for each one. However, GitHub
-# will hard limit this to 3 tags per commit, as it will assume more tags is a
-# mistake.
-#
-# If there's a prerelease-style suffix to the version, then the release(s)
-# will be marked as a prerelease.
+# Run after merging the release version bump. cargo-dist uses the Cargo-style
+# package version to identify prereleases.
 on:
   pull_request:
   workflow_dispatch:
     inputs:
-      tag:
-        description: Release Tag
+      dry-run:
+        description: Build release artifacts without publishing
         required: true
-        default: dry-run
-        type: string
+        default: false
+        type: boolean
 
 env:
   UV_LOCKED: 1
@@ -80,16 +61,37 @@ jobs:
     runs-on: "depot-ubuntu-24.04-4"
     outputs:
       val: ${{ steps.plan.outputs.manifest }}
-      tag: ${{ (inputs.tag != 'dry-run' && inputs.tag) || '' }}
-      tag-flag: ${{ inputs.tag && inputs.tag != 'dry-run' && format('--tag={0}', inputs.tag) || '' }}
-      publishing: ${{ inputs.tag && inputs.tag != 'dry-run' }}
+      tag: ${{ steps.release-tag.outputs.tag }}
+      tag-flag: ${{ steps.release-tag.outputs.tag && format('--tag={0}', steps.release-tag.outputs.tag) || '' }}
+      publishing: ${{ steps.release-tag.outputs.tag != '' }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      - uses: $/.github/actions/setup-ruff-workspace
+        with:
+          group: jaq
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           persist-credentials: false
           submodules: recursive
+      - name: Resolve release tag
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.dry-run }}
+        id: release-tag
+        shell: bash
+        run: |
+          tag=$(yq -e -p toml -o yaml '.package.version' crates/ruff/Cargo.toml)
+          # A dispatch before the version bump merges still uses the previous version.
+          release_exists="$(gh api graphql \
+            -f owner="$GITHUB_REPOSITORY_OWNER" \
+            -f name="${GITHUB_REPOSITORY#*/}" \
+            -f tag="$tag" \
+            -f query="query(\$owner: String!, \$name: String!, \$tag: String!) { repository(owner: \$owner, name: \$name) { release(tagName: \$tag) { id } } }" \
+            --jq '.data.repository | if . == null then error("Repository not found") else .release != null end')"
+          if [[ "$release_exists" != "false" ]]; then
+            echo "::error::Release $tag already exists"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Install dist
         shell: bash
         run: |
@@ -102,24 +104,19 @@ jobs:
         with:
           name: cargo-dist-cache
           path: ~/.cargo/bin/dist
-      # sure would be cool if github gave us proper conditionals...
-      # so here's a doubly-nested ternary-via-truthiness to try to provide the best possible
-      # functionality based on whether this is a pull_request, and whether it's from a fork.
-      # (PRs run on the *source* but secrets are usually on the *target* -- that's *good*
-      # but also really annoying to build CI around when it needs secrets to work right.)
       - id: plan
         shell: bash
         run: |
           dist_args=(plan)
-          if [[ -n "$DIST_TAG_FLAG" ]]; then
-            dist_args=(host --steps=create "$DIST_TAG_FLAG")
+          if [[ -n "$RELEASE_TAG" ]]; then
+            dist_args=(host --steps=create "--tag=$RELEASE_TAG")
           fi
           dist "${dist_args[@]}" --output-format=json > plan-dist-manifest.json
           echo "dist ran successfully"
           cat plan-dist-manifest.json
-          echo "manifest=$(jq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
+          echo "manifest=$(jaq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
         env:
-          DIST_TAG_FLAG: ${{ inputs.tag && inputs.tag != 'dry-run' && format('--tag={0}', inputs.tag) || '' }}
+          RELEASE_TAG: ${{ steps.release-tag.outputs.tag }}
       - name: "Upload dist-manifest.json"
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
@@ -129,7 +126,7 @@ jobs:
   custom-build-binaries:
     needs:
       - plan
-    if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.tag == 'dry-run' }}
+    if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.dry-run }}
     uses: $/.github/workflows/build-binaries.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
@@ -141,7 +138,7 @@ jobs:
     needs:
       - plan
       - release-gate
-    if: ${{ always() && needs.plan.result == 'success' && (needs.release-gate.result == 'success' || needs.release-gate.result == 'skipped') && (needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.tag == 'dry-run') }}
+    if: ${{ always() && needs.plan.result == 'success' && (needs.release-gate.result == 'success' || needs.release-gate.result == 'skipped') && (needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.dry-run) }}
     uses: $/.github/workflows/build-docker.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
@@ -155,7 +152,7 @@ jobs:
   custom-build-wasm:
     needs:
       - plan
-    if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.tag == 'dry-run' }}
+    if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.dry-run }}
     uses: $/.github/workflows/build-wasm.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
@@ -190,7 +187,7 @@ jobs:
       - sign-release-binaries
       - plan
       - custom-build-binaries
-    if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.tag == 'dry-run' }}
+    if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.dry-run }}
     permissions:
       "contents": "read"
     runs-on: "depot-ubuntu-24.04-4"
@@ -199,13 +196,7 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-      - name: "Install uv"
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
-        with:
-          # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.13.6"
-          checksum: "f29c3e94ffabd7e6f3ba521dba169a9b7ec12100bf3257087f0f24f6123f3645"
-          enable-cache: false
+      - uses: $/.github/actions/setup-ruff-workspace
       - name: Install cached dist
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
@@ -219,7 +210,7 @@ jobs:
           path: target/distrib/
           merge-multiple: true
       - name: "Use signed native release archives"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.sign-release-binaries.outputs.github-archives }}
           path: target/distrib/
@@ -262,6 +253,9 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       BUILD_MANIFEST_NAME: target/distrib/global-dist-manifest.json
     steps:
+      - uses: $/.github/actions/setup-ruff-workspace
+        with:
+          group: jaq
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           persist-credentials: false
@@ -280,7 +274,7 @@ jobs:
           path: target/distrib/
           merge-multiple: true
       - name: "Use signed native release archives"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.sign-release-binaries.outputs.github-archives }}
           path: target/distrib/
@@ -297,7 +291,7 @@ jobs:
 
           # Parse out what we just built and upload it to scratch storage
           echo "paths<<EOF" >> "$GITHUB_OUTPUT"
-          jq --raw-output ".upload_files[]" dist-manifest.json >> "$GITHUB_OUTPUT"
+          jaq --raw-output ".upload_files[]" dist-manifest.json >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
           cp dist-manifest.json "$BUILD_MANIFEST_NAME"
@@ -330,6 +324,9 @@ jobs:
     outputs:
       val: ${{ steps.host.outputs.manifest }}
     steps:
+      - uses: $/.github/actions/setup-ruff-workspace
+        with:
+          group: jaq
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           persist-credentials: false
@@ -348,7 +345,7 @@ jobs:
           path: target/distrib/
           merge-multiple: true
       - name: "Use signed native release archives"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.sign-release-binaries.outputs.github-archives }}
           path: target/distrib/
@@ -364,7 +361,7 @@ jobs:
           dist host "${dist_args[@]}" --steps=upload --steps=release --output-format=json > dist-manifest.json
           echo "artifacts uploaded and released successfully"
           cat dist-manifest.json
-          echo "manifest=$(jq -c "." dist-manifest.json)" >> "$GITHUB_OUTPUT"
+          echo "manifest=$(jaq -c "." dist-manifest.json)" >> "$GITHUB_OUTPUT"
         env:
           DIST_TAG_FLAG: ${{ needs.plan.outputs.tag-flag }}
       - name: "Upload dist-manifest.json"
@@ -455,7 +452,7 @@ jobs:
           path: artifacts
           merge-multiple: true
       - name: "Use signed native release archives"
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ needs.sign-release-binaries.outputs.github-archives }}
           path: artifacts
@@ -475,7 +472,7 @@ jobs:
             artifacts/*.tar.gz
       - name: Get release token
         id: release-token
-        uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
+        uses: astral-sh/github-actions/simple-token-service@67dc9ee1ddc113eccd8116e7b949fb6cdcd89889 # 2026.11.16.0
         with:
           exchange-url: ${{ secrets.STS_API_URL }}/exchange
           audience: ${{ secrets.STS_API_URL }}

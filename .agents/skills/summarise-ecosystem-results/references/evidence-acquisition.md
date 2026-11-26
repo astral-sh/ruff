@@ -18,7 +18,7 @@ GH_TELEMETRY=false gh run view <actions-run> --repo astral-sh/ruff --attempt <ac
   --json attempt,headSha,jobs,startedAt,updatedAt,url > "$snapshot_dir/run.json"
 GH_TELEMETRY=false gh api --paginate --slurp \
   "repos/astral-sh/ruff/actions/runs/<actions-run>/artifacts?per_page=100" |
-  jq '{artifacts: [.[].artifacts[]]}' > "$snapshot_dir/artifacts.json"
+  uv run --locked --only-group jaq jaq '{artifacts: [.[].artifacts[]]}' > "$snapshot_dir/artifacts.json"
 printf 'TY_ECOSYSTEM_SNAPSHOT_DIR=%s\n' "$snapshot_dir"
 ```
 

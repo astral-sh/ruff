@@ -1,12 +1,14 @@
 use crate::ProgramEnvironment;
 use bitflags::bitflags;
 use compact_str::CompactString;
+use itertools::Itertools;
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashSet;
 
 use crate::Db;
 use crate::types::enums::EnumClassLiteral;
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::{ClassLiteral, KnownClass, Type};
+use crate::types::{ClassLiteral, KnownClass, Truthiness, Type, UnionType};
 use ty_python_core::definition::Definition;
 use ty_python_core::{place_table, use_def_map};
 
@@ -90,6 +92,18 @@ pub(crate) enum LiteralValueTypeKind<'db> {
     Bytes(BytesLiteralType<'db>),
 }
 
+impl LiteralValueTypeKind<'_> {
+    pub(super) fn known_class(self) -> Option<KnownClass> {
+        match self {
+            Self::Int(_) => Some(KnownClass::Int),
+            Self::Bool(_) => Some(KnownClass::Bool),
+            Self::String(_) | Self::LiteralString => Some(KnownClass::Str),
+            Self::Bytes(_) => Some(KnownClass::Bytes),
+            Self::Enum(_) => None,
+        }
+    }
+}
+
 impl<'db> LiteralValueType<'db> {
     pub(crate) fn new(
         kind: impl Into<LiteralValueTypeKind<'db>>,
@@ -111,6 +125,11 @@ impl<'db> LiteralValueType<'db> {
             | LiteralValueTypeInner::Bytes(_, f)
             | LiteralValueTypeInner::LiteralString(f) => f,
         }
+    }
+
+    /// Whether the two literals have the same promotion and recursion flags.
+    pub(super) fn has_same_flags(self, other: Self) -> bool {
+        self.flags() == other.flags()
     }
 
     fn map_flags(self, func: impl FnOnce(LiteralFlags) -> LiteralFlags) -> Self {
@@ -184,6 +203,21 @@ impl<'db> LiteralValueType<'db> {
         }
     }
 
+    /// Returns whether these literal types are known to have no value in common.
+    pub(super) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self.kind(), other.kind()) {
+            (LiteralValueTypeKind::String(_), LiteralValueTypeKind::LiteralString)
+            | (LiteralValueTypeKind::LiteralString, LiteralValueTypeKind::String(_)) => false,
+            (LiteralValueTypeKind::Enum(left), LiteralValueTypeKind::Enum(right))
+                if left.enum_class_literal(db) == right.enum_class_literal(db)
+                    && !left.enum_class_literal(db).aliases_are_known(db) =>
+            {
+                false
+            }
+            (left, right) => left != right,
+        }
+    }
+
     pub(crate) fn as_bytes(self) -> Option<BytesLiteralType<'db>> {
         if let LiteralValueTypeKind::Bytes(v) = self.kind() {
             Some(v)
@@ -222,6 +256,17 @@ impl<'db> LiteralValueType<'db> {
         } else {
             None
         }
+    }
+
+    /// Whether this literal represents a single built-in value.
+    pub(super) fn is_concrete_builtin(self) -> bool {
+        matches!(
+            self.kind(),
+            LiteralValueTypeKind::Int(_)
+                | LiteralValueTypeKind::Bool(_)
+                | LiteralValueTypeKind::String(_)
+                | LiteralValueTypeKind::Bytes(_)
+        )
     }
 
     pub(crate) fn is_int(self) -> bool {
@@ -426,5 +471,165 @@ impl<'db> EnumLiteralType<'db> {
         use_def_map(db, scope)
             .end_of_scope_symbol_bindings(symbol_id)
             .find_map(|binding| binding.binding.definition())
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum LiteralComparisonKind {
+    Equality,
+    Identity,
+}
+
+/// Two unions of builtin literal values whose Cartesian product is expensive to compare.
+#[derive(Clone, Copy)]
+pub(super) struct WideLiteralComparison<'db> {
+    left: &'db [Type<'db>],
+    right: &'db [Type<'db>],
+}
+
+impl<'db> WideLiteralComparison<'db> {
+    const MAX_PAIRS: usize = 4096;
+
+    pub(super) fn new(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> Option<Self> {
+        // Only unions and their aliases need expansion. In particular, a single literal
+        // against a wide union still gets a precise, linear comparison.
+        if !matches!(left, Type::Union(_) | Type::TypeAlias(_))
+            || !matches!(right, Type::Union(_) | Type::TypeAlias(_))
+        {
+            return None;
+        }
+        let elements = |ty: Type<'db>| {
+            ty.expand_top_level_aliases(db, env)
+                .as_union()
+                .map(|union| union.elements(db))
+        };
+        let left = elements(left)?;
+        let right = elements(right)?;
+        (left.len().saturating_mul(right.len()) > Self::MAX_PAIRS
+            && left
+                .iter()
+                .chain(right)
+                .all(|&ty| Self::comparison_class(db, ty).is_some()))
+        .then_some(Self { left, right })
+    }
+
+    /// Determine whether the operands can compare equal without visiting every pair.
+    ///
+    /// A lexicographic tuple comparison reaches later elements only if the preceding ones
+    /// can compare equal. Preserving disjointness here avoids checking an unreachable
+    /// comparison between later elements.
+    pub(super) fn truthiness(self, db: &'db dyn Db, kind: LiteralComparisonKind) -> Truthiness {
+        if self.matching_literals(db, kind).next().is_some() {
+            // Even when some values match, the wide union also contains other values.
+            Truthiness::Ambiguous
+        } else {
+            Truthiness::AlwaysFalse
+        }
+    }
+
+    fn matching_literals(
+        self,
+        db: &'db dyn Db,
+        kind: LiteralComparisonKind,
+    ) -> impl Iterator<Item = Type<'db>> {
+        let bool_key = move |value| match kind {
+            LiteralComparisonKind::Equality => Type::int_literal(i64::from(value)),
+            LiteralComparisonKind::Identity => Type::bool_literal(value),
+        };
+        let keys = move |ty: Type<'db>| {
+            let (first, second) = match ty.as_literal_value_kind() {
+                Some(LiteralValueTypeKind::Bool(value)) => (bool_key(value), None),
+                Some(kind) => (Type::LiteralValue(LiteralValueType::promotable(kind)), None),
+                None if ty.is_bool(db) => (bool_key(false), Some(bool_key(true))),
+                None => (ty, None), // NoneType
+            };
+            std::iter::once(first).chain(second)
+        };
+
+        // Equality filters the left operand. An identity check constrains it by the right
+        // operand's type, including its union order and the promotability of its literals.
+        let (candidates, other) = match kind {
+            LiteralComparisonKind::Equality => (self.left, self.right),
+            LiteralComparisonKind::Identity => (self.right, self.left),
+        };
+        let other_keys: FxHashSet<_> = other.iter().copied().flat_map(keys).collect();
+        candidates.iter().copied().filter_map(move |ty| {
+            // For identity, intersecting the left operand with the right-hand `bool` already
+            // preserves the literal flags of any matching left-hand boolean.
+            if matches!(kind, LiteralComparisonKind::Equality) && ty.is_bool(db) {
+                let [matches_false, matches_true] =
+                    [false, true].map(|value| other_keys.contains(&bool_key(value)));
+                return match (matches_false, matches_true) {
+                    (true, true) => Some(ty),
+                    (false, false) => None,
+                    _ => Some(Type::bool_literal(matches_true)),
+                };
+            }
+            keys(ty).any(|key| other_keys.contains(&key)).then_some(ty)
+        })
+    }
+
+    fn comparison_class(db: &'db dyn Db, ty: Type<'db>) -> Option<KnownClass> {
+        match ty.as_literal_value_kind() {
+            Some(LiteralValueTypeKind::LiteralString) => None,
+            Some(literal) => literal.known_class(),
+            // Both boolean literals together simplify to `bool`.
+            None if ty.is_bool(db) => Some(KnownClass::Bool),
+            None if ty.is_none(db) => Some(KnownClass::NoneType),
+            _ => None,
+        }
+    }
+
+    /// Check operator support once per pair of builtin classes. Their methods accept the same
+    /// operand types for every literal value, even when the result depends on those values.
+    pub(super) fn widened_operands(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> (Type<'db>, Type<'db>) {
+        (
+            Self::widen(db, env, self.left),
+            Self::widen(db, env, self.right),
+        )
+    }
+
+    fn widen(db: &'db dyn Db, env: &ProgramEnvironment<'db>, elements: &[Type<'db>]) -> Type<'db> {
+        UnionType::from_elements(
+            db,
+            env,
+            elements
+                .iter()
+                .filter_map(|&ty| Self::comparison_class(db, ty))
+                .unique()
+                .map(|class| class.to_instance(db, env)),
+        )
+    }
+
+    /// Disjoint operands produce `Some(Type::Never)`. Applying a nonempty constraint
+    /// intersects it with the original operand. When the shared literals would form a
+    /// large product, narrow to their builtin classes.
+    pub(super) fn positive_constraint(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        kind: LiteralComparisonKind,
+    ) -> Option<Type<'db>> {
+        let shared: Vec<_> = self.matching_literals(db, kind).collect();
+        if shared.as_slice() == self.left {
+            return None;
+        }
+        Some(
+            if shared.len() <= 1 || shared.len().saturating_mul(self.left.len()) <= Self::MAX_PAIRS
+            {
+                UnionType::from_elements(db, env, shared)
+            } else {
+                Self::widen(db, env, &shared)
+            },
+        )
     }
 }

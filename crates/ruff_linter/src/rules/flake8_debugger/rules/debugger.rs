@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, Stmt};
+use ruff_python_ast::{ExprCall, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
@@ -50,20 +50,14 @@ impl Violation for Debugger {
 
 /// T100
 /// Checks for the presence of a debugger call.
-pub(crate) fn debugger_call(checker: &Checker, expr: &Expr, func: &Expr) {
-    if let Some(using_type) =
-        checker
-            .semantic()
-            .resolve_qualified_name(func)
-            .and_then(|qualified_name| {
-                if is_debugger_call(&qualified_name) {
-                    Some(DebuggerUsingType::Call(qualified_name.to_string()))
-                } else {
-                    None
-                }
-            })
-    {
-        checker.report_diagnostic(Debugger { using_type }, expr.range());
+pub(crate) fn debugger_call(checker: &Checker, call: &ExprCall, qualified_name: &QualifiedName) {
+    if is_debugger_call(qualified_name) {
+        checker.report_diagnostic(
+            Debugger {
+                using_type: DebuggerUsingType::Call(qualified_name.to_string()),
+            },
+            call.range(),
+        );
     }
 }
 

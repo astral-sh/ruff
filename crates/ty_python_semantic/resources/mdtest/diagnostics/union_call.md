@@ -115,8 +115,8 @@ def _(n: int):
     # error: [invalid-argument-type] "Argument to function `f4` is incorrect: Argument type `Literal[3]` does not satisfy upper bound `str` of type variable `T`"
     # error: [invalid-argument-type] "Argument to function `f5` is incorrect: Expected `str`, found `Literal[3]`"
     # error: [no-matching-overload] "No overload of function `f6` matches arguments"
-    # error: [call-non-callable] "Object of type `Literal[5]` is not callable"
-    # error: [call-non-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
+    # error: [not-callable] "Object of type `Literal[5]` is not callable"
+    # error: [not-callable] "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
     x = f(3)
 ```
 
@@ -198,6 +198,6 @@ We should only report the specific error for the incompatible variant (`invalid-
 ```py
 def _(x: bytes | str | int):
     # error: [invalid-argument-type]
-    # error: [unresolved-attribute]
+    # error: [missing-union-attribute]
     x.split(" ")
 ```

@@ -69,7 +69,7 @@ class D:
     y: str = "default"
     z: int | None = 1 + 2
 
-reveal_type(D.__init__)  # revealed: (self: D, x: int, y: str = "default", z: int | None = 3) -> None
+reveal_type(D.__init__)  # revealed: (self: D, /, x: int, y: str = "default", z: int | None = 3) -> None
 ```
 
 This also works if the declaration and binding are split:
@@ -80,7 +80,7 @@ class D:
     x: int | None
     x = None
 
-reveal_type(D.__init__)  # revealed: (self: D, x: int | None = None) -> None
+reveal_type(D.__init__)  # revealed: (self: D, /, x: int | None = None) -> None
 ```
 
 Non-fully static types are handled correctly:
@@ -95,7 +95,7 @@ class C:
     y: int | Any
     z: tuple[int, Any]
 
-reveal_type(C.__init__)  # revealed: (self: C, w: type[Any], x: Any, y: int | Any, z: tuple[int, Any]) -> None
+reveal_type(C.__init__)  # revealed: (self: C, /, w: type[Any], x: Any, y: int | Any, z: tuple[int, Any]) -> None
 ```
 
 Variables without annotations are ignored:
@@ -106,7 +106,7 @@ class D:
     x: int
     y = 1
 
-reveal_type(D.__init__)  # revealed: (self: D, x: int) -> None
+reveal_type(D.__init__)  # revealed: (self: D, /, x: int) -> None
 ```
 
 If attributes without default values are declared after attributes with default values, a
@@ -118,14 +118,14 @@ from dataclasses import field
 @dataclass
 class D:
     x: int = 1
-    # error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
+    # error: [invalid-dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
     y: str
 
 @dataclass
 class E:
     x: int = field(default=3)
     y: int = field(default_factory=lambda: 4)
-    # error: [dataclass-field-order]
+    # error: [invalid-dataclass-field-order]
     z: str
 
 import sys
@@ -134,7 +134,7 @@ import sys
 class F:
     x: int = 1
     if sys.version_info > (3, 7):
-        # error: [dataclass-field-order]
+        # error: [invalid-dataclass-field-order]
         y: str
 ```
 
@@ -152,7 +152,7 @@ class GoodWithInitFalse:
 class BadWithInitFalse:
     x: int = 1
     y: str = field(init=False)
-    # error: [dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
+    # error: [invalid-dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
     z: float
 ```
 
@@ -170,7 +170,7 @@ class GoodWithClassInitFalse:
 GoodWithClassInitFalse("value")
 
 @dataclass
-class BadWithReenabledInit(GoodWithClassInitFalse):  # error: [dataclass-field-order]
+class BadWithReenabledInit(GoodWithClassInitFalse):  # error: [invalid-dataclass-field-order]
     pass
 ```
 
@@ -197,7 +197,7 @@ class AlsoGoodWithKwOnly:
 class BadWithKwOnly:
     x: int = 1
     y: str = field(kw_only=True)
-    # error: [dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
+    # error: [invalid-dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
     z: float
 ```
 
@@ -216,7 +216,7 @@ class GoodWithKwOnlySentinel:
 @dataclass
 class BadWithKwOnlySentinel:
     x: int = 1
-    # error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
+    # error: [invalid-dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
     y: str
     _: KW_ONLY
     z: float
@@ -233,7 +233,7 @@ class D:
     y: ClassVar[str] = "default"
     z: bool
 
-reveal_type(D.__init__)  # revealed: (self: D, x: int, z: bool) -> None
+reveal_type(D.__init__)  # revealed: (self: D, /, x: int, z: bool) -> None
 
 d = D(1, True)
 reveal_type(d.x)  # revealed: int
@@ -251,7 +251,7 @@ class D:
     def y(self) -> str:
         return ""
 
-reveal_type(D.__init__)  # revealed: (self: D, x: int) -> None
+reveal_type(D.__init__)  # revealed: (self: D, /, x: int) -> None
 ```
 
 And neither do nested class declarations:
@@ -264,7 +264,7 @@ class D:
     class Nested:
         y: str
 
-reveal_type(D.__init__)  # revealed: (self: D, x: int) -> None
+reveal_type(D.__init__)  # revealed: (self: D, /, x: int) -> None
 ```
 
 But if there is a variable annotation with a function or class literal type, the signature of
@@ -283,7 +283,7 @@ class D:
     class_literal: TypeOf[SomeClass]
     class_subtype_of: type[SomeClass]
 
-# revealed: (self: D, function_literal: def some_function() -> None, class_literal: <class 'SomeClass'>, class_subtype_of: type[SomeClass]) -> None
+# revealed: (self: D, /, function_literal: def some_function() -> None, class_literal: <class 'SomeClass'>, class_subtype_of: type[SomeClass]) -> None
 reveal_type(D.__init__)
 ```
 
@@ -296,7 +296,7 @@ from typing import Callable
 class D:
     c: Callable[[int], str]
 
-reveal_type(D.__init__)  # revealed: (self: D, c: (int, /) -> str) -> None
+reveal_type(D.__init__)  # revealed: (self: D, /, c: (int, /) -> str) -> None
 ```
 
 Implicit instance attributes do not affect the signature of `__init__`:
@@ -311,7 +311,7 @@ class D:
 
 reveal_type(D(1).y)  # revealed: str
 
-reveal_type(D.__init__)  # revealed: (self: D, x: int) -> None
+reveal_type(D.__init__)  # revealed: (self: D, /, x: int) -> None
 ```
 
 Annotating expressions does not lead to an entry in `__annotations__` at runtime, and so it wouldn't
@@ -324,7 +324,37 @@ class D:
     (x): int = 1  # fmt: skip
 
 # TODO: should ideally not include a `x` parameter
-reveal_type(D.__init__)  # revealed:(self: D, x: int = 1) -> None
+reveal_type(D.__init__)  # revealed:(self: D, /, x: int = 1) -> None
+```
+
+## Signature of `__replace__`
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+Starting in Python 3.13, dataclasses synthesize a `__replace__` method. `copy.replace` calls it to
+create a new instance of the same class with the specified fields updated.
+
+```py
+from copy import replace
+from dataclasses import dataclass, field
+
+@dataclass
+class Record:
+    value: int
+    id: int = field(init=False, default=0)
+
+record = Record(2)
+reveal_type(replace(record, value=3))  # revealed: Record
+```
+
+A field with `init=False` cannot be replaced.
+
+```py
+replace(record, id=9)  # error: [unknown-argument]
+record.__replace__(id=9)  # error: [unknown-argument]
 ```
 
 ## `@dataclass` calls with arguments
@@ -357,7 +387,7 @@ SLOTS = {"slots": True}
 class C:
     x: int
 
-reveal_type(C.__init__)  # revealed: (self: C, x: int) -> None
+reveal_type(C.__init__)  # revealed: (self: C, /, x: int) -> None
 reveal_type(C.__slots__)  # revealed: tuple[Literal["x"]]
 C(1)
 ```
@@ -793,7 +823,7 @@ class MyFrozenClass:
     x: int = 1
 
 class MyFrozenIntermediateClass(MyFrozenClass):
-    def __setattr__(self, name: str, value: object) -> None: ...  # error: [invalid-method-override]
+    def __setattr__(self, name: str, value: object) -> None: ...  # error: [incompatible-method-override]
 
 class MyFrozenChildClass(MyFrozenIntermediateClass):
     y: int
@@ -1220,7 +1250,7 @@ deletion on both that subclass and its subclasses:
 
 ```py
 class ChildWithDeletionOverride(Frozen):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __delattr__(self, name: str) -> None: ...
 
 class GrandchildWithDeletionOverride(ChildWithDeletionOverride): ...
@@ -1380,7 +1410,7 @@ class NoMatchArgs:
     x: int
     y: str
 
-NoMatchArgs.__match_args__  # error: [unresolved-attribute]
+NoMatchArgs.__match_args__  # error: [missing-attribute]
 ```
 
 ### `kw_only`
@@ -1402,7 +1432,7 @@ class A:
     y: int
 
 # error: [missing-argument] "No arguments provided for required parameters `x`, `y`"
-# error: [too-many-positional-arguments] "Too many positional arguments: expected 0, got 2"
+# error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 3"
 a = A(1, 2)
 a = A(x=1, y=2)
 ```
@@ -1417,7 +1447,7 @@ class A:
     a: str = field(kw_only=False)
     b: int = 0
 
-reveal_type(A.__init__)  # revealed:(self: A, a: str, *, b: int = 0) -> None
+reveal_type(A.__init__)  # revealed:(self: A, /, a: str, *, b: int = 0) -> None
 
 A("hi")
 ```
@@ -1472,7 +1502,7 @@ The class-level `kw_only` parameter can be overridden per-field.
 class KwOnlyClassWithPositionalField:
     x: int = 1
     y: str = field(kw_only=False, default="hello")
-    # error: [dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
+    # error: [invalid-dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
     z: float = field(kw_only=False)
 ```
 
@@ -1504,14 +1534,14 @@ from dataclasses import dataclass, field
 class PositionalField:
     value: int = field(default=1, kw_only=True)
 
-reveal_type(PositionalField.__init__)  # revealed: (self: PositionalField, value: int = 1) -> None
+reveal_type(PositionalField.__init__)  # revealed: (self: PositionalField, /, value: int = 1) -> None
 
 PositionalField(1)
 
 @dataclass
 class InvalidFieldOrder:
     optional: int = field(default=1, kw_only=True)
-    required: str  # error: [dataclass-field-order]
+    required: str  # error: [invalid-dataclass-field-order]
 ```
 
 ### `kw_only` - Python 3.13
@@ -1587,7 +1617,7 @@ class Outer(Inner):
     outer: int
 
 # Inherited field `inner` is positional, new field `outer` is keyword-only
-reveal_type(Outer.__init__)  # revealed: (self: Outer, inner: int, *, outer: int) -> None
+reveal_type(Outer.__init__)  # revealed: (self: Outer, /, inner: int, *, outer: int) -> None
 
 Outer(0, outer=5)  # OK
 Outer(inner=0, outer=5)  # Also OK
@@ -1613,7 +1643,7 @@ class Child(Parent):
 
 # `a` is positional (from parent), `b` is keyword-only (from parent's KW_ONLY),
 # `c` is keyword-only (from child's kw_only=True)
-reveal_type(Child.__init__)  # revealed: (self: Child, a: int, *, b: str, c: bytes) -> None
+reveal_type(Child.__init__)  # revealed: (self: Child, /, a: int, *, b: str, c: bytes) -> None
 
 Child(1, b="hello", c=b"world")  # OK
 # error: [missing-argument] "No arguments provided for required parameters `b`, `c`"
@@ -1637,7 +1667,7 @@ class Derived(Base):
     z: bytes
 
 # `x` and `y` are positional, `z` is keyword-only (from Derived's KW_ONLY)
-reveal_type(Derived.__init__)  # revealed: (self: Derived, x: int, y: str, *, z: bytes) -> None
+reveal_type(Derived.__init__)  # revealed: (self: Derived, /, x: int, y: str, *, z: bytes) -> None
 
 Derived(1, "hello", z=b"world")  # OK
 # error: [missing-argument]
@@ -1660,7 +1690,7 @@ class PositionalChild(KwOnlyParent):
     child_field: str
 
 # `child_field` is positional (child's default), `parent_field` stays keyword-only
-reveal_type(PositionalChild.__init__)  # revealed: (self: PositionalChild, child_field: str, *, parent_field: int) -> None
+reveal_type(PositionalChild.__init__)  # revealed: (self: PositionalChild, /, child_field: str, *, parent_field: int) -> None
 
 PositionalChild("hello", parent_field=1)  # OK
 # error: [missing-argument]
@@ -1683,7 +1713,7 @@ class A:
     y: int
 
 # revealed: Unknown
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(A.__slots__)
 
 @dataclass(slots=True)
@@ -1826,7 +1856,7 @@ from dataclasses import dataclass
 @dataclass(slots=True)
 class C: ...
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(C().__weakref__)  # revealed: Unknown
 ```
 
@@ -1854,9 +1884,9 @@ class Foo: ...
 
 # fmt: on
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(Foo.__slots__)  # revealed: Unknown
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(Foo.__match_args__)  # revealed: Unknown
 
 # TODO: this actually *does* exist at runtime
@@ -1864,7 +1894,7 @@ reveal_type(Foo.__match_args__)  # revealed: Unknown
 # We could try to model that more fully...?
 # It's not added by the dataclasses machinery, though.
 #
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(Foo.__weakref__)  # revealed: Unknown
 ```
 
@@ -1888,11 +1918,22 @@ class C:
     class_variable1: ClassVar[Final[int]] = 1
     class_variable2: ClassVar[Final[int]] = 1
 
-reveal_type(C.__init__)  # revealed:(self: C, instance_variable_no_default: int, instance_variable: int = 1) -> None
+reveal_type(C.__init__)  # revealed:(self: C, /, instance_variable_no_default: int, instance_variable: int = 1) -> None
 
 c = C(1)
 # error: [invalid-assignment] "Cannot assign to final attribute `instance_variable` on type `C`"
 c.instance_variable = 2
+```
+
+A bare `Final` field uses its default value to infer the constructor parameter type.
+
+```py
+@dataclass
+class Image:
+    data: Final = bytes.fromhex("fd")
+
+reveal_type(Image(b"bytes").data)  # revealed: bytes
+Image("fd")  # error: [invalid-argument-type]
 ```
 
 ## Inheritance
@@ -1983,8 +2024,8 @@ from base import Base
 class Child(Base):
     added: str
 
-reveal_type(Base.__init__)  # revealed: (self: Base, required: int) -> None
-reveal_type(Child.__init__)  # revealed: (self: Child, required: int, added: str) -> None
+reveal_type(Base.__init__)  # revealed: (self: Base, /, required: int) -> None
+reveal_type(Child.__init__)  # revealed: (self: Child, /, required: int, added: str) -> None
 
 Base(1)
 Child(1, "value")
@@ -2018,13 +2059,13 @@ invalid.
 from dataclasses import dataclass
 from base import EllipsisDefault
 
-reveal_type(EllipsisDefault.__init__)  # revealed: (self: EllipsisDefault, required: int, optional: int = ...) -> None
+reveal_type(EllipsisDefault.__init__)  # revealed: (self: EllipsisDefault, /, required: int, optional: int = ...) -> None
 
 EllipsisDefault(1)
 
 @dataclass
 class InvalidEllipsisChild(EllipsisDefault):
-    added: str  # error: [dataclass-field-order]
+    added: str  # error: [invalid-dataclass-field-order]
 ```
 
 ### Required fields after inherited defaults
@@ -2046,7 +2087,7 @@ class DefaultedBase:
 
 @dataclass
 class InvalidChild(DefaultedBase):
-    # error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
+    # error: [invalid-dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
     y: int
 ```
 
@@ -2059,7 +2100,7 @@ class DefaultFactoryBase:
 
 @dataclass
 class InvalidDefaultFactoryChild(DefaultFactoryBase):
-    # error: [dataclass-field-order]
+    # error: [invalid-dataclass-field-order]
     y: int
 ```
 
@@ -2069,7 +2110,7 @@ An ordering violation already present in an ancestor is not reported again on it
 @dataclass
 class InvalidAncestor:
     optional: int = 1
-    required: int  # error: [dataclass-field-order]
+    required: int  # error: [invalid-dataclass-field-order]
 
 @dataclass
 class ChildOfInvalidAncestor(InvalidAncestor):
@@ -2087,7 +2128,7 @@ hierarchy.
 @dataclass
 class IgnoredInvalidAncestor:
     optional: int = 1
-    required: int  # ty: ignore[dataclass-field-order]
+    required: int  # ty: ignore[invalid-dataclass-field-order]
 
 @dataclass
 class ChildOfIgnoredAncestor(IgnoredInvalidAncestor):
@@ -2105,14 +2146,14 @@ violation in an ancestor.
 @dataclass
 class IgnoredViolationsBase:
     first: int = 1
-    second: int  # ty: ignore[dataclass-field-order]
-    third: int  # ty: ignore[dataclass-field-order]
+    second: int  # ty: ignore[invalid-dataclass-field-order]
+    third: int  # ty: ignore[invalid-dataclass-field-order]
 
 @dataclass
 class NewlyInvalidOverride(IgnoredViolationsBase):
     first: int = field()
     second: int = 1
-    third: int = field()  # error: [dataclass-field-order]
+    third: int = field()  # error: [invalid-dataclass-field-order]
 ```
 
 Combining independently valid bases can introduce a new ordering violation even when the child
@@ -2128,7 +2169,7 @@ class RequiredOnlyBase:
     required: int
 
 @dataclass
-class InvalidMergedBases(RequiredOnlyBase, DefaultOnlyBase):  # error: [dataclass-field-order]
+class InvalidMergedBases(RequiredOnlyBase, DefaultOnlyBase):  # error: [invalid-dataclass-field-order]
     pass
 
 @dataclass
@@ -2177,7 +2218,7 @@ class RequiredBase:
     second: int
 
 @dataclass
-class InvalidDefaultOverride(RequiredBase):  # error: [dataclass-field-order]
+class InvalidDefaultOverride(RequiredBase):  # error: [invalid-dataclass-field-order]
     first: int = 1
 ```
 
@@ -2196,16 +2237,17 @@ class DefaultedFieldBase:
 
 @dataclass
 class ClassVariableOverride(DefaultedFieldBase):
-    x: ClassVar[int] = 1  # error: [invalid-attribute-override]
+    x: ClassVar[int] = 1  # error: [incompatible-attribute-override]
     y: int
 
-reveal_type(ClassVariableOverride.__init__)  # revealed: (self: ClassVariableOverride, y: int) -> None
+reveal_type(ClassVariableOverride.__init__)  # revealed: (self: ClassVariableOverride, /, y: int) -> None
 
 @dataclass
 class InheritedClassVariableOverride(ClassVariableOverride):
     z: int
 
-reveal_type(InheritedClassVariableOverride.__init__)  # revealed: (self: InheritedClassVariableOverride, y: int, z: int) -> None
+# revealed: (self: InheritedClassVariableOverride, /, y: int, z: int) -> None
+reveal_type(InheritedClassVariableOverride.__init__)
 ```
 
 A class variable declared by an undecorated intermediate class does not remove the inherited
@@ -2213,11 +2255,11 @@ dataclass field.
 
 ```py
 class OrdinaryClassVariableOverride(DefaultedFieldBase):
-    x: ClassVar[int] = 1  # error: [invalid-attribute-override]
+    x: ClassVar[int] = 1  # error: [incompatible-attribute-override]
 
 @dataclass
 class DataclassAfterOrdinaryOverride(OrdinaryClassVariableOverride):
-    y: int  # error: [dataclass-field-order]
+    y: int  # error: [invalid-dataclass-field-order]
 ```
 
 An annotation-only class variable also masks the inherited instance field.
@@ -2225,10 +2267,11 @@ An annotation-only class variable also masks the inherited instance field.
 ```py
 @dataclass
 class AnnotationOnlyClassVariableOverride(DefaultedFieldBase):
-    x: ClassVar[int]  # error: [invalid-attribute-override]
+    x: ClassVar[int]  # error: [incompatible-attribute-override]
     y: int
 
-reveal_type(AnnotationOnlyClassVariableOverride.__init__)  # revealed: (self: AnnotationOnlyClassVariableOverride, y: int) -> None
+# revealed: (self: AnnotationOnlyClassVariableOverride, /, y: int) -> None
+reveal_type(AnnotationOnlyClassVariableOverride.__init__)
 ```
 
 Restoring an instance field in a later subclass preserves the field's original inherited position.
@@ -2236,9 +2279,9 @@ Restoring an instance field in a later subclass preserves the field's original i
 ```py
 @dataclass
 class RestoredInstanceField(ClassVariableOverride):
-    x: int = field()  # error: [invalid-attribute-override]
+    x: int = field()  # error: [incompatible-attribute-override]
 
-reveal_type(RestoredInstanceField.__init__)  # revealed: (self: RestoredInstanceField, x: int, y: int) -> None
+reveal_type(RestoredInstanceField.__init__)  # revealed: (self: RestoredInstanceField, /, x: int, y: int) -> None
 ```
 
 An initialization-only field overrides an inherited class variable and remains a constructor
@@ -2253,7 +2296,7 @@ class ClassVariableBase:
 class InitializationVariableOverride(ClassVariableBase):
     value: InitVar[int]
 
-reveal_type(InitializationVariableOverride.__init__)  # revealed: (self: InitializationVariableOverride, value: int) -> None
+reveal_type(InitializationVariableOverride.__init__)  # revealed: (self: InitializationVariableOverride, /, value: int) -> None
 InitializationVariableOverride(1)
 ```
 
@@ -2298,7 +2341,7 @@ class C(Base):
     z: int = 10
     x: int = 15
 
-reveal_type(C.__init__)  # revealed:(self: C, x: int = 15, y: int = 0, z: int = 10) -> None
+reveal_type(C.__init__)  # revealed:(self: C, /, x: int = 15, y: int = 0, z: int = 10) -> None
 ```
 
 ## Conditionally defined fields
@@ -2321,7 +2364,7 @@ class C:
     if 1 + 2 == 4:
         never_present: bool
 
-reveal_type(C.__init__)  # revealed: (self: C, normal: int, always_present: str) -> None
+reveal_type(C.__init__)  # revealed: (self: C, /, normal: int, always_present: str) -> None
 ```
 
 ### Dynamic conditions
@@ -2342,7 +2385,7 @@ class C:
     if flag():
         conditionally_present: str
 
-reveal_type(C.__init__)  # revealed: (self: C, normal: int, conditionally_present: str) -> None
+reveal_type(C.__init__)  # revealed: (self: C, /, normal: int, conditionally_present: str) -> None
 ```
 
 ## Generic dataclasses
@@ -2383,20 +2426,20 @@ from dataclasses import dataclass
 class Wrap[T]:
     data: T
 
-reveal_type(Wrap[int].__init__)  # revealed: (self: Wrap[int], data: int) -> None
+reveal_type(Wrap[int].__init__)  # revealed: (self: Wrap[int], /, data: int) -> None
 
 @dataclass
 class WrappedInt(Wrap[int]):
     other_field: str
 
-reveal_type(WrappedInt.__init__)  # revealed: (self: WrappedInt, data: int, other_field: str) -> None
+reveal_type(WrappedInt.__init__)  # revealed: (self: WrappedInt, /, data: int, other_field: str) -> None
 
 # Make sure that another generic type parameter does not affect the `data` field
 @dataclass
 class WrappedIntAndExtraData[T](Wrap[int]):
     extra_data: T
 
-# revealed: (self: WrappedIntAndExtraData[bytes], data: int, extra_data: bytes) -> None
+# revealed: (self: WrappedIntAndExtraData[bytes], /, data: int, extra_data: bytes) -> None
 reveal_type(WrappedIntAndExtraData[bytes].__init__)
 ```
 
@@ -2420,10 +2463,10 @@ class ChildOfParentDataclass[T](ParentDataclass[T]): ...
 def uses_dataclass[T](x: T) -> ChildOfParentDataclass[T]:
     return ChildOfParentDataclass(x)
 
-# revealed: [T](self: ParentDataclass[T], value: T) -> None
+# revealed: [T](self: ParentDataclass[T], /, value: T) -> None
 reveal_type(ParentDataclass.__init__)
 
-# revealed: [T](self: ParentDataclass[T], value: T) -> None
+# revealed: [T](self: ParentDataclass[T], /, value: T) -> None
 reveal_type(ChildOfParentDataclass.__init__)
 
 result_int = uses_dataclass(42)
@@ -2458,7 +2501,7 @@ class UppercaseString:
 class C:
     upper: UppercaseString = UppercaseString()
 
-reveal_type(C.__init__)  # revealed: (self: C, upper: str = ...) -> None
+reveal_type(C.__init__)  # revealed: (self: C, /, upper: str = ...) -> None
 
 c = C("abc")
 reveal_type(c.upper)  # revealed: str
@@ -2504,7 +2547,7 @@ class ConvertToLength:
 class C:
     converter: ConvertToLength = ConvertToLength()
 
-reveal_type(C.__init__)  # revealed: (self: C, converter: str = "") -> None
+reveal_type(C.__init__)  # revealed: (self: C, /, converter: str = "") -> None
 
 c = C("abc")
 reveal_type(c.converter)  # revealed: int
@@ -2543,7 +2586,7 @@ class AcceptsStrAndInt:
 class C:
     field: AcceptsStrAndInt = AcceptsStrAndInt()
 
-reveal_type(C.__init__)  # revealed: (self: C, field: str | int = ...) -> None
+reveal_type(C.__init__)  # revealed: (self: C, /, field: str | int = ...) -> None
 ```
 
 ### Intersections of descriptor `__set__` types
@@ -2578,7 +2621,7 @@ class C:
         DescA(),
     )
 
-reveal_type(C.__init__)  # revealed: (self: C, field: A & B = ...) -> None
+reveal_type(C.__init__)  # revealed: (self: C, /, field: A & B = ...) -> None
 ```
 
 ## `dataclasses.field`
@@ -2672,7 +2715,7 @@ class C:
     _: KW_ONLY
     y: str
 
-reveal_type(C.__init__)  # revealed: (self: C, x: int, *, y: str) -> None
+reveal_type(C.__init__)  # revealed: (self: C, /, x: int, *, y: str) -> None
 
 # snapshot: missing-argument
 # snapshot: too-many-positional-arguments
@@ -2689,7 +2732,7 @@ error[missing-argument]: No argument provided for required parameter `y`
    | ^^^^^^^^
 
 
-error[too-many-positional-arguments]: Too many positional arguments: expected 1, got 2
+error[too-many-positional-arguments]: Too many positional arguments: expected 2, got 3
   --> src/mdtest_snippet.py:13:6
    |
 13 | C(3, "")
@@ -2706,7 +2749,7 @@ class ShadowedOrder:
     _: KW_ONLY
     int: int
 
-reveal_type(ShadowedOrder.__init__)  # revealed: (self: ShadowedOrder, x: int, *, int: int) -> None
+reveal_type(ShadowedOrder.__init__)  # revealed: (self: ShadowedOrder, /, x: int, *, int: int) -> None
 ```
 
 Using `KW_ONLY` to annotate more than one field in a dataclass causes a `TypeError` to be raised at
@@ -2721,7 +2764,7 @@ class Fails:  # error: [duplicate-kw-only]
     d: KW_ONLY
     e: bytes
 
-reveal_type(Fails.__init__)  # revealed: (self: Fails, a: int, *, c: str, e: bytes) -> None
+reveal_type(Fails.__init__)  # revealed: (self: Fails, /, a: int, *, c: str, e: bytes) -> None
 ```
 
 This also works if `KW_ONLY` is used in a conditional branch:
@@ -2760,7 +2803,7 @@ class E(D):
 # This should work: x=1 (positional), z=b"foo" (positional), y="foo" (keyword-only)
 E(1, b"foo", y="foo")
 
-reveal_type(E.__init__)  # revealed: (self: E, x: int, z: bytes, *, y: str) -> None
+reveal_type(E.__init__)  # revealed: (self: E, /, x: int, z: bytes, *, y: str) -> None
 ```
 
 ## Other special cases
@@ -2776,7 +2819,7 @@ import dataclasses
 class C:
     x: str
 
-reveal_type(C.__init__)  # revealed: (self: C, x: str) -> None
+reveal_type(C.__init__)  # revealed: (self: C, /, x: str) -> None
 ```
 
 ### Dataclass with custom `__init__` method
@@ -2901,7 +2944,7 @@ reveal_mro(Person)  # revealed: (<class 'Person'>, <class 'object'>)
 The generated methods have the following signatures:
 
 ```py
-reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int | None = None) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, /, name: str, age: int | None = None) -> None
 
 reveal_type(Person.__repr__)  # revealed: def __repr__(self) -> str
 
@@ -2928,14 +2971,14 @@ from ty_extensions._internal import CallableTypeOf, TypeOf, is_subtype_of, is_as
 class C:
     x: int
 
-reveal_type(C.__init__)  # revealed: (self: C, x: int) -> None
+reveal_type(C.__init__)  # revealed: (self: C, /, x: int) -> None
 reveal_type(type(C.__init__))  # revealed: <class 'FunctionType'>
 
 # We can access attributes that are defined on functions:
 reveal_type(type(C.__init__).__code__)  # revealed: CodeType
 reveal_type(C.__init__.__code__)  # revealed: CodeType
 
-def equivalent_signature(self: C, x: int) -> None:
+def equivalent_signature(self: C, /, x: int) -> None:
     pass
 
 type DunderInitType = TypeOf[C.__init__]

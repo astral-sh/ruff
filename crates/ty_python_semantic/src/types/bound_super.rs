@@ -962,7 +962,7 @@ impl<'db> BoundSuperType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
-        policy: MemberLookupPolicy,
+        mut policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         let owner = self.owner(db);
         let class = match &owner {
@@ -976,7 +976,17 @@ impl<'db> BoundSuperType<'db> {
                     .find_name_in_mro_with_policy(db, env, name, policy)
                     .expect("Calling `find_name_in_mro` on Unknown should return `Some`");
             }
-            SuperOwnerKind::Resolved(resolved_owner) => resolved_owner.lookup_anchor,
+            SuperOwnerKind::Resolved(resolved_owner) => {
+                // With a bare class as the owner, e.g. `super(Child, Child).__init__`, the call
+                // can infer the class's type arguments from the explicit receiver.
+                if matches!(name, "__new__" | "__init__")
+                    && resolved_owner.receiver == DescriptorReceiverKind::Class
+                    && resolved_owner.owner_type.is_class_literal()
+                {
+                    policy |= MemberLookupPolicy::INHERIT_GENERIC_CONTEXT;
+                }
+                resolved_owner.lookup_anchor
+            }
         };
 
         let mut mro_after_pivot = self.skip_until_after_pivot(db, env, owner.iter_mro(db, env));
@@ -1046,9 +1056,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             (ClassBase::Class(_), _) => self.never(),
 
             // A `Divergent` type is only equivalent to itself
-            (ClassBase::Divergent(l), ClassBase::Divergent(r)) => {
-                ConstraintSet::from_bool(self.constraints, l == r)
-            }
+            (ClassBase::Divergent(l), ClassBase::Divergent(r)) => self.when(l == r),
             (ClassBase::Divergent(_), _) | (_, ClassBase::Divergent(_)) => self.never(),
             (ClassBase::Any | ClassBase::Dynamic(_), ClassBase::Any | ClassBase::Dynamic(_)) => {
                 self.always()
@@ -1061,13 +1069,11 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             (ClassBase::Protocol, ClassBase::Protocol) => self.always(),
             (ClassBase::Protocol, _) => self.never(),
 
-            (ClassBase::TypedDict(left), ClassBase::TypedDict(right)) => {
-                ConstraintSet::from_bool(self.constraints, left == right)
-            }
+            (ClassBase::TypedDict(left), ClassBase::TypedDict(right)) => self.when(left == right),
             (ClassBase::TypedDict(_), _) => self.never(),
         };
-        if class_equivalence.is_trivially_never_satisfied() {
-            return self.never();
+        if class_equivalence.short_circuits_and() {
+            return class_equivalence;
         }
         let owner_equivalence = match (left.owner(db), right.owner(db)) {
             (SuperOwnerKind::Resolved(left), SuperOwnerKind::Resolved(right)) => self
@@ -1080,14 +1086,12 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
                     )
                 })
                 .and(db, self.constraints, || {
-                    ConstraintSet::from_bool(self.constraints, left.receiver == right.receiver)
+                    self.when(left.receiver == right.receiver)
                 }),
             (SuperOwnerKind::Resolved(_), _) => self.never(),
 
             // A `Divergent` type is only equivalent to itself
-            (SuperOwnerKind::Divergent(l), SuperOwnerKind::Divergent(r)) => {
-                ConstraintSet::from_bool(self.constraints, l == r)
-            }
+            (SuperOwnerKind::Divergent(l), SuperOwnerKind::Divergent(r)) => self.when(l == r),
             (SuperOwnerKind::Divergent(_), _) | (_, SuperOwnerKind::Divergent(_)) => self.never(),
             (SuperOwnerKind::Dynamic(_), SuperOwnerKind::Dynamic(_)) => self.always(),
             (SuperOwnerKind::Dynamic(_), _) => self.never(),

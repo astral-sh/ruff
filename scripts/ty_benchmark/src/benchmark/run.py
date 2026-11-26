@@ -2,21 +2,20 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
-from benchmark import Hyperfine
+from benchmark import Hyperfine, cli_benchmark_environment
 from benchmark.projects import ALL as ALL_PROJECTS
 from benchmark.snapshot import SnapshotRunner
-from benchmark.tool import Mypy, Pyrefly, Pyright, Tool, Ty
+from benchmark.tool import Mypy, Pyrefly, Pyright, Tool, Ty, Zuban
 from benchmark.venv import Venv
 
 if TYPE_CHECKING:
     from benchmark.tool import Tool
 
-TOOL_CHOICES: Final = ["ty", "pyrefly", "mypy", "pyright"]
+TOOL_CHOICES: Final = ["ty", "pyrefly", "mypy", "pyright", "zuban"]
 
 
 def main() -> None:
@@ -122,6 +121,8 @@ def main() -> None:
                 suites.append(Mypy(warm=False))
                 if args.warm:
                     suites.append(Mypy(warm=True))
+            case "zuban":
+                suites.append(Zuban())
             case _:
                 raise ValueError(f"Unknown tool: {tool_name}")
 
@@ -131,11 +132,6 @@ def main() -> None:
         else ALL_PROJECTS
     )
 
-    benchmark_env = os.environ.copy()
-
-    if args.single_threaded:
-        benchmark_env["TY_MAX_PARALLELISM"] = "1"
-
     first = True
 
     for project in projects:
@@ -143,16 +139,18 @@ def main() -> None:
             print(f"Skipping {project.name}: {skip_reason}")
             continue
 
+        if not project.include:
+            project = project._replace(include=["."])
+
         with tempfile.TemporaryDirectory() as tempdir:
             cwd = Path(tempdir)
             project.clone(cwd)
-
             venv = Venv.create(
                 project=project.name, parent=cwd, python_version=project.python_version
             )
-            venv.install(
-                project.install_arguments,
-                include_mypy=any(isinstance(suite, Mypy) for suite in suites),
+            venv.install(project.install_arguments)
+            benchmark_env = cli_benchmark_environment(
+                cwd, single_threaded=args.single_threaded
             )
 
             commands = []

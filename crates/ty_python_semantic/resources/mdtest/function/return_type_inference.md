@@ -453,6 +453,28 @@ def returns_4_but_will_be_replaced():
 reveal_type(returns_4_but_will_be_replaced())  # revealed: Literal["a"]
 ```
 
+## Decorated classes
+
+When the inner decorator's return type is inferred, we still check the original class body. The
+decorated name takes the type returned by the outer decorator.
+
+```py
+from typing import Final
+
+def identity(cls: type):
+    return cls
+
+def replace(cls: type) -> type[bool]:
+    return bool
+
+@replace
+@identity
+class C:
+    value: Final[int]  # error: [final-without-value]
+
+reveal_type(C)  # revealed: <class 'bool'>
+```
+
 ## Methods
 
 ### Overrides
@@ -555,7 +577,7 @@ subclass method returns an incompatible value:
 ```py
 class IncompatibleChild(Parent):
     def method(self):
-        # TODO: This should be an invalid-return-type error.
+        # TODO: This should be an invalid-explicit-return error.
         return "a"
 
 reveal_type(IncompatibleChild().method())  # revealed: int | None
@@ -832,7 +854,7 @@ class Box[T]:
         return value
 
 reveal_type(Box[int].identity(1))  # revealed: int | Unknown
-value: int = Box[int].identity(1)  # no diagnostic
+value: int = Box[int].identity(1)  # ok
 ```
 
 ## Overloaded functions
@@ -973,6 +995,25 @@ reveal_type(left(3))  # revealed: Literal[1, "a"]
 reveal_type(right(3))  # revealed: Literal["a", 1]
 ```
 
+### Recursive mapping unpacking
+
+Unpacking a child node inside `__getitem__` depends on the return type we are inferring.
+
+```py
+class Node:
+    child: Node | None = None
+
+    def keys(self) -> list[str]:
+        return ["child"]
+
+    def __getitem__(self, key: str):
+        if self.child is None:
+            return None
+        return {**self.child}
+
+reveal_type({**Node()})  # revealed: dict[str, None | dict[str, Divergent] | Unknown]
+```
+
 ## Edge cases
 
 ### `functools.wraps`
@@ -1019,8 +1060,7 @@ class C:
         return 42
 
 instance = C()
-# TODO: This shouldn't be an error
-instance.method()  # error: [missing-argument]
+instance.method()
 ```
 
 Calling `method` on the class object itself is also possible:

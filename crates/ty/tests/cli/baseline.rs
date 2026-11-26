@@ -169,6 +169,51 @@ x: int = 1.5
 }
 
 #[test]
+fn baseline_accepts_previous_rule_name() {
+    let case = CliTest::with_files([
+        // Both diagnostics underline `missing`. Renaming the import rule reverses their sort order.
+        (
+            "test.py",
+            "
+            from typing import Final
+            missing: Final = 0
+            import missing
+            ",
+        ),
+        (
+            "baseline.json",
+            r#"{
+                "version": 0,
+                "files": {"test.py": [
+                    {"rule": "invalid-assignment", "startColumn": 7, "endColumn": 14, "lineCount": 1},
+                    {"rule": "unresolved-import", "startColumn": 7, "endColumn": 14, "lineCount": 1}
+                ]}
+            }"#,
+        ),
+    ])
+    .unwrap();
+
+    assert_cmd_snapshot!(case.command().args(["--baseline", "baseline.json"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+    assert_cmd_snapshot!(case.command().args(["--baseline", "baseline.json", "--update-baseline"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Updated baseline `<temp_dir>/baseline.json` with 2 diagnostics.
+
+    ----- stderr -----
+    ");
+    let baseline = fs::read_to_string(case.root().join("baseline.json")).unwrap();
+    assert!(baseline.contains(r#""rule": "import-not-found""#));
+}
+
+#[test]
 fn update_baseline_is_idempotent() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "test.py",

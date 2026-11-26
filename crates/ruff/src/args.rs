@@ -15,6 +15,7 @@ use colored::Colorize;
 use itertools::Itertools;
 use path_absolutize::path_dedot;
 use regex::Regex;
+use ruff_command_line::TerminalColor;
 use ruff_graph::Direction;
 use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
@@ -32,6 +33,7 @@ use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
 use ruff_workspace::resolver::ConfigurationTransformer;
+use ruff_workspace::script::ScriptConfiguration;
 use rustc_hash::FxHashMap;
 use toml;
 
@@ -89,20 +91,6 @@ impl GlobalConfigArgs {
     fn partition(self) -> (LogLevel, Vec<SingleConfigArgument>, bool) {
         (self.log_level(), self.config, self.isolated)
     }
-}
-
-/// Control when colored output is used.
-#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
-pub(crate) enum TerminalColor {
-    /// Display colors if the output goes to an interactive terminal.
-    #[default]
-    Auto,
-
-    /// Always display colors.
-    Always,
-
-    /// Never display colors.
-    Never,
 }
 
 // Configures Clap v3-style help menu colors
@@ -729,8 +717,28 @@ pub struct ConfigArguments {
 }
 
 impl ConfigArguments {
+    pub(crate) fn script_configuration(&self) -> ScriptConfiguration {
+        if self.isolated || self.config_file.is_some() {
+            ScriptConfiguration::Disabled
+        } else {
+            ScriptConfiguration::Enabled
+        }
+    }
+
     pub(crate) fn config_file(&self) -> Option<&Path> {
         self.config_file.as_deref()
+    }
+
+    pub(crate) fn overrides_script_target(&self) -> bool {
+        self.script_configuration() == ScriptConfiguration::Disabled
+            || self.target_version().is_some()
+            || self.overrides.per_file_target_version.is_some()
+    }
+
+    pub(crate) fn target_version(&self) -> Option<ast::PythonVersion> {
+        self.per_flag_overrides
+            .target_version
+            .or(self.overrides.target_version)
     }
 
     fn from_cli_arguments(

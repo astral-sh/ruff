@@ -19,8 +19,8 @@ pub(crate) fn string_like(string_like: StringLike, checker: &Checker) {
         flake8_bandit::rules::hardcoded_tmp_directory(checker, string_like);
     }
     if checker.source_type.is_stub() {
-        if checker.is_rule_enabled(Rule::StringOrBytesTooLong) {
-            flake8_pyi::rules::string_or_bytes_too_long(checker, string_like);
+        if checker.is_rule_enabled(Rule::StringOrBytesTooLongInStub) {
+            flake8_pyi::rules::string_or_bytes_too_long_in_stub(checker, string_like);
         }
     }
     if checker.any_rule_enabled(&[

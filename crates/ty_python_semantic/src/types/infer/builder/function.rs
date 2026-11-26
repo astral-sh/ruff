@@ -1,11 +1,13 @@
+use std::cell::LazyCell;
+
 use crate::{
     Db, DisplaySettings, FxIndexMap, ProgramEnvironment,
     reachability::is_end_of_scope_reachable,
     types::{
-        Binding, CallArguments, CallableType, ClassBase, ClassLiteral, ClassType, DynamicType,
-        IntersectionBuilder, KnownClass, KnownInstanceType, ParamSpecAttrKind, SpecialFormType,
-        SubclassOfInner, SubclassOfType, Type, TypeContext, TypeVarBoundOrConstraints, TypeVarKind,
-        UnionBuilder, UnionType, UnionTypeInstance,
+        Binding, Bindings, CallableBinding, CallableType, ClassBase, ClassLiteral, ClassType,
+        DynamicType, IntersectionBuilder, KnownClass, KnownInstanceType, ParamSpecAttrKind,
+        SpecialFormType, SubclassOfInner, SubclassOfType, Type, TypeContext,
+        TypeVarBoundOrConstraints, TypeVarKind, UnionBuilder, UnionType, UnionTypeInstance,
         callable::CallableTypeKind,
         constraints::ConstraintSetBuilder,
         context::InferContext,
@@ -14,16 +16,16 @@ use crate::{
             ABSTRACT_AND_FINAL_METHOD, ASSERT_TYPE_UNSPELLABLE_SUBTYPE, DISJOINT_CAST,
             FINAL_ON_NON_METHOD, INVALID_ARGUMENT_TYPE, INVALID_PARAMETER_DEFAULT,
             INVALID_PARAMSPEC, INVALID_TYPE_FORM, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
-            TYPE_ASSERTION_FAILURE, UNSOUND_RETURN_STATEMENT, USELESS_OVERLOAD_BODY,
+            TYPE_ASSERTION_FAILURE, UNSOUND_RETURN, USELESS_OVERLOAD_BODY,
             add_type_expression_reference_link, is_invalid_typed_dict_literal,
             report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
-            report_implicit_return_type, report_invalid_generator_function_return_type,
-            report_invalid_return_type, report_invalid_runtime_checkable,
+            report_implicit_return_type, report_invalid_explicit_return,
+            report_invalid_generator_function_return_type, report_invalid_runtime_checkable,
             report_invalid_total_ordering_call,
             report_issubclass_check_against_protocol_with_non_method_members,
             report_runtime_check_against_non_runtime_checkable_protocol,
             report_runtime_check_against_typed_dict, report_shadowed_type_variable,
-            report_unsound_return_statement,
+            report_unsound_return,
         },
         function::{
             FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
@@ -34,8 +36,8 @@ use crate::{
         infer::{
             InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
             builder::{
-                DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
-                validate_paramspec_components,
+                CallArgumentInference, DeclaredAndInferredType, DeferredExpressionState,
+                TypeAndRange, validate_paramspec_components,
             },
             function_known_decorator_flags, function_known_decorators, infer_deferred_types,
             infer_function_default_types, infer_statement_types, nearest_enclosing_function,
@@ -46,7 +48,7 @@ use crate::{
         relation::TypeRelation,
         signatures::{ReturnCallableTypeVarScope, function_signature_expression_type},
         tuple::{TupleSpec, TupleSpecBuilder, TupleType},
-        typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
+        typed_dict::unpacked_typed_dict_from_kwargs_annotation,
         typevar::TypeVarSet,
         visitor::non_any_dynamic_content,
     },
@@ -65,7 +67,7 @@ use ty_python_core::{
     scope::NodeWithScopeRef,
 };
 
-use ruff_python_ast::{self as ast, find_node::covering_node};
+use ruff_python_ast::{self as ast, find_node::covering_node, helpers::is_stub_body};
 use ruff_text_size::Ranged;
 
 fn parameters_have_defaults(parameters: &ast::Parameters) -> bool {
@@ -146,88 +148,53 @@ impl MethodReceiverKind {
     }
 }
 
-/// Return type policy for checking explicit `return` statements in a function body.
-#[derive(Debug, Copy, Clone)]
-struct ExpectedReturnType<'db> {
-    /// The externally-visible return type.
-    public: Type<'db>,
-    /// The return type as seen from inside the function body.
-    lexical: Type<'db>,
-}
-
-impl<'db> ExpectedReturnType<'db> {
-    /// Creates the expected return type policy for `function`.
-    fn from_function(db: &'db dyn Db, function: FunctionType<'db>) -> Self {
-        /// Normalizes special return annotations to the type actually returned by expressions.
-        fn normalize<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            ty: Type<'db>,
-        ) -> Type<'db> {
-            match ty.resolve_type_alias(db) {
-                Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(db, env),
-                _ => ty,
-            }
-        }
-
-        let env = ProgramEnvironment::from_file(function.program_file(db));
-        let public = normalize(
-            db,
-            &env,
-            same_module_uncached_raw_signature(db, function, ReturnCallableTypeVarScope::Public)
-                .return_ty,
-        );
-        let lexical = normalize(
-            db,
-            &env,
-            same_module_uncached_raw_signature(db, function, ReturnCallableTypeVarScope::Lexical)
-                .return_ty,
-        );
-
-        Self { public, lexical }
-    }
-
-    /// Returns the externally-visible return type.
-    fn public(self) -> Type<'db> {
-        self.public
-    }
-
-    /// Returns `true` if `ty` is accepted by either the public return type or the lexical return
-    /// type.
-    fn accepts(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        ty: Type<'db>,
-        relation: TypeRelation,
-    ) -> bool {
-        let builder = ConstraintSetBuilder::new();
-
-        let check =
-            |target| ty.has_relation_to(db, env, target, &builder, TypeVarSet::None, relation);
-
-        check(self.public)
-            .or(db, &builder, || check(self.lexical))
-            .is_always_satisfied(db, env, TypeVarSet::None)
+/// The type that a return expression must produce for a given annotation.
+fn expected_return_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    annotation: Type<'db>,
+) -> Type<'db> {
+    match annotation.resolve_type_alias(db) {
+        Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(db, env),
+        _ => annotation,
     }
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
-    pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
+    pub(super) fn infer_function_body(&mut self, function: &'ast ast::StmtFunctionDef) {
         let env = self.program_environment();
         let db = self.db();
 
-        // Parameters are odd: they are Definitions in the function body scope, but have no
-        // constituent nodes that are part of the function body. In order to get diagnostics
-        // merged/emitted for them, we need to explicitly infer their definitions here.
-        for parameter in &function.parameters {
-            self.infer_definition(parameter);
+        let parameters = function.parameters.as_ref();
+        let scope = self.scope().file_scope_id(db);
+        // In a stub body, every symbol comes from a parameter. Repeated names can produce
+        // assignment diagnostics when a later parameter rebinds an earlier one.
+        if is_stub_body(&function.body)
+            && self.index.place_table(scope).symbols().len() == parameters.len()
+        {
+            for parameter in parameters.iter_non_variadic_params() {
+                self.infer_parameter_definition(parameter, None);
+            }
+            for (parameter, component) in [
+                (parameters.vararg.as_deref(), ParamSpecAttrKind::Args),
+                (parameters.kwarg.as_deref(), ParamSpecAttrKind::Kwargs),
+            ] {
+                if let Some(annotation) = parameter.and_then(ast::Parameter::annotation) {
+                    self.variadic_parameter_annotation(annotation, component);
+                }
+            }
+        } else {
+            // Parameters have definitions in the body scope, but their annotations and defaults
+            // belong to enclosing scopes. Visit them explicitly to collect their diagnostics.
+            for parameter in parameters {
+                self.infer_definition(parameter);
+            }
         }
 
-        validate_paramspec_components(&self.context, self.index, &function.parameters, |expr| {
+        validate_paramspec_components(&self.context, self.index, parameters, |expr| {
             self.file_expression_type(expr)
         });
-        self.validate_unpacked_typed_dict_kwargs(&function.parameters);
+        self.validate_unpacked_typed_dict_kwargs(parameters);
 
         self.infer_scope_body(&function.body);
 
@@ -258,14 +225,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let enclosing_function = nearest_enclosing_function(db, self.index, self.scope())
                 .expect("should be in a function body scope");
-            let declared_ty = same_module_uncached_raw_signature(
-                db,
-                enclosing_function,
-                ReturnCallableTypeVarScope::Public,
-            )
-            .return_ty;
-            let expected_return = ExpectedReturnType::from_function(db, enclosing_function);
-            let expected_ty = expected_return.public();
+            let declared_ty = LazyCell::new(|| {
+                same_module_uncached_raw_signature(
+                    db,
+                    enclosing_function,
+                    ReturnCallableTypeVarScope::Public,
+                )
+                .return_ty
+            });
+            let public = LazyCell::new(|| expected_return_type(db, env, *declared_ty));
+            let lexical = LazyCell::new(|| {
+                let annotation = function_signature_expression_type(
+                    db,
+                    enclosing_function.definition(db),
+                    returns,
+                );
+                expected_return_type(db, env, annotation)
+            });
+            // A return may satisfy either the lexical annotation or the public annotation,
+            // whose returned callables may bind their own type variables. If the lexical
+            // annotation already accepts the value, the parameter types are unnecessary.
+            let accepts = |ty: Type<'db>, relation| {
+                let builder = ConstraintSetBuilder::new();
+                let build = builder.unlimited();
+                let check =
+                    |target| ty.has_relation_to(db, env, target, build, TypeVarSet::None, relation);
+                let lexical = check(*lexical);
+                lexical.is_trivially_always_satisfied()
+                    || check(*public)
+                        .or(db, build, || lexical)
+                        .is_always_satisfied(db, env, TypeVarSet::None)
+            };
 
             let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
             if scope_id.is_generator_function(self.index) {
@@ -284,30 +274,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
                 if !inferred_return
                     .to_instance_unknown(db, env)
-                    .is_assignable_to(db, env, expected_ty)
+                    .is_assignable_to(db, env, *public)
                 {
                     report_invalid_generator_function_return_type(
                         &self.context,
                         returns.range(),
                         inferred_return,
-                        declared_ty,
+                        *declared_ty,
                     );
                 }
 
-                if let Some(expected_return_ty) = declared_ty.generator_return_type(db, env) {
+                if let Some(expected_return_ty) = (*declared_ty).generator_return_type(db, env) {
                     for &return_statement in &self.return_types_and_ranges {
                         if !return_statement
                             .ty
                             .is_assignable_to(db, env, expected_return_ty)
                         {
-                            report_invalid_return_type(
+                            report_invalid_explicit_return(
                                 &self.context,
                                 return_statement.range,
                                 returns.range(),
                                 expected_return_ty,
                                 return_statement.ty,
                             );
-                        } else if self.context.is_lint_enabled(&UNSOUND_RETURN_STATEMENT)
+                        } else if self.context.is_lint_enabled(&UNSOUND_RETURN)
                             && expected_return_ty.is_fully_static(db, env)
                             && !return_statement.ty.is_pure_redundant_with(
                                 db,
@@ -317,7 +307,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             // N.B. the implementation here is the ~same as for `UNSOUND_YIELD` and `UNSOUND_ASSIGNMENT`;
                             // update those too if updating this!
-                            report_unsound_return_statement(
+                            report_unsound_return(
                                 &self.context,
                                 return_statement.range,
                                 returns.range(),
@@ -360,48 +350,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         _ => Some(ty_range),
                     })
             {
-                if !expected_return.accepts(
-                    db,
-                    env,
-                    return_statement.ty,
-                    TypeRelation::Assignability,
-                ) {
-                    report_invalid_return_type(
+                if !accepts(return_statement.ty, TypeRelation::Assignability) {
+                    report_invalid_explicit_return(
                         &self.context,
                         return_statement.range,
                         returns.range(),
-                        declared_ty,
+                        *declared_ty,
                         return_statement.ty,
                     );
-                } else if self.context.is_lint_enabled(&UNSOUND_RETURN_STATEMENT)
-                    && expected_return.public.is_fully_static(db, env)
-                    && !expected_return.accepts(
-                        db,
-                        env,
-                        return_statement.ty,
-                        TypeRelation::Redundancy { pure: true },
-                    )
+                } else if self.context.is_lint_enabled(&UNSOUND_RETURN)
+                    && public.is_fully_static(db, env)
+                    && !accepts(return_statement.ty, TypeRelation::Redundancy { pure: true })
                 {
                     // N.B. the implementation here is the ~same as for `UNSOUND_YIELD` and `UNSOUND_ASSIGNMENT`;
                     // update those too if updating this!
-                    report_unsound_return_statement(
+                    report_unsound_return(
                         &self.context,
                         return_statement.range,
                         returns.range(),
-                        declared_ty,
+                        *declared_ty,
                         return_statement.ty,
                     );
                 }
             }
 
             if is_end_of_scope_reachable(db, self.scope())
-                && !Type::none(db, env).is_assignable_to(db, env, expected_ty)
+                && !Type::none(db, env).is_assignable_to(db, env, *public)
             {
                 let no_return = self.return_types_and_ranges.is_empty();
                 report_implicit_return_type(
                     &self.context,
                     returns.range(),
-                    declared_ty,
+                    *declared_ty,
                     has_empty_body,
                     enclosing_class_context,
                     no_return,
@@ -439,6 +419,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.context.extend(decorator_inference.context_result());
             self.expressions
                 .extend(decorator_inference.expression_types());
+            self.deferred_name_loads
+                .extend(decorator_inference.deferred_name_loads.iter().copied());
             self.bindings.extend(decorator_inference.bindings());
             self.called_functions
                 .extend(decorator_inference.called_functions().iter().copied());
@@ -549,8 +531,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let body_scope = self
             .index
-            .node_scope(NodeWithScopeRef::Function(function))
-            .to_scope_id(db, self.program_file());
+            .scope_id(self.index.node_scope(NodeWithScopeRef::Function(function)));
 
         let overload_literal = OverloadLiteral::new(
             db,
@@ -562,7 +543,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_transformer_params,
             function.returns.is_some(),
         );
-        let function_literal = FunctionLiteral::new(db, overload_literal);
+        let function_literal =
+            FunctionLiteral::new(db, overload_literal, self.index, function, definition);
         let function_type = FunctionType::new(db, function_literal, None);
         let is_decorated_overload_implementation =
             has_transforming_decorators && function_literal.has_separate_implementation(db);
@@ -718,9 +700,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             let implementation_callables = implementation_ty
                 .try_upcast_to_callable(db, self.program_environment())
-                .map_or_else(Box::default, |callables| {
-                    callables.iter().copied().collect()
-                });
+                .map_or_default(|callables| callables.iter().copied().collect());
             inferred_ty = Type::FunctionLiteral(
                 function_type.with_implementation_callables(db, implementation_callables),
             );
@@ -826,7 +806,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let annotation = param_with_default
                 .annotation()
                 .map(|annotation| function_signature_expression_type(db, definition, annotation));
-            self.infer_expression(default, TypeContext::declared(annotation));
+            self.infer_expression(default, TypeContext::preference(annotation));
         }
 
         self.deferred_state = previous_deferred_state;
@@ -997,11 +977,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let annotated_type = self.file_expression_type(annotation);
-        let Some(unpacked_keys) = extract_unpacked_typed_dict_keys_from_kwargs_annotation(
-            db,
-            annotated_type,
-            annotation_flags,
-        ) else {
+        let Some(typed_dict) =
+            unpacked_typed_dict_from_kwargs_annotation(db, annotated_type, annotation_flags)
+        else {
             if !annotated_type.is_unknown()
                 && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation)
             {
@@ -1029,11 +1007,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             0
         };
 
+        let fields = typed_dict.items(db);
         let overlapping = parameters
             .iter_non_variadic_params()
             .skip(parameters.posonlyargs.len() + pep_484_positional_only_count)
             .map(|parameter| &parameter.parameter)
-            .filter(|parameter| unpacked_keys.contains_key(&parameter.name.id))
+            .filter(|parameter| fields.contains_key(&parameter.name.id))
             .collect::<Vec<_>>();
 
         if overlapping.is_empty() {
@@ -1096,8 +1075,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Set initial declared type (if annotated) and inferred type for a function-parameter symbol,
-    /// in the function body scope.
+    /// Check a parameter's annotation and default. When a definition is supplied, record the
+    /// declared and inferred types of the parameter in the function body scope.
     ///
     /// The declared type is the annotated type, if any, or `Unknown`.
     ///
@@ -1118,7 +1097,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_parameter_definition(
         &mut self,
         parameter_with_default: &'ast ast::ParameterWithDefault,
-        definition: Definition<'db>,
+        definition: Option<Definition<'db>>,
     ) {
         let env = self.program_environment();
         let ast::ParameterWithDefault {
@@ -1188,12 +1167,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            self.add_declaration_with_binding(
-                parameter.into(),
-                definition,
-                &DeclaredAndInferredType::are_the_same_type(declared_ty),
-            );
-        } else {
+            if let Some(definition) = definition {
+                self.add_declaration_with_binding(
+                    parameter.into(),
+                    definition,
+                    &DeclaredAndInferredType::are_the_same_type(declared_ty),
+                );
+            }
+        } else if let Some(definition) = definition {
             let ty = if let Some(default_expr) = default_expr {
                 let default_ty = self.file_expression_type(default_expr);
                 UnionType::from_two_elements(db, env, Type::unknown(), default_ty)
@@ -1206,6 +1187,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.add_binding(parameter.into(), definition)
                 .insert(self, ty);
         }
+    }
+
+    /// Check that a `ParamSpec` component annotates the corresponding variadic parameter.
+    /// A misplaced component or a bare `ParamSpec` gives the parameter an unknown element type.
+    fn variadic_parameter_annotation(
+        &self,
+        annotation: &ast::Expr,
+        expected: ParamSpecAttrKind,
+    ) -> Type<'db> {
+        let db = self.db();
+        let ty = self.file_expression_type(annotation);
+        let Type::TypeVar(typevar) = ty else {
+            return ty;
+        };
+        if !typevar.is_paramspec(db)
+            || typevar.paramspec_attr(db) == Some(expected)
+            || (expected == ParamSpecAttrKind::Args
+                && self
+                    .file_type_expression_flags(annotation)
+                    .contains(TypeExpressionFlags::UNPACK))
+        {
+            return ty;
+        }
+
+        // A bare ParamSpec is diagnosed when inferring the annotation.
+        if let Some(component) = typevar.paramspec_attr(db)
+            && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation)
+        {
+            let name = typevar.name(db);
+            let parameter = match component {
+                ParamSpecAttrKind::Args => "*args",
+                ParamSpecAttrKind::Kwargs => "**kwargs",
+            };
+            let mut diag = builder.into_diagnostic(format_args!(
+                "`{name}.{component}` is valid only in `{parameter}` annotation",
+            ));
+            diag.set_primary_annotation_message(format_args!("Did you mean `{name}.{expected}`?"));
+            add_type_expression_reference_link(diag);
+        }
+        Type::unknown()
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter.
@@ -1223,7 +1244,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         if let Some(annotation) = parameter.annotation() {
-            let annotated_type = self.file_expression_type(annotation);
+            let annotated_type =
+                self.variadic_parameter_annotation(annotation, ParamSpecAttrKind::Args);
             let has_unpacked_annotation = self
                 .file_type_expression_flags(annotation)
                 .contains(TypeExpressionFlags::UNPACK);
@@ -1240,37 +1262,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ))
                 }
                 _ if has_unpacked_annotation => annotated_type,
-                Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
-                    match typevar.paramspec_attr(db) {
-                        // `*args: P.args`
-                        Some(ParamSpecAttrKind::Args) => annotated_type,
-
-                        // `*args: P.kwargs`
-                        Some(ParamSpecAttrKind::Kwargs) => {
-                            // TODO: Should this diagnostic be raised as part of
-                            // `ArgumentTypeChecker`?
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_TYPE_FORM, annotation)
-                            {
-                                let name = typevar.name(db);
-                                let mut diag = builder.into_diagnostic(format_args!(
-                                    "`{name}.kwargs` is valid only in `**kwargs` annotation",
-                                ));
-                                diag.set_primary_annotation_message(format_args!(
-                                    "Did you mean `{name}.args`?"
-                                ));
-                                add_type_expression_reference_link(diag);
-                            }
-                            Type::homogeneous_tuple(db, self.program_environment(), Type::unknown())
-                        }
-
-                        // `*args: P`
-                        None => {
-                            // The diagnostic for this case is handled in `in_type_expression`.
-                            Type::homogeneous_tuple(db, self.program_environment(), Type::unknown())
-                        }
-                    }
-                }
+                Type::TypeVar(typevar) if typevar.is_paramspec(db) => annotated_type,
                 _ => Type::homogeneous_tuple(db, self.program_environment(), annotated_type),
             };
 
@@ -1294,43 +1286,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Option<Type<'db>> {
         let env = self.program_environment();
         let db = self.db();
-        let file = self.program_file();
+        let scope = self.scope().file_scope_id(db);
+        let function = self.index.scope(scope).node().as_function()?;
+        let function_node = function.node(self.module());
 
-        let function_scope_id = self.scope();
-        let function_scope = function_scope_id.scope(db);
-        let function = function_scope.node().as_function()?;
-
-        let parent_file_scope_id = function_scope.parent()?;
-        let mut parent_scope_id = parent_file_scope_id.to_scope_id(db, file);
-
-        // Skip type parameter scopes, if the method itself is generic.
-        if parent_scope_id.is_annotation(db) {
-            let parent_scope = parent_scope_id.scope(db);
-            parent_scope_id = parent_scope.parent()?.to_scope_id(db, file);
-        }
-
-        // Return early if this is not a method inside a class.
-        let class = parent_scope_id.scope(db).node().as_class()?;
-
-        let method_definition = self.index.expect_single_definition(function);
-        let DefinitionKind::Function(function_definition) = method_definition.kind(db) else {
-            return None;
-        };
-
-        if function_definition
-            .node(self.module())
+        if function_node
             .parameters
-            .index(parameter.name())
-            .is_none_or(|index| index != 0)
+            .iter_non_variadic_params()
+            .next()
+            .is_none_or(|first| first.parameter.name() != parameter.name())
         {
             return None;
         }
 
-        let function_node = function_definition.node(self.module());
+        let class_definition = self.index.class_definition_of_method(scope)?;
+        let method_definition = self.index.expect_single_definition(function);
         let receiver_kind =
             MethodReceiverKind::from_function(db, method_definition, function_node)?;
-
-        let class_definition = self.index.expect_single_definition(class);
         let class_literal = original_class_type(db, class_definition)?;
         let typing_self = typing_self(db, self.scope(), Some(method_definition), class_literal);
         match receiver_kind {
@@ -1357,52 +1329,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         if let Some(annotation) = parameter.annotation() {
-            let annotated_type = self.file_expression_type(annotation);
-            let ty = if let Type::TypeVar(typevar) = annotated_type
-                && typevar.is_paramspec(db)
-            {
-                match typevar.paramspec_attr(db) {
-                    // `**kwargs: P.args`
-                    Some(ParamSpecAttrKind::Args) => {
-                        // TODO: Should this diagnostic be raised as part of `ArgumentTypeChecker`?
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_TYPE_FORM, annotation)
-                        {
-                            let name = typevar.name(db);
-                            let mut diag = builder.into_diagnostic(format_args!(
-                                "`{name}.args` is valid only in `*args` annotation",
-                            ));
-                            diag.set_primary_annotation_message(format_args!(
-                                "Did you mean `{name}.kwargs`?"
-                            ));
-                            add_type_expression_reference_link(diag);
-                        }
-                        KnownClass::Dict.to_specialized_instance(
-                            db,
-                            env,
-                            &[KnownClass::Str.to_instance(db, env), Type::unknown()],
-                        )
-                    }
-
-                    // `**kwargs: P.kwargs`
-                    Some(ParamSpecAttrKind::Kwargs) => annotated_type,
-
-                    // `**kwargs: P`
-                    None => {
-                        // The diagnostic for this case is handled in `in_type_expression`.
-                        KnownClass::Dict.to_specialized_instance(
-                            db,
-                            env,
-                            &[KnownClass::Str.to_instance(db, env), Type::unknown()],
-                        )
-                    }
-                }
-            } else if extract_unpacked_typed_dict_keys_from_kwargs_annotation(
-                db,
-                annotated_type,
-                self.file_type_expression_flags(annotation),
-            )
-            .is_some()
+            let annotated_type =
+                self.variadic_parameter_annotation(annotation, ParamSpecAttrKind::Kwargs);
+            let ty = if matches!(annotated_type, Type::TypeVar(typevar) if typevar.is_paramspec(db))
+                || unpacked_typed_dict_from_kwargs_annotation(
+                    db,
+                    annotated_type,
+                    self.file_type_expression_flags(annotation),
+                )
+                .is_some()
             {
                 annotated_type
             } else {
@@ -1533,6 +1468,134 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         (!parameter_type.has_provisional_marker(db, self.program_environment()))
             .then_some(parameter_type)
     }
+
+    pub(super) fn check_type_observations(
+        &self,
+        bindings: &Bindings<'db>,
+        revealed_type: Option<Type<'db>>,
+        call_expression: &ast::ExprCall,
+    ) {
+        if let Some(revealed_type) = revealed_type {
+            report_revealed_type(
+                &self.context,
+                revealed_type,
+                call_argument_node(call_expression, "obj", 0)
+                    .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
+            );
+        }
+
+        self.check_assert_type(bindings, call_expression);
+    }
+
+    pub(super) fn revealed_type_for_call(
+        &self,
+        inference: &CallArgumentInference<'_, '_, 'db>,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+
+        let mut revealed_type = None;
+        for (bindings, arguments) in inference.iter() {
+            for (_, overload) in bindings
+                .iter_flat()
+                .filter(|binding| {
+                    binding
+                        .callable_type
+                        .as_function_literal()
+                        .is_some_and(|function| function.is_known(db, KnownFunction::RevealType))
+                })
+                .flat_map(CallableBinding::matching_overloads)
+            {
+                let union = revealed_type.get_or_insert_with(|| UnionBuilder::new(db, env));
+                for (_, ty) in overload.arguments_for_parameter(arguments, 0) {
+                    union.add_in_place(ty);
+                }
+            }
+        }
+
+        revealed_type.map(UnionBuilder::build)
+    }
+
+    fn check_assert_type(&self, bindings: &Bindings<'db>, call_expression: &ast::ExprCall) {
+        let db = self.db();
+        let env = self.program_environment();
+
+        let mut parameter_types = bindings
+            .iter_flat()
+            .filter(|binding| {
+                binding
+                    .callable_type
+                    .as_function_literal()
+                    .is_some_and(|function| function.is_known(db, KnownFunction::AssertType))
+            })
+            .flat_map(CallableBinding::matching_overloads)
+            .filter_map(|(_, overload)| {
+                let [Some(actual_ty), Some(asserted_ty)] = overload.parameter_types() else {
+                    return None;
+                };
+                Some((*actual_ty, *asserted_ty))
+            });
+
+        let Some((actual_ty, asserted_ty)) = parameter_types.next() else {
+            return;
+        };
+        let actual_ty = UnionType::from_elements(
+            db,
+            env,
+            std::iter::once(actual_ty).chain(parameter_types.map(|(ty, _)| ty)),
+        );
+        let asserted_ty = asserted_ty.project_type_form(db, env);
+        if actual_ty.is_equivalent_to(db, env, asserted_ty) {
+            return;
+        }
+        let diagnostic =
+            if actual_ty.is_spellable(db) || !actual_ty.is_subtype_of(db, env, asserted_ty) {
+                &TYPE_ASSERTION_FAILURE
+            } else {
+                &ASSERT_TYPE_UNSPELLABLE_SUBTYPE
+            };
+        if let Some(diagnostic) = self.context.report_lint(diagnostic, call_expression) {
+            let settings =
+                DisplaySettings::from_possibly_ambiguous_types(db, env, [actual_ty, asserted_ty]);
+            let mut diagnostic = diagnostic.into_diagnostic(format_args!(
+                "Argument does not have asserted type `{}`",
+                asserted_ty.display_with(db, env, settings.clone()),
+            ));
+
+            diagnostic.annotate(
+                Annotation::secondary(
+                    self.context.span(
+                        call_argument_node(call_expression, "val", 0)
+                            .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
+                    ),
+                )
+                .message(format_args!(
+                    "Inferred type is `{}`",
+                    actual_ty.display_with(db, env, settings.clone())
+                )),
+            );
+
+            if actual_ty.is_subtype_of(db, env, asserted_ty) {
+                diagnostic.info(format_args!(
+                    "`{inferred_type}` is a subtype of `{asserted_type}`, but they are not equivalent",
+                    asserted_type = asserted_ty.display_with(db, env, settings.clone()),
+                    inferred_type = actual_ty.display_with(db, env, settings.clone()),
+                ));
+            } else {
+                diagnostic.info(format_args!(
+                    "`{asserted_type}` and `{inferred_type}` are not equivalent types",
+                    asserted_type = asserted_ty.display_with(db, env, settings.clone()),
+                    inferred_type = actual_ty.display_with(db, env, settings.clone()),
+                ));
+            }
+
+            diagnostic.set_concise_message(format_args!(
+                "Type `{}` does not match asserted type `{}`",
+                actual_ty.display_with(db, env, settings.clone()),
+                asserted_ty.display_with(db, env, settings),
+            ));
+        }
+    }
 }
 
 impl KnownFunction {
@@ -1542,29 +1605,12 @@ impl KnownFunction {
         self,
         builder: &TypeInferenceBuilder<'db, '_>,
         overload: &mut Binding<'db>,
-        call_arguments: &CallArguments<'_, 'db>,
         call_expression: &ast::ExprCall,
     ) {
         let db = builder.db();
         let parameter_types = overload.parameter_types();
 
         match self {
-            KnownFunction::RevealType => {
-                let env = builder.program_environment();
-                let revealed_type = overload
-                    .arguments_for_parameter(call_arguments, 0)
-                    .fold(UnionBuilder::new(db, env), |builder, (_, ty)| {
-                        builder.add(ty)
-                    })
-                    .build();
-                report_revealed_type(
-                    &builder.context,
-                    revealed_type,
-                    call_argument_node(call_expression, "obj", 0)
-                        .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
-                );
-            }
-
             KnownFunction::HasMember => {
                 let [Some(ty), Some(Type::LiteralValue(literal))] = parameter_types else {
                     return;
@@ -1577,68 +1623,6 @@ impl KnownFunction {
                 overload.set_return_type(Type::bool_literal(
                     ty_members.iter().any(|m| m.name == member.value(db)),
                 ));
-            }
-
-            KnownFunction::AssertType => {
-                let [Some(actual_ty), Some(asserted_ty)] = parameter_types else {
-                    return;
-                };
-                let env = builder.program_environment();
-                let asserted_ty = asserted_ty.project_type_form(db, env);
-                if actual_ty.is_equivalent_to(db, env, asserted_ty) {
-                    return;
-                }
-                let diagnostic = if actual_ty.is_spellable(db)
-                    || !actual_ty.is_subtype_of(db, env, asserted_ty)
-                {
-                    &TYPE_ASSERTION_FAILURE
-                } else {
-                    &ASSERT_TYPE_UNSPELLABLE_SUBTYPE
-                };
-                if let Some(diagnostic) = builder.context.report_lint(diagnostic, call_expression) {
-                    let settings = DisplaySettings::from_possibly_ambiguous_types(
-                        db,
-                        env,
-                        [*actual_ty, asserted_ty],
-                    );
-                    let mut diagnostic = diagnostic.into_diagnostic(format_args!(
-                        "Argument does not have asserted type `{}`",
-                        asserted_ty.display_with(db, env, settings.clone()),
-                    ));
-
-                    diagnostic.annotate(
-                        Annotation::secondary(
-                            builder.context.span(
-                                call_argument_node(call_expression, "val", 0)
-                                    .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
-                            ),
-                        )
-                        .message(format_args!(
-                            "Inferred type is `{}`",
-                            actual_ty.display_with(db, env, settings.clone())
-                        )),
-                    );
-
-                    if actual_ty.is_subtype_of(db, env, asserted_ty) {
-                        diagnostic.info(format_args!(
-                            "`{inferred_type}` is a subtype of `{asserted_type}`, but they are not equivalent",
-                            asserted_type = asserted_ty.display_with(db, env, settings.clone()),
-                            inferred_type = actual_ty.display_with(db, env, settings.clone()),
-                        ));
-                    } else {
-                        diagnostic.info(format_args!(
-                            "`{asserted_type}` and `{inferred_type}` are not equivalent types",
-                            asserted_type = asserted_ty.display_with(db, env, settings.clone()),
-                            inferred_type = actual_ty.display_with(db, env, settings.clone()),
-                        ));
-                    }
-
-                    diagnostic.set_concise_message(format_args!(
-                        "Type `{}` does not match asserted type `{}`",
-                        actual_ty.display_with(db, env, settings.clone()),
-                        asserted_ty.display_with(db, env, settings),
-                    ));
-                }
             }
 
             KnownFunction::AssertNever => {
@@ -1802,7 +1786,7 @@ impl KnownFunction {
                                 .speculate_without_diagnostics()
                                 .infer_expression(
                                     value_expr,
-                                    TypeContext::declared(Some(casted_type)),
+                                    TypeContext::preference(Some(casted_type)),
                                 )
                                 .is_disjoint_from(db, env, casted_type)
                         })

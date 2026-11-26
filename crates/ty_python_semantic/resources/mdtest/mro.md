@@ -166,7 +166,7 @@ reveal_mro(Z)
 
 ```py
 from ty_extensions._internal import reveal_mro
-from does_not_exist import DoesNotExist  # error: [unresolved-import]
+from does_not_exist import DoesNotExist  # error: [import-not-found]
 
 class A(DoesNotExist): ...
 class B: ...
@@ -189,7 +189,7 @@ disjoint from `type`.
 
 ```py
 from ty_extensions._internal import reveal_mro
-from does_not_exist import DoesNotExist  # error: [unresolved-import]
+from does_not_exist import DoesNotExist  # error: [import-not-found]
 
 reveal_type(DoesNotExist)  # revealed: Unknown
 
@@ -600,7 +600,7 @@ the dynamic base can usually be materialised to a type that would lead to a reso
 
 ```py
 from ty_extensions._internal import reveal_mro
-from unresolvable_module import UnknownBase1, UnknownBase2  # error: [unresolved-import]
+from unresolvable_module import UnknownBase1, UnknownBase2  # error: [import-not-found]
 
 reveal_type(UnknownBase1)  # revealed: Unknown
 reveal_type(UnknownBase2)  # revealed: Unknown
@@ -688,7 +688,7 @@ class InlineTupleInvalidBases(*(int, 1)): ...
 ## Unrelated objects inferred as `Any`/`Unknown` do not have special `__mro__` attributes
 
 ```py
-from does_not_exist import unknown_object  # error: [unresolved-import]
+from does_not_exist import unknown_object  # error: [import-not-found]
 
 reveal_type(unknown_object)  # revealed: Unknown
 reveal_type(unknown_object.__mro__)  # revealed: Unknown

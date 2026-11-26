@@ -23,6 +23,13 @@ pub struct Member {
     flags: MemberFlags,
 }
 
+impl Hash for Member {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.expression.as_ref().hash(state);
+        self.flags.bits().hash(state);
+    }
+}
+
 impl Member {
     pub(crate) fn new(expression: MemberExpr) -> Self {
         Self {
@@ -81,14 +88,14 @@ impl Member {
     /// parameter of the method (i.e. `self`). To answer those questions,
     /// use [`Self::as_instance_attribute`].
     fn as_instance_attribute_candidate(&self) -> Option<&str> {
-        let mut segments = self.expression().segments();
-        let first_segment = segments.next()?;
-
-        if first_segment.kind == SegmentKind::Attribute && segments.next().is_none() {
-            Some(first_segment.text)
-        } else {
-            None
+        let expression = self.expression();
+        if expression.num_segments() != 1 {
+            return None;
         }
+
+        let segment = expression.segment_infos().next()?;
+        (segment.kind() == SegmentKind::Attribute)
+            .then(|| &expression.path.as_str()[usize::from(segment.offset())..])
     }
 
     /// Return `true` if the place expression has the form `<NAME>.<MEMBER>`,
@@ -163,8 +170,26 @@ pub(crate) struct MemberExpr {
 }
 
 impl MemberExpr {
-    #[cfg(test)]
-    fn try_from_expr(expression: ast::ExprRef<'_>) -> Option<Self> {
+    /// Build a member path from an attribute or a supported subscript.
+    pub(super) fn try_from_expr(expression: ast::ExprRef<'_>) -> Option<Self> {
+        // Direct attribute accesses have one segment. Avoid collecting and copying
+        // two temporary vectors of path parts and segment metadata.
+        if let ast::ExprRef::Attribute(attribute) = expression
+            && let ast::Expr::Name(name) = attribute.value.as_ref()
+        {
+            let name = name.id.as_str();
+            let segment = SegmentInfo::new(SegmentKind::Attribute, name.text_len());
+            let segments = if let Some(small) = SmallSegments::try_from_slice(&[segment]) {
+                Segments::Small(small)
+            } else {
+                Segments::Heap(Box::new([segment]))
+            };
+            return Some(Self {
+                path: CharStr::concat(&[name, attribute.attr.id.as_str()]),
+                segments,
+            });
+        }
+
         MemberExprBuilder::visit_expr(expression).and_then(Self::try_from_builder)
     }
 
@@ -361,12 +386,13 @@ impl MemberExprBuilder {
             )),
             // Handle bytes literal subscripts, like `x[b"key"]`.
             ast::Expr::BytesLiteral(bytes) => {
-                let bytes_vec: Vec<u8> = bytes.value.bytes().collect();
-                let text = String::from_utf8_lossy(&bytes_vec);
-                Some((
-                    SegmentKind::BytesSubscript,
-                    MemberPathPart::Owned(CharString::from(text.as_ref())),
-                ))
+                let escaped = bytes
+                    .value
+                    .bytes()
+                    .flat_map(std::ascii::escape_default)
+                    .map(char::from)
+                    .collect();
+                Some((SegmentKind::BytesSubscript, MemberPathPart::Owned(escaped)))
             }
             _ => None,
         }
@@ -1159,6 +1185,23 @@ mod tests {
         // Test parent of single segment is a symbol and not a member.
         let parent3 = parent2.parent();
         assert!(parent3.is_none());
+    }
+
+    #[test]
+    fn direct_attribute_matches_its_path_in_a_chained_access() {
+        use ruff_python_parser::parse_expression;
+
+        // With a two-byte suffix, the receiver spans 63 or 64 bytes.
+        for n in [61, 62] {
+            let receiver = format!("{}é", "a".repeat(n));
+            let direct = parse_expression(&format!("{receiver}.π")).unwrap();
+            let chained = parse_expression(&format!("{receiver}.π[0]")).unwrap();
+            let direct = MemberExpr::try_from_expr(direct.expr().into()).unwrap();
+            let chained = MemberExpr::try_from_expr(chained.expr().into()).unwrap();
+
+            assert_eq!(direct.symbol_name(), receiver);
+            assert_eq!(direct.as_ref(), chained.as_ref().parent().unwrap());
+        }
     }
 
     #[test]

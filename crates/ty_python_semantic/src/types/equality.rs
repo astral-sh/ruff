@@ -4,22 +4,28 @@
 //! constraints and definite truthiness while remaining conservative around custom comparison
 //! methods.
 
-use rustc_hash::FxHashSet;
+use std::collections::hash_map::Entry;
+use std::ops::ControlFlow;
+
+use rustc_hash::FxHashMap;
+use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
-use crate::{AnalysisSettings, Db, ProgramEnvironment, place::PlaceAndQualifiers};
+use crate::{AnalysisSettings, Db, Program, ProgramEnvironment, place::PlaceAndQualifiers};
 
 use super::{
     CallArguments, EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass,
-    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder,
+    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, SubclassOfInner, Truthiness, Type,
+    TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
     bool::BoolError,
     cyclic::ActiveRecursionDetector,
     enums::{enum_member_literals, enum_metadata},
+    literal::{LiteralComparisonKind, WideLiteralComparison},
 };
 
 mod enums;
 
+pub(super) use self::enums::enum_has_distinct_member_equality;
 use self::enums::evaluate_enum_comparison;
 
 /// The result of evaluating a runtime comparison between two types.
@@ -298,8 +304,7 @@ pub(super) fn inequality_truthiness<'db>(
 
 /// Evaluates container elements using identity or equality.
 ///
-/// Reuses the active-comparison set across element comparisons. The set only detects recursive
-/// comparisons; results are not cached between elements.
+/// Reuses comparison results across elements, including repeated pairs in nested containers.
 pub(super) struct ContainerElementEqualityEvaluator<'db> {
     evaluator: ComparisonEvaluator<'db>,
 }
@@ -321,6 +326,11 @@ impl<'db> ContainerElementEqualityEvaluator<'db> {
         right: Type<'db>,
     ) -> Result<Truthiness, BoolError<'db>> {
         let db = self.evaluator.db;
+        if let Some(comparison) = WideLiteralComparison::new(db, &self.evaluator.env, left, right) {
+            // Builtin literal equality is reflexive and returns a boolean, so neither identity
+            // nor a rich-comparison method call can add an outcome here.
+            return Ok(comparison.truthiness(db, LiteralComparisonKind::Equality));
+        }
         let truthiness = evaluate_container_element_equality(&mut self.evaluator, left, right);
         if !truthiness.is_ambiguous() {
             return Ok(truthiness);
@@ -415,7 +425,7 @@ impl ComparisonSoundnessPolicy {
     }
 }
 
-/// Identifies an active comparison evaluation.
+/// Identifies a comparison evaluation.
 ///
 /// Operand order and branch are significant because the left operand is the narrowing target.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -426,11 +436,79 @@ struct ComparisonKey<'db> {
     operator: ComparisonOperator,
 }
 
-/// Tracks comparisons that are already in progress so recursive evaluation terminates.
+#[derive(Clone, Copy)]
+struct PendingComparison<'db> {
+    key: ComparisonKey<'db>,
+    generation: usize,
+}
+
+/// Memoizes completed comparisons and tracks active comparisons for cycle detection.
+#[derive(Default)]
+struct ComparisonCache<'db> {
+    /// An entry with no result is still being evaluated.
+    entries: FxHashMap<ComparisonKey<'db>, Option<ComparisonResult<'db>>>,
+    /// Number of `Some` entries. The cache limit applies only to completed results.
+    completed: usize,
+    /// Changes when an active evaluation encounters a cycle or the cache is cleared.
+    generation: usize,
+}
+
+impl<'db> ComparisonCache<'db> {
+    /// Large unions can visit a Cartesian product of distinct pairs with little reuse.
+    const MAX_CACHED_COMPARISONS: usize = 1024;
+
+    /// Return a cached result or register the comparison as active.
+    ///
+    /// If the comparison is already active, return `Ambiguous`. This fallback can depend on
+    /// which comparisons are active, so it makes every active comparison ineligible for caching.
+    fn begin(
+        &mut self,
+        key: ComparisonKey<'db>,
+    ) -> ControlFlow<ComparisonResult<'db>, PendingComparison<'db>> {
+        match self.entries.entry(key) {
+            Entry::Occupied(entry) => match *entry.get() {
+                Some(result) => ControlFlow::Break(result),
+                None => {
+                    self.generation += 1;
+                    ControlFlow::Break(ComparisonResult::Ambiguous)
+                }
+            },
+            Entry::Vacant(entry) => {
+                entry.insert(None);
+                ControlFlow::Continue(PendingComparison {
+                    key,
+                    generation: self.generation,
+                })
+            }
+        }
+    }
+
+    /// Finish a comparison, caching its result if the generation is unchanged.
+    ///
+    /// When adding a result would exceed the cache limit, discard the completed entries and
+    /// keep the active ones for cycle detection. Comparisons in progress may have used the
+    /// discarded entries, so advance the generation to keep their results out of the cache.
+    fn finish(&mut self, pending: PendingComparison<'db>, result: ComparisonResult<'db>) {
+        let PendingComparison { key, generation } = pending;
+        if self.generation == generation {
+            if self.completed < Self::MAX_CACHED_COMPARISONS {
+                self.entries.insert(key, Some(result));
+                self.completed += 1;
+                return;
+            }
+
+            self.entries.retain(|_, result| result.is_none());
+            self.completed = 0;
+            self.generation += 1;
+        }
+        self.entries.remove(&key);
+    }
+}
+
 struct ComparisonEvaluator<'db> {
     db: &'db dyn Db,
     env: ProgramEnvironment<'db>,
-    active: FxHashSet<ComparisonKey<'db>>,
+    cache: ComparisonCache<'db>,
     goal: ComparisonGoal,
     soundness_policy: ComparisonSoundnessPolicy,
 }
@@ -444,7 +522,7 @@ impl<'db> ComparisonEvaluator<'db> {
         Self {
             db,
             env: env.clone(),
-            active: FxHashSet::default(),
+            cache: ComparisonCache::default(),
             goal: ComparisonGoal::Constraint,
             soundness_policy,
         }
@@ -458,7 +536,7 @@ impl<'db> ComparisonEvaluator<'db> {
         Self {
             db,
             env: env.clone(),
-            active: FxHashSet::default(),
+            cache: ComparisonCache::default(),
             goal: ComparisonGoal::Truthiness,
             soundness_policy,
         }
@@ -516,14 +594,12 @@ impl<'db> ComparisonEvaluator<'db> {
             operator,
         };
 
-        // A repeated key means that the result depends on itself. Treating it as ambiguous is
-        // conservative: callers only narrow from definite truthiness or an explicit constraint.
-        if !self.active.insert(key) {
-            return ComparisonResult::Ambiguous;
-        }
-
+        let pending = match self.cache.begin(key) {
+            ControlFlow::Break(result) => return result,
+            ControlFlow::Continue(pending) => pending,
+        };
         let result = evaluate_comparison_once(self, left, right, branch, operator);
-        self.active.remove(&key);
+        self.cache.finish(pending, result);
         result
     }
 }
@@ -541,6 +617,30 @@ fn evaluate_comparison_once<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    if let Some(comparison) = WideLiteralComparison::new(evaluator.db, &evaluator.env, left, right)
+    {
+        if evaluator.goal == ComparisonGoal::Constraint
+            && operator.condition_expects_equality(branch)
+        {
+            return match comparison.positive_constraint(
+                evaluator.db,
+                &evaluator.env,
+                LiteralComparisonKind::Equality,
+            ) {
+                Some(Type::Never) => operator.result_from_equality(false),
+                Some(constraint) => ComparisonResult::CanNarrow(constraint),
+                None => ComparisonResult::Ambiguous,
+            };
+        }
+        return if comparison
+            .truthiness(evaluator.db, LiteralComparisonKind::Equality)
+            .is_always_false()
+        {
+            operator.result_from_equality(false)
+        } else {
+            ComparisonResult::Ambiguous
+        };
+    }
     evaluate_enum_comparison(evaluator, left, right, branch, operator)
         .or_else(|| evaluate_dynamic_comparison(evaluator, left, right, branch, operator))
         .or_else(|| evaluate_finite_comparison(evaluator, left, right, branch, operator))
@@ -800,6 +900,35 @@ fn evaluate_structural_comparison<'db>(
                 && has_known_identity_comparison_semantics(db, env, right, operator) =>
         {
             operator.result_from_equality(left == right)
+        }
+        // A bare generic class can be the runtime class of any of its specializations.
+        // Comparing a specialized constructor with its origin must preserve its type arguments.
+        (Type::SubclassOf(subclass), Type::ClassLiteral(class))
+        | (Type::ClassLiteral(class), Type::SubclassOf(subclass))
+            if class.generic_context(db).is_some()
+                && let SubclassOfInner::Class(base) = subclass.subclass_of()
+                && base.is_generic() =>
+        {
+            ComparisonResult::Ambiguous
+        }
+        (Type::ClassLiteral(_), Type::SubclassOf(_) | Type::NominalInstance(_))
+        | (Type::SubclassOf(_) | Type::NominalInstance(_), Type::ClassLiteral(_))
+            if [left, right].into_iter().all(|ty| {
+                evaluator.comparison_semantics(ty, operator)
+                    == Some(KnownComparisonSemantics::Object)
+            }) =>
+        {
+            if left.is_disjoint_from(db, env, right) {
+                operator.result_from_equality(false)
+            } else if matches!(right, Type::ClassLiteral(_)) {
+                ComparisonResult::CanNarrow(right.negate_if(
+                    db,
+                    env,
+                    !operator.condition_expects_equality(branch),
+                ))
+            } else {
+                ComparisonResult::Ambiguous
+            }
         }
 
         (Type::NominalInstance(left_instance), Type::NominalInstance(right_instance)) => {
@@ -1185,8 +1314,8 @@ fn evaluate_target_union<'db>(
         {
             narrowed = IntersectionBuilder::new(db, env)
                 .add_positive(narrowed)
-                .add_negative(removed)
-                .build();
+                .bounded_add_negative(removed)
+                .map_or(narrowed, IntersectionBuilder::build);
         }
         builder = builder.add(narrowed);
     }
@@ -1326,8 +1455,7 @@ fn evaluate_intersection_left<'db>(
     let mut any_true = false;
     let mut any_false = false;
     let mut any_ambiguous = false;
-    let mut any_narrowing = false;
-    let mut builder = IntersectionBuilder::new(db, &evaluator.env).add_positive(original);
+    let mut narrowed_types = SmallVec::<[_; 1]>::new();
 
     for element in positive {
         match evaluator.evaluate(*element, other, branch, operator) {
@@ -1346,14 +1474,13 @@ fn evaluate_intersection_left<'db>(
                     return ComparisonResult::Ambiguous;
                 }
 
-                any_narrowing = true;
-                builder.add_positive_in_place(narrowed);
+                narrowed_types.push(narrowed);
             }
             ComparisonResult::Ambiguous => any_ambiguous = true,
         }
     }
 
-    if any_ambiguous || (any_narrowing && (any_true || any_false)) {
+    if any_ambiguous || (!narrowed_types.is_empty() && (any_true || any_false)) {
         return ComparisonResult::Ambiguous;
     }
 
@@ -1361,7 +1488,12 @@ fn evaluate_intersection_left<'db>(
         (true, false) => ComparisonResult::AlwaysTrue,
         (false, true) => ComparisonResult::AlwaysFalse,
         (true, true) => ComparisonResult::Ambiguous,
-        (false, false) => ComparisonResult::CanNarrow(builder.build()),
+        (false, false) => ComparisonResult::CanNarrow(
+            IntersectionBuilder::new(db, &evaluator.env)
+                .add_positive(original)
+                .positive_elements(narrowed_types)
+                .build(),
+        ),
     }
 }
 
@@ -1766,6 +1898,7 @@ enum KnownComparisonSemantics {
     Str,
     Bytes,
     Tuple,
+    List,
     Dict,
 }
 
@@ -1799,6 +1932,26 @@ impl KnownComparisonSemantics {
     ) -> Option<Self> {
         match ty {
             Type::LiteralValue(literal) => Self::of_literal(db, env, literal.kind(), operator),
+            Type::ClassLiteral(class)
+                if let metaclass @ Type::ClassLiteral(_) = class.metaclass(db) =>
+            {
+                class_comparison_semantics(db, env.program(db), metaclass, operator)
+            }
+            // A subclass of C may use a subclass of C's metaclass. In strict mode we can
+            // rely on its comparison method only if the metaclass itself is final.
+            Type::SubclassOf(subclass)
+                if let SubclassOfInner::Class(class) = subclass.subclass_of()
+                    && let Type::ClassLiteral(metaclass) =
+                        class.inferred_metaclass(db).for_inheritance(db, env)
+                    && (soundness_policy.allow_unsafe_equality || metaclass.is_final(db)) =>
+            {
+                class_comparison_semantics(
+                    db,
+                    env.program(db),
+                    Type::ClassLiteral(metaclass),
+                    operator,
+                )
+            }
             Type::TypedDict(_) => Some(Self::Dict),
             Type::EnumComplement(complement) => Self::of_instance(
                 db,
@@ -1878,52 +2031,59 @@ impl KnownComparisonSemantics {
         operator: ComparisonOperator,
     ) -> Option<Self> {
         instance.nominal_class(db, env)?;
-        let class = instance.to_meta_type(db, env);
-        let dunder = lookup_dunder(db, env, class, operator.dunder());
-
-        if dunder.place.is_undefined() {
-            if operator == ComparisonOperator::Inequality {
-                let equality = lookup_dunder(db, env, class, "__eq__");
-                // `tuple.__ne__` delegates to its builtin equality implementation.
-                if equality
-                    == lookup_dunder(
-                        db,
-                        env,
-                        KnownClass::Tuple.to_class_literal(db, env),
-                        "__eq__",
-                    )
-                {
-                    return Some(Self::Tuple);
-                }
-                if !equality.place.is_undefined() {
-                    return None;
-                }
-            }
-            return Some(Self::Object);
-        }
-
-        for (known_class, semantics) in [
-            (KnownClass::Int, Self::Int),
-            (KnownClass::Str, Self::Str),
-            (KnownClass::Bytes, Self::Bytes),
-            (KnownClass::Tuple, Self::Tuple),
-            (KnownClass::Dict, Self::Dict),
-        ] {
-            if same_member_implementation(
-                db,
-                dunder,
-                lookup_dunder(
-                    db,
-                    env,
-                    known_class.to_class_literal(db, env),
-                    operator.dunder(),
-                ),
-            ) {
-                return Some(semantics);
-            }
-        }
-        None
+        class_comparison_semantics(
+            db,
+            env.program(db),
+            instance.to_meta_type(db, env),
+            operator,
+        )
     }
+}
+
+/// Classify the implementation once per class so every enum member can reuse it.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+fn class_comparison_semantics<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    class: Type<'db>,
+    operator: ComparisonOperator,
+) -> Option<KnownComparisonSemantics> {
+    let env = &ProgramEnvironment::from_program(program);
+    let dunder = lookup_dunder(db, env, class, operator.dunder())?;
+
+    if dunder.place.is_undefined() {
+        return match operator {
+            ComparisonOperator::Equality => Some(KnownComparisonSemantics::Object),
+            // Typeshed omits `__ne__` for builtins like `list`, `tuple`, and `dict` whose
+            // inequality negates equality. Custom equality remains unknown.
+            ComparisonOperator::Inequality => {
+                class_comparison_semantics(db, program, class, ComparisonOperator::Equality)
+            }
+        };
+    }
+
+    for (known_class, semantics) in [
+        (KnownClass::Int, KnownComparisonSemantics::Int),
+        (KnownClass::Str, KnownComparisonSemantics::Str),
+        (KnownClass::Bytes, KnownComparisonSemantics::Bytes),
+        (KnownClass::Tuple, KnownComparisonSemantics::Tuple),
+        (KnownClass::List, KnownComparisonSemantics::List),
+        (KnownClass::Dict, KnownComparisonSemantics::Dict),
+    ] {
+        if same_member_implementation(
+            db,
+            dunder,
+            lookup_dunder(
+                db,
+                env,
+                known_class.to_class_literal(db, env),
+                operator.dunder(),
+            )?,
+        ) {
+            return Some(semantics);
+        }
+    }
+    None
 }
 
 /// Return whether equality on `ty` is reflexive and therefore rules out shared identity when false.
@@ -1955,14 +2115,6 @@ fn has_known_identity_comparison_semantics<'db>(
 ) -> bool {
     match ty {
         Type::FunctionLiteral(_) | Type::ModuleLiteral(_) => true,
-        Type::ClassLiteral(class) => {
-            KnownComparisonSemantics::of_instance(
-                db,
-                env,
-                class.metaclass_instance_type(db, env),
-                operator,
-            ) == Some(KnownComparisonSemantics::Object)
-        }
         _ => {
             ty.is_singleton(db, env)
                 && KnownComparisonSemantics::of_type(db, env, ty, operator)
@@ -1993,14 +2145,14 @@ fn same_member_implementation(
     }
 }
 
-/// Look up a comparison method without falling back to `object`.
+/// Look up a comparison method in the class's MRO, excluding `object`'s identity fallback.
 fn lookup_dunder<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     name: &'static str,
-) -> PlaceAndQualifiers<'db> {
-    ty.member_lookup_with_policy(db, env, name, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK)
+) -> Option<PlaceAndQualifiers<'db>> {
+    ty.find_name_in_mro_with_policy(db, env, name, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK)
 }
 
 /// Return the comparison result for two literals when their runtime values determine it.

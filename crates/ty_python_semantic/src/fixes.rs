@@ -130,17 +130,29 @@ where
             continue;
         };
 
+        // Match the path formatting used by `UnifiedFile::relative_path`.
+        let display_path = path
+            .strip_prefix(db.system().current_directory())
+            .unwrap_or(path);
+
+        if !diagnostics
+            .iter()
+            .any(|diagnostic| fix_mode.is_fixable(diagnostic))
+        {
+            tracing::debug!("Skipping file `{display_path}` without applicable fixes.");
+            continue;
+        }
+
         let python_file = db.program_file(file).python_file(db);
         let parsed = parsed_module(db, python_file);
         if parsed.load(db).has_syntax_errors() {
-            tracing::warn!("Skipping file `{path}` with syntax errors");
+            tracing::warn!("Skipping file `{display_path}` with syntax errors");
             continue;
         }
 
         let fixes = fix_mode.fixes(db, python_file, diagnostics);
 
         if fixes.is_empty() {
-            tracing::debug!("Skipping file `{path}` without applicable fixes.");
             continue;
         }
 
@@ -170,7 +182,7 @@ where
             } = apply_fixes(&staged_source, fixes);
 
             let fixed_source = staged_source.with_text(source, &source_map);
-            source_texts.set_unstaged(db, file.file, fixed_source.clone());
+            source_texts.set_unstaged(db, file.file, fixed_source);
 
             unstaged_fixes.push((file, applied_fixes));
         }
@@ -278,9 +290,10 @@ where
 
     // Stitch the remaining diagnostics back together.
     diagnostics.extend(by_file.into_values().flatten());
+    let resolver: &dyn ruff_db::Db = db;
     diagnostics.sort_by(|left, right| {
-        left.rendering_sort_key(db)
-            .cmp(&right.rendering_sort_key(db))
+        left.rendering_sort_key(&resolver)
+            .cmp(&right.rendering_sort_key(&resolver))
     });
 
     Ok(FixAllResults {
@@ -877,7 +890,7 @@ mod tests {
 
         ```py
         import sys
-        a = b + 10 + sys.veeersion  # ty: ignore[unresolved-attribute, unresolved-reference]
+        a = b + 10 + sys.veeersion  # ty: ignore[missing-attribute, unresolved-reference]
         ```
         ");
     }
@@ -1105,7 +1118,7 @@ class B(A):
             def test(
                 self,
                 b: str
-            ) -> A.b:  # ty: ignore[invalid-method-override, unresolved-attribute]
+            ) -> A.b:  # ty: ignore[incompatible-method-override, missing-attribute]
                 pass
         ```
         "#);
@@ -1138,10 +1151,10 @@ class B(A):
 
 
         class B(A):
-            def test(  # ty:ignore[unresolved-reference, invalid-method-override]
+            def test(  # ty:ignore[unresolved-reference, incompatible-method-override]
                 self,
                 b: str
-            ) -> A.b:  # ty: ignore[unresolved-attribute]
+            ) -> A.b:  # ty: ignore[missing-attribute]
                 pass
         ```
 
@@ -1151,7 +1164,7 @@ class B(A):
          --> test.py:7:28
           |
         6 | class B(A):
-        7 |     def test(  # ty:ignore[unresolved-reference, invalid-method-override]
+        7 |     def test(  # ty:ignore[unresolved-reference, incompatible-method-override]
           |                            ^^^^^^^^^^^^^^^^^^^^
         8 |         self,
         9 |         b: str
@@ -1159,8 +1172,8 @@ class B(A):
         help: Remove the unused suppression code
           |
         6 | class B(A):
-          -     def test(  # ty:ignore[unresolved-reference, invalid-method-override]
-        7 +     def test(  # ty:ignore[invalid-method-override]
+          -     def test(  # ty:ignore[unresolved-reference, incompatible-method-override]
+        7 +     def test(  # ty:ignore[incompatible-method-override]
         8 |         self,
           |
         "#);
@@ -1279,25 +1292,25 @@ class B(A):
 
         ```py
         seen_code = True
-        # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
+        # ty: ignore[unknown-rule-in-ignore-comment] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
         value = 1 / 0
         ```
 
         ## Diagnostics after applying fixes
 
         warning[unused-ignore-comment]: Unused `ty: ignore` directive
-         --> test.py:2:68
+         --> test.py:2:71
           |
         1 | seen_code = True
-        2 | # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
-          |                                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        2 | # ty: ignore[unknown-rule-in-ignore-comment] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
+          |                                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         3 | value = 1 / 0
           |
         help: Remove the unused suppression comment
           |
         1 | seen_code = True
-          - # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
-        2 + # ty: ignore[ignore-comment-unknown-rule] # ty: ignore[not-a-rule]
+          - # ty: ignore[unknown-rule-in-ignore-comment] # ty: ignore[not-a-rule] # ty: ignore[division-by-zero]
+        2 + # ty: ignore[unknown-rule-in-ignore-comment] # ty: ignore[not-a-rule]
         3 | value = 1 / 0
           |
         "

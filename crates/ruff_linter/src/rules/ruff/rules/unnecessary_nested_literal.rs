@@ -34,6 +34,8 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
+/// from typing import Literal
+///
 /// AllModes = Literal[
 ///     Literal["r", "r+"],
 ///     Literal["w", "w+", "wt", "w+t"],
@@ -44,6 +46,8 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// Use instead:
 /// ```python
+/// from typing import Literal
+///
 /// AllModes = Literal[
 ///     "r", "r+", "w", "w+", "wt", "w+t", "r+", "r+t", "a", "a+", "at", "a+t"
 /// ]

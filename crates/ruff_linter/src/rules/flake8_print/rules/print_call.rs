@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -105,9 +106,9 @@ impl Violation for Print {
 /// that are used beyond debugging purposes.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.57", category = Category::Restriction)]
-pub(crate) struct PPrint;
+pub(crate) struct Pprint;
 
-impl Violation for PPrint {
+impl Violation for Pprint {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -121,12 +122,8 @@ impl Violation for PPrint {
 }
 
 /// T201, T203
-pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall, qualified_name: &QualifiedName) {
     let semantic = checker.semantic();
-
-    let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) else {
-        return;
-    };
 
     let diagnostic = match qualified_name.segments() {
         ["" | "builtins", "print"] => {
@@ -143,7 +140,7 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
             if has_non_default_output_target(semantic, call, "stream") {
                 return;
             }
-            checker.report_diagnostic_if_enabled(PPrint, call.func.range())
+            checker.report_diagnostic_if_enabled(Pprint, call.func.range())
         }
         _ => return,
     };

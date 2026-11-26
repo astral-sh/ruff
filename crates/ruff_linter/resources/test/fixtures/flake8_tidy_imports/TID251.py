@@ -34,3 +34,9 @@ totally_not_typing.TypedDict
 
 # relative imports are respected
 from .typing import TypedDict
+
+# Only the implicit builtin matches the ban on .dict.fromkeys
+import builtins
+
+dict.fromkeys([])
+builtins.dict.fromkeys([])

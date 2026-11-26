@@ -3,6 +3,7 @@ use std::fmt::Formatter;
 use std::str::FromStr;
 
 use ruff_db::files::File;
+use ruff_db::system::SystemPathBuf;
 use ruff_python_ast::PythonVersion;
 use salsa::Database;
 use salsa::plumbing::AsId;
@@ -10,7 +11,7 @@ use salsa::plumbing::AsId;
 use crate::module_name::ModuleName;
 use crate::path::SearchPath;
 use crate::resolve;
-use crate::{Db, ResolverEnvironment};
+use crate::{Db, ModuleResolveMode, ResolverEnvironment};
 
 /// Representation of a Python module.
 #[derive(Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::SalsaValue)]
@@ -139,6 +140,19 @@ impl<'db> Module<'db> {
         }
     }
 
+    /// Returns the package's local directories in search order for the requested resolution mode.
+    ///
+    /// Returns `None` for a single-file module, a vendored module (whose package directories are
+    /// not available on the local file system), or when configured search paths select a different
+    /// module in this mode.
+    pub fn package_directories(
+        self,
+        db: &'db dyn Db,
+        mode: ModuleResolveMode,
+    ) -> Option<Vec<SystemPathBuf>> {
+        resolve::package_directories(db, self, mode)
+    }
+
     /// Returns resolved immediate submodules, including portions of namespace packages.
     ///
     /// Names are discovered only in directories whose path below their search root contains no
@@ -263,6 +277,8 @@ pub enum KnownModule {
     #[strum(serialize = "struct", serialize = "_struct")]
     Struct,
     // Third-party modules
+    Attr,
+    Attrs,
     #[strum(serialize = "django.db.models.base")]
     DjangoDbModelsBase,
     #[strum(serialize = "django.db.models.fields")]
@@ -328,6 +344,8 @@ impl KnownModule {
             Self::Templatelib => "string.templatelib",
             Self::Numbers => "numbers",
             Self::Struct => "struct",
+            Self::Attr => "attr",
+            Self::Attrs => "attrs",
             Self::DjangoDbModelsBase => "django.db.models.base",
             Self::DjangoDbModelsFields => "django.db.models.fields",
             Self::DjangoDbModelsFieldsRelated => "django.db.models.fields.related",
@@ -365,7 +383,9 @@ impl KnownModule {
     /// Return `true` if this module is provided by a supported third-party package.
     pub const fn is_third_party(self) -> bool {
         match self {
-            Self::DjangoDbModelsBase
+            Self::Attr
+            | Self::Attrs
+            | Self::DjangoDbModelsBase
             | Self::DjangoDbModelsFields
             | Self::DjangoDbModelsFieldsRelated
             | Self::PydanticConfig

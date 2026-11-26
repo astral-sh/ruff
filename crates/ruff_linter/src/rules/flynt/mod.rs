@@ -13,7 +13,7 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
 
-    #[test_case(Rule::StaticJoinToFString, Path::new("FLY002.py"))]
+    #[test_case(Rule::UnnecessaryStrJoin, Path::new("FLY002.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(

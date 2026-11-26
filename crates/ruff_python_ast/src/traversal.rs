@@ -1,4 +1,6 @@
 //! Utilities for manually traversing a Python AST.
+use ruff_text_size::Ranged;
+
 use crate::{self as ast, AnyNodeRef, ExceptHandler, Stmt};
 
 /// Given a [`Stmt`] and its parent, return the [`ast::Suite`] that contains the [`Stmt`].
@@ -59,9 +61,15 @@ pub struct EnclosingSuite<'a> {
 
 impl<'a> EnclosingSuite<'a> {
     pub fn new(suite: &'a [Stmt], stmt: AnyNodeRef<'a>) -> Option<Self> {
-        let position = suite
+        // Statements are in source order. Check identity among statements at the same
+        // offset: error recovery can produce nodes with empty ranges.
+        let start = stmt.start();
+        let first = suite.partition_point(|sibling| sibling.start() < start);
+        let offset = suite[first..]
             .iter()
+            .take_while(|sibling| sibling.start() == start)
             .position(|sibling| AnyNodeRef::ptr_eq(sibling.into(), stmt))?;
+        let position = first + offset;
 
         Some(EnclosingSuite { suite, position })
     }
@@ -84,5 +92,27 @@ impl std::ops::Deref for EnclosingSuite<'_> {
 
     fn deref(&self) -> &Self::Target {
         self.suite
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_text_size::TextRange;
+
+    use super::EnclosingSuite;
+    use crate::{AtomicNodeIndex, Stmt, StmtPass};
+
+    #[test]
+    fn statements_with_identical_ranges_are_matched_by_identity() {
+        let stmt = Stmt::Pass(StmtPass {
+            node_index: AtomicNodeIndex::NONE,
+            range: TextRange::empty(4.into()),
+        });
+        let body = [stmt.clone(), stmt];
+
+        for (position, stmt) in body.iter().enumerate() {
+            let suite = EnclosingSuite::new(&body, stmt.into()).unwrap();
+            assert_eq!(suite.position, position);
+        }
     }
 }

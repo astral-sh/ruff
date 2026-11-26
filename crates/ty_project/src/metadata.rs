@@ -5,7 +5,7 @@ use ruff_db::files::FileRootKind;
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_ranged_value::ValueSource;
+use ruff_ranged_value::{RangedValue, ValueSource};
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
@@ -15,12 +15,12 @@ use ty_python_semantic::PythonEnvironment;
 use crate::Db;
 use crate::metadata::options::{
     EnvironmentOptions, OptionDiagnostic, OptionsContext, ProgramSettingsDiagnostic,
-    ToProgramSettingsError, ToSettingsError,
+    ProjectManager, ToProgramSettingsError, ToSettingsError,
 };
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::settings::Settings;
 use crate::metadata::value::RelativePathBuf;
-use crate::uv::{self, UseUv, UvWorkspace};
+use crate::uv::{self, UvWorkspace};
 pub use options::Options;
 use options::TyTomlError;
 mod configuration_file;
@@ -68,9 +68,6 @@ pub struct ProjectMetadata {
 
     #[cfg_attr(test, serde(skip))]
     uv_workspace: UvWorkspace,
-
-    #[cfg_attr(test, serde(skip))]
-    use_uv: UseUv,
 }
 
 impl ProjectMetadata {
@@ -86,7 +83,6 @@ impl ProjectMetadata {
             user_configuration: None,
             fallback_options: None,
             uv_workspace: UvWorkspace::default(),
-            use_uv: UseUv::Off,
         }
     }
 
@@ -117,7 +113,6 @@ impl ProjectMetadata {
             user_configuration: None,
             fallback_options: None,
             uv_workspace: UvWorkspace::default(),
-            use_uv: UseUv::from_system(system),
         })
     }
 
@@ -172,7 +167,6 @@ impl ProjectMetadata {
             user_configuration: None,
             fallback_options: None,
             uv_workspace: UvWorkspace::default(),
-            use_uv: UseUv::Off,
         })
     }
 
@@ -191,7 +185,6 @@ impl ProjectMetadata {
             return Err(ProjectMetadataError::NotADirectory(path.to_path_buf()));
         }
 
-        let use_uv = UseUv::from_system(system);
         let mut closest_project = None;
         for project_root in path.ancestors() {
             let Some(metadata) = Self::discover_in(project_root, system)? else {
@@ -200,7 +193,7 @@ impl ProjectMetadata {
 
             if matches!(metadata.configuration_source, ConfigurationSource::Ty) {
                 tracing::debug!("Found project at '{}'", project_root);
-                return Ok(metadata.with_use_uv(use_uv));
+                return Ok(metadata);
             }
 
             if closest_project.is_none() {
@@ -220,10 +213,10 @@ impl ProjectMetadata {
             );
             Self::new(path.file_name().unwrap_or("root"), path.to_path_buf())
         };
-        Ok(metadata.with_use_uv(use_uv))
+        Ok(metadata)
     }
 
-    /// Applies a previously obtained uv workspace without invoking uv or checking [`Self::use_uv`].
+    /// Applies a previously obtained uv workspace without invoking uv or checking [`Self::project_uses_uv`].
     ///
     /// An explicit ty configuration keeps its root; otherwise uv's workspace root supplies
     /// the project configuration. Already applied option layers are preserved.
@@ -348,13 +341,6 @@ impl ProjectMetadata {
         Ok(Some(metadata))
     }
 
-    /// Overrides which uv integrations are enabled for this project.
-    #[must_use]
-    pub fn with_use_uv(mut self, use_uv: UseUv) -> Self {
-        self.use_uv = use_uv;
-        self
-    }
-
     /// Rediscovers the project from `path`, while preserving applied options.
     pub(crate) fn rediscover(
         &self,
@@ -369,11 +355,18 @@ impl ProjectMetadata {
         };
 
         metadata.apply_uv_workspace(system, workspace)?;
-        Ok(metadata.with_applied_options_from(self))
+        let mut metadata = metadata.with_applied_options_from(self);
+        if let Err(error) = metadata.apply_configuration_files(system) {
+            let error = anyhow::Error::new(error);
+            tracing::error!(
+                "Failed to apply configuration files, \
+                 continuing without applying them: {error:#}"
+            );
+        }
+        Ok(metadata)
     }
 
     fn with_applied_options_from(mut self, previous: &Self) -> Self {
-        self.use_uv = previous.use_uv;
         self.override_options.clone_from(&previous.override_options);
         self.fallback_options.clone_from(&previous.fallback_options);
         self.user_configuration
@@ -389,9 +382,16 @@ impl ProjectMetadata {
         self.name.as_str()
     }
 
-    /// Returns which uv integrations are enabled for this project.
-    pub const fn use_uv(&self) -> UseUv {
-        self.use_uv
+    /// Whether ty should query uv for workspace metadata.
+    pub fn project_uses_uv(&self) -> bool {
+        self.options_in_precedence_order(&self.options, None)
+            .find_map(Options::project_uses_uv)
+            .unwrap_or(false)
+    }
+
+    /// The `project-manager.script` override that takes precedence over inline and project settings.
+    pub fn script_uv_override(&self) -> Option<bool> {
+        self.override_options()?.script_uses_uv()
     }
 
     pub(crate) fn options(&self) -> &Options {
@@ -433,6 +433,15 @@ impl ProjectMetadata {
     /// Sets the highest-precedence options for this project, replacing any previous overrides.
     pub fn set_override_options(&mut self, options: Options) {
         self.override_options = Some(Box::new(options));
+    }
+
+    /// Overrides the project manager without changing any other explicit overrides.
+    pub fn override_project_manager(&mut self, manager: RangedValue<ProjectManager>) {
+        self.override_options
+            .get_or_insert_default()
+            .project_manager
+            .get_or_insert_default()
+            .project = Some(manager);
     }
 
     pub(crate) fn uv_workspace(&self) -> &UvWorkspace {
@@ -522,6 +531,12 @@ impl ProjectMetadata {
         Ok(())
     }
 
+    fn lint_options(&self, db: &dyn Db) -> Vec<OptionDiagnostic> {
+        self.options_in_precedence_order(&self.options, self.uv_workspace_options.as_deref())
+            .flat_map(|options| options.lint_unmerged(db))
+            .collect()
+    }
+
     /// Returns all option layers merged according to their precedence.
     pub fn to_merged_options(&self) -> MergedOptions<'_> {
         let mut options = Options::default();
@@ -597,8 +612,14 @@ impl MergedOptions<'_> {
         db: &dyn Db,
         strategy: &Strategy,
     ) -> Result<(Settings, Vec<OptionDiagnostic>), Strategy::Error<ToSettingsError>> {
-        self.options
-            .to_settings(db, OptionsContext::Project(self.metadata.root()), strategy)
+        let lint_diagnostics = self.metadata.lint_options(db);
+        let (settings, mut diagnostics) = self.options.to_settings(
+            db,
+            OptionsContext::Project(self.metadata.root()),
+            strategy,
+        )?;
+        diagnostics.extend(lint_diagnostics);
+        Ok((settings, diagnostics))
     }
 }
 
@@ -655,7 +676,7 @@ mod tests {
     use anyhow::{Context, anyhow};
     use insta::assert_ron_snapshot;
     use ruff_db::Db as _;
-    use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
+    use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity, SubDiagnosticSeverity};
     use ruff_db::files::File;
     #[cfg(unix)]
     use ruff_db::system::{OsSystem, System, SystemPath, WritableSystem};
@@ -1152,8 +1173,12 @@ unclosed table, expected `]`
 
         let diagnostics = db.project().check_settings(&db);
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::ProjectManager);
         assert_eq!(diagnostics[0].severity(), Severity::Warning);
+        assert_eq!(
+            diagnostics[0].sub_diagnostics()[0].severity(),
+            SubDiagnosticSeverity::Error
+        );
         assert_eq!(
             diagnostics[0].concise_message().to_string(),
             "Failed to load uv dependency metadata: uv did not provide a Python environment"
@@ -1476,7 +1501,7 @@ unclosed table, expected `]`
         system.memory_file_system().create_directory_all(&root)?;
         let mut workspace = uv_workspace(&root, &system)?;
         workspace.error = Some(Diagnostic::new(
-            DiagnosticId::UvMetadata,
+            DiagnosticId::ProjectManager,
             Severity::Warning,
             "uv metadata refresh failed",
         ));
@@ -1492,7 +1517,7 @@ unclosed table, expected `]`
         assert!(project.metadata(&db).uv_workspace_metadata().is_some());
         let diagnostics = project.check_settings(&db);
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::ProjectManager);
         assert_eq!(diagnostics[0].severity(), Severity::Warning);
         assert_eq!(
             diagnostics[0].concise_message().to_string(),

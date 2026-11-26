@@ -84,7 +84,7 @@ impl<'db> Bindings<'db> {
                             .parameters
                             .iter()
                             .find(|parameter| parameter.index == parameter_index)?;
-                        argument.matched_type(None, parameter.argument_type)
+                        argument.default_matched_type(parameter.argument_type)
                     })
                     .filter(|ty| !ty.is_none(db))
             };

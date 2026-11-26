@@ -171,6 +171,7 @@ pub enum KnownClass {
     PydanticBaseModel,
     PydanticBaseSettings,
     PydanticConfigDict,
+    PydanticSettingsConfigDict,
     PydanticRootModel,
     PydanticStrict,
     // Pytest
@@ -300,6 +301,7 @@ impl KnownClass {
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
+            | Self::PydanticSettingsConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestParametrizeMarkDecorator => false,
@@ -441,6 +443,7 @@ impl KnownClass {
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
+            | Self::PydanticSettingsConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestParametrizeMarkDecorator => Some(Truthiness::Ambiguous),
@@ -452,6 +455,13 @@ impl KnownClass {
 
             Self::Tuple => None,
         }
+    }
+
+    pub(in crate::types) const fn is_builtin_enum_base(self) -> bool {
+        matches!(
+            self,
+            Self::Enum | Self::IntEnum | Self::StrEnum | Self::Flag | Self::IntFlag
+        )
     }
 
     /// Return `true` if this class is a subclass of `enum.Enum` *and* has enum members, i.e.
@@ -572,6 +582,7 @@ impl KnownClass {
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticSettingsConfigDict
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
             | KnownClass::PytestParametrizeMarkDecorator => false,
@@ -698,7 +709,7 @@ impl KnownClass {
             | KnownClass::PydanticStrict
             | KnownClass::PytestParametrizeMarkDecorator => false,
 
-            KnownClass::PydanticConfigDict => true,
+            KnownClass::PydanticConfigDict | KnownClass::PydanticSettingsConfigDict => true,
         }
     }
 
@@ -818,6 +829,7 @@ impl KnownClass {
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticSettingsConfigDict
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
             | KnownClass::PytestParametrizeMarkDecorator => false,
@@ -953,6 +965,7 @@ impl KnownClass {
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
+            | Self::PydanticSettingsConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestParametrizeMarkDecorator => false,
@@ -1077,6 +1090,7 @@ impl KnownClass {
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticSettingsConfigDict
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
             | KnownClass::PytestParametrizeMarkDecorator => false,
@@ -1213,6 +1227,7 @@ impl KnownClass {
             Self::PydanticBaseModel => "BaseModel",
             Self::PydanticBaseSettings => "BaseSettings",
             Self::PydanticConfigDict => "ConfigDict",
+            Self::PydanticSettingsConfigDict => "SettingsConfigDict",
             Self::PydanticRootModel => "RootModel",
             Self::PydanticStrict => "Strict",
             Self::PytestParametrizeMarkDecorator => "_ParametrizeMarkDecorator",
@@ -1245,7 +1260,7 @@ impl KnownClass {
 
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_initial=|_, id, _, _| Type::divergent(id),
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, argument: KnownClassArgument<'db>| {
                 let env = ProgramEnvironment::from_program(argument.program(db));
                 result.cycle_normalized(db, &env, *previous, cycle)
@@ -1379,7 +1394,7 @@ impl KnownClass {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Result<Option<StaticClassLiteral<'db>>, KnownClassLookupError<'db>> {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
         fn known_class_to_class_literal<'db>(
             db: &'db dyn Db,
             argument: KnownClassArgument<'db>,
@@ -1634,8 +1649,8 @@ impl KnownClass {
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
-            Self::NamedTupleLike => KnownModule::TyExtensions,
-            Self::ConstraintSet
+            Self::NamedTupleLike
+            | Self::ConstraintSet
             | Self::ConstraintSetSolution
             | Self::GenericContext
             | Self::Specialization
@@ -1651,7 +1666,9 @@ impl KnownClass {
             Self::DjangoField | Self::DjangoDateField => KnownModule::DjangoDbModelsFields,
             Self::DjangoForeignKey => KnownModule::DjangoDbModelsFieldsRelated,
             Self::PydanticBaseModel => KnownModule::PydanticMain,
-            Self::PydanticBaseSettings => KnownModule::PydanticSettingsMain,
+            Self::PydanticBaseSettings | Self::PydanticSettingsConfigDict => {
+                KnownModule::PydanticSettingsMain
+            }
             Self::PydanticConfigDict => KnownModule::PydanticConfig,
             Self::PydanticRootModel => KnownModule::PydanticRootModel,
             Self::PydanticStrict => KnownModule::PydanticTypes,
@@ -1779,6 +1796,7 @@ impl KnownClass {
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
+            | Self::PydanticSettingsConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestParametrizeMarkDecorator => false,
@@ -1901,6 +1919,7 @@ impl KnownClass {
             "BaseModel" => &[Self::PydanticBaseModel],
             "BaseSettings" => &[Self::PydanticBaseSettings],
             "ConfigDict" => &[Self::PydanticConfigDict],
+            "SettingsConfigDict" => &[Self::PydanticSettingsConfigDict],
             "RootModel" => &[Self::PydanticRootModel],
             "Strict" => &[Self::PydanticStrict],
             "_ParametrizeMarkDecorator" => &[Self::PytestParametrizeMarkDecorator],
@@ -2015,6 +2034,7 @@ impl KnownClass {
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
+            | Self::PydanticSettingsConfigDict
             | Self::PydanticRootModel
             | Self::PydanticStrict
             | Self::PytestParametrizeMarkDecorator => {

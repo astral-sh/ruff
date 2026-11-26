@@ -1,4 +1,4 @@
-use itertools::Either;
+use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
@@ -18,7 +18,6 @@ use crate::types::diagnostic::{
     report_invalid_concatenate_last_arg, report_missing_type_arguments,
     report_unsupported_binary_operation,
 };
-use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::legacy_type_alias::non_alias_assignment;
 use crate::types::infer::{
     CyclicTypeAliasError, InferenceFlags, LegacyTypeAliasInference, TypeExpressionFlags,
@@ -551,7 +550,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ast::Operator::BitOr => {
                         let left = self.infer_type_expression(&binary.left);
                         let right = self.infer_type_expression(&binary.right);
-                        UnionType::from_elements_leave_aliases(db, env, [left, right])
+                        UnionType::from_two_elements_leave_aliases(db, env, left, right)
                     }
                     ast::Operator::BitAnd => {
                         if let Some(builder) =
@@ -1327,10 +1326,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             None
         };
         InferredUnionOperand {
-            annotation: UnionType::from_elements_leave_aliases(
+            annotation: UnionType::from_two_elements_leave_aliases(
                 db,
                 env,
-                [left.annotation, right.annotation],
+                left.annotation,
+                right.annotation,
             ),
             runtime_value,
         }
@@ -1509,12 +1509,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         value_ty: Type<'db>,
         definition: Option<Definition<'db>>,
     ) -> Type<'db> {
+        let db = self.db();
         let alias_reference =
             self.legacy_type_alias_reference(value_ty, definition, &subscript.value);
         if let LegacyTypeAliasReference::Alias(alias, parameters) = alias_reference
             && (parameters.is_some() || !alias.is_dynamic())
         {
-            let db = self.db();
             return self.infer_explicit_callable_specialization(
                 subscript,
                 alias,
@@ -1534,13 +1534,28 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             return Type::unknown();
         }
+        // In annotations, the builtin classes `type` and `tuple` share their subscript
+        // handlers with `typing.Type` and `typing.Tuple`. Use the special forms as
+        // dispatch keys so each equivalent pair of bindings is checked once.
+        let annotation_operand =
+            |ty: Type<'db>| match ty.as_class_literal().and_then(|class| class.known(db)) {
+                Some(KnownClass::Type) => Type::SpecialForm(SpecialFormType::Type),
+                Some(KnownClass::Tuple) => Type::SpecialForm(SpecialFormType::Tuple),
+                _ => ty,
+            };
         match value_ty {
-            Type::ClassLiteral(class_literal) => match class_literal.known(self.db()) {
-                Some(KnownClass::Tuple) => Type::tuple(self.infer_tuple_type_expression(subscript)),
-                Some(KnownClass::Type) => self.infer_subclass_of_type_expression(slice),
-                _ => self.infer_subscript_type_expression(subscript, value_ty),
-            },
-            _ => self.infer_subscript_type_expression(subscript, value_ty),
+            Type::Union(union) => {
+                // Deduplicate by dispatch key. Rebuilding the union could discard a valid
+                // operand based on the runtime type of its special form.
+                let operands = union
+                    .elements(db)
+                    .iter()
+                    .copied()
+                    .map(annotation_operand)
+                    .unique();
+                self.infer_union_subscript_type_expression(subscript, union, operands)
+            }
+            _ => self.infer_subscript_type_expression(subscript, annotation_operand(value_ty)),
         }
     }
 
@@ -2335,25 +2350,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // For stringified TypeAlias; remove once properly supported
                 todo_type!("string literal subscripted in type expression")
             }
-            Type::Union(union) => {
-                let db = self.db();
-                let mut union_builder = UnionBuilder::new(db, env)
-                    .or_recursively_defined(union.recursively_defined(db));
-
-                for (index, element) in union.elements(db).iter().enumerate() {
-                    let mut speculative_builder = self.speculate();
-                    let subscript_ty =
-                        speculative_builder.infer_subscript_type_expression(subscript, *element);
-                    if index == 0 {
-                        self.extend(speculative_builder);
-                    } else {
-                        self.context.extend(&speculative_builder.context.finish());
-                    }
-                    union_builder = union_builder.add(subscript_ty);
-                }
-
-                union_builder.build()
-            }
+            Type::Union(union) => self.infer_union_subscript_type_expression(
+                subscript,
+                union,
+                union.elements(db).iter().copied(),
+            ),
             _ => {
                 if !self.in_string_annotation() {
                     self.infer_expression(slice, TypeContext::default());
@@ -2368,6 +2369,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
         }
+    }
+
+    fn infer_union_subscript_type_expression(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        union: UnionType<'db>,
+        operands: impl Iterator<Item = Type<'db>>,
+    ) -> Type<'db> {
+        let db = self.db();
+        let mut union_builder = UnionBuilder::new(db, self.program_environment())
+            .or_recursively_defined(union.recursively_defined(db));
+
+        for (index, operand) in operands.enumerate() {
+            let mut speculative_builder = self.speculate();
+            let subscript_ty =
+                speculative_builder.infer_subscript_type_expression(subscript, operand);
+            if index == 0 {
+                self.extend(speculative_builder);
+            } else {
+                self.context.extend(&speculative_builder.context.finish());
+            }
+            union_builder = union_builder.add(subscript_ty);
+        }
+
+        union_builder.build()
     }
 
     fn infer_parameterized_legacy_typing_alias(
@@ -2547,9 +2573,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             SpecialFormType::Annotated => self
                 .parse_subscription_of_annotated_special_form(
                     subscript,
-                    AnnotatedExprContext::TypeExpression,
+                    Self::infer_type_expression,
                 )
-                .map_or(Type::unknown(), |inferred| inferred.inner_type()),
+                .unwrap_or_else(Type::unknown),
             SpecialFormType::Literal => match self.infer_literal_parameter_type(arguments_slice) {
                 Ok(ty) => ty,
                 Err(nodes) => {
@@ -2568,7 +2594,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
             SpecialFormType::Optional => {
                 let param_type = self.infer_type_expression(arguments_slice);
-                UnionType::from_elements_leave_aliases(db, env, [param_type, Type::none(db, env)])
+                UnionType::from_two_elements_leave_aliases(db, env, param_type, Type::none(db, env))
             }
             SpecialFormType::Union => {
                 // TODO: Support the union of a `TypeVarTuple`'s elements. Until then, reject

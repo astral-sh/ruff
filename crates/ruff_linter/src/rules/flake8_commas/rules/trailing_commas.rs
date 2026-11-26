@@ -237,9 +237,9 @@ impl Violation for TrailingCommaOnBareTuple {
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.223", category = Category::Formatting)]
-pub(crate) struct ProhibitedTrailingComma;
+pub(crate) struct UnnecessaryTrailingComma;
 
-impl AlwaysFixableViolation for ProhibitedTrailingComma {
+impl AlwaysFixableViolation for UnnecessaryTrailingComma {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Trailing comma prohibited".to_string()
@@ -367,7 +367,7 @@ fn check_token(
 
     if comma_prohibited {
         if let Some(mut diagnostic) =
-            lint_context.report_diagnostic_if_enabled(ProhibitedTrailingComma, prev.range())
+            lint_context.report_diagnostic_if_enabled(UnnecessaryTrailingComma, prev.range())
         {
             diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(prev.range)));
             return;

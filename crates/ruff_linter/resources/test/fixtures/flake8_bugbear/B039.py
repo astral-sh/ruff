@@ -38,3 +38,7 @@ ContextVar("cv", default=time.time())
 
 def baz(): ...
 ContextVar("cv", default=baz())
+
+
+ContextVar("cv", default=frozendict())
+ContextVar("cv", default=frozendict.fromkeys(""))

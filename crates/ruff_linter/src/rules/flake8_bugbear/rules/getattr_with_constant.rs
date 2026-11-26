@@ -53,9 +53,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: `getattr`](https://docs.python.org/3/library/functions.html#getattr)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.110", category = Category::Complexity)]
-pub(crate) struct GetAttrWithConstant;
+pub(crate) struct GetattrWithConstant;
 
-impl AlwaysFixableViolation for GetAttrWithConstant {
+impl AlwaysFixableViolation for GetattrWithConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Do not call `getattr` with a constant attribute value. It is not any safer than \
@@ -96,7 +96,7 @@ pub(crate) fn getattr_with_constant(checker: &Checker, expr: &Expr, func: &Expr,
     let has_comments = checker.comment_ranges().intersects(expr.range());
     let is_unsafe = attr_name.nfkc().collect::<String>() != attr_name || has_comments;
 
-    let mut diagnostic = checker.report_diagnostic(GetAttrWithConstant, expr.range());
+    let mut diagnostic = checker.report_diagnostic(GetattrWithConstant, expr.range());
     let edit = Edit::range_replacement(
         pad(
             if matches!(

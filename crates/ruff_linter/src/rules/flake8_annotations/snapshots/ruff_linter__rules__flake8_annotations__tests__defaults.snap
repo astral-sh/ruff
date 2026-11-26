@@ -18,7 +18,7 @@ help: Add return type annotation: `None`
   |
 note: This is an unsafe fix and may change runtime behavior
 
-ANN001 Missing type annotation for function argument `a`
+ANN001 Missing type annotation for function parameter `a`
  --> annotation_presence.py:5:9
   |
 4 | # Error
@@ -27,7 +27,7 @@ ANN001 Missing type annotation for function argument `a`
 6 |     pass
   |
 
-ANN001 Missing type annotation for function argument `b`
+ANN001 Missing type annotation for function parameter `b`
  --> annotation_presence.py:5:12
   |
 4 | # Error
@@ -53,7 +53,7 @@ help: Add return type annotation: `None`
    |
 note: This is an unsafe fix and may change runtime behavior
 
-ANN001 Missing type annotation for function argument `b`
+ANN001 Missing type annotation for function parameter `b`
   --> annotation_presence.py:10:17
    |
  9 | # Error
@@ -62,7 +62,7 @@ ANN001 Missing type annotation for function argument `b`
 11 |     pass
    |
 
-ANN001 Missing type annotation for function argument `b`
+ANN001 Missing type annotation for function parameter `b`
   --> annotation_presence.py:15:17
    |
 14 | # Error

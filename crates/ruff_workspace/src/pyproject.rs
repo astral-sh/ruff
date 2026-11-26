@@ -18,8 +18,8 @@ use ruff_python_ast::PythonVersion;
 use crate::options::{Options, validate_required_version};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-struct Tools {
-    ruff: Option<Options>,
+pub(super) struct Tools {
+    pub(super) ruff: Option<Options>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -116,7 +116,7 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
     Ok(None)
 }
 
-fn check_required_version(value: &toml::de::DeTable, table_path: &[&str]) -> Result<()> {
+pub(super) fn check_required_version(value: &toml::de::DeTable, table_path: &[&str]) -> Result<()> {
     let mut current = value;
     for key in table_path {
         let Some(next) = current.get(*key) else {

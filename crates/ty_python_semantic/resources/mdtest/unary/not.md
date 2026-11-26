@@ -50,7 +50,7 @@ from typing import Any
 def _(value: Any) -> None:
     result = not value
     reveal_type(result)  # revealed: bool
-    result.nonexistent()  # error: [unresolved-attribute] "Object of type `bool` has no attribute `nonexistent`"
+    result.nonexistent()  # error: [missing-attribute] "Object of type `bool` has no attribute `nonexistent`"
 ```
 
 ## Union

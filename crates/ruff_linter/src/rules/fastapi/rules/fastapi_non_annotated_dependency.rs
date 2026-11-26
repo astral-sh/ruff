@@ -2,7 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::Modules;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
@@ -114,40 +114,21 @@ pub(crate) fn fastapi_non_annotated_dependency(
         return;
     }
 
-    // `create_diagnostic` needs to know if a default argument has been seen to
-    // avoid emitting fixes that would remove defaults and cause a syntax error.
-    let mut seen_default = false;
-
-    for parameter in function_def
-        .parameters
-        .args
+    // Only remove a positional default if all earlier positional parameters are already required.
+    // A `noqa` or a conflicting edit can prevent an earlier fix from removing its default.
+    let parameters = &function_def.parameters;
+    let mut seen_default = parameters
+        .posonlyargs
         .iter()
-        .chain(&function_def.parameters.kwonlyargs)
-    {
-        let (Some(annotation), Some(default)) = (parameter.annotation(), parameter.default())
-        else {
-            seen_default |= parameter.default.is_some();
-            continue;
-        };
+        .any(|parameter| parameter.default.is_some());
+    for parameter in &parameters.args {
+        check_parameter(checker, parameter, seen_default);
+        seen_default |= parameter.default.is_some();
+    }
 
-        if let Some(dependency) = is_fastapi_dependency(checker, default) {
-            let dependency_call = DependencyCall::from_expression(default);
-            let dependency_parameter = DependencyParameter {
-                annotation,
-                default,
-                kind: dependency,
-                name: parameter.name(),
-                range: parameter.range,
-            };
-            seen_default = create_diagnostic(
-                checker,
-                &dependency_parameter,
-                dependency_call,
-                seen_default,
-            );
-        } else {
-            seen_default |= parameter.default.is_some();
-        }
+    // Keyword-only parameters can be required after a parameter with a default.
+    for parameter in &parameters.kwonlyargs {
+        check_parameter(checker, parameter, false);
     }
 }
 
@@ -185,14 +166,6 @@ enum FastApiDependency {
     Security,
 }
 
-struct DependencyParameter<'a> {
-    annotation: &'a ast::Expr,
-    default: &'a ast::Expr,
-    range: TextRange,
-    name: &'a str,
-    kind: FastApiDependency,
-}
-
 struct DependencyCall<'a> {
     default_argument: ast::ArgOrKeyword<'a>,
     keyword_arguments: Vec<&'a ast::Keyword>,
@@ -216,33 +189,15 @@ impl<'a> DependencyCall<'a> {
     }
 }
 
-/// Create a [`Diagnostic`] for `parameter` and return an updated value of `seen_default`.
-///
-/// While all of the *input* `parameter` values have default values (see the `needs_update` match in
-/// [`fastapi_non_annotated_dependency`]), some of the fixes remove default values. For example,
-///
-/// ```python
-/// def handler(some_path_param: str = Path()): pass
-/// ```
-///
-/// Gets fixed to
-///
-/// ```python
-/// def handler(some_path_param: Annotated[str, Path()]): pass
-/// ```
-///
-/// Causing it to lose its default value. That's fine in this example but causes a syntax error if
-/// `some_path_param` comes after another argument with a default. We only compute the information
-/// necessary to determine this while generating the fix, thus the need to return an updated
-/// `seen_default` here.
-fn create_diagnostic(
-    checker: &Checker,
-    parameter: &DependencyParameter,
-    dependency_call: Option<DependencyCall>,
-    mut seen_default: bool,
-) -> bool {
+fn check_parameter(checker: &Checker, parameter: &ast::ParameterWithDefault, seen_default: bool) {
+    let (Some(annotation), Some(default)) = (parameter.annotation(), parameter.default()) else {
+        return;
+    };
+    let Some(kind) = is_fastapi_dependency(checker, default) else {
+        return;
+    };
     let Some(importer) = checker.typing_importer("Annotated", PythonVersion::PY39) else {
-        return seen_default;
+        return;
     };
 
     let mut diagnostic = checker.report_diagnostic(
@@ -252,6 +207,7 @@ fn create_diagnostic(
         parameter.range,
     );
 
+    let dependency_call = DependencyCall::from_expression(default);
     let try_generate_fix = || {
         let (import_edit, binding) = importer.import(parameter.range.start())?;
 
@@ -264,7 +220,7 @@ fn create_diagnostic(
         // Annotated[str, Query()] = ""` for example, but Depends and
         // Security need to stay like `Annotated[str, Depends(callable)]`
         let is_route_param = !matches!(
-            parameter.kind,
+            kind,
             FastApiDependency::Depends | FastApiDependency::Security
         );
 
@@ -293,18 +249,11 @@ fn create_diagnostic(
                     return Ok(None);
                 }
 
-                if !is_default_argument_ellipsis {
-                    // For actual default values, mark that we've seen a default
-                    seen_default = true;
-                }
-
                 let base_format = format!(
                     "{parameter_name}: {binding}[{annotation}, {default_}({kwarg_list})]",
-                    parameter_name = parameter.name,
-                    annotation = checker.locator().slice(parameter.annotation.range()),
-                    default_ = checker
-                        .locator()
-                        .slice(map_callable(parameter.default).range()),
+                    parameter_name = parameter.name(),
+                    annotation = checker.locator().slice(annotation.range()),
+                    default_ = checker.locator().slice(map_callable(default).range()),
                 );
 
                 if is_default_argument_ellipsis {
@@ -330,9 +279,9 @@ fn create_diagnostic(
                 }
                 format!(
                     "{parameter_name}: {binding}[{annotation}, {default_}]",
-                    parameter_name = parameter.name,
-                    annotation = checker.locator().slice(parameter.annotation.range()),
-                    default_ = checker.locator().slice(parameter.default.range())
+                    parameter_name = parameter.name(),
+                    annotation = checker.locator().slice(annotation.range()),
+                    default_ = checker.locator().slice(default.range())
                 )
             }
         };
@@ -340,14 +289,6 @@ fn create_diagnostic(
         Ok(Some(Fix::unsafe_edits(import_edit, [parameter_edit])))
     };
 
-    // make sure we set `seen_default` if we bail out of `try_generate_fix` early. we could
-    // `match` on the result directly, but still calling `try_set_optional_fix` avoids
-    // duplicating the debug logging here
     let fix: anyhow::Result<Option<Fix>> = try_generate_fix();
-    if fix.is_err() {
-        seen_default = true;
-    }
     diagnostic.try_set_optional_fix(|| fix);
-
-    seen_default
 }

@@ -35,7 +35,7 @@ class Point:
     x: int
     y: int
 
-reveal_type(Point.__replace__)  # revealed: (self: Point, *, x: int = ..., y: int = ...) -> Point
+reveal_type(Point.__replace__)  # revealed: (self: Point, /, *, x: int = ..., y: int = ...) -> Point
 ```
 
 The `__replace__` method can either be called directly or through the `replace` function:
@@ -69,6 +69,26 @@ e = a.__replace__(x="wrong")  # error: [invalid-argument-type]
 e = replace(a, x="wrong")
 ```
 
+### Dataclass fields named `self`
+
+The receiver of `__replace__` is positional-only, so a keyword argument named `self` replaces the
+field:
+
+```py
+from dataclasses import dataclass
+from copy import replace
+
+@dataclass
+class Record:
+    self: int
+
+record = Record(self=1)
+reveal_type(record.__replace__(self=2))  # revealed: Record
+reveal_type(replace(record, self=2))  # revealed: Record
+record.__replace__(self="wrong")  # error: [invalid-argument-type]
+replace(record, self="wrong")  # error: [invalid-argument-type]
+```
+
 ### Dataclass transforms
 
 Classes transformed through a base class or metaclass also support the `__replace__` protocol.
@@ -83,7 +103,7 @@ class ModelBase: ...
 class BaseModel(ModelBase):
     value: int
 
-# revealed: (self: BaseModel, *, value: int = ...) -> BaseModel
+# revealed: (self: BaseModel, /, *, value: int = ...) -> BaseModel
 reveal_type(BaseModel.__replace__)
 
 base_model = BaseModel(value=1)
@@ -96,7 +116,7 @@ class ModelMetaclass(type): ...
 class MetaclassModel(metaclass=ModelMetaclass):
     value: int
 
-# revealed: (self: MetaclassModel, *, value: int = ...) -> MetaclassModel
+# revealed: (self: MetaclassModel, /, *, value: int = ...) -> MetaclassModel
 reveal_type(MetaclassModel.__replace__)
 
 metaclass_model = MetaclassModel(value=1)
@@ -116,7 +136,7 @@ class Point(NamedTuple):
     x: int
     y: int
 
-reveal_type(Point.__replace__)  # revealed: (self: Self, *, x: int = ..., y: int = ...) -> Self
+reveal_type(Point.__replace__)  # revealed: [Self](self: Self, /, *, x: int = ..., y: int = ...) -> Self
 ```
 
 The `__replace__` method can either be called directly or through the `replace` function:
@@ -156,6 +176,6 @@ class ModelBase: ...
 class Model(ModelBase):
     value: int
 
-Model.__replace__  # error: [unresolved-attribute]
-Model(value=1).__replace__  # error: [unresolved-attribute]
+Model.__replace__  # error: [missing-attribute]
+Model(value=1).__replace__  # error: [missing-attribute]
 ```

@@ -148,17 +148,19 @@ fn cmp_fix(name1: &str, name2: &str, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
     // Break ties in the event of overlapping rules, for some specific combinations.
     .then_with(|| {
         let rules = (name1, name2);
-        // Apply `MissingTrailingPeriod` fixes before `NewLineAfterLastParagraph` fixes.
-        let missing_trailing_period = Rule::MissingTrailingPeriod.name().as_str();
-        let newline_after_last_paragraph = Rule::NewLineAfterLastParagraph.name().as_str();
+        // Apply `D400` fixes before `D209` fixes.
+        let summary_period = Rule::DocstringSummaryWithoutPeriod.name().as_str();
+        let missing_newline_after_last_paragraph = Rule::MissingNewlineAfterLastDocstringParagraph
+            .name()
+            .as_str();
         let if_else_instead_of_dict_get = Rule::IfElseBlockInsteadOfDictGet.name().as_str();
-        let if_else_instead_of_if_exp = Rule::IfElseBlockInsteadOfIfExp.name().as_str();
-        if rules == (missing_trailing_period, newline_after_last_paragraph) {
+        let if_else_instead_of_if_exp = Rule::IfElseAssignmentToSameVariable.name().as_str();
+        if rules == (summary_period, missing_newline_after_last_paragraph) {
             std::cmp::Ordering::Less
-        } else if rules == (newline_after_last_paragraph, missing_trailing_period) {
+        } else if rules == (missing_newline_after_last_paragraph, summary_period) {
             std::cmp::Ordering::Greater
         }
-        // Apply `IfElseBlockInsteadOfDictGet` fixes before `IfElseBlockInsteadOfIfExp` fixes.
+        // Apply `IfElseBlockInsteadOfDictGet` fixes before `IfElseAssignmentToSameVariable` fixes.
         else if rules == (if_else_instead_of_dict_get, if_else_instead_of_if_exp) {
             std::cmp::Ordering::Less
         } else if rules == (if_else_instead_of_if_exp, if_else_instead_of_dict_get) {

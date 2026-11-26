@@ -11,9 +11,8 @@ use crate::registry::Rule;
 use crate::rules::pycodestyle::rules::logical_lines::{
     LogicalLines, TokenFlags, extraneous_whitespace, indentation, missing_whitespace,
     missing_whitespace_after_keyword, missing_whitespace_around_operator, redundant_backslash,
-    space_after_comma, space_around_operator, whitespace_around_keywords,
-    whitespace_around_named_parameter_equals, whitespace_before_comment,
-    whitespace_before_parameters,
+    space_after_comma, space_around_operator, whitespace_around_argument_or_parameter_equals,
+    whitespace_around_keywords, whitespace_before_comment, whitespace_before_open_bracket,
 };
 use crate::settings::LinterSettings;
 
@@ -54,8 +53,8 @@ pub(crate) fn check_logical_lines(
         Rule::TabBeforeOperator,
         Rule::TabAfterOperator,
     ]);
-    let enforce_whitespace_around_named_parameter_equals = context.any_rule_enabled(&[
-        Rule::UnexpectedSpacesAroundKeywordParameterEquals,
+    let enforce_whitespace_around_argument_or_parameter_equals = context.any_rule_enabled(&[
+        Rule::UnexpectedSpacesAroundArgumentOrParameterEquals,
         Rule::MissingWhitespaceAroundParameterEquals,
     ]);
     let enforce_missing_whitespace_around_operator = context.any_rule_enabled(&[
@@ -86,8 +85,8 @@ pub(crate) fn check_logical_lines(
         Rule::NoSpaceAfterBlockComment,
         Rule::MultipleLeadingHashesForBlockComment,
     ]);
-    let enforce_whitespace_before_parameters =
-        context.is_rule_enabled(Rule::WhitespaceBeforeParameters);
+    let enforce_whitespace_before_open_bracket =
+        context.is_rule_enabled(Rule::WhitespaceBeforeOpenBracket);
     let enforce_redundant_backslash = context.is_rule_enabled(Rule::RedundantBackslash);
     let enforce_indentation = context.any_rule_enabled(&[
         Rule::IndentationWithInvalidMultiple,
@@ -105,8 +104,8 @@ pub(crate) fn check_logical_lines(
                 space_around_operator(&line, context);
             }
 
-            if enforce_whitespace_around_named_parameter_equals {
-                whitespace_around_named_parameter_equals(&line, context);
+            if enforce_whitespace_around_argument_or_parameter_equals {
+                whitespace_around_argument_or_parameter_equals(&line, context);
             }
 
             if enforce_missing_whitespace_around_operator {
@@ -145,8 +144,8 @@ pub(crate) fn check_logical_lines(
         }
 
         if line.flags().contains(TokenFlags::BRACKET) {
-            if enforce_whitespace_before_parameters {
-                whitespace_before_parameters(&line, context);
+            if enforce_whitespace_before_open_bracket {
+                whitespace_before_open_bracket(&line, context);
             }
 
             if enforce_redundant_backslash {

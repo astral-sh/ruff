@@ -1,3 +1,3 @@
-pub(crate) use static_join_to_fstring::*;
+pub(crate) use unnecessary_str_join::*;
 
-mod static_join_to_fstring;
+mod unnecessary_str_join;

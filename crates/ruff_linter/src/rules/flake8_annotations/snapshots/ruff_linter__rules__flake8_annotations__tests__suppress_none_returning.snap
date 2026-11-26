@@ -36,7 +36,7 @@ help: Add return type annotation: `bool | None`
    |
 note: This is an unsafe fix and may change runtime behavior
 
-ANN001 Missing type annotation for function argument `a`
+ANN001 Missing type annotation for function parameter `a`
   --> suppress_none_returning.py:59:9
    |
 58 | # Error (on the argument, but not the return type)

@@ -308,11 +308,53 @@ def _(top: Top[GradualParams], bottom: Bottom[GradualParams]) -> None:
     reveal_type(bottom)  # revealed: (*args: object, **kwargs: object) -> int
 ```
 
+Explicit parameters still constrain calls to the bottom materialization. Their types materialize
+contravariantly. The top materialization permits no calls because the gradual tail could require
+additional arguments.
+
+```py
+from typing import Concatenate
+from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
+
+def handle(value: Any, /, name: str = "", *items: Any, flag: Any, **options: Any) -> int:
+    return 1
+
+type Handle = RegularCallableTypeOf[handle]
+
+def fixed_parameters(bottom: Bottom[Handle], top: Top[Handle]) -> None:
+    # revealed: (value: object, /, name: str = "", *items: object, flag: object, **options: object) -> int
+    reveal_type(bottom)
+    bottom(object(), flag=True)  # ok
+    bottom(object())  # error: [missing-argument]
+    top(object(), flag=True)  # error: [call-to-function-with-unknown-signature]
+
+static_assert(is_assignable_to(Bottom[Handle], Handle))
+static_assert(is_assignable_to(Handle, Bottom[Handle]))
+static_assert(is_subtype_of(Bottom[Handle], Handle))
+static_assert(not is_subtype_of(Handle, Bottom[Handle]))
+
+def positional_prefix(bottom: Bottom[Callable[Concatenate[int, ...], str]]) -> None:
+    reveal_type(bottom)  # revealed: (int, /, *args: object, **kwargs: object) -> str
+```
+
+The bottom materialization accepts `other="two"` with `value` omitted, or any number of positional
+strings. A call like `callback("one", value="two")` would bind `value` twice.
+
+```py
+def named(value: str = "", *args: Any, **kwargs: Any) -> None: ...
+def other(other: str) -> None: ...
+def strings(*args: str) -> None: ...
+def both(other: str, /, *, value: str) -> None: ...
+def _(bottom: Bottom[RegularCallableTypeOf[named]]) -> None:
+    renamed: RegularCallableTypeOf[other] = bottom  # ok
+    many_strings: RegularCallableTypeOf[strings] = bottom  # ok
+    duplicate: RegularCallableTypeOf[both] = bottom  # error: [invalid-assignment]
+```
+
 Materializing an overloaded callable materializes each overload separately.
 
 ```py
 from typing import overload
-from ty_extensions._internal import RegularCallableTypeOf
 
 @overload
 def f(x: int) -> Any: ...
@@ -370,9 +412,9 @@ def check(
     restricted: Callable[[int], Never],
     returns_none: Bottom[Callable[..., None]],
 ) -> None:
-    positional: Callable[[str, bytes], int] = bottom  # no diagnostic
-    keyword_only: Required = bottom  # no diagnostic
-    declared: Required = never_returns  # no diagnostic
+    positional: Callable[[str, bytes], int] = bottom  # ok
+    keyword_only: Required = bottom  # ok
+    declared: Required = never_returns  # ok
 
     wrong_parameters: Callable[[str], int] = restricted  # error: [invalid-assignment]
     wrong_return: Callable[[int], str] = returns_none  # error: [invalid-assignment]
@@ -389,7 +431,7 @@ class Restricted:
 class Allowed(Restricted): ...
 
 def check_receiver(restricted: Restricted, allowed: Allowed) -> None:
-    valid: Callable[[int], str] = allowed.method  # no diagnostic
+    valid: Callable[[int], str] = allowed.method  # ok
     invalid: Callable[[int], str] = restricted.method  # error: [invalid-assignment]
 ```
 
@@ -412,11 +454,11 @@ def returns_str(*args: object, **kwargs: object) -> str:
 def returns_int(*args: object, **kwargs: object) -> int:
     return 0
 
-accepts_target(returns_str)  # no diagnostic
+accepts_target(returns_str)  # ok
 accepts_target(returns_int)  # error: [invalid-argument-type]
 
 def check_source_receiver(restricted: Restricted, allowed: Allowed) -> None:
-    accepts_target(allowed.method)  # no diagnostic
+    accepts_target(allowed.method)  # ok
     accepts_target(restricted.method)  # error: [invalid-argument-type]
 ```
 
@@ -438,8 +480,8 @@ class Required(Protocol):
     def __call__(self, *, enabled: bool) -> bytes: ...
 
 def check(positional: Callable[[int], str], keyword_only: Required) -> None:
-    first: Top[Callable[..., object]] = positional  # no diagnostic
-    second: Top[Callable[..., object]] = keyword_only  # no diagnostic
+    first: Top[Callable[..., object]] = positional  # ok
+    second: Top[Callable[..., object]] = keyword_only  # ok
     wrong_return: Top[Callable[..., int]] = positional  # error: [invalid-assignment]
     wrong_parameters: Top[Callable[[str], object]] = positional  # error: [invalid-assignment]
 ```
@@ -464,9 +506,9 @@ class Restricted:
 class Allowed(Restricted): ...
 
 def check_receiver(restricted: Restricted) -> None:
-    valid: Top[Callable[..., object]] = restricted.method  # no diagnostic
-    aliased: Top[Callable[..., object]] = restricted.aliased  # no diagnostic
-    generic: Top[Callable[..., object]] = restricted.generic  # no diagnostic
+    valid: Top[Callable[..., object]] = restricted.method  # ok
+    aliased: Top[Callable[..., object]] = restricted.aliased  # ok
+    generic: Top[Callable[..., object]] = restricted.generic  # ok
 
     invalid: Callable[[], str] = restricted.method  # error: [invalid-assignment]
     invalid_alias: Callable[[], str] = restricted.aliased  # error: [invalid-assignment]
@@ -2202,12 +2244,12 @@ on `type[Top[MutableAny]]` or `type[Bottom[MutableAny]]`.
 
 ```py
 def class_instance_attributes(top: Top[MutableAny], bottom: Bottom[MutableAny]) -> None:
-    type(top).value  # error: [unresolved-attribute]
-    type(bottom).value  # error: [unresolved-attribute]
+    type(top).value  # error: [missing-attribute]
+    type(bottom).value  # error: [missing-attribute]
 
 def annotated_class_instance_attributes(top: type[Top[MutableAny]], bottom: type[Bottom[MutableAny]]) -> None:
-    top.value  # error: [unresolved-attribute]
-    bottom.value  # error: [unresolved-attribute]
+    top.value  # error: [missing-attribute]
+    bottom.value  # error: [missing-attribute]
 ```
 
 ### Writable properties
@@ -2305,7 +2347,7 @@ class ChildProtocol(BaseProtocol, Protocol):
     marker: Any
 
     @property
-    def value(self) -> str: ...  # error: [invalid-property-type-override]
+    def value(self) -> str: ...  # error: [incompatible-property-override]
 
 static_assert(is_subtype_of(Top[ChildProtocol], BaseProtocol))
 static_assert(is_subtype_of(ChildProtocol, Top[BaseProtocol]))
@@ -2447,7 +2489,52 @@ static_assert(not is_subtype_of(Top[Source], Bottom[Target]))
 static_assert(is_subtype_of(Bottom[Source], Top[Target]))
 
 def invalid(source: Top[Source]) -> Bottom[Target]:
-    return source  # error: [invalid-return-type]
+    return source  # error: [invalid-explicit-return]
+```
+
+### Methods with gradual variadics
+
+Narrowing to a recursive protocol in strict mode materializes its methods. The fixed `key` parameter
+of `handle` is retained when comparing the `Handler` accepted by `combine`.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Any, Protocol, assert_type, overload, runtime_checkable
+
+@runtime_checkable
+class Handler[T](Protocol):
+    def handle(self, key: str, *args: Any, **kwargs: Any) -> None: ...
+    def combine(self, other: "Handler[T]") -> None: ...
+
+def narrowed(value: object) -> None:
+    if isinstance(value, Handler):
+        handler: Handler[Any] = value  # ok
+```
+
+Overload selection compares `process` with its top materialization, which bottom-materializes the
+`handler` parameter. The identity overload of `mark` still applies and preserves the return type.
+
+```py
+@overload
+def mark[T](value: T) -> T: ...
+@overload
+def mark(value: object) -> object: ...
+def mark(value: object) -> object:
+    return value
+
+@mark
+def process(handler: Handler[Any]) -> int:
+    return 1
+
+def use(handler: Handler[Any]) -> None:
+    assert_type(process(handler), int)
 ```
 
 ### Members outside the protocol interface
@@ -3854,7 +3941,7 @@ static_assert(not is_equivalent_to(Tree, Bottom[Tree]))
 
 def write(top: Top[Tree], bottom: Bottom[Tree]) -> None:
     top.value = 1  # error: [invalid-assignment]
-    bottom.value = object()  # no diagnostic
+    bottom.value = object()  # ok
 ```
 
 The getter can be gradual even when the setter is fully static:

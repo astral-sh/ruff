@@ -266,7 +266,7 @@ impl<'db> UnionTypeInstance<'db> {
 
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|_, id, _, _| Ok(Type::divergent(id)),
+        cycle_initial=|_, id, _, _, _| Ok(Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Result<Type<'db>, _>, result: Result<Type<'db>, _>, _, program| {
             let env = ProgramEnvironment::from_program(program);
             result.map(|ty| match previous {

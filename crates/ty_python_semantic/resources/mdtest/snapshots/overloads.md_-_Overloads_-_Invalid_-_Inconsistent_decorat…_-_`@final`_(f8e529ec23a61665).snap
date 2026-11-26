@@ -26,7 +26,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 11 | 
 12 |     @overload
 13 |     @final
-14 |     # error: [invalid-overload]
+14 |     # error: [misplaced-overload-decorator]
 15 |     def method2(self, x: int) -> int: ...
 16 |     @overload
 17 |     def method2(self, x: str) -> str: ...
@@ -37,7 +37,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 22 |     def method3(self, x: int) -> int: ...
 23 |     @overload
 24 |     @final
-25 |     # error: [invalid-overload]
+25 |     # error: [misplaced-overload-decorator]
 26 |     def method3(self, x: str) -> str: ...
 27 |     def method3(self, x: int | str) -> int | str:
 28 |         return x
@@ -58,16 +58,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 10 |     def method2(self, x: int) -> int: ...
 11 |     @final
 12 |     @overload
-13 |     # error: [invalid-overload]
+13 |     # error: [misplaced-overload-decorator]
 14 |     def method2(self, x: str) -> str: ...
 15 |     @overload
 16 |     def method3(self, x: int) -> int: ...
 17 |     @final
 18 |     @overload
-19 |     def method3(self, x: str) -> int: ...  # error: [invalid-overload]
+19 |     def method3(self, x: str) -> int: ...  # error: [misplaced-overload-decorator]
 20 |     @overload
 21 |     @final
-22 |     def method3(self, x: bytes) -> bytes: ...  # error: [invalid-overload]
+22 |     def method3(self, x: bytes) -> bytes: ...  # error: [misplaced-overload-decorator]
 23 |     @overload
 24 |     def method3(self, x: bytearray) -> bytearray: ...
 ```
@@ -75,14 +75,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 # Diagnostics
 
 ```
-error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
+error[misplaced-overload-decorator]: `@final` decorator should be applied only to the overload implementation
   --> src/mdtest_snippet.py:15:9
    |
 12 |     @overload
    |     ---------
 13 |     @final
    |     ------
-14 |     # error: [invalid-overload]
+14 |     # error: [misplaced-overload-decorator]
 15 |     def method2(self, x: int) -> int: ...
    |         ^^^^^^^
 16 |     @overload
@@ -93,14 +93,14 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
 ```
 
 ```
-error[invalid-overload]: `@final` decorator should be applied only to the overload implementation
+error[misplaced-overload-decorator]: `@final` decorator should be applied only to the overload implementation
   --> src/mdtest_snippet.py:26:9
    |
 23 |     @overload
    |     ---------
 24 |     @final
    |     ------
-25 |     # error: [invalid-overload]
+25 |     # error: [misplaced-overload-decorator]
 26 |     def method3(self, x: str) -> str: ...
    |         ^^^^^^^
 27 |     def method3(self, x: int | str) -> int | str:
@@ -109,7 +109,7 @@ error[invalid-overload]: `@final` decorator should be applied only to the overlo
 ```
 
 ```
-error[invalid-overload]: `@final` decorator should be applied only to the first overload
+error[misplaced-overload-decorator]: `@final` decorator should be applied only to the first overload
   --> src/mdtest_snippet.pyi:14:9
    |
  9 | /     @overload
@@ -118,14 +118,14 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
 11 |       @final
    |       ------
 12 |       @overload
-13 |       # error: [invalid-overload]
+13 |       # error: [misplaced-overload-decorator]
 14 |       def method2(self, x: str) -> str: ...
    |           ^^^^^^^
 
 ```
 
 ```
-error[invalid-overload]: `@final` decorator should be applied only to the first overload
+error[misplaced-overload-decorator]: `@final` decorator should be applied only to the first overload
   --> src/mdtest_snippet.pyi:19:9
    |
 15 | /     @overload
@@ -134,13 +134,13 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
 17 |       @final
    |       ------
 18 |       @overload
-19 |       def method3(self, x: str) -> int: ...  # error: [invalid-overload]
+19 |       def method3(self, x: str) -> int: ...  # error: [misplaced-overload-decorator]
    |           ^^^^^^^
 
 ```
 
 ```
-error[invalid-overload]: `@final` decorator should be applied only to the first overload
+error[misplaced-overload-decorator]: `@final` decorator should be applied only to the first overload
   --> src/mdtest_snippet.pyi:22:9
    |
 15 | /     @overload
@@ -148,11 +148,11 @@ error[invalid-overload]: `@final` decorator should be applied only to the first 
    | |_________________________________________- First overload defined here
 17 |       @final
 18 |       @overload
-19 |       def method3(self, x: str) -> int: ...  # error: [invalid-overload]
+19 |       def method3(self, x: str) -> int: ...  # error: [misplaced-overload-decorator]
 20 |       @overload
 21 |       @final
    |       ------
-22 |       def method3(self, x: bytes) -> bytes: ...  # error: [invalid-overload]
+22 |       def method3(self, x: bytes) -> bytes: ...  # error: [misplaced-overload-decorator]
    |           ^^^^^^^
 
 ```

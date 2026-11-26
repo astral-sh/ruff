@@ -357,7 +357,7 @@ def test($):  # ty: ignore
 ```py
 a = 10
 # revealed: Literal[10]
-# error: [ignore-comment-unknown-rule] "Unknown rule `revealed-type`"
+# error: [unknown-rule-in-ignore-comment] "Unknown rule `revealed-type`"
 reveal_type(a)  # ty: ignore[revealed-type]
 ```
 
@@ -461,7 +461,7 @@ a = 10 + 4  # ty: ignore[division-by-zer]
 ```
 
 ```snapshot
-warning[ignore-comment-unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
+warning[unknown-rule-in-ignore-comment]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
  --> src/mdtest_snippet.py:2:26
   |
 2 | a = 10 + 4  # ty: ignore[division-by-zer]
@@ -471,7 +471,7 @@ warning[ignore-comment-unknown-rule]: Unknown rule `division-by-zer`. Did you me
 ## Code with `lint:` prefix
 
 ```py
-# error:[ignore-comment-unknown-rule] "Unknown rule `lint:division-by-zero`. Did you mean `division-by-zero`?"
+# error: [unknown-rule-in-ignore-comment] "Unknown rule `lint:division-by-zero`. Did you mean `division-by-zero`?"
 # error: [division-by-zero]
 a = 10 / 0  # ty: ignore[lint:division-by-zero]
 ```

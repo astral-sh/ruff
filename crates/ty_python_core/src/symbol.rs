@@ -17,7 +17,7 @@ const LINEAR_SEARCH_THRESHOLD: usize = 16;
 pub struct ScopedSymbolId;
 
 /// A symbol in a given scope.
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct Symbol {
     name: Name,
     flags: SymbolFlags,
@@ -34,7 +34,7 @@ bitflags! {
     ///
     /// See the doc-comment at the top of [`super::use_def`] for explanations of what it
     /// means for a symbol to be *bound* as opposed to *declared*.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
     struct SymbolFlags: u8 {
         const IS_USED               = 1 << 0;
         const IS_BOUND              = 1 << 1;
@@ -44,6 +44,7 @@ bitflags! {
         /// true if the symbol is assigned more than once, or if it is assigned even though it is already in use
         const IS_REASSIGNED         = 1 << 5;
         const IS_PARAMETER          = 1 << 6;
+        const HAS_SCOPE_DECLARATION = 1 << 7;
     }
 }
 
@@ -84,6 +85,11 @@ impl Symbol {
     /// Is the symbol `nonlocal` its containing scope?
     pub fn is_nonlocal(&self) -> bool {
         self.flags.contains(SymbolFlags::MARKED_NONLOCAL)
+    }
+
+    /// Returns whether a `global` or `nonlocal` statement makes this symbol refer to another scope.
+    pub fn has_scope_declaration(&self) -> bool {
+        self.flags.contains(SymbolFlags::HAS_SCOPE_DECLARATION)
     }
 
     /// Is the symbol defined in this scope, vs referring to some enclosing scope?
@@ -134,6 +140,10 @@ impl Symbol {
         self.insert_flags(SymbolFlags::MARKED_NONLOCAL);
     }
 
+    pub(super) fn mark_scope_declaration(&mut self) {
+        self.insert_flags(SymbolFlags::HAS_SCOPE_DECLARATION);
+    }
+
     pub(super) fn mark_bound(&mut self) {
         if self.is_bound() || self.is_used() {
             self.insert_flags(SymbolFlags::IS_REASSIGNED);
@@ -179,11 +189,11 @@ impl SymbolReverseTable {
     fn entry<'a>(
         &'a mut self,
         symbols: &IndexVec<ScopedSymbolId, Symbol>,
-        symbol: &Symbol,
+        name: &Name,
     ) -> Entry<'a, ScopedSymbolId> {
         self.0.entry(
-            Self::hash_name(symbol.name()),
-            |id| &symbols[*id].name == symbol.name(),
+            Self::hash_name(name),
+            |id| &symbols[*id].name == name,
             |id| Self::hash_name(&symbols[*id].name),
         )
     }
@@ -272,9 +282,21 @@ impl SymbolTableBuilder {
         self.reverse.symbol_id(&self.table.symbols, name)
     }
 
+    /// Reuse an existing symbol without allocating or copying its name.
+    pub(super) fn add_name(&mut self, name: &Name) -> (ScopedSymbolId, bool) {
+        match self.reverse.entry(&self.table.symbols, name) {
+            Entry::Occupied(entry) => (*entry.get(), false),
+            Entry::Vacant(entry) => {
+                let id = self.table.symbols.push(Symbol::new(name.clone()));
+                entry.insert(id);
+                (id, true)
+            }
+        }
+    }
+
     /// Add a new symbol to this scope or update the flags if a symbol with the same name already exists.
     pub(super) fn add(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
-        let entry = self.reverse.entry(&self.table.symbols, &symbol);
+        let entry = self.reverse.entry(&self.table.symbols, symbol.name());
 
         match entry {
             Entry::Occupied(entry) => {

@@ -13,6 +13,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/build-wasm.yml
+      - .github/actions/setup-ruff-workspace/action.yml
 
 concurrency:
   group: build-wasm-${{ github.ref }}
@@ -49,13 +50,16 @@ jobs:
       - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29 # v0.2.0
       - name: "Run wasm-pack build"
         run: wasm-pack build --target ${{ matrix.target }} crates/ruff_wasm
+      - uses: $/.github/actions/setup-ruff-workspace
+        with:
+          group: jaq
       - name: "Rename generated package"
-        run: | # Replace the package name w/ jq
-          jq '.name="@astral-sh/ruff-wasm-${{ matrix.target }}"' crates/ruff_wasm/pkg/package.json > /tmp/package.json
+        run: |
+          jaq '.name="@astral-sh/ruff-wasm-${{ matrix.target }}"' crates/ruff_wasm/pkg/package.json > /tmp/package.json
           mv /tmp/package.json crates/ruff_wasm/pkg
       - run: cp LICENSE crates/ruff_wasm/pkg # wasm-pack does not put the LICENSE file in the pkg
       - name: "Upload wasm artifact"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           # Avoid prefixing the name with `artifacts-` here to exclude it from the GitHub release.
           name: wasm-npm-${{ matrix.target }}

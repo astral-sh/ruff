@@ -4,6 +4,7 @@ use lsp_types::{
     Code, CodeAction, CodeActionKind, CodeActionResolveRequest, CodeActionResponse,
     DocumentDiagnosticReport,
 };
+use ruff_python_trivia::textwrap::dedent;
 
 use crate::TestServerBuilder;
 
@@ -27,6 +28,52 @@ fn no_code_actions_for_markdown() -> Result<()> {
 
     assert_json_snapshot!(actions, @"[]");
 
+    Ok(())
+}
+
+#[test]
+fn script_cannot_enable_unsafe_fixes() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_server_preview(true)
+        .with_file("ruff.toml", "unsafe-fixes = false")?
+        .build();
+    server.open_text_document(
+        "script.py",
+        dedent(
+            r"
+            # /// script
+            # [tool.ruff]
+            # unsafe-fixes = true
+            # lint.select = ['T201']
+            # ///
+            import os
+
+            print('side effect')
+            ",
+        ),
+        1,
+    );
+    // Fix All would remove the unused import with the project's rules or the
+    // print call with the script's unsafe fixes enabled.
+    assert_json_snapshot!(server.code_action_request("script.py", vec![]), @r#"
+    [
+      {
+        "title": "Ruff: Fix all auto-fixable problems",
+        "kind": "source.fixAll.ruff",
+        "edit": {
+          "changes": {}
+        }
+      },
+      {
+        "title": "Ruff: Organize imports",
+        "kind": "source.organizeImports.ruff",
+        "edit": {
+          "changes": {}
+        }
+      }
+    ]
+    "#);
     Ok(())
 }
 

@@ -8,13 +8,16 @@ use ty_module_resolver::{
 use crate::{
     TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
     dependency::{DependencyProjectKind, missing_direct_dependency},
-    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, TypeOrigin},
+    place::{
+        DefinedPlace, Definedness, GlobalDeclarations, Place, PlaceAndQualifiers, Provenance,
+        TypeOrigin, module_may_define_getattr,
+    },
     reachability::evaluate_reachability_with_cache,
     types::{
-        ModuleLiteralType, Type, TypeAndQualifiers,
+        DeclaredType, ModuleLiteralType, Type,
         diagnostic::{
-            MISSING_DIRECT_DEPENDENCY, POSSIBLY_MISSING_IMPORT, UNRESOLVED_IMPORT,
-            hint_if_stdlib_attribute_exists_on_other_versions,
+            IMPORT_NOT_FOUND, MISSING_DIRECT_DEPENDENCY, MISSING_MODULE_MEMBER,
+            POSSIBLY_MISSING_IMPORT, hint_if_stdlib_attribute_exists_on_other_versions,
             hint_if_stdlib_submodule_exists_on_other_versions,
         },
         infer::TypeInferenceBuilder,
@@ -58,7 +61,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if qualifiers.contains(TypeQualifiers::FINAL) {
             self.declarations.insert(
                 definition,
-                TypeAndQualifiers::new(ty, TypeOrigin::Declared, qualifiers)
+                DeclaredType::new(Some(ty), TypeOrigin::Declared, qualifiers)
                     .with_provenance(provenance),
             );
         }
@@ -127,7 +130,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
     }
 
-    fn report_unresolved_import(
+    fn report_import_not_found(
         &self,
         range: TextRange,
         level: u32,
@@ -151,7 +154,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let Some(builder) = self.context.report_lint(&UNRESOLVED_IMPORT, range) else {
+        let Some(builder) = self.context.report_lint(&IMPORT_NOT_FOUND, range) else {
             return;
         };
 
@@ -286,7 +289,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Resolve the module being imported.
         let Some(full_module_ty) = self.module_type_from_name(&full_module_name) else {
-            self.report_unresolved_import(alias.range(), 0, Some(name), Some(&full_module_name));
+            self.report_import_not_found(alias.range(), 0, Some(name), Some(&full_module_name));
             self.add_binding(alias.into(), definition)
                 .insert(self, Type::unknown());
             return;
@@ -338,63 +341,82 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let import_range = import.module.as_ref().map_or(import.range(), Ranged::range);
 
         for alias in names {
-            let mut checked_dependency = false;
-            for definition in self.index.definitions(alias) {
-                if let Some(star_import) = definition.kind(db).as_star_import() {
-                    let use_def = self.index.use_def_map(self.scope().file_scope_id(db));
-                    if let Some(binding) = use_def
-                        .reachable_symbol_bindings(star_import.symbol_id())
-                        .find(|binding| {
-                            binding
-                                .binding
-                                .is_defined_and(|candidate| candidate == *definition)
-                        })
-                        && evaluate_reachability_with_cache(
-                            db,
-                            Some(self.reachability_cache()),
-                            use_def.reachability_constraints(),
-                            use_def.predicates(),
-                            binding.reachability_constraint,
-                        )
-                        .is_always_false()
-                    {
-                        continue;
-                    }
+            if &alias.name == "*" {
+                if let Some(module) = module {
+                    self.infer_star_import(alias, module);
+                    // The dependency matters even when the module exports no names.
+                    self.check_direct_dependency(module, import_range);
                 }
-
-                let inferred = infer_definition_types(self.db(), *definition);
-                // Check non-star imports for missing direct dependencies.
-                if definition.kind(db).as_star_import().is_none() {
-                    // Cycle recovery can omit bindings; the fallback below checks the parent module.
-                    for (_, ty) in inferred.bindings(*definition) {
-                        // `from namespace import child` can import a distribution other than the
-                        // namespace's other children. Use inference's attribute-versus-submodule
-                        // decision, and do not follow values re-exported from unrelated modules.
-                        if self.context.is_lint_enabled(&MISSING_DIRECT_DEPENDENCY)
-                            && let Some(parent) = module
-                        {
-                            let imported_module = if let Type::ModuleLiteral(literal) = ty
-                                && let child = literal.module(db)
-                                && let child_name = child.name(db)
-                                && child_name.parent().as_ref() == Some(parent.name(db))
-                                && child_name.components().next_back() == Some(alias.name.as_str())
-                            {
-                                child
-                            } else {
-                                parent
-                            };
-                            self.check_direct_dependency(imported_module, import_range);
-                            checked_dependency = true;
-                        }
-                    }
-                }
-                self.extend_definition(*definition, inferred);
+                continue;
             }
 
-            // Star imports can have no definitions, and cycle recovery can omit bindings.
-            if !checked_dependency && let Some(parent) = module {
-                self.check_direct_dependency(parent, import_range);
+            let definition = self.index.expect_single_definition(alias);
+            let inferred = infer_definition_types(db, definition);
+            if self.context.is_lint_enabled(&MISSING_DIRECT_DEPENDENCY)
+                && let Some(parent) = module
+            {
+                // `from namespace import child` can import a distribution other than the
+                // namespace's other children. Use inference's attribute-versus-submodule
+                // decision, and do not follow values re-exported from unrelated modules.
+                let imported_module = if let Type::ModuleLiteral(literal) =
+                    inferred.binding_type(definition)
+                    && let child = literal.module(db)
+                    && let child_name = child.name(db)
+                    && child_name.parent().as_ref() == Some(parent.name(db))
+                    && child_name.components().next_back() == Some(alias.name.as_str())
+                {
+                    child
+                } else {
+                    parent
+                };
+                self.check_direct_dependency(imported_module, import_range);
             }
+            self.extend_definition(definition, inferred);
+        }
+    }
+
+    /// Check the bindings introduced by `from module import *`. When checking the scope,
+    /// we only need to infer a binding if assigning to the name or calling the module's
+    /// `__getattr__` could produce a diagnostic. Name lookups infer the rest on demand.
+    fn infer_star_import(&mut self, alias: &ast::Alias, module: Module<'db>) {
+        let definitions = self.index.definitions(alias);
+        if definitions.is_empty() {
+            return;
+        }
+
+        let db = self.db();
+        let env = self.program_environment();
+        let infer_all =
+            self.region.collects_bindings() || module_may_define_getattr(db, env, module);
+        let declarations = GlobalDeclarations::new(db, env);
+        let scope = self.scope().file_scope_id(db);
+        debug_assert!(scope.is_global());
+        let places = self.index.place_table(scope);
+        let use_def = self.index.use_def_map(scope);
+
+        for &definition in definitions {
+            let symbol = definition.place(db).expect_symbol();
+            if !infer_all && !declarations.may_declare(places.symbol(symbol)) {
+                continue;
+            }
+
+            let binding = use_def
+                .reachable_symbol_bindings(symbol)
+                .find(|binding| binding.binding.definition() == Some(definition));
+            if let Some(binding) = binding
+                && evaluate_reachability_with_cache(
+                    db,
+                    Some(self.reachability_cache()),
+                    use_def.reachability_constraints(),
+                    use_def.predicates(),
+                    binding.reachability_constraint,
+                )
+                .is_always_false()
+            {
+                continue;
+            }
+
+            self.extend_definition(definition, infer_definition_types(db, definition));
         }
     }
 
@@ -403,7 +425,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// `package`, not `child`. Relative imports are resolved to an absolute module name.
     ///
     /// Return `None` if the module name is invalid or the module cannot be resolved.
-    /// Emit an unresolved-import diagnostic for resolution failures; syntax errors are
+    /// Emit an import-not-found diagnostic for resolution failures; syntax errors are
     /// reported elsewhere.
     fn check_import_from_module_is_resolvable(
         &mut self,
@@ -444,7 +466,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     "Relative module resolution `{}` failed: too many leading dots",
                     format_import_from_module(*level, module),
                 );
-                self.report_unresolved_import(module_ref.range(), *level, module, None);
+                self.report_import_not_found(module_ref.range(), *level, module, None);
                 return None;
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
@@ -454,14 +476,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     format_import_from_module(*level, module),
                     self.file().path(db)
                 );
-                self.report_unresolved_import(module_ref.range(), *level, module, None);
+                self.report_import_not_found(module_ref.range(), *level, module, None);
                 return None;
             }
         };
 
         let resolved = resolve_module(db, importing_file, &module_name);
         if resolved.is_none() {
-            self.report_unresolved_import(module_ref.range(), *level, module, Some(&module_name));
+            self.report_import_not_found(module_ref.range(), *level, module, Some(&module_name));
         }
 
         resolved
@@ -637,7 +659,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Some(builder) = self
             .context
-            .report_lint(&UNRESOLVED_IMPORT, ast::AnyNodeRef::Alias(alias))
+            .report_lint(&MISSING_MODULE_MEMBER, ast::AnyNodeRef::Alias(alias))
         else {
             return;
         };
@@ -763,7 +785,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let Some(builder) = self.context.report_lint(
-            &UNRESOLVED_IMPORT,
+            &IMPORT_NOT_FOUND,
             ast::AnyNodeRef::StmtImportFrom(import_from),
         ) else {
             return;

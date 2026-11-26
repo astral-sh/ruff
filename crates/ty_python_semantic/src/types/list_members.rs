@@ -146,6 +146,7 @@ pub(crate) fn all_reachable_members<'db>(
 // `__init__`, `__repr__`, `__eq__`, `__ne__` and `__hash__` are always included via `object`,
 // so we don't need to list them here.
 const SYNTHETIC_DATACLASS_ATTRIBUTES: &[&str] = &[
+    "__attrs_init__",
     "__lt__",
     "__le__",
     "__gt__",

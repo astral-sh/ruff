@@ -321,11 +321,11 @@ Binding the receiver does not make incompatible overrides or protocol implementa
 
 ```py
 class ExtraArgument(Base):
-    def method(self, value: int) -> int:  # error: [invalid-method-override]
+    def method(self, value: int) -> int:  # error: [incompatible-method-override]
         return value
 
 class WrongReturn(Base):
-    def method(self) -> str:  # error: [invalid-method-override]
+    def method(self) -> str:  # error: [incompatible-method-override]
         return "wrong result"
 
 wrong_return: P = WrongReturn()  # error: [invalid-assignment]

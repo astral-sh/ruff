@@ -50,6 +50,15 @@ pub(in crate::server) enum Task {
 // as a reference, to create the inner 'static closure. That closure is then moved to a background task pool.
 pub(in crate::server) struct BackgroundTaskBuilder {
     pub(super) schedule: BackgroundSchedule,
+    /// A database modification can cause Salsa to cancel a running request. If the handler
+    /// enables `RetriableRequestHandler::RETRY_ON_CANCELLATION`, the main loop automatically
+    /// retries the request while it is still pending. There is no limit on the number of retries.
+    /// If the worker queue is full or shutdown has started when a retry is due, the main loop
+    /// replies with this error.
+    ///
+    /// Request builders store the handler's `salsa_cancellation_error` here.
+    /// Use `None` for requests that have no response, such as notifications.
+    pub(in crate::server) cancellation_error: Option<fn() -> lsp_server::ResponseError>,
     pub(super) builder: BackgroundFnBuilder,
 }
 
@@ -59,12 +68,17 @@ pub(in crate::server) struct SyncTask {
 
 impl Task {
     /// Creates a new background task.
-    pub(crate) fn background<F>(schedule: BackgroundSchedule, func: F) -> Self
+    pub(crate) fn background<F>(
+        schedule: BackgroundSchedule,
+        cancellation_error: Option<fn() -> lsp_server::ResponseError>,
+        func: F,
+    ) -> Self
     where
         F: FnOnce(&Session) -> Box<dyn FnOnce(&Client) + Send + 'static> + 'static,
     {
         Self::Background(BackgroundTaskBuilder {
             schedule,
+            cancellation_error,
             builder: Box::new(func),
         })
     }

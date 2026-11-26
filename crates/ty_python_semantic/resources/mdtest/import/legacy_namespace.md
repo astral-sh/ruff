@@ -256,7 +256,7 @@ __version__ = "9.15.0"
 `test.py`:
 
 ```py
-from airflow.providers.amazon import __version__ as amazon_provider_version  # error: [unresolved-import]
+from airflow.providers.amazon import __version__ as amazon_provider_version  # error: [import-not-found]
 from airflow import __version__ as airflow_version
 
 reveal_type(airflow_version)  # revealed: Literal["3.2.0"]
@@ -297,7 +297,7 @@ __version__ = "9.15.0"
 `test.py`:
 
 ```py
-from airflow.providers.amazon import __version__ as amazon_provider_version  # error: [unresolved-import]
+from airflow.providers.amazon import __version__ as amazon_provider_version  # error: [import-not-found]
 from airflow import __version__ as airflow_version
 
 reveal_type(airflow_version)  # revealed: Literal["3.2.0"]
@@ -338,7 +338,7 @@ __version__ = "9.15.0"
 `test.py`:
 
 ```py
-from airflow.providers.amazon import __version__ as amazon_provider_version  # error: [unresolved-import]
+from airflow.providers.amazon import __version__ as amazon_provider_version  # error: [import-not-found]
 from airflow import __version__ as airflow_version
 
 reveal_type(airflow_version)  # revealed: Literal["3.2.0"]
@@ -379,7 +379,7 @@ __version__ = "9.15.0"
 `test.py`:
 
 ```py
-from airflow.providers.amazon import __version__ as amazon_provider_version  # error: [unresolved-import]
+from airflow.providers.amazon import __version__ as amazon_provider_version  # error: [import-not-found]
 from airflow import __version__ as airflow_version
 
 reveal_type(airflow_version)  # revealed: Literal["3.2.0"]

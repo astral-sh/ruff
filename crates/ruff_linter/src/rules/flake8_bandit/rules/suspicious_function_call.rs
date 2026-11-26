@@ -337,9 +337,9 @@ impl Violation for SuspiciousMktempUsage {
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
-pub(crate) struct SuspiciousEvalUsage;
+pub(crate) struct Eval;
 
-impl Violation for SuspiciousEvalUsage {
+impl Violation for Eval {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Use of possibly insecure function; consider using `ast.literal_eval`".to_string()
@@ -936,9 +936,9 @@ impl Violation for SuspiciousUnverifiedContextUsage {
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
-pub(crate) struct SuspiciousTelnetUsage;
+pub(crate) struct SuspiciousTelnetlibUsage;
 
-impl Violation for SuspiciousTelnetUsage {
+impl Violation for SuspiciousTelnetlibUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Telnet is considered insecure. Use SSH or some other encrypted protocol.".to_string()
@@ -962,9 +962,9 @@ impl Violation for SuspiciousTelnetUsage {
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.258", category = Category::Security)]
-pub(crate) struct SuspiciousFTPLibUsage;
+pub(crate) struct SuspiciousFtplibUsage;
 
-impl Violation for SuspiciousFTPLibUsage {
+impl Violation for SuspiciousFtplibUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
         "FTP-related functions are being called. FTP is considered insecure. \
@@ -1158,9 +1158,7 @@ fn suspicious_function(
             }),
 
         // Eval
-        ["" | "builtins", "eval"] => {
-            checker.report_diagnostic_if_enabled(SuspiciousEvalUsage, range)
-        }
+        ["" | "builtins", "eval"] => checker.report_diagnostic_if_enabled(Eval, range),
 
         // MarkSafe
         ["django", "utils", "safestring" | "html", "mark_safe"] => {
@@ -1214,12 +1212,10 @@ fn suspicious_function(
                         // If the `url` argument is a `urllib.request.Request` object, allow `http` and `https` schemes.
                         Some(Expr::Call(ExprCall {
                             func, arguments, ..
-                        })) if checker
-                            .semantic()
-                            .resolve_qualified_name(func.as_ref())
-                            .is_some_and(|name| {
-                                name.segments() == ["urllib", "request", "Request"]
-                            }) =>
+                        })) if checker.semantic().matches_qualified_name(
+                            func.as_ref(),
+                            &["urllib", "request", "Request"],
+                        ) =>
                         {
                             if let Some(url_expr) = arguments.find_argument_value("url", 0)
                                 && expression_starts_with_http_prefix(url_expr, checker.semantic())
@@ -1314,10 +1310,10 @@ fn suspicious_function(
         ] => checker.report_diagnostic_if_enabled(SuspiciousXMLETreeUsage, range),
 
         // Telnet
-        ["telnetlib", ..] => checker.report_diagnostic_if_enabled(SuspiciousTelnetUsage, range),
+        ["telnetlib", ..] => checker.report_diagnostic_if_enabled(SuspiciousTelnetlibUsage, range),
 
         // FTPLib
-        ["ftplib", ..] => checker.report_diagnostic_if_enabled(SuspiciousFTPLibUsage, range),
+        ["ftplib", ..] => checker.report_diagnostic_if_enabled(SuspiciousFtplibUsage, range),
 
         _ => return,
     };

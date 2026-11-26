@@ -9,7 +9,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 
 /// ## What it does
-/// Checks for `__iter__` methods in stubs that return `Iterable[T]` instead
+/// Checks for `__iter__` methods that return `Iterable[T]` instead
 /// of an `Iterator[T]`.
 ///
 /// ## Why is this bad?

@@ -11,7 +11,7 @@ class Member:
     role: str = field(default="user")
     tag: str | None = field(default=None, init=False)
 
-# revealed: (self: Member, name: str, role: str = "user") -> None
+# revealed: (self: Member, /, name: str, role: str = "user") -> None
 reveal_type(Member.__init__)
 
 alice = Member(name="Alice", role="admin")
@@ -38,14 +38,14 @@ class AnyFieldSpecifier:
     proto: Any = field(repr=False)
     key: str | None
 
-reveal_type(AnyFieldSpecifier.__init__)  # revealed: (self: AnyFieldSpecifier, proto: Any, key: str | None) -> None
+reveal_type(AnyFieldSpecifier.__init__)  # revealed: (self: AnyFieldSpecifier, /, proto: Any, key: str | None) -> None
 
 @dataclass
 class AnyInitFalseField:
     key: str | None
     proto: Any = field(init=False)
 
-reveal_type(AnyInitFalseField.__init__)  # revealed: (self: AnyInitFalseField, key: str | None) -> None
+reveal_type(AnyInitFalseField.__init__)  # revealed: (self: AnyInitFalseField, /, key: str | None) -> None
 ```
 
 ## Inheritance with defaults
@@ -135,7 +135,7 @@ class Data:
     content: list[int] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.now, init=False)
 
-# revealed: (self: Data, content: list[int] = ...) -> None
+# revealed: (self: Data, /, content: list[int] = ...) -> None
 reveal_type(Data.__init__)
 
 data = Data([1, 2, 3])
@@ -161,12 +161,12 @@ class Person:
     age: int | None = field(default=None, kw_only=True)
     role: str = field(default="user", kw_only=True)
 
-# revealed: (self: Person, name: str, *, age: int | None = None, role: str = "user") -> None
+# revealed: (self: Person, /, name: str, *, age: int | None = None, role: str = "user") -> None
 reveal_type(Person.__init__)
 
 alice = Person(role="admin", name="Alice")
 
-# error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 2"
+# error: [too-many-positional-arguments] "Too many positional arguments: expected 2, got 3"
 bob = Person("Bob", 30)
 ```
 
@@ -193,10 +193,10 @@ class DC:
 
 dc = DC(name="Alice")
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 dc.sentinel
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 DC.sentinel
 ```
 
@@ -216,7 +216,7 @@ class Child(Parent):
     name: str
 
 # Parent's `_: int` field is inherited; the sentinel makes `name` keyword-only.
-# revealed: (self: Child, _: int, *, name: str) -> None
+# revealed: (self: Child, /, _: int, *, name: str) -> None
 reveal_type(Child.__init__)
 
 c = Child(1, name="Alice")
@@ -246,7 +246,7 @@ class A:
     name: str = field(init=False)
 
 # Without explicit field_specifiers, field(init=False) is an ordinary default RHS.
-reveal_type(A.__init__)  # revealed: (self: A, name: str = ...) -> None
+reveal_type(A.__init__)  # revealed: (self: A, /, name: str = ...) -> None
 
 class OtherFieldInfo:
     def __init__(self, default: Any = None, **kwargs: Any) -> None: ...
@@ -265,14 +265,14 @@ class C:
     name: str = field(init=False)
 
 # Even with other active field_specifiers, an unlisted RHS is an ordinary default value.
-reveal_type(C.__init__)  # revealed: (self: C, name: str = ...) -> None
+reveal_type(C.__init__)  # revealed: (self: C, /, name: str = ...) -> None
 
 @dataclass
 class B:
     name: str = field(init=False)
 
 # Regular @dataclass should respect field(init=False)
-reveal_type(B.__init__)  # revealed: (self: B) -> None
+reveal_type(B.__init__)  # revealed: (self: B, /) -> None
 ```
 
 Test constructor calls:
@@ -287,4 +287,70 @@ C(name="foo")
 # This should error because field(init=False) is respected for B
 # error: [unknown-argument]
 B(name="foo")
+```
+
+## Union-annotated fields
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+When a field is annotated with a union type, the `field(..)` call is inferred with the full union as
+type context, so that a single `Field[..]` specialization is inferred, instead of e.g.
+`Field[str] | Field[None]`. This ensures that the field's metadata can be accurately captured.
+
+For the `values` field, the `field(..)` call is inferred with a narrower `Field[list[int]]`
+specialization due to the default factory argument, but the declared type is what determines the
+constructor signature, so lists of strings are still allowed.
+
+```py
+from dataclasses import dataclass, field
+from typing import Any
+
+def returns_any() -> Any:
+    return None
+
+@dataclass
+class Entry:
+    value: str | None = field(default_factory=returns_any, kw_only=True)
+    reveal_type(value)  # revealed: dataclasses.Field[str | None]
+
+    values: list[int] | list[str] = field(default_factory=lambda: [1], kw_only=True)
+    reveal_type(values)  # revealed: dataclasses.Field[list[int]]
+
+# revealed: (self: Entry, /, *, value: str | None = ..., values: list[int] | list[str] = ...) -> None
+reveal_type(Entry.__init__)
+
+Entry()
+Entry(value=None)
+Entry(values=[1, 2])
+Entry(value="value", values=["other"])
+```
+
+The `kw_only` argument is respected:
+
+```py
+Entry("value", [1, 2])  # error: [too-many-positional-arguments]
+```
+
+## Field named `self`
+
+A field named `self` can be passed positionally or by keyword, including when inherited:
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Record:
+    self: int
+
+reveal_type(Record(self=1).self)  # revealed: int
+Record(1)  # ok
+Record(self="wrong")  # error: [invalid-argument-type]
+
+@dataclass
+class Child(Record): ...
+
+reveal_type(Child(self=1))  # revealed: Child
 ```

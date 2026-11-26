@@ -117,9 +117,14 @@ def _(
 
 ## Enum literals
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from enum import Enum
-from typing import Literal, Any
+from typing import Any, Literal, Protocol
 from ty_extensions import Intersection
 
 class Color(Enum):
@@ -148,6 +153,142 @@ def _(
 ):
     reveal_type(u1)  # revealed: Literal[Color.RED]
     reveal_type(u2)  # revealed: Literal[Color.RED]
+```
+
+A protocol can distinguish enum members by their `name`. Only `Color.RED` is redundant in a union
+with `NamedRed`, in either operand order.
+
+```py
+class NamedRed(Protocol):
+    @property
+    def name(self) -> Literal["RED"]: ...
+
+def _(
+    literals_first: Literal[Color.RED, Color.GREEN] | NamedRed = Color.GREEN,
+    protocol_first: NamedRed | Literal[Color.RED, Color.GREEN] = Color.GREEN,
+):
+    reveal_type(literals_first)  # revealed: Literal[Color.GREEN] | NamedRed
+    reveal_type(protocol_first)  # revealed: NamedRed | Literal[Color.GREEN]
+```
+
+The same simplification applies through a type alias for the protocol.
+
+```py
+type Red = NamedRed
+
+def _(
+    literals_first: Literal[Color.RED, Color.GREEN] | Red = Color.GREEN,
+    alias_first: Red | Literal[Color.RED, Color.GREEN] = Color.GREEN,
+):
+    reveal_type(literals_first)  # revealed: Literal[Color.GREEN] | NamedRed
+    reveal_type(alias_first)  # revealed: NamedRed | Literal[Color.GREEN]
+```
+
+A negative `TypeIs` check excludes `T` from `Color.BLUE`. Since `T` is a subtype of `RedOrBlue`,
+adding `RedOrBlue` restores `Color.BLUE`. If we have already found that `RedOrBlue` covers
+`Color.RED`, we remove `Color.RED` before restoring `Color.BLUE`. Otherwise, the three literals
+would combine into `Color` and ty would reject the return.
+
+```py
+from collections.abc import Callable
+from typing_extensions import TypeIs
+
+class RedOrBlue(Protocol):
+    @property
+    def name(self) -> Literal["RED", "BLUE"]: ...
+
+def pick[T: RedOrBlue](
+    test: Callable[[object], TypeIs[T]],
+    value: T,
+    fallback: RedOrBlue,
+    index: int,
+) -> Literal[Color.GREEN] | RedOrBlue:
+    if value is Color.RED or test(Color.BLUE):
+        return fallback
+    direct = (Color.RED, Color.GREEN, Color.BLUE, fallback)[index]
+    reveal_type(direct)  # revealed: Literal[Color.GREEN] | RedOrBlue
+    # Here the protocol first restores T, which in turn restores Color.BLUE.
+    return (Color.RED, Color.GREEN, value, Color.BLUE, fallback)[index]
+```
+
+If the protocol covers neither of the earlier literals, restoring the third completes the enum. We
+can then narrow `Color` to its last remaining member.
+
+```py
+def pick_red[T: NamedRed](
+    test: Callable[[object], TypeIs[T]],
+    fallback: NamedRed,
+    index: int,
+) -> Literal[Color.RED] | None:
+    if test(Color.RED):
+        return None
+    color = (Color.GREEN, Color.BLUE, Color.RED, fallback)[index]
+    if isinstance(color, Color) and color not in (Color.GREEN, Color.BLUE):
+        return color
+    return None
+```
+
+## Unions of integer literals with a numerator protocol
+
+An integer is its own numerator, so only `1` satisfies this protocol.
+
+```py
+from typing import Literal, Protocol
+
+class NumeratorOne(Protocol):
+    @property
+    def numerator(self) -> Literal[1]: ...
+
+def _(literals_first: Literal[1, 2] | NumeratorOne, protocol_first: NumeratorOne | Literal[1, 2]):
+    reveal_type(literals_first)  # revealed: Literal[2] | NumeratorOne
+    reveal_type(protocol_first)  # revealed: NumeratorOne | Literal[2]
+```
+
+## Unions of string and bytes literals with a length protocol
+
+For both strings and bytes, a protocol can distinguish literals by their length.
+
+```py
+from typing import Literal, Protocol
+
+class LengthOne(Protocol):
+    def __len__(self) -> Literal[1]: ...
+
+def _(
+    strings_first: Literal["a", "ab"] | LengthOne,
+    strings_last: LengthOne | Literal["a", "ab"],
+    bytes_first: Literal[b"a", b"ab"] | LengthOne,
+    bytes_last: LengthOne | Literal[b"a", b"ab"],
+):
+    reveal_type(strings_first)  # revealed: Literal["ab"] | LengthOne
+    reveal_type(strings_last)  # revealed: LengthOne | Literal["ab"]
+    reveal_type(bytes_first)  # revealed: Literal[b"ab"] | LengthOne
+    reveal_type(bytes_last)  # revealed: LengthOne | Literal[b"ab"]
+```
+
+## Unions of class objects and string literals
+
+```py
+from typing import Literal
+
+def _(dtype: type[float] | Literal["float", "double"]):
+    reveal_type(dtype)  # revealed: type[float] | Literal["float", "double"]
+    if isinstance(dtype, str):
+        reveal_type(dtype)  # revealed: Literal["float", "double"]
+```
+
+If the metaclass never returns, there is no class object to include in the union.
+
+```py
+from typing_extensions import Never
+
+def meta(*args: object) -> Never:
+    raise ValueError
+
+class C(metaclass=meta): ...
+
+def _(x: type[C] | Literal["a"]):
+    reveal_type(x)  # revealed: Literal["a"]
 ```
 
 ## Do not erase `Unknown`
@@ -203,6 +344,23 @@ def _(
     reveal_type(i2)  # revealed: P & Q
 ```
 
+Excluding the same class from unrelated alternatives keeps both. In `Q & Child`, `Child` satisfies
+the `P` bound in `P & Q` even though it comes second.
+
+```py
+class R: ...
+class Child(P): ...
+
+def _(
+    distinct: Intersection[P, Not[R]] | Intersection[Q, Not[R]],
+    narrower_last: Intersection[P, Q] | Intersection[Q, Child],
+    narrower_first: Intersection[Q, Child] | Intersection[P, Q],
+):
+    reveal_type(distinct)  # revealed: (P & ~R) | (Q & ~R)
+    reveal_type(narrower_last)  # revealed: P & Q
+    reveal_type(narrower_first)  # revealed: P & Q
+```
+
 Recombining the truthy and falsy parts of `int` also subsumes the earlier `bool` operand.
 
 ```py
@@ -212,6 +370,28 @@ from ty_extensions import AlwaysFalsy, AlwaysTruthy
 TruthyInt = Intersection[int, Not[AlwaysFalsy]]
 FalsyInt = Intersection[int, Not[AlwaysTruthy]]
 reveal_type(Union[bool, TruthyInt, FalsyInt])  # revealed: <types.UnionType special-form 'int'>
+```
+
+## Unions of gradual literals
+
+When we intersect literals with `Any`, distinct values still give distinct alternatives.
+`LiteralString` can subsume a particular string.
+
+```py
+from typing import Any, Literal
+from typing_extensions import LiteralString
+from ty_extensions import Intersection
+
+def _(
+    distinct: Intersection[Any, Literal["a"]] | Intersection[Literal["b"], Any],
+    same: Intersection[Literal["a"], Any] | Intersection[Any, Literal["a"]],
+    broader: Intersection[Literal["a"], Any] | Intersection[Any, LiteralString],
+    mixed: Intersection[Any, LiteralString] | Intersection[Any, Literal[1]],
+):
+    reveal_type(distinct)  # revealed: (Any & Literal["a"]) | (Literal["b"] & Any)
+    reveal_type(same)  # revealed: Literal["a"] & Any
+    reveal_type(broader)  # revealed: Any & LiteralString
+    reveal_type(mixed)  # revealed: (Any & LiteralString) | (Any & Literal[1])
 ```
 
 ## Unions of literals with `AlwaysTruthy` and `AlwaysFalsy`

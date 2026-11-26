@@ -208,7 +208,7 @@ from typing_extensions import TypeForm
 
 def unwrap(form: TypeForm):
     while True:
-        # error: [unresolved-attribute]
+        # error: [missing-union-attribute]
         form = form.__supertype__
         unwrap(form)
 ```
@@ -221,7 +221,7 @@ class Wrapper: ...
 
 def unwrap_alias(form: Wrapper) -> TypeForm:
     while True:
-        # error: [unresolved-attribute]
+        # error: [missing-union-attribute]
         form = form.__value__
         if form:
             return form
@@ -363,7 +363,7 @@ def returned_union() -> TypeForm[int | str]:
     return identity(int | str)
 
 def returned_incompatible_class() -> TypeForm[str]:
-    return identity(int)  # error: [invalid-return-type]
+    return identity(int)  # error: [invalid-explicit-return]
 
 async def async_identity[T](value: T) -> T:
     return value
@@ -550,7 +550,7 @@ def is_bare_runtime_type(value: TypeForm[Any]) -> TypeIs[type]:
 
 def reject_broad_runtime_type_narrowing(
     value: TypeForm[str],
-) -> TypeIs[type]:  # error: [invalid-type-guard-definition]
+) -> TypeIs[type]:  # error: [suspicious-type-is-narrowing]
     return isinstance(value, type)
 
 class A: ...

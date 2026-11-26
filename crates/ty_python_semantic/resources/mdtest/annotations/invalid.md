@@ -1268,26 +1268,17 @@ python-version = "3.12"
 class C:
     list = 42
 
-    # TODO: `visible_ancestor_scopes` skips the class through nested annotation scopes,
-    # so we incorrectly offer a fix that resolves `list` to `C.list`.
     type Alias[T] = [int]  # snapshot: invalid-type-form
 ```
 
 ```snapshot
 error[invalid-type-form]: List literals are not allowed in this context in a type alias definition
- --> src/mdtest_snippet.py:6:21
+ --> src/mdtest_snippet.py:4:21
   |
-6 |     type Alias[T] = [int]  # snapshot: invalid-type-form
+4 |     type Alias[T] = [int]  # snapshot: invalid-type-form
   |                     ^^^^^ Did you mean `list[int]`?
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-help: Replace with `list[...]`
-  |
-5 |     # so we incorrectly offer a fix that resolves `list` to `C.list`.
-  -     type Alias[T] = [int]  # snapshot: invalid-type-form
-6 +     type Alias[T] = list[int]  # snapshot: invalid-type-form
-  |
-note: This is an unsafe fix and may change runtime behavior
 ```
 
 #### Collection literal fixes with project-level builtin overrides

@@ -18,7 +18,7 @@ use crate::types::{
     class::walk_generic_alias,
     cyclic::{ActiveRecursionDetector, TypeIdentity},
     function::{FunctionType, walk_function_type},
-    generics::{GenericContext, walk_specialization_types},
+    generics::walk_specialization_types,
     instance::{walk_nominal_instance_type, walk_protocol_instance_type},
     known_instance::walk_known_instance_type,
     method::{walk_bound_method_type, walk_method_wrapper_type},
@@ -67,6 +67,10 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
         walk_callable_type(db, callable, self);
+    }
+
+    fn visit_signature(&self, db: &'db dyn Db, signature: &super::Signature<'db>) {
+        super::walk_signature(db, signature, self);
     }
 
     fn visit_property_instance_type(&self, db: &'db dyn Db, property: PropertyInstanceType<'db>) {
@@ -137,6 +141,16 @@ pub(crate) trait TypeVisitor<'db> {
         walk_known_instance_type(db, known_instance, self);
     }
 
+    /// Visit an alias used as a value, such as `Box[T]` in `values = [Box[T]]`.
+    /// Its specialization arguments are available without evaluating its lazy `__value__`.
+    fn visit_type_alias_object(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+        if self.should_visit_lazy_type_attributes() {
+            self.visit_type_alias_type(db, alias);
+        } else {
+            self.notify_skipped_lazy_type_attributes();
+        }
+    }
+
     fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
         walk_type_alias_type(db, type_alias, self);
     }
@@ -162,7 +176,7 @@ pub(crate) trait TypeVisitor<'db> {
 }
 
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::SalsaValue)]
 pub(super) enum NonAtomicType<'db> {
     Union(UnionType<'db>),
     Intersection(IntersectionType<'db>),
@@ -670,21 +684,21 @@ pub(super) fn dynamic_content_impl<'db>(
     visitor.content.get()
 }
 
-/// Whether a type may depend on variables from a generic context, including in lazy attributes.
+/// Whether a type may depend on any matching type variables, including in lazy attributes.
 ///
 /// Recursive definitions can keep changing their specialization without introducing any of the
 /// variables we are looking for. After visiting a definition's body, inspect the arguments of a
 /// recursive reference instead of expanding the body again. This can overestimate dependencies
 /// carried in unused recursive arguments, but a recursion cutoff alone is not a dependency.
-pub(super) fn may_contain_typevar_from<'db>(
+pub(super) fn may_contain_typevar_matching<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
-    generic_context: GenericContext<'db>,
+    matches: impl Fn(BoundTypeVarInstance<'db>) -> bool,
 ) -> bool {
     struct TypeVarOccurrenceVisitor<'a, 'db> {
         env: &'a ProgramEnvironment<'db>,
-        generic_context: GenericContext<'db>,
+        matches: &'a dyn Fn(BoundTypeVarInstance<'db>) -> bool,
         visited_types: TypeCollector<'db>,
         active_types: ActiveRecursionDetector<TypeIdentity<'db>>,
         active_protocols: ActiveRecursionDetector<Definition<'db>>,
@@ -728,13 +742,16 @@ pub(super) fn may_contain_typevar_from<'db>(
                 return;
             }
 
-            if matches!(ty, Type::TypeVar(typevar) if self.generic_context.contains(db, typevar.identity(db)))
-            {
+            if ty.as_typevar().is_some_and(self.matches) {
                 self.found.set(true);
                 return;
             }
 
             walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
+        }
+
+        fn visit_type_alias_object(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+            walk_type_alias_arguments(db, alias, self);
         }
 
         fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
@@ -830,7 +847,7 @@ pub(super) fn may_contain_typevar_from<'db>(
 
     let visitor = TypeVarOccurrenceVisitor {
         env,
-        generic_context,
+        matches: &matches,
         visited_types: TypeCollector::default(),
         active_types: ActiveRecursionDetector::default(),
         active_protocols: ActiveRecursionDetector::default(),
@@ -1020,6 +1037,15 @@ where
                     }
                     return;
                 }
+            }
+            // An ordinary nominal instance visits only its class. Class literals have no
+            // children, and generic aliases have their own recursion guard. An exact tuple
+            // visits its elements directly, so it still needs the guard on the instance.
+            if let Type::NominalInstance(instance) = ty
+                && !instance.is_exact_tuple()
+            {
+                walk_nominal_instance_type(db, instance, self);
+                return;
             }
             walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }

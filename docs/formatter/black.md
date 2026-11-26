@@ -134,47 +134,43 @@ We agree that Ruff's formatting (that matches Black's 23) is hard to read and ne
 
 ### Call expressions with a single multiline string argument
 
-Unlike Black, Ruff preserves the indentation of a single multiline-string argument in a call expression:
+Black and Ruff both preserve the indentation inside the multiline-string argument in a call expression. The key difference is the placement of the opening quotation marks and the placement of the closing parenthesis:
 
 ```python
 # Input
 call(
-  """"
-  A multiline
-  string
-  """
+    """
+    A multiline
+    string
+    """
 )
 
-dedent(""""
+dedent("""
     A multiline
     string
 """)
 
 # Black
-call(
-  """"
-  A multiline
-  string
-  """
-)
+call("""
+    A multiline
+    string
+    """)
 
-dedent(
-  """"
-  A multiline
-  string
-"""
-)
+dedent("""
+    A multiline
+    string
+""")
 
 
 # Ruff
 call(
-  """"
-  A multiline
-  string
-  """
+    """
+    A multiline
+    string
+    """
 )
 
-dedent(""""
+dedent("""
     A multiline
     string
 """)

@@ -84,12 +84,14 @@ def exact_sequence_pattern_is_exhaustive(value: tuple[int, str]) -> int:
         case int(), str():
             return 1
 
-def refutable_exact_sequence_pattern_is_not_exhaustive(value: tuple[int]) -> int:  # error: [invalid-return-type]
+def refutable_exact_sequence_pattern_is_not_exhaustive(value: tuple[int]) -> int:  # error: [invalid-implicit-return]
     match value:
         case [int(real=0)]:
             return 1
 
-def guarded_exact_sequence_pattern_is_not_exhaustive(value: tuple[int, str], flag: bool) -> int:  # error: [invalid-return-type]
+def guarded_exact_sequence_pattern_is_not_exhaustive(
+    value: tuple[int, str], flag: bool
+) -> int:  # error: [invalid-implicit-return]
     match value:
         case [int(), str()] if flag:
             return 1
@@ -230,12 +232,12 @@ from typing import NamedTuple, final
 class Point(NamedTuple):
     x: bool
 
-def named_tuple(value: Point) -> int:  # no diagnostic
+def named_tuple(value: Point) -> int:  # ok
     match value:
         case Point():
             return 42
 
-def nested_named_tuple(value: tuple[Point]) -> int:  # no diagnostic
+def nested_named_tuple(value: tuple[Point]) -> int:  # ok
     match value:
         case [Point()]:
             return 42
@@ -243,7 +245,7 @@ def nested_named_tuple(value: tuple[Point]) -> int:  # no diagnostic
 @final
 class TupleSubclass(tuple[bool]): ...
 
-def tuple_subclass(value: TupleSubclass) -> int:  # no diagnostic
+def tuple_subclass(value: TupleSubclass) -> int:  # ok
     match value:
         case TupleSubclass():
             return 42
@@ -252,12 +254,12 @@ def tuple_subclass(value: TupleSubclass) -> int:  # no diagnostic
 A guard or a refutable attribute pattern can still leave values unmatched:
 
 ```py
-def guarded(value: Point, flag: bool) -> int:  # error: [invalid-return-type] "can implicitly return `None`"
+def guarded(value: Point, flag: bool) -> int:  # error: [invalid-implicit-return] "can implicitly return `None`"
     match value:
         case Point() if flag:
             return 42
 
-def refutable(value: Point) -> int:  # error: [invalid-return-type] "can implicitly return `None`"
+def refutable(value: Point) -> int:  # error: [invalid-implicit-return] "can implicitly return `None`"
     match value:
         case Point(x=True):
             return 42

@@ -72,11 +72,11 @@ use crate::package::PackageRoot;
 use crate::preview::{
     is_incorrect_dict_iterator_comprehension_enabled, is_undefined_export_in_dunder_init_enabled,
 };
-use crate::registry::Rule;
+use crate::registry::{LintSource, Rule};
 use crate::rules::flake8_bugbear::rules::ReturnInGenerator;
 use crate::rules::pyflakes::rules::{
-    LateFutureImport, MultipleStarredExpressions, ReturnOutsideFunction,
-    UndefinedLocalWithNestedImportStarUsage, YieldOutsideFunction,
+    LateFutureImport, MultipleStarredExpressions, NonModuleLevelStarImport, ReturnOutsideFunction,
+    YieldOutsideFunction,
 };
 use crate::rules::pylint::rules::{
     AwaitOutsideAsync, LoadBeforeGlobalDeclaration, NonlocalWithoutBinding,
@@ -294,7 +294,12 @@ impl<'a> Checker<'a> {
             locator,
             stylist,
             indexer,
-            importer: Importer::new(parsed, locator.contents(), stylist),
+            importer: Importer::new(
+                parsed,
+                locator.contents(),
+                stylist,
+                target_version.parser_version(),
+            ),
             semantic,
             visit: deferred::Visit::default(),
             analyze: deferred::Analyze::default(),
@@ -585,9 +590,7 @@ impl<'a> Checker<'a> {
     /// that we delete at most one statement per indented block per fixer pass. Fix isolation should
     /// thus be applied whenever we delete a statement, but can otherwise be omitted.
     pub(crate) fn isolation(node_id: Option<NodeId>) -> IsolationLevel {
-        node_id
-            .map(|node_id| IsolationLevel::Group(node_id.into()))
-            .unwrap_or_default()
+        node_id.map_or_default(|node_id| IsolationLevel::Group(node_id.into()))
     }
 
     /// Parse a stringified type annotation as an AST expression,
@@ -640,6 +643,13 @@ impl<'a> Checker<'a> {
     /// supported Python version.
     pub(crate) fn target_version(&self) -> PythonVersion {
         self.target_version.linter_version()
+    }
+
+    /// Return the [`PythonVersion`] to use for syntax checking and future-import classification.
+    ///
+    /// This defaults to [`PythonVersion::latest`] when `target_version` is unset.
+    pub(crate) fn parser_version(&self) -> PythonVersion {
+        self.target_version.parser_version()
     }
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Checker)) {
@@ -808,11 +818,8 @@ impl SemanticSyntaxContext for Checker<'_> {
                 }
             }
             SemanticSyntaxErrorKind::NonModuleImportStar(name) => {
-                if self.is_rule_enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
-                    self.report_diagnostic(
-                        UndefinedLocalWithNestedImportStarUsage { name },
-                        error.range,
-                    );
+                if self.is_rule_enabled(Rule::NonModuleLevelStarImport) {
+                    self.report_diagnostic(NonModuleLevelStarImport { name }, error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReturnOutsideFunction => {
@@ -1075,18 +1082,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
             {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
             }
-            Stmt::ImportFrom(ast::StmtImportFrom {
-                module,
-                names,
-                is_lazy,
-                ..
-            }) => {
+            Stmt::ImportFrom(import_from) => {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
 
                 // Allow eager `__future__` imports until we see any other import. Lazy imports,
                 // including `lazy from __future__ import ...`, don't enable future annotations.
-                if !*is_lazy && matches!(module.as_deref(), Some("__future__")) {
-                    if names
+                if !import_from.is_lazy && import_from.is_future_import(self.parser_version()) {
+                    if import_from
+                        .names
                         .iter()
                         .any(|alias| alias.name.as_str() == "annotations")
                     {
@@ -1222,8 +1225,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
 
+                let is_future = stmt
+                    .as_import_from_stmt()
+                    .is_some_and(|import_from| import_from.is_future_import(self.parser_version()));
+
                 for alias in names {
-                    if !is_lazy && matches!(module, Some("__future__")) {
+                    if !is_lazy && is_future {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
                         self.add_binding(
                             name,
@@ -1967,60 +1974,30 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.semantic
                         .resolve_qualified_name(func)
                         .and_then(|qualified_name| {
-                            if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "cast")
-                            {
-                                Some(typing::Callable::Cast)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "TypeForm")
-                            {
-                                Some(typing::Callable::TypeForm)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "NewType")
-                            {
-                                Some(typing::Callable::NewType)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "TypeVar")
-                            {
-                                Some(typing::Callable::TypeVar)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "TypeAliasType")
-                            {
-                                Some(typing::Callable::TypeAliasType)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "NamedTuple")
-                            {
-                                Some(typing::Callable::NamedTuple)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "TypedDict")
-                            {
-                                Some(typing::Callable::TypedDict)
-                            } else if matches!(
-                                qualified_name.segments(),
-                                [
-                                    "mypy_extensions",
-                                    "Arg"
-                                        | "DefaultArg"
-                                        | "NamedArg"
-                                        | "DefaultNamedArg"
-                                        | "VarArg"
-                                        | "KwArg"
-                                ]
-                            ) {
-                                Some(typing::Callable::MypyExtension)
-                            } else if matches!(qualified_name.segments(), ["" | "builtins", "bool"])
-                            {
-                                Some(typing::Callable::Bool)
-                            } else {
-                                None
-                            }
+                            let segments = qualified_name.segments();
+                            let &name = segments.last()?;
+                            let callable = match name {
+                                "cast" => typing::Callable::Cast,
+                                "TypeForm" => typing::Callable::TypeForm,
+                                "NewType" => typing::Callable::NewType,
+                                "TypeVar" => typing::Callable::TypeVar,
+                                "TypeAliasType" => typing::Callable::TypeAliasType,
+                                "NamedTuple" => typing::Callable::NamedTuple,
+                                "TypedDict" => typing::Callable::TypedDict,
+                                "Arg" | "DefaultArg" | "NamedArg" | "DefaultNamedArg"
+                                | "VarArg" | "KwArg"
+                                    if matches!(segments, ["mypy_extensions", _]) =>
+                                {
+                                    return Some(typing::Callable::MypyExtension);
+                                }
+                                "bool" if matches!(segments, ["" | "builtins", _]) => {
+                                    return Some(typing::Callable::Bool);
+                                }
+                                _ => return None,
+                            };
+                            self.semantic
+                                .match_typing_qualified_name(&qualified_name, name)
+                                .then_some(callable)
                         });
                 match callable {
                     Some(typing::Callable::Bool) => {
@@ -2816,8 +2793,8 @@ impl<'a> Checker<'a> {
     fn visit_cast_type_argument(&mut self, arg: &'a Expr) {
         self.visit_type_definition(arg);
 
-        if !self.source_type.is_stub() && self.is_rule_enabled(Rule::RuntimeCastValue) {
-            flake8_type_checking::rules::runtime_cast_value(self, arg);
+        if !self.source_type.is_stub() && self.is_rule_enabled(Rule::CastWithUnquotedType) {
+            flake8_type_checking::rules::cast_with_unquoted_type(self, arg);
         }
     }
 
@@ -2869,6 +2846,7 @@ impl<'a> Checker<'a> {
         }
 
         // Create the `Binding`.
+        let is_annotation = kind.is_annotation();
         let binding_id = self.semantic.push_binding(name, range, kind, flags);
 
         // If the name is private, mark is as such.
@@ -2876,16 +2854,15 @@ impl<'a> Checker<'a> {
             self.semantic.bindings[binding_id].flags |= BindingFlags::PRIVATE_DECLARATION;
         }
 
-        // If there's an existing binding in this scope, copy its references.
-        if let Some(shadowed_id) = self.semantic.scopes[scope_id].get(name) {
-            // If this is an annotation, and we already have an existing value in the same scope,
-            // don't treat it as an assignment, but track it as a delayed annotation.
-            if self.semantic.binding(binding_id).kind.is_annotation() {
-                self.semantic
-                    .add_delayed_annotation(shadowed_id, binding_id);
-                return binding_id;
-            }
+        // An annotation on an existing value is delayed and leaves the binding in place.
+        if is_annotation && let Some(shadowed_id) = self.semantic.scopes[scope_id].get(name) {
+            self.semantic
+                .add_delayed_annotation(shadowed_id, binding_id);
+            return binding_id;
+        }
 
+        // If this binding replaces an existing one, copy its references.
+        if let Some(shadowed_id) = self.semantic.scopes[scope_id].add(name, binding_id) {
             // Avoid shadowing builtins.
             let shadowed = &self.semantic.bindings[shadowed_id];
             if !matches!(
@@ -2921,10 +2898,6 @@ impl<'a> Checker<'a> {
                 .shadowed_bindings
                 .insert(binding_id, shadowed_id);
         }
-
-        // Add the binding to the scope.
-        let scope = &mut self.semantic.scopes[scope_id];
-        scope.add(name, binding_id);
 
         binding_id
     }
@@ -3247,10 +3220,19 @@ impl<'a> Checker<'a> {
                             }
                         };
 
+                        let flags_snapshot = self.semantic.flags;
                         self.semantic.flags |=
                             SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
                         let parsed_expr = parsed_annotation.expression();
                         self.visit_expr(parsed_expr);
+                        self.semantic.flags = flags_snapshot;
+                        if self.is_rule_enabled(Rule::RuntimeStringUnion) {
+                            flake8_type_checking::rules::runtime_string_union(
+                                self,
+                                parsed_expr,
+                                string_expr,
+                            );
+                        }
                         if self.semantic.in_type_alias_value() {
                             // stub files are covered by PYI020
                             if !self.source_type.is_stub()
@@ -3446,9 +3428,9 @@ impl<'a> Checker<'a> {
                 } else {
                     if self.semantic.global_scope().uses_star_imports() {
                         // F405
-                        if self.is_rule_enabled(Rule::UndefinedLocalWithImportStarUsage) {
+                        if self.is_rule_enabled(Rule::PossiblyUndefinedNameWithStarImport) {
                             self.report_diagnostic(
-                                pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                                pyflakes::rules::PossiblyUndefinedNameWithStarImport {
                                     name: name.to_string(),
                                 },
                                 range,
@@ -3652,10 +3634,8 @@ impl<'a> LintContext<'a> {
     /// Create a new collector for `path` with an empty collection of `Diagnostic`s.
     pub(crate) fn new(path: &'a Path, contents: &'a str, settings: &'a LinterSettings) -> Self {
         // Ignore diagnostics based on per-file-ignores.
-        let mut rules = settings.rules.clone();
-        for ignore in crate::fs::ignores_from_path(path, &settings.per_file_ignores) {
-            rules.disable(ignore);
-        }
+        let ignored = crate::fs::ignores_from_path(path, &settings.per_file_ignores);
+        let rules = settings.rules.clone().without(&ignored);
 
         Self {
             diagnostics: RefCell::default(),
@@ -3766,8 +3746,8 @@ impl<'a> LintContext<'a> {
     }
 
     #[inline]
-    pub(crate) fn iter_enabled_rules(&self) -> impl Iterator<Item = Rule> + '_ {
-        self.rules.iter_enabled()
+    pub(crate) fn has_rules_for(&self, source: LintSource) -> bool {
+        self.rules.any_enabled_in(source.rule_set())
     }
 
     #[inline]

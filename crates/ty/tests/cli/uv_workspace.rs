@@ -361,7 +361,7 @@ fn overridden_python_environment_disables_dependency_checks() -> anyhow::Result<
             exit_code: 1
             ----- stdout -----
             packages/member/member.py:3:15: error[invalid-assignment] Object of type `int` is not assignable to `str`
-            pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: selected Python environment `<environment>` (from `--python` argument) differs from uv's environment `<temp_dir>/.venv`
+            pyproject.toml: warning[project-manager] Failed to load uv dependency metadata: selected Python environment `<environment>` (from `--python` argument) differs from uv's environment `<temp_dir>/.venv`
             Found 2 diagnostics
 
             ----- stderr -----
@@ -430,7 +430,7 @@ fn explicit_script_path_disables_uv_workspace_discovery() -> anyhow::Result<()> 
     exit_code: 1
     ----- stdout -----
     member.py:1:14: error[invalid-assignment] Object of type `Literal["selected-member"]` is not assignable to `int`
-    pyproject.toml: warning[uv-metadata] Failed to load uv metadata: No solution found when resolving dependencies
+    pyproject.toml: warning[project-manager] Failed to load project metadata from uv: No solution found when resolving dependencies
     Found 2 diagnostics
 
     ----- stderr -----
@@ -457,7 +457,7 @@ fn explicit_script_path_disables_uv_workspace_discovery() -> anyhow::Result<()> 
     success: false
     exit_code: 1
     ----- stdout -----
-    member.py:5:8: error[unresolved-import] Cannot resolve imported module `shared`
+    member.py:5:8: error[import-not-found] Cannot resolve imported module `shared`
     member.py:6:14: error[invalid-assignment] Object of type `Literal["selected-script"]` is not assignable to `int`
     Found 2 diagnostics
 
@@ -713,9 +713,59 @@ fn uv_workspace_discovery_is_opt_in() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    member.py:1:8: error[unresolved-import] Cannot resolve imported module `shared`
+    member.py:1:8: error[import-not-found] Cannot resolve imported module `shared`
     member.py:2:14: error[invalid-assignment] Object of type `Literal["selected-member"]` is not assignable to `int`
     Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn ty_uv_off_overrides_project_cli_setting() -> anyhow::Result<()> {
+    let case = CliTest::with_file("main.py", "x = 1")?;
+    assert_cmd_snapshot!(
+        case.command()
+            .args(["--config", "project-manager.project='uv'"])
+            .env(EnvVars::TY_UV, "off")
+            .env(EnvVars::UV, "missing-ty-project-uv"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+    Ok(())
+}
+
+#[cfg(feature = "test-uv")]
+#[test]
+fn configured_uv_discovers_workspace_from_member() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    case.write_file("shared.py", "value = 1")?;
+    case.write_file(
+        "packages/member/member.py",
+        r#"
+        import shared
+        value: int = 'selected-member'
+        "#,
+    )?;
+    let mut command = uv_sync_command(&case, None)?;
+    command
+        .current_dir(case.root().join("packages/member"))
+        .env_remove("TY_UV")
+        .args([".", "--config", "project-manager.project='uv'"]);
+    assert_cmd_snapshot!(command, @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    member.py:3:14: error[invalid-assignment] Object of type `Literal["selected-member"]` is not assignable to `int`
+    Found 1 diagnostic
 
     ----- stderr -----
     "#);
@@ -743,7 +793,7 @@ fn scripts_only_mode_disables_uv_workspace_discovery() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Cannot resolve imported module `shared`
+    error[import-not-found]: Cannot resolve imported module `shared`
      --> member.py:1:8
       |
     1 | import shared
@@ -788,7 +838,7 @@ fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    pyproject.toml: warning[uv-metadata] Failed to invoke `uv workspace metadata`: failed to resolve uv executable: cannot find binary path
+    pyproject.toml: warning[project-manager] Failed to load project metadata from uv: could not find `uv` on `PATH`
     Found 1 diagnostic
 
     ----- stderr -----
@@ -800,8 +850,9 @@ fn warns_when_uv_workspace_metadata_cannot_be_loaded() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning[uv-metadata]: Failed to invoke `uv workspace metadata`: failed to resolve uv executable: cannot find binary path
+    warning[project-manager]: Failed to load project metadata from uv: could not find `uv` on `PATH`
     --> pyproject.toml:1:1
+    info: To install uv, see https://docs.astral.sh/uv/
 
     Found 1 diagnostic
 
@@ -908,7 +959,7 @@ members = ["packages/*"]
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `typing` has no member `override`
+    error[missing-module-member]: Module `typing` has no member `override`
      --> member.py:1:20
       |
     1 | from typing import override

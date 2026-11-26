@@ -51,12 +51,16 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Example
 ///
 /// ```python
+/// import re
+///
 /// re.compile("foo\\bar")
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
+/// import re
+///
 /// re.compile(r"foo\bar")
 /// ```
 #[derive(ViolationMetadata)]
