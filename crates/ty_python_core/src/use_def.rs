@@ -252,7 +252,7 @@ use std::ops::Index;
 use std::rc::Rc;
 use std::sync::{Arc, LazyLock};
 
-use ruff_index::{FrozenIndexVec, Idx, IndexVec, newtype_index};
+use ruff_index::{FrozenIndexVec, Idx, IndexSlice, IndexVec, newtype_index};
 use ruff_python_ast::NodeIndex;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHasher};
@@ -353,8 +353,6 @@ struct PlaceStateInterner {
     undeclared_declarations_by_constraint:
         IndexVec<ScopedReachabilityConstraintId, Option<InternedDeclarationsId>>,
     // These values are extremely common, so avoid repeatedly hashing their small vectors.
-    empty_bindings: Option<InternedBindingsId>,
-    empty_declarations: Option<InternedDeclarationsId>,
     always_unbound_bindings: Option<InternedBindingsId>,
     always_undeclared_declarations: Option<InternedDeclarationsId>,
 }
@@ -367,8 +365,6 @@ impl PlaceStateInterner {
             interned_declarations: RetainedDeclarationsBuilder::with_capacity(declarations),
             interned_ids_by_declarations: hashbrown::HashTable::with_capacity(declaration_map),
             undeclared_declarations_by_constraint: IndexVec::new(),
-            empty_bindings: None,
-            empty_declarations: None,
             always_unbound_bindings: None,
             always_undeclared_declarations: None,
         }
@@ -377,9 +373,7 @@ impl PlaceStateInterner {
     fn intern_bindings(&mut self, bindings: &Bindings) -> InternedBindingsId {
         // Reachable places with no explicit bindings share an empty slice.
         if bindings.as_slice().is_empty() {
-            return *self
-                .empty_bindings
-                .get_or_insert_with(|| self.interned_bindings.push(bindings));
+            return InternedBindingsId::new(0);
         }
         if bindings.is_always_unbound() {
             if let Some(interned_id) = self.always_unbound_bindings {
@@ -418,9 +412,7 @@ impl PlaceStateInterner {
 
     fn intern_declarations(&mut self, declarations: &Declarations) -> InternedDeclarationsId {
         if declarations.as_slice().is_empty() {
-            return *self
-                .empty_declarations
-                .get_or_insert_with(|| self.interned_declarations.push(declarations));
+            return InternedDeclarationsId::new(0);
         }
         if declarations.is_always_undeclared() {
             if let Some(interned_id) = self.always_undeclared_declarations {
@@ -494,11 +486,48 @@ impl PlaceStateInterner {
     }
 }
 
+/// State zero is empty. While all other states are singletons, their IDs
+/// are also their exclusive end offsets, so no offset table is needed.
+fn push_retained_state<I: Idx, T: Clone>(
+    ends: &mut IndexVec<I, u32>,
+    entries: &mut Vec<T>,
+    state: &[T],
+) -> I {
+    debug_assert!(!state.is_empty());
+    let start = entries.len();
+    let capacity = entries.capacity();
+    entries.extend_from_slice(state);
+    let end =
+        u32::try_from(entries.len()).expect("Expected retained state length to fit into a u32");
+
+    if ends.is_empty() {
+        if state.len() == 1 {
+            return I::new(entries.len());
+        }
+        // Materialize the implicit offsets, preserving every existing state ID.
+        *ends = IndexVec::with_capacity(capacity.max(start + 2));
+        ends.extend(0..=u32::try_from(start).unwrap());
+    }
+    ends.push(end)
+}
+
+/// Returns the range for a state, using its ID as the end offset until a table exists.
+fn retained_state_range<I: Idx>(ends: &IndexSlice<I, u32>, index: I) -> std::ops::Range<usize> {
+    let id = index.index();
+    if id == 0 {
+        0..0
+    } else if ends.is_empty() {
+        id - 1..id
+    } else {
+        ends[I::new(id - 1)] as usize..ends[index] as usize
+    }
+}
+
 /// Compact, retained representation of the interned binding vectors for a scope.
 ///
 /// The builder needs a `SmallVec` and an optional unbound constraint while constructing each
 /// binding state. Neither is needed after the semantic index is built, so the retained map stores
-/// cumulative end offsets into one contiguous array instead.
+/// one contiguous array, with explicit end offsets only when needed.
 #[derive(Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 struct RetainedBindings {
     ends: FrozenIndexVec<InternedBindingsId, u32>,
@@ -513,28 +542,17 @@ struct RetainedBindingsBuilder {
 impl RetainedBindingsBuilder {
     fn with_capacity(bindings: usize) -> Self {
         Self {
-            ends: IndexVec::with_capacity(bindings),
+            ends: IndexVec::new(),
             live_bindings: Vec::with_capacity(bindings),
         }
     }
 
     fn push(&mut self, bindings: &Bindings) -> InternedBindingsId {
-        // Definition IDs are also 32-bit and a single scope cannot practically approach this
-        // limit. Keeping one cumulative end offset per state halves the retained range metadata.
-        self.live_bindings.extend_from_slice(bindings.as_slice());
-        let end = u32::try_from(self.live_bindings.len())
-            .expect("Expected live-bindings length to fit into a u32");
-        self.ends.push(end)
+        push_retained_state(&mut self.ends, &mut self.live_bindings, bindings.as_slice())
     }
 
     fn get(&self, index: InternedBindingsId) -> &[LiveBinding] {
-        let end = self.ends[index];
-        let start = if index.index() == 0 {
-            0
-        } else {
-            self.ends[InternedBindingsId::new(index.index() - 1)]
-        };
-        &self.live_bindings[start as usize..end as usize]
+        &self.live_bindings[retained_state_range(&self.ends, index)]
     }
 
     fn finish(
@@ -557,20 +575,14 @@ impl Index<InternedBindingsId> for RetainedBindings {
     type Output = [LiveBinding];
 
     fn index(&self, index: InternedBindingsId) -> &Self::Output {
-        let end = self.ends[index];
-        let start = if index.index() == 0 {
-            0
-        } else {
-            self.ends[InternedBindingsId::new(index.index() - 1)]
-        };
-        &self.live_bindings[start as usize..end as usize]
+        &self.live_bindings[retained_state_range(&self.ends, index)]
     }
 }
 
 /// Compact, retained representation of the interned declaration vectors for a scope.
 #[derive(Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 struct RetainedDeclarations {
-    /// The exclusive end of each state in `live_declarations`; its start is the previous end.
+    /// Explicit end offsets when some states have multiple declarations.
     ends: FrozenIndexVec<InternedDeclarationsId, u32>,
     live_declarations: Box<[LiveDeclaration]>,
 }
@@ -583,26 +595,21 @@ struct RetainedDeclarationsBuilder {
 impl RetainedDeclarationsBuilder {
     fn with_capacity(declarations: usize) -> Self {
         Self {
-            ends: IndexVec::with_capacity(declarations),
+            ends: IndexVec::new(),
             live_declarations: Vec::with_capacity(declarations),
         }
     }
 
     fn push(&mut self, declarations: &Declarations) -> InternedDeclarationsId {
-        self.live_declarations.extend(declarations.iter().cloned());
-        let end = u32::try_from(self.live_declarations.len())
-            .expect("Expected live-declarations length to fit into a u32");
-        self.ends.push(end)
+        push_retained_state(
+            &mut self.ends,
+            &mut self.live_declarations,
+            declarations.as_slice(),
+        )
     }
 
     fn get(&self, index: InternedDeclarationsId) -> &[LiveDeclaration] {
-        let end = self.ends[index];
-        let start = if index.index() == 0 {
-            0
-        } else {
-            self.ends[InternedDeclarationsId::new(index.index() - 1)]
-        };
-        &self.live_declarations[start as usize..end as usize]
+        &self.live_declarations[retained_state_range(&self.ends, index)]
     }
 
     fn finish(
@@ -623,13 +630,7 @@ impl Index<InternedDeclarationsId> for RetainedDeclarations {
     type Output = [LiveDeclaration];
 
     fn index(&self, index: InternedDeclarationsId) -> &Self::Output {
-        let end = self.ends[index];
-        let start = if index.index() == 0 {
-            0
-        } else {
-            self.ends[InternedDeclarationsId::new(index.index() - 1)]
-        };
-        &self.live_declarations[start as usize..end as usize]
+        &self.live_declarations[retained_state_range(&self.ends, index)]
     }
 }
 
@@ -3941,5 +3942,29 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         interned_ids_by_snapshot
+    }
+}
+
+#[cfg(test)]
+mod retained_state_tests {
+    use super::*;
+
+    #[test]
+    fn materializing_offsets_preserves_singleton_ids() {
+        let mut ends = IndexVec::<InternedBindingsId, u32>::new();
+        let mut entries = Vec::new();
+        let empty = InternedBindingsId::new(0);
+        let first = push_retained_state(&mut ends, &mut entries, &[1]);
+        let second = push_retained_state(&mut ends, &mut entries, &[2]);
+        assert!(ends.is_empty());
+        assert_eq!(entries[retained_state_range(&ends, second)], [2]);
+
+        let pair = push_retained_state(&mut ends, &mut entries, &[3, 4]);
+        let last = push_retained_state(&mut ends, &mut entries, &[5]);
+        assert!(entries[retained_state_range(&ends, empty)].is_empty());
+        assert_eq!(entries[retained_state_range(&ends, first)], [1]);
+        assert_eq!(entries[retained_state_range(&ends, second)], [2]);
+        assert_eq!(entries[retained_state_range(&ends, pair)], [3, 4]);
+        assert_eq!(entries[retained_state_range(&ends, last)], [5]);
     }
 }
