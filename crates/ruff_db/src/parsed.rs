@@ -13,7 +13,7 @@ use ruff_python_parser::{
 };
 
 use crate::files::File;
-use crate::source::source_text;
+use crate::source::{read_source_text, source_text};
 use crate::{Db, PythonFile};
 
 /// Returns the parsed AST of `file`, including its token stream.
@@ -47,7 +47,13 @@ pub(super) fn disable_lru(db: &mut dyn Db) {
 }
 
 fn parsed_module_impl(db: &dyn Db, file: File, target_version: PythonVersion) -> Parsed<ModModule> {
-    let source = source_text(db, file);
+    // A bundled stub's AST is often enough for type inference. Only cache its decompressed
+    // source if a caller asks for the text itself.
+    let source = if file.path(db).is_vendored_path() {
+        read_source_text(db, file)
+    } else {
+        source_text(db, file)
+    };
     let ty = file.source_type(db);
 
     let options = ParseOptions::from(ty).with_target_version(target_version);
@@ -986,12 +992,14 @@ mod tests {
     use crate::PythonFile;
     use crate::files::{system_path_to_file, vendored_path_to_file};
     use crate::parsed::parsed_module;
+    use crate::source::source_text;
     use crate::system::{
         DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemVirtualPath,
     };
     use crate::tests::TestDb;
     use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
     use ruff_python_ast::PythonVersion;
+    use salsa::EventKind;
     use zip::CompressionMethod;
 
     #[test]
@@ -1086,10 +1094,19 @@ else:
 
         let file = vendored_path_to_file(&db, VendoredPath::new("path.pyi")).unwrap();
 
-        let file = PythonFile::new(&db, file, PythonVersion::latest_ty());
-        let parsed = parsed_module(&db, file).load(&db);
+        let python_file = PythonFile::new(&db, file, PythonVersion::latest_ty());
+        let parsed = parsed_module(&db, python_file).load(&db);
 
         assert!(parsed.has_valid_syntax());
+
+        // Parsing alone leaves the source-text query unevaluated.
+        db.clear_salsa_events();
+        let _ = source_text(&db, file);
+        assert!(
+            db.take_salsa_events()
+                .iter()
+                .any(|event| matches!(event.kind, EventKind::WillExecute { .. }))
+        );
     }
 
     #[test]

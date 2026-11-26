@@ -103,6 +103,92 @@ def f():
     print("unreachable")
 ```
 
+### Reading an unchanged parameter after nested branches
+
+Both inner branches end in a call that never returns. The read of `y` must see the merged conditions
+even though neither branch assigns to `y`.
+
+```py
+from typing_extensions import Never
+
+def stop() -> Never:
+    raise RuntimeError
+
+def f(x: int, y: str):
+    if isinstance(x, str):
+        if x:
+            stop()
+        else:
+            stop()
+        reveal_type(y)  # revealed: Never
+        assert y
+```
+
+### Testing an uninhabited value in nested branches
+
+Inside the `isinstance` branch, `v` has type `Never`. Neither outcome of the test of `v` is
+possible. If `x` was `None`, the only path to the return assigns an integer to `x`.
+
+```py
+def f(x: int | None, v: int, verbose: bool) -> int:
+    if x is None:
+        if isinstance(v, str):
+            if v:
+                if verbose:
+                    print("text")
+        else:
+            x = 1
+    return x
+```
+
+### Short-circuit conditions around a call returning `Never`
+
+A branch that leaves `x` unchanged must not make the final return reachable. The string assigned to
+`message` is truthy, so the condition always evaluates `sys.exit`.
+
+```py
+import sys
+
+def f(x: int | None, flag: bool) -> int:
+    if x is not None:
+        return x
+    if flag:
+        pass
+    if (message := "missing") and sys.exit(message):
+        pass
+    return x
+```
+
+Merging the alternatives of an `elif` must also preserve the earlier call to `stop`.
+
+```py
+from typing_extensions import Never
+
+def stop() -> Never:
+    raise RuntimeError
+
+def g(x: int | None, verbose: bool) -> int:
+    if x is None:
+        if stop():
+            pass
+        elif (message := "") and verbose:
+            print(message)
+    else:
+        x = 1
+    return x
+
+def h(x: int | None, verbose: bool) -> int:
+    if x is None:
+        if verbose and stop():
+            pass
+        elif (message := "") and verbose:
+            print(message)
+    else:
+        x = 1
+    # When verbose is false, the condition skips stop() and x can still be None.
+    return x  # error: [invalid-explicit-return]
+```
+
 ### Calls to unions of functions returning `Never`
 
 In the example below, either function raises an exception, so calling the selected function makes

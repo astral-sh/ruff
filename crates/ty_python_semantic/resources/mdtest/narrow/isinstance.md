@@ -1515,7 +1515,7 @@ class Box[T]:
 def narrow_box[T: str](value: Box[T] | T) -> Box[T]:
     if isinstance(value, Box):
         reveal_type(value)  # revealed: Box[T@narrow_box] | (T@narrow_box & Top[Box[Unknown]])
-        return value  # error: [invalid-return-type]
+        return value  # error: [invalid-explicit-return]
 
     reveal_type(value)  # revealed: T@narrow_box & ~Top[Box[Unknown]]
     raise TypeError
@@ -1870,7 +1870,7 @@ def narrow_defaulted_tuple(value: object) -> None:
 
 After an `isinstance(..., classmethod)` branch unwraps and replaces a generic `classmethod`, the
 false-branch residual should be impossible. This avoids retaining a `classmethod[...] & Top[...]`
-arm that later causes `call-top-callable` false positives.
+arm that later causes `call-to-function-with-unknown-signature` false positives.
 
 ```toml
 [environment]
@@ -2063,7 +2063,7 @@ def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
     if isinstance(value, Iterable) and not isinstance(value, Sized):
         # revealed: list[object]
         reveal_type(list(value))
-        # error: [invalid-return-type]
+        # error: [invalid-explicit-return]
         # revealed: list[object]
         return reveal_type(list(value))
     raise NotImplementedError

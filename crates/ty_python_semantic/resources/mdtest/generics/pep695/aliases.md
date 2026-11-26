@@ -397,10 +397,10 @@ error[not-subscriptable]: Cannot specialize non-generic type alias `AliasB`
 type A = int
 type B[T] = T
 
-# error: [call-non-callable] "Object of type `TypeAliasType` is not callable"
+# error: [not-callable] "Object of type `TypeAliasType` is not callable"
 reveal_type(A())  # revealed: Unknown
 
-# error: [call-non-callable] "Object of type `GenericAlias` is not callable"
+# error: [not-callable] "Object of type `GenericAlias` is not callable"
 reveal_type(B[int]())  # revealed: Unknown
 ```
 
@@ -426,7 +426,7 @@ r2: RecursiveList[int] = [1, [1, 2, 3]]
 r3: RecursiveList[int] = "a"
 # error: [invalid-assignment]
 r4: RecursiveList[int] = ["a"]
-# error: [invalid-assignment] "Object of type `list[int | list[RecursiveList[int]] | list[int | list[RecursiveList[int]] | str]]` is not assignable to `RecursiveList[int]`"
+# error: [invalid-assignment] "Object of type `list[int | list[str]]` is not assignable to `RecursiveList[int]`"
 r5: RecursiveList[int] = [1, ["a"]]
 
 def _(x: RecursiveList[int]):
@@ -466,7 +466,7 @@ d1: DivergentList[int] = []
 d2: DivergentList[int] = [1]
 # error: [invalid-assignment]
 d3: DivergentList[int] = ["a"]
-# error: [invalid-assignment] "Object of type `list[list[DivergentList[int]] | list[list[DivergentList[int]] | int]]` is not assignable to `DivergentList[int]`"
+# error: [invalid-assignment] "Object of type `list[list[int]]` is not assignable to `DivergentList[int]`"
 d4: DivergentList[int] = [[1]]
 
 def _(x: DivergentList[int]):
@@ -808,7 +808,7 @@ class Box[T]:
 type RefBox[T] = Box[T]
 
 def transmute_inner[T, V](x: RefBox[T]) -> RefBox[V]:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `RefBox[V@transmute_inner]`, found `RefBox[T@transmute_inner]`"
+    # error: [invalid-explicit-return] "Return type does not match returned value: expected `RefBox[V@transmute_inner]`, found `RefBox[T@transmute_inner]`"
     return x
 ```
 

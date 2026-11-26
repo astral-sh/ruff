@@ -19,7 +19,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variable
  4 | T = TypeVar("T")
  5 | 
  6 | # This recovers as the `Q` binding for source-level name resolution.
- 7 | # error: [mismatched-type-name]
+ 7 | # error: [mismatched-typevar-name]
  8 | Q = TypeVar("T")
  9 | 
 10 | class Outer(Generic[Q]):
@@ -32,7 +32,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variable
 # Diagnostics
 
 ```
-warning[mismatched-type-name]: The name passed to `TypeVar` must match the variable it is assigned to
+warning[mismatched-typevar-name]: The name passed to `TypeVar` must match the variable it is assigned to
  --> src/mdtest_snippet.py:8:13
   |
 8 | Q = TypeVar("T")

@@ -56,7 +56,7 @@ use crate::{
 /// ## See also
 ///
 /// This rule avoids offering a fix if any of the rule codes in a `noqa` comment are unused. See
-/// `unused-noqa` for a rule that will remove these and allow the remaining codes to be moved into a
+/// `unused-suppression-comment` for a rule that will remove these and allow the remaining codes to be moved into a
 /// `ruff: ignore` comment.
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.15.22", category = Category::Pedantic)]

@@ -230,6 +230,177 @@ fn benchmark_factored_upper_bounds(criterion: &mut Criterion) {
     });
 }
 
+/// Bokeh's constructor combines a large literal alias with `str` in its receiver (ty#5046).
+fn benchmark_constructor_literal_alias(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for (name, receiver_arg, size) in [
+        ("union_28", "A | B", 28),
+        ("alias_12", "Alternatives[A, B]", 12),
+    ] {
+        let markers = (0..size).map(|i| format!("'marker{i}'")).join(", ");
+        let code = format!(
+            r#"
+            from typing import Literal, assert_type
+
+            type Alternatives[A, B] = A | B
+            type Marker = Literal[{markers}]
+
+            class Property[T]:
+                value: T
+
+            class Either[T](Property[T]):
+                def __init__[A, B](
+                    self: "Either[{receiver_arg}]", first: type[Property[A]], second: type[Property[B]]
+                ) -> None: ...
+
+            assert_type(Either(Property[Marker], Property[str]), Either[str])
+            "#
+        );
+        criterion.bench_function(
+            &format!("ty_micro[constructor_literal_alias/{name}]"),
+            |b| {
+                b.iter_batched_ref(
+                    || setup_micro_case(&code),
+                    |Case { db }| assert_eq!(db.check().len(), 0),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+}
+
+/// Bokeh calls `super().__init__()` on a receiver with a large union of literals (ty#5063).
+/// We specialize the overloads before filtering by arity. Two ways to partition the literals
+/// between `A` and `B` already rule out a unique receiver specialization.
+fn benchmark_overloaded_constructor_receiver(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+        from typing import Literal, overload
+
+        type Pattern = Literal["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"]
+
+        class Either[T]:
+            value: T
+
+            @overload
+            def __init__[A, B](self: "Either[A | B]", value: A) -> None: ...
+            @overload
+            def __init__(self) -> None: ...
+            def __init__(self, *args: object) -> None: ...
+
+        class HatchPattern(Either[Pattern]):
+            def __init__(self) -> None:
+                super().__init__()
+    "#;
+
+    criterion.bench_function("ty_micro[overloaded_constructor_receiver]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// These constructors used to hang because recursive substitution kept reordering union
+/// members in their inferred type arguments (ty#5057).
+fn benchmark_constructor_union_specialization(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for (name, parameters, example) in [
+        (
+            "instances",
+            "first: PropertyArg[A], second: PropertyArg[B], third: PropertyArg[C]",
+            r#"
+            result = Either(
+                Property[Literal["start", "center", "end"]](),
+                Property[Literal["left", "center", "right"]](),
+                Property[float](),
+            )
+            assert_type(result, Either[Literal["start", "center", "end", "left", "right"] | float])
+            "#,
+        ),
+        (
+            "classes",
+            "first: type[Property[A]], second: type[Property[B]], third: type[Property[C]]",
+            "
+            result = Either(Property[float], Property[str | None], Property[bytes])
+            assert_type(result, Either[float | str | None | bytes])
+            ",
+        ),
+    ] {
+        for (suffix, typevars) in [("", "A, B, C"), ("_reversed", "C, B, A")] {
+            let code = format!(
+                r#"
+            from typing import Literal, assert_type
+
+            class Property[T]:
+                value: T
+
+            type PropertyArg[T] = type[Property[T]] | Property[T]
+
+            class Either[T](Property[T]):
+                def __init__[{typevars}](
+                    self: "Either[A | B | C]", {parameters}
+                ) -> None: ...
+            {example}
+            "#
+            );
+            criterion.bench_function(
+                &format!("ty_micro[constructor_union_specialization/{name}{suffix}]"),
+                |b| {
+                    b.iter_batched_ref(
+                        || setup_micro_case(&code),
+                        |Case { db }| assert_eq!(db.check().len(), 0),
+                        BatchSize::SmallInput,
+                    );
+                },
+            );
+        }
+    }
+}
+
+/// Rejecting `T <= int` contradicts `T <= bool`. Trying to disprove the expression on that
+/// branch can exhaust every combination of unrelated choices for `V`.
+fn benchmark_counterexample_behind_implied_bound(criterion: &mut Criterion) {
+    setup_rayon();
+    let choices = (0..22)
+        .map(|i| format!(
+            "(ConstraintSet.lower_bound(Literal[{}], V) | ConstraintSet.lower_bound(Literal[{}], V))",
+            2 * i, 2 * i + 1
+        ))
+        .join(" & ");
+    // Falsifying a long disjunction requires one continuous path through every bound.
+    let alternatives = (1000..1033)
+        .map(|i| format!("ConstraintSet.lower_bound(Literal[{i}], U)"))
+        .join(" | ");
+    let code = format!(
+        "
+        from typing import Literal
+        from ty_extensions import static_assert
+        from ty_extensions._internal import ConstraintSet
+
+        def check[T, U, V]():
+            t_bool = ConstraintSet.upper_bound(T, bool)
+            t_int = ConstraintSet.upper_bound(T, int)
+            u_int = ConstraintSet.upper_bound(U, int)
+            choices = {choices}
+            static_assert(not (~(t_bool & choices) | (u_int & t_int)))
+            alternatives = {alternatives}
+            static_assert(not (((t_int | ~choices) & t_bool) | alternatives))
+        "
+    );
+    criterion.bench_function("ty_micro[counterexample_behind_implied_bound]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Guards against quadratic pruning when contravariant callbacks contribute many upper-only bounds.
 fn benchmark_many_upper_bound_callbacks(criterion: &mut Criterion) {
     const NUM_CALLBACKS: usize = 1_200;
@@ -291,6 +462,88 @@ def check(make: Callable[[], {union}]) -> None:
 
         criterion.bench_function(
             &format!("ty_micro[incompatible_lower_bound_alternatives/{members}]"),
+            |b| {
+                b.iter_batched_ref(
+                    || setup_micro_case(&code),
+                    |Case { db }| assert_eq!(db.check().len(), 0),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+}
+
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/5088>.
+///
+/// Each string can constrain `T` directly or through its characters. Putting the long string
+/// first introduces all the character bounds before the bounds for the two-letter strings.
+fn benchmark_string_or_sequence_inference(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let letters = "abcdefghijklmnop";
+    let pairs = letters.chars().map(|c| format!("'{c}{c}'")).join(", ");
+    let first = format!("'{letters}', {pairs}");
+    let last = format!("{pairs}, '{letters}'");
+    let consume = |argument: &str, parameter: &str| {
+        format!(
+            "def consume[T](value: {parameter}) -> None: ...
+
+def check(value: {argument}) -> None:
+    consume(value)
+"
+        )
+    };
+    let provide = "def provide[T](x: T) -> Callable[[T | Sequence[T]], None]:
+    raise NotImplementedError
+
+x: Callable[[Words], None] = provide('x')
+";
+    let receiver = "from typing import overload
+
+class C[T]:
+    @overload
+    def f[S](self: 'C[S | Sequence[S]]', x: int) -> S: ...
+    @overload
+    def f(self, x: str) -> int: ...
+    def f(self, x: int | str) -> object: raise NotImplementedError
+
+def check(c: C[Words]) -> None:
+    c.f(1)
+";
+    let generic_callback = "def consume[T](f: Callable[[int], T | Sequence[T]]) -> None: ...
+def callback[X](x: X) -> Words: raise NotImplementedError
+consume(callback)
+";
+    let direct = "T | Sequence[T]";
+    for (case, literals, body) in [
+        ("long_first", &first, consume("Words", direct)),
+        ("long_last", &last, consume("Words", direct)),
+        ("optional", &first, consume("Words | None", direct)),
+        (
+            "tuple",
+            &first,
+            consume("tuple[Words]", "tuple[T | Sequence[T]] | None"),
+        ),
+        (
+            "callable",
+            &first,
+            consume("Callable[[], Words]", "Callable[[], T | Sequence[T]]"),
+        ),
+        ("context", &first, provide.to_owned()),
+        ("overloaded_receiver", &first, receiver.to_owned()),
+        ("generic_callback", &last, generic_callback.to_owned()),
+    ] {
+        let code = format!(
+            "from collections.abc import Callable, Sequence
+from typing import Literal
+
+type Words = Literal[{literals}]
+
+{body}",
+        );
+
+        criterion.bench_function(
+            &format!("ty_micro[string_or_sequence_inference/{case}]"),
             |b| {
                 b.iter_batched_ref(
                     || setup_micro_case(&code),
@@ -588,6 +841,31 @@ def perform(rows: Rows) -> AllResults:
     });
 }
 
+/// Meson's list protocol matches the generic overload of `list[T].__add__` against
+/// `(list[Language]) -> list[Language]` while inferring the list literal's element type.
+fn benchmark_invariant_list_protocol(criterion: &mut Criterion) {
+    setup_rayon();
+    let code = r#"
+from typing import Literal, Protocol
+
+Language = Literal["c", "cpp", "cuda", "fortran", "d", "objc", "objcpp", "rust",
+                   "vala", "cs", "swift", "java", "cython", "nasm", "masm", "linearasm"]
+
+class Addable[T](Protocol):
+    def __add__(self, other: list[T], /) -> list[T]: ...
+    def copy(self) -> list[T]: ...
+
+languages: Addable[Language] = ["cpp", "c", "cuda"]
+"#;
+    criterion.bench_function("ty_micro[invariant_list_protocol]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_sequence_literal_union_access(criterion: &mut Criterion) {
     const NUM_LITERALS: usize = 1_200;
 
@@ -794,6 +1072,114 @@ fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
     });
 }
 
+/// Each overload brings its own `T` into the scope of `P`. Interning the growing set of
+/// binders after each overload retains a quadratic number of entries. Passing `first` keeps
+/// the final argument check from comparing the whole overload set against itself.
+fn benchmark_paramspec_capture_many_overloads(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from("from typing import Callable, Literal, overload\n\n");
+    for tag in 0..256 {
+        writeln!(
+            &mut code,
+            "@overload\ndef select[T](tag: Literal[{tag}], value: T) -> T: ..."
+        )
+        .ok();
+    }
+    code.push_str(
+        "\
+def select(tag: int, value: object) -> object:
+    return value
+
+def register[**P](f: Callable[P, object], g: Callable[P, object]) -> None: ...
+
+def first(tag: Literal[0], value: int) -> int:
+    return value
+
+register(first, select)
+",
+    );
+
+    criterion.bench_function("ty_micro[paramspec_capture_many_overloads]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// An overloaded `__call__` can refer to the protocol itself in each receiver annotation. Checking
+/// the receiver can therefore encounter the same overloads again.
+fn benchmark_overloaded_protocol_receivers(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+        from __future__ import annotations
+
+        from collections.abc import Callable
+        from os import PathLike
+        from typing import Generic, ParamSpec, Protocol, TypeVar, overload
+
+        V = TypeVar("V", covariant=True)
+        A = TypeVar("A", contravariant=True)
+        P = ParamSpec("P")
+        T = TypeVar("T")
+        C = TypeVar("C", bound=type)
+
+        class Wrapper(Protocol, Generic[V, A]):
+            @overload
+            def __call__(
+                self: Wrapper[Callable[P, T], A], f: Callable[P, T], arg: A, /
+            ) -> Callable[P, T]: ...
+            @overload
+            def __call__(
+                self: Wrapper[classmethod[C, P, T], A], f: classmethod[C, P, T], arg: A, /
+            ) -> classmethod[C, P, T]: ...
+            @overload
+            def __call__(
+                self: Wrapper[staticmethod[P, T], A], f: staticmethod[P, T], arg: A, /
+            ) -> staticmethod[P, T]: ...
+            def __call__(self, f, arg, /): ...
+
+        def check(wrapper: Wrapper[object, str | PathLike[str]], f: Callable[P, T]) -> Callable[P, T]:
+            return wrapper(f, "arg")
+    "#;
+
+    criterion.bench_function("ty_micro[overloaded_protocol_receivers]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Inferring the element type of this list checks whether a recursive alias and the type variables
+/// from `product` can satisfy both endpoints of an inference bound.
+fn benchmark_recursive_alias_product(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+        from collections.abc import Hashable, Sequence
+        from itertools import product
+        from typing import Union
+
+        Label = Union[Hashable, tuple["Label", ...]]
+
+        def check(values: tuple[Sequence[Label], ...]):
+            return list(product(*values))
+    "#;
+
+    criterion.bench_function("ty_micro[recursive_alias_product]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Repeated unions share source-order subtrees even after the TDD stops growing. Persisting each
 /// result must not expand those shared subtrees into exponentially many copies.
 fn benchmark_shared_source_order_compaction(criterion: &mut Criterion) {
@@ -826,19 +1212,28 @@ criterion_group!(
     benchmark_constraint_quantification,
     benchmark_bottom_and_top_signature_comparisons,
     benchmark_factored_upper_bounds,
+    benchmark_constructor_literal_alias,
+    benchmark_overloaded_constructor_receiver,
+    benchmark_constructor_union_specialization,
+    benchmark_counterexample_behind_implied_bound,
     benchmark_many_upper_bound_callbacks,
     benchmark_incompatible_lower_bound_alternatives,
+    benchmark_string_or_sequence_inference,
     benchmark_long_valid_bound_prefix,
     benchmark_pandas_tdd,
     benchmark_mixed_typed_dict_union_copy,
     benchmark_missing_key_typed_dict_union_copy,
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_invariant_generic_return_union,
+    benchmark_invariant_list_protocol,
     benchmark_sequence_literal_union_access,
     benchmark_invariant_generic_union_bound,
     benchmark_many_invariant_typevars,
     benchmark_mixed_many_invariant_typevars,
     benchmark_pydantic_core_schema_dict,
+    benchmark_paramspec_capture_many_overloads,
+    benchmark_overloaded_protocol_receivers,
+    benchmark_recursive_alias_product,
     benchmark_shared_source_order_compaction,
 );
 criterion_main!(constraint_set);

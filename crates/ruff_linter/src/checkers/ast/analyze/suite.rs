@@ -13,7 +13,7 @@ pub(crate) fn suite(suite: &[Stmt], checker: &Checker) {
     if checker.source_type.is_stub() && checker.is_rule_enabled(Rule::DocstringInStub) {
         flake8_pyi::rules::docstring_in_stubs(checker, suite);
     }
-    if checker.is_rule_enabled(Rule::RepeatedGlobal) {
-        refurb::rules::repeated_global(checker, suite);
+    if checker.is_rule_enabled(Rule::ConsecutiveGlobalOrNonlocalStatements) {
+        refurb::rules::consecutive_global_or_nonlocal_statements(checker, suite);
     }
 }

@@ -351,10 +351,7 @@ impl Printer {
 
                 // By default, we mimic Flake8's `--statistics` format.
                 for statistic in &statistics {
-                    let code = statistic
-                        .code
-                        .map(SecondaryCode::as_str)
-                        .unwrap_or_default();
+                    let code = statistic.code.map_or_default(SecondaryCode::as_str);
                     let padding_width = code_width - code.len();
 
                     writeln!(

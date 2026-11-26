@@ -209,25 +209,6 @@ help: Merge multiple comparisons
    |
 note: This is an unsafe fix and may change runtime behavior
 
-PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b"}`.
-  --> repeated_equality_comparison.py:24:1
-   |
-22 | foo != "a" and "b" != foo and foo != "c"
-23 |
-24 | foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-25 |
-26 | foo.bar == "a" or foo.bar == "b"  # Attributes.
-   |
-help: Merge multiple comparisons
-   |
-23 |
-   - foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
-24 + foo in {"a", "b"} or "c" == bar or "d" == bar  # Multiple targets
-25 |
-   |
-note: This is an unsafe fix and may change runtime behavior
-
 PLR1714 [*] Consider merging multiple comparisons: `bar in {"c", "d"}`.
   --> repeated_equality_comparison.py:24:1
    |
@@ -243,6 +224,25 @@ help: Merge multiple comparisons
 23 |
    - foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
 24 + foo == "a" or foo == "b" or bar in {"c", "d"}  # Multiple targets
+25 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b"}`.
+  --> repeated_equality_comparison.py:24:1
+   |
+22 | foo != "a" and "b" != foo and foo != "c"
+23 |
+24 | foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+25 |
+26 | foo.bar == "a" or foo.bar == "b"  # Attributes.
+   |
+help: Merge multiple comparisons
+   |
+23 |
+   - foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
+24 + foo in {"a", "b"} or "c" == bar or "d" == bar  # Multiple targets
 25 |
    |
 note: This is an unsafe fix and may change runtime behavior

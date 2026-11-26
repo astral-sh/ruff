@@ -1346,7 +1346,7 @@ impl Flake8BooleanTrapOptions {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Flake8BugbearOptions {
     /// Additional callable functions to consider "immutable" when evaluating, e.g., the
-    /// `function-call-in-default-argument` rule (`B008`) or `function-call-in-dataclass-defaults`
+    /// `function-call-in-parameter-default` rule (`B008`) or `function-call-in-dataclass-field-default`
     /// rule (`RUF009`).
     ///
     /// Expects to receive a list of fully-qualified names (e.g., `fastapi.Query`, rather than
@@ -3494,49 +3494,49 @@ pub struct PydocstyleOptions {
     /// ```
     ///
     /// The PEP 257 convention includes all `D` errors apart from:
-    /// [`D203`](rules/incorrect-blank-line-before-class.md),
-    /// [`D212`](rules/multi-line-summary-first-line.md),
-    /// [`D213`](rules/multi-line-summary-second-line.md),
-    /// [`D214`](rules/overindented-section.md),
-    /// [`D215`](rules/overindented-section-underline.md),
+    /// [`D203`](rules/incorrect-blank-line-before-class-docstring.md),
+    /// [`D212`](rules/multiline-docstring-summary-on-separate-line.md),
+    /// [`D213`](rules/multiline-docstring-summary-on-first-line.md),
+    /// [`D214`](rules/over-indented-docstring-section.md),
+    /// [`D215`](rules/over-indented-docstring-section-underline.md),
     /// [`D404`](rules/docstring-starts-with-this.md),
-    /// [`D405`](rules/non-capitalized-section-name.md),
-    /// [`D406`](rules/missing-new-line-after-section-name.md),
-    /// [`D407`](rules/missing-dashed-underline-after-section.md),
-    /// [`D408`](rules/missing-section-underline-after-name.md),
-    /// [`D409`](rules/mismatched-section-underline-length.md),
-    /// [`D410`](rules/no-blank-line-after-section.md),
-    /// [`D411`](rules/no-blank-line-before-section.md),
-    /// [`D413`](rules/missing-blank-line-after-last-section.md),
-    /// [`D415`](rules/missing-terminal-punctuation.md),
-    /// [`D416`](rules/missing-section-name-colon.md),
-    /// [`D417`](rules/undocumented-param.md), and
-    /// [`D420`](rules/incorrect-section-order.md).
+    /// [`D405`](rules/incorrectly-capitalized-docstring-section-name.md),
+    /// [`D406`](rules/missing-newline-after-docstring-section-name.md),
+    /// [`D407`](rules/missing-docstring-section-underline.md),
+    /// [`D408`](rules/blank-line-before-docstring-section-underline.md),
+    /// [`D409`](rules/incorrect-docstring-section-underline-length.md),
+    /// [`D410`](rules/missing-blank-line-after-docstring-section.md),
+    /// [`D411`](rules/missing-blank-line-before-docstring-section.md),
+    /// [`D413`](rules/missing-blank-line-after-last-docstring-section.md),
+    /// [`D415`](rules/docstring-summary-without-terminal-punctuation.md),
+    /// [`D416`](rules/docstring-section-name-without-colon.md),
+    /// [`D417`](rules/undocumented-parameter.md), and
+    /// [`D420`](rules/incorrect-docstring-section-order.md).
     ///
     /// The NumPy convention includes all `D` errors apart from:
     /// [`D107`](rules/undocumented-public-init.md),
-    /// [`D203`](rules/incorrect-blank-line-before-class.md),
-    /// [`D212`](rules/multi-line-summary-first-line.md),
-    /// [`D213`](rules/multi-line-summary-second-line.md),
+    /// [`D203`](rules/incorrect-blank-line-before-class-docstring.md),
+    /// [`D212`](rules/multiline-docstring-summary-on-separate-line.md),
+    /// [`D213`](rules/multiline-docstring-summary-on-first-line.md),
     /// [`D402`](rules/signature-in-docstring.md),
-    /// [`D413`](rules/missing-blank-line-after-last-section.md),
-    /// [`D415`](rules/missing-terminal-punctuation.md),
-    /// [`D416`](rules/missing-section-name-colon.md), and
-    /// [`D417`](rules/undocumented-param.md).
+    /// [`D413`](rules/missing-blank-line-after-last-docstring-section.md),
+    /// [`D415`](rules/docstring-summary-without-terminal-punctuation.md),
+    /// [`D416`](rules/docstring-section-name-without-colon.md), and
+    /// [`D417`](rules/undocumented-parameter.md).
     ///
     /// The Google convention includes all `D` errors apart from:
-    /// [`D203`](rules/incorrect-blank-line-before-class.md),
-    /// [`D204`](rules/incorrect-blank-line-after-class.md),
-    /// [`D213`](rules/multi-line-summary-second-line.md),
-    /// [`D215`](rules/overindented-section-underline.md),
-    /// [`D400`](rules/missing-trailing-period.md),
-    /// [`D401`](rules/non-imperative-mood.md),
+    /// [`D203`](rules/incorrect-blank-line-before-class-docstring.md),
+    /// [`D204`](rules/incorrect-blank-line-after-class-docstring.md),
+    /// [`D213`](rules/multiline-docstring-summary-on-first-line.md),
+    /// [`D215`](rules/over-indented-docstring-section-underline.md),
+    /// [`D400`](rules/docstring-summary-without-period.md),
+    /// [`D401`](rules/non-imperative-docstring-summary.md),
     /// [`D404`](rules/docstring-starts-with-this.md),
-    /// [`D406`](rules/missing-new-line-after-section-name.md),
-    /// [`D407`](rules/missing-dashed-underline-after-section.md),
-    /// [`D408`](rules/missing-section-underline-after-name.md),
-    /// [`D409`](rules/mismatched-section-underline-length.md), and
-    /// [`D413`](rules/missing-blank-line-after-last-section.md).
+    /// [`D406`](rules/missing-newline-after-docstring-section-name.md),
+    /// [`D407`](rules/missing-docstring-section-underline.md),
+    /// [`D408`](rules/blank-line-before-docstring-section-underline.md),
+    /// [`D409`](rules/incorrect-docstring-section-underline-length.md), and
+    /// [`D413`](rules/missing-blank-line-after-last-docstring-section.md).
     ///
     /// For more information see the [FAQ](faq.md#does-ruff-support-numpy-or-google-style-docstrings) entry.
     ///

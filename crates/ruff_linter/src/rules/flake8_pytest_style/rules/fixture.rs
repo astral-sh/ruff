@@ -135,14 +135,14 @@ impl AlwaysFixableViolation for PytestFixtureIncorrectParenthesesStyle {
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
-pub(crate) struct PytestFixturePositionalArgs {
+pub(crate) struct PytestFixturePositionalArguments {
     function: String,
 }
 
-impl Violation for PytestFixturePositionalArgs {
+impl Violation for PytestFixturePositionalArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestFixturePositionalArgs { function } = self;
+        let PytestFixturePositionalArguments { function } = self;
         format!("Configuration for fixture `{function}` specified via positional args, use kwargs")
     }
 }
@@ -367,14 +367,14 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 /// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
-pub(crate) struct PytestFixtureParamWithoutValue {
+pub(crate) struct PytestFixtureParameterWithoutValue {
     name: String,
 }
 
-impl Violation for PytestFixtureParamWithoutValue {
+impl Violation for PytestFixtureParameterWithoutValue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestFixtureParamWithoutValue { name } = self;
+        let PytestFixtureParameterWithoutValue { name } = self;
         format!(
             "Fixture `{name}` without value is injected as parameter, use \
              `@pytest.mark.usefixtures` instead"
@@ -770,10 +770,10 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
                 }
             }
 
-            if checker.is_rule_enabled(Rule::PytestFixturePositionalArgs) {
+            if checker.is_rule_enabled(Rule::PytestFixturePositionalArguments) {
                 if !arguments.args.is_empty() {
                     checker.report_diagnostic(
-                        PytestFixturePositionalArgs {
+                        PytestFixturePositionalArguments {
                             function: func_name.to_string(),
                         },
                         decorator.range(),
@@ -920,7 +920,7 @@ fn check_test_function_args(checker: &Checker, parameters: &Parameters, decorato
         let name = parameter.name();
         if name.starts_with('_') && !named_parametrize.contains(name.as_str()) {
             checker.report_diagnostic(
-                PytestFixtureParamWithoutValue {
+                PytestFixtureParameterWithoutValue {
                     name: name.to_string(),
                 },
                 parameter.range(),
@@ -1016,7 +1016,7 @@ pub(crate) fn fixture(
     let decorator = fixture_decorator(decorators, checker);
     if let Some(decorator) = decorator {
         if checker.is_rule_enabled(Rule::PytestFixtureIncorrectParenthesesStyle)
-            || checker.is_rule_enabled(Rule::PytestFixturePositionalArgs)
+            || checker.is_rule_enabled(Rule::PytestFixturePositionalArguments)
             || checker.is_rule_enabled(Rule::PytestExtraneousScopeFunction)
         {
             check_fixture_decorator(checker, name, decorator);
@@ -1043,7 +1043,9 @@ pub(crate) fn fixture(
         }
     }
 
-    if checker.is_rule_enabled(Rule::PytestFixtureParamWithoutValue) && name.starts_with("test_") {
+    if checker.is_rule_enabled(Rule::PytestFixtureParameterWithoutValue)
+        && name.starts_with("test_")
+    {
         check_test_function_args(checker, parameters, decorators);
     }
 }

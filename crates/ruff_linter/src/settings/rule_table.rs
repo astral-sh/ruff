@@ -61,6 +61,13 @@ impl RuleTable {
         }
     }
 
+    /// Returns the rule table with every rule in `rules` disabled.
+    pub(crate) fn without(mut self, rules: &RuleSet) -> Self {
+        self.enabled = self.enabled.subtract(rules);
+        self.should_fix = self.should_fix.subtract(rules);
+        self
+    }
+
     /// Disables the given rule.
     #[inline]
     pub fn disable(&mut self, rule: Rule) {

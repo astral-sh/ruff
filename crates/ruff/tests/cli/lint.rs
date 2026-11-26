@@ -1,12 +1,15 @@
 //! Tests the interaction of the `lint` configuration section
 
 use std::fs;
-use std::process::Command;
+use std::io;
+use std::process::{Command, Stdio};
 use std::str;
 
 use anyhow::Result;
+use indoc::indoc;
 
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
+use ruff_python_trivia::textwrap::dedent;
 
 use crate::CliTest;
 
@@ -19,6 +22,27 @@ impl CliTest {
         command.args(STDIN_BASE_OPTIONS);
         command
     }
+}
+
+#[test]
+fn verbose_logging_with_closed_stderr() -> Result<()> {
+    let case = CliTest::with_file("test.py", "import os\n")?;
+    let (reader, writer) = io::pipe()?;
+    drop(reader);
+
+    assert_cmd_snapshot!(case.check_command()
+        .args(["--isolated", "--verbose", "test.py"])
+        .stderr(writer), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+    Ok(())
 }
 
 #[test]
@@ -1373,6 +1397,25 @@ fn rule_name_selector_cli_preview_enabled() -> Result<()> {
 }
 
 #[test]
+fn renamed_rule_selector() -> Result<()> {
+    let fixture = CliTest::with_file("test.py", "def f(): pass")?;
+    let old_name = "missing-return-type-undocumented-public-function";
+
+    assert_cmd_snapshot!(fixture.check_command().args(["--preview", "--select", old_name]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:5: missing-return-annotation-for-public-function: Missing return type annotation for public function `f`
+    Found 1 error.
+    1 unsafe fix available with `--fix --unsafe-fixes`.
+
+    ----- stderr -----
+    warning: `missing-return-type-undocumented-public-function` has been remapped to `missing-return-annotation-for-public-function`.
+    ");
+    Ok(())
+}
+
+#[test]
 fn rule_category_selector_cli_preview_disabled() -> Result<()> {
     let fixture = unknown_rule_selector_test()?;
 
@@ -2644,6 +2687,164 @@ select = ["D100"]
 }
 
 #[test]
+fn add_noqa_skips_script_opening_marker() -> Result<()> {
+    let source = dedent(
+        r"
+            #!/usr/bin/env python3
+            # /// script
+            # dependencies = []
+            # ///
+            print(42)
+        ",
+    );
+    let source = source.trim_start();
+    let test = CliTest::with_file("script.py", source)?;
+
+    assert_cmd_snapshot!(test.check_command().args(["--select=D100", "--add-noqa", "script.py"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+    assert_eq!(test.read_file("script.py")?, source);
+    Ok(())
+}
+
+#[test]
+fn add_noqa_in_multiline_script_metadata() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # requires-python = """>=3.11, \
+            # <4"""
+            # ///
+            print(42)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(test.check_command().args([
+        "--select=E501",
+        "--line-length=30",
+        "--add-noqa",
+        "script.py",
+    ]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    ");
+    // FIXME: Appending a suppression after the continuation backslash invalidates the TOML.
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:3:35: invalid-script-metadata: invalid multi-line basic string, expected newline
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn add_ignore_reuses_directive_in_multiline_script_metadata() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # tool.example.text = """
+            # ruff: ignore[F541]
+            # """
+            # ///
+            print(f"hello")
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(test.check_command().args(["--select=T201,F541", "--add-ignore", "script.py"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 ignore comment.
+    ");
+    // FIXME: The apparent ignore suppresses F541 on the statement. Extending it to
+    // suppress T201 changes the TOML string.
+    insta::assert_snapshot!(test.read_file("script.py")?, @r#"
+
+    # /// script
+    # tool.example.text = """
+    # ruff: ignore[F541, T201]
+    # """
+    # ///
+    print(f"hello")
+    "#);
+    Ok(())
+}
+
+#[test]
+fn add_ignore_to_script_metadata() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # dependencies = ["numpy", "scipy", "matplotlib"]
+            # ///
+            print(42)
+        "#,
+    )?;
+    let args = ["--select=E501", "--line-length=40", "script.py"];
+
+    assert_cmd_snapshot!(test.check_command().args(args).arg("--add-ignore"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 ignore comment.
+    ");
+    assert_cmd_snapshot!(test.check_command().args(args), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn add_ignore_skips_script_closing_marker() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r"
+            # /// script
+            # ///",
+    )?;
+    let source = test.read_file("script.py")?;
+
+    assert_cmd_snapshot!(test.check_command().args([
+        "--preview",
+        "--select=W292",
+        "--add-ignore",
+        "script.py",
+    ]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+    assert_eq!(test.read_file("script.py")?, source);
+    Ok(())
+}
+
+#[test]
 fn add_noqa_exclude() -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file(
@@ -2766,6 +2967,100 @@ fn add_noqa_with_newline_in_reason() -> Result<()> {
     ----- stderr -----
     ruff failed
       Cause: --add-noqa <reason> cannot contain newline characters
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_uses_inline_script_rules() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # tool.ruff.lint.select = ['T201']
+            # ///
+            print(42)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--add-noqa", "script.py"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    ");
+
+    insta::assert_snapshot!(test.read_file("script.py")?, @"
+
+    # /// script
+    # tool.ruff.lint.select = ['T201']
+    # ///
+    print(42)  # noqa: T201
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_invalid_script_metadata() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # requires-python = 42
+            # ///
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--add-noqa", "script.py"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: invalid-script-metadata: invalid type: integer `42`, expected a string
+     --> script.py:3:21
+      |
+    2 | # /// script
+    3 | # requires-python = 42
+      |                     ^^
+    4 | # ///
+      |
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn add_ignore_invalid_script_metadata() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # requires-python = 42
+            # ///
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--add-ignore", "script.py"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: invalid-script-metadata: invalid type: integer `42`, expected a string
+     --> script.py:3:21
+      |
+    2 | # /// script
+    3 | # requires-python = 42
+      |                     ^^
+    4 | # ///
+      |
     ");
 
     Ok(())
@@ -3080,7 +3375,10 @@ requires-python = ">= 3.11"
 /// ```
 #[test]
 fn requires_python_no_tool_target_version_override() -> Result<()> {
-    let fixture = CliTest::new()?;
+    let fixture = CliTest::with_settings(|_, mut settings| {
+        settings.add_filter(r"\[\d{4}-\d{2}-\d{2}\]\[\d{2}:\d{2}:\d{2}\]", "[TIMESTAMP]");
+        settings
+    })?;
     fixture.write_file(
         "pyproject.toml",
         r#"[project]
@@ -3102,6 +3400,17 @@ requires-python = ">= 3.11"
             .arg("test.py")
             .arg("-")
     );
+
+    assert_cmd_snapshot!(fixture.check_command()
+        .args(["--verbose", "--no-respect-gitignore", "--show-settings", "--target-version=py310", "test.py"])
+        .stdout(Stdio::null()), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    [TIMESTAMP][ruff::resolve][DEBUG] Using Ruff default settings
+    ");
 
     Ok(())
 }
@@ -4066,6 +4375,572 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn script_without_tool_ruff_inherits_project_rules() -> Result<()> {
+    let test = CliTest::with_files([
+        ("ruff.toml", "lint.select = ['T201']"),
+        (
+            "script.py",
+            r"
+                # /// script
+                # [tool.other]
+                # ///
+                print(missing)
+            ",
+        ),
+    ])?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:5:1: print: `print` found
+    Found 1 error.
+    1 unsafe fix available with `--fix --unsafe-fixes`.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn script_with_empty_tool_ruff_uses_default_rules() -> Result<()> {
+    let test = CliTest::with_files([
+        ("config/ruff/ruff.toml", "lint.ignore = ['F821']"),
+        ("ruff.toml", "lint.select = ['T201']"),
+        (
+            "script.py",
+            r"
+                # /// script
+                # [tool.ruff]
+                # ///
+                print(missing)
+            ",
+        ),
+    ])?;
+    assert_cmd_snapshot!(test.check_command()
+        .env("HOME", test.root())
+        .env("XDG_CONFIG_HOME", test.root().join("config"))
+        .args(["--preview", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:5:7: undefined-name: Undefined name `missing`
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn script_with_tool_ruff_uses_inline_rules() -> Result<()> {
+    let test = CliTest::with_files([
+        ("ruff.toml", "lint.select = ['T201']"),
+        (
+            "script.py",
+            r"
+                # /// script
+                # [tool.ruff.lint]
+                # ignore = ['F821']
+                # ///
+                print(missing)
+            ",
+        ),
+    ])?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "script.py"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn inline_script_namespace_packages() -> Result<()> {
+    let test = CliTest::with_file(
+        "ruff.toml",
+        r#"
+            preview = true
+            namespace-packages = ['pkg']
+            lint.select = ['N999']
+        "#,
+    )?;
+    test.write_file(
+        "pkg/Invalid-Name.py",
+        r#"
+            # /// script
+            # tool.ruff.lint.select = ['N999']
+            # tool.ruff.namespace-packages = ['.']
+            # ///
+        "#,
+    )?;
+    test.write_file(
+        "pkg/Other-Name.py",
+        r"
+            # /// script
+            # tool.ruff.lint.select = ['N999']
+            # ///
+        ",
+    )?;
+    assert_cmd_snapshot!(test.check_command().arg("pkg"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    pkg/Invalid-Name.py:1:1: invalid-module-name: Invalid module name: 'Invalid-Name'
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn inline_script_nested_package_root() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "ruff.toml",
+            r"
+                preview = true
+                namespace-packages = ['acme']
+                lint.select = ['INP001']
+            ",
+        ),
+        ("acme/__init__.py", ""),
+        (
+            "acme/plugins/pkg/__init__.py",
+            r"
+                # /// script
+                # tool.ruff.lint.select = ['INP001']
+                # ///
+            ",
+        ),
+    ])?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "acme"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    acme/plugins/pkg/__init__.py:1:1: implicit-namespace-package: File `acme/plugins/pkg/__init__.py` declares a package, but is nested under an implicit namespace package. Add an `__init__.py` to `acme/plugins`.
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn explicit_config_overrides_script_settings() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "explicit.toml",
+            r#"
+                target-version = 'py310'
+                lint.select = ['UP045']
+            "#,
+        ),
+        (
+            "script.py",
+            r#"
+                # /// script
+                # requires-python = '>=3.9'
+                # tool.ruff.lint.ignore = ['UP045']
+                # ///
+                from typing import Optional
+
+                x: Optional[int]
+            "#,
+        ),
+    ])?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--config", "explicit.toml", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:8:4: non-pep604-annotation-optional: [*] Use `X | None` for type annotations
+    Found 1 error.
+    [*] 1 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn invalid_script_python_requirement() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        indoc! {r#"
+            #!/usr/bin/env python
+
+            # /// script
+            # requires-python = 'invalid'
+            # ///
+        "#},
+    )?;
+    assert_cmd_snapshot!(test.command().args(["check", "--preview", "--no-cache", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    invalid-script-metadata: Failed to parse version: Unexpected end of version specifier, expected operator:
+    invalid
+    ^^^^^^^
+     --> script.py:4:21
+      |
+    3 | # /// script
+    4 | # requires-python = 'invalid'
+      |                     ^^^^^^^^^
+    5 | # ///
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn fix_only_preserves_stdin_on_invalid_script_metadata() -> Result<()> {
+    let test = CliTest::new()?;
+    let source = indoc! {r#"
+        # /// script
+        # requires-python = "invalid"
+        # ///
+        print(42)
+    "#};
+    assert_cmd_snapshot!(test.check_command()
+        .args(["--preview", "--fix-only", "--stdin-filename=input.py", "-"])
+        .pass_stdin(source), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # /// script
+    # requires-python = "invalid"
+    # ///
+    print(42)
+
+    ----- stderr -----
+    "#);
+    Ok(())
+}
+
+#[test]
+fn invalid_inline_script_configuration() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # tool.ruff.preview = true
+            # tool.ruff.extend = 'missing.toml'
+            # ///
+        "#,
+    )?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py: invalid-script-metadata: Failed to load configuration `[TMP]/missing.toml`: Failed to read [TMP]/missing.toml: No such file or directory (os error 2)
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn script_target_overrides_extended_per_file_targets() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "common.toml",
+            r#"
+                lint.select = ["UP045"]
+                per-file-target-version = { "*.py" = "py312" }
+            "#,
+        ),
+        (
+            "inferred.py",
+            r#"
+                # /// script
+                # requires-python = ">=3.8"
+                # [tool.ruff]
+                # extend = "common.toml"
+                # ///
+                from typing import Optional
+                x: Optional[int]
+            "#,
+        ),
+        (
+            "explicit.py",
+            r#"
+                # /// script
+                # requires-python = ">=3.8"
+                # [tool.ruff]
+                # extend = "common.toml"
+                # target-version = "py38"
+                # ///
+                from typing import Optional
+                x: Optional[int]
+            "#,
+        ),
+        (
+            "own.py",
+            r#"
+                # /// script
+                # requires-python = ">=3.8"
+                # [tool.ruff]
+                # extend = "common.toml"
+                # target-version = "py38"
+                # per-file-target-version = { "own.py" = "py310" }
+                # ///
+                from typing import Optional
+                x: Optional[int]
+            "#,
+        ),
+    ])?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "inferred.py", "explicit.py", "own.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    own.py:10:4: non-pep604-annotation-optional: [*] Use `X | None` for type annotations
+    Found 1 error.
+    [*] 1 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn script_requires_python() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+                [project]
+                requires-python = ">=3.10"
+
+                [tool.ruff]
+                preview = true
+                per-file-target-version = { "old_*.py" = "py39" }
+
+                [tool.ruff.lint]
+                select = ["UP045"]
+            "#,
+        ),
+        (
+            "old_script.py",
+            r#"
+                # /// script
+                # requires-python = '>=3.10'
+                # ///
+                from typing import Optional
+                x: Optional[int]
+            "#,
+        ),
+        (
+            "old_fallback.py",
+            r#"
+                # /// script
+                # dependencies = []
+                # ///
+                from typing import Optional
+                x: Optional[int]
+            "#,
+        ),
+    ])?;
+    assert_cmd_snapshot!(test.check_command().arg("."), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    old_script.py:6:4: non-pep604-annotation-optional: [*] Use `X | None` for type annotations
+    Found 1 error.
+    [*] 1 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn cli_target_version_overrides_script_requirement() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r"
+            # /// script
+            # requires-python = '>=3.9'
+            # ///
+            from typing import Optional
+            x: Optional[int]
+        ",
+    )?;
+    test.write_file("ruff.toml", "target-version = 'py310'")?;
+    let args = [
+        "check",
+        "--quiet",
+        "--preview",
+        "--select=UP045",
+        "--output-format=concise",
+        "script.py",
+    ];
+    // Warm the cache. The explicit override changes the script target but not the project target.
+    assert_cmd_snapshot!(test.command().args(args), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+    assert_cmd_snapshot!(test.command().args(args).arg("--target-version=py310"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:6:4: non-pep604-annotation-optional: [*] Use `X | None` for type annotations
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn isolated_ignores_script_settings() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # requires-python = '>=3.9'
+            # tool.ruff.required-version = '>=99'
+            # tool.ruff.extend = 'missing.toml'
+            # ///
+            from typing import Optional
+            x: Optional[int]
+        "#,
+    )?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--isolated", "--select", "UP045", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:8:4: non-pep604-annotation-optional: [*] Use `X | None` for type annotations
+    Found 1 error.
+    [*] 1 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+
+    test.write_file(
+        "script.py",
+        r#"
+            # /// script
+            # invalid TOML
+            # ///
+        "#,
+    )?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--isolated", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:3:11: invalid-script-metadata: key with no value, expected `=`
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+
+    test.write_file("ruff.toml", "")?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--config", "ruff.toml", "script.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:3:11: invalid-script-metadata: key with no value, expected `=`
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn script_requires_python_stdin() -> Result<()> {
+    let test = CliTest::with_file(
+        "ruff.toml",
+        r#"
+            target-version = 'py39'
+            lint.select = ['UP045']
+        "#,
+    )?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "--fix", "-"]).pass_stdin(
+        indoc! {r#"
+            # /// script
+            # requires-python = '>=3.10'
+            # ///
+            from typing import Optional
+            x: Optional[int]
+        "#}
+    ), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # /// script
+    # requires-python = '>=3.10'
+    # ///
+    from typing import Optional
+    x: int | None
+
+    ----- stderr -----
+    Found 1 error (1 fixed, 0 remaining).
+    ");
+    Ok(())
+}
+
+#[test]
+fn script_rule_selectors_from_stdin() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.check_command().args(["--preview", "-"]).pass_stdin(indoc! {r#"
+        # /// script
+        # tool.ruff.lint.select = ["RUF999", "blank-line-before-function"]
+        # ///
+    "#}), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: Unknown rule selector `RUF999` in `select` from `-`
+    ");
+    Ok(())
+}
+
+#[test]
+fn invalid_script_metadata_stdin() -> Result<()> {
+    let test = CliTest::new()?;
+    assert_cmd_snapshot!(test.command()
+        .args(["check", "--no-cache", "--preview", "--output-format", "full", "--stdin-filename", "script.py", "-"])
+        .pass_stdin(indoc! {r#"
+            # /// script
+            # requires-python = 'invalid'
+            # ///
+        "#}), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    invalid-script-metadata: Failed to parse version: Unexpected end of version specifier, expected operator:
+    invalid
+    ^^^^^^^
+     --> script.py:2:21
+      |
+    1 | # /// script
+    2 | # requires-python = 'invalid'
+      |                     ^^^^^^^^^
+    3 | # ///
+      |
+
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
 /// Test that the linter respects per-file-target-version.
 #[test]
 fn per_file_target_version_linter() {
@@ -4496,12 +5371,7 @@ match 42:  # invalid-syntax
     case _: ...
 ";
 
-    let fixture = CliTest::with_settings(|_project_dir, mut settings| {
-        // JSON double escapes backslashes
-        settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
-
-        settings
-    })?;
+    let fixture = CliTest::with_settings(crate::output_format_settings)?;
 
     fixture.write_file("input.py", CONTENT)?;
 
@@ -4545,12 +5415,7 @@ match 42:  # invalid-syntax
     case _: ...
 ";
 
-    let fixture = CliTest::with_settings(|_project_dir, mut settings| {
-        // JSON double escapes backslashes
-        settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
-
-        settings
-    })?;
+    let fixture = CliTest::with_settings(crate::output_format_settings)?;
 
     fixture.write_file("input.py", CONTENT)?;
 
@@ -4753,12 +5618,12 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
     success: false
     exit_code: 2
     ----- stdout -----
-    normal.py:1:1: stable-test-rule: Hey this is a stable test rule.
-    normal.py:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
-    normal.py:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
-    normal.py:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
     normal.py:1:1: preview-test-rule: Hey this is a preview test rule.
     normal.py:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
+    normal.py:1:1: stable-test-rule: Hey this is a stable test rule.
+    normal.py:1:1: stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    normal.py:1:1: stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
+    normal.py:1:1: stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
     panic.py: panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     Found 7 errors.
     [*] 1 fixable with `--fix` (1 unsafe fix available with `--fix --unsafe-fixes`).
@@ -4788,8 +5653,22 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     success: false
     exit_code: 2
     ----- stdout -----
+    preview-test-rule: Hey this is a preview test rule.
+    --> normal.py:1:1
+
+    redirected-to-test-rule: Hey this is a test rule that was redirected from another.
+    --> normal.py:1:1
+
     stable-test-rule: Hey this is a stable test rule.
     --> normal.py:1:1
+
+    stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
+    --> normal.py:1:1
+      |
+    1 + # fix from stable-test-rule-display-only-fix
+    2 | import os
+      |
+    note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
     stable-test-rule-safe-fix: [*] Hey this is a stable test rule with a safe fix.
     --> normal.py:1:1
@@ -4805,20 +5684,6 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     2 | import os
       |
     note: This is an unsafe fix and may change runtime behavior
-
-    stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
-    --> normal.py:1:1
-      |
-    1 + # fix from stable-test-rule-display-only-fix
-    2 | import os
-      |
-    note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
-
-    preview-test-rule: Hey this is a preview test rule.
-    --> normal.py:1:1
-
-    redirected-to-test-rule: Hey this is a test rule that was redirected from another.
-    --> normal.py:1:1
 
     panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     --> panic.py:1:1
@@ -5025,7 +5890,7 @@ fn default_rules() -> Result<()> {
     	sys-version-cmp-str10 (YTT302),
     	sys-version-slice1 (YTT303),
     	cancel-scope-no-checkpoint (ASYNC100),
-    	trio-sync-call (ASYNC105),
+    	trio-call-not-awaited (ASYNC105),
     	async-zero-sleep (ASYNC115),
     	long-sleep-not-forever (ASYNC116),
     	blocking-http-call-in-async-function (ASYNC210),
@@ -5034,24 +5899,24 @@ fn default_rules() -> Result<()> {
     	wait-for-process-in-async-function (ASYNC222),
     	blocking-open-call-in-async-function (ASYNC230),
     	blocking-sleep-in-async-function (ASYNC251),
-    	exec-builtin (S102),
+    	exec (S102),
     	try-except-pass (S110),
     	try-except-continue (S112),
-    	blind-except (BLE001),
+    	catch-exception-or-base-exception (BLE001),
     	unary-prefix-increment-decrement (B002),
     	assignment-to-os-environ (B003),
     	unreliable-callable-check (B004),
-    	strip-with-multi-characters (B005),
-    	mutable-argument-default (B006),
-    	function-call-in-default-argument (B008),
-    	get-attr-with-constant (B009),
-    	set-attr-with-constant (B010),
+    	strip-with-duplicate-characters (B005),
+    	mutable-parameter-default (B006),
+    	function-call-in-parameter-default (B008),
+    	getattr-with-constant (B009),
+    	setattr-with-constant (B010),
     	jump-statement-in-finally (B012),
     	redundant-tuple-in-exception-handler (B013),
     	duplicate-handler-exception (B014),
     	useless-comparison (B015),
     	raise-literal (B016),
-    	assert-raises-exception (B017),
+    	assert-raises-exception-or-base-exception (B017),
     	useless-expression (B018),
     	cached-instance-method (B019),
     	loop-variable-overrides-iterator (B020),
@@ -5059,7 +5924,7 @@ fn default_rules() -> Result<()> {
     	useless-contextlib-suppress (B022),
     	function-uses-loop-variable (B023),
     	duplicate-try-block-exception (B025),
-    	star-arg-unpacking-after-keyword-arg (B026),
+    	star-arg-after-keyword (B026),
     	except-with-empty-tuple (B029),
     	except-with-non-exception-classes (B030),
     	reuse-of-groupby-generator (B031),
@@ -5088,24 +5953,24 @@ fn default_rules() -> Result<()> {
     	call-datetime-utcnow (DTZ003),
     	call-datetime-utcfromtimestamp (DTZ004),
     	debugger (T100),
-    	shebang-not-executable (EXE001),
-    	shebang-missing-executable-file (EXE002),
+    	non-executable-file-with-shebang (EXE001),
+    	executable-file-without-shebang (EXE002),
     	shebang-leading-whitespace (EXE004),
     	shebang-not-first-line (EXE005),
     	future-rewritable-type-annotation (FA100),
     	future-required-type-annotation (FA102),
-    	f-string-in-get-text-func-call (INT001),
-    	format-in-get-text-func-call (INT002),
-    	printf-in-get-text-func-call (INT003),
+    	f-string-in-gettext-call (INT001),
+    	str-format-in-gettext-call (INT002),
+    	printf-in-gettext-call (INT003),
     	implicit-string-concatenation-in-collection-literal (ISC004),
     	direct-logger-instantiation (LOG001),
-    	invalid-get-logger-argument (LOG002),
-    	undocumented-warn (LOG009),
-    	exc-info-outside-except-handler (LOG014),
+    	file-path-as-logger-name (LOG002),
+    	logging-warn-constant (LOG009),
+    	logging-exc-info-outside-except-handler (LOG014),
     	root-logger-call (LOG015),
     	logging-warn (G010),
     	logging-extra-attr-clash (G101),
-    	logging-exc-info (G201),
+    	logging-error-with-exc-info (G201),
     	logging-redundant-exc-info (G202),
     	unnecessary-placeholder (PIE790),
     	duplicate-class-field-definition (PIE794),
@@ -5115,17 +5980,17 @@ fn default_rules() -> Result<()> {
     	reimplemented-container-builtin (PIE807),
     	unnecessary-range-start (PIE808),
     	multiple-starts-ends-with (PIE810),
-    	unprefixed-type-param (PYI001),
+    	public-type-var-in-stub (PYI001),
     	complex-if-statement-in-stub (PYI002),
-    	unrecognized-version-info-check (PYI003),
-    	patch-version-comparison (PYI004),
-    	wrong-tuple-length-version-comparison (PYI005),
+    	unrecognized-version-info-check-in-stub (PYI003),
+    	patch-version-comparison-in-stub (PYI004),
+    	wrong-tuple-length-version-comparison-in-stub (PYI005),
     	bad-version-info-comparison (PYI006),
-    	unrecognized-platform-check (PYI007),
-    	unrecognized-platform-name (PYI008),
+    	unrecognized-platform-check-in-stub (PYI007),
+    	unrecognized-platform-name-in-stub (PYI008),
     	pass-statement-stub-body (PYI009),
     	non-empty-stub-body (PYI010),
-    	pass-in-class-body (PYI012),
+    	pass-in-stub-class-body (PYI012),
     	ellipsis-in-non-empty-class-body (PYI013),
     	assignment-default-in-stub (PYI015),
     	duplicate-union-member (PYI016),
@@ -5134,7 +5999,7 @@ fn default_rules() -> Result<()> {
     	custom-type-var-for-self (PYI019),
     	quoted-annotation-in-stub (PYI020),
     	unaliased-collections-abc-set-import (PYI025),
-    	type-alias-without-annotation (PYI026),
+    	unannotated-type-alias-in-stub (PYI026),
     	str-or-repr-defined-in-stub (PYI029),
     	unnecessary-literal-union (PYI030),
     	any-eq-ne-annotation (PYI032),
@@ -5151,11 +6016,11 @@ fn default_rules() -> Result<()> {
     	unused-private-type-alias (PYI047),
     	stub-body-multiple-statements (PYI048),
     	unused-private-typed-dict (PYI049),
-    	no-return-argument-annotation-in-stub (PYI050),
+    	parameter-annotated-with-no-return (PYI050),
     	unannotated-assignment-in-stub (PYI052),
     	unnecessary-type-union (PYI055),
-    	byte-string-usage (PYI057),
-    	generator-return-from-iter-method (PYI058),
+    	deprecated-byte-string-type (PYI057),
+    	iter-method-with-generator-return-annotation (PYI058),
     	generic-not-last-base-class (PYI059),
     	redundant-none-literal (PYI061),
     	duplicate-literal-member (PYI062),
@@ -5166,16 +6031,16 @@ fn default_rules() -> Result<()> {
     	pytest-duplicate-parametrize-test-cases (PT014),
     	pytest-deprecated-yield-fixture (PT020),
     	pytest-erroneous-use-fixtures-on-fixture (PT025),
-    	pytest-use-fixtures-without-parameters (PT026),
+    	pytest-use-fixtures-without-arguments (PT026),
     	pytest-warns-with-multiple-statements (PT031),
     	unnecessary-return-none (RET501),
     	duplicate-isinstance-call (SIM101),
     	collapsible-if (SIM102),
     	needless-bool (SIM103),
     	return-in-try-except-finally (SIM107),
-    	enumerate-for-loop (SIM113),
-    	if-with-same-arms (SIM114),
-    	open-file-with-context-handler (SIM115),
+    	manual-loop-counter (SIM113),
+    	if-with-identical-branches (SIM114),
+    	open-file-without-context-manager (SIM115),
     	multiple-with-statements (SIM117),
     	in-dict-keys (SIM118),
     	negate-equal-op (SIM201),
@@ -5196,7 +6061,7 @@ fn default_rules() -> Result<()> {
     	runtime-string-union (TC010),
     	py-path (PTH124),
     	invalid-pathlib-with-suffix (PTH210),
-    	static-join-to-f-string (FLY002),
+    	unnecessary-str-join (FLY002),
     	unsorted-imports (I001),
     	invalid-module-name (N999),
     	unnecessary-list-cast (PERF101),
@@ -5209,22 +6074,22 @@ fn default_rules() -> Result<()> {
     	unused-import (F401),
     	import-shadowed-by-loop-var (F402),
     	late-future-import (F404),
-    	undefined-local-with-nested-import-star-usage (F406),
+    	non-module-level-star-import (F406),
     	future-feature-not-defined (F407),
-    	percent-format-invalid-format (F501),
+    	percent-format-invalid-syntax (F501),
     	percent-format-expected-mapping (F502),
     	percent-format-expected-sequence (F503),
-    	percent-format-extra-named-arguments (F504),
+    	percent-format-unused-named-arguments (F504),
     	percent-format-missing-argument (F505),
     	percent-format-mixed-positional-and-named (F506),
     	percent-format-positional-count-mismatch (F507),
     	percent-format-star-requires-sequence (F508),
     	percent-format-unsupported-format-character (F509),
-    	string-dot-format-invalid-format (F521),
-    	string-dot-format-extra-named-arguments (F522),
-    	string-dot-format-extra-positional-arguments (F523),
-    	string-dot-format-missing-arguments (F524),
-    	string-dot-format-mixing-automatic (F525),
+    	str-format-invalid-syntax (F521),
+    	str-format-unused-keyword-arguments (F522),
+    	str-format-unused-positional-arguments (F523),
+    	str-format-missing-arguments (F524),
+    	str-format-mixed-placeholder-numbering (F525),
     	f-string-missing-placeholders (F541),
     	multi-value-repeated-key-literal (F601),
     	multi-value-repeated-key-variable (F602),
@@ -5273,27 +6138,27 @@ fn default_rules() -> Result<()> {
     	misplaced-bare-raise (PLE0704),
     	repeated-keyword-argument (PLE1132),
     	await-outside-async (PLE1142),
-    	logging-too-many-args (PLE1205),
-    	logging-too-few-args (PLE1206),
+    	logging-too-many-arguments (PLE1205),
+    	logging-too-few-arguments (PLE1206),
     	bad-string-format-character (PLE1300),
     	bad-string-format-type (PLE1307),
     	bad-str-strip-call (PLE1310),
-    	invalid-envvar-value (PLE1507),
+    	invalid-getenv-key (PLE1507),
     	singledispatch-method (PLE1519),
     	singledispatchmethod-function (PLE1520),
     	yield-from-in-async-function (PLE1700),
     	bidirectional-unicode (PLE2502),
-    	invalid-character-backspace (PLE2510),
-    	invalid-character-sub (PLE2512),
-    	invalid-character-esc (PLE2513),
-    	invalid-character-nul (PLE2514),
-    	invalid-character-zero-width-space (PLE2515),
+    	unescaped-backspace-character (PLE2510),
+    	unescaped-substitute-character (PLE2512),
+    	unescaped-escape-character (PLE2513),
+    	unescaped-null-character (PLE2514),
+    	unescaped-zero-width-space-character (PLE2515),
     	comparison-with-itself (PLR0124),
     	comparison-of-constant (PLR0133),
     	property-with-parameters (PLR0206),
     	manual-from-import (PLR0402),
-    	redefined-argument-from-local (PLR1704),
-    	stop-iteration-return (PLR1708),
+    	redefined-parameter-from-local (PLR1704),
+    	raise-stop-iteration-in-generator (PLR1708),
     	useless-return (PLR1711),
     	boolean-chained-comparison (PLR1716),
     	sys-exit-alias (PLR1722),
@@ -5304,11 +6169,11 @@ fn default_rules() -> Result<()> {
     	useless-else-on-loop (PLW0120),
     	self-assigning-variable (PLW0127),
     	redeclared-assigned-name (PLW0128),
-    	assert-on-string-literal (PLW0129),
+    	assert-string-literal (PLW0129),
     	named-expr-without-context (PLW0131),
     	useless-exception-statement (PLW0133),
     	nan-comparison (PLW0177),
-    	bad-staticmethod-argument (PLW0211),
+    	bad-staticmethod-parameter (PLW0211),
     	super-without-brackets (PLW0245),
     	import-self (PLW0406),
     	global-variable-not-assigned (PLW0602),
@@ -5327,27 +6192,27 @@ fn default_rules() -> Result<()> {
     	deprecated-unittest-alias (UP005),
     	non-pep585-annotation (UP006),
     	non-pep604-annotation-union (UP007),
-    	super-call-with-parameters (UP008),
+    	redundant-super-arguments (UP008),
     	utf8-encoding-declaration (UP009),
     	unnecessary-future-import (UP010),
-    	lru-cache-without-parameters (UP011),
+    	lru-cache-call-without-arguments (UP011),
     	unnecessary-encode-utf8 (UP012),
-    	convert-named-tuple-functional-to-class (UP014),
+    	functional-named-tuple (UP014),
     	datetime-timezone-utc (UP017),
-    	native-literals (UP018),
+    	unnecessary-literal-constructor (UP018),
     	typing-text-str-alias (UP019),
     	open-alias (UP020),
-    	replace-universal-newlines (UP021),
-    	replace-stdout-stderr (UP022),
+    	subprocess-run-with-universal-newlines (UP021),
+    	subprocess-run-with-piped-stdout-and-stderr (UP022),
     	deprecated-c-element-tree (UP023),
     	os-error-alias (UP024),
     	unicode-kind-prefix (UP025),
     	deprecated-mock-import (UP026),
     	yield-in-for-loop (UP028),
     	unnecessary-builtin-import (UP029),
-    	format-literals (UP030),
+    	unnecessary-positional-str-format-indices (UP030),
     	printf-string-formatting (UP031),
-    	f-string (UP032),
+    	str-format (UP032),
     	lru-cache-with-maxsize-none (UP033),
     	extraneous-parentheses (UP034),
     	deprecated-import (UP035),
@@ -5356,7 +6221,7 @@ fn default_rules() -> Result<()> {
     	unnecessary-class-parentheses (UP039),
     	non-pep695-type-alias (UP040),
     	timeout-error-alias (UP041),
-    	unnecessary-default-type-args (UP043),
+    	unnecessary-default-type-arguments (UP043),
     	non-pep646-unpack (UP044),
     	non-pep604-annotation-optional (UP045),
     	non-pep695-generic-class (UP046),
@@ -5381,8 +6246,8 @@ fn default_rules() -> Result<()> {
     	slice-to-remove-prefix-or-suffix (FURB188),
     	sorted-min-max (FURB192),
     	zip-instead-of-pairwise (RUF007),
-    	mutable-dataclass-default (RUF008),
-    	function-call-in-dataclass-default-argument (RUF009),
+    	mutable-dataclass-field-default (RUF008),
+    	function-call-in-dataclass-field-default (RUF009),
     	explicit-f-string-type-conversion (RUF010),
     	mutable-class-default (RUF012),
     	implicit-optional (RUF013),
@@ -5400,8 +6265,8 @@ fn default_rules() -> Result<()> {
     	assert-with-print-message (RUF030),
     	decimal-from-float-literal (RUF032),
     	post-init-default (RUF033),
-    	useless-if-else (RUF034),
-    	invalid-assert-message-literal-argument (RUF040),
+    	if-expr-with-identical-branches (RUF034),
+    	non-string-literal-as-assert-message (RUF040),
     	unnecessary-nested-literal (RUF041),
     	unnecessary-cast-to-int (RUF046),
     	map-int-version-parsing (RUF048),
@@ -5413,14 +6278,14 @@ fn default_rules() -> Result<()> {
     	unused-unpacked-variable (RUF059),
     	access-annotations-from-class-dict (RUF063),
     	duplicate-entry-in-dunder-all (RUF068),
-    	unused-noqa (RUF100),
-    	redirected-noqa (RUF101),
+    	unused-suppression-comment (RUF100),
+    	renamed-rule-in-suppression-comment (RUF101),
     	invalid-pyproject-toml (RUF200),
-    	raise-vanilla-class (TRY002),
+    	raise-exception-or-base-exception (TRY002),
     	type-check-without-type-error (TRY004),
     	verbose-raise (TRY201),
     	useless-try-except (TRY203),
-    	verbose-log-message (TRY401),
+    	redundant-exception-in-logging-message (TRY401),
     ]
     ",
     );
@@ -5460,6 +6325,32 @@ fn ruff_toml_is_linted() -> Result<()> {
 
     ----- stderr -----
     "#,
+    );
+
+    Ok(())
+}
+
+#[test]
+fn fix_redirected_selectors_with_rule_names() -> Result<()> {
+    let test = CliTest::with_file("ruff.toml", "lint.select = ['TCH002', 'TCH']\n")?;
+
+    assert_cmd_snapshot!(
+        test.check_command()
+            .args(["--preview", "--extend-select", "RUF201,RUF202", "--diff", "ruff.toml"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    --- ruff.toml
+    +++ ruff.toml
+    @@ -1 +1 @@
+    -lint.select = ['TCH002', 'TCH']
+    +lint.select = ['typing-only-third-party-import', 'TC']
+
+    Would fix 3 errors.
+
+    ----- stderr -----
+    "
     );
 
     Ok(())

@@ -3,7 +3,7 @@ use ruff_text_size::Ranged;
 use smallvec::{SmallVec, smallvec};
 
 use super::{ArgumentsIter, MultiInferenceGuard, TypeInferenceBuilder};
-use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers};
+use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin};
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, DescriptorSetterDomain,
     ExplicitAttributeWriteRequirement, FallbackAttributeWriteRequirement,
@@ -401,10 +401,12 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 }
                 false
             }
-            AttributeWriteRequirement::Module(write_ty) => {
-                if let Some(write_ty) = write_ty {
-                    let value_ty =
-                        self.infer_value(TypeContext::declared(Some(*write_ty)), emit_diagnostics);
+            AttributeWriteRequirement::Module(member) => {
+                if let Some((write_ty, origin)) = member {
+                    let value_ty = self.infer_value(
+                        TypeContext::from_origin(*write_ty, *origin),
+                        emit_diagnostics,
+                    );
                     self.check_type_pair(value_ty, *write_ty, emit_diagnostics)
                 } else {
                     self.infer_value(TypeContext::default(), emit_diagnostics);
@@ -422,8 +424,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 qualifiers,
             } => match write {
                 Some(ProtocolMemberWriteRequirement::AssignableTo(write_ty)) => {
-                    let value_ty =
-                        self.infer_value(TypeContext::declared(Some(*write_ty)), emit_diagnostics);
+                    let value_ty = self
+                        .infer_value(TypeContext::preference(Some(*write_ty)), emit_diagnostics);
                     self.check_type_pair(value_ty, *write_ty, emit_diagnostics)
                 }
                 Some(ProtocolMemberWriteRequirement::Descriptor {
@@ -431,7 +433,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     domain,
                 }) => {
                     let value_ty = self.infer_value(
-                        TypeContext::declared(Some(domain.unwrap_or_else(Type::unknown))),
+                        TypeContext::preference(Some(domain.unwrap_or_else(Type::unknown))),
                         emit_diagnostics,
                     );
                     if let Some(domain) = domain
@@ -659,6 +661,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     let fallback_valid = self.evaluate_instance_fallback(
                         receiver.unwrap_or(object_ty),
                         fallback,
+                        value_ty,
                         emit_diagnostics,
                     );
                     member_valid && fallback_valid
@@ -669,6 +672,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             InstanceAttributeWriteMember::Instance(fallback) => self.evaluate_instance_fallback(
                 receiver.unwrap_or(object_ty),
                 fallback,
+                value_ty,
                 emit_diagnostics,
             ),
             InstanceAttributeWriteMember::SetAttr => match setattr_result {
@@ -789,14 +793,18 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         &self,
         requirement: &ExplicitAttributeWriteRequirement<'db>,
     ) -> TypeContext<'db> {
-        if let ExplicitAttributeWriteRequirement::AssignableTo { ty, .. } = requirement {
+        if let ExplicitAttributeWriteRequirement::AssignableTo { ty, origin, .. } = requirement {
             let db = self.builder.db();
             let is_callable = ty.as_union().map_or(ty.is_callable_type(), |union| {
                 union.elements(db).iter().all(Type::is_callable_type)
             });
             // When shadowing e.g. `def method(self, x: int): ...` with
             // `self.method = lambda x: str(x)`, infer `x` as `int` on the first pass.
-            return TypeContext::declared(is_callable.then_some(*ty));
+            return if is_callable {
+                TypeContext::from_origin(*ty, *origin)
+            } else {
+                TypeContext::default()
+            };
         }
         if let ExplicitAttributeWriteRequirement::Descriptor {
             descriptor_ty,
@@ -810,7 +818,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 *receiver_ty,
             )
         {
-            TypeContext::declared(Some(write_ty))
+            TypeContext::preference(Some(write_ty))
         } else {
             TypeContext::default()
         }
@@ -838,8 +846,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     )
                     .is_some()
                 }),
-            ExplicitAttributeWriteRequirement::AssignableTo { ty, .. } => {
-                let value_ty = self.infer_value(TypeContext::declared(Some(*ty)), false);
+            ExplicitAttributeWriteRequirement::AssignableTo { ty, origin, .. } => {
+                let value_ty = self.infer_value(TypeContext::from_origin(*ty, *origin), false);
                 self.check_type_pair(value_ty, *ty, emit_diagnostics)
             }
         }
@@ -935,18 +943,29 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         &mut self,
         object_ty: Type<'db>,
         requirement: &FallbackAttributeWriteRequirement<'db>,
+        value_ty: Type<'db>,
         emit_diagnostics: bool,
     ) -> bool {
         match requirement {
             FallbackAttributeWriteRequirement::AssignableTo {
                 ty,
+                origin,
                 qualifiers,
                 possibly_missing,
             } => {
                 if !self.final_assignment_is_valid(object_ty, *qualifiers, emit_diagnostics) {
                     return false;
                 }
-                let value_ty = self.infer_value(TypeContext::declared(Some(*ty)), false);
+                // If the committed value already has the attribute's inferred type, we
+                // can check assignability without inferring the value again. Speculative
+                // writes still need to record the context for the eventual committed
+                // inference.
+                let value_ty =
+                    if emit_diagnostics && *origin == TypeOrigin::Inferred && value_ty == *ty {
+                        value_ty
+                    } else {
+                        self.infer_value(TypeContext::from_origin(*ty, *origin), false)
+                    };
                 let valid = self.check_type_pair(value_ty, *ty, emit_diagnostics);
                 if *possibly_missing {
                     self.report(AssignmentAttributeWriteDiagnostic::PossiblyMissing);
@@ -970,11 +989,12 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         match requirement {
             FallbackAttributeWriteRequirement::AssignableTo {
                 ty,
+                origin,
                 qualifiers,
                 possibly_missing,
             } => {
                 let value_ty = self.infer_value(
-                    TypeContext::declared(Some(*ty)),
+                    TypeContext::from_origin(*ty, *origin),
                     matches!(inference, ContextualInference::Commit) && emit_diagnostics,
                 );
                 if !self.builder.validate_generic_class_attribute_access(

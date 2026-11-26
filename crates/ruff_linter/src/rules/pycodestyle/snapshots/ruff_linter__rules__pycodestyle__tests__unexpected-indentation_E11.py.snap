@@ -12,7 +12,7 @@ invalid-syntax: Expected an indented block after `if` statement
 11 | print()
    |
 
-E113 Unexpected indentation
+invalid-syntax: Unexpected indentation
   --> E11.py:12:1
    |
 10 | #: E113
@@ -23,7 +23,7 @@ E113 Unexpected indentation
 14 | mimetype = 'application/x-directory'
    |
 
-invalid-syntax: Unexpected indentation
+E113 Unexpected indentation
   --> E11.py:12:1
    |
 10 | #: E113

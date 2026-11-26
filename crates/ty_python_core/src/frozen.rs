@@ -1,7 +1,7 @@
-use std::hash::Hash;
+use std::hash::{BuildHasher, Hash};
 
 use ruff_index::{FrozenIndexVec, IndexVec, newtype_index};
-use rustc_hash::FxHashMap;
+use rustc_hash::FxBuildHasher;
 
 /// A slice of 32-bit IDs stored at the narrowest width that fits every entry.
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
@@ -79,6 +79,14 @@ impl<K: Ord, V, S> From<std::collections::HashMap<K, V, S>> for FrozenMap<K, V> 
 }
 
 impl<K: Ord, V> FrozenMap<K, V> {
+    /// Freeze entries that are already in strictly increasing key order.
+    ///
+    /// Duplicate or unsorted keys would make lookups by binary search unreliable.
+    pub fn from_sorted(entries: Vec<(K, V)>) -> Self {
+        debug_assert!(entries.windows(2).all(|w| w[0].0 < w[1].0));
+        Self(entries.into_boxed_slice())
+    }
+
     /// Creates a frozen map from entries with unique keys.
     pub(crate) fn from_entries(mut entries: Vec<(K, V)>) -> Self {
         entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
@@ -165,28 +173,7 @@ fn sort_and_deduplicate<K: Ord, V>(mut entries: Vec<(K, V)>) -> Vec<(K, V)> {
     entries
 }
 
-fn index_values<K, V>(
-    entries: impl IntoIterator<Item = (K, V)>,
-) -> (Vec<(K, FrozenValueIndex)>, IndexVec<FrozenValueIndex, V>)
-where
-    V: Copy + Eq + Hash,
-{
-    let mut values = IndexVec::new();
-    let mut value_indices = FxHashMap::default();
-    let entries = entries
-        .into_iter()
-        .map(|(key, value)| {
-            let index = *value_indices
-                .entry(value)
-                .or_insert_with(|| values.push(value));
-            (key, index)
-        })
-        .collect();
-
-    (entries, values)
-}
-
-/// Compact immutable key-value entries that deduplicate repeated values.
+/// Compact immutable key-value entries that can share repeated values.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct FrozenValueMap<K, V> {
     entries: FrozenMap<K, FrozenValueIndex>,
@@ -194,6 +181,40 @@ pub struct FrozenValueMap<K, V> {
 }
 
 impl<K, V> FrozenValueMap<K, V> {
+    /// Freeze entries in strictly increasing key order. Assigning value indices in
+    /// that order gives equal maps the same representation for Salsa comparisons.
+    pub fn from_sorted(entries: impl IntoIterator<Item = (K, V)>) -> Self
+    where
+        K: Ord,
+        V: Copy + Eq + Hash,
+    {
+        // Keep only the most recent index per hash bucket. This costs 1 KiB of
+        // scratch space and avoids allocating and growing a hash table per scope.
+        // A collision can leave extra copies of a value in the finished map.
+        let mut recent = [None; 256];
+        let entries = entries.into_iter();
+        let mut values = IndexVec::with_capacity(entries.size_hint().0.min(16));
+        let entries = entries
+            .map(|(key, value)| {
+                let bucket = FxBuildHasher.hash_one(value).to_le_bytes()[0];
+                let slot = &mut recent[usize::from(bucket)];
+                let index = match *slot {
+                    Some(index) if values[index] == value => index,
+                    _ => {
+                        let index = values.push(value);
+                        *slot = Some(index);
+                        index
+                    }
+                };
+                (key, index)
+            })
+            .collect();
+        Self {
+            entries: FrozenMap::from_sorted(entries),
+            values: values.into(),
+        }
+    }
+
     pub fn get(&self, key: &K) -> Option<&V>
     where
         K: Ord,
@@ -217,12 +238,7 @@ impl<K, V> FrozenValueMap<K, V> {
         V: Copy + Eq + Hash,
         F: FnMut(K, V) -> V,
     {
-        let (entries, values) =
-            index_values(self.iter().map(|(key, value)| (key, map(key, value))));
-        *self = Self {
-            entries: FrozenMap(entries.into_boxed_slice()),
-            values: values.into(),
-        };
+        *self = Self::from_sorted(self.iter().map(|(key, value)| (key, map(key, value))));
     }
 }
 
@@ -232,30 +248,7 @@ where
     V: Copy + Eq + Hash,
 {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let source_entries = sort_and_deduplicate(iter.into_iter().collect());
-
-        let (entries, values) = index_values(source_entries);
-
-        Self {
-            entries: FrozenMap(entries.into_boxed_slice()),
-            values: values.into(),
-        }
-    }
-}
-
-impl<K, V, S> From<std::collections::HashMap<K, V, S>> for FrozenValueMap<K, V>
-where
-    K: Ord,
-    V: Copy + Eq + Hash,
-{
-    fn from(map: std::collections::HashMap<K, V, S>) -> Self {
-        let (mut entries, values) = index_values(map);
-        entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
-
-        Self {
-            entries: FrozenMap(entries.into_boxed_slice()),
-            values: values.into(),
-        }
+        Self::from_sorted(sort_and_deduplicate(iter.into_iter().collect()))
     }
 }
 
@@ -366,6 +359,35 @@ mod tests {
         assert_eq!(
             map.iter().collect::<Vec<_>>(),
             vec![(1, [2; 4]), (2, [1; 4]), (3, [1; 4])]
+        );
+    }
+
+    #[test]
+    fn frozen_value_map_preserves_values_on_hash_collisions() {
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        struct Value(u8);
+
+        impl std::hash::Hash for Value {
+            fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+                state.write_u8(0);
+            }
+        }
+
+        let a = Value(1);
+        let b = Value(2);
+        let entries = [(0, a), (1, a), (2, b), (3, a)];
+        let mut map = FrozenValueMap::from_sorted(entries);
+        assert_eq!(map.values.len(), 3);
+        assert!(map.iter().eq(entries));
+        for (key, value) in entries {
+            assert_eq!(map.get(&key), Some(&value));
+        }
+
+        // Cycle normalization can assign different types to nodes that shared a value.
+        map.map_values(|key, value| if key == 1 { b } else { value });
+        assert_eq!(
+            map,
+            FrozenValueMap::from_sorted([(0, a), (1, b), (2, b), (3, a)])
         );
     }
 

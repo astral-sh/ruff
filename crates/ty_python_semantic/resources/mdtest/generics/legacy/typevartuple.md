@@ -64,10 +64,46 @@ from typing import Generic, TypeVarTuple
 
 Ts1 = TypeVarTuple("Ts1")
 
-# error: [mismatched-type-name]
+# snapshot: mismatched-typevartuple-name
 Ts2 = TypeVarTuple("Ts3")
 
 class Array(Generic[*Ts2]): ...
+```
+
+```snapshot
+warning[mismatched-typevartuple-name]: The name passed to `TypeVarTuple` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:6:20
+  |
+6 | Ts2 = TypeVarTuple("Ts3")
+  |                    ^^^^^ Expected "Ts2", got "Ts3"
+```
+
+### Name supplied at runtime
+
+When ty cannot verify the name match, it displays the `TypeVarTuple` using the assignment target.
+
+```py
+from typing_extensions import TypeVarTuple
+
+def runtime_name() -> str:
+    return "Ts"
+
+Ts = TypeVarTuple(runtime_name())  # error: [mismatched-typevartuple-name]
+
+def as_ints(values: tuple[*Ts]) -> tuple[int, ...]:
+    # snapshot: invalid-explicit-return
+    return values
+```
+
+```snapshot
+error[invalid-explicit-return]: Return type does not match returned value
+  --> src/mdtest_snippet.py:10:12
+   |
+ 8 | def as_ints(values: tuple[*Ts]) -> tuple[int, ...]:
+   |                                    --------------- Expected `tuple[int, ...]` because of return type
+ 9 |     # snapshot: invalid-explicit-return
+10 |     return values
+   |            ^^^^^^ expected `tuple[int, ...]`, found `tuple[*Ts@as_ints]`
 ```
 
 ### Bounds and constraints
@@ -505,6 +541,22 @@ reveal_type(Between().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Un
 reveal_type(Between[int]().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
 ```
 
+### Inherited methods on variadic tuple subclasses
+
+A tuple subclass inherits `__reversed__` from `Sequence`. Its type arguments still apply when
+looking up a method on one of the returned elements.
+
+```py
+from typing import Generic, TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+class Parts(tuple[Unpack[Ts]], Generic[Unpack[Ts]]): ...
+
+def count_matches(parts: Parts[str, str]) -> int:
+    return next(parts.__reversed__()).count("x")  # no diagnostic
+```
+
 ### Inherited specializations containing `Never`
 
 A `Never` argument in a variadic generic must retain its position when a subclass forwards its type
@@ -755,10 +807,10 @@ class Array(Generic[*Ts]):
         return self
 
     def erase_shape_bottom(self) -> "Bottom[Array[*tuple[Any, ...]]]":
-        return self  # error: [invalid-return-type]
+        return self  # error: [invalid-explicit-return]
 
     def fixed_shape(self) -> "Top[Array[Any]]":
-        return self  # error: [invalid-return-type]
+        return self  # error: [invalid-explicit-return]
 ```
 
 ## Functions

@@ -851,6 +851,49 @@ unannotated(reveal_type(identity(1)))  # revealed: Literal[1]
 annotated(reveal_type(identity(1)))  # revealed: Unknown
 ```
 
+A generic call in a bare `Final` initializer infers its return type from its argument.
+
+```py
+from typing import Final
+
+ONE: Final = reveal_type(identity(1))  # revealed: Literal[1]
+```
+
+A call through an unannotated parameter supplies no expected type for its arguments. A callable with
+a parameter annotated as `Any` supplies `Any` as context.
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+def call(sink, typed_sink: Callable[[Any], None]):
+    sink(reveal_type(identity(1)))  # revealed: Literal[1]
+    typed_sink(reveal_type(identity(1)))  # revealed: Any
+```
+
+A generator without a return annotation leaves the operands of `yield` and `yield from` to
+inference. An explicit return annotation supplies its declared element type, including `Any` or
+`Unknown`.
+
+```py
+from collections.abc import Iterator
+
+def singleton[T](x: T) -> list[T]:
+    return [x]
+
+def values():
+    yield reveal_type(identity(1))  # revealed: Literal[1]
+    yield from reveal_type(singleton(1))  # revealed: list[int]
+
+def annotated_values() -> Iterator[Any]:
+    yield reveal_type(identity(1))  # revealed: Any
+    yield from reveal_type(singleton(1))  # revealed: list[Any]
+
+def unknown_values() -> Iterator[Unknown]:
+    yield reveal_type(identity(1))  # revealed: Unknown
+    yield from reveal_type(singleton(1))  # revealed: list[Unknown]
+```
+
 ## Upper-bound type context
 
 The declared upper bound of a type variable provides type context for a nested generic call:
@@ -929,12 +972,30 @@ reveal_type(payload({"value": 1}))  # revealed: Payload
 reveal_type(callback(lambda value: [value]))  # revealed: (value: int) -> list[int]
 ```
 
-As well as propagate through lambda bodies:
+Declared upper bounds are also propagated through lambda bodies, without restricting the range of
+nested gradual types:
 
 ```py
 def _(value: Any):
     f = callback(lambda _: singleton(value))
     reveal_type(f(1))  # revealed: list[Any | int]
+
+    annotated: Callable[[int], list[int]] = lambda _: singleton(value)
+    reveal_type(annotated(1))  # revealed: list[int]
+```
+
+As well as through nested `TypedDict` literals and constructor calls:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+
+def _(value: Any):
+    payload({"value": reveal_type(identity(value))})  # revealed: Any
+    literal: Payload = {"value": reveal_type(identity(value))}  # revealed: int
+
+    payload(dict(value=reveal_type(identity(value))))  # revealed: Any
+    constructed: Payload = dict(value=reveal_type(identity(value)))  # revealed: int
 ```
 
 ## Upper-bound context without inference evidence
@@ -1094,6 +1155,59 @@ from typing import Any
 # string keys for keyword arguments. We special-case it to match the literal form.
 x1: dict[Hashable, Callable[..., object]] = {"x": lambda: 1}
 x2: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
+```
+
+## Generic calls with the same argument types
+
+When the expected return type is incompatible, the arguments can still determine the return type.
+Each argument error points to the offending value in its own call.
+
+```py
+from typing import Any
+
+def first[T](values: list[T], tag: Any) -> T:
+    return values[0]
+
+def check(values: list[int] | None):
+    # error: [invalid-assignment] "Object of type `int` is not assignable to `str`"
+    a: str = first(values, 0)  # error: 20 [invalid-argument-type] "Expected `list[int]`"
+    # error: [invalid-assignment] "Object of type `int` is not assignable to `str`"
+    b: str = first(tag="b", values=values)  # error: 29 [invalid-argument-type] "Expected `list[int]`"
+```
+
+Both attributes initially have type `list[int]`. Only the annotation takes precedence over `Any`
+when the attributes are reassigned.
+
+```py
+def wrap[T](value: T) -> list[T]:
+    return [value]
+
+class Fields:
+    def update(self, value: Any):
+        self.inferred = [1]
+        self.declared: list[int] = [1]
+        self.inferred = wrap(value)
+        self.declared = wrap(value)
+        reveal_type(self.inferred)  # revealed: list[Any]
+        reveal_type(self.declared)  # revealed: list[int]
+```
+
+## Preserving literal element types in a generic call
+
+`max(..., key=len)` returns one of its input tuples. When the result is annotated as `Colors`, ty
+preserves the literal element types while inferring the list passed to `max`.
+
+```py
+from typing import Literal
+
+Colors = tuple[Literal["red", "blue"], ...]
+left = ("red",)
+right = ("blue", "red")
+
+named: Colors = max([left, right], key=len)  # ok
+extended: Colors = max([(*left, "blue"), (*right, "red")], key=len)  # ok
+# error: [invalid-assignment]
+invalid: Colors = max([(*left, "blue"), (*right, "green")], key=len)
 ```
 
 ## Covariant constructors with outer return contexts
@@ -1261,11 +1375,11 @@ x2: TD | None = first([{"x": 0}, {"x": 1}])
 reveal_type(x2)  # revealed: TD
 
 # TODO: We could provide `TypedDict` key diagnostics here.
-# error: [invalid-assignment] "Object of type `TD | dict[str, int]` is not assignable to `TD`"
+# error: [invalid-assignment] "Object of type `dict[str, int] | TD` is not assignable to `TD`"
 x3: TD = first([{"y": 0}, {"x": 1}])
 
 # TODO: We could provide `TypedDict` key diagnostics here.
-# error: [invalid-assignment] "Object of type `TD | None | dict[str, int]` is not assignable to `TD | None`"
+# error: [invalid-assignment] "Object of type `dict[str, int] | TD` is not assignable to `TD | None`"
 x4: TD | None = first([{"y": 0}, {"x": 1}])
 
 # `ObjectCallback` is redundant in this union, so expanding the aliases collapses the narrowing
@@ -1645,7 +1759,7 @@ collection literals:
 import builtins
 from collections import defaultdict
 from collections.abc import Mapping
-from typing import Any, Callable, Iterable, Literal, MutableSequence, overload, Sequence
+from typing import Any, Callable, Iterable, Literal, MutableSequence, overload, Protocol, Sequence
 
 # TODO: This should be `list[Any]`.
 # revealed: list[int]
@@ -1688,6 +1802,12 @@ x11: list[Iterable[Any]] = reveal_type([[i] for i in [1, 2, 3]])
 
 # revealed: list[list[Any]]
 x12: Iterable[list[Any]] = reveal_type([[i] for i in [1, 2, 3]])
+
+class Sink[T](Protocol):
+    def append(self, item: T, /) -> None: ...
+
+# revealed: list[int | str]
+x13: Sink[int] = reveal_type(["x"])
 
 def _(dynamic: Any):
     # TODO: This should be `list[int]`.
@@ -1877,6 +1997,60 @@ class MultiPath[T]:
 # fmt: off
 x10: Callable[[list[int]], MultiPath[int] | MultiPath[list[int]]] = reveal_type(MultiPath)  # revealed: <class 'MultiPath'>
 # fmt: on
+```
+
+## Type context and explicitly annotated `self`
+
+When `self` is explicitly annotated with a concrete specialization, ty uses it when inferring the
+type of unspecialized constructor calls:
+
+```py
+class Reader[T]:
+    def __init__(self: "Reader[int]") -> None: ...
+    def read(self) -> T:
+        raise NotImplementedError
+
+reveal_type(Reader())  # revealed: Reader[int]
+```
+
+When trying to specialize explicitly, the call will fail:
+
+```py
+Reader[str]()  # error: [invalid-argument-type]
+```
+
+`Reader[int]` is also inferred if it is assignable to the assignment context (`Reader` is covariant
+in `T`):
+
+```py
+# revealed: Reader[int]
+reader: Reader[int] = reveal_type(Reader())
+
+# revealed: Reader[int]
+reader: Reader[int | str] = reveal_type(Reader())
+```
+
+The assignment context can also narrow the inferred type argument from `int` to `bool`. Since
+`Reader` is covariant, `Reader[bool]` is a valid argument for `self: Reader[int]`.
+
+```py
+# TODO: this should not be an error, and Reader[bool] should be inferred (see https://github.com/astral-sh/ty/issues/4993)
+# revealed: Reader[int]
+narrow_reader: Reader[bool] = reveal_type(Reader())  # error: [invalid-assignment]
+```
+
+The same is also true if the receiver is annotated with a union:
+
+```py
+class ReaderUnion[T]:
+    def __init__(self: "ReaderUnion[int | str]") -> None: ...
+
+# revealed: ReaderUnion[int | str]
+reader: ReaderUnion[int | str] = reveal_type(ReaderUnion())
+# revealed: ReaderUnion[int | str]
+reader: ReaderUnion[int | str | None] = reveal_type(ReaderUnion())
+# revealed: ReaderUnion[int]
+narrow_union: ReaderUnion[int] = reveal_type(ReaderUnion())
 ```
 
 ## Generic class specialization through recursive callable aliases
@@ -2101,20 +2275,65 @@ def _(a: int, b: str, c: int | str):
     # for performance reasons.
     x9: int | str | None = head(lst(c))
     reveal_type(x9)  # revealed: int | str | None
+
+class Base: ...
+class Left(Base): ...
+class Right(Base): ...
+
+def choose_head[T, U](values: list[T], fallback: list[U]) -> T | U:
+    return head(values) if values else head(fallback)
+
+def _(a: Left, b: Right, c: Right | None):
+    x1: Left | Right = choose_head(lst(a), lst(a))
+    reveal_type(x1)  # revealed: Left
+
+    x2: Left | Right = choose_head(lst(a), lst(b))
+    reveal_type(x2)  # revealed: Left | Right
+
+    x3: Base | None = choose_head(lst(a), lst(b))
+    reveal_type(x3)  # revealed: Base
+
+    x4: Base | None = choose_head(lst(a), lst(c))
+    reveal_type(x4)  # revealed: Base | None
 ```
 
-Generic calls are never narrowed to a dynamic type, which can lead to overly narrow or gradual types
-in the presence of unconstrained or dynamic arguments. Instead, the full declared union is preferred
-over a dynamic member:
+A single declared member can provide context to multiple matching union arms in the return type of a
+given call:
 
 ```py
-def head_or[T, U](values: list[T], default: U) -> T | U:
-    return values[0] if values else default
+def list_of_either[T, U](x: T, y: U) -> list[T] | list[U]:
+    return [x] if x else [y]
 
-def _(values: list[Any]):
-    result: str | Any = reveal_type(head_or(list(values), default=0))  # revealed: str | Any | Literal[0]
+def _(ints: list[int]):
+    x1: list[list[int]] | list[list[str]] = list_of_either([], ints)
+    reveal_type(x1)  # revealed: list[list[int]]
+```
 
-items: Any | list[int] = reveal_type(list())  # revealed: list[int]
+Narrowing also allows more precisely correlated results to be inferred for covariant types:
+
+```py
+from typing import TypedDict
+
+class A(TypedDict):
+    x: list[int]
+
+class B(TypedDict):
+    x: list[str]
+
+def make_pair[T](x: T) -> tuple[T, T]:
+    return x, x
+
+def maybe_make_pair[T](x: T) -> tuple[T, T] | None:
+    raise NotImplementedError
+
+# revealed: tuple[A, A] | tuple[B, B]
+x1: tuple[A, A | B] | tuple[B, A | B] = reveal_type(make_pair({"x": []}))
+
+# TODO: Narrowing to arbitrary sized subsets of the declared union would allow us to infer
+# the more precise `tuple[A, A] | tuple[B, B] | None` here.
+# error: [invalid-assignment]
+# revealed: tuple[A | B, A | B] | None
+x2: tuple[A, A | B] | tuple[B, A | B] | None = reveal_type(maybe_make_pair({"x": []}))
 ```
 
 When a generic call is narrowed to a single element of the union, any diagnostics emitted use the
@@ -2146,8 +2365,9 @@ x2: list[A] | list[dict[str, int]] = lst(reveal_type({"value": 1}))  # revealed:
 reveal_type(x2)  # revealed: list[A] | list[dict[str, int]]
 ```
 
-If inferring a generic call against a member of the declared type produces a wider return type, that
-member is excluded from the result.
+If inferring a generic call against a member of the declared type produces a wider return type, we
+fall back to inferring against the entire declared union instead of inferring an overly narrow
+result:
 
 ```py
 def make_list[U = str]() -> list[U] | list[int]:
@@ -2157,10 +2377,70 @@ def _():
     x1 = make_list()
     reveal_type(x1)  # revealed: list[str] | list[int]
 
-    # TODO: Ideally this would return the same result as the unannotated case, but it's
-    # not clear which result is more desirable.
+    # TODO: We infer against the union `list[str] | list[int]` here, but the constraint solver
+    # chooses the narrower solution. Ideally this would return the same result as the
+    # unannotated case.
     x2: list[str] | list[int] = make_list()
     reveal_type(x2)  # revealed: list[int]
+
+def default[T](x: T | None = None) -> T | int:
+    return 0 if x is None else x
+
+def _(value: Any):
+    # TODO: We should infer the narrower `int` here.
+    x1: int | str = default()
+    reveal_type(x1)  # revealed: int | str
+
+    # TODO: This should also be `int`.
+    x2: int | str = default(None)
+    reveal_type(x2)  # revealed: int | str
+
+    x3: int | str = default(value)
+    reveal_type(x3)  # revealed: int | str
+
+def empty[T = int]() -> list[T]:
+    return []
+
+def _(items: list[list[int]]):
+    x1 = head([*items, empty()])
+    reveal_type(x1)  # revealed: list[int]
+
+    x2: list[int] | list[str] = head([*items, empty()])
+    reveal_type(x2)  # revealed: list[int] | list[str]
+```
+
+This applies even if the narrowing attempt only partially specialized the generic call:
+
+```py
+def head_or_empty[T, U](items: list[U]) -> list[T] | U:
+    return items[0] if items else []
+
+def _(item: Any):
+    x1: list[int] | str = head_or_empty([item])
+    reveal_type(x1)  # revealed: list[int] | str
+```
+
+However, if a given narrowing attempt does not contribute any useful constraints to the call, it is
+ignored:
+
+```py
+class Other: ...
+class BytesList(list[bytes]): ...
+
+x1: list[int] | list[str] | None = list()
+reveal_type(x1)  # revealed: list[int] | list[str]
+
+x2: list[int] | list[str] | Other = list()
+reveal_type(x2)  # revealed: list[int] | list[str]
+
+x3: list[int] | list[str] | BytesList = list()
+reveal_type(x3)  # revealed: list[int] | list[str]
+
+x4: list[int] | None = reveal_type(head([[]]))  # revealed: list[int]
+x5: list[int] | Other = reveal_type(head([[]]))  # revealed: list[int]
+
+# TODO: This should also infer `list[int]`.
+x6: list[int] | BytesList = reveal_type(head([[]]))  # revealed: list[int] | BytesList
 ```
 
 If multiple alternatives are inferred for a given type variable during fixpoint iteration, however,
@@ -2181,6 +2461,9 @@ def _(ints: list[int]):
 Dynamic types inferred from arguments are also preserved.
 
 ```py
+def head_or[T, U](values: list[T], default: U) -> T | U:
+    return values[0] if values else default
+
 def _(values: list[Any]):
     x = choose(head_or(list(values), default=None), None)
     reveal_type(x)  # revealed: Any | None
@@ -2207,7 +2490,80 @@ x2: tuple[list[str] | list[int]] = wrap_tuple((
 ))
 ```
 
-## Correlated overload specializations from declared type
+## Narrowing generic calls with gradual types
+
+When inferring a generic call with gradual arguments, we avoid inferring overly narrow results that
+only succeed under gradual assignability.
+
+```py
+from typing import Any
+
+def first_or_none[T](items: list[T]) -> T | None:
+    raise NotImplementedError
+
+def _(value: Any):
+    x1: int | None = reveal_type(first_or_none([value]))  # revealed: int | None
+    x2: list[int | None] = [reveal_type(first_or_none([value]))]  # revealed: int | None
+
+    x3: int | None
+    # TODO: We should infer `Any | None` here.
+    x3 = reveal_type(first_or_none([value]))  # revealed: None
+
+def head_or[T, U](values: list[T], default: U) -> T | U:
+    return values[0] if values else default
+
+def _(values: list[Any]):
+    x1: int | None = reveal_type(head_or(values, default=None))  # revealed: int | None
+```
+
+Generic calls are never narrowed to a dynamic type, which can lead to overly gradual results.
+Instead, the full declared union is preferred over a dynamic member:
+
+```py
+x1: Any | list[int] = reveal_type(list())  # revealed: list[int]
+
+def _(values: list[Any]):
+    x2: str | Any = reveal_type(head_or(list(values), default=0))  # revealed: str | Any | Literal[0]
+```
+
+A single dynamic member is also ignored if the call is compatible with the concrete subset of the
+declared type:
+
+```py
+from typing import TypedDict
+
+def list_of_either[T, U](x: T, y: U) -> list[T] | list[U]:
+    raise NotImplementedError
+
+class Row(TypedDict):
+    name: str
+
+class Message(TypedDict):
+    text: str
+
+type RowsOrMessages = list[Row] | list[Message] | Any
+
+# revealed: list[Row] | list[Message]
+x1: RowsOrMessages = reveal_type(list_of_either({"name": "first"}, {"text": "hello"}))
+
+# revealed: list[dict[str, int]]
+x2: RowsOrMessages = reveal_type(list_of_either({"name": 0}, {"text": 0}))
+```
+
+If a gradual argument prevents narrowing to individual members of the union, the call is still
+inferred against the concrete subset of the union if compatible:
+
+```py
+def tag[T, U](row: T, value: U) -> tuple[T, U]:
+    return row, value
+
+def _(value: Any | None):
+    x1: tuple[Row, None] | tuple[Row, int] | Any = tag({"name": "first"}, value)
+    # TODO: This should infer `tuple[Row, None | int]`.
+    reveal_type(x1)  # revealed: tuple[Row, None]
+```
+
+## Correlated overload specializations from an expected type
 
 A declared return type can be satisfied by correlated specializations even when merging the type
 arguments independently would violate the declared constraints:
@@ -2229,6 +2585,19 @@ type Choice = tuple[list[int], list[str]] | tuple[list[str], list[int]]
 
 # revealed: tuple[tuple[list[int], list[str]]] | tuple[tuple[list[str], list[int]]]
 result: tuple[Choice] = reveal_type(f(callback))
+```
+
+The same applies when the expected tuple type is inferred from a previous assignment:
+
+```py
+def initial() -> tuple[Choice]:
+    return (([1], ["s"]),)
+
+class Fields:
+    pair = initial()
+
+# revealed: tuple[tuple[list[int], list[str]]] | tuple[tuple[list[str], list[int]]]
+Fields.pair = reveal_type(f(callback))
 ```
 
 ## Literal union context for generic calls
@@ -2405,6 +2774,54 @@ class Callbacks:
         self.identities = [{"x": 0}, {"x": lambda x: x}]
 ```
 
+An inferred attribute type does not provide a declared type preference to later assignments:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+
+class Fields:
+    class_value = None
+
+    def __init__(self, value: Any):
+        self.value = None
+        self.value = identity(value)
+        reveal_type(self.value)  # revealed: Any
+
+def _(value: Any):
+    Fields.class_value = reveal_type(identity(value))  # revealed: Any
+    reveal_type(Fields.class_value)  # revealed: Any
+```
+
+The inferred attribute type is, however, used to fill in unsolved type variables:
+
+```py
+class Collections:
+    numbers = [1]
+    items = iter([1])
+
+def _():
+    Collections.numbers = reveal_type(list())  # revealed: list[int]
+    Collections.items = reveal_type(iter(list()))  # revealed: Iterator[int]
+```
+
+An annotated instance attribute provides a declared type preference even if the class body
+conditionally annotated the same field:
+
+```py
+def _(flag: bool, value: Any):
+    class Conditional:
+        if flag:
+            field: int
+
+        def __init__(self):
+            self.field: int = 0
+
+    obj = Conditional()
+    obj.field = identity(value)
+    reveal_type(obj.field)  # revealed: int
+```
+
 ## Overload evaluation
 
 The type context of all matching overloads are considered during argument inference:
@@ -2572,7 +2989,8 @@ def _(flag: bool):
 ## Collection literals in boolean and conditional expressions
 
 When a boolean or conditional expression combines a fresh collection literal with another operand,
-the other operand can provide type context for the literal:
+the other operand can provide type context for the literal. The fresh collection can include
+additional element types without widening the type of an existing collection.
 
 ```py
 from collections.abc import Mapping
@@ -2638,8 +3056,14 @@ def generic_type_context(values: list[int | str] | None) -> None:
     reveal_type(preserve_partially_specialized(values or []))  # revealed: list[Unknown | int]
 
 def widened_non_empty_fallback(values: list[int] | None) -> None:
-    result = values or ["x"]
-    reveal_type(result)  # revealed: (list[int] & ~AlwaysFalsy) | list[int | str]
+    result = values or [None]
+    reveal_type(result)  # revealed: (list[int] & ~AlwaysFalsy) | list[int | None]
+    result.append(1)  # ok
+    result.append(None)  # error: [invalid-argument-type]
+
+def nested_dict_fallback(rows: list[dict[Key, int]] | None) -> None:
+    for row in rows or [{"foo": "missing"}]:
+        row["bar"] = 1  # ok
 
 def incompatible_collection_kind(values: set[str] | None) -> None:
     reveal_type(values or [1])  # revealed: (set[str] & ~AlwaysFalsy) | list[int]
@@ -3344,7 +3768,7 @@ parameter types do not contribute `Unknown` to the inferred return type:
 python-version = "3.13"
 
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -3490,6 +3914,14 @@ def _(x: X):
 def _(x: X | Bar):
     x |= reveal_type({"bar": [1]})  # revealed: dict[str, list[int]]
 
+class Fallback:
+    def __or__(self, other: dict[str, list[int]]):
+        return self
+
+def _(x: X | Fallback):
+    # Only the in-place method provides a contextual type for the dictionary.
+    x |= reveal_type({"bar": [1]})  # revealed: dict[str, list[int]]
+
 class Y:
     def __ior__(self, other: Bar):
         return self
@@ -3563,19 +3995,19 @@ def make_list() -> list[str]:
     result = list()
     result.append(1)
     reveal_type(result)  # revealed: list[int | str]
-    return result  # error: [invalid-return-type]
+    return result  # error: [invalid-explicit-return]
 
 def make_set() -> set[str]:
     result = set()
     result.add(1)
     reveal_type(result)  # revealed: set[int | str]
-    return result  # error: [invalid-return-type]
+    return result  # error: [invalid-explicit-return]
 
 def make_dict() -> dict[str, str]:
     result = dict()
     result["x"] = 1
     reveal_type(result)  # revealed: dict[str, int | str]
-    return result  # error: [invalid-return-type]
+    return result  # error: [invalid-explicit-return]
 
 set_alias = set
 aliased_result = set_alias()
@@ -3653,7 +4085,7 @@ def _() -> list[int | None]:
 
 def _() -> int:
     invalid_x6 = []
-    return invalid_x6  # error: [invalid-return-type]
+    return invalid_x6  # error: [invalid-explicit-return]
 ```
 
 A return annotation can provide a union of fixed-length tuple element types. Inferring an empty list

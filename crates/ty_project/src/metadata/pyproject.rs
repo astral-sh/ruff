@@ -185,7 +185,7 @@ impl fmt::Display for ResolveRequiresPythonError {
 
 impl std::error::Error for ResolveRequiresPythonError {}
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Tool {
     pub ty: Option<Options>,

@@ -1,5 +1,106 @@
 # Changelog
 
+## 0.17.6
+
+Released on 2026-11-19.
+
+### Preview features
+
+- \[`flake8-type-checking`\] Add a fix for `runtime-string-union` (`TC010`) ([#15635](https://github.com/astral-sh/ruff/pull/15635))
+
+### Bug fixes
+
+- Fix handling of parenthesized duplicate items (`B033`, `RUF068`) ([#30493](https://github.com/astral-sh/ruff/pull/30493))
+- \[`pyflakes`\] Fix false negative when a name is assigned more than once (`F823`) ([#30524](https://github.com/astral-sh/ruff/pull/30524))
+- \[`pylint`\] Avoid false positive when collection is modified in loop (`PLR1733`, `PLR1736`) ([#30466](https://github.com/astral-sh/ruff/pull/30466))
+- \[`ruff`\] Avoid syntax error in `useless-finally` fix for inline `try` bodies (`RUF072`) ([#30349](https://github.com/astral-sh/ruff/pull/30349))
+- Treat relative imports from `.__future__` as ordinary imports ([#30260](https://github.com/astral-sh/ruff/pull/30260))
+
+### Rule changes
+
+- \[`flake8-simplify`\] Avoid redundant `bool` wrappers in `SIM208` fixes ([#30457](https://github.com/astral-sh/ruff/pull/30457))
+- \[`pyflakes`\] Ignore `__traceback_hide__` in `unused-variable` (`F841`) ([#29600](https://github.com/astral-sh/ruff/pull/29600))
+
+### Performance
+
+- Decode in-memory notebooks directly from their source string ([#30385](https://github.com/astral-sh/ruff/pull/30385))
+- Short-circuit exact qualified-name checks ([#30058](https://github.com/astral-sh/ruff/pull/30058))
+- Stream JSON diagnostics to the output writer ([#30384](https://github.com/astral-sh/ruff/pull/30384))
+
+### Documentation
+
+- Fix the multiline string example in Known Deviations from Black ([#30447](https://github.com/astral-sh/ruff/pull/30447))
+- Include the category in individual rule documentation pages ([#30503](https://github.com/astral-sh/ruff/pull/30503))
+
+### Other changes
+
+- Update Rust toolchain to 1.100 and MSRV to 1.98 ([#30416](https://github.com/astral-sh/ruff/pull/30416))
+
+### Contributors
+
+- [@pseudo-usama](https://github.com/pseudo-usama)
+- [@G26karthik](https://github.com/G26karthik)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@apathydevil](https://github.com/apathydevil)
+- [@Shivansh-S17](https://github.com/Shivansh-S17)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@ntBre](https://github.com/ntBre)
+- [@anujdas](https://github.com/anujdas)
+- [@chammika](https://github.com/chammika)
+- [@imryanthedev](https://github.com/imryanthedev)
+- [@Daverball](https://github.com/Daverball)
+
+## 0.17.5
+
+Released on 2026-11-12.
+
+### Preview features
+
+- Redirect renamed rules ([#30081](https://github.com/astral-sh/ruff/pull/30081))
+- \[`flake8-async`\] Implement `pytest-raises-exception-group` (`ASYNC401`) ([#28772](https://github.com/astral-sh/ruff/pull/28772))
+- \[`flake8-logging-format`\] Mark `G004` fix as unsafe ([#30087](https://github.com/astral-sh/ruff/pull/30087))
+- \[`pylint`\] Implement `no-method-argument` (`PLE0211`) ([#29748](https://github.com/astral-sh/ruff/pull/29748))
+- \[`refurb`\] Do not offer fix when `write` is nested in an expression (`FURB103`) ([#29789](https://github.com/astral-sh/ruff/pull/29789))
+- \[`ruff`\] Add `renamed-rule` (`RUF202`) ([#30079](https://github.com/astral-sh/ruff/pull/30079))
+- \[`ruff`\] Expand `redirected-noqa` to other suppression comments (`RUF101`) ([#30078](https://github.com/astral-sh/ruff/pull/30078))
+
+### Bug fixes
+
+- Avoid crashing when Ruff logs to a closed stderr pipe ([#30209](https://github.com/astral-sh/ruff/pull/30209))
+- Fix fixes that add or remove a keyword argument with a parenthesized value ([#30189](https://github.com/astral-sh/ruff/pull/30189))
+- \[`flake8-import-conventions`\] Avoid shadowing names when fixing import aliases (`ICN001`) ([#30035](https://github.com/astral-sh/ruff/pull/30035))
+- \[`flake8-bugbear`\] Fix `B010` autofix for parenthesized `setattr` calls ([#30168](https://github.com/astral-sh/ruff/pull/30168))
+- \[`flake8-pyi`\] Fix `PYI034` autofix for parenthesized `self` annotations ([#30173](https://github.com/astral-sh/ruff/pull/30173))
+- \[`pyupgrade`\] Fix `UP031` duplicating closing parentheses around the format string ([#30172](https://github.com/astral-sh/ruff/pull/30172))
+
+### Rule changes
+
+- \[`flake8-bugbear`\] Ignore frozen dataclass instantiations (`B008`) ([#29231](https://github.com/astral-sh/ruff/pull/29231))
+
+### Performance
+
+- Various performance improvements ([#30375](https://github.com/astral-sh/ruff/pull/30375), [#30211](https://github.com/astral-sh/ruff/pull/30211), [#30368](https://github.com/astral-sh/ruff/pull/30368), [#30259](https://github.com/astral-sh/ruff/pull/30259), [#30354](https://github.com/astral-sh/ruff/pull/30354), [#30115](https://github.com/astral-sh/ruff/pull/30115), [#30133](https://github.com/astral-sh/ruff/pull/30133), [#30132](https://github.com/astral-sh/ruff/pull/30132), [#30358](https://github.com/astral-sh/ruff/pull/30358), [#30135](https://github.com/astral-sh/ruff/pull/30135), [#30369](https://github.com/astral-sh/ruff/pull/30369), [#30351](https://github.com/astral-sh/ruff/pull/30351), [#30352](https://github.com/astral-sh/ruff/pull/30352), [#30347](https://github.com/astral-sh/ruff/pull/30347), [#30379](https://github.com/astral-sh/ruff/pull/30379), [#30328](https://github.com/astral-sh/ruff/pull/30328), [#30329](https://github.com/astral-sh/ruff/pull/30329), [#29446](https://github.com/astral-sh/ruff/pull/29446))
+
+### Other changes
+
+- Fix FreeBSD source builds with libc 0.2.190 ([#30176](https://github.com/astral-sh/ruff/pull/30176))
+
+### Contributors
+
+- [@rajveer3x](https://github.com/rajveer3x)
+- [@tjkuson](https://github.com/tjkuson)
+- [@hugehoo](https://github.com/hugehoo)
+- [@hector2394](https://github.com/hector2394)
+- [@ansh-rohilla](https://github.com/ansh-rohilla)
+- [@mati-caliz](https://github.com/mati-caliz)
+- [@yxshee](https://github.com/yxshee)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@GeorgiaPreda](https://github.com/GeorgiaPreda)
+- [@G26karthik](https://github.com/G26karthik)
+- [@ntBre](https://github.com/ntBre)
+- [@s-cork](https://github.com/s-cork)
+
 ## 0.17.4
 
 Released on 2026-11-05.

@@ -12,6 +12,11 @@ Thank you for contributing to Ruff/ty! To help us out with reviewing, please con
 
 <!-- What's the purpose of the change? What does it do, and why? -->
 
-## Test Plan
+## Notes to reviewers
 
-<!-- How was it tested? -->
+<!--
+This section is optional. Omit it if you have no additional notes for reviewers.
+
+Examples include how the change fits into a larger effort or, if you did manual testing beyond
+what CI covers, what you found and why those checks couldn't be automated.
+-->

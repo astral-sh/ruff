@@ -1,17 +1,26 @@
 use std::borrow::Cow;
 
+use crate::place::TypeOrigin;
 use crate::types::generics::Specialization;
 use crate::types::{DynamicType, KnownClass, Type};
 use crate::{Db, ProgramEnvironment};
 
 /// The kind of type context constraint being provided.
-#[derive(
-    Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
-)]
-pub(in crate::types) enum TypeContextKind {
-    /// A direct declared type annotation.
-    #[default]
-    Declared,
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum TypeContextKind {
+    /// A concrete expected type, whether explicitly declared, or inferred through previous assignments.
+    Expected {
+        /// Whether the type context should provide a solver preference in the case that the
+        /// declared and inferred solutions are mutually assignable.
+        prefer: bool,
+
+        /// Whether this context originated from an annotated assignment.
+        from_annotated_assignment: bool,
+    },
+
+    /// The type of another operand in a boolean or conditional expression. A fresh
+    /// collection can use the peer's element types without being assignable to the peer.
+    CollectionPeer,
 
     /// A constraint originating from inference evidence.
     ///
@@ -22,8 +31,25 @@ pub(in crate::types) enum TypeContextKind {
     /// The declared upper bound of a type variable.
     ///
     /// Note that unlike a declared type, the upper bound of a type variable acts only as a validity
-    /// constraint, and does not provide a preferred specialization during generic call inference.
+    /// constraint, and does not provide a preferred specialization. A validity constraint is also not
+    /// used to solve otherwise unconstrained type variables.
     Validity,
+}
+
+impl TypeContextKind {
+    pub(crate) fn preference() -> Self {
+        Self::Expected {
+            prefer: true,
+            from_annotated_assignment: false,
+        }
+    }
+
+    pub(crate) fn annotated_assignment() -> Self {
+        Self::Expected {
+            prefer: true,
+            from_annotated_assignment: true,
+        }
+    }
 }
 
 /// The type context for a given expression, e.g., the type annotation
@@ -31,16 +57,20 @@ pub(in crate::types) enum TypeContextKind {
 ///
 /// Knowing the outer type context when inferring an expression can enable
 /// more precise inference results, aka "bidirectional type inference".
-#[derive(
-    Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
-)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct TypeContext<'db> {
-    declared_type: Option<Type<'db>>,
+    expected_type: Option<Type<'db>>,
     kind: TypeContextKind,
 }
 
+impl Default for TypeContext<'_> {
+    fn default() -> Self {
+        Self::preference(None)
+    }
+}
+
 impl<'db> TypeContext<'db> {
-    pub(in crate::types) fn new(declared_type: Option<Type<'db>>, kind: TypeContextKind) -> Self {
+    pub(crate) fn new(expected_type: Option<Type<'db>>, kind: TypeContextKind) -> Self {
         // During generic call argument inference, type variables that cannot yet be specialized are
         // replaced by `UnspecializedTypeVar`. This marker intentionally carries neither type-variable
         // identity nor a concrete expected type, and so it should not be treated as a useful constraint.
@@ -48,28 +78,48 @@ impl<'db> TypeContext<'db> {
         // This deliberately matches only the bare marker: a partially specialized context such as
         // `list[UnspecializedTypeVar | int]` still carries useful structure and concrete type
         // information.
-        let declared_type =
-            declared_type.filter(|ty| *ty != Type::Dynamic(DynamicType::UnspecializedTypeVar));
+        let expected_type =
+            expected_type.filter(|ty| *ty != Type::Dynamic(DynamicType::UnspecializedTypeVar));
 
         Self {
-            declared_type,
+            expected_type,
             kind,
         }
     }
 
-    pub(crate) fn declared(declared_type: Option<Type<'db>>) -> Self {
-        Self::new(declared_type, TypeContextKind::Declared)
+    pub(crate) fn preference(expected_type: Option<Type<'db>>) -> Self {
+        Self::new(expected_type, TypeContextKind::preference())
     }
 
-    pub(crate) fn validity(declared_type: Type<'db>) -> Self {
-        Self::new(Some(declared_type), TypeContextKind::Validity)
+    pub(super) fn annotated_assignment(expected_type: Option<Type<'db>>) -> Self {
+        Self::new(expected_type, TypeContextKind::annotated_assignment())
     }
 
-    pub(in crate::types) fn declared_type(self) -> Option<Type<'db>> {
-        self.declared_type
+    fn expected(expected_type: Option<Type<'db>>) -> Self {
+        Self::new(
+            expected_type,
+            TypeContextKind::Expected {
+                prefer: false,
+                from_annotated_assignment: false,
+            },
+        )
     }
 
-    pub(in crate::types) fn kind(self) -> TypeContextKind {
+    pub(super) fn from_origin(ty: Type<'db>, origin: TypeOrigin) -> Self {
+        match origin {
+            TypeOrigin::Declared => Self::preference(Some(ty)),
+            // Later assignments are validated against the type of an inferred attribute, but it
+            // does not provide a declared type preference, allowing the type of the attribute to
+            // be overwritten by a gradual type.
+            TypeOrigin::Inferred => Self::expected(Some(ty)),
+        }
+    }
+
+    pub(crate) fn expected_type(self) -> Option<Type<'db>> {
+        self.expected_type
+    }
+
+    pub(crate) fn kind(self) -> TypeContextKind {
         self.kind
     }
 
@@ -77,11 +127,27 @@ impl<'db> TypeContext<'db> {
         matches!(self.kind, TypeContextKind::Inferred)
     }
 
-    pub(crate) fn is_validity(self) -> bool {
-        matches!(self.kind, TypeContextKind::Validity)
+    pub(super) fn is_from_annotated_assignment(self) -> bool {
+        matches!(
+            self.kind,
+            TypeContextKind::Expected {
+                from_annotated_assignment: true,
+                ..
+            }
+        )
     }
 
-    /// If the declared type is a specialized instance of the given `KnownClass`, returns the
+    pub(crate) fn should_prefer_expected_type(self) -> bool {
+        match self.kind {
+            TypeContextKind::Expected { prefer, .. } => prefer,
+            // Preserve the type inferred from a peer or from other arguments in the
+            // previous fixpoint round.
+            TypeContextKind::CollectionPeer | TypeContextKind::Inferred => true,
+            TypeContextKind::Validity => false,
+        }
+    }
+
+    /// If the expected type is a specialized instance of the given `KnownClass`, returns the
     /// specialization.
     pub(super) fn known_specialization(
         &self,
@@ -89,30 +155,30 @@ impl<'db> TypeContext<'db> {
         env: &ProgramEnvironment<'db>,
         known_class: KnownClass,
     ) -> Option<Specialization<'db>> {
-        self.declared_type
+        self.expected_type
             .and_then(|ty| ty.known_specialization(db, env, known_class))
     }
 
     pub(super) fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
-        self.with_declared_type(self.declared_type.map(f))
+        self.with_expected_type(self.expected_type.map(f))
     }
 
-    pub(crate) fn with_declared_type(self, declared_type: Option<Type<'db>>) -> Self {
-        Self::new(declared_type, self.kind)
+    pub(crate) fn with_expected_type(self, expected_type: Option<Type<'db>>) -> Self {
+        Self::new(expected_type, self.kind)
     }
 
     pub(super) fn is_typealias(&self) -> bool {
-        self.declared_type
+        self.expected_type
             .is_some_and(|ty| ty.is_typealias_special_form())
     }
 
-    /// If the declared type is a union, returns the target elements that it can be narrowed to.
+    /// If the expected type is a union, returns the target elements that it can be narrowed to.
     pub(super) fn narrow_targets(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Cow<'db, [Type<'db>]>> {
-        let union = self.declared_type?.as_union_like(db)?;
+        let union = self.expected_type?.as_union_like(db)?;
 
         let targets = if union.has_aliases(db) {
             let expanded = union.expand_aliases(db, env);
@@ -133,7 +199,7 @@ impl<'db> TypeContext<'db> {
 }
 
 impl<'db> From<Type<'db>> for TypeContext<'db> {
-    fn from(declared_type: Type<'db>) -> Self {
-        Self::declared(Some(declared_type))
+    fn from(expected_type: Type<'db>) -> Self {
+        Self::preference(Some(expected_type))
     }
 }

@@ -196,7 +196,7 @@ continue without returning a value:
 def may_raise() -> int:
     raise ValueError
 
-# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `int`"
+# error: [invalid-implicit-return] "Function can implicitly return `None`, which is not assignable to return type `int`"
 def interrupted_return() -> int:
     with suppress(ValueError):
         return may_raise()
@@ -262,7 +262,7 @@ from contextlib import suppress
 def may_raise() -> int:
     raise ValueError
 
-# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `int`"
+# error: [invalid-implicit-return] "Function can implicitly return `None`, which is not assignable to return type `int`"
 def eager_comprehension() -> int:
     with suppress(ValueError):
         [may_raise() for _ in [0]]
@@ -272,7 +272,7 @@ def eager_comprehension() -> int:
 Generator expressions are also assumed to run eagerly, so their exceptions can be suppressed:
 
 ```py
-# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `int`"
+# error: [invalid-implicit-return] "Function can implicitly return `None`, which is not assignable to return type `int`"
 def eager_generator() -> int:
     with suppress(ValueError):
         (may_raise() for _ in [0])

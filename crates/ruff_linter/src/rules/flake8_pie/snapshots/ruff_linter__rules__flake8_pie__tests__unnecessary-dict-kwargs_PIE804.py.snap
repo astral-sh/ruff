@@ -236,3 +236,17 @@ help: Remove unnecessary kwargs
 37 | )
    |
 note: This is an unsafe fix and may change runtime behavior
+
+PIE804 [*] Unnecessary `dict` kwargs
+  --> PIE804.py:44:5
+   |
+42 | )
+43 |
+44 | foo(**{**(options := defaults)})  # PIE804
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Remove unnecessary kwargs
+   |
+43 |
+   - foo(**{**(options := defaults)})  # PIE804
+44 + foo(**(options := defaults))  # PIE804
+   |

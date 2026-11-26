@@ -1314,7 +1314,7 @@ from typing import Literal
 class Custom:
     declared: str
 
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __setattr__(self, name: Literal["dynamic"], value: int) -> None:
         pass
 
@@ -1641,6 +1641,59 @@ class NestedBox(Generic[N]): ...
 
 reveal_type(Box())  # revealed: Box[Unknown]
 reveal_type(NestedBox())  # revealed: NestedBox[Unknown]
+```
+
+### A default that refers to the subclass through an inherited alias
+
+Both classes use the alias that `Child` inherits from `Root` as their default.
+
+```py
+from typing import TypeAlias
+
+class Root[T]:
+    Item: TypeAlias = "Child[int]"
+
+class Parent[T = Child.Item](Root["Child[T]"]): ...
+class Child[T = Child.Item](Parent[T]): ...
+
+reveal_type(Child[int]())  # revealed: Child[int]
+```
+
+### A generic default with an inherited type argument
+
+A bare `Parent` defaults to `Child`, which takes its own default from `Root.Item`.
+
+```py
+class Root[T]:
+    Item = int
+
+class Parent[T = Child](Root["Child[T]"]): ...
+class Child[T = Parent.Item](Parent[T]): ...
+
+concrete: Child[int]
+
+def check(x: Parent):
+    reveal_type(x)  # revealed: Parent[Child[int]]
+```
+
+### A default that looks up an alias on a grandchild
+
+Resolving `Leaf.Item` traverses `Parent` while its default is being inferred. The alias still
+supplies the concrete type `Child[int]`.
+
+```py
+from typing import TypeAlias
+
+class Root[T]:
+    Item: TypeAlias = "Child[int]"
+
+class Mid[T](Root[T]): ...
+class Parent[T = Leaf.Item](Mid["Child[T]"]): ...
+class Child[T = Parent.Item](Parent[T]): ...
+class Leaf[T](Child[T]): ...
+
+def check(p: Parent):
+    reveal_type(p)  # revealed: Parent[Child[int]]
 ```
 
 [pep 695]: https://peps.python.org/pep-0695/

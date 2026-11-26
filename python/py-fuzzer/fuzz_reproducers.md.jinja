@@ -1,20 +1,24 @@
 {% block introduction %}{% endblock %}
 {% for reproducer in reproducers %}
+
+### Seed {{ reproducer.seed }}
+
+{% if reproducer.failure_description %}
+{{ reproducer.failure_description }}
+
+{% endif %}
 {% if reproducer.bug.minimization_succeeded %}
+Minimized reproducer
 
-### Seed: {{ reproducer.seed }}
-
-{{ reproducer.fence }}python
-{{ reproducer.bug.source }}
-{{ reproducer.fence }}
 {% else %}
-
 <details>
-<summary>Seed: {{ reproducer.seed }} (original source; minimization did not complete)</summary>
+<summary>Original source (minimization did not complete)</summary>
 
+{% endif %}
 {{ reproducer.fence }}python
 {{ reproducer.bug.source }}
 {{ reproducer.fence }}
+{% if not reproducer.bug.minimization_succeeded %}
 
 </details>
 {% endif %}

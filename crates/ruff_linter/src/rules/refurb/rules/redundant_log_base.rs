@@ -100,8 +100,7 @@ pub(crate) fn redundant_log_base(
         Base::Ten
     } else if checker
         .semantic()
-        .resolve_qualified_name(base)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["math", "e"]))
+        .matches_qualified_name(base, &["math", "e"])
     {
         Base::E
     } else {

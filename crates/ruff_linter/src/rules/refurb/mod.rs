@@ -15,11 +15,11 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
-    #[test_case(Rule::ReadWholeFile, Path::new("FURB101_0.py"))]
-    #[test_case(Rule::ReadWholeFile, Path::new("FURB101_1.py"))]
-    #[test_case(Rule::ReadWholeFile, Path::new("FURB101_2.py"))]
+    #[test_case(Rule::ManualPathRead, Path::new("FURB101_0.py"))]
+    #[test_case(Rule::ManualPathRead, Path::new("FURB101_1.py"))]
+    #[test_case(Rule::ManualPathRead, Path::new("FURB101_2.py"))]
     #[test_case(Rule::RepeatedAppend, Path::new("FURB113.py"))]
-    #[test_case(Rule::IfExpInsteadOfOrOperator, Path::new("FURB110.py"))]
+    #[test_case(Rule::IfExprWithBodyAsCondition, Path::new("FURB110.py"))]
     #[test_case(Rule::ReimplementedOperator, Path::new("FURB118.py"))]
     #[test_case(Rule::ForLoopWrites, Path::new("FURB122.py"))]
     #[test_case(Rule::ReadlinesInFor, Path::new("FURB129.py"))]
@@ -30,8 +30,8 @@ mod tests {
     #[test_case(Rule::ForLoopSetMutations, Path::new("FURB142.py"))]
     #[test_case(Rule::SliceCopy, Path::new("FURB145.py"))]
     #[test_case(Rule::UnnecessaryEnumerate, Path::new("FURB148.py"))]
-    #[test_case(Rule::MathConstant, Path::new("FURB152.py"))]
-    #[test_case(Rule::RepeatedGlobal, Path::new("FURB154.py"))]
+    #[test_case(Rule::HardcodedMathConstant, Path::new("FURB152.py"))]
+    #[test_case(Rule::ConsecutiveGlobalOrNonlocalStatements, Path::new("FURB154.py"))]
     #[test_case(Rule::HardcodedStringCharset, Path::new("FURB156.py"))]
     #[test_case(Rule::VerboseDecimalConstructor, Path::new("FURB157.py"))]
     #[test_case(Rule::UnnecessaryFromFloat, Path::new("FURB164.py"))]
@@ -48,10 +48,10 @@ mod tests {
     #[test_case(Rule::MetaClassABCMeta, Path::new("FURB180.py"))]
     #[test_case(Rule::HashlibDigestHex, Path::new("FURB181.py"))]
     #[test_case(Rule::ListReverseCopy, Path::new("FURB187.py"))]
-    #[test_case(Rule::WriteWholeFile, Path::new("FURB103_0.py"))]
-    #[test_case(Rule::WriteWholeFile, Path::new("FURB103_1.py"))]
-    #[test_case(Rule::WriteWholeFile, Path::new("FURB103_2.py"))]
-    #[test_case(Rule::FStringNumberFormat, Path::new("FURB116.py"))]
+    #[test_case(Rule::ManualPathWrite, Path::new("FURB103_0.py"))]
+    #[test_case(Rule::ManualPathWrite, Path::new("FURB103_1.py"))]
+    #[test_case(Rule::ManualPathWrite, Path::new("FURB103_2.py"))]
+    #[test_case(Rule::SlicedIntegerBaseConversion, Path::new("FURB116.py"))]
     #[test_case(Rule::SortedMinMax, Path::new("FURB192.py"))]
     #[test_case(Rule::SortedMinMax, Path::new("FURB192_1.py"))]
     #[test_case(Rule::SliceToRemovePrefixOrSuffix, Path::new("FURB188.py"))]
@@ -68,22 +68,22 @@ mod tests {
     }
 
     #[test]
-    fn read_whole_file_newline_python_version_diff() -> Result<()> {
+    fn manual_path_read_newline_python_version_diff() -> Result<()> {
         assert_diagnostics_diff!(
             Path::new("refurb/FURB101_3.py"),
-            &settings::LinterSettings::for_rule(Rule::ReadWholeFile)
+            &settings::LinterSettings::for_rule(Rule::ManualPathRead)
                 .with_target_version(PythonVersion::PY313),
-            &settings::LinterSettings::for_rule(Rule::ReadWholeFile)
+            &settings::LinterSettings::for_rule(Rule::ManualPathRead)
                 .with_target_version(PythonVersion::PY312),
         );
         Ok(())
     }
 
     #[test]
-    fn write_whole_file_python_39() -> Result<()> {
+    fn manual_path_write_python_39() -> Result<()> {
         let diagnostics = test_path(
             Path::new("refurb/FURB103_0.py"),
-            &settings::LinterSettings::for_rule(Rule::WriteWholeFile)
+            &settings::LinterSettings::for_rule(Rule::ManualPathWrite)
                 .with_target_version(PythonVersion::PY39),
         )?;
         assert_diagnostics!(diagnostics);
@@ -94,7 +94,7 @@ mod tests {
     fn fstring_number_format_python_311() -> Result<()> {
         let diagnostics = test_path(
             Path::new("refurb/FURB116.py"),
-            &settings::LinterSettings::for_rule(Rule::FStringNumberFormat)
+            &settings::LinterSettings::for_rule(Rule::SlicedIntegerBaseConversion)
                 .with_target_version(PythonVersion::PY311),
         )?;
         assert_diagnostics!(diagnostics);

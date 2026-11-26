@@ -77,8 +77,9 @@ def _(flag: bool):
 ## Other collection branches
 
 When both branches are empty, their element types remain unknown. A list in the other branch can
-also supply `Unknown` or `Any` as the element type. Lists with different element types combine those
-types. A list in one branch and a dictionary in the other produce a union of the two types.
+also supply `Unknown` or `Any` as the element type. When both branches are nonempty list literals,
+we use the element type of the `else` branch to widen the first list. A list in one branch and a
+dictionary in the other produce a union of the two types.
 
 ```py
 from typing import Any
@@ -89,8 +90,10 @@ def _(flag: bool, unknown: list[Unknown], gradual: list[Any]):
     reveal_type({} if flag else {})  # revealed: dict[Unknown, Unknown]
     reveal_type(["x"] if flag else unknown)  # revealed: list[Unknown]
     reveal_type(["x"] if flag else gradual)  # revealed: list[Any]
-    # TODO: This should reveal `list[int | str]` based on the peer type context.
-    reveal_type(["x"] if flag else [1])  # revealed: list[int | str] | list[int]
+    values = ["x"] if flag else [1]
+    # TODO: Both literals could use `list[int | str]`.
+    reveal_type(values)  # revealed: list[int | str] | list[int]
+    values.append(1)  # ok
     reveal_type(["x"] if flag else {})  # revealed: list[str] | dict[Unknown, Unknown]
 ```
 

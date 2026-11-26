@@ -11,14 +11,17 @@ use crate::{
         cyclic::CycleDetector,
         definition_expression_type,
         display::qualified_name_components_from_scope,
-        generics::{ApplySpecialization, Specialization, bind_typevar, walk_specialization_types},
+        factory_name_argument,
+        generics::{
+            AliasPolicy, ApplySpecialization, Specialization, bind_typevar,
+            walk_specialization_types,
+        },
         variance::{VarianceInferable, VarianceOrigin},
         visitor,
     },
 };
 use ty_python_core::{
     definition::{Definition, DefinitionKind},
-    scope::ScopeId,
     semantic_index,
 };
 
@@ -194,7 +197,7 @@ pub struct PEP695TypeAliasType<'db> {
     pub name: Name,
 
     #[returns(copy)]
-    rhs_scope: ScopeId<'db>,
+    definition: Definition<'db>,
 
     #[returns(copy)]
     pub(super) specialization: Option<Specialization<'db>>,
@@ -217,18 +220,17 @@ fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 #[salsa::tracked]
 impl<'db> PEP695TypeAliasType<'db> {
-    fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        let scope = self.rhs_scope(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        semantic_index(db, scope.program_file(db)).expect_single_definition(type_alias_stmt_node)
+    /// The alias at its declaration, without specialization or pending materialization.
+    pub(super) fn unspecialized(self, db: &'db dyn Db) -> Self {
+        Self::new(db, self.name(db), self.definition(db), None, None)
     }
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent_alias(id),
+        cycle_initial=|_, id, _, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
-            let env = ProgramEnvironment::from_scope(alias.rhs_scope(db));
+            let env = ProgramEnvironment::from_definition(alias.definition(db));
             value.cycle_normalized(db, &env, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
@@ -241,21 +243,19 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent_alias(id),
+        cycle_initial=|_, id, _, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
-            let env = ProgramEnvironment::from_scope(alias.rhs_scope(db));
+            let env = ProgramEnvironment::from_definition(alias.definition(db));
             value.cycle_normalized(db, &env, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(super) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
-        let scope = self.rhs_scope(db);
-        let program_file = scope.program_file(db);
-        let python_file = program_file.python_file(db);
-        let module = parsed_module(db, python_file).load(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
-
+        let DefinitionKind::TypeAlias(type_alias_stmt_node) = definition.kind(db) else {
+            return Type::unknown();
+        };
+        let module = parsed_module(db, definition.python_file(db)).load(db);
         definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
     }
 
@@ -277,7 +277,7 @@ impl<'db> PEP695TypeAliasType<'db> {
                 PEP695TypeAliasType::new(
                     db,
                     self.name(db),
-                    self.rhs_scope(db),
+                    self.definition(db),
                     Some(specialization),
                     self.materialization_kind(db),
                 )
@@ -285,32 +285,28 @@ impl<'db> PEP695TypeAliasType<'db> {
         }
     }
 
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        let scope = self.rhs_scope(db);
-        let program_file = scope.program_file(db);
-        let python_file = program_file.python_file(db);
-        let parsed = parsed_module(db, python_file).load(db);
-        let type_alias_stmt_node = scope.node(db).expect_type_alias();
-
-        type_alias_stmt_node
-            .node(&parsed)
-            .type_params
-            .as_ref()
-            .and_then(|type_params| {
-                let index = semantic_index(db, program_file);
-                let definition = index.expect_single_definition(type_alias_stmt_node);
-                GenericContext::from_type_params(db, index, definition, type_params)
-            })
+        let definition = self.definition(db);
+        let DefinitionKind::TypeAlias(type_alias_stmt_node) = definition.kind(db) else {
+            return None;
+        };
+        let parsed = parsed_module(db, definition.python_file(db)).load(db);
+        let type_params = type_alias_stmt_node.node(&parsed).type_params.as_ref()?;
+        let index = semantic_index(db, definition.program_file(db));
+        GenericContext::from_type_params(db, index, definition, type_params)
     }
 }
 
 /// Find the `name` and `value` arguments to `TypeAliasType`. If either is supplied
 /// twice, use the positional argument for error recovery.
 pub(super) fn type_alias_arguments(arguments: &ast::Arguments) -> Option<(&ast::Expr, &ast::Expr)> {
-    let keyword = |name| arguments.find_keyword(name).map(|keyword| &keyword.value);
-    let name = arguments.args.first().or_else(|| keyword("name"))?;
-    let value = arguments.args.get(1).or_else(|| keyword("value"))?;
+    let name = factory_name_argument(arguments)?;
+    let value = arguments.args.get(1).or_else(|| {
+        arguments
+            .find_keyword("value")
+            .map(|keyword| &keyword.value)
+    })?;
     Some((name, value))
 }
 
@@ -354,7 +350,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// Computed lazily from the definition with specialization applied.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent_alias(id),
+        cycle_initial=|_, id, _, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_definition(alias.definition(db));
             value.cycle_normalized(db, &env, *previous, cycle)
@@ -371,7 +367,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent_alias(id),
+        cycle_initial=|_, id, _, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_definition(alias.definition(db));
             value.cycle_normalized(db, &env, *previous, cycle)
@@ -413,7 +409,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         )
     }
 
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let definition = self.definition(db);
         let file = definition.program_file(db);
@@ -480,7 +476,7 @@ fn apply_type_alias_specialization<'db>(
 /// inferred body in the key leaves its inference and unguarded cycle recovery in the caller.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _, _| Type::divergent(id),
+    cycle_initial=|_, id, _, _, _| Type::divergent(id),
     cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, specialization: Specialization<'db>, _| {
         let env = ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
         value.cycle_normalized_impl(db, &env, *previous, cycle)
@@ -541,7 +537,7 @@ impl<'db> TypeAliasType<'db> {
     fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, id, _, ()| AliasCycleSummary { cycle: Some(Type::divergent_alias(id)), ..AliasCycleSummary::default() },
+            cycle_initial=|_, id, _, _, ()| AliasCycleSummary { cycle: Some(Type::divergent_alias(id)), ..AliasCycleSummary::default() },
             heap_size=ruff_memory_usage::heap_size
         )]
         fn cycle_summary<'db>(
@@ -639,12 +635,7 @@ impl<'db> TypeAliasType<'db> {
         let Some(materialization_kind) = self.materialization_kind(db) else {
             return value_type;
         };
-        let env = match alias {
-            TypeAliasType::PEP695(alias) => ProgramEnvironment::from_scope(alias.rhs_scope(db)),
-            TypeAliasType::ManualPEP695(alias) => {
-                ProgramEnvironment::from_definition(alias.definition(db))
-            }
-        };
+        let env = ProgramEnvironment::from_definition(alias.definition(db));
         value_type.materialize(
             db,
             materialization_kind,
@@ -659,7 +650,7 @@ impl<'db> TypeAliasType<'db> {
     /// without losing its materialization polarity.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, alias: TypeAliasType<'db>, _| Type::TypeAlias(alias),
+        cycle_initial=|_, _, _, alias: TypeAliasType<'db>, _| Type::TypeAlias(alias),
         heap_size=ruff_memory_usage::heap_size
     )]
     fn materialized_value_type(
@@ -686,13 +677,7 @@ impl<'db> TypeAliasType<'db> {
     /// Returns the alias without an applied specialization or pending materialization.
     pub(super) fn unspecialized(self, db: &'db dyn Db) -> Self {
         match self {
-            TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(PEP695TypeAliasType::new(
-                db,
-                alias.name(db),
-                alias.rhs_scope(db),
-                None,
-                None,
-            )),
+            TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(alias.unspecialized(db)),
             TypeAliasType::ManualPEP695(alias) => {
                 TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
                     db,
@@ -726,7 +711,7 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(PEP695TypeAliasType::new(
                 db,
                 alias.name(db),
-                alias.rhs_scope(db),
+                alias.definition(db),
                 alias.specialization(db),
                 materialization_kind,
             )),
@@ -785,6 +770,14 @@ impl<'db> TypeAliasType<'db> {
             TypeMapping::ApplyRecursiveSubstitution(_) => {
                 Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
             }
+            TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                ..,
+                AliasPolicy::Preserve,
+            )) => Type::TypeAlias(self.apply_specialization(db, |context| {
+                self.specialization(db)
+                    .unwrap_or_else(|| context.default_specialization(db, None))
+                    .apply_type_mapping_impl(db, type_mapping, &[], visitor)
+            })),
             TypeMapping::FreshenBoundTypeVars { .. } => {
                 visitor.visit(db, ty, type_mapping, || {
                     // Stored arguments account for the alias's own parameters, but its
@@ -881,7 +874,7 @@ impl<'db> TypeAliasType<'db> {
             Self::PEP695(alias) => Self::PEP695(PEP695TypeAliasType::new(
                 db,
                 alias.name(db),
-                alias.rhs_scope(db),
+                alias.definition(db),
                 Some(mapped),
                 alias.materialization_kind(db),
             )),
@@ -935,7 +928,7 @@ impl<'db> TypeAliasType<'db> {
     /// formal `T` still describes `list[T]`, not the specialized `list[int]`.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
+        cycle_initial=|_, _, _, _, _| VarianceTerm::BIVARIANT,
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(in crate::types) fn variance_equation(

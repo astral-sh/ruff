@@ -47,11 +47,12 @@ use crate::place::{
     PlaceExpr, PlaceTable, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId,
     match_subject_place_expressions,
 };
+use crate::platform::PythonPlatform;
 use crate::predicate::{
     CallableAndCallExpr, ClassPatternKeywordPredicateKind, ClassPatternPredicateKind,
     MappingPatternEntryPredicateKind, MappingPatternPredicateKind, PatternPredicate,
     PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, ScopedPredicateId,
-    SequencePatternPredicateKind, StarImportPlaceholderPredicate, StatementCall,
+    SequencePatternPredicateKind, StarImportContext, StarImportPlaceholderPredicate, StatementCall,
     SubjectElementPatternPredicate,
 };
 use crate::re_exports::exported_names;
@@ -66,9 +67,9 @@ use crate::statement::StatementInner;
 use crate::symbol::{ScopedSymbolId, Symbol};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
-    EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, ImportedQualifierAction, LiveBinding,
-    LiveBindingStatus, PreviousDefinitions, ScopedDefinitionId, ScopedEnclosingSnapshotId,
-    UseDefMapBuilder, UseDefMapInterner,
+    BindingKind, EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, ImportedQualifierAction,
+    LiveBinding, LiveBindingStatus, PreviousDefinitions, ScopedDefinitionId,
+    ScopedEnclosingSnapshotId, StubParameter, UseDefMapBuilder, UseDefMapInterner,
 };
 use crate::{
     AncestorsIter, DefinitionsByNode, EvaluationMode, LoopHeader, LoopHeaderId,
@@ -103,12 +104,20 @@ struct NarrowingAlias<'ast> {
     first_definition_after_alias: ScopedDefinitionId,
 }
 
+#[derive(Default)]
+struct NarrowingAliases<'ast> {
+    by_name: FxHashMap<Name, NarrowingAlias<'ast>>,
+    /// Every place narrowed by a live alias in this scope. Places can stay in the set
+    /// after an alias is removed, since we only use it to rule out invalidations.
+    narrowed_places: PossiblyNarrowedPlaces,
+}
+
 struct ScopeInfo<'ast> {
     file_scope_id: FileScopeId,
     /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
     /// Saved narrowing aliases from the enclosing scope, restored on `pop_scope`.
-    narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
+    narrowing_aliases: NarrowingAliases<'ast>,
     /// `global` and `nonlocal` declarations from scopes nested under this one. This is used for:
     ///
     /// 1. Visibility of nested writes. A nested function that binds a variable might affect the
@@ -312,7 +321,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Maps alias variable names to their narrowing expressions (same-scope only).
     /// TODO: cross-scope alias narrowing support
-    narrowing_aliases: FxHashMap<Name, NarrowingAlias<'ast>>,
+    narrowing_aliases: NarrowingAliases<'ast>,
 
     /// Alias metadata for predicate leaf names in the current file.
     alias_predicates: FxHashMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
@@ -371,7 +380,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             semantic_checker: SemanticSyntaxChecker::default(),
             in_try_statement: false,
             semantic_syntax_errors: RefCell::default(),
-            narrowing_aliases: FxHashMap::default(),
+            narrowing_aliases: NarrowingAliases::default(),
             alias_predicates: FxHashMap::default(),
         };
 
@@ -623,29 +632,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             })
             .collect();
 
-        let captures = self
-            .current_scope_info_mut()
+        // A scope contributes each free name once from its symbol table. Each enclosing
+        // scope forwards that capture at most once when it pops.
+        self.current_scope_info_mut()
             .pending_captures
             .entry(capture.name)
-            .or_default();
-
-        if let Some(pending) = captures
-            .iter_mut()
-            .find(|pending| pending.nested_scope == capture.nested_scope)
-        {
-            pending
-                .binding_definition_ids
-                .extend(binding_definition_ids);
-            if capture.laziness.is_lazy() {
-                pending.laziness = ScopeLaziness::Lazy;
-            }
-        } else {
-            captures.push(PendingCapture {
+            .or_default()
+            .push(PendingCapture {
                 nested_scope: capture.nested_scope,
                 laziness: capture.laziness,
                 binding_definition_ids,
             });
-        }
     }
 
     fn record_pending_capture_binding(
@@ -1157,7 +1154,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .is_some_and(|symbol| narrowed_places.contains(&symbol.into()));
 
         if !narrowed_places.is_empty() && !target_is_narrowed {
-            self.narrowing_aliases.insert(
+            self.narrowing_aliases
+                .narrowed_places
+                .extend(&narrowed_places);
+            self.narrowing_aliases.by_name.insert(
                 target_name.clone(),
                 NarrowingAlias {
                     expression: value,
@@ -1171,31 +1171,33 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Invalidate any narrowing aliases affected by a new definition of `place`.
     fn invalidate_narrowing_aliases_for(&mut self, place: ScopedPlaceId) {
+        if self.narrowing_aliases.by_name.is_empty() {
+            return;
+        }
+
         let place_table = &self.place_tables[self.current_scope()];
+        // Rebinding the alias itself invalidates it: `is_none = x is None; is_none = False`.
+        if let Some(symbol) = place.as_symbol() {
+            self.narrowing_aliases
+                .by_name
+                .remove(place_table.symbol(symbol).name());
+        }
+
+        // Rebinding a place also invalidates aliases that narrow it or any of its members,
+        // e.g. `is_none = a.x is None; a = A()`.
         let associated_members = place_table.associated_place_ids(place);
-        let reassigned_alias_name = place
-            .as_symbol()
-            .map(|symbol_id| place_table.symbol(symbol_id).name());
+        let affected = |places: &PossiblyNarrowedPlaces| {
+            places.contains(&place)
+                || associated_members
+                    .iter()
+                    .any(|member| places.contains(&(*member).into()))
+        };
 
-        self.narrowing_aliases.retain(|name, alias| {
-            // Drop aliases that narrow the reassigned place or any of its members.
-            //  e.g. `is_none = x is None and ...; x = 1`
-            if alias.narrowed_places.contains(&place) {
-                return false;
-            }
-
-            //  e.g. `is_none = a.x is None; a = A()`
-            if associated_members
-                .iter()
-                .any(|m| alias.narrowed_places.contains(&(*m).into()))
-            {
-                return false;
-            }
-
-            // Drop the alias whose own variable is the reassigned place.
-            // e.g. `is_none = x is None; is_none = False`
-            reassigned_alias_name != Some(name)
-        });
+        if affected(&self.narrowing_aliases.narrowed_places) {
+            self.narrowing_aliases
+                .by_name
+                .retain(|_, alias| !affected(&alias.narrowed_places));
+        }
     }
 
     fn can_register_narrowing_alias(value: &ast::Expr) -> bool {
@@ -1263,7 +1265,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let Some(name) = leaf.as_name_expr() else {
                 return;
             };
-            let Some(alias) = self.narrowing_aliases.get(&name.id) else {
+            let Some(alias) = self.narrowing_aliases.by_name.get(&name.id) else {
                 return;
             };
             if self
@@ -1361,8 +1363,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn flow_restore(&mut self, state: FlowSnapshot) {
-        self.current_use_def_map_mut().restore(state);
+    /// Resumes another path and returns the state of the path we're leaving.
+    fn flow_restore(&mut self, state: FlowSnapshot) -> FlowSnapshot {
+        self.current_use_def_map_mut().restore(state)
     }
 
     fn flow_merge(&mut self, state: FlowSnapshot) {
@@ -1645,6 +1648,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     _ => ImportedQualifierAction::Preserve,
                 };
+                let binding_kind = match kind {
+                    DefinitionKind::LoopHeader(_) => BindingKind::LoopHeader,
+                    DefinitionKind::NestedBindings(_) => BindingKind::NestedBindings,
+                    DefinitionKind::DictKeyAssignment(_) => BindingKind::DictKeyAssignment,
+                    _ => BindingKind::Default,
+                };
                 let previous = previous_definitions.unwrap_or(if kind.is_loop_header() {
                     PreviousDefinitions::AreKept
                 } else {
@@ -1657,6 +1666,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         previous,
                         FutureDefinitions::ShadowThisOne,
                         imported_qualifier_action,
+                        binding_kind,
                     );
                 });
             }
@@ -1777,6 +1787,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .take_while(|e| !e.is_starred_expr())
                 .enumerate()
             {
+                if !matches!(
+                    item,
+                    ast::Expr::Dict(_) | ast::Expr::List(_) | ast::Expr::Tuple(_)
+                ) {
+                    continue;
+                }
+
                 if let Some(target) = MemberExprBuilder::visit_subscript_expr(
                     target,
                     &ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -1981,6 +1998,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 PreviousDefinitions::AreKept,
                 FutureDefinitions::DontShadowThisOne,
                 ImportedQualifierAction::Preserve,
+                BindingKind::NestedBindings,
             );
         }
     }
@@ -2229,7 +2247,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         self.register_narrowing_alias_predicates(predicate_node);
 
-        if let Some(literal) = resolve_to_literal(predicate_node) {
+        let literal = resolve_to_literal(predicate_node).or_else(|| {
+            // Only the bundled stubs can assume that `sys` refers to the standard library.
+            if !self.source_type.is_stub()
+                || !self.file.file(self.db).path(self.db).is_vendored_path()
+            {
+                return None;
+            }
+            environment_check(
+                predicate_node,
+                self.python_version,
+                self.file.program(self.db).python_platform(self.db),
+            )
+        });
+        if let Some(literal) = literal {
             if registered.is_none() {
                 self.add_standalone_expression(predicate_node);
             }
@@ -2485,16 +2516,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    /// Returns whether accessing a name, attribute, or subscript can raise.
+    /// Returns whether accessing a name can raise.
     ///
     /// Only a definitely bound name in the current flow state is known to be safe. In particular,
     /// a builtin-looking name may be shadowed by a local binding that has not been visited yet.
-    fn place_access_can_raise(&mut self, expr: &ast::Expr, is_use: bool) -> bool {
-        let ast::Expr::Name(name) = expr else {
-            return true;
-        };
-
-        is_use
+    fn name_access_can_raise(&mut self, name: &ast::ExprName, access: PlaceAccess) -> bool {
+        access.is_use()
             && self
                 .exception_context_stack_manager
                 .has_active_exception_handler(self)
@@ -3189,54 +3216,66 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let (predicate, narrowing_id) = self.record_expression_narrowing_constraint(if_expr);
         let reachability_constraint = self.record_reachability_constraint_id(narrowing_id);
-        let included_path = self.flow_snapshot();
-
-        self.flow_restore(filtered_out);
+        let included_path = self.flow_restore(filtered_out);
         self.record_negated_narrowing_constraint(predicate, narrowing_id);
         self.record_negated_reachability_constraint(reachability_constraint);
-        let filtered_out = self.flow_snapshot();
-
-        self.flow_restore(included_path);
-        filtered_out
+        self.flow_restore(included_path)
     }
 
-    fn declare_parameters(&mut self, parameters: &'ast ast::Parameters) {
-        for parameter in parameters.iter_non_variadic_params() {
-            self.declare_parameter(parameter);
-        }
-        if let Some(vararg) = parameters.vararg.as_ref() {
-            let symbol = self.add_symbol(vararg.name.id().clone());
-            self.current_place_table_mut()
-                .symbol_mut(symbol)
-                .mark_parameter();
-            self.add_definition(
-                symbol.into(),
-                ParameterDefinitionNodeRef::VariadicPositionalParameter(vararg),
+    fn declare_parameters(&mut self, parameters: &'ast ast::Parameters, is_stub_body: bool) {
+        let nodes = parameters
+            .iter_non_variadic_params()
+            .map(ParameterDefinitionNodeRef::Parameter)
+            .chain(
+                parameters
+                    .vararg
+                    .as_deref()
+                    .map(ParameterDefinitionNodeRef::VariadicPositionalParameter),
+            )
+            .chain(
+                parameters
+                    .kwarg
+                    .as_deref()
+                    .map(ParameterDefinitionNodeRef::VariadicKeywordParameter),
             );
-        }
-        if let Some(kwarg) = parameters.kwarg.as_ref() {
-            let symbol = self.add_symbol(kwarg.name.id().clone());
-            self.current_place_table_mut()
-                .symbol_mut(symbol)
-                .mark_parameter();
-            self.add_definition(
-                symbol.into(),
-                ParameterDefinitionNodeRef::VariadicKeywordParameter(kwarg),
-            );
+        if is_stub_body {
+            let parameters = nodes
+                .map(|node| self.declare_stub_parameter(node))
+                .collect();
+            self.current_use_def_map_mut().stub_parameters = Some(parameters);
+        } else {
+            for node in nodes {
+                let symbol = self.add_symbol(node.parameter().name.id().clone());
+                self.add_definition(symbol.into(), node);
+                self.current_place_table_mut()
+                    .symbol_mut(symbol)
+                    .mark_parameter();
+            }
         }
     }
 
-    fn declare_parameter(&mut self, parameter: &'ast ast::ParameterWithDefault) {
-        let symbol = self.add_symbol(parameter.name().id().clone());
-
-        self.add_definition(
-            symbol.into(),
-            ParameterDefinitionNodeRef::Parameter(parameter),
-        );
-
-        self.current_place_table_mut()
-            .symbol_mut(symbol)
-            .mark_parameter();
+    /// Creates the definition now so the semantic index can resolve the parameter's AST node.
+    /// Its binding and optional declaration are recorded when the scope's use-def map is finished.
+    fn declare_stub_parameter(
+        &mut self,
+        node: ParameterDefinitionNodeRef<'ast>,
+    ) -> StubParameter<'db> {
+        let parameter = node.parameter();
+        let (symbol, _) = self
+            .current_place_table_mut()
+            .add_symbol(Symbol::new(parameter.name.id().clone()));
+        let info = self.current_place_table_mut().symbol_mut(symbol);
+        info.mark_bound();
+        info.mark_parameter();
+        let annotated = parameter.annotation.is_some();
+        if annotated {
+            info.mark_declared();
+        }
+        StubParameter {
+            symbol,
+            definition: self.create_definition(symbol.into(), node),
+            annotated,
+        }
     }
 
     fn declare_lambda_parameters(
@@ -3320,11 +3359,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         target: &'ast ast::Expr,
         value: Expression<'db>,
     ) {
-        self.record_exception_checkpoint_if(matches!(
-            target,
-            ast::Expr::List(_) | ast::Expr::Tuple(_)
-        ));
-
         let current_assignment = match target {
             ast::Expr::List(_) | ast::Expr::Tuple(_) => {
                 if matches!(unpackable, Unpackable::Comprehension { .. }) {
@@ -3333,24 +3367,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         ScopeKind::Comprehension
                     );
                 }
-                // The first iterator of the comprehension is evaluated in the outer scope, while all subsequent
-                // nodes are evaluated in the inner scope.
-                // SAFETY: The current scope is the comprehension, and the comprehension scope must have a parent scope.
-                let value_file_scope =
-                    if let Unpackable::Comprehension { first: true, .. } = unpackable {
-                        self.scope_stack
-                            .iter()
-                            .rev()
-                            .nth(1)
-                            .expect("The comprehension scope must have a parent scope")
-                            .file_scope_id
-                    } else {
-                        self.current_scope()
-                    };
                 let unpack = Unpack::new(
                     self.db,
                     self.file,
-                    value_file_scope,
                     self.current_scope(),
                     // Note `target` belongs to the `self.module` tree
                     AstNodeRef::new(self.module, target),
@@ -3445,7 +3464,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             use_def_maps: self
                 .use_def_maps
                 .into_iter()
-                .map(|builder| use_def_map_interner.intern(builder.finish()))
+                .map(|builder| use_def_map_interner.finish(builder))
                 .collect(),
             enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),
@@ -3488,16 +3507,39 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Expr::Name(ast::ExprName { ctx, .. })
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
-                // Record place effects after walking the expression. For names, this is
-                // equivalent because `walk_expr` is a no-op; for attribute/subscript places,
-                // child evaluation can introduce bindings (for example via walrus operators),
-                // and those bindings need to exist before we register parent/member associations.
-                let mut deferred_effects = None;
-                if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
-                        && let PlaceExpr::Member(member) = &mut place_expr
+                let access = match (ctx, self.current_assignment()) {
+                    (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
+                        // Record the target load now; the definition is recorded separately
+                        // after visiting the right-hand side.
+                        PlaceAccess::Use
+                    }
+                    (ast::ExprContext::Load, _) => PlaceAccess::Use,
+                    (ast::ExprContext::Store, _) => PlaceAccess::Definition,
+                    (ast::ExprContext::Del, _) => PlaceAccess::UseAndDefinition,
+                    (ast::ExprContext::Invalid, _) => PlaceAccess::Invalid,
+                };
+
+                let place_id = if let ast::Expr::Name(name) = expr {
+                    // Names have no children. Borrow the AST name and clone it only when it
+                    // becomes a new symbol in this scope.
+                    if !access.is_use() {
+                        self.ast_ids.record_expression(expr, self.current_scope());
+                    }
+                    let can_raise = self.name_access_can_raise(name, access);
+                    self.record_exception_checkpoint_if(can_raise);
+                    let (symbol, added) = self.current_place_table_mut().add_name(&name.id);
+                    let place_id = ScopedPlaceId::from(symbol);
+                    if added {
+                        self.current_use_def_map_mut().add_place(place_id);
+                    }
+                    place_id
+                } else {
+                    let mut place = PlaceExpr::try_from_expr(expr);
+                    if let Some(PlaceExpr::Member(member)) = &mut place
                         && member.is_instance_attribute_candidate()
                         && let Some(attribute) = expr.as_attribute_expr()
+                        && let Some(method_scope_id) =
+                            self.is_method_or_eagerly_executed_in_method()
                     {
                         // We specifically mark direct attribute assignments to the first
                         // parameter of a method, i.e. typically `self` or `cls`.
@@ -3522,59 +3564,51 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         }
                     }
 
-                    let (is_use, is_definition) = match (ctx, self.current_assignment()) {
-                        (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
-                            // Record the target load now; the definition is recorded separately
-                            // after visiting the right-hand side.
-                            (true, false)
-                        }
-                        (ast::ExprContext::Load, _) => (true, false),
-                        (ast::ExprContext::Store, _) => (false, true),
-                        (ast::ExprContext::Del, _) => (true, true),
-                        (ast::ExprContext::Invalid, _) => (false, false),
-                    };
-                    deferred_effects = Some((place_expr, is_use, is_definition));
-                }
+                    // Child evaluation may introduce new bindings (e.g. via a walrus), which
+                    // must exist before we register the parent/member associations.
+                    walk_expr(self, expr);
+                    if place.is_none() || !access.is_use() {
+                        self.ast_ids.record_expression(expr, self.current_scope());
+                    }
+                    self.record_exception_checkpoint();
+                    let Some(place) = place else { return };
+                    self.add_place(place)
+                };
 
-                walk_expr(self, expr);
+                if access.is_use() {
+                    let use_id = self.record_place_use(place_id, expr);
 
-                let is_use = deferred_effects
-                    .as_ref()
-                    .is_some_and(|(_, is_use, _)| *is_use);
-                if !is_use {
-                    self.ast_ids.record_expression(expr, self.current_scope());
-                }
-                let can_raise = self.place_access_can_raise(expr, is_use);
-                self.record_exception_checkpoint_if(can_raise);
-
-                if let Some((place_expr, is_use, is_definition)) = deferred_effects {
-                    let place_id = self.add_place(place_expr);
-
-                    if is_use {
-                        let use_id = self.record_place_use(place_id, expr);
-
-                        // Keep track of any uses of unannotated collection initializers.
-                        if let Some(collection_def) =
+                    // Keep track of any uses of unannotated collection initializers.
+                    if self
+                        .current_statements
+                        .last()
+                        .is_some_and(|statement| statement.constrains_collection(expr))
+                        && let Some(collection_def) =
                             self.unannotated_collection_initializer_binding(use_id)
-                            && let Some(current_statement) = self.current_statements.last_mut()
-                        {
-                            current_statement
-                                .collection_uses
-                                .push((collection_def, expr.into()));
-                        }
-                    }
-
-                    if is_definition {
-                        self.record_place_definition(place_id, expr);
-                    }
-
-                    if let Some(unpack_position) = self
-                        .current_assignment_mut()
-                        .and_then(CurrentAssignment::unpack_position_mut)
+                        && let Some(current_statement) = self.current_statements.last_mut()
                     {
-                        *unpack_position = UnpackPosition::Other;
+                        current_statement
+                            .collection_uses
+                            .push((collection_def, expr.into()));
                     }
                 }
+
+                if access.is_definition() {
+                    self.record_place_definition(place_id, expr);
+                }
+
+                if let Some(unpack_position) = self
+                    .current_assignment_mut()
+                    .and_then(CurrentAssignment::unpack_position_mut)
+                {
+                    *unpack_position = UnpackPosition::Other;
+                }
+            }
+            ast::Expr::List(ast::ExprList { ctx, .. })
+            | ast::Expr::Tuple(ast::ExprTuple { ctx, .. }) => {
+                // A nested unpack can raise after earlier targets have been assigned.
+                self.record_exception_checkpoint_if(*ctx == ast::ExprContext::Store);
+                walk_expr(self, expr);
             }
             ast::Expr::Named(node) => {
                 self.visit_expr(&node.value);
@@ -3745,8 +3779,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut()
             .record_range_reachability(body.range(), in_type_checking_block);
         self.visit_expr_with_context(body, context);
-        let post_body = self.flow_snapshot();
-        self.flow_restore(falsy);
+        let post_body = self.flow_restore(falsy);
 
         self.record_negated_narrowing_constraint(predicate, predicate_id);
         self.record_negated_reachability_constraint(reachability_constraint);
@@ -3816,9 +3849,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                     // This path reaches the current operand and then short-circuits.
                     self.record_negated_reachability_constraint(reachability_constraint);
-                    snapshots.push(self.flow_snapshot());
-
-                    self.flow_restore(continuation);
+                    snapshots.push(self.flow_restore(continuation));
                 }
                 self.record_narrowing_constraint_id_for_places(predicate_id, &possibly_narrowed);
                 // The continuation carries the conditions that led to this operand. Named
@@ -3927,7 +3958,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
 
-                        builder.declare_parameters(parameters);
+                        builder.declare_parameters(parameters, ast::helpers::is_stub_body(body));
 
                         let mut first_parameter_name = parameters
                             .iter_non_variadic_params()
@@ -4220,17 +4251,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         // ```
                         //
                         // For more details, see the doc-comment on `StarImportPlaceholderPredicate`.
+                        let import = StarImportContext::new(
+                            self.db,
+                            self.current_scope_id(),
+                            referenced_program_file,
+                        );
                         for export in exported_names(self.db, referenced_program_file) {
                             let symbol_id = self.add_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
-                            let star_import = StarImportPlaceholderPredicate::new(
-                                self.db,
-                                self.file,
-                                symbol_id,
-                                referenced_program_file,
+                            let star_import_predicate = self.add_predicate(
+                                StarImportPlaceholderPredicate { import, symbol_id }.into(),
                             );
-
-                            let star_import_predicate = self.add_predicate(star_import.into());
 
                             let scope = self.current_scope();
                             let associated_member_ids = self.place_tables[scope]
@@ -4288,8 +4319,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // import, so we still check using it (and will also emit a diagnostic about a
                     // miss-placed `__future__` import.)
                     self.has_future_annotations |= !node.is_lazy
-                        && alias.name.id == "annotations"
-                        && node.module.as_deref() == Some("__future__");
+                        && node.is_future_import(self.python_version())
+                        && alias.name.id == "annotations";
 
                     let symbol = self.add_symbol(symbol_name.clone());
 
@@ -4550,12 +4581,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 });
 
                 for (clause_test, clause_body) in elif_else_clauses {
-                    // snapshot after every block except the last; the last one will just become
-                    // the state that we merge the other snapshots into
-                    post_clauses.push(self.flow_snapshot());
-                    // we can only take an elif/else branch if none of the previous ones were
-                    // taken
-                    self.flow_restore(falsy);
+                    // Save this branch for the merge and resume the path where no test
+                    // has succeeded yet.
+                    post_clauses.push(self.flow_restore(falsy));
 
                     self.record_negated_narrowing_constraint(last_predicate, last_narrowing_id);
                     self.record_negated_reachability_constraint(last_reachability_constraint);
@@ -4894,11 +4922,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if let Some((after_iter, non_empty_range_constraint)) =
                         non_empty_range_constraint
                     {
-                        let post_loop_body = self.flow_snapshot();
-                        self.flow_restore(after_iter);
+                        let post_loop_body = self.flow_restore(after_iter);
                         self.record_negated_reachability_constraint(non_empty_range_constraint);
-                        let no_iteration = self.flow_snapshot();
-                        self.flow_restore(post_loop_body);
+                        let no_iteration = self.flow_restore(post_loop_body);
                         self.flow_merge(no_iteration);
                     } else {
                         self.flow_merge(pre_loop);
@@ -5058,17 +5084,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         let guard_predicate_id = self.record_narrowing_constraint(guard_predicate);
                         let guard_reachability_constraint =
                             self.record_reachability_constraint_id(guard_predicate_id);
-                        let guard_success = self.flow_snapshot();
-
-                        self.flow_restore(falsy);
+                        let guard_success = self.flow_restore(falsy);
                         self.record_negated_narrowing_constraint(
                             guard_predicate,
                             guard_predicate_id,
                         );
                         self.record_negated_reachability_constraint(guard_reachability_constraint);
-                        let match_success_guard_failure = self.flow_snapshot();
-                        self.flow_restore(guard_success);
-                        match_success_guard_failure
+                        self.flow_restore(guard_success)
                     });
 
                     self.visit_body(&case.body);
@@ -5139,31 +5161,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let try_block_snapshots = self.exception_context_stack_manager.end_try_suite();
 
                 if !handlers.is_empty() {
-                    // Save the state immediately *after* visiting the `try` block
-                    // but *before* we prepare for visiting the `except` block(s).
-                    //
-                    // We will revert to this state prior to visiting the `else` block,
-                    // as there necessarily must have been 0 `except` blocks executed
-                    // if we hit the `else` block.
-                    let post_try_block_state = self.flow_snapshot();
-
-                    // Prepare for visiting the `except` block(s). If the `try` suite contained no
-                    // exception checkpoints, its handlers are unreachable.
+                    // Resume the first checkpoint, keeping the normal exit from the try suite
+                    // for the else suite. If nothing could raise, start the handlers on an
+                    // unreachable copy of that exit instead.
                     let mut try_block_snapshots = try_block_snapshots.into_iter();
-                    if let Some(first_snapshot) = try_block_snapshots.next() {
-                        self.flow_restore(first_snapshot);
+                    let post_try_block_state = if let Some(first) = try_block_snapshots.next() {
+                        let normal_exit = self.flow_restore(first);
                         for snapshot in try_block_snapshots {
                             self.flow_merge(snapshot);
                         }
+                        normal_exit
                     } else {
-                        self.flow_restore(post_try_block_state.clone());
+                        let normal_exit = self.flow_restore(self.flow_snapshot());
                         self.mark_unreachable();
-                    }
+                        normal_exit
+                    };
 
-                    let pre_except_state = self.flow_snapshot();
-                    let num_handlers = handlers.len();
+                    let pre_except_state = (handlers.len() > 1).then(|| self.flow_snapshot());
 
                     for (i, except_handler) in handlers.iter().enumerate() {
+                        if i > 0
+                            && let Some(state) = &pre_except_state
+                        {
+                            // Save the previous handler's exit before starting this one.
+                            post_except_states.push(self.flow_restore(state.clone()));
+                        }
+
                         let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
                         let ast::ExceptHandlerExceptHandler {
                             name: symbol_name,
@@ -5200,20 +5223,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         if let Some(symbol) = symbol {
                             self.delete_binding(symbol.into());
                         }
-                        // Each `except` block is mutually exclusive with all other `except` blocks.
-                        post_except_states.push(self.flow_snapshot());
-
-                        // It's unnecessary to do the `self.flow_restore()` call for the final except handler,
-                        // as we'll immediately call `self.flow_restore()` to a different state
-                        // as soon as this loop over the handlers terminates.
-                        if i < (num_handlers - 1) {
-                            self.flow_restore(pre_except_state.clone());
-                        }
                     }
 
                     // If we get to the `else` block, we know that 0 of the `except` blocks can have been executed,
                     // and the entire `try` block must have been executed:
-                    self.flow_restore(post_try_block_state);
+                    post_except_states.push(self.flow_restore(post_try_block_state));
                 }
 
                 self.visit_body(orelse);
@@ -5222,7 +5236,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.flow_merge(post_except_state);
                 }
 
-                let normal_pre_finally_state = self.flow_snapshot();
                 let (
                     terminal_finally_entry_snapshots,
                     has_escaping_exception,
@@ -5241,7 +5254,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // For more details, see:
                 // - https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d
                 // - https://github.com/astral-sh/ruff/pull/13633#discussion_r1788626702
-                if normal_pre_finally_state.is_always_unreachable()
+                if self.current_use_def_map().reachability
+                    == ScopedReachabilityConstraintId::ALWAYS_FALSE
                     && !terminal_finally_entry_snapshots.is_empty()
                 {
                     let mut snapshots = terminal_finally_entry_snapshots.into_iter();
@@ -5251,7 +5265,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.flow_merge(snapshot);
                     }
                     self.visit_body(finalbody);
-                    if !self.flow_snapshot().is_always_unreachable() {
+                    if self.current_use_def_map().reachability
+                        != ScopedReachabilityConstraintId::ALWAYS_FALSE
+                    {
                         if !finalbody.is_empty() && has_escaping_exception {
                             self.record_exception_checkpoint();
                         }
@@ -5276,7 +5292,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 is_positive: true,
                             }));
 
-                        self.flow_restore(snapshot);
+                        let normal_pre_finally_state = self.flow_restore(snapshot);
                         for snapshot in terminal_snapshots {
                             self.flow_merge(snapshot);
                         }
@@ -5295,8 +5311,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             );
 
                         if finalbody.is_empty() {
-                            let terminal_snapshot = self.flow_snapshot();
-                            self.flow_restore(normal_pre_finally_state);
+                            let terminal_snapshot = self.flow_restore(normal_pre_finally_state);
                             self.exception_context_stack_manager
                                 .propagate_deferred_terminal_context_manager_exit(
                                     terminal_snapshot,
@@ -5334,8 +5349,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 terminal_reachability,
                                 terminal_narrowing,
                             );
-                        let terminal_snapshot = self.flow_snapshot();
-                        self.flow_restore(post_finally_state);
+                        let terminal_snapshot = self.flow_restore(post_finally_state);
                         self.exception_context_stack_manager
                             .propagate_deferred_terminal_context_manager_exit(terminal_snapshot);
 
@@ -5619,51 +5633,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     }
 
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
-        self.push_statement(CurrentStatement::default());
+        self.push_statement(CurrentStatement::new(stmt));
         self.visit_stmt_impl(stmt);
-        let mut current_statement = self.pop_statement();
-
-        // We currently only consider certain types of statements to introduce constraints
-        // on collection initializers. This restriction is mostly for performance reasons, as we
-        // want to avoid "reads" of a collection contributing to the complexity of the cycles
-        // created by full-scope collection inference.
-        current_statement
-            .collection_uses
-            .retain(|(_, use_expression)| {
-                match stmt {
-                    // A return involving the collection object.
-                    ruff_python_ast::Stmt::Return(_) => true,
-
-                    // A subscript assignment on the collection object.
-                    ruff_python_ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                        match targets.as_slice() {
-                            [ast::Expr::Subscript(ast::ExprSubscript { value, .. })] => {
-                                ExpressionNodeKey::from(value) == *use_expression
-                            }
-                            _ => false,
-                        }
-                    }
-
-                    // An annotated assignment assigning the collection object to a new binding.
-                    ruff_python_ast::Stmt::AnnAssign(_) => true,
-
-                    // A bound-method call on the collection object.
-                    ruff_python_ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
-                        match value.as_ref() {
-                            ast::Expr::Call(ast::ExprCall { func, .. }) => match func.as_ref() {
-                                ruff_python_ast::Expr::Attribute(ast::ExprAttribute {
-                                    value,
-                                    ..
-                                }) => ExpressionNodeKey::from(value) == *use_expression,
-                                _ => false,
-                            },
-                            _ => false,
-                        }
-                    }
-
-                    _ => false,
-                }
-            });
+        let current_statement = self.pop_statement();
 
         if current_statement.lambda_expressions.is_empty()
             && current_statement.collection_uses.is_empty()
@@ -5784,8 +5756,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 if let Some(previous_alternatives) = successful_alternatives.take() {
                     self.flow_merge(previous_alternatives);
                 }
-                successful_alternatives = Some(self.flow_snapshot());
-                self.flow_restore(remaining_alternatives);
+                successful_alternatives = Some(self.flow_restore(remaining_alternatives));
                 self.record_negated_reachability_constraint(selected_alternative);
             }
 
@@ -6024,6 +5995,25 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 }
 
+/// The effects to record when visiting a name, attribute, or subscript.
+#[derive(Copy, Clone, Debug)]
+enum PlaceAccess {
+    Use,
+    Definition,
+    UseAndDefinition,
+    Invalid,
+}
+
+impl PlaceAccess {
+    fn is_use(self) -> bool {
+        matches!(self, Self::Use | Self::UseAndDefinition)
+    }
+
+    fn is_definition(self) -> bool {
+        matches!(self, Self::Definition | Self::UseAndDefinition)
+    }
+}
+
 /// A simple-name annotated assignment with an RHS whose declaration is already recorded.
 /// Created only by `begin_annotated_assignment`; finishing it records the value binding.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -6073,12 +6063,40 @@ impl CurrentAssignment<'_, '_> {
     }
 }
 
-#[derive(Default)]
 struct CurrentStatement<'ast, 'db> {
+    stmt: &'ast ast::Stmt,
     /// A list of lambda expressions contained in this statement.
     lambda_expressions: Vec<&'ast ast::ExprLambda>,
     /// A list of collection definitions whose uses are contained in this statement.
     collection_uses: Vec<(Definition<'db>, ExpressionNodeKey)>,
+}
+
+impl<'ast> CurrentStatement<'ast, '_> {
+    fn new(stmt: &'ast ast::Stmt) -> Self {
+        Self {
+            stmt,
+            lambda_expressions: Vec::new(),
+            collection_uses: Vec::new(),
+        }
+    }
+
+    /// Can this read constrain the type of an unannotated collection initializer?
+    /// Ignoring other reads keeps the cycles in full-scope inference small.
+    fn constrains_collection(&self, expr: &ast::Expr) -> bool {
+        match self.stmt {
+            ast::Stmt::Return(_) | ast::Stmt::AnnAssign(_) => true,
+            ast::Stmt::Assign(assign) => matches!(
+                assign.targets.as_slice(),
+                [ast::Expr::Subscript(target)] if std::ptr::eq(target.value.as_ref(), expr)
+            ),
+            ast::Stmt::Expr(stmt) => stmt
+                .value
+                .as_call_expr()
+                .and_then(|call| call.func.as_attribute_expr())
+                .is_some_and(|attr| std::ptr::eq(attr.value.as_ref(), expr)),
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -6224,6 +6242,53 @@ fn literal_iterable_truthiness(expr: &ast::Expr) -> Truthiness {
         | ast::Expr::StringLiteral(_)
         | ast::Expr::BytesLiteral(_) => Truthiness::from_expr(expr, |_| false),
         _ => Truthiness::Unknown,
+    }
+}
+
+/// Resolve common version and platform guards before building constraints for both branches.
+pub(super) fn environment_check(
+    expr: &ast::Expr,
+    version: PythonVersion,
+    platform: &PythonPlatform,
+) -> Option<bool> {
+    let (left, op, right) = expr.as_compare_expr()?.as_single()?;
+    let attribute = left.as_attribute_expr()?;
+    if attribute.value.as_name_expr()?.id != "sys" {
+        return None;
+    }
+    match attribute.attr.as_str() {
+        "version_info" => {
+            let [major, minor] = right.as_tuple_expr()?.elts.as_slice() else {
+                return None;
+            };
+            let component = |expr: &ast::Expr| match &expr.as_number_literal_expr()?.value {
+                ast::Number::Int(value) => value.as_u8(),
+                _ => None,
+            };
+            let cutoff = PythonVersion {
+                major: component(major)?,
+                minor: component(minor)?,
+            };
+            // For these operators, truncating `sys.version_info` preserves the
+            // comparison even when the first two components match the cutoff.
+            match op {
+                ast::CmpOp::GtE => Some(version >= cutoff),
+                ast::CmpOp::Lt => Some(version < cutoff),
+                _ => None,
+            }
+        }
+        "platform" => {
+            let PythonPlatform::Identifier(platform) = platform else {
+                return None;
+            };
+            let name = right.as_string_literal_expr()?.value.to_str();
+            match op {
+                ast::CmpOp::Eq => Some(platform == name),
+                ast::CmpOp::NotEq => Some(platform != name),
+                _ => None,
+            }
+        }
+        _ => None,
     }
 }
 

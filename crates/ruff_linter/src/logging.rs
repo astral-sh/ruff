@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 
@@ -153,7 +154,10 @@ pub fn set_up_logging(level: LogLevel) -> Result<()> {
         .level_for("globset", log::LevelFilter::Warn)
         .level_for("ty_python_semantic", log::LevelFilter::Warn)
         .level_for("salsa", log::LevelFilter::Warn)
-        .chain(std::io::stderr())
+        .chain(fern::Output::call(|record| {
+            // Fern reports write errors to stderr and panics if that write also fails.
+            writeln!(io::stderr().lock(), "{}", record.args()).ok();
+        }))
         .apply()?;
     Ok(())
 }

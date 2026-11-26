@@ -115,16 +115,16 @@ help: Use `ruff: file-ignore` instead
 ### Unknown codes still receive a diagnostic
 
 In case the unknown code is a typo rather than an intentionally external code, we emit both
-`invalid-rule-code` and `noqa-comments`:
+`unknown-rule-in-suppression-comment` and `noqa-comments`:
 
 ```toml
 [lint]
 preview = true
-select = ["noqa-comments", "unused-noqa", "invalid-rule-code", "F401"]
+select = ["noqa-comments", "unused-suppression-comment", "unknown-rule-in-suppression-comment", "F401"]
 ```
 
 ```py
-# error: [invalid-rule-code]
+# error: [unknown-rule-in-suppression-comment]
 # snapshot: noqa-comments
 import math  # noqa: F401, UNK001
 ```
@@ -148,7 +148,7 @@ help: Use `ruff: ignore` instead
 ```toml
 [lint]
 preview = true
-select = ["noqa-comments", "unused-noqa", "invalid-rule-code", "F401"]
+select = ["noqa-comments", "unused-suppression-comment", "unknown-rule-in-suppression-comment", "F401"]
 external = ["EXT"]
 ```
 
@@ -339,7 +339,7 @@ help: Use `ruff: file-ignore` instead
 ```toml
 [lint]
 preview = true
-select = ["noqa-comments", "unused-noqa", "F401"]
+select = ["noqa-comments", "unused-suppression-comment", "F401"]
 ```
 
 It should be possible to suppress `RUF105` with a `noqa` comment:
@@ -360,7 +360,7 @@ import math  # noqa: RUF100, F401
 ```toml
 [lint]
 preview = true
-select = ["noqa-comments", "unused-noqa", "F401"]
+select = ["noqa-comments", "unused-suppression-comment", "F401"]
 ```
 
 ### Inline suppression

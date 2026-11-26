@@ -9,6 +9,7 @@ use std::sync::Arc;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 
 use ruff_index::{FrozenIndexVec, IndexSlice};
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{HasNodeIndex, NodeIndex};
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use ruff_text_size::{Ranged, TextRange};
@@ -25,6 +26,7 @@ pub use ast_ids::ExpressionNodeKey;
 use builder::SemanticIndexBuilder;
 use definition::{Definition, DefinitionNodeKey, Definitions};
 use expression::Expression;
+use member::ScopedMemberId;
 use narrowing_constraints::ScopedNarrowingConstraint;
 pub use place::{PlaceExprRef, PlaceTable};
 pub use reachability_constraints::ReachabilityConstraintsBuilder;
@@ -32,10 +34,10 @@ pub use scope::FileScopeId;
 use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness};
 use symbol::ScopedSymbolId;
 pub use use_def::{
-    ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
-    BindingsSnapshotId, DeclarationWithConstraint, DeclarationsIterator, ImportedFinalCandidate,
-    ImportedFinalCandidatesIterator, LiveBinding, LoopHeaderId, NarrowingEvaluator,
-    PredicateNarrowingTargets, ScopedDefinitionId, UseDefMap,
+    ApplicableConstraints, BindingKind, BindingWithConstraints, BindingWithConstraintsIterator,
+    BindingsSnapshotId, DeclarationSources, DeclarationWithConstraint, DeclarationsIterator,
+    ImportedFinalCandidate, ImportedFinalCandidatesIterator, LiveBinding, LoopHeaderId,
+    NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, UseDefMap,
 };
 use use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId};
 
@@ -226,6 +228,42 @@ pub fn attribute_scopes<'db>(
         })
 }
 
+/// Receiver attributes in method scopes, grouped by name in scope traversal order.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn receiver_attribute_locations<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+) -> Box<[(Name, FileScopeId, ScopedMemberId)]> {
+    let index = semantic_index(db, scope.program_file(db));
+    let mut locations = Vec::new();
+    for method in attribute_scopes(db, scope) {
+        for (id, member) in index.place_table(method).members().enumerate() {
+            if let Some(name) = member.as_instance_attribute() {
+                locations.push((Name::new(name), method, ScopedMemberId::from_usize(id)));
+            }
+        }
+    }
+    // Keep the same order as scanning the methods and taking the first matching
+    // member in each scope.
+    locations.sort_by(|a, b| a.0.cmp(&b.0));
+    locations.dedup_by(|a, b| a.0 == b.0 && a.1 == b.1);
+    locations.into_boxed_slice()
+}
+
+/// Returns the first matching receiver member in each method scope that uses this name.
+pub fn receiver_attribute_places<'db, 's>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    name: &'s str,
+) -> impl Iterator<Item = (FileScopeId, ScopedMemberId)> + use<'s, 'db> {
+    let locations = receiver_attribute_locations(db, scope);
+    let start = locations.partition_point(|(candidate, _, _)| candidate.as_str() < name);
+    locations[start..]
+        .iter()
+        .take_while(move |(candidate, _, _)| candidate.as_str() == name)
+        .map(|&(_, method, member)| (method, member))
+}
+
 /// Returns the module global scope of `file`.
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 pub fn global_scope<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> ScopeId<'db> {
@@ -410,13 +448,13 @@ impl<'db> SemanticIndex<'db> {
         &self.use_def_maps[scope_id]
     }
 
-    /// Returns the set of modules that are imported anywhere in this file.
+    /// Returns the modules imported anywhere in this file, including their parent packages.
     ///
     /// This set only considers `import` statements, not `from...import` statements.
     /// See `ModuleLiteralType::available_submodule_attributes` for discussion
     /// of why this analysis is intentionally limited.
-    pub fn imported_modules(&self) -> impl Iterator<Item = &ModuleName> {
-        self.imported_modules.iter()
+    pub fn imported_modules(&self) -> &FrozenSet<ModuleName> {
+        &self.imported_modules
     }
 
     #[track_caller]
@@ -1189,6 +1227,9 @@ mod tests {
             ParameterDefinitionNodeKind,
         },
         program::Program,
+        use_def::{
+            FutureDefinitions, ImportedQualifierAction, PreviousDefinitions, UseDefMapBuilder,
+        },
     };
 
     impl UseDefMap<'_> {
@@ -1403,15 +1444,16 @@ mod tests {
                     DefinitionKind::AnnotatedAssignment(_)
                 );
             }
+            let sources = use_def.declaration_sources_at_binding(assignment).unwrap();
             assert_eq!(
-                use_def
-                    .declarations_at_binding(assignment)
+                sources
+                    .declarations()
                     .map(|declaration| declaration.declaration)
                     .collect::<Vec<_>>(),
                 [declaration.map_or(DefinitionState::Undefined, DefinitionState::Defined)]
             );
 
-            let mut candidates = use_def.imported_final_candidates_at_binding(assignment);
+            let mut candidates = sources.imported_final_candidates();
             assert_matches!(
                 candidates
                     .next()
@@ -1440,6 +1482,7 @@ mod tests {
             .first_public_binding(global_table.symbol_id("x").expect("symbol exists"))
             .unwrap();
         assert_matches!(binding.kind(&db), DefinitionKind::Assignment(_));
+        assert!(use_def.declaration_sources_at_binding(binding).is_none());
     }
 
     #[test]
@@ -1585,6 +1628,61 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             kwargs_binding.kind(&db),
             DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicKeywordParameter(_))
         );
+    }
+
+    #[test]
+    fn stub_parameter_bindings_belong_to_their_own_function() {
+        let TestCase { db, file } = test_case(
+            "def first(a, /, *rest: int, b: str, **options): ...\n\
+             def second(c, /, *values: float, d: bytes, **kwargs): pass",
+        );
+        let file = program_file(&db, file);
+        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, file.python_file(&db)).load(&db);
+        for stmt in module.suite() {
+            let ast::Stmt::FunctionDef(function) = stmt else {
+                panic!("expected a function");
+            };
+            let scope = index.node_scope(NodeWithScopeRef::Function(function));
+            let table = index.place_table(scope);
+            let use_def = index.use_def_map(scope);
+            let mut reference = Box::new(UseDefMapBuilder::new(ScopeKind::Function));
+            for (_, definition, used) in use_def.definitions_with_usage() {
+                assert!(!used);
+                let place = definition.place(&db);
+                reference.add_place(place);
+                let category = definition.kind(&db).category(false, &module);
+                if category.is_declaration() {
+                    reference.record_combined_definition(place, definition, category);
+                } else {
+                    reference.record_binding(
+                        place,
+                        definition,
+                        PreviousDefinitions::AreShadowed,
+                        FutureDefinitions::ShadowThisOne,
+                        ImportedQualifierAction::Preserve,
+                        BindingKind::Default,
+                    );
+                }
+            }
+            assert_eq!(use_def, &reference.finish());
+            for parameter in &function.parameters {
+                let definition = index.expect_single_definition(parameter);
+                let symbol = table.symbol_id(parameter.name()).unwrap();
+                assert_eq!(use_def.first_public_binding(symbol), Some(definition));
+                assert_eq!(
+                    use_def.first_public_declaration(symbol),
+                    parameter.annotation().map(|_| definition),
+                );
+                assert_eq!(
+                    use_def
+                        .reachable_symbol_bindings(symbol)
+                        .filter_map(|binding| binding.binding.definition())
+                        .collect::<Vec<_>>(),
+                    [definition],
+                );
+            }
+        }
     }
 
     #[test]

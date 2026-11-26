@@ -66,6 +66,7 @@ impl<'db, 'a> PlaceLoadResolver<'db, 'a> {
         db: &'db dyn Db,
         env: &'a ProgramEnvironment<'db>,
         index: &'db SemanticIndex<'db>,
+        file: ProgramFile<'db>,
         scope: ScopeId<'db>,
         place_expr: PlaceExprRef<'a>,
         mode: PlaceLoadMode<'a>,
@@ -76,7 +77,7 @@ impl<'db, 'a> PlaceLoadResolver<'db, 'a> {
             procedure: PlaceLoadResolutionProcedure::from_source(
                 db,
                 index,
-                scope.program_file(db),
+                file,
                 scope,
                 place_expr,
                 mode,
@@ -96,10 +97,24 @@ impl<'db, 'a> PlaceLoadResolver<'db, 'a> {
         mut visit: impl FnMut(&mut ResolvedPlaceLoadSource<'_, 'db>),
     ) -> ResolvedPlaceLoad<'db> {
         let db = self.procedure.context.db;
-        let mut place = PlaceAndQualifiers::from(Place::Undefined);
+        // The first source can only be local bindings. It has no entry constraints
+        // or earlier sources to merge with, and already provides the raw binding type.
+        let mut place = if let Some(bindings) = self.procedure.select_local_bindings() {
+            let mut source = ResolvedPlaceLoadSource {
+                place: self.resolve_bindings(bindings.clone()).into(),
+                kind: PlaceLoadSourceKind::Bindings(bindings),
+                constraint_keys: &[],
+            };
+            visit(&mut source);
+            source.place
+        } else {
+            Place::Undefined.into()
+        };
         let mut deprecation_target = None;
 
-        while let Some(step) = self.procedure.next() {
+        while !place.place.is_definitely_bound()
+            && let Some(step) = self.procedure.next()
+        {
             let source = match step {
                 PlaceLoadResolutionStep::Source(source) => source,
                 PlaceLoadResolutionStep::MemberResolutionCondition(prefix_loads) => {
@@ -115,7 +130,7 @@ impl<'db, 'a> PlaceLoadResolver<'db, 'a> {
                         .loaded_symbol_name()
                         .is_some_and(|name| name == "reveal_type") =>
                 {
-                    PlaceLoadConstraints::unnarrowed_source(
+                    ConstraintKeys::unnarrowed_source(
                         PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::UnimportedRevealType),
                         PlaceLoadSourceRole::Ordinary,
                     )
@@ -135,17 +150,13 @@ impl<'db, 'a> PlaceLoadResolver<'db, 'a> {
             };
             visit(&mut resolved_source);
             place = place.or_fall_back_to(db, self.env, || resolved_source.place);
-
-            if place.place.is_definitely_bound() {
-                break;
-            }
         }
 
         ResolvedPlaceLoad {
             place,
             deprecation_target: deprecation_target.unwrap_or(place),
             crosses_scope_declaration: self.procedure.crosses_scope_declaration,
-            constraint_keys: self.procedure.into_constraints(),
+            constraint_keys: self.procedure.constraints,
         }
     }
 
@@ -196,8 +207,9 @@ impl<'db, 'a> PlaceLoadResolver<'db, 'a> {
                 }
                 ImplicitPlaceLoad::Builtin(name) => {
                     let context = self.procedure.context;
-                    if Some(context.index.scope_id(context.scope))
-                        == builtins_module_scope(db, self.env)
+                    if context.scope.is_global()
+                        && Some(context.index.scope_id(context.scope))
+                            == builtins_module_scope(db, self.env)
                     {
                         Place::Undefined.into()
                     } else {
@@ -259,7 +271,7 @@ pub(crate) struct ResolvedPlaceLoad<'db> {
     /// or the `reveal_type` fallback.
     pub(crate) deprecation_target: PlaceAndQualifiers<'db>,
     /// Constraint keys accumulated for expression-level narrowing.
-    pub(crate) constraint_keys: Vec<(FileScopeId, ConstraintKey)>,
+    pub(crate) constraint_keys: ConstraintKeys,
     /// Whether resolution followed a `global` or `nonlocal` declaration.
     pub(crate) crosses_scope_declaration: bool,
 }
@@ -375,7 +387,7 @@ pub(crate) struct PlaceLoadResolutionProcedure<'db, 'ast> {
     /// The next node to visit in the resolution graph, or `None` after reaching a leaf.
     next_node: Option<PlaceLoadResolutionNode<'db>>,
     /// Narrowing constraints accumulated while resolution advances.
-    constraints: PlaceLoadConstraints,
+    constraints: ConstraintKeys,
     /// Whether resolution has crossed a `global` or `nonlocal` declaration so far.
     crosses_scope_declaration: bool,
 }
@@ -390,21 +402,24 @@ impl<'db> Iterator for PlaceLoadResolutionProcedure<'db, '_> {
         while let Some(current_node) = self.next_node.take() {
             match current_node {
                 PlaceLoadResolutionNode::LocalSource => {
-                    self.next_node =
-                        Some(PlaceLoadResolutionNode::AskConsumerWhetherToContinueForMember);
-
-                    if let Some((kind, exit_constraint)) =
-                        self.context.local_source(self.place_expr())
-                    {
-                        let source = self.constraints.source(
-                            kind,
-                            PlaceLoadSourceRole::Ordinary,
-                            exit_constraint,
-                        );
-                        return Some(PlaceLoadResolutionStep::Source(source));
+                    if let Some(bindings) = self.select_local_bindings() {
+                        return Some(PlaceLoadResolutionStep::Source(
+                            ConstraintKeys::unnarrowed_source(
+                                PlaceLoadSourceKind::Bindings(bindings),
+                                PlaceLoadSourceRole::Ordinary,
+                            ),
+                        ));
                     }
                 }
                 PlaceLoadResolutionNode::AskConsumerWhetherToContinueForMember => {
+                    if matches!(self.place_expr, PlaceExprRef::Member(_))
+                        && !self.context.can_resolve_enclosing_member()
+                    {
+                        return Some(PlaceLoadResolutionStep::Exhausted(
+                            PlaceLoadFailure::NotFound,
+                        ));
+                    }
+
                     self.next_node = Some(PlaceLoadResolutionNode::DecideResolutionPath);
 
                     if let Some(prefix_loads) =
@@ -422,7 +437,7 @@ impl<'db> Iterator for PlaceLoadResolutionProcedure<'db, '_> {
                     self.next_node = Some(PlaceLoadResolutionNode::EnclosingScopeSource);
 
                     return Some(PlaceLoadResolutionStep::Source(
-                        PlaceLoadConstraints::unnarrowed_source(
+                        ConstraintKeys::unnarrowed_source(
                             PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::DunderClass(
                                 definition,
                             )),
@@ -524,7 +539,7 @@ impl<'db> Iterator for PlaceLoadResolutionProcedure<'db, '_> {
                         Some(PlaceLoadResolutionNode::Failure(PlaceLoadFailure::NotFound));
 
                     return Some(PlaceLoadResolutionStep::Source(
-                        PlaceLoadConstraints::unnarrowed_source(
+                        ConstraintKeys::unnarrowed_source(
                             PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::Builtin(name)),
                             PlaceLoadSourceRole::Ordinary,
                         ),
@@ -586,9 +601,19 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
             context,
             place_expr,
             next_node: Some(PlaceLoadResolutionNode::LocalSource),
-            constraints: PlaceLoadConstraints::default(),
+            constraints: ConstraintKeys::default(),
             crosses_scope_declaration,
         }
+    }
+
+    /// Selects the first source and activates its constraints for subsequent sources.
+    fn select_local_bindings(&mut self) -> Option<BindingWithConstraintsIterator<'db, 'db>> {
+        self.next_node = Some(PlaceLoadResolutionNode::AskConsumerWhetherToContinueForMember);
+        let (bindings, exit_constraint) = self.context.local_source(self.place_expr())?;
+        if let Some((scope, key)) = exit_constraint {
+            self.constraints.push(scope, key);
+        }
+        Some(bindings)
     }
 
     fn decide_resolution_path(&mut self) -> PlaceLoadResolutionNode<'db> {
@@ -847,10 +872,6 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
         source: &PlaceLoadSource<'_>,
     ) -> &[(FileScopeId, ConstraintKey)] {
         self.constraints.narrowing_constraints_for(source)
-    }
-
-    fn into_constraints(self) -> Vec<(FileScopeId, ConstraintKey)> {
-        self.constraints.into_constraints()
     }
 
     fn place_expr(&self) -> PlaceExprRef<'_> {
@@ -1208,7 +1229,7 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
         self,
         place_expr: PlaceExprRef,
     ) -> Option<(
-        PlaceLoadSourceKind<'db>,
+        BindingWithConstraintsIterator<'db, 'db>,
         Option<(FileScopeId, ConstraintKey)>,
     )> {
         let scope = self.scope;
@@ -1229,12 +1250,12 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                     |operand| operand.use_id,
                 );
                 Some((
-                    PlaceLoadSourceKind::Bindings(use_def.bindings_at_use(use_id)),
+                    use_def.bindings_at_use(use_id),
                     Some((scope, ConstraintKey::UseId(use_id))),
                 ))
             }
             PlaceLoadMode::AtNameSnapshot(snapshot) => Some((
-                PlaceLoadSourceKind::Bindings(use_def.bindings_at_snapshot(snapshot)),
+                use_def.bindings_at_snapshot(snapshot),
                 Some((scope, ConstraintKey::Snapshot(snapshot))),
             )),
             PlaceLoadMode::Deferred | PlaceLoadMode::StringAnnotation => {
@@ -1242,7 +1263,7 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                     .local_operand
                     .map(|op| op.place)
                     .or_else(|| table.place_id(place_expr))
-                    .map(|id| PlaceLoadSourceKind::Bindings(use_def.reachable_bindings(id)));
+                    .map(|id| use_def.reachable_bindings(id));
                 assert!(
                     source.is_some() || matches!(self.mode, PlaceLoadMode::StringAnnotation),
                     "Expected the place table to create a place for every valid PlaceExpr node"
@@ -1250,6 +1271,23 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                 source.map(|source| (source, None))
             }
         }
+    }
+
+    /// Could an enclosing scope supply a binding or narrowing constraint for a member?
+    fn can_resolve_enclosing_member(self) -> bool {
+        if self.scope.is_global() {
+            return false;
+        }
+
+        // Eager scopes can capture a snapshot of an outer member. Lazy snapshots and
+        // global lookup only handle symbols, so a lazy scope needs a visible non-module
+        // ancestor to find another source for an attribute or subscript.
+        self.index.scope(self.scope).is_eager()
+            || self
+                .index
+                .visible_ancestor_scopes(self.scope)
+                .nth(1)
+                .is_some_and(|(id, _)| !id.is_global())
     }
 
     /// Describes how to evaluate the tracked prefixes of `place_expr` in this scope.
@@ -1368,11 +1406,12 @@ struct ForwardedGlobalSnapshot<'db> {
 
 /// Narrowing constraints accumulated while a consumer advances through a place load.
 #[derive(Default)]
-struct PlaceLoadConstraints {
-    constraint_keys: Vec<(FileScopeId, ConstraintKey)>,
+pub(crate) struct ConstraintKeys {
+    /// A read usually needs at most the constraint from its own scope.
+    keys: SmallVec<[(FileScopeId, ConstraintKey); 1]>,
 }
 
-impl PlaceLoadConstraints {
+impl ConstraintKeys {
     /// Creates a source narrowed by the constraints accumulated before it.
     ///
     /// `exit_constraint`, when present, is activated only after the source is requested (that
@@ -1397,8 +1436,8 @@ impl PlaceLoadConstraints {
         role: PlaceLoadSourceRole,
         exit_constraint: Option<(FileScopeId, ConstraintKey)>,
     ) -> PlaceLoadSource<'db> {
-        let entry_checkpoint = self.constraint_keys.len();
-        self.constraint_keys.extend(exit_constraint);
+        let entry_checkpoint = self.keys.len();
+        self.keys.extend(exit_constraint);
         PlaceLoadSource {
             kind,
             entry_checkpoint,
@@ -1420,7 +1459,7 @@ impl PlaceLoadConstraints {
 
     /// Extends the list of constraints used by subsequent sources.
     fn push(&mut self, scope: FileScopeId, key: ConstraintKey) {
-        self.constraint_keys.push((scope, key));
+        self.keys.push((scope, key));
     }
 
     /// Returns the constraints used to narrow `source`.
@@ -1428,11 +1467,11 @@ impl PlaceLoadConstraints {
         &self,
         source: &PlaceLoadSource<'_>,
     ) -> &[(FileScopeId, ConstraintKey)] {
-        &self.constraint_keys[..source.entry_checkpoint]
+        &self.keys[..source.entry_checkpoint]
     }
 
     /// Returns the constraints activated by the sources that were requested.
-    fn into_constraints(self) -> Vec<(FileScopeId, ConstraintKey)> {
-        self.constraint_keys
+    pub(crate) fn as_slice(&self) -> &[(FileScopeId, ConstraintKey)] {
+        &self.keys
     }
 }

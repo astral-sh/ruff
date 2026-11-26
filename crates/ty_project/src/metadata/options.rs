@@ -1,8 +1,8 @@
-use crate::Db;
 use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter, PortableGlobKind};
 use crate::metadata::pyproject::{ResolveRequiresPythonError, resolve_requires_python_lower_bound};
 use crate::metadata::python_version::SupportedPythonVersion;
 use crate::metadata::settings::{OverrideSettings, SrcSettings};
+use crate::{Db, UseUv};
 
 use super::settings::{Override, Settings, TerminalSettings};
 use crate::metadata::value::{RelativeGlobPattern, RelativePathBuf};
@@ -77,6 +77,11 @@ pub struct Options {
     )]
     pub baseline: Option<RelativePathBuf>,
 
+    /// Configures the project manager ty uses.
+    #[option_group]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_manager: Option<ProjectManagerOptions>,
+
     /// Configures the type checking environment.
     #[option_group]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -132,6 +137,41 @@ pub struct Options {
 }
 
 impl Options {
+    /// Translates an explicit uv mode into ty configuration overrides.
+    pub fn from_uv_mode(mode: Option<RangedValue<UseUv>>) -> Self {
+        Self {
+            project_manager: mode.map(|mode| ProjectManagerOptions {
+                project: Some(mode.clone().map_value(|mode| match mode {
+                    UseUv::On => ProjectManager::Uv,
+                    UseUv::Off | UseUv::Scripts => ProjectManager::None,
+                })),
+                script: Some(mode.map_value(|mode| match mode {
+                    UseUv::On | UseUv::Scripts => ScriptProjectManager::Uv,
+                    UseUv::Off => ScriptProjectManager::None,
+                })),
+            }),
+            ..Self::default()
+        }
+    }
+
+    /// Whether these options explicitly select uv for project discovery.
+    pub(crate) fn project_uses_uv(&self) -> Option<bool> {
+        self.project_manager
+            .as_ref()?
+            .project
+            .as_ref()
+            .map(|manager| **manager == ProjectManager::Uv)
+    }
+
+    pub(crate) fn script_project_manager(&self) -> Option<&RangedValue<ScriptProjectManager>> {
+        self.project_manager.as_ref()?.script.as_ref()
+    }
+
+    pub(crate) fn script_uses_uv(&self) -> Option<bool> {
+        self.script_project_manager()
+            .map(|manager| **manager == ScriptProjectManager::Uv)
+    }
+
     pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
         let _guard = ValueSourceGuard::new(source, true);
         let mut options: Self = toml::from_str(content)?;
@@ -238,10 +278,16 @@ impl Options {
                 default
             });
 
+        // Scripts with uv enabled use only their own environment, even before sync or after
+        // sync fails. The setting does not affect environment discovery for the project.
+        let allow_environment_fallback =
+            !matches!(context, OptionsContext::Script(_)) || self.script_uses_uv() != Some(true);
         let python_environment = match self.python_environment(context.configuration_root(), system)
         {
-            Ok(None) => PythonEnvironment::discover(context.project_root(), system)
-                .map_err(ToProgramSettingsError::PythonEnvironmentDiscovery),
+            Ok(None) if allow_environment_fallback => {
+                PythonEnvironment::discover(context.project_root(), system)
+                    .map_err(ToProgramSettingsError::PythonEnvironmentDiscovery)
+            }
             configured => configured.map_err(ToProgramSettingsError::PythonEnvironment),
         };
 
@@ -260,13 +306,17 @@ impl Options {
             })?
             .flatten();
 
-        let self_environment = self_environment_search_paths(
-            python_environment
-                .as_ref()
-                .map(ty_python_semantic::PythonEnvironment::origin)
-                .cloned(),
-            system,
-        );
+        let self_environment = if allow_environment_fallback {
+            self_environment_search_paths(
+                python_environment
+                    .as_ref()
+                    .map(ty_python_semantic::PythonEnvironment::origin)
+                    .cloned(),
+                system,
+            )
+        } else {
+            None
+        };
 
         let site_packages_paths = if let Some(python_environment) = python_environment.as_ref() {
             let site_packages_paths = python_environment
@@ -288,7 +338,7 @@ impl Options {
             }
         } else {
             tracing::debug!("No virtual environment found");
-            self_environment.map(|(paths, _)| paths).unwrap_or_default()
+            self_environment.map_or_default(|(paths, _)| paths)
         };
 
         let real_stdlib_path = python_environment.as_ref().and_then(|python_environment| {
@@ -597,6 +647,10 @@ impl Options {
         }
         if let Some(overrides) = &self.overrides {
             for section in &overrides.0 {
+                // Inline overrides never apply to a script.
+                if matches!(section.source(), ValueSource::ScriptMetadata(_)) {
+                    continue;
+                }
                 OverrideOptions::lint(db, section, &mut diagnostics);
             }
         }
@@ -859,6 +913,97 @@ fn self_environment_search_paths(
     Debug,
     Default,
     Clone,
+    PartialEq,
+    Eq,
+    Combine,
+    Serialize,
+    Deserialize,
+    OptionsMetadata,
+    get_size2::GetSize,
+)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct ProjectManagerOptions {
+    /// The project manager to use for discovering the project's workspace and Python environment.
+    ///
+    /// This setting is in preview and may change between ty releases.
+    ///
+    /// - With `"none"` (the default), ty discovers the project and Python environment itself.
+    /// - With `"uv"`, ty uses [uv](https://docs.astral.sh/uv/) to discover the workspace root,
+    ///   Python environment, and dependency metadata. The environment must already be synchronized;
+    ///   ty does not install project dependencies. uv may update the lockfile. This requires
+    ///   uv 0.12.3 or newer.
+    ///
+    /// An explicit `TY_UV` takes precedence over this setting. If your editor marks the workspace
+    /// as untrusted, ty discovers the project without running uv.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#""none""#,
+        value_type = r#""uv" | "none""#,
+        example = r#"project = "uv""#
+    )]
+    pub project: Option<RangedValue<ProjectManager>>,
+
+    /// The project manager to use for scripts with PEP 723 inline metadata.
+    ///
+    /// This setting is in preview and may change between ty releases.
+    ///
+    /// - With `"none"` (the default), ty looks for imported packages in your Python environment.
+    ///   Install any third-party packages the script needs in that environment.
+    /// - With `"uv"`, each script gets its own Python environment. ty uses
+    ///   [uv](https://docs.astral.sh/uv/) to install the script's declared dependencies there
+    ///   and resolves imports from that environment. This requires uv 0.12.3 or newer.
+    ///
+    /// If a script has an inline `[tool.ty]` table, its `project-manager.script` setting
+    /// takes precedence. Otherwise, the script inherits the project's value.
+    ///
+    /// When checking untrusted code with `ty check`, pass `--config 'project-manager.script="none"'`
+    /// to disable script synchronization. To disable both script synchronization and uv workspace
+    /// discovery, set the `TY_UV` environment variable to `off`. `TY_UV` takes precedence over
+    /// `--config`. If your editor marks the workspace as untrusted, ty disables both automatically.
+    ///
+    /// `uv check` sets `TY_UV=1`, so it always enables script synchronization.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#""none""#,
+        value_type = r#""uv" | "none""#,
+        example = r#"script = "uv""#
+    )]
+    pub script: Option<RangedValue<ScriptProjectManager>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, get_size2::GetSize)]
+#[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum ProjectManager {
+    /// Discover the project and Python environment without a project manager.
+    None,
+    /// Discover the workspace, environment, and dependency metadata with uv.
+    Uv,
+}
+
+impl Combine for ProjectManager {
+    fn combine_with(&mut self, _other: Self) {}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, get_size2::GetSize)]
+#[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum ScriptProjectManager {
+    /// Use the configured or discovered Python environment. Install the script's dependencies there.
+    None,
+    /// Use uv to synchronize a dedicated environment with the script's inline dependencies.
+    Uv,
+}
+
+impl Combine for ScriptProjectManager {
+    fn combine_with(&mut self, _other: Self) {}
+}
+
+#[derive(
+    Debug,
+    Default,
+    Clone,
     Eq,
     PartialEq,
     Combine,
@@ -1056,7 +1201,7 @@ pub struct SrcOptions {
         "#
     )]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub exclude_scripts: Option<bool>,
+    pub exclude_scripts: Option<RangedValue<bool>>,
 
     /// A list of files and directories to check. The `include` option
     /// follows a similar syntax to `.gitignore` but reversed:
@@ -1177,7 +1322,7 @@ impl SrcOptions {
 
         Ok(SrcSettings {
             respect_ignore_files: self.respect_ignore_files.unwrap_or(true),
-            exclude_scripts: self.exclude_scripts.unwrap_or(false),
+            exclude_scripts: self.exclude_scripts.as_deref().copied().unwrap_or(false),
             files,
         })
     }
@@ -1224,11 +1369,18 @@ impl Rules {
                 ),
                 Ok(_) => continue,
                 // TODO: Add a note if the value was configured on the CLI.
-                Err(error) => OptionDiagnostic::new(
-                    DiagnosticId::UnknownRule,
-                    error.to_string(),
-                    Severity::Warning,
-                ),
+                Err(error) => {
+                    let mut diagnostic = OptionDiagnostic::new(
+                        DiagnosticId::UnknownRule,
+                        error.to_string(),
+                        Severity::Warning,
+                    );
+                    if let Some(info) = error.info() {
+                        diagnostic =
+                            diagnostic.sub(SubDiagnostic::new(SubDiagnosticSeverity::Info, info));
+                    }
+                    diagnostic
+                }
             };
             diagnostics.push(diagnostic.at(db, name, None));
         }
@@ -1779,7 +1931,10 @@ pub struct AnalysisOptions {
     )]
     pub respect_type_ignore_comments: Option<bool>,
 
-    /// A list of module glob patterns for which `import-not-found` diagnostics should be suppressed.
+    /// A list of module glob patterns for which `import-not-found` and
+    /// `missing-module-member` diagnostics should be suppressed.
+    /// For `from pkg import name`, ty matches against `pkg` if the module cannot be resolved,
+    /// and against `pkg.name` if the module resolves but the name cannot be imported.
     ///
     /// Details on supported glob patterns:
     /// - `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but
@@ -1853,7 +2008,7 @@ impl AnalysisOptions {
         }
     }
 
-    pub(super) fn to_settings(
+    pub(crate) fn to_settings(
         &self,
         db: &dyn Db,
         context: AnalysisOptionsContext,
@@ -1924,7 +2079,7 @@ impl AnalysisOptions {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum AnalysisOptionsContext {
+pub(crate) enum AnalysisOptionsContext {
     TopLevel,
     Override,
 }

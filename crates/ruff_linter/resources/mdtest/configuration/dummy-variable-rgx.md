@@ -45,15 +45,15 @@ underscores.
 
 ```py
 def f(
-    _a_,  # error: [unused-function-argument]
-    _次_,  # error: [unused-function-argument]
-    __init__,  # error: [unused-function-argument]
+    _a_,  # error: [unused-function-parameter]
+    _次_,  # error: [unused-function-parameter]
+    __init__,  # error: [unused-function-parameter]
 ):
     return 0
 
-lambda _a_: 0  # error: [unused-lambda-argument]
-lambda _次_: 0  # error: [unused-lambda-argument]
-lambda __init__: 0  # error: [unused-lambda-argument]
+lambda _a_: 0  # error: [unused-lambda-parameter]
+lambda _次_: 0  # error: [unused-lambda-parameter]
+lambda __init__: 0  # error: [unused-lambda-parameter]
 ```
 
 ## No leading underscore
@@ -62,11 +62,11 @@ Names without a leading underscore are not treated as dummy names.
 
 ```py
 def f(
-    a,  # error: [unused-function-argument]
-    次,  # error: [unused-function-argument]
+    a,  # error: [unused-function-parameter]
+    次,  # error: [unused-function-parameter]
 ):
     return 0
 
-lambda a: 0  # error: [unused-lambda-argument]
-lambda 次: 0  # error: [unused-lambda-argument]
+lambda a: 0  # error: [unused-lambda-parameter]
+lambda 次: 0  # error: [unused-lambda-parameter]
 ```

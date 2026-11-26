@@ -369,3 +369,13 @@ async def read_thing_callable_dep_instance_default(query: str = Depends(Callable
 # Error: `__call__` has `other`, not `thing_id`.
 @app.get("/things/{thing_id}")
 async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...
+
+
+# OK: class dependency shortcut as default value without arguments.
+# https://github.com/astral-sh/ruff/issues/30467
+@app.get("/things/{thing_id}")
+async def read_thing_init_default_shortcut(query: InitAndCallQuery = Depends()): ...
+
+
+@app.get("/{my_id}")
+async def read_thing_pydantic_default_shortcut(query: PydanticParams = Depends()): ...

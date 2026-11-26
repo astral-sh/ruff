@@ -308,11 +308,53 @@ def _(top: Top[GradualParams], bottom: Bottom[GradualParams]) -> None:
     reveal_type(bottom)  # revealed: (*args: object, **kwargs: object) -> int
 ```
 
+Explicit parameters still constrain calls to the bottom materialization. Their types materialize
+contravariantly. The top materialization permits no calls because the gradual tail could require
+additional arguments.
+
+```py
+from typing import Concatenate
+from ty_extensions._internal import RegularCallableTypeOf, is_assignable_to
+
+def handle(value: Any, /, name: str = "", *items: Any, flag: Any, **options: Any) -> int:
+    return 1
+
+type Handle = RegularCallableTypeOf[handle]
+
+def fixed_parameters(bottom: Bottom[Handle], top: Top[Handle]) -> None:
+    # revealed: (value: object, /, name: str = "", *items: object, flag: object, **options: object) -> int
+    reveal_type(bottom)
+    bottom(object(), flag=True)  # ok
+    bottom(object())  # error: [missing-argument]
+    top(object(), flag=True)  # error: [call-to-function-with-unknown-signature]
+
+static_assert(is_assignable_to(Bottom[Handle], Handle))
+static_assert(is_assignable_to(Handle, Bottom[Handle]))
+static_assert(is_subtype_of(Bottom[Handle], Handle))
+static_assert(not is_subtype_of(Handle, Bottom[Handle]))
+
+def positional_prefix(bottom: Bottom[Callable[Concatenate[int, ...], str]]) -> None:
+    reveal_type(bottom)  # revealed: (int, /, *args: object, **kwargs: object) -> str
+```
+
+The bottom materialization accepts `other="two"` with `value` omitted, or any number of positional
+strings. A call like `callback("one", value="two")` would bind `value` twice.
+
+```py
+def named(value: str = "", *args: Any, **kwargs: Any) -> None: ...
+def other(other: str) -> None: ...
+def strings(*args: str) -> None: ...
+def both(other: str, /, *, value: str) -> None: ...
+def _(bottom: Bottom[RegularCallableTypeOf[named]]) -> None:
+    renamed: RegularCallableTypeOf[other] = bottom  # ok
+    many_strings: RegularCallableTypeOf[strings] = bottom  # ok
+    duplicate: RegularCallableTypeOf[both] = bottom  # error: [invalid-assignment]
+```
+
 Materializing an overloaded callable materializes each overload separately.
 
 ```py
 from typing import overload
-from ty_extensions._internal import RegularCallableTypeOf
 
 @overload
 def f(x: int) -> Any: ...
@@ -2305,7 +2347,7 @@ class ChildProtocol(BaseProtocol, Protocol):
     marker: Any
 
     @property
-    def value(self) -> str: ...  # error: [invalid-property-type-override]
+    def value(self) -> str: ...  # error: [incompatible-property-override]
 
 static_assert(is_subtype_of(Top[ChildProtocol], BaseProtocol))
 static_assert(is_subtype_of(ChildProtocol, Top[BaseProtocol]))
@@ -2447,7 +2489,52 @@ static_assert(not is_subtype_of(Top[Source], Bottom[Target]))
 static_assert(is_subtype_of(Bottom[Source], Top[Target]))
 
 def invalid(source: Top[Source]) -> Bottom[Target]:
-    return source  # error: [invalid-return-type]
+    return source  # error: [invalid-explicit-return]
+```
+
+### Methods with gradual variadics
+
+Narrowing to a recursive protocol in strict mode materializes its methods. The fixed `key` parameter
+of `handle` is retained when comparing the `Handler` accepted by `combine`.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Any, Protocol, assert_type, overload, runtime_checkable
+
+@runtime_checkable
+class Handler[T](Protocol):
+    def handle(self, key: str, *args: Any, **kwargs: Any) -> None: ...
+    def combine(self, other: "Handler[T]") -> None: ...
+
+def narrowed(value: object) -> None:
+    if isinstance(value, Handler):
+        handler: Handler[Any] = value  # ok
+```
+
+Overload selection compares `process` with its top materialization, which bottom-materializes the
+`handler` parameter. The identity overload of `mark` still applies and preserves the return type.
+
+```py
+@overload
+def mark[T](value: T) -> T: ...
+@overload
+def mark(value: object) -> object: ...
+def mark(value: object) -> object:
+    return value
+
+@mark
+def process(handler: Handler[Any]) -> int:
+    return 1
+
+def use(handler: Handler[Any]) -> None:
+    assert_type(process(handler), int)
 ```
 
 ### Members outside the protocol interface

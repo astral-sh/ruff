@@ -1,4 +1,5 @@
 use ruff_macros::CacheKey;
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::collect_import_from_member;
 use ruff_python_ast::name::QualifiedName;
 
@@ -160,26 +161,27 @@ impl std::fmt::Display for MemberNameImport {
 
 pub trait FutureImport {
     /// Returns `true` if this import is from the `__future__` module.
-    fn is_future_import(&self) -> bool;
+    fn is_future_import(&self, target_version: PythonVersion) -> bool;
 }
 
 impl FutureImport for ModuleNameImport {
-    fn is_future_import(&self) -> bool {
+    fn is_future_import(&self, _target_version: PythonVersion) -> bool {
         self.name.name == "__future__"
     }
 }
 
 impl FutureImport for MemberNameImport {
-    fn is_future_import(&self) -> bool {
+    fn is_future_import(&self, target_version: PythonVersion) -> bool {
         self.module.as_deref() == Some("__future__")
+            && (self.level == 0 || target_version < PythonVersion::PY313)
     }
 }
 
 impl FutureImport for NameImport {
-    fn is_future_import(&self) -> bool {
+    fn is_future_import(&self, target_version: PythonVersion) -> bool {
         match self {
-            NameImport::Import(import) => import.is_future_import(),
-            NameImport::ImportFrom(import_from) => import_from.is_future_import(),
+            NameImport::Import(import) => import.is_future_import(target_version),
+            NameImport::ImportFrom(import_from) => import_from.is_future_import(target_version),
         }
     }
 }

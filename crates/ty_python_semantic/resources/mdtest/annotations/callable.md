@@ -366,6 +366,25 @@ def expects_str_return(c: Callable[[int | str], str]) -> None:
 expects_str_return(wide_return_converter)
 ```
 
+## Overloaded bound method assignability
+
+When both overloads accept any receiver, their parameter types together cover the callable's input
+union.
+
+```py
+from typing import Callable, overload
+
+class Parser:
+    @overload
+    def parse(self: object, x: int, /) -> int: ...
+    @overload
+    def parse(self: object, x: str, /) -> str: ...
+    def parse(self: object, x: int | str, /) -> int | str:
+        return x
+
+parse: Callable[[int | str], int | str] = Parser().parse  # ok
+```
+
 ## Union
 
 ```py

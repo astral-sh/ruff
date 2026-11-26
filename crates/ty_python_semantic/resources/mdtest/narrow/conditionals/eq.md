@@ -936,7 +936,7 @@ from enum import IntEnum
 from typing import Literal
 
 class AnnotatedShifted(IntEnum):
-    _value_: Literal[1]  # error: [invalid-mutable-override]
+    _value_: Literal[1]  # error: [incompatible-mutable-override]
 
     def __new__(cls, value: int) -> "AnnotatedShifted":
         member = int.__new__(cls, value + 1)
@@ -955,7 +955,7 @@ if AnnotatedShifted.MEMBER != Other.MEMBER:
     reveal_type(AnnotatedShifted.MEMBER)  # revealed: AnnotatedShifted
 
 class AnnotatedInitialized(IntEnum):
-    _value_: Literal[2]  # error: [invalid-mutable-override]
+    _value_: Literal[2]  # error: [incompatible-mutable-override]
 
     def __init__(self, value: int) -> None:
         self._value_ = 2
@@ -998,7 +998,7 @@ from enum import IntEnum, auto
 from typing import Literal
 
 class Generated(IntEnum):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def _generate_next_value_(name, start, count, last_values) -> Literal["1"]:
         return "1"
 
@@ -1858,6 +1858,66 @@ def _(flag: bool):
         reveal_type(C)  # revealed: <class 'A'>
 ```
 
+## Equality between class objects and `type[...]` types
+
+A `type[...]` type includes arbitrary subclasses, which could have metaclasses with `__eq__`
+implementing arbitrary behavior, so in general it is not sound to assume that `cls == SomeClass`
+(where `cls` has a `type[...]` type) narrows.
+
+In practice, though, metaclasses that override `__eq__` are uncommon, and people do rely on this
+type of narrowing. In non-strict mode, when both known metaclasses use the default equality
+implementation, we optimistically assume that subclasses retain it and permit this narrowing.
+
+```py
+class Base: ...
+class Child(Base): ...
+
+def _(cls: type[Base]):
+    if cls == Child:
+        reveal_type(cls)  # revealed: <class 'Child'>
+```
+
+A class's own `__eq__` affects comparisons between its instances, not between class objects; it has
+no effect here.
+
+```py
+class ChildWithEq(Base):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def _(cls: type[Base]):
+    if cls == ChildWithEq:
+        reveal_type(cls)  # revealed: <class 'ChildWithEq'>
+```
+
+Distinct classes can compare equal when either metaclass defines or inherits an `__eq__` override.
+
+```py
+class EqualMeta(type):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class DerivedMeta(EqualMeta): ...
+class Custom(Base, metaclass=DerivedMeta): ...
+
+def compare(cls: type[Base], custom: type[Custom] | None):
+    if cls == Custom:
+        reveal_type(cls)  # revealed: type[Base]
+    if custom == Child:
+        reveal_type(custom)  # revealed: type[Custom]
+```
+
+The override also remains possible when the metaclass is selected at runtime.
+
+```py
+def choose(flag: bool, cls: type[Base]):
+    meta = EqualMeta if flag else type
+    class Candidate(Base, metaclass=meta): ...
+
+    if cls == Candidate:
+        reveal_type(cls)  # revealed: type[Base]
+```
+
 ## `x != y` where `y` has multiple literal options
 
 ```py
@@ -2579,6 +2639,45 @@ def _(s: LiteralString | None, t: LiteralString | Any):
         reveal_type(t)  # revealed: Literal["foo"] | Any
 ```
 
+## Narrowing with lists and dictionaries
+
+By default, a list or dictionary can't compare equal to a string literal. This also applies to
+subclasses that inherit the built-in comparison methods.
+
+```py
+def equality(value: str | list[str]):
+    if value == "all":
+        reveal_type(value)  # revealed: Literal["all"]
+
+def inequality(value: str | list[str] | dict[str, str]):
+    if value != "all":
+        return
+    reveal_type(value)  # revealed: Literal["all"]
+```
+
+A list subclass can override `__eq__` and `__ne__` independently.
+
+```py
+class AlwaysEqual(list[str]):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def custom_equality(value: str | AlwaysEqual):
+    if value == "all":
+        reveal_type(value)  # revealed: Literal["all"] | AlwaysEqual
+
+class NeverUnequal(list[str]):
+    def __ne__(self, other: object) -> bool:
+        return False
+
+def custom_inequality(value: str | NeverUnequal):
+    if value == "all":
+        reveal_type(value)  # revealed: Literal["all"]
+    if value != "all":
+        return
+    reveal_type(value)  # revealed: Literal["all"] | NeverUnequal
+```
+
 ## Narrowing with tuple types
 
 We assume that tuple subclasses don't override `tuple.__eq__`, which only returns True for other
@@ -3245,6 +3344,10 @@ def broad_integer(value: int):
     if value == 1:
         reveal_type(value)  # revealed: int
 
+def list_union(value: str | list[str]):
+    if value == "all":
+        reveal_type(value)  # revealed: str | list[str]
+
 def inequality(value: str):
     if value != "a":
         reveal_type(value)  # revealed: str & ~Literal["a"]
@@ -3344,6 +3447,43 @@ def tuple_union(value: Foo | None, other: tuple[int, ...]):
         reveal_type(value)  # revealed: Foo | None
     else:
         reveal_type(value)  # revealed: Foo | None
+```
+
+Strict mode accounts for a subclass that introduces a metaclass with custom equality.
+
+```py
+class Base: ...
+class Child(Base): ...
+
+def compare_classes(cls: type[Base], flag: bool):
+    if cls == Child:
+        reveal_type(cls)  # revealed: type[Base]
+
+    # A union of exact class objects can still narrow because their metaclasses are known.
+    either = Base if flag else Child
+    if either == Child:
+        reveal_type(either)  # revealed: <class 'Child'>
+```
+
+A final metaclass fixes the comparison method for every subclass. Equality on its own metaclass only
+affects comparisons with the metaclass itself, not class equality.
+
+```py
+from typing import final
+
+class MetaMeta(type):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+@final
+class Meta(type, metaclass=MetaMeta): ...
+
+class Parent(metaclass=Meta): ...
+class Derived(Parent): ...
+
+def compare_final_metaclass(cls: type[Parent]):
+    if cls == Derived:
+        reveal_type(cls)  # revealed: <class 'Derived'>
 ```
 
 ## The strict literal narrowing alias

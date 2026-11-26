@@ -36,6 +36,30 @@ def f(x: f):
 reveal_type(f)  # revealed: def f(x: Unknown) -> Unknown
 ```
 
+## A `TypeVar` name depends on its own `__name__`
+
+The name passed to `TypeVar` comes from `T.__name__` in another module. Inferring `T.__name__` leads
+back to the name argument, so ty falls back to `str` for the attribute.
+
+`parameter.py`:
+
+```py
+from typing import TypeVar
+from typing_extensions import reveal_type
+from names import name
+
+T = TypeVar(name)  # error: [mismatched-typevar-name]
+reveal_type(T.__name__)  # revealed: str
+```
+
+`names.py`:
+
+```py
+from parameter import T
+
+name = T.__name__
+```
+
 ## Unpacking a recursively growing tuple
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3838>.
@@ -149,7 +173,7 @@ class B(Protocol):
 x = 5
 
 while isinstance(x, B):
-    x = B()  # error: [call-non-callable]
+    x = B()  # error: [abstract-class-instantiation]
 
 type(x)
 x = 2
@@ -162,7 +186,7 @@ if bool:
     x = 5
 
 while isinstance(x, B):
-    x = B()  # error: [call-non-callable]
+    x = B()  # error: [abstract-class-instantiation]
 
 class A: ...
 ```
@@ -482,6 +506,45 @@ Example("example")
 Example(123)  # error: [invalid-argument-type] "Expected `str`, found `Literal[123]`"
 ```
 
+## Inherited annotations depend on the result of overload resolution
+
+Looking up `kind` to select a decorator overload requires resolving the bases, which refer back to
+the decorated class. Since `kind` is `int`, the second overload applies and `Child.Item` resolves to
+the type alias on `Result`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing import NamedTuple, Protocol, overload
+
+class Result:
+    type Item = int
+
+class HasStrKind(Protocol):
+    kind: type[str] | None
+
+class Base:
+    kind: type["Child.Item"] | None
+
+class Record(NamedTuple):
+    item: "Child.Item"
+
+@overload
+def choose[T: HasStrKind](cls: type[T]) -> type[T]: ...
+@overload
+def choose(cls: type[Base]) -> type[Result]: ...
+
+@choose
+class Child(Base, Record):
+    kind = int
+    Item = kind
+
+reveal_type(Child)  # revealed: type[Result]
+```
+
 ## Dataclass outside a decorator whose annotations depend on the class
 
 An outer `@dataclass` still generates an initializer when the inner decorator's annotations depend
@@ -759,8 +822,9 @@ while value:
 python-version = "3.12"
 ```
 
-A list passed to a generic function retains the type inferred from its elements, even when the
-call's return type supplies an incompatible context for that list.
+An unannotated list receives element types from both its initializer and its later uses. Here the
+return annotation supplies `T` through `keep`, but the list also contains an `int`. Returning it as
+`list[T]` would be unsafe.
 
 ```py
 def keep[U](values: list[U]) -> list[U]:
@@ -768,6 +832,60 @@ def keep[U](values: list[U]) -> list[U]:
 
 def make[T](arg: T) -> list[T]:
     values = [42]
-    reveal_type(values)  # revealed: list[int]
-    return keep(values)  # error: [invalid-return-type]
+    reveal_type(values)  # revealed: list[T@make | int]
+    return keep(values)  # error: [invalid-explicit-return]
+```
+
+## A nested union inside and outside a bound method
+
+Both alternatives for `items` are one-element tuples. While normalizing the outer `copy` method, ty
+can encounter the same method on the inner frozenset. That recursion must not affect the independent
+tuple in the next field.
+
+```py
+from typing import Literal
+
+def check(flag: bool):
+    items = (frozenset({1}).copy,) if flag else (0,)
+    state = None
+    for _ in range(2):
+        state = (frozenset((items,)).copy, items, state)
+        size: Literal[1] = len(state[1])
+        state[1].append(42)  # error: [missing-attribute]
+```
+
+## A decorator whose inferred return type changes during cycle recovery
+
+The decorator's overload depends on `Child.item`, whose inherited type depends in turn on the
+decorated `Child`. Even if we widen the public binding to include both overload results, the class
+body still needs the original class to infer `self`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any, Protocol, overload
+
+class HasItem(Protocol):
+    item: type[str]
+
+@overload
+def wrap[T: HasItem](cls: type[T]) -> type[T]: ...
+@overload
+def wrap(cls: type) -> type[Any]: ...
+def wrap(cls: type) -> type:
+    return cls
+
+class Base[T = "Child.Item"]:
+    item: type[T]
+
+@wrap
+class Child(Base):
+    item = str
+    Item = item
+
+    def read(self):
+        reveal_type(self)  # revealed: Self@read
 ```

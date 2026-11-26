@@ -296,7 +296,7 @@ even when augmented assignments recursively look up that attribute.
 
 ```toml
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -358,7 +358,7 @@ introduce `Unknown` into its instance attribute type.
 
 ```toml
 [rules]
-unsound-return-statement = "error"
+unsound-return = "error"
 ```
 
 ```py
@@ -935,7 +935,7 @@ reveal_type(c_instance.b2)  # revealed: int
 
 ```py
 class C:
-    # This might trigger a stylistic lint like `invalid-first-argument-name-for-method`, but
+    # This might trigger a stylistic lint like `instance-method-receiver-not-named-self`, but
     # it should be supported in general:
     def __init__(this) -> None:
         this.declared_and_bound: str | None = "a"
@@ -1160,14 +1160,14 @@ class C:
 
 reveal_type(C.pure_class_variable1)  # revealed: str
 
-reveal_type(C.pure_class_variable2)  # revealed: Unknown | Literal[1]
+reveal_type(C.pure_class_variable2)  # revealed: int
 
 c_instance = C()
 
 # It is okay to access a pure class variable on an instance.
 reveal_type(c_instance.pure_class_variable1)  # revealed: str
 
-reveal_type(c_instance.pure_class_variable2)  # revealed: Unknown | Literal[1]
+reveal_type(c_instance.pure_class_variable2)  # revealed: int
 
 # error: [invalid-attribute-access] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `C`"
 c_instance.pure_class_variable1 = "value set on instance"
@@ -1183,8 +1183,7 @@ class Subclass(C):
 reveal_type(Subclass.pure_class_variable1)  # revealed: str
 ```
 
-If a class variable is additionally qualified as `Final`, we do not union with `Unknown` for bare
-`ClassVar`s:
+A `Final` class variable with no explicit type argument keeps its literal type.
 
 ```py
 from typing import Final
@@ -1366,6 +1365,40 @@ reveal_type(m.augmented)  # revealed: str | Descriptor
 reveal_type(m.conditional)  # revealed: str | Descriptor | bytes
 ```
 
+#### A nested global write leaves the inherited annotation intact
+
+```py
+items = 1
+
+class Base:
+    items: list[int] = []
+
+class Child(Base):
+    def update(self):
+        global items
+        items = 2
+
+class Grandchild(Child):
+    items = []
+
+reveal_type(Child.items)  # revealed: list[int]
+reveal_type(Grandchild.items)  # revealed: list[int]
+```
+
+#### Deleting a class-level default
+
+An inherited annotation still guides the initializer if the subclass later deletes the name.
+
+```py
+class Base:
+    items: list[int]
+
+class Child(Base):
+    items = []
+    reveal_type(items)  # revealed: list[int]
+    del items
+```
+
 #### Augmented assignments to overriding class-level defaults
 
 An unannotated class-level default retains the inherited declaration, including through a diamond.
@@ -1453,13 +1486,13 @@ class Intermediate(Base):
     #
     # The opt-in mutable-override rule rejects this narrowing.
     #
-    redeclared_with_narrower_type: str  # error: [invalid-mutable-override]
+    redeclared_with_narrower_type: str  # error: [incompatible-mutable-override]
 
     # Redeclaring attributes with a *wider type* directly violates LSP.
     #
     # In this case, both mypy and pyright report an error.
     #
-    redeclared_with_wider_type: str | int | None  # error: [invalid-attribute-override]
+    redeclared_with_wider_type: str | int | None  # error: [incompatible-attribute-override]
 
     overwritten_in_subclass_body = 1  # error: [invalid-assignment]
 
@@ -1471,9 +1504,9 @@ class Intermediate(Base):
     def set_attributes(self) -> None:
         self.redeclared_in_method_with_same_type: str | None = None
 
-        self.redeclared_in_method_with_narrower_type: str = "foo"  # error: [invalid-mutable-override]
+        self.redeclared_in_method_with_narrower_type: str = "foo"  # error: [incompatible-mutable-override]
 
-        self.redeclared_in_method_with_wider_type: object = object()  # error: [invalid-attribute-override]
+        self.redeclared_in_method_with_wider_type: object = object()  # error: [incompatible-attribute-override]
 
         self.overwritten_in_subclass_method = None  # error: [invalid-assignment]
 
@@ -1528,6 +1561,187 @@ reveal_type(Derived().pure_overwritten_in_subclass_method)  # revealed: str
 reveal_type(Derived.undeclared)  # revealed: str
 reveal_type(Derived().undeclared)  # revealed: str
 reveal_type(Derived().pure_undeclared)  # revealed: str
+```
+
+## Nested class attributes
+
+We treat a nested class defined by a `class` statement in another class's body as a read-only
+attribute. Subclasses can override it with a narrower class. Some libraries use this pattern for
+metadata or configuration.
+
+### Attribute access types
+
+Access on the defining class retains the exact class object. Access through an instance or an
+unspecified subclass accounts for possible overrides.
+
+```py
+class Outer:
+    class Inner: ...
+
+reveal_type(Outer.Inner)  # revealed: <class 'Inner'>
+
+def read(cls: type[Outer], obj: Outer):
+    reveal_type(cls.Inner)  # revealed: type[Inner]
+    reveal_type(obj.Inner)  # revealed: type[Inner]
+```
+
+### Generic nested classes
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Outer:
+    class Inner[T]: ...
+
+reveal_type(Outer.Inner)  # revealed: <class 'Inner'>
+
+def inspect(obj: Outer, cls: type[Outer]) -> None:
+    reveal_type(obj.Inner)  # revealed: type[Inner[Unknown]]
+    reveal_type(cls.Inner)  # revealed: type[Inner[Unknown]]
+```
+
+The nested class can be used in annotations, explicit specializations, and base classes.
+
+```py
+class Integer(Outer.Inner[int]): ...  # ok
+
+value: Outer.Inner[int] = Integer()  # ok
+```
+
+### On final classes
+
+On (an instance of) a final class, even an inherited nested class is known exactly.
+
+```py
+from typing import final
+
+class Outer:
+    class Inner: ...
+
+@final
+class FinalOuter(Outer): ...
+
+def read(cls: type[FinalOuter], obj: FinalOuter):
+    reveal_type(cls.Inner)  # revealed: <class 'Inner'>
+    reveal_type(obj.Inner)  # revealed: <class 'Inner'>
+```
+
+### Writes are not allowed
+
+Rebinding or deleting the nested class could invalidate a subclass's narrower type.
+
+```py
+class Outer:
+    class Inner: ...
+
+def write(cls: type[Outer], obj: Outer):
+    Outer.Inner = Outer.Inner  # error: [invalid-assignment]
+    cls.Inner = Outer.Inner  # error: [invalid-assignment]
+    obj.Inner = Outer.Inner  # error: [invalid-assignment]
+    del Outer.Inner  # error: [invalid-assignment]
+    del cls.Inner  # error: [invalid-assignment]
+    del obj.Inner  # error: [invalid-assignment]
+```
+
+### Class statements only
+
+An unannotated attribute initialized by assigning a class object remains writable. Only nested
+`class` statements create an implicitly non-writable attribute. (It would be surprising to
+implicitly make an attribute non-writable just based on what type it happens to have; giving this
+special treatment to nested `class` statements seems more defensible, and matches the motivating
+real-world patterns.)
+
+```py
+class NotReallyInner: ...
+
+class Outer:
+    Inner = NotReallyInner
+
+Outer.Inner = NotReallyInner  # ok
+```
+
+### Redeclaring nested class attributes on instances
+
+A subclass can explicitly redeclare an inherited nested class as a writable instance attribute. The
+annotation governs writes on its instances and further subclasses.
+
+```py
+class Base:
+    class Inner: ...
+
+class Writable(Base):
+    def __init__(self):
+        self.Inner: type[Base.Inner] = Base.Inner  # ok
+
+class Inherited(Writable): ...
+
+def write(obj: Inherited):
+    obj.Inner = Base.Inner  # ok
+    obj.Inner = str  # error: [invalid-assignment]
+    del obj.Inner  # ok
+
+Writable.Inner = Base.Inner  # error: [invalid-assignment]
+```
+
+A new nested class takes precedence over receiver annotations on the same class and its ancestors.
+
+```py
+class ReadOnly(Writable):
+    class Inner(Base.Inner): ...  # error: [incompatible-attribute-override]
+
+    def __init__(self):
+        self.Inner: type[Base.Inner] = Base.Inner  # error: [invalid-assignment]
+
+del ReadOnly().Inner  # error: [invalid-assignment]
+```
+
+### On metaclasses
+
+A class object cannot rebind or delete a nested class inherited from its metaclass.
+
+```py
+class Meta(type):
+    class Inner: ...
+
+class Base(metaclass=Meta): ...
+
+def update(cls: type[Base]):
+    cls.Inner = Meta.Inner  # error: [invalid-assignment]
+    del cls.Inner  # error: [invalid-assignment]
+```
+
+An explicitly annotated attribute in the class namespace takes precedence over the nested class on
+the metaclass and permits writes and deletion.
+
+```py
+class Writable(metaclass=Meta):
+    Inner: type[Meta.Inner] = Meta.Inner
+
+Writable.Inner = Meta.Inner  # ok
+del Writable.Inner  # ok
+```
+
+A receiver annotation on a subclass of the metaclass can also make the attribute writable. It does
+not permit replacing a nested class defined on the receiver itself.
+
+```py
+class WritableMeta(Meta):
+    def __init__(self, *args):
+        self.Inner: type[Meta.Inner] = Meta.Inner
+
+class ReceiverWritable(metaclass=WritableMeta): ...
+
+ReceiverWritable.Inner = Meta.Inner  # ok
+del ReceiverWritable.Inner  # ok
+
+class Own(metaclass=WritableMeta):
+    class Inner(Meta.Inner): ...
+
+Own.Inner = Meta.Inner  # error: [invalid-assignment]
+del Own.Inner  # error: [invalid-assignment]
 ```
 
 ## Allow replacing ordinary methods with compatible functions
@@ -3183,7 +3397,7 @@ class Invalid(Base):
     values = ("wrong",)  # error: [invalid-assignment]
 
 class Redeclared(Base):
-    value: str = "child"  # error: [invalid-mutable-override]
+    value: str = "child"  # error: [incompatible-mutable-override]
 
 reveal_type(Redeclared.value)  # revealed: str
 ```
@@ -3246,7 +3460,7 @@ class Right:
     value: bytes = b""
 
 class Child(Left, Right):
-    value = "child"  # error: [invalid-attribute-override]
+    value = "child"  # error: [incompatible-attribute-override]
 
 reveal_type(Child.value)  # revealed: int | str
 
@@ -3415,12 +3629,12 @@ class Other:
     value: bytes = b""
 
 class Child(Intermediate, Other):
-    value = 1  # error: [invalid-attribute-override]
+    value = 1  # error: [incompatible-attribute-override]
 
 reveal_type(Child.value)  # revealed: int | str
 
 class Invalid(Intermediate, Other):
-    # error: [invalid-attribute-override]
+    # error: [incompatible-attribute-override]
     value = b"wrong"  # error: [invalid-assignment]
 ```
 
@@ -3534,11 +3748,11 @@ class Left(Root):
     value = 1
 
 class Right(Root):
-    value: str = "right"  # error: [invalid-attribute-override]
+    value: str = "right"  # error: [incompatible-attribute-override]
 
 class Child(Left, Right):
     # error: [invalid-assignment]
-    # error: [invalid-attribute-override]
+    # error: [incompatible-attribute-override]
     value = "wrong"
 
 reveal_type(Child.value)  # revealed: int
@@ -4001,7 +4215,7 @@ return type for error recovery.
 class InvalidGetAttribute:
     defined: bool = True
 
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(self) -> str:
         return "fallback"
 
@@ -4035,7 +4249,7 @@ An incompatible type for the attribute name also makes the implicit call invalid
 
 ```py
 class InvalidNameType:
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(self, name: int) -> bytes:
         return b"fallback"
 
@@ -4050,7 +4264,7 @@ the subclass.
 
 ```py
 class InvalidBase:
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(self) -> int:
         return 1
 
@@ -4087,7 +4301,7 @@ An invalid `__getattribute__` raises before Python can call an otherwise valid `
 
 ```py
 class CustomAccess:
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(self) -> int:
         return 1
 
@@ -4229,7 +4443,7 @@ attributes. Their original types remain available for error recovery.
 
 ```py
 class Meta(type):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(cls) -> int:
         return 1
 
@@ -4253,7 +4467,7 @@ the class object.
 
 ```py
 class InvalidBaseMeta(type):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __getattribute__(cls) -> int:
         return 1
 
@@ -4411,7 +4625,7 @@ we only consider the attribute assignment to be valid if the assigned attribute 
 from typing import Literal
 
 class Date:
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
         pass
 
@@ -5173,7 +5387,7 @@ class Base:
         return Sub()
 
 class Sub(Base):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def flip(self) -> "Base":
         return Base()
 
@@ -5517,6 +5731,29 @@ class Answer(enum.Enum):
 reveal_type(Answer.NO)  # revealed: Literal[Answer.NO]
 reveal_type(Answer.NO.value)  # revealed: Literal[0]
 reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Answer]
+```
+
+## An implicit attribute inferred from a generic call
+
+An initializer can determine the type of an attribute and still have errors in its arguments.
+Subsequent writes must respect the inferred type.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def wrap(value: T, count: int) -> list[T]:
+    return [value] * count
+
+class Values:
+    def __init__(self, value: str):
+        self.items = wrap(value, "once")  # error: [invalid-argument-type]
+
+def update(values: Values):
+    reveal_type(values.items)  # revealed: list[str]
+    values.items = ["a"]
+    values.items = [1]  # error: [invalid-assignment]
 ```
 
 ## Divergent inferred implicit instance attribute types

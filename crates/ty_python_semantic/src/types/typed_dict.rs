@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, btree_map::Entry};
+use std::convert::Infallible;
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
@@ -9,8 +10,11 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
+use rustc_hash::FxHashMap;
 
-use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field, KnownClass};
+use super::class::{
+    ClassLiteral, ClassType, CodeGeneratorKind, DynamicTypedDictLiteral, Field, KnownClass,
+};
 use super::context::InferContext;
 use super::diagnostic::{
     self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_TYPED_DICT_KEY,
@@ -27,7 +31,9 @@ use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
+use crate::types::relation::{
+    DisjointnessChecker, TypeRelation, TypeRelationChecker, try_constraint,
+};
 use crate::types::variance::VarianceOrigin;
 use crate::{Db, ProgramEnvironment};
 use ty_python_core::Truthiness;
@@ -271,7 +277,7 @@ impl<'db> TypedDictType<'db> {
     pub(crate) fn openness(self, db: &'db dyn Db) -> TypedDictOpenness<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _| TypedDictOpenness::ImplicitlyOpen,
+            cycle_initial=|_, _, _, _| TypedDictOpenness::ImplicitlyOpen,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn class_based_openness<'db>(
@@ -508,29 +514,34 @@ impl<'db> TypedDictType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Type<'db>> {
-        self.dict_value_type_if(db, |field_ty, extra_items_ty| {
-            field_ty.is_equivalent_to(db, env, extra_items_ty)
-        })
+        let Ok(ty) = self.dict_value_type_if(db, |field_ty, extra_items_ty| {
+            Ok::<_, Infallible>(field_ty.is_equivalent_to(db, env, extra_items_ty))
+        });
+        ty
     }
 
     /// Like [`Self::dict_value_type`], but uses the caller's equivalence or mutual-assignability
     /// check so recursive comparisons can share their cycle guards.
-    pub(super) fn dict_value_type_if(
+    pub(super) fn dict_value_type_if<E>(
         self,
         db: &'db dyn Db,
-        types_match: impl Fn(Type<'db>, Type<'db>) -> bool,
-    ) -> Option<Type<'db>> {
-        let extra_items = self.explicit_extra_items(db)?;
-        if extra_items.is_read_only()
-            || self.items(db).values().any(|field| {
-                field.is_required()
-                    || field.is_read_only()
-                    || !types_match(field.declared_ty, extra_items.declared_ty)
-            })
-        {
-            return None;
+        types_match: impl Fn(Type<'db>, Type<'db>) -> Result<bool, E>,
+    ) -> Result<Option<Type<'db>>, E> {
+        let Some(extra_items) = self.explicit_extra_items(db) else {
+            return Ok(None);
+        };
+        if extra_items.is_read_only() {
+            return Ok(None);
         }
-        Some(extra_items.declared_ty)
+        for field in self.items(db).values() {
+            if field.is_required()
+                || field.is_read_only()
+                || !types_match(field.declared_ty, extra_items.declared_ty)?
+            {
+                return Ok(None);
+            }
+        }
+        Ok(Some(extra_items.declared_ty))
     }
 
     pub(crate) fn items(self, db: &'db dyn Db) -> &'db TypedDictSchema<'db> {
@@ -538,7 +549,7 @@ impl<'db> TypedDictType<'db> {
         // being collected, e.g. through `typing.Self` in a `TypedDict` field.
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _| TypedDictSchema::default(),
+            cycle_initial=|_, _, _, _| TypedDictSchema::default(),
             heap_size=ruff_memory_usage::heap_size
         )]
         fn class_based_items<'db>(db: &'db dyn Db, class: ClassType<'db>) -> TypedDictSchema<'db> {
@@ -756,7 +767,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.check_type_pair(db, source_item_field.declared_ty, target_ty),
                 );
 
-                if result.is_trivially_never_satisfied() {
+                if result.short_circuits_and() {
                     return result;
                 }
             }
@@ -783,7 +794,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             target_item_field.declared_ty,
                         ),
                     );
-                    if result.is_trivially_never_satisfied() {
+                    if result.short_circuits_and() {
                         return result;
                     }
                 }
@@ -813,10 +824,22 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // This should be cheaper in many cases, and also helps us avoid some cycles.
         if let Some(defining_class) = source.defining_class()
             && let Some(target_defining_class) = target.defining_class()
-            && self.is_class_subtype(db, defining_class, target_defining_class)
+            && try_constraint!(self.is_class_subtype(db, defining_class, target_defining_class))
         {
             return self.always();
         }
+
+        // Mutable fields require the relation in both directions. For identical annotations,
+        // the reverse check would repeat the forward check with exactly the same arguments.
+        let check_mutable_field = |source, target| {
+            let forward = self.check_type_pair(db, source, target);
+            if forward.is_trivially_always_satisfied() && source == target {
+                return forward;
+            }
+            forward.and(db, self.constraints, || {
+                self.check_type_pair(db, target, source)
+            })
+        };
 
         let source_items = source.items(db);
         let target_items = target.items(db);
@@ -876,18 +899,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // invariants of self. For fully-static types, this is "equivalence".
                     // For gradual types, it depends on the relation, but mutual
                     // assignability is "consistency".
-                    self.check_type_pair(
-                        db,
+                    check_mutable_field(
                         source_item_field.declared_ty,
                         target_item_field.declared_ty,
                     )
-                    .and(db, self.constraints, || {
-                        self.check_type_pair(
-                            db,
-                            target_item_field.declared_ty,
-                            source_item_field.declared_ty,
-                        )
-                    })
                 }
             } else {
                 // `NotRequired[]` target fields
@@ -942,18 +957,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                         // As above, for mutable fields in the target, the relation needs
                         // to apply both ways.
-                        self.check_type_pair(
-                            db,
+                        check_mutable_field(
                             source_item_field.declared_ty,
                             target_item_field.declared_ty,
                         )
-                        .and(db, self.constraints, || {
-                            self.check_type_pair(
-                                db,
-                                target_item_field.declared_ty,
-                                source_item_field.declared_ty,
-                            )
-                        })
                     } else {
                         let Some(source_extra_items) = source_openness.explicit_extra_items()
                         else {
@@ -962,22 +969,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         if source_extra_items.is_read_only() {
                             return self.never();
                         }
-                        self.check_type_pair(
-                            db,
+                        check_mutable_field(
                             source_extra_items.declared_ty,
                             target_item_field.declared_ty,
                         )
-                        .and(db, self.constraints, || {
-                            self.check_type_pair(
-                                db,
-                                target_item_field.declared_ty,
-                                source_extra_items.declared_ty,
-                            )
-                        })
                     }
                 }
             };
             result.intersect(db, self.constraints, field_constraints);
+            if result.is_budget_exceeded() {
+                return result;
+            }
             if result.is_trivially_never_satisfied()
                 || (self.is_context_collection_enabled()
                     && result.is_never_satisfied(db, self.env, self.inferable))
@@ -1017,39 +1019,26 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 result.intersect(
                     db,
                     self.constraints,
-                    self.check_type_pair(
-                        db,
+                    check_mutable_field(
                         source_extra_items.declared_ty,
                         target_extra_items.declared_ty,
-                    )
-                    .and(db, self.constraints, || {
-                        self.check_type_pair(
-                            db,
-                            target_extra_items.declared_ty,
-                            source_extra_items.declared_ty,
-                        )
-                    }),
+                    ),
                 );
                 for (source_item_name, source_item_field) in source_items {
                     if !target_items.contains_key(source_item_name) {
+                        if result.is_budget_exceeded() {
+                            return result;
+                        }
                         if source_item_field.is_required() || source_item_field.is_read_only() {
                             return self.never();
                         }
                         result.intersect(
                             db,
                             self.constraints,
-                            self.check_type_pair(
-                                db,
+                            check_mutable_field(
                                 source_item_field.declared_ty,
                                 target_extra_items.declared_ty,
-                            )
-                            .and(db, self.constraints, || {
-                                self.check_type_pair(
-                                    db,
-                                    target_extra_items.declared_ty,
-                                    source_item_field.declared_ty,
-                                )
-                            }),
+                            ),
                         );
                     }
                 }
@@ -1073,6 +1062,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
                 for (source_item_name, source_item_field) in source_items {
                     if !target_items.contains_key(source_item_name) {
+                        if result.is_budget_exceeded() {
+                            return result;
+                        }
                         result.intersect(
                             db,
                             self.constraints,
@@ -1451,13 +1443,16 @@ impl<'db> VarianceInferable<'db> for TypedDictType<'db> {
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial = |_, _, _|TypedDictSchema::default(),
+    cycle_initial = |_, _, _, _|TypedDictSchema::default(),
     heap_size = ruff_memory_usage::heap_size
 )]
 pub(super) fn deferred_functional_typed_dict_schema<'db>(
     db: &'db dyn Db,
-    definition: Definition<'db>,
+    class: DynamicTypedDictLiteral<'db>,
 ) -> TypedDictSchema<'db> {
+    let definition = class
+        .definition(db)
+        .expect("deferred inference requires a definition");
     let program_file = definition.program_file(db);
     let python_file = program_file.python_file(db);
     let env = ProgramEnvironment::from_file(program_file);
@@ -1516,13 +1511,16 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
 /// ```
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _| TypedDictOpenness::ImplicitlyOpen,
+    cycle_initial = |_, _, _, _| TypedDictOpenness::ImplicitlyOpen,
     heap_size = ruff_memory_usage::heap_size
 )]
 pub(super) fn deferred_functional_typed_dict_openness<'db>(
     db: &'db dyn Db,
-    definition: Definition<'db>,
+    class: DynamicTypedDictLiteral<'db>,
 ) -> TypedDictOpenness<'db> {
+    let definition = class
+        .definition(db)
+        .expect("deferred inference requires a definition");
     let program_file = definition.program_file(db);
     let python_file = program_file.python_file(db);
     let env = ProgramEnvironment::from_file(program_file);
@@ -1823,6 +1821,9 @@ pub(crate) struct UnpackedTypedDict<'db> {
     pub(crate) keys: BTreeMap<Name, UnpackedTypedDictKey<'db>>,
     pub(crate) openness: TypedDictOpenness<'db>,
 }
+
+/// Shapes of unpacked values, reused while checking one literal against multiple union arms.
+pub(super) type UnpackedTypedDictCache<'db> = FxHashMap<Type<'db>, Option<UnpackedTypedDict<'db>>>;
 
 /// Combines the openness policies of intersected `TypedDict`-shaped values.
 ///
@@ -2127,36 +2128,19 @@ fn merge_unpacked_key_definitions<'db>(
     if existing == new { existing } else { None }
 }
 
-/// Extracts unpacked `TypedDict` keys for a `**kwargs` annotation only when the annotation
-/// explicitly uses `Unpack[...]`.
+/// Returns the `TypedDict` unpacked by a `**kwargs` annotation.
 ///
 /// Per [PEP 692](https://peps.python.org/pep-0692/#typeddict-unions), this accepts only a concrete
 /// `TypedDict` target, or a type alias resolving to one.
-pub(crate) fn extract_unpacked_typed_dict_keys_from_kwargs_annotation<'db>(
+pub(crate) fn unpacked_typed_dict_from_kwargs_annotation<'db>(
     db: &'db dyn Db,
     annotated_type: Type<'db>,
     annotation_flags: TypeExpressionFlags,
-) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
-    let typed_dict = annotation_flags
-        .contains(TypeExpressionFlags::UNPACK)
-        .then(|| annotated_type.resolve_type_alias(db).as_typed_dict())??;
-
-    Some(
-        typed_dict
-            .items(db)
-            .iter()
-            .map(|(name, field)| {
-                (
-                    name.clone(),
-                    UnpackedTypedDictKey {
-                        value_ty: field.declared_ty,
-                        is_required: field.is_required(),
-                        definition: field.first_declaration(),
-                    },
-                )
-            })
-            .collect(),
-    )
+) -> Option<TypedDictType<'db>> {
+    if !annotation_flags.contains(TypeExpressionFlags::UNPACK) {
+        return None;
+    }
+    annotated_type.resolve_type_alias(db).as_typed_dict()
 }
 
 /// Infers each unpacked `**kwargs` constructor argument exactly once.
@@ -2664,7 +2648,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
             let positional_inference_target_ty = Type::TypedDict(positional_inference_target);
             let arg_ty = expression_type_fn(
                 arg,
-                TypeContext::declared(Some(positional_inference_target_ty)),
+                TypeContext::preference(Some(positional_inference_target_ty)),
             );
 
             if let Some(provided_keys) = validate_from_typed_dict_argument(
@@ -2717,7 +2701,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
         // Assignability already checks for required keys and type compatibility,
         // so we don't need separate validation.
         let arg = &arguments.args[0];
-        let arg_ty = expression_type_fn(arg, TypeContext::declared(Some(typed_dict_ty)));
+        let arg_ty = expression_type_fn(arg, TypeContext::preference(Some(typed_dict_ty)));
 
         if !arg_ty.is_assignable_to(db, env, typed_dict_ty) {
             if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, arg) {
@@ -2768,6 +2752,7 @@ fn validate_from_dict_literal<'db, 'ast>(
         },
         &mut provided_keys,
         &mut shadowed_keys,
+        &mut UnpackedTypedDictCache::default(),
         expression_type_fn,
     );
 
@@ -2809,8 +2794,7 @@ fn validate_from_keywords<'db, 'ast>(
 
             let value_tcx = typed_dict
                 .item(db, arg_name.id.as_str())
-                .map(|field| TypeContext::declared(Some(field.declared_ty)))
-                .unwrap_or_default();
+                .map_or_default(|field| TypeContext::preference(Some(field.declared_ty)));
             let value_ty = expression_type_fn(&keyword.value, value_tcx);
             TypedDictKeyAssignment {
                 context,
@@ -2849,6 +2833,7 @@ fn validate_from_keywords<'db, 'ast>(
                 },
                 &mut unpacked_guaranteed_keys,
                 &mut shadowed_keys,
+                &mut UnpackedTypedDictCache::default(),
                 expression_type_fn,
             );
 
@@ -2871,6 +2856,7 @@ fn validate_from_keywords<'db, 'ast>(
     guaranteed_keys.into_keys().collect()
 }
 
+#[expect(clippy::too_many_arguments)]
 fn validate_merged_dict_literal<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
@@ -2878,6 +2864,7 @@ fn validate_merged_dict_literal<'db, 'ast>(
     nodes: TypedDictAssignmentNodes<'ast>,
     guaranteed_keys: &mut BTreeMap<Name, Option<AnyNodeRef<'ast>>>,
     shadowed_keys: &mut OrderSet<Name>,
+    unpacked_cache: &mut UnpackedTypedDictCache<'db>,
     expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> bool {
     let db = context.db();
@@ -2894,7 +2881,7 @@ fn validate_merged_dict_literal<'db, 'ast>(
                     {
                         let value_ty = expression_type_fn(
                             &item.value,
-                            TypeContext::declared(Some(expected_ty)),
+                            TypeContext::preference(Some(expected_ty)),
                         );
                         if !value_ty.is_assignable_to(db, env, expected_ty) {
                             valid = false;
@@ -2941,8 +2928,7 @@ fn validate_merged_dict_literal<'db, 'ast>(
             if !is_shadowed {
                 let value_tcx = typed_dict
                     .item(db, key.as_str())
-                    .map(|field| TypeContext::declared(Some(field.declared_ty)))
-                    .unwrap_or_default();
+                    .map_or_default(|field| TypeContext::preference(Some(field.declared_ty)));
                 let value_ty = expression_type_fn(&item.value, value_tcx);
                 valid &= TypedDictKeyAssignment {
                     context,
@@ -2976,6 +2962,7 @@ fn validate_merged_dict_literal<'db, 'ast>(
                 },
                 guaranteed_keys,
                 shadowed_keys,
+                unpacked_cache,
                 expression_type_fn,
             );
         }
@@ -2995,6 +2982,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
     nodes: TypedDictAssignmentNodes<'ast>,
     guaranteed_keys: &mut BTreeMap<Name, Option<AnyNodeRef<'ast>>>,
     shadowed_keys: &mut OrderSet<Name>,
+    unpacked_cache: &mut UnpackedTypedDictCache<'db>,
     expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> bool {
     let db = context.db();
@@ -3009,6 +2997,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
             nodes,
             guaranteed_keys,
             shadowed_keys,
+            unpacked_cache,
             expression_type_fn,
         );
     }
@@ -3023,7 +3012,10 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
         return true;
     }
 
-    if let Some(unpacked) = extract_unpacked_typed_dict_from_value_type(db, env, unpacked_type) {
+    let unpacked = unpacked_cache
+        .entry(unpacked_type)
+        .or_insert_with(|| extract_unpacked_typed_dict_from_value_type(db, env, unpacked_type));
+    if let Some(unpacked) = unpacked.as_ref() {
         let ignored_keys = shadowed_keys.clone();
         let (_, mut unpacked_valid) = validate_extracted_typed_dict_keys(
             context,
@@ -3042,8 +3034,8 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
             &ignored_keys,
         );
 
-        for (key_name, unpacked_key) in unpacked.keys {
-            if unpacked_key.is_required && !ignored_keys.contains(&key_name) {
+        for (key_name, unpacked_key) in &unpacked.keys {
+            if unpacked_key.is_required && !ignored_keys.contains(key_name) {
                 guaranteed_keys
                     .entry(key_name.clone())
                     .and_modify(|node| {
@@ -3052,7 +3044,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
                         }
                     })
                     .or_insert(Some(nodes.key));
-                shadowed_keys.insert(key_name);
+                shadowed_keys.insert(key_name.clone());
             }
         }
 
@@ -3092,6 +3084,7 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
     typed_dict: TypedDictType<'db>,
     dict_expr: &ast::ExprDict,
     typed_dict_node: AnyNodeRef,
+    unpacked_cache: &mut UnpackedTypedDictCache<'db>,
     mut expression_type_fn: impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> Result<OrderSet<Name>, OrderSet<Name>> {
     let mut provided_keys = BTreeMap::new();
@@ -3108,6 +3101,7 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
         },
         &mut provided_keys,
         &mut shadowed_keys,
+        unpacked_cache,
         &mut expression_type_fn,
     );
 

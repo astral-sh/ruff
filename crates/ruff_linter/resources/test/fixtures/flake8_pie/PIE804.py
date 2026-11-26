@@ -40,3 +40,5 @@ foo(
         "y": 2.0,
     }
 )
+
+foo(**{**(options := defaults)})  # PIE804

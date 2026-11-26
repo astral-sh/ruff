@@ -288,7 +288,7 @@ help: Remove unused suppression
 87 |     print("hello")
    |
 
-RUF102 [*] Invalid rule code in suppression: YF829
+RUF102 [*] Unknown rule in suppression: YF829
   --> suppressions.py:93:21
    |
 91 | def f():
@@ -311,7 +311,7 @@ help: Remove the suppression comment
 96 |
    |
 
-RUF102 [*] Invalid rule code in suppression: RQW320
+RUF102 [*] Unknown rule in suppression: RQW320
   --> suppressions.py:94:27
    |
 92 |     # Unknown rule codes
@@ -323,7 +323,7 @@ RUF102 [*] Invalid rule code in suppression: RQW320
    |                          ------
 97 |     # ruff: enable[YF829]
    |
-help: Remove the rule code `RQW320`
+help: Remove the rule `RQW320`
    |
 93 |     # ruff: disable[YF829]
    -     # ruff: disable[F841, RQW320]
@@ -414,7 +414,7 @@ help: Remove assignment to unused variable `bar`
     |
 note: This is an unsafe fix and may change runtime behavior
 
-ARG001 Unused function argument: `bar`
+ARG001 Unused function parameter: `bar`
    --> suppressions.py:146:5
     |
 144 |     # ruff: ignore[ARG001]  should only cover the first argument
@@ -425,7 +425,7 @@ ARG001 Unused function argument: `bar`
 148 |     print("hello")
     |
 
-ARG001 Unused function argument: `bar`
+ARG001 Unused function parameter: `bar`
    --> suppressions.py:153:5
     |
 151 | def f(

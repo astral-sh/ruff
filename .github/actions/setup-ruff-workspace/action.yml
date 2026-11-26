@@ -30,20 +30,20 @@ runs:
       run: |
         case "$RUNNER_OS/$RUNNER_ARCH" in
           Linux/X64)
-            uv_version="0.13.7"
-            uv_checksum="c5221ff41b7892bfc223543883600125f6a47fe845093e0f5bdff4f359196d83"
+            uv_version="0.13.10"
+            uv_checksum="bf65ac1a0af10f92c522d91ac096c7c0a39657647b155577e7836c2cbbb4526c"
             ;;
           Linux/ARM64)
-            uv_version="0.13.7"
-            uv_checksum="71279f8d3c67241e807b9d8db872d1bf541579fb9f08b7d1eb1682196d1e57dc"
+            uv_version="0.13.10"
+            uv_checksum="14590f644805a6234ffe071154340669e38137f38e60aa9629690119704107d2"
             ;;
           macOS/ARM64)
-            uv_version="0.13.7"
-            uv_checksum="81b811b57e4624df7ed3aac148e0359100d9962f3d9dce00aec533dc2e086731"
+            uv_version="0.13.10"
+            uv_checksum="e419bf07533bdbf48795fc793601c834dd79db57a8c49ce8e25cfe3a8639958d"
             ;;
           Windows/X64)
-            uv_version="0.13.7"
-            uv_checksum="0cdc5b38fe5a8168ed6a25814f5ba43c21d313dd3187314fccb37b7cec46e021"
+            uv_version="0.13.10"
+            uv_checksum="297b3881fe1adfb922becc2c1613202abb41dc83ea5ff43d472aa087ca1f8683"
             ;;
           *)
             echo "Unsupported uv runner: $RUNNER_OS/$RUNNER_ARCH" >&2
@@ -55,7 +55,7 @@ runs:
           echo "checksum=$uv_checksum"
         } >> "$GITHUB_OUTPUT"
 
-    - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+    - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
       with:
         version: ${{ steps.release.outputs.version }}
         checksum: ${{ steps.release.outputs.checksum }}

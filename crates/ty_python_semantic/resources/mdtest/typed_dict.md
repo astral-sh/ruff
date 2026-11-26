@@ -931,10 +931,10 @@ def return_unpack(src: TD) -> TD:
     return dict(**src)
 
 def return_invalid_literal() -> TD:
-    # TODO: ideally, this would only emit the first error, but not `invalid-return-type` (like the
-    # `return_invalid_dict` case below).
+    # TODO: ideally, this would only emit the first error, but not `invalid-explicit-return` (like
+    # the `return_invalid_dict` case below).
     # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
-    # error: [invalid-return-type]
+    # error: [invalid-explicit-return]
     return {}
 
 def return_invalid_dict() -> TD:
@@ -1023,6 +1023,11 @@ class Bar(TypedDict):
 x2: Foo | Bar = {"foo": 1}
 reveal_type(x2)  # revealed: Foo
 
+# The literal matches `Foo`, but its value expression still has an error.
+def _(text: str) -> Foo | Bar:
+    # error: [too-many-positional-arguments] "Too many positional arguments to function `len`"
+    return {"foo": len(text, text)}
+
 x3: Foo | Bar = {"bar": 1}
 reveal_type(x3)  # revealed: Bar
 
@@ -1048,6 +1053,14 @@ class FooBar3(TypedDict):
     foo: int
     bar: int
     baz: NotRequired[int]
+
+# Both unpacks contribute different keys; the first candidate rejects the second key.
+def _(left: Foo, right: Bar):
+    merged: Foo | FooBar1 = {**left, **right}
+    reveal_type(merged)  # revealed: FooBar1
+
+    # error: [invalid-assignment]
+    neither: Foo | Bar = {**left, **right}
 
 x6: FooBar1 | FooBar2 = {"foo": 1, "bar": 1}
 reveal_type(x6)  # revealed: FooBar1 | FooBar2
@@ -1170,6 +1183,33 @@ class StrCallback(TypedDict):
 # revealed: Unknown
 x1: IntCallback | StrCallback = {"f": lambda value: reveal_type(value)}
 reveal_type(x1)  # revealed: IntCallback | StrCallback
+```
+
+## Matching the final value of a tag
+
+When a literal assigns the same key twice, its last value determines which `TypedDict` matches.
+
+```py
+from typing import Literal, TypedDict
+
+class Start(TypedDict):
+    event: Literal["start"]
+
+class Stop(TypedDict):
+    event: Literal["stop"]
+
+event: Start | Stop = {"event": "start", "event": "stop"}
+reveal_type(event)  # revealed: Stop
+```
+
+An unpack or computed key can also replace an earlier tag.
+
+```py
+def _(stop: Stop, key: Literal["event"]):
+    unpacked: Start | Stop = {"event": "start", **stop}
+    reveal_type(unpacked)  # revealed: Stop
+    computed: Start | Stop = {"event": "start", key: "stop"}
+    reveal_type(computed)  # revealed: Stop
 ```
 
 ## Union of `TypedDict` behind a type alias
@@ -2157,10 +2197,11 @@ def b_from_c(c: C) -> B:
     return c  # allowed
 
 def a_from_b(b: B) -> A:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `A`, found `B`"
+    # error: [invalid-explicit-return] "Return type does not match returned value: expected `A`, found `B`"
     return b
 
-# The [invalid-return-type] error above is the only thing that keeps us from corrupting the type of c['y'].
+# The [invalid-explicit-return] error above is the only thing that keeps us from corrupting the
+# type of c['y'].
 c: C = {"x": 1, "y": "hello"}
 a: A = a_from_b(b_from_c(c))
 a["y"] = 42
@@ -2185,7 +2226,7 @@ class A3(TypedDict):
     y: NotRequired[ReadOnly[int]]  # not assignable from `object`
 
 def a3_from_b(b: B) -> A3:
-    return b  # error: [invalid-return-type]
+    return b  # error: [invalid-explicit-return]
 ```
 
 ## Structural assignability supports `TypedDict`s that contain other `TypedDict`s
@@ -2414,6 +2455,29 @@ class Person2(TypedDict):
 
 static_assert(is_assignable_to(Person1, Person2))
 static_assert(is_equivalent_to(Person1, Person2))
+```
+
+`Tree` lacks the `name` field required by both `Other` and `NamedNode`. When checking the child
+field of `NamedNode`, ty reuses the failure against `Other` and provisionally accepts `Tree` as a
+`NamedNode` to break the cycle. Caching that union result would incorrectly make `Tree` assignable
+to `Parent`.
+
+```py
+from typing_extensions import ReadOnly
+
+class Tree(TypedDict):
+    child: "Tree | None"
+
+class Other(TypedDict):
+    name: int
+
+class Parent(TypedDict):
+    child: ReadOnly["Other | NamedNode | None"]
+
+class NamedNode(Parent):
+    name: str
+
+static_assert(not is_assignable_to(Tree, Other | NamedNode | Parent))
 ```
 
 ## Recursively-specialized generic `TypedDict`s
@@ -3123,6 +3187,34 @@ def _(payload: Payload | Payload2) -> None:
     takes_resolved(payload.get("resolved", {}))
 ```
 
+Nested calls can infer different defaults even when the overloads for different keys share a
+synthetic type variable.
+
+```py
+from typing import TypedDict
+from typing_extensions import assert_type
+
+class Record(TypedDict, total=False):
+    name: str
+    count: int
+
+def _(record: Record, backup: bytes) -> None:
+    assert_type(record.get("count", record.get("name", backup)), int | str | bytes)
+```
+
+The overload for a later key can give the default a different type context.
+
+```py
+from typing_extensions import NotRequired, TypeForm, TypedDict
+
+class Fields(TypedDict):
+    text: str
+    form: NotRequired[TypeForm[int]]
+
+def _(data: Fields):
+    value: TypeForm[int] = data.get("form", 1)  # error: [invalid-type-form]
+```
+
 With a gradual default, the specialized known-key overload and generic default overload both match,
 so we currently fall back to `Unknown`:
 
@@ -3183,7 +3275,7 @@ def _(v: OptionalX | RequiredX) -> None:
     # TODO: it's correct that we emit an error,
     # but this is a terrible error message:
     #
-    # error: [call-non-callable] "Object of type `Overload[]` is not callable"
+    # error: [not-callable] "Object of type `Overload[]` is not callable"
     reveal_type(v.pop("x"))  # revealed: int | Unknown
 
 def union_pop_with_default(u: OptionalX | OptStrX) -> None:
@@ -5935,12 +6027,12 @@ TypedDict("Foo")
 # error: [invalid-argument-type] "Invalid argument to parameter `typename` of `TypedDict()`: Expected `str`, found `Literal[123]`"
 Bad1 = TypedDict(123, {"name": str})
 
-# error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
+# error: [mismatched-typeddict-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "BadTypedDict3", got "WrongName""
 BadTypedDict3 = TypedDict("WrongName", {"name": str})
 reveal_type(BadTypedDict3)  # revealed: <class 'WrongName'>
 
 def f(x: str) -> None:
-    # error: [mismatched-type-name] "The name passed to `TypedDict` must match the variable it is assigned to: Expected "Y", got variable of type `str`"
+    # error: [mismatched-typeddict-name] "The name passed to `TypedDict` must match the variable it is assigned to: Cannot verify that a value of type `str` matches "Y""
     Y = TypedDict(x, {})
 
 def g(x: str) -> None:
@@ -9529,7 +9621,7 @@ def as_mapping(value: Recursive) -> Mapping[str, object]:
     return value
 
 def as_dict(value: Recursive) -> dict[str, bool]:
-    return value  # error: [invalid-return-type]
+    return value  # error: [invalid-explicit-return]
 
 def update(value: Recursive) -> None:
     value.update({"child": value})

@@ -1,4 +1,4 @@
-use crate::ProgramEnvironment;
+use crate::{Program, ProgramEnvironment};
 use ruff_python_ast::name::Name;
 
 use crate::{
@@ -457,10 +457,10 @@ impl<'db> KnownInstanceType<'db> {
                 .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::NamedTupleSpec),
             Self::FunctoolsPartial(partial) => partial
-                .recursive_type_normalized_impl(db, env, div, nested)
+                .recursive_type_normalized_impl(db, env.program(db), div, nested)
                 .map(Self::FunctoolsPartial),
             Self::FunctoolsPartialCall(partial) => partial
-                .recursive_type_normalized_impl(db, env, div, nested)
+                .recursive_type_normalized_impl(db, env.program(db), div, nested)
                 .map(Self::FunctoolsPartialCall),
             Self::MethodWrapper(wrapper) => wrapper
                 .recursive_type_normalized_impl(db, env, div, nested)
@@ -720,10 +720,26 @@ pub struct DeprecatedInstance<'db> {
     pub(crate) message: Option<StringLiteralType<'db>>,
 }
 
+/// The kind of field object returned by a dataclass field specifier.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum FieldInstanceKind {
+    Other,
+    Attrs,
+}
+
+impl FieldInstanceKind {
+    pub(super) fn is_attrs(self) -> bool {
+        matches!(self, Self::Attrs)
+    }
+}
+
 /// Contains information about instances of `dataclasses.Field`, typically created using
 /// `dataclasses.field()`.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FieldInstance<'db> {
+    #[returns(copy)]
+    pub(crate) kind: FieldInstanceKind,
+
     /// The type of the default value for this field. This is derived from the `default` or
     /// `default_factory` arguments to `dataclasses.field()`.
     #[returns(copy)]
@@ -779,6 +795,7 @@ impl<'db> FieldInstance<'db> {
         });
         Self::new(
             db,
+            self.kind(db),
             default_type,
             self.init(db),
             self.kw_only(db),
@@ -824,6 +841,7 @@ impl<'db> FieldInstance<'db> {
         };
         Some(FieldInstance::new(
             db,
+            self.kind(db),
             default_type,
             self.init(db),
             self.kw_only(db),
@@ -835,15 +853,19 @@ impl<'db> FieldInstance<'db> {
     }
 }
 
+#[salsa::tracked]
 impl<'db> FunctoolsPartialInstance<'db> {
-    /// Normalizes both the wrapped callable and the exposed reduced callable recursively.
+    /// Normalizes the wrapped and reduced callables. Union alternatives can share inner
+    /// partials, so reuse their normalization when walking the chain.
+    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        program: Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        let env = &ProgramEnvironment::from_program(program);
         // Repeated `f = partial(f)` assignments add a new layer to the wrapped callable.
         // Treat it as nested so that cycle recovery can collapse these layers while
         // preserving the reduced signature of the outer partial.

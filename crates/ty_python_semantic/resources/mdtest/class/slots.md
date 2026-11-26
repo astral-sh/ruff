@@ -362,6 +362,22 @@ reveal_type(IndirectDictionarySlots().value)  # revealed: Unknown
 IndirectDictionarySlots().missing  # error: [missing-attribute]
 ```
 
+## Recursive slot declarations
+
+In this stub, `name` refers to itself through an instance. We can still infer the fallback slot name
+and expose its descriptor on the class.
+
+```pyi
+instance: Slotted
+
+class Slotted:
+    name = instance.name
+    __slots__ = name or "value"
+
+reveal_type(Slotted.__slots__)  # revealed: Literal["value"]
+reveal_type(Slotted.value)  # revealed: MemberDescriptorType
+```
+
 ## Mutated slot declarations
 
 Slot names are taken from the original literal. Later changes to that literal are not evaluated, so
@@ -471,7 +487,7 @@ class Base:
 
 class Child(Base):
     __slots__ = ()
-    value: int  # error: [invalid-mutable-override]
+    value: int  # error: [incompatible-mutable-override]
 
 reveal_type(Child().value)  # revealed: int
 Child().value = 2
@@ -483,7 +499,7 @@ An annotation on an assignment in the subclass's initializer establishes the sam
 ```py
 class InitializedChild(Base):
     def __init__(self) -> None:
-        self.value: int = 1  # error: [invalid-mutable-override]
+        self.value: int = 1  # error: [incompatible-mutable-override]
 
     def get(self) -> int:
         return self.value
@@ -497,7 +513,7 @@ As with an ordinary instance attribute, an overriding annotation replaces the in
 ```py
 class StringChild(Base):
     def __init__(self) -> None:
-        self.value: str = "valid"  # error: [invalid-attribute-override]
+        self.value: str = "valid"  # error: [incompatible-attribute-override]
 
 reveal_type(StringChild().value)  # revealed: str
 StringChild().value = 1  # error: [invalid-assignment]
@@ -1083,6 +1099,24 @@ class Child(Slotted):
 
 reveal_type(Child().missing)  # revealed: int
 Child().missing = 1
+```
+
+## Receiver annotations do not create instance storage
+
+Redeclaring an inherited nested class as an instance attribute still requires a slot or an instance
+dictionary.
+
+```py
+class Base:
+    __slots__ = ()
+
+    class Inner: ...
+
+class Child(Base):
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        self.Inner: type[Base.Inner] = Base.Inner  # error: [missing-slot]
 ```
 
 ## Class attributes cannot have the same name as a slot

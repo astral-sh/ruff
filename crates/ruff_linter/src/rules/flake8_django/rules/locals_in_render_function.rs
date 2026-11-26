@@ -53,10 +53,7 @@ pub(crate) fn locals_in_render_function(checker: &Checker, call: &ast::ExprCall)
 
     if !checker
         .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["django", "shortcuts", "render"])
-        })
+        .matches_qualified_name(&call.func, &["django", "shortcuts", "render"])
     {
         return;
     }

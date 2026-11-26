@@ -35,10 +35,6 @@ impl<'db> ScopeId<'db> {
         self.program_file(db).program(db)
     }
 
-    pub fn is_annotation(self, db: &'db dyn Db) -> bool {
-        self.node(db).scope_kind().is_annotation()
-    }
-
     pub fn node(self, db: &'db dyn Db) -> &'db NodeWithScopeKind {
         self.scope(db).node()
     }
@@ -432,17 +428,6 @@ impl NodeWithScopeKind {
 
     pub fn expect_function(&self) -> &AstNodeRef<ast::StmtFunctionDef> {
         self.as_function().expect("expected function")
-    }
-
-    fn as_type_alias(&self) -> Option<&AstNodeRef<ast::StmtTypeAlias>> {
-        match self {
-            Self::TypeAlias(type_alias) => Some(type_alias),
-            _ => None,
-        }
-    }
-
-    pub fn expect_type_alias(&self) -> &AstNodeRef<ast::StmtTypeAlias> {
-        self.as_type_alias().expect("expected type alias")
     }
 
     /// Returns the anchor node index for this scope, or `None` for the module scope.

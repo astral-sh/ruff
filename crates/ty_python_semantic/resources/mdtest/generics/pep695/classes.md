@@ -313,6 +313,15 @@ factory: type[Box[str]] | None = Box
 reveal_type(factory())  # revealed: Box[str]
 ```
 
+The bare class is also the runtime class of a `Box[str]`. Comparing with it preserves the
+constructor's specialization.
+
+```py
+def construct(factory: type[Box[str]]):
+    if factory == Box:
+        reveal_type(factory())  # revealed: Box[str]
+```
+
 Without a concrete type context, the default still applies:
 
 ```py
@@ -358,7 +367,7 @@ class P[U = str]: ...
 def create[T: P[str]](cls: type[T]) -> int:
     if cls is not P:
         reveal_type(cls)  # revealed: type[T@create] & ~<class 'P'>
-        return cls()  # error: [invalid-return-type]
+        return cls()  # error: [invalid-explicit-return]
     return 0
 
 create(P[str])
@@ -382,7 +391,7 @@ class Impl:
 def create[T: Impl](cls: type[T]) -> int:
     if cls is not P:
         reveal_type(cls)  # revealed: type[T@create] & ~<class 'P'>
-        return cls()  # error: [invalid-return-type]
+        return cls()  # error: [invalid-explicit-return]
     return 0
 
 create(Impl)
@@ -405,7 +414,7 @@ class Impl:
     value: int
 
 def as_protocol_class[T: Impl](cls: type[T]) -> TypeOf[P[int]]:
-    return cls  # error: [invalid-return-type]
+    return cls  # error: [invalid-explicit-return]
 ```
 
 ## Narrowing class objects against a final TypedDict
@@ -426,7 +435,7 @@ class Other(TypedDict):
 def create[T: Other](cls: type[T]) -> int:
     if cls is not Shape:
         reveal_type(cls)  # revealed: type[T@create] & ~<class 'Shape'>
-        return "wrong"  # error: [invalid-return-type]
+        return "wrong"  # error: [invalid-explicit-return]
     return 0
 
 create(Other)
@@ -449,7 +458,7 @@ class Other(TypedDict):
     value: int
 
 def as_shape_class[T: Other](cls: type[T]) -> TypeOf[Shape[int]]:
-    return cls  # error: [invalid-return-type]
+    return cls  # error: [invalid-explicit-return]
 ```
 
 ## Diagnostics for bad specializations
@@ -591,6 +600,36 @@ class D[T]:
         contextual: D[int] = D()
 ```
 
+## Constructor receivers preserve bounds and constraints
+
+An empty call supplies no concrete type for `S`, but its upper bound still constrains the items.
+
+```py
+class Bucket[T]:
+    items: tuple[T, ...]
+
+    def __init__[S: int](self: "Bucket[S]", *items: S) -> None:
+        self.items = items
+
+empty = Bucket()
+integers: tuple[int, ...] = empty.items
+strings: tuple[str, ...] = empty.items  # error: [invalid-assignment]
+reveal_type(Bucket(1, 2))  # revealed: Bucket[int]
+```
+
+The constructor narrows the class's three allowed types to `int` and `str`.
+
+```py
+class Choice[T: (int, str, bytes)]:
+    value: T
+
+    def __init__[S: (int, str)](self: "Choice[S]") -> None: ...
+
+value = Choice().value
+valid: int | str = value
+invalid: bytes = value  # error: [invalid-assignment]
+```
+
 ## Inferring generic class parameters from constructors
 
 If the type of a constructor parameter is a class typevar, we can use that to infer the type
@@ -708,13 +747,13 @@ class C[T]:
     def __init__(self, value: T) -> None:
         reveal_type(C(value))  # revealed: C[T@C]
 
-        # error: [invalid-argument-type] "Expected `int`, found `T@C`"
+        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
         invalid: C[int] = C(value)
 
     def from_union(self, value: T | list[T]) -> None:
         reveal_type(C(value))  # revealed: C[T@C | list[T@C]]
 
-        # error: [invalid-argument-type] "Expected `list[T@C]`, found `T@C | list[T@C]`"
+        # error: [invalid-assignment] "Object of type `C[T@C | list[T@C]]` is not assignable to `C[list[T@C]]`"
         invalid_union: C[list[T]] = C(value)
 ```
 
@@ -840,7 +879,7 @@ class Box[T, U]:
         return result
 
     def wrong_wrap(self, value: T) -> "Box[T, T]":
-        return Box[T, Self](value, self)  # error: [invalid-return-type]
+        return Box[T, Self](value, self)  # error: [invalid-explicit-return]
 ```
 
 ### Identical `__new__` and `__init__` signatures
@@ -923,7 +962,7 @@ class Pair[T, U]:
     def check(self, x: int, y: str) -> int:
         # revealed: Pair[str, int]
         reveal_type(Pair(x, y))
-        return Pair(x, y).first  # error: [invalid-return-type]
+        return Pair(x, y).first  # error: [invalid-explicit-return]
 
 def check(x: int, y: str) -> None:
     # revealed: Pair[str, int]
@@ -1034,6 +1073,12 @@ reveal_type(generic_context(into_regular_callable(D)))
 reveal_type(D(1))  # revealed: C[Unknown, int]
 ```
 
+Through `super(D, D)`, the inherited `__new__` infers the specialization from its `cls` argument.
+
+```py
+reveal_type(super(D, D).__new__(D[str]))  # revealed: C[str, int]
+```
+
 ### Explicit access to constructors of bare generic classes
 
 Bare `__new__` and `__init__` members retain the class type variables in their generic contexts.
@@ -1085,6 +1130,24 @@ reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(C(1, "str"))  # revealed: C[Literal[1], Literal["str"]]
 reveal_type(D(1, "str"))  # revealed: D[Literal[1], Literal["str"]]
+```
+
+Passing the bare class to `super` leaves the initializer unbound, so each call can infer its type
+arguments.
+
+```py
+def initialize(child: D[int, str]) -> None:
+    super(D, D).__init__(child, 1, "value")  # ok
+```
+
+Inside a class method, `super()` uses the specialization of `cls`. The initializer's `t` parameter
+expects `T`, which could be a type other than `int`.
+
+```py
+class Child[T](D[T, str]):
+    @classmethod
+    def initialize(cls, child: "Child[T]") -> None:
+        super().__init__(child, 1, "value")  # error: [invalid-argument-type] "Expected `T@Child`"
 ```
 
 ### Generic class inherits `__init__` from `dict`
@@ -1162,6 +1225,75 @@ reveal_type(C(1, True))  # revealed: C[int]
 
 # error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
+```
+
+### Inferring a union from the initializer's receiver
+
+The arguments fix `A` to `bool` and `B` to `int`. The initializer's `self` annotation then gives the
+new box the element type `int`, since `bool` is a subtype of `int`.
+
+```py
+class Box[T]:
+    value: T
+
+    def __init__[A, B](self: "Box[A | B]", left: "Box[A]", right: "Box[B]") -> None: ...
+
+def combine(left: Box[bool], right: Box[int]):
+    reveal_type(Box(left, right))  # revealed: Box[int]
+```
+
+If the left box carries a caller's type variable, the result keeps it in the union.
+
+```py
+def forward[U](left: Box[U], right: Box[int]):
+    reveal_type(Box(left, right))  # revealed: Box[U@forward | int]
+```
+
+### Calling a generic initializer on an existing instance
+
+An inherited initializer can infer its own type parameters from the arguments. Its explicit `self`
+annotation must also match the specialization of the receiver.
+
+```py
+from collections.abc import Callable
+
+type Factory[T] = Callable[[], T]
+
+class Either[T]:
+    value: T
+
+    def __init__[A, B](
+        self: "Either[A | B]",
+        first: type[A],
+        second: type[B],
+        default: A | B | Factory[A | B],
+    ) -> None: ...
+
+class TextOrNumber[T: str | int](Either[str | int]):
+    def initialize(self, default: T | Factory[T]) -> None:
+        super().__init__(str, int, default)  # ok
+        super().__init__(str, bytes, default)  # error: [invalid-argument-type] "found `Self@initialize`"
+```
+
+An instance of `Either[T]` can accept values of type `T`. Even with the upper bound `str | int`, `T`
+could be `str` alone, so the initializer cannot assume it accepts both types.
+
+```py
+class Child[T: str | int](Either[T]):
+    def initialize(self, cls: type[T], default: T | Factory[T]) -> None:
+        super().__init__(cls, cls, default)  # ok
+        super().__init__(str, int, default)  # error: [invalid-argument-type] "found `Self@initialize`"
+```
+
+For `Either[bytes]`, the receiver is incompatible whether it is bound implicitly or passed
+explicitly to the inherited method.
+
+```py
+class Bytes[T: str | int](Either[bytes]):
+    def initialize(self, default: T | Factory[T]) -> None:
+        super().__init__(str, int, default)  # error: [invalid-argument-type] "found `Self@initialize`"
+        self.__init__(str, int, default)  # error: [invalid-argument-type] "found `Self@initialize`"
+        Bytes.__init__(self, str, int, default)  # error: [invalid-argument-type] "found `Self@initialize`"
 ```
 
 ### Class-scoped type variables in `__init__` receiver annotations
@@ -1386,12 +1518,37 @@ from ty_extensions._internal import generic_context, into_regular_callable
 class A[T]:
     x: T
 
+    def reset(self, x: T) -> None:
+        self.__init__(x)  # ok
+        self.__init__(42)  # error: [invalid-argument-type]
+
 # revealed: ty_extensions._internal.GenericContext[T@A]
 reveal_type(generic_context(A))
 # revealed: ty_extensions._internal.GenericContext[T@A]
 reveal_type(generic_context(into_regular_callable(A)))
 
 reveal_type(A(x=1))  # revealed: A[int]
+```
+
+### Self fields in generic dataclasses
+
+A dataclass constructor infers the class type parameter alongside the `Self` used in its fields.
+
+```py
+from dataclasses import dataclass
+from typing import Self
+
+@dataclass
+class Node[T]:
+    value: T
+    parent: Self | None = None
+
+class IntNode(Node[int]): ...
+
+reveal_type(Node(1, Node(2)))  # revealed: Node[int]
+reveal_type(IntNode(1, IntNode(2)))  # revealed: IntNode
+IntNode("wrong")  # error: [invalid-argument-type]
+reveal_type(IntNode(1, Node(2)))  # revealed: IntNode
 ```
 
 ### Inherited dataclass converters
@@ -1418,7 +1575,7 @@ class Base[T]:
 @model
 class Child(Base[str]): ...
 
-reveal_type(Child.__init__)  # revealed: (self: Child, value: str) -> None
+reveal_type(Child.__init__)  # revealed: (self: Child, /, value: str) -> None
 child = Child("a")
 reveal_type(child.value)  # revealed: str
 Child(1)  # error: [invalid-argument-type]
@@ -1426,7 +1583,7 @@ Child(1)  # error: [invalid-argument-type]
 child.value = "b"  # ok
 child.value = 1  # error: [invalid-assignment]
 
-reveal_type(Child.__replace__)  # revealed: (self: Child, *, value: str = ...) -> Child
+reveal_type(Child.__replace__)  # revealed: (self: Child, /, *, value: str = ...) -> Child
 child.__replace__(value="b")  # ok
 child.__replace__(value=1)  # error: [invalid-argument-type]
 ```
@@ -1440,7 +1597,7 @@ class Nested[U](Base[list[U]]): ...
 @model
 class Indirect(Nested[str]): ...
 
-reveal_type(Indirect.__init__)  # revealed: (self: Indirect, value: list[str]) -> None
+reveal_type(Indirect.__init__)  # revealed: (self: Indirect, /, value: list[str]) -> None
 indirect = Indirect(["a"])
 Indirect([1])  # error: [invalid-argument-type]
 indirect.value = ["b"]  # ok
@@ -1643,6 +1800,102 @@ as_specialized: Base[list[int]] = GenericChild[int]()
 incompatible_specialization: Base[list[str]] = GenericChild[int]()  # error: [unsound-assignment]
 ```
 
+Both `Child` and `Reversed` inherit `Base[int]`, so a value stored in either must be assignable to
+`int`.
+
+```py
+def store[T](value: T, box: Base[T]) -> None:
+    box.value = value
+
+def check[U](value: U, child: Child, reversed_child: Reversed, concrete: Concrete):
+    # TODO: error: [invalid-argument-type]
+    store("wrong", child)
+    # TODO: error: [invalid-argument-type]
+    store(value, child)
+
+    # TODO: error: [invalid-argument-type]
+    store("wrong", reversed_child)
+    # TODO: error: [invalid-argument-type]
+    store(value, reversed_child)
+
+    store("wrong", concrete)  # error: [invalid-argument-type]
+    store(value, concrete)  # error: [invalid-argument-type]
+```
+
+## Overriding a method that returns its receiver type
+
+The base method promises a `Base` at minimum. An override that can return `None` violates that
+promise even when the receiver satisfies the bound on `T`.
+
+```pyi
+class Base:
+    def clone[T: Base](self: T) -> T: ...
+
+class Child(Base):
+    def clone(self) -> Child: ...
+
+class OptionalChild(Base):
+    def clone(self) -> OptionalChild | None: ...  # error: [incompatible-method-override]
+
+class Sibling(Base):
+    # TODO: Reject this override. The bound permits a Child, but the receiver is a Sibling.
+    def clone(self) -> Child: ...
+```
+
+## Invariant parameter and return types with a bounded receiver type variable
+
+The override of `get` returns `list[int]` where the base method promises `list[T]`. The override of
+`put` accepts `list[T]` where the base method accepts `list[int]`. Since `list` is invariant, both
+overrides would require `T` to be `int`, which exceeds its bound of `bool`.
+
+```pyi
+class Buffer[K: bool]:
+    def get[T: bool](self: Buffer[T]) -> list[T]: ...
+    def put(self, values: list[int]) -> None: ...
+
+class Child[K: bool](Buffer[K]):
+    def get(self) -> list[int]: ...  # error: [incompatible-method-override]
+    # error: [incompatible-method-override]
+    def put[T: bool](self: Child[T], values: list[T]) -> None: ...
+```
+
+## Parameter and return types with a constrained receiver type variable
+
+The base methods restrict the receiver's key type to `bool` or `str`. Neither choice allows
+`first_key` to return an arbitrary `int` or `remove` to narrow its parameter from `int` to `T`.
+Returning `K` is valid for every receiver the base method accepts, even though `K` is unbounded.
+
+```pyi
+from typing import Any
+
+class Map[K, V]:
+    def first_key[T: (bool, str)](self: Map[T, Any]) -> T: ...
+    def remove[T: (bool, str)](self: Map[T, Any], key: int) -> None: ...
+
+class ChildMap[K, V](Map[K, V]):
+    def first_key(self) -> int: ...  # error: [incompatible-method-override]
+    # error: [incompatible-method-override]
+    def remove[T: (bool, str)](self: ChildMap[T, Any], key: T) -> None: ...
+
+class KeyMap[K, V](Map[K, V]):
+    def first_key(self) -> K: ...  # ok
+```
+
+## An override with the same receiver restriction as the base method
+
+Although `K` is unbounded, `Box.read` only accepts receivers whose element type satisfies the bound
+on `T`. The override accepts every `Child` for which the base method is defined.
+
+```pyi
+class Box[K]:
+    value: K
+
+    def read[T: int](self: Box[T]) -> T: ...
+
+class Child[K](Box[K]):
+    def read[T: int](self: Child[T]) -> T: ...  # ok
+```
+
 ## Method overrides through gradual and concrete inheritance paths
 
 An override must satisfy the concrete return type inherited through `Concrete`, even when the MRO
@@ -1659,7 +1912,7 @@ class Gradual(Base[Any]): ...
 class Concrete(Base[int]): ...
 
 class Invalid(Gradual, Concrete):
-    # snapshot: invalid-method-override
+    # snapshot: incompatible-method-override
     def method(self) -> str:
         return ""
 
@@ -1669,7 +1922,7 @@ class Valid(Gradual, Concrete):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `method`
+error[incompatible-method-override]: Invalid override of method `method`
   --> src/mdtest_snippet.py:12:9
    |
 12 |     def method(self) -> str:
@@ -1688,7 +1941,7 @@ invalid override produces one diagnostic.
 
 ```py
 class Reversed(Concrete, Gradual):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def method(self) -> str:
         return ""
 
@@ -1697,7 +1950,7 @@ class Combined(Gradual, Concrete): ...
 reveal_type(Combined().method())  # revealed: Any
 
 class Indirect(Combined):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def method(self) -> str:
         return ""
 ```
@@ -1721,7 +1974,7 @@ class Strings(Gradual):
         return ""
 
 class Child(Strings, Concrete):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def method(self) -> str:
         return ""
 
@@ -1737,7 +1990,7 @@ intermediate class.
 class Intermediate(Strings): ...
 
 class IndirectChild(Intermediate, Concrete):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def method(self) -> str:
         return ""
 ```
@@ -1748,7 +2001,7 @@ Specializing a generic intermediate class also specializes the inherited method'
 class GenericDiamond[T](Gradual, Base[T]): ...
 
 class Specialized(GenericDiamond[int]):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def method(self) -> str:
         return ""
 ```
@@ -1768,7 +2021,7 @@ class Base[T]:
         raise NotImplementedError
 
 class Invalid(Base[Any]):
-    # error: [invalid-method-override]
+    # error: [incompatible-method-override]
     def method(self, value: str) -> Any:
         return value
 
@@ -1898,6 +2151,44 @@ Box.value
 box = Box[int]()
 box.value = 1
 reveal_type(box.value)  # revealed: Literal[1]
+```
+
+## Inferred `ClassVar` types in generic classes
+
+`Cache[int]` and `Cache[str]` share the same list, so its element type cannot depend on the `T`
+bound by `Cache`. For a stored function, the same check allows a type parameter bound by the
+function and rejects a signature that depends on `Cache`'s parameter.
+
+```py
+from typing import ClassVar, Self
+
+def identity[T](value: T) -> T:
+    return value
+
+class Cache[T]:
+    values: ClassVar = list[T]()  # error: [invalid-type-form]
+    pending: ClassVar
+    pending = list[T]()  # error: [invalid-type-form]
+    transform: ClassVar = identity  # ok
+    peers: ClassVar = list[Self]()  # ok
+
+    def echo(self, value: T) -> T:
+        return value
+
+    echo_again: ClassVar = echo  # error: [invalid-type-form]
+```
+
+The same restriction applies when the `ClassVar` declaration follows the assignment or comes from a
+base class.
+
+```py
+class Base:
+    inherited: ClassVar
+
+class OtherCache[T](Base):
+    values = list[T]()  # error: [invalid-type-form]
+    values: ClassVar
+    inherited = list[T]()  # error: [invalid-type-form]
 ```
 
 ## Generic attributes accessed through subclass methods
@@ -2916,7 +3207,23 @@ def copy(value: Nested) -> Nested:
     return Box(value.value)
 
 def invalid() -> Nested:
-    return Box("wrong")  # error: [invalid-return-type]
+    return Box("wrong")  # error: [invalid-explicit-return]
+```
+
+## Inferring a recursive alias in a constructor receiver
+
+The element type inferred from the argument also specializes recursive references to `Tree`.
+
+```py
+type Tree[T] = T | list[Tree[T]]
+
+class Box[T]:
+    value: T
+
+    def __init__[A](self: "Box[Tree[A]]", values: list[A]) -> None: ...
+
+def from_values(values: list[int]) -> Tree[int]:
+    return Box(values).value
 ```
 
 ## Multiple inherited recursive protocol methods
@@ -3158,7 +3465,7 @@ def inferred_result[T](a: Box[str], b: Box[T], cond: bool):
 
 def wrong_return[T](a: Box[str], b: Box[T], cond: bool) -> tuple[Box[str], str]:
     box = a if cond else b
-    return box.pair()  # error: [invalid-return-type]
+    return box.pair()  # error: [invalid-explicit-return]
 ```
 
 ## Calling a union of generic methods
@@ -3182,7 +3489,7 @@ def call[T, U](a: Box[str], b: Box[T], cond: bool, value: U):
 
 def wrong_return[T, U](a: Box[str], b: Box[T], cond: bool, value: U) -> tuple[Box[str], str, int]:
     pair = a.pair if cond else b.pair
-    return pair(value)  # error: [invalid-return-type]
+    return pair(value)  # error: [invalid-explicit-return]
 ```
 
 ## Dictionary methods on unions
@@ -3224,13 +3531,13 @@ class Same(Base[int]):
         return True
 
 class Narrow(Base[int]):
-    value: bool  # error: [invalid-mutable-override]
+    value: bool  # error: [incompatible-mutable-override]
 
 class Incompatible(Base[int]):
-    value: str  # error: [invalid-attribute-override]
+    value: str  # error: [incompatible-attribute-override]
 
     @property
-    def readonly(self) -> str:  # error: [invalid-property-type-override]
+    def readonly(self) -> str:  # error: [incompatible-property-override]
         return ""
 ```
 
@@ -3239,7 +3546,7 @@ repeat an incompatibility already introduced by the parent.
 
 ```py
 class WithDefault(Base[int]):
-    value: str = ""  # error: [invalid-attribute-override]
+    value: str = ""  # error: [incompatible-attribute-override]
 
 class Grandchild(WithDefault):
     value: str = ""  # ok
@@ -3257,7 +3564,7 @@ class Gradual(Base[Any]):
 class Concrete(Base[int]): ...
 
 class NewConflict(Gradual, Concrete):
-    value: str  # error: [invalid-attribute-override]
+    value: str  # error: [incompatible-attribute-override]
 ```
 
 ## Attribute annotations in generic constructors
@@ -3281,10 +3588,10 @@ fails to preserve the inherited type.
 ```py
 class Narrow(Base[int]):
     def __init__(self) -> None:
-        self.value: bool = True  # error: [invalid-mutable-override]
+        self.value: bool = True  # error: [incompatible-mutable-override]
 
 class Incompatible(Base[int]):
-    value: str  # error: [invalid-attribute-override]
+    value: str  # error: [incompatible-attribute-override]
 ```
 
 ## Specialized declarations after a dynamic base
@@ -3391,7 +3698,7 @@ class String(Base[Any]):  # ok
         return ""
 
 class Integer(Base[int]): ...
-class Conflict(String, Integer): ...  # error: [invalid-property-type-override]
+class Conflict(String, Integer): ...  # error: [incompatible-property-override]
 ```
 
 An explicit override is also checked against `Base[int]`, and the error is reported only at the
@@ -3400,7 +3707,7 @@ override.
 ```py
 class Explicit(String, Integer):
     @property
-    def value(self) -> str:  # error: [invalid-property-type-override]
+    def value(self) -> str:  # error: [incompatible-property-override]
         return ""
 ```
 

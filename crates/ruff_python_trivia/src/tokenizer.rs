@@ -126,7 +126,7 @@ pub fn lines_after_ignoring_end_of_line_trivia(offset: TextSize, code: &str) -> 
         .count() as u32
 }
 
-fn is_identifier_start(c: char) -> bool {
+pub(super) fn is_identifier_start(c: char) -> bool {
     if c.is_ascii() {
         c.is_ascii_alphabetic() || c == '_'
     } else {
@@ -136,7 +136,7 @@ fn is_identifier_start(c: char) -> bool {
 
 // Checks if the character c is a valid continuation character as described
 // in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
-fn is_identifier_continuation(c: char) -> bool {
+pub(super) fn is_identifier_continuation(c: char) -> bool {
     // Arrange things such that ASCII codepoints never
     // result in the slower `is_xid_continue` getting called.
     if c.is_ascii() {
@@ -478,7 +478,7 @@ pub enum SimpleTokenKind {
     /// Any other non trivia token.
     Other,
 
-    /// Returned for each character after [`SimpleTokenKind::Other`] has been returned once.
+    /// Returned once for any remaining input after [`SimpleTokenKind::Other`].
     Bogus,
 }
 
@@ -503,10 +503,11 @@ impl SimpleTokenKind {
 /// The tokenizer must start at an offset that is trivia (e.g. not inside of a multiline string).
 ///
 /// In case it finds something it can't parse, the tokenizer will return a
-/// [`SimpleTokenKind::Other`] and then only a final [`SimpleTokenKind::Bogus`] afterwards.
+/// [`SimpleTokenKind::Other`], followed by a single [`SimpleTokenKind::Bogus`] token
+/// covering any remaining text in the requested range.
 pub struct SimpleTokenizer<'a> {
     offset: TextSize,
-    /// `true` when it is known that the current `back` line has no comment for sure.
+    /// Whether an unsupported token has been encountered.
     bogus: bool,
     source: &'a str,
     cursor: Cursor<'a>,
@@ -539,14 +540,15 @@ impl<'a> SimpleTokenizer<'a> {
 
         if self.bogus {
             // Emit a single final bogus token
+            let end = self.offset + first.text_len() + self.cursor.text_len();
             let token = SimpleToken {
                 kind: SimpleTokenKind::Bogus,
-                range: TextRange::new(self.offset, self.source.text_len()),
+                range: TextRange::new(self.offset, end),
             };
 
             // Set the cursor to EOF
             self.cursor = Cursor::new("");
-            self.offset = self.source.text_len();
+            self.offset = end;
             return token;
         }
 
@@ -796,230 +798,6 @@ impl<'a> SimpleTokenizer<'a> {
 }
 
 impl Iterator for SimpleTokenizer<'_> {
-    type Item = SimpleToken;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let token = self.next_token();
-
-        if token.kind == SimpleTokenKind::EndOfFile {
-            None
-        } else {
-            Some(token)
-        }
-    }
-}
-
-/// Simple zero allocation backwards tokenizer for finding preceding tokens.
-///
-/// The tokenizer must start at an offset that is trivia (e.g. not inside of a multiline string).
-/// It will fail when reaching a string.
-///
-/// In case it finds something it can't parse, the tokenizer will return a
-/// [`SimpleTokenKind::Other`] and then only a final [`SimpleTokenKind::Bogus`] afterwards.
-pub struct BackwardsTokenizer<'a> {
-    offset: TextSize,
-    back_offset: TextSize,
-    /// Not `&CommentRanges` to avoid a circular dependency.
-    comment_ranges: &'a [TextRange],
-    bogus: bool,
-    source: &'a str,
-    cursor: Cursor<'a>,
-}
-
-impl<'a> BackwardsTokenizer<'a> {
-    pub fn new(source: &'a str, range: TextRange, comment_range: &'a [TextRange]) -> Self {
-        Self {
-            offset: range.start(),
-            back_offset: range.end(),
-            // Throw out any comments that follow the range.
-            comment_ranges: &comment_range
-                [..comment_range.partition_point(|comment| comment.start() <= range.end())],
-            bogus: false,
-            source,
-            cursor: Cursor::new(&source[range]),
-        }
-    }
-
-    pub fn up_to(offset: TextSize, source: &'a str, comment_range: &'a [TextRange]) -> Self {
-        Self::new(source, TextRange::up_to(offset), comment_range)
-    }
-
-    pub fn skip_trivia(self) -> impl Iterator<Item = SimpleToken> + 'a {
-        self.filter(|t| !t.kind().is_trivia())
-    }
-
-    fn next_token(&mut self) -> SimpleToken {
-        self.cursor.start_token();
-        self.back_offset = self.cursor.text_len() + self.offset;
-
-        let Some(last) = self.cursor.bump_back() else {
-            return SimpleToken {
-                kind: SimpleTokenKind::EndOfFile,
-                range: TextRange::empty(self.back_offset),
-            };
-        };
-
-        if self.bogus {
-            let token = SimpleToken {
-                kind: SimpleTokenKind::Bogus,
-                range: TextRange::up_to(self.back_offset),
-            };
-
-            // Set the cursor to EOF
-            self.cursor = Cursor::new("");
-            self.back_offset = TextSize::new(0);
-            return token;
-        }
-
-        if let Some(comment) = self
-            .comment_ranges
-            .last()
-            .filter(|comment| comment.contains_inclusive(self.back_offset))
-        {
-            self.comment_ranges = &self.comment_ranges[..self.comment_ranges.len() - 1];
-
-            // Skip the comment without iterating over the chars manually.
-            self.cursor = Cursor::new(&self.source[TextRange::new(self.offset, comment.start())]);
-            debug_assert_eq!(self.cursor.text_len() + self.offset, comment.start());
-            return SimpleToken {
-                kind: SimpleTokenKind::Comment,
-                range: comment.range(),
-            };
-        }
-
-        let kind = match last {
-            // Space, tab, or form feed. We ignore the true semantics of form feed, and treat it as
-            // whitespace. Note that this will lex-out trailing whitespace from a comment as
-            // whitespace rather than as part of the comment token, but this shouldn't matter for
-            // our use case.
-            ' ' | '\t' | '\x0C' => {
-                self.cursor
-                    .eat_back_while(|c| matches!(c, ' ' | '\t' | '\x0C'));
-                SimpleTokenKind::Whitespace
-            }
-
-            '\r' => SimpleTokenKind::Newline,
-            '\n' => {
-                self.cursor.eat_char_back('\r');
-                SimpleTokenKind::Newline
-            }
-            _ => self.next_token_inner(last),
-        };
-
-        let token_len = self.cursor.token_len();
-        let start = self.back_offset - token_len;
-        SimpleToken {
-            kind,
-            range: TextRange::at(start, token_len),
-        }
-    }
-
-    /// Helper to parser the previous token once we skipped all whitespace
-    fn next_token_inner(&mut self, last: char) -> SimpleTokenKind {
-        match last {
-            // Keywords and identifiers
-            c if is_identifier_continuation(c) => {
-                // if we only have identifier continuations but no start (e.g. 555) we
-                // don't want to consume the chars, so in that case, we want to rewind the
-                // cursor to here
-                let savepoint = self.cursor.clone();
-                self.cursor.eat_back_while(is_identifier_continuation);
-
-                let token_len = self.cursor.token_len();
-                let range = TextRange::at(self.back_offset - token_len, token_len);
-
-                if self.source[range]
-                    .chars()
-                    .next()
-                    .is_some_and(is_identifier_start)
-                {
-                    to_keyword_or_other(&self.source[range])
-                } else {
-                    self.cursor = savepoint;
-                    self.bogus = true;
-                    SimpleTokenKind::Other
-                }
-            }
-
-            // Non-trivia tokens that are unambiguous when lexing backwards.
-            // In other words: these are characters that _don't_ appear at the
-            // end of a multi-character token (like `!=`).
-            '\\' => SimpleTokenKind::Continuation,
-            ':' => SimpleTokenKind::Colon,
-            '~' => SimpleTokenKind::Tilde,
-            '%' => SimpleTokenKind::Percent,
-            '|' => SimpleTokenKind::Vbar,
-            ',' => SimpleTokenKind::Comma,
-            ';' => SimpleTokenKind::Semi,
-            '(' => SimpleTokenKind::LParen,
-            ')' => SimpleTokenKind::RParen,
-            '[' => SimpleTokenKind::LBracket,
-            ']' => SimpleTokenKind::RBracket,
-            '{' => SimpleTokenKind::LBrace,
-            '}' => SimpleTokenKind::RBrace,
-            '&' => SimpleTokenKind::Ampersand,
-            '^' => SimpleTokenKind::Circumflex,
-            '+' => SimpleTokenKind::Plus,
-            '-' => SimpleTokenKind::Minus,
-
-            // Non-trivia tokens that _are_ ambiguous when lexing backwards.
-            // In other words: these are characters that _might_ mark the end
-            // of a multi-character token (like `!=` or `->` or `//` or `**`).
-            '=' | '*' | '/' | '@' | '!' | '<' | '>' | '.' => {
-                // This could be a single-token token, like `+` in `x + y`, or a
-                // multi-character token, like `+=` in `x += y`. It could also be a sequence
-                // of multi-character tokens, like `x ==== y`, which is invalid, _but_ it's
-                // important that we produce the same token stream when lexing backwards as
-                // we do when lexing forwards. So, identify the range of the sequence, lex
-                // forwards, and return the last token.
-                let mut cursor = self.cursor.clone();
-                cursor.eat_back_while(|c| {
-                    matches!(
-                        c,
-                        ':' | '~'
-                            | '%'
-                            | '|'
-                            | '&'
-                            | '^'
-                            | '+'
-                            | '-'
-                            | '='
-                            | '*'
-                            | '/'
-                            | '@'
-                            | '!'
-                            | '<'
-                            | '>'
-                            | '.'
-                    )
-                });
-
-                let token_len = cursor.token_len();
-                let range = TextRange::at(self.back_offset - token_len, token_len);
-
-                let forward_lexer = SimpleTokenizer::new(self.source, range);
-                if let Some(token) = forward_lexer.last() {
-                    // If the token spans multiple characters, bump the cursor. Note,
-                    // though, that we already bumped the cursor to past the last character
-                    // in the token at the very start of `next_token_back`.y
-                    for _ in self.source[token.range].chars().rev().skip(1) {
-                        self.cursor.bump_back().unwrap();
-                    }
-                    token.kind()
-                } else {
-                    self.bogus = true;
-                    SimpleTokenKind::Other
-                }
-            }
-            _ => {
-                self.bogus = true;
-                SimpleTokenKind::Other
-            }
-        }
-    }
-}
-
-impl Iterator for BackwardsTokenizer<'_> {
     type Item = SimpleToken;
 
     fn next(&mut self) -> Option<Self::Item> {

@@ -68,11 +68,15 @@ impl EnvVars {
     ///
     /// When set to `1` or `true`, ty also uses uv to discover the workspace root and its Python
     /// environment.
+    ///
+    /// Set to `off` to disable all uv integration, even when `project-manager.project` or
+    /// `project-manager.script` is set to `"uv"`. An explicit `TY_UV` takes precedence over ty
+    /// configuration.
     pub const TY_UV: &'static str = "TY_UV";
 
     /// The path to the uv executable to use for workspace discovery and script environments.
     ///
-    /// ty uses this path when uv integration is enabled by `TY_UV`.
+    /// ty uses this path when uv integration is enabled.
     #[attr_hidden]
     pub const UV: &'static str = "UV";
 

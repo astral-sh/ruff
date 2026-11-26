@@ -108,7 +108,7 @@ class Grandchild(OtherChild):
     # error: [override-of-final-method]
     def foo(): ...
     @property
-    # error: [invalid-property-type-override]
+    # error: [incompatible-property-override]
     # error: [override-of-final-method]
     def my_property1(self) -> str: ...
     # TODO: we should emit a Liskov violation here too
@@ -209,13 +209,13 @@ class Bad:
     def bar(self, x: str) -> str: ...
     @overload
     @final
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def bar(self, x: int) -> int: ...
     @overload
     def baz(self, x: str) -> str: ...
     @final
     @overload
-    # error: [invalid-overload]
+    # error: [misplaced-overload-decorator]
     def baz(self, x: int) -> int: ...
 
 class ChildOfBad(Bad):
@@ -256,7 +256,7 @@ class ChildOfGood(Good):
 class Bad:
     @overload
     @final
-    def f(self, x: str) -> str: ...  # error: [invalid-overload]
+    def f(self, x: str) -> str: ...  # error: [misplaced-overload-decorator]
     @overload
     def f(self, x: int) -> int: ...
     def f(self, x: int | str) -> int | str:
@@ -264,7 +264,7 @@ class Bad:
 
     @final
     @overload
-    def g(self, x: str) -> str: ...  # error: [invalid-overload]
+    def g(self, x: str) -> str: ...  # error: [misplaced-overload-decorator]
     @overload
     def g(self, x: int) -> int: ...
     def g(self, x: int | str) -> int | str:
@@ -274,7 +274,7 @@ class Bad:
     def h(self, x: str) -> str: ...
     @overload
     @final
-    def h(self, x: int) -> int: ...  # error: [invalid-overload]
+    def h(self, x: int) -> int: ...  # error: [misplaced-overload-decorator]
     def h(self, x: int | str) -> int | str:
         return x
 
@@ -282,7 +282,7 @@ class Bad:
     def i(self, x: str) -> str: ...
     @final
     @overload
-    def i(self, x: int) -> int: ...  # error: [invalid-overload]
+    def i(self, x: int) -> int: ...  # error: [misplaced-overload-decorator]
     def i(self, x: int | str) -> int | str:
         return x
 
@@ -1346,7 +1346,7 @@ class Base(ABC):
 @final
 # snapshot: abstract-method-in-final-class
 class Bad(Base):
-    method: int  # error: [invalid-attribute-override]
+    method: int  # error: [incompatible-attribute-override]
 ```
 
 ```snapshot
@@ -1366,7 +1366,7 @@ info: The instance-attribute annotation for `method` does not override the abstr
 help: Either assign a value or add `ClassVar` to this declaration
   --> src/mdtest_snippet.py:11:5
    |
-11 |     method: int  # error: [invalid-attribute-override]
+11 |     method: int  # error: [incompatible-attribute-override]
    |     ------ Instance-attribute declaration
 ```
 

@@ -15,8 +15,8 @@ use crate::{
         function::OverloadLiteral,
         known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
         relation::{TypeRelation, TypeRelationChecker},
-        signatures::{CallableSignature, PartialSignatureApplication},
-        visitor, walk_signature,
+        signatures::CallableSignature,
+        visitor,
     },
 };
 use ty_python_core::definition::Definition;
@@ -42,10 +42,6 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => alias.value_type(db).is_function_like(db),
             _ => self.function_like_kind(db).is_some(),
         }
-    }
-
-    pub(super) fn is_classmethod(self, db: &'db dyn Db) -> bool {
-        self.function_like_kind(db) == Some(CallableTypeKind::ClassMethodLike)
     }
 
     /// Returns the function exposed by descriptor access or a bound method's `__func__`.
@@ -89,24 +85,25 @@ impl<'db> Type<'db> {
             _ => {}
         }
         let kind = self.function_like_kind(db)?;
-        let receiver = match kind {
+        let (function, receiver) = match kind {
             CallableTypeKind::StaticMethodLike => return Some(self.underlying_function(db)),
-            CallableTypeKind::ClassMethodLike => owner
-                .filter(|owner| !owner.is_none(db))
-                .or_else(|| instance.map(|instance| instance.to_meta_type(db, env))),
-            _ => instance,
+            CallableTypeKind::ClassMethodLike => (
+                self.underlying_function(db),
+                owner
+                    .filter(|owner| !owner.is_none(db))
+                    .or_else(|| instance.map(|instance| instance.to_meta_type(db, env))),
+            ),
+            _ => (self, instance),
         };
-        Some(receiver.map_or_else(
-            || self.underlying_function(db),
-            |receiver| {
-                Type::BoundMethod(super::BoundMethodType::from_callable(
-                    db,
-                    self,
-                    env.program(db),
-                    receiver,
-                ))
-            },
-        ))
+        Some(receiver.map_or(function, |receiver| {
+            Type::BoundMethod(super::BoundMethodType::from_callable(
+                db,
+                function,
+                env.program(db),
+                receiver,
+                kind,
+            ))
+        }))
     }
 
     /// Return a type that represents the "contract" that a callable must satisfy when attempting
@@ -772,7 +769,7 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     visitor: &V,
 ) {
     for signature in &ty.signatures(db).overloads {
-        walk_signature(db, signature, visitor);
+        visitor.visit_signature(db, signature);
     }
 }
 
@@ -924,15 +921,13 @@ impl<'db> CallableType<'db> {
     }
 
     /// Returns the reduced callable produced by partially applying selected overloads.
-    pub(crate) fn partially_apply(
+    pub(crate) fn from_partial_overloads(
         db: &'db dyn Db,
-        overloads: impl IntoIterator<Item = PartialSignatureApplication<'db>>,
+        overloads: impl IntoIterator<Item = Signature<'db>>,
     ) -> Option<Self> {
-        Some(Self::new(
-            db,
-            CallableSignature::partially_apply(db, overloads)?,
-            CallableTypeKind::Regular,
-        ))
+        let signatures = CallableSignature::from_partial_overloads(overloads);
+        (!signatures.overloads.is_empty())
+            .then(|| Self::new(db, signatures, CallableTypeKind::Regular))
     }
 
     /// Reifies this callable as the nominal `functools.partial[T]` instance for its return type.
@@ -1004,6 +999,52 @@ impl<'db> CallableType<'db> {
     /// `(*args: object, **kwargs: object) -> Never`.
     pub(crate) fn bottom(db: &'db dyn Db) -> CallableType<'db> {
         Self::new(db, CallableSignature::bottom(), CallableTypeKind::Regular)
+    }
+
+    /// Returns whether this callable can stand in for `target`. The source overloads must
+    /// collectively cover every target overload.
+    ///
+    /// In this stub, the two overloads of `Child.parse` together accept every `int | str` call
+    /// that `Base.parse` accepts. The override still fails because neither overload accepts `bytes`.
+    ///
+    /// ```python
+    /// from typing import overload
+    ///
+    /// class Base:
+    ///     @overload
+    ///     def parse(self, x: int | str) -> str: ...
+    ///     @overload
+    ///     def parse(self, x: bytes) -> str: ...
+    ///
+    /// class Child(Base):
+    ///     @overload
+    ///     def parse(self, x: int) -> str: ...
+    ///     @overload
+    ///     def parse(self, x: str) -> str: ...
+    /// ```
+    ///
+    /// A boolean check can stop at the first target overload whose constraints do not hold for
+    /// every specialization. Inference needs the combined constraints for the whole callable.
+    pub(super) fn is_assignable_to(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Self,
+    ) -> bool {
+        let check_target = |target| {
+            Type::Callable(self).is_assignable_to_via_constraints(db, env, Type::Callable(target))
+        };
+        if self != target
+            && self.signatures(db).overloads.len() > 1
+            && target.signatures(db).overloads.len() > 1
+        {
+            return target.signatures(db).iter().all(|signature| {
+                let overload =
+                    target.with_signatures(db, CallableSignature::single(signature.clone()));
+                check_target(overload)
+            });
+        }
+        check_target(target)
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -1122,30 +1163,13 @@ impl<'db> CallableTypes<'db> {
         db: &'db dyn Db,
         wrapped: Type<'db>,
     ) -> Type<'db> {
-        let mut overloads = Vec::new();
-        let mut seen_overloads = FxHashSet::default();
-
-        for callable in self.0 {
-            for signature in callable.signatures(db) {
-                let signature = signature.clone();
-                let dedup_key = signature
-                    .clone()
-                    .with_definition(None)
-                    .with_source_overload_index(None);
-                if seen_overloads.insert(dedup_key) {
-                    overloads.push(signature);
-                }
-            }
-        }
-
-        debug_assert!(!overloads.is_empty(), "CallableTypes should not be empty");
-
-        CallableType::new(
-            db,
-            CallableSignature::from_overloads(overloads),
-            CallableTypeKind::Regular,
-        )
-        .into_precise_functools_partial_instance(db, wrapped)
+        let signatures = CallableSignature::from_partial_overloads(self.signatures(db).cloned());
+        debug_assert!(
+            !signatures.overloads.is_empty(),
+            "CallableTypes should not be empty"
+        );
+        CallableType::new(db, signatures, CallableTypeKind::Regular)
+            .into_precise_functools_partial_instance(db, wrapped)
     }
 }
 

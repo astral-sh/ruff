@@ -13,11 +13,11 @@ pub(crate) fn deferred_with_statements(checker: &mut Checker) {
         let Stmt::With(stmt_with) = checker.semantic.current_statement() else {
             unreachable!("Expected Stmt::With");
         };
-        if checker.is_rule_enabled(Rule::ReadWholeFile) {
-            refurb::rules::read_whole_file(checker, stmt_with);
+        if checker.is_rule_enabled(Rule::ManualPathRead) {
+            refurb::rules::manual_path_read(checker, stmt_with);
         }
-        if checker.is_rule_enabled(Rule::WriteWholeFile) {
-            refurb::rules::write_whole_file(checker, stmt_with);
+        if checker.is_rule_enabled(Rule::ManualPathWrite) {
+            refurb::rules::manual_path_write(checker, stmt_with);
         }
     }
 }

@@ -197,11 +197,14 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
         /// Inner cached function for deferred inference of bases.
         /// Only called for assigned calls where inference was deferred.
-        #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(deref), cycle_initial=|_, _, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
         fn deferred_explicit_bases<'db>(
             db: &'db dyn Db,
-            definition: Definition<'db>,
+            class: DynamicClassLiteral<'db>,
         ) -> Box<[Type<'db>]> {
+            let definition = class
+                .definition(db)
+                .expect("deferred inference requires a definition");
             let program_file = definition.program_file(db);
             let python_file = program_file.python_file(db);
             let env = ProgramEnvironment::from_file(program_file);
@@ -230,7 +233,7 @@ impl<'db> DynamicClassLiteral<'db> {
             // For dangling calls, bases are stored directly on the anchor.
             DynamicClassAnchor::ScopeOffset { explicit_bases, .. } => explicit_bases.as_ref(),
             // For assigned calls, use deferred inference.
-            DynamicClassAnchor::Definition(definition) => deferred_explicit_bases(db, *definition),
+            DynamicClassAnchor::Definition(_) => deferred_explicit_bases(db, self),
         }
     }
 
@@ -281,7 +284,7 @@ impl<'db> DynamicClassLiteral<'db> {
     /// See <https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass>
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _| Ok(ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown())),
+        cycle_initial=|_, _, _, _| Ok(ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown())),
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(in crate::types) fn try_metaclass(
@@ -460,8 +463,7 @@ impl<'db> DynamicClassLiteral<'db> {
             .iter()
             .find_map(|(member_name, ty)| (name == member_name).then_some(*ty))
             .or_else(|| self.has_dynamic_namespace(db).then(Type::unknown))
-            .map(Member::definitely_declared)
-            .unwrap_or_default()
+            .map_or_default(Member::definitely_declared)
     }
 
     /// Look up an instance member defined directly on this class (not inherited).
@@ -478,7 +480,7 @@ impl<'db> DynamicClassLiteral<'db> {
     /// an error (duplicate bases or C3 linearization failure).
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|db, _, self_: DynamicClassLiteral<'db>| {
+        cycle_initial=|db, _, _, self_: DynamicClassLiteral<'db>| {
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::Dynamic(self_))),
                 ClassBase::object(db, &ProgramEnvironment::from_scope(self_.scope(db))),

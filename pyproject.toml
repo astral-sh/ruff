@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.17.4"
+version = "0.17.6"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -59,14 +59,14 @@ exclude = [
 [dependency-groups]
 dev = [
     { include-group = "jaq" },
-    "astral-dev-toolchain-cargo-codspeed>=5.0.1",
+    "astral-dev-toolchain-cargo-codspeed>=6.0.0",
     "astral-dev-toolchain-cargo-deny>=0.20.2",
     "astral-dev-toolchain-cargo-fuzz>=0.13.2",
     "astral-dev-toolchain-cargo-insta>=1.48.0",
     "astral-dev-toolchain-cargo-nextest>=0.9.143",
     "astral-dev-toolchain-cargo-shear>=1.13.4",
     "astral-dev-toolchain-hyperfine>=2.0.0",
-    "prek==0.5.5",
+    "prek==0.5.7",
 ]
 jaq = [
     "astral-dev-toolchain-jaq>=3.1.1",
@@ -229,7 +229,7 @@ exclude-newer = "P7D"
 astral-dev-toolchain-cargo-deny = "2026-09-15T19:10:00Z"
 astral-dev-toolchain-hyperfine = "2026-10-08T08:11:00Z"
 astral-dev-toolchain-cargo-shear = "2026-08-27T00:00:00Z"
-astral-dev-toolchain-cargo-codspeed = "2026-08-27T00:00:00Z"
+astral-dev-toolchain-cargo-codspeed = "2026-10-30T18:01:00Z"
 astral-dev-toolchain-cargo-nextest = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-insta = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-fuzz = "2026-09-01T00:00:00Z"
@@ -367,6 +367,15 @@ ignore = [
     "repeated-append",
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"crates/ty_vendored/ty_extensions/*.pyi" = [
+    # Import newer typing features from typing_extensions so ty can resolve them
+    # when checking code that targets Python 3.8.
+    "deprecated-import",
+    # Allow stub docstrings so IDEs can show them on hover.
+    "docstring-in-stub",
+]
+
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
 combine-as-imports = true
@@ -375,6 +384,37 @@ combine-as-imports = true
 "crates/ty_python_semantic/mdtest.py" = "py310"
 "crates/ty_vendored/ty_extensions/*.pyi" = "py312"
 "scripts/*.py" = "py312"
+
+[tool.ty.project-manager]
+script = "uv"
+
+[[tool.ty.overrides]]
+include = [
+    "scripts/*.py",
+    "crates/ruff_python_ast/generate.py",
+    "crates/ty_python_semantic/mdtest.py",
+    "python/py-fuzzer/prepare_corpus.py",
+]
+
+[tool.ty.overrides.analysis]
+return-type-inference = "always"
+
+[tool.ty.overrides.rules]
+truthiness-test-of-none-union = "warn"
+blanket-ignore-comment = "warn"
+missing-type-argument = "warn"
+possibly-unresolved-reference = "warn"
+unsound-return = "warn"
+unsound-yield = "warn"
+unsupported-dynamic-base = "warn"
+division-by-zero = "warn"
+dynamic-function-decorator-return = "warn"
+unsound-assignment = "warn"
+redundant-condition-strict = "warn"
+disjoint-cast = "warn"
+missing-direct-dependency = "warn"
+mismatched-enum-name = "warn"
+mismatched-namedtuple-name = "warn"
 
 [tool.black]
 force-exclude = '''

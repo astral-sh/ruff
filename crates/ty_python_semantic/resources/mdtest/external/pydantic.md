@@ -20,7 +20,7 @@ class User(BaseModel):
     id: int
     name: str
 
-reveal_type(User.__init__)  # revealed: (self: User, *, id: LaxInt, name: LaxStr, **extra: Any) -> None
+reveal_type(User.__init__)  # revealed: (self: User, /, *, id: LaxInt, name: LaxStr, **extra: Any) -> None
 
 user = User(id=1, name="John Doe")
 reveal_type(user.id)  # revealed: int
@@ -28,6 +28,21 @@ reveal_type(user.name)  # revealed: str
 
 # error: [missing-argument] "No argument provided for required parameter `name`"
 invalid_user = User(id=2)
+```
+
+## Field named `self`
+
+The constructor's receiver is positional-only, so `self` can be used as a field name:
+
+```py
+from pydantic import BaseModel
+
+class Links(BaseModel):
+    self: str
+
+links = Links(self="/items")
+reveal_type(links.self)  # revealed: str
+Links(self=1)  # error: [invalid-argument-type]
 ```
 
 ## Usage of `Field`
@@ -43,7 +58,7 @@ class Product(BaseModel):
     tags: list[str] = Field(default_factory=list)
     internal_price_cent: int = Field(gt=0, alias="price_cent")
 
-# revealed: (self: Product, *, name: LaxStr, tags: Iterable[LaxStr] = ..., price_cent: LaxInt, **extra: Any) -> None
+# revealed: (self: Product, /, *, name: LaxStr, tags: Iterable[LaxStr] = ..., price_cent: LaxInt, **extra: Any) -> None
 reveal_type(Product.__init__)
 
 product = Product(name="Laptop", price_cent=999_00)
@@ -399,7 +414,7 @@ from pydantic import BaseModel
 class Model(BaseModel):
     value: AliasedDatetime
 
-reveal_type(Model.__init__)  # revealed: (self: Model, *, value: LaxDatetime, **extra: Any) -> None
+reveal_type(Model.__init__)  # revealed: (self: Model, /, *, value: LaxDatetime, **extra: Any) -> None
 ```
 
 For collections, we widen something like `list[int]` to `Iterable[LaxInt]`. Pydantic can coerce a
@@ -487,7 +502,7 @@ class Parent(BaseModel):
     child: Child
     children: list[Child]
 
-# revealed: (self: Parent, *, child: Child | Mapping[str, Any], children: Iterable[Child | Mapping[str, Any]], **extra: Any) -> None
+# revealed: (self: Parent, /, *, child: Child | Mapping[str, Any], children: Iterable[Child | Mapping[str, Any]], **extra: Any) -> None
 reveal_type(Parent.__init__)
 
 child_input = {"value": "1"}
@@ -518,7 +533,7 @@ class BeforeValidatedParent(BaseModel):
             return {"value": value}
         return value
 
-# revealed: (self: BeforeValidatedParent, *, child: Any, untouched_child: Child | Mapping[str, Any], **extra: Any) -> None
+# revealed: (self: BeforeValidatedParent, /, *, child: Any, untouched_child: Child | Mapping[str, Any], **extra: Any) -> None
 reveal_type(BeforeValidatedParent.__init__)
 
 BeforeValidatedParent(child=1, untouched_child={"value": "2"})
@@ -539,8 +554,25 @@ class BeforeValidatorBase(BaseModel):
 class InheritedBeforeValidatedParent(BeforeValidatorBase):
     child: Child
 
-# revealed: (self: InheritedBeforeValidatedParent, *, child: Any, **extra: Any) -> None
+# revealed: (self: InheritedBeforeValidatedParent, /, *, child: Any, **extra: Any) -> None
 reveal_type(InheritedBeforeValidatedParent.__init__)
+```
+
+A subclass can override a validator to target different fields. Only the new targets accept
+arbitrary input:
+
+```py
+class RetargetedValidator(InheritedBeforeValidatedParent):
+    left: Child
+    right: Child
+
+    @field_validator("left", "right", mode="before")
+    @classmethod
+    def coerce_child(cls, value: object) -> object:
+        return value
+
+# revealed: (self: RetargetedValidator, /, *, child: Child | Mapping[str, Any], left: Any, right: Any, **extra: Any) -> None
+reveal_type(RetargetedValidator.__init__)
 ```
 
 A wildcard "before" validator applies to every field:
@@ -556,7 +588,7 @@ class WildcardBeforeValidatedParent(BaseModel):
             return {"value": value}
         return value
 
-# revealed: (self: WildcardBeforeValidatedParent, *, child: Any, **extra: Any) -> None
+# revealed: (self: WildcardBeforeValidatedParent, /, *, child: Any, **extra: Any) -> None
 reveal_type(WildcardBeforeValidatedParent.__init__)
 
 WildcardBeforeValidatedParent(child=1)
@@ -574,7 +606,7 @@ class PlainValidatedParent(BaseModel):
     def accept_child(cls, value: object) -> object:
         return value
 
-# revealed: (self: PlainValidatedParent, *, child: Any, untouched_child: Child | Mapping[str, Any], **extra: Any) -> None
+# revealed: (self: PlainValidatedParent, /, *, child: Any, untouched_child: Child | Mapping[str, Any], **extra: Any) -> None
 reveal_type(PlainValidatedParent.__init__)
 
 PlainValidatedParent(child=1, untouched_child={"value": "2"})
@@ -592,7 +624,7 @@ class AfterValidatedParent(BaseModel):
     def validate_child(cls, value: Child) -> Child:
         return value
 
-# revealed: (self: AfterValidatedParent, *, child: Child | Mapping[str, Any], **extra: Any) -> None
+# revealed: (self: AfterValidatedParent, /, *, child: Child | Mapping[str, Any], **extra: Any) -> None
 reveal_type(AfterValidatedParent.__init__)
 
 AfterValidatedParent(child=1)  # error: [invalid-argument-type]
@@ -608,7 +640,7 @@ class Box[T](BaseModel):
 class HasBox(BaseModel):
     box: Box[int]
 
-# revealed: (self: HasBox, *, box: Box[Unknown] | Mapping[str, Any], **extra: Any) -> None
+# revealed: (self: HasBox, /, *, box: Box[Unknown] | Mapping[str, Any], **extra: Any) -> None
 reveal_type(HasBox.__init__)
 
 HasBox(box=Box(value=1))
@@ -635,7 +667,7 @@ class AttributeSource:
     def __init__(self, value: int) -> None:
         self.value = value
 
-# revealed: (self: AttributeParent, *, child: Any, **extra: Any) -> None
+# revealed: (self: AttributeParent, /, *, child: Any, **extra: Any) -> None
 reveal_type(AttributeParent.__init__)
 
 AttributeParent(child=AttributeSource(1))
@@ -655,7 +687,7 @@ class Color(Enum):
 class LaxColor(BaseModel):
     value: Color
 
-reveal_type(LaxColor.__init__)  # revealed: (self: LaxColor, *, value: Any, **extra: Any) -> None
+reveal_type(LaxColor.__init__)  # revealed: (self: LaxColor, /, *, value: Any, **extra: Any) -> None
 
 LaxColor(value=Color.RED)
 LaxColor(value="red")
@@ -685,7 +717,7 @@ Unions are converted element-wise:
 class LaxUnion(BaseModel):
     value: int | list[str] | None
 
-reveal_type(LaxUnion.__init__)  # revealed: (self: LaxUnion, *, value: LaxInt | Iterable[LaxStr] | None, **extra: Any) -> None
+reveal_type(LaxUnion.__init__)  # revealed: (self: LaxUnion, /, *, value: LaxInt | Iterable[LaxStr] | None, **extra: Any) -> None
 
 LaxUnion(value=1)
 LaxUnion(value="1")
@@ -932,6 +964,27 @@ StrictFields(strict_int=1, strict_str="foo")
 StrictFields(strict_int="1", strict_str="foo")  # error: [invalid-argument-type]
 StrictFields(strict_int=1, strict_str=b"foo")  # error: [invalid-argument-type]
 
+type Direct = Annotated[int, Strict()]
+type Indirect = StrictInt
+
+class AliasedStrictFields(BaseModel):
+    direct: Direct
+    indirect: Indirect
+
+AliasedStrictFields(direct=1, indirect=1)  # ok
+AliasedStrictFields(direct="1", indirect=1)  # error: [invalid-argument-type]
+AliasedStrictFields(direct=1, indirect="1")  # error: [invalid-argument-type]
+
+type StrictField[T] = Annotated[T, Strict()]
+
+class SpecializedStrictFields(BaseModel):
+    integer: StrictField[int]
+    text: StrictField[str]
+
+SpecializedStrictFields(integer=1, text="foo")  # ok
+SpecializedStrictFields(integer="1", text="foo")  # error: [invalid-argument-type]
+SpecializedStrictFields(integer=1, text=b"foo")  # error: [invalid-argument-type]
+
 class StrictMetadataOrder(BaseModel):
     field_then_lax: Annotated[int, Field(strict=True), Strict(False)]
     lax_then_field: Annotated[int, Strict(False), Field(strict=True)]
@@ -1089,7 +1142,7 @@ class PersonWithoutExtras(BaseModel):
 
     name: str
 
-# revealed: (self: PersonWithoutExtras, *, name: LaxStr) -> None
+# revealed: (self: PersonWithoutExtras, /, *, name: LaxStr) -> None
 reveal_type(PersonWithoutExtras.__init__)
 PersonWithoutExtras(name="Alice", something_else=7)  # error: [unknown-argument]
 ```
@@ -1111,7 +1164,7 @@ class FrameworkBase(BaseModel):
 class User(FrameworkBase):
     name: str
 
-reveal_type(User.__init__)  # revealed: (self: User, *, name: LaxStr, **extra: Any) -> None
+reveal_type(User.__init__)  # revealed: (self: User, /, *, name: LaxStr, **extra: Any) -> None
 User(name="Alice", city="Berlin")
 ```
 
@@ -1145,7 +1198,7 @@ class PersonWithExtraField(BaseModel):
 
     extra: int
 
-# revealed: (self: PersonWithExtraField, *, extra: LaxInt, **extra_: Any) -> None
+# revealed: (self: PersonWithExtraField, /, *, extra: LaxInt, **extra_: Any) -> None
 reveal_type(PersonWithExtraField.__init__)
 PersonWithExtraField(extra=1, something_else=2)
 ```
@@ -1164,7 +1217,7 @@ class Person(BaseModel):
     _private_with_default: int = 1
     _explicit_private: int = PrivateAttr(default=0)
 
-# revealed: (self: Person, *, name: LaxStr, **extra: Any) -> None
+# revealed: (self: Person, /, *, name: LaxStr, **extra: Any) -> None
 reveal_type(Person.__init__)
 
 person = Person(name="Alice")
@@ -1499,6 +1552,46 @@ class FrozenFieldWithCustomSetattr(BaseModel):
 FrozenFieldWithCustomSetattr(value=1).value = 2  # ok
 ```
 
+## Hashability of frozen models
+
+Pydantic generates a hash for frozen models even when they define their own equality method.
+
+```py
+from collections.abc import Hashable
+from typing import Literal
+from pydantic import BaseModel
+
+def accepts_hashable(value: Hashable) -> None: ...
+
+class Frozen(BaseModel, frozen=True):
+    value: int = 0
+    __eq__ = object.__eq__
+
+class Child(Frozen):
+    __eq__ = object.__eq__
+
+accepts_hashable(Frozen())
+accepts_hashable(Child())
+Frozen.__hash__(1)  # error: [invalid-argument-type]
+```
+
+If a base defines a custom hash, Pydantic leaves it alone. A subclass can then inherit that hash or
+disable it by defining `__eq__`.
+
+```py
+class Custom(BaseModel):
+    def __hash__(self) -> Literal[7]:
+        return 7
+
+class Inherited(Custom, frozen=True): ...
+
+class Disabled(Custom, frozen=True):
+    __eq__ = object.__eq__
+
+reveal_type(Inherited().__hash__())  # revealed: Literal[7]
+accepts_hashable(Disabled())  # error: [invalid-argument-type]
+```
+
 ## Frozen models and protocols
 
 Frozen models cannot satisfy a protocol that requires a writable field, but can satisfy one that
@@ -1543,6 +1636,27 @@ class FrozenField(BaseModel):
 
 update(FrozenField(value=1))  # error: [invalid-argument-type]
 read(FrozenField(value=1))  # ok
+```
+
+## Frozen models and variance
+
+### Python 3.13 and later
+
+On Python 3.13 and later, the synthesized `__replace__` method takes field values as arguments. A
+frozen model is therefore invariant in the type of its generic field.
+
+```py
+from pydantic import BaseModel, ConfigDict
+
+class Animal(BaseModel): ...
+class Dog(Animal): ...
+
+class Frozen[T](BaseModel):
+    model_config = ConfigDict(frozen=True)
+    value: T
+
+def check(dog: Frozen[Dog]):
+    animal: Frozen[Animal] = dog  # error: [invalid-assignment]
 ```
 
 ## Validation of default values
@@ -1720,7 +1834,7 @@ from pydantic import RootModel, BaseModel
 
 class IntList(RootModel[list[int]]): ...
 
-reveal_type(IntList.__init__)  # revealed: (self: IntList, root: Iterable[LaxInt]) -> None
+reveal_type(IntList.__init__)  # revealed: (self: IntList, /, root: Iterable[LaxInt]) -> None
 
 IntList([1, 2, 3])
 IntList(root=[1, 2, 3])
@@ -1922,7 +2036,7 @@ class Mixin:
 class MyModel(BaseModel, Mixin):
     model_field: bool
 
-# revealed: (self: MyModel, *, mixin_field: LaxBool, model_field: LaxBool, **extra: Any) -> None
+# revealed: (self: MyModel, /, *, mixin_field: LaxBool, model_field: LaxBool, **extra: Any) -> None
 reveal_type(MyModel.__init__)
 MyModel(model_field=True, mixin_field=False)
 ```
@@ -1941,9 +2055,9 @@ class Parent(BaseModel):
     name: str
 
 class Child(Parent):
-    params: ClassVar[int] = 1  # error: [invalid-attribute-override]
+    params: ClassVar[int] = 1  # error: [incompatible-attribute-override]
 
-reveal_type(Child.__init__)  # revealed: (self: Child, *, name: LaxStr, **extra: Any) -> None
+reveal_type(Child.__init__)  # revealed: (self: Child, /, *, name: LaxStr, **extra: Any) -> None
 Child(name="child")  # ok
 Child()  # error: [missing-argument] "No argument provided for required parameter `name`"
 ```
@@ -1954,7 +2068,7 @@ The field stays excluded in subclasses, including their synthesized `__replace__
 class Grandchild(Child):
     pass
 
-reveal_type(Grandchild.__init__)  # revealed: (self: Grandchild, *, name: LaxStr, **extra: Any) -> None
+reveal_type(Grandchild.__init__)  # revealed: (self: Grandchild, /, *, name: LaxStr, **extra: Any) -> None
 reveal_type(Grandchild.__replace__)  # revealed: (self: Grandchild, *, name: str = ...) -> Grandchild
 Grandchild(name="grandchild")  # ok
 ```
@@ -1963,9 +2077,9 @@ A `ClassVar` declaration without a value also excludes the inherited field.
 
 ```py
 class AnnotationOnly(Parent):
-    params: ClassVar[int]  # error: [invalid-attribute-override]
+    params: ClassVar[int]  # error: [incompatible-attribute-override]
 
-reveal_type(AnnotationOnly.__init__)  # revealed: (self: AnnotationOnly, *, name: LaxStr, **extra: Any) -> None
+reveal_type(AnnotationOnly.__init__)  # revealed: (self: AnnotationOnly, /, *, name: LaxStr, **extra: Any) -> None
 AnnotationOnly(name="child")  # ok
 ```
 
@@ -1981,9 +2095,9 @@ class Parent:
     params: int
 
 class Child(BaseModel, Parent):
-    params: ClassVar[int] = 1  # error: [invalid-attribute-override]
+    params: ClassVar[int] = 1  # error: [incompatible-attribute-override]
 
-reveal_type(Child.__init__)  # revealed: (self: Child, **extra: Any) -> None
+reveal_type(Child.__init__)  # revealed: (self: Child, /, **extra: Any) -> None
 child = Child()  # ok
 reveal_type(child.params)  # revealed: int
 ```
@@ -1992,12 +2106,12 @@ The overriding `ClassVar` can itself be inherited from an ordinary class.
 
 ```py
 class Mixin(Parent):
-    params: ClassVar[int] = 1  # error: [invalid-attribute-override]
+    params: ClassVar[int] = 1  # error: [incompatible-attribute-override]
 
 class Model(BaseModel, Mixin):
     pass
 
-reveal_type(Model.__init__)  # revealed: (self: Model, **extra: Any) -> None
+reveal_type(Model.__init__)  # revealed: (self: Model, /, **extra: Any) -> None
 Model()  # ok
 ```
 
@@ -2016,7 +2130,7 @@ class RequiredAfterDefault(BaseModel):
     defaulted: int = 0
     required: int
 
-# revealed: (self: RequiredAfterDefault, *, defaulted: LaxInt = 0, required: LaxInt, **extra: Any) -> None
+# revealed: (self: RequiredAfterDefault, /, *, defaulted: LaxInt = 0, required: LaxInt, **extra: Any) -> None
 reveal_type(RequiredAfterDefault.__init__)
 RequiredAfterDefault(required=1)
 ```
@@ -2245,11 +2359,21 @@ class Person:
     age: int = Field(default=0)
 
 # `id` is absent in the constructor signature:
-reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int = 0) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, /, name: str, age: int = 0) -> None
 
 Person(name="Alice")
 Person(name="Alice", age=20)
 Person(name="Alice", something_else=7)  # error: [unknown-argument]
+```
+
+Fields excluded from initialization are also excluded from replacement.
+
+```py
+from copy import replace
+
+person = Person(name="Alice")
+reveal_type(replace(person, age=21))  # revealed: Person
+replace(person, id=1)  # error: [unknown-argument]
 ```
 
 ## Inherited `ModelMetaclass`
@@ -2267,7 +2391,7 @@ class User(BaseModel, metaclass=RegistryMeta):
     name: str
     age: int = 0
 
-reveal_type(User.__init__)  # revealed: (self: User, *, name: LaxStr, age: LaxInt = 0, **extra: Any) -> None
+reveal_type(User.__init__)  # revealed: (self: User, /, *, name: LaxStr, age: LaxInt = 0, **extra: Any) -> None
 
 User(name="alice")
 User(name="alice", age=1)
@@ -2348,7 +2472,7 @@ from pydantic import BaseModel
 class Person(BaseModel):
     name: str
 
-reveal_type(Person.__init__)  # revealed: (self: Person, *, name: str) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, /, *, name: str) -> None
 Person(name="Alice")
 Person(name="Alice", something_else=7)  # error: [unknown-argument]
 ```

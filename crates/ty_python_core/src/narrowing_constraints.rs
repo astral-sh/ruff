@@ -35,12 +35,11 @@
 use std::cmp::Ordering;
 
 use ruff_index::Idx;
-use rustc_hash::FxHashMap;
 
 use crate::ast_ids::ScopedUseId;
-use crate::interned_nodes::InternedNodes;
+use crate::interned_nodes::{BinaryConstraintCache, ConstraintId, InternedNodes};
 use crate::predicate::ScopedPredicateId;
-use crate::rank::{RankBitBox, RankBitBoxVec};
+use crate::rank::RankBitBox;
 use crate::scope::FileScopeId;
 use crate::use_def::BindingsSnapshotId;
 
@@ -60,6 +59,10 @@ impl ScopedNarrowingConstraint {
     }
 }
 
+impl ConstraintId for ScopedNarrowingConstraint {
+    const EMPTY: Self = ALWAYS_TRUE;
+}
+
 impl Idx for ScopedNarrowingConstraint {
     fn new(value: usize) -> Self {
         assert!(value < Self::ALWAYS_FALSE.0 as usize);
@@ -76,8 +79,8 @@ impl Idx for ScopedNarrowingConstraint {
 const ALWAYS_TRUE: ScopedNarrowingConstraint = ScopedNarrowingConstraint::ALWAYS_TRUE;
 const ALWAYS_FALSE: ScopedNarrowingConstraint = ScopedNarrowingConstraint::ALWAYS_FALSE;
 
-/// Once a scope reaches this limit, operations return `ALWAYS_TRUE`. Dropping narrowing is less
-/// precise, but avoids exponential growth on pathological input.
+/// Once a scope reaches this limit, approximate uncached combinations to avoid exponential
+/// growth on pathological input.
 const MAX_INTERIOR_NODES: usize = 512 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
@@ -114,7 +117,7 @@ impl NarrowingConstraints {
         self.used_interiors.is_empty()
     }
 
-    pub fn get_interior_node(&self, id: ScopedNarrowingConstraint) -> InteriorNode {
+    pub fn get_interior_node(&self, id: ScopedNarrowingConstraint) -> &InteriorNode {
         debug_assert!(!id.is_terminal());
         let raw_index = id.0 as usize;
         if let Some(used_indices) = &self.used_indices {
@@ -122,9 +125,9 @@ impl NarrowingConstraints {
                 used_indices.get_bit(raw_index).unwrap_or(false),
                 "all used narrowing constraints should have been marked as used",
             );
-            self.used_interiors[used_indices.rank(raw_index) as usize]
+            &self.used_interiors[used_indices.rank(raw_index) as usize]
         } else {
-            self.used_interiors[raw_index]
+            &self.used_interiors[raw_index]
         }
     }
 }
@@ -132,42 +135,21 @@ impl NarrowingConstraints {
 #[derive(Debug, Default)]
 pub struct NarrowingConstraintsBuilder {
     interiors: InternedNodes<ScopedNarrowingConstraint, InteriorNode>,
-    interior_used: RankBitBoxVec,
-    and_cache: FxHashMap<
-        (ScopedNarrowingConstraint, ScopedNarrowingConstraint),
-        ScopedNarrowingConstraint,
-    >,
-    or_cache: FxHashMap<
-        (ScopedNarrowingConstraint, ScopedNarrowingConstraint),
-        ScopedNarrowingConstraint,
-    >,
+    and_cache: BinaryConstraintCache<ScopedNarrowingConstraint>,
+    or_cache: BinaryConstraintCache<ScopedNarrowingConstraint>,
 }
 
 impl NarrowingConstraintsBuilder {
     pub(crate) fn build(self) -> NarrowingConstraints {
-        if self.interior_used.first_zero().is_none() {
-            NarrowingConstraints {
-                used_interiors: self.interiors.into_nodes_boxed_slice(),
-                used_indices: None,
-            }
-        } else {
-            let used_interiors = self
-                .interiors
-                .into_node_iterator()
-                .zip(&self.interior_used)
-                .filter_map(|(interior, used)| used.then_some(interior))
-                .collect();
-            let used_indices = RankBitBox::from_bits(self.interior_used);
-            NarrowingConstraints {
-                used_interiors,
-                used_indices: Some(used_indices),
-            }
+        let (used_interiors, used_indices) = self.interiors.into_used_nodes();
+        NarrowingConstraints {
+            used_interiors,
+            used_indices,
         }
     }
 
     pub(crate) fn mark_used(&mut self, node: ScopedNarrowingConstraint) {
-        if !node.is_terminal() && !self.interior_used[node.index()] {
-            self.interior_used.set(node.index(), true);
+        if !node.is_terminal() && self.interiors.mark_used(node) {
             let node = self.interiors[node];
             self.mark_used(node.if_true);
             self.mark_used(node.if_uncertain);
@@ -228,11 +210,7 @@ impl NarrowingConstraintsBuilder {
             });
         }
 
-        let (id, inserted) = self.interiors.intern(node);
-        if inserted {
-            self.interior_used.push(false);
-        }
-        id
+        self.interiors.intern(node)
     }
 
     pub(crate) fn add_atom(&mut self, predicate: ScopedPredicateId) -> ScopedNarrowingConstraint {
@@ -305,8 +283,8 @@ impl NarrowingConstraintsBuilder {
         }
 
         let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
-        if let Some(cached) = self.or_cache.get(&(a, b)) {
-            return *cached;
+        if let Some(cached) = self.or_cache.get(a, b) {
+            return cached;
         }
         self.or_uncached(a, b)
     }
@@ -354,7 +332,7 @@ impl NarrowingConstraintsBuilder {
             }
         };
 
-        self.or_cache.insert((a, b), result);
+        self.or_cache.insert(a, b, result);
         result
     }
 
@@ -372,8 +350,8 @@ impl NarrowingConstraintsBuilder {
         }
 
         let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
-        if let Some(cached) = self.and_cache.get(&(a, b)) {
-            return *cached;
+        if let Some(cached) = self.and_cache.get(a, b) {
+            return cached;
         }
         self.and_uncached(a, b)
     }
@@ -385,7 +363,9 @@ impl NarrowingConstraintsBuilder {
         b: ScopedNarrowingConstraint,
     ) -> ScopedNarrowingConstraint {
         if self.interiors.len() >= MAX_INTERIOR_NODES {
-            return ALWAYS_TRUE;
+            // A conjunction implies either operand. Keep the more recently interned one
+            // so a new check can still narrow a binding after a complex merge.
+            return b;
         }
 
         // See the "Lazier BDDs (for intersections)" section for the edge calculations below:
@@ -437,7 +417,7 @@ impl NarrowingConstraintsBuilder {
             }
         };
 
-        self.and_cache.insert((a, b), result);
+        self.and_cache.insert(a, b, result);
         result
     }
 }
@@ -476,6 +456,18 @@ mod tests {
                     }
             }
         }
+    }
+
+    #[test]
+    fn conjunction_keeps_new_checks_at_the_node_limit() {
+        let mut constraints = NarrowingConstraintsBuilder::default();
+        let earlier = constraints.add_atom(predicate(0));
+        for i in 1..MAX_INTERIOR_NODES {
+            constraints.add_atom(predicate(i));
+        }
+        let check = constraints.add_negated_atom(predicate(MAX_INTERIOR_NODES));
+        assert_eq!(constraints.add_and_constraint(earlier, check), check);
+        assert_eq!(constraints.add_and_constraint(check, earlier), check);
     }
 
     #[test]

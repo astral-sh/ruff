@@ -122,16 +122,16 @@ impl AlwaysFixableViolation for PytestIncorrectMarkParenthesesStyle {
 /// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.208", category = Category::Correctness)]
-pub(crate) struct PytestUseFixturesWithoutParameters;
+pub(crate) struct PytestUseFixturesWithoutArguments;
 
-impl AlwaysFixableViolation for PytestUseFixturesWithoutParameters {
+impl AlwaysFixableViolation for PytestUseFixturesWithoutArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Useless `pytest.mark.usefixtures` without parameters".to_string()
+        "Useless `pytest.mark.usefixtures` without arguments".to_string()
     }
 
     fn fix_title(&self) -> String {
-        "Remove `usefixtures` decorator or pass parameters".to_string()
+        "Remove `usefixtures` decorator or pass arguments".to_string()
     }
 }
 
@@ -224,7 +224,7 @@ fn check_useless_usefixtures(checker: &Checker, decorator: &Decorator, marker: &
     }
 
     let mut diagnostic =
-        checker.report_diagnostic(PytestUseFixturesWithoutParameters, decorator.range());
+        checker.report_diagnostic(PytestUseFixturesWithoutArguments, decorator.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(decorator.range())));
 }
 
@@ -232,7 +232,7 @@ fn check_useless_usefixtures(checker: &Checker, decorator: &Decorator, marker: &
 pub(crate) fn marks(checker: &Checker, decorators: &[Decorator]) {
     let enforce_parentheses = checker.is_rule_enabled(Rule::PytestIncorrectMarkParenthesesStyle);
     let enforce_useless_usefixtures =
-        checker.is_rule_enabled(Rule::PytestUseFixturesWithoutParameters);
+        checker.is_rule_enabled(Rule::PytestUseFixturesWithoutArguments);
 
     for (decorator, marker) in get_mark_decorators(decorators, checker.semantic()) {
         if enforce_parentheses {

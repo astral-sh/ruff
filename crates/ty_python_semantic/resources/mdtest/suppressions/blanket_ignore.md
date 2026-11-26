@@ -39,8 +39,7 @@ e = 1  # ty: ignore
 ## Suppression diagnostics
 
 Suppression-related diagnostics are checked before `blanket-ignore-comment`. A blanket ignore that
-suppresses an `ignore-comment-unknown-rule` or `invalid-ignore-comment` diagnostic therefore counts
-as used:
+suppresses `unknown-rule-in-ignore-comment` or `invalid-ignore-comment` therefore counts as used.
 
 ```py
 # The nested ignore contains an unknown rule.

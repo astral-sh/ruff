@@ -644,6 +644,25 @@ def consume_explicit(value: E | F) -> None: ...
 reveal_type(infer_from_consumers(consume_first, consume_second, consume_explicit))  # revealed: Unknown
 ```
 
+## Independent bounds after inference exhausts its budget
+
+Matching each string against both `T` and `Sequence[T]` can exhaust the construction budget. The
+callback still violates the upper bound on `U` in either argument order.
+
+```py
+from collections.abc import Callable, Sequence
+from typing import Literal
+
+type Words = Literal[
+    "abcdefghijklmnop", "aa", "bb", "cc", "dd", "ee", "ff", "gg", "hh", "ii", "jj", "kk", "ll", "mm", "nn", "oo", "pp"
+]
+
+def consume[T, U: int](value: T | Sequence[T], other: Callable[[], U]) -> None: ...
+def check(value: Words, other: Callable[[], str]) -> None:
+    consume(value=value, other=other)  # error: [invalid-argument-type] "does not satisfy upper bound `int`"
+    consume(other=other, value=value)  # error: [invalid-argument-type] "does not satisfy upper bound `int`"
+```
+
 ## Narrowing negated intersection aliases
 
 The negation of an aliased intersection acts as a union of negations. Intersecting three such upper
@@ -922,6 +941,51 @@ class Closed:
     @decorate  # ok
     @classmethod
     def method(cls, value: int) -> None: ...
+```
+
+## Decorating a binary method with a bounded receiver
+
+Both `self` and `abs(self)` satisfy the bound on `M`. The decorated method accepts another matrix,
+even though the decorator's signature doesn't tell us whether the result keeps the receiver's type.
+
+```py
+from typing import Callable, Self
+
+def decorate[A, B, R](fn: Callable[[A, B], R]) -> Callable[[A, B], R]:
+    return fn
+
+class Matrix:
+    def __abs__(self) -> Self:
+        return self
+
+    @decorate
+    def __add__[M: Matrix](self: M, other: M) -> M:
+        return self
+
+    def check(self):
+        reveal_type(abs(self))  # revealed: Self@check
+        reveal_type(self + self)  # revealed: Unknown
+        reveal_type(abs(self) + self)  # revealed: Unknown
+        abs(self) + 1  # error: [unsupported-operator]
+```
+
+## Decorating a generic function with a bounded decorator
+
+`identity` accepts any value, but the decorator limits the wrapped function to integers.
+
+```py
+from typing import Callable
+
+def integers[A: int, R: int](fn: Callable[[A], R]) -> Callable[[A], R]:
+    return fn
+
+@integers
+def identity[T](value: T) -> T:
+    return value
+
+identity("x")  # error: [invalid-argument-type]
+# TODO: Solve for the decorator's bounded variables and accept this call.
+identity(1)  # error: [invalid-argument-type]
 ```
 
 ## Gradual class parameters
@@ -1356,7 +1420,7 @@ def _(callback: Restricted[str]):
     x: Callable[[int], str] = callback  # error: [invalid-assignment]
 
 def _[F: Restricted[str]](callback: F):
-    consume(callback)  # TODO: This should error.
+    consume(callback)  # error: [invalid-argument-type]
     x: Callable[[int], str] = callback  # error: [invalid-assignment]
 ```
 
@@ -1369,8 +1433,7 @@ def _(callback: Restricted[int]):
 
 def _[F: Restricted[int]](callback: F):
     consume(callback)
-    # TODO: This should not error.
-    x: Callable[[int], str] = callback  # error: [invalid-assignment]
+    x: Callable[[int], str] = callback  # ok
 ```
 
 Note that a compatible receiver bound does not satisfy an incompatible return type:
@@ -1378,6 +1441,31 @@ Note that a compatible receiver bound does not satisfy an incompatible return ty
 ```py
 def _[F: Restricted[int]](callback: F):
     wrong: Callable[[int], bytes] = callback  # error: [invalid-assignment]
+```
+
+## Overloaded methods on a bounded type variable
+
+Both overloads accept any receiver, so together they cover the protocol's input union even when the
+receiver is `T`. The bound method's return type must account for both overloads.
+
+```py
+from typing import Callable, Protocol, overload
+
+class Parser:
+    @overload
+    def parse(self: object, value: int, /) -> int: ...
+    @overload
+    def parse(self: object, value: str, /) -> str: ...
+    def parse(self: object, value: int | str, /) -> int | str:
+        return value
+
+class SupportsParse(Protocol):
+    def parse(self, value: int | str, /) -> int | str: ...
+
+def check[T: Parser](parser: T):
+    impl: SupportsParse = parser  # ok
+    parse: Callable[[int | str], int | str] = parser.parse  # ok
+    wrong: Callable[[int | str], int] = parser.parse  # error: [invalid-assignment]
 ```
 
 ## Constructor bounds in callable inference
@@ -1514,6 +1602,20 @@ def infer_result_with_value[T, R](callback: Callable[[T], R], consumer: Callable
 def _(a: A, b: B) -> None:
     reveal_type(infer_result_with_value(identity, consume, a))  # revealed: A
     reveal_type(infer_result_with_value(identity, consume, b))  # revealed: B
+```
+
+## Type variables captured by a generic callback
+
+```py
+type Pair[T, U] = tuple[T, U]
+
+def pairs[T](captured: T):
+    def pair[U](value: U) -> Pair[T, U]:
+        return captured, value
+
+    callbacks = {pair}
+    callbacks |= {pair}
+    reveal_type(callbacks.pop()(1))  # revealed: tuple[T@pairs, Literal[1]]
 ```
 
 ## Multiple occurrences of a higher-order generic callable
@@ -1723,7 +1825,7 @@ class Box[C]:
             result = other.pair(n)
             # revealed: tuple[T@pair, int]
             reveal_type(result)
-            return result  # error: [invalid-return-type]
+            return result  # error: [invalid-explicit-return]
 
         return self.value, arg
 ```
@@ -1743,6 +1845,30 @@ class Box[C]:
         def check_class_parameter(arg: tuple[C, int]) -> None:
             # revealed: Box[C@Box]
             reveal_type(Box[C](arg))
+```
+
+## Inferring a callback parameter through a protocol member
+
+`Box` has no type arguments, but its `value` attribute carries the type variable from `put`.
+Comparing the result of `put` with `HasValue` supplies the upper bound of `int` for `X`.
+
+```py
+from typing import Callable, Protocol
+
+class HasValue(Protocol):
+    @property
+    def value(self) -> int: ...
+
+class Box:
+    def put[T: int](self, x: T) -> "Box":
+        self.value = x
+        return self
+
+def argument[X](f: Callable[[X], HasValue]) -> X:
+    raise NotImplementedError
+
+def check(box: Box):
+    reveal_type(argument(box.put))  # revealed: int
 ```
 
 ## Specializing generic protocol methods
@@ -1810,6 +1936,22 @@ def accept_str(value: Required[str]) -> None: ...
 
 accept_int(Implementation())  # no diagnostic
 accept_str(Implementation())  # error: [invalid-argument-type]
+```
+
+## An invariant parameter shared with the return type
+
+The return requires `T` to include `str`. The parameter must then accept `list[int | str]`.
+
+```pyi
+from typing import Callable
+from typing_extensions import assert_type
+
+def infer[T](f: Callable[[list[int | T]], list[int | T]]) -> T: ...
+def append[S: (int | str, bytes)](xs: list[S]) -> list[S | str]: ...
+def only_ints[I: int](xs: list[I]) -> list[I | str]: ...
+
+assert_type(infer(append), str)
+infer(only_ints)  # error: [invalid-argument-type]
 ```
 
 ## Returned callables with recursive parameter aliases

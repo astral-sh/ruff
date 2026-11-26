@@ -186,11 +186,12 @@ needle is longer than every haystack.
 
 ```py
 from typing import Literal
+from typing_extensions import LiteralString
 
 Letter = Literal["a", "b", "c", "d", "e", "f", "g", "h", "i"]
 ByteLetter = Literal[b"a", b"b", b"c", b"d", b"e", b"f", b"g", b"h", b"i"]
 
-def _(first: Letter, second: Letter, first_byte: ByteLetter, second_byte: ByteLetter, flag: bool):
+def _(first: Letter, second: Letter, first_byte: ByteLetter, second_byte: ByteLetter, flag: bool, literal: LiteralString):
     text = first + second
     data = first_byte + second_byte
     prefixed_text = "_" + text
@@ -208,6 +209,12 @@ When there is one shared two-letter value, equality narrows to it.
         reveal_type(text)  # revealed: Literal["ab"]
     if data == (b"ab" if flag else prefixed_data):
         reveal_type(data)  # revealed: Literal[b"ab"]
+```
+
+A `LiteralString` can match any of the concrete strings in `text`.
+
+```py
+    reveal_type(text == (literal if flag else data))  # revealed: bool
 ```
 
 A text needle is unsupported when the haystack can be `bytes`.

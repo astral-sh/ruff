@@ -106,7 +106,8 @@ fn test_output_format_env() -> anyhow::Result<()> {
         from typing_extensions import reveal_type
         reveal_type('str'.lower())  # [revealed-type]
         "#,
-    )?;
+    )?
+    .with_filter(r",file=[^,\n]+[\\/]", ",file=<temp_dir>/");
     assert_cmd_snapshot!(case.command().env("TY_OUTPUT_FORMAT", "github").arg("--warn").arg("unresolved-reference"), @"
     success: false
     exit_code: 1
@@ -785,7 +786,8 @@ fn github_diagnostics() -> anyhow::Result<()> {
         from typing_extensions import reveal_type
         reveal_type('str'.lower())  # [revealed-type]
         "#,
-    )?;
+    )?
+    .with_filter(r",file=[^,\n]+[\\/]", ",file=<temp_dir>/");
 
     assert_cmd_snapshot!(case.command().arg("--output-format=github").arg("--warn").arg("unresolved-reference"), @"
     success: false

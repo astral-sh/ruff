@@ -28,7 +28,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 13 | async def i() -> typing.AsyncIterable[int]:
 14 |     yield 42
 15 | 
-16 | async def j() -> str:  # error: [invalid-return-type]
+16 | async def j() -> str:  # error: [invalid-generator-return-type]
 17 |     yield 42
 18 | 
 19 | async def k() -> typing.AsyncGenerator[int]:
@@ -39,10 +39,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 # Diagnostics
 
 ```
-error[invalid-return-type]: Return type does not match returned value
+error[invalid-generator-return-type]: Return type does not match returned value
   --> src/mdtest_snippet.py:16:18
    |
-16 | async def j() -> str:  # error: [invalid-return-type]
+16 | async def j() -> str:  # error: [invalid-generator-return-type]
    |                  ^^^ expected `str`, found `types.AsyncGeneratorType`
 info: Function is inferred as returning `types.AsyncGeneratorType` because it is an async generator function
 info: See https://docs.python.org/3/glossary.html#term-asynchronous-generator for more details
