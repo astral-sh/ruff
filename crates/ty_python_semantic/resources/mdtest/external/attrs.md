@@ -60,22 +60,30 @@ class User2:
 reveal_type(User1.__attrs_attrs__)  # revealed: tuple[Attribute[Unknown], ...]
 reveal_type(User2.__attrs_attrs__)  # revealed: tuple[Attribute[Unknown], ...]
 
+user1 = User1("Ada")
 user2 = User2("Ada")
+
+reveal_type(user1.__attrs_attrs__[0].name)  # revealed: str
 reveal_type(user2.__attrs_attrs__[0].name)  # revealed: str
 ```
 
-This member lets attrs classes satisfy the `AttrsInstance` protocol. An ordinary dataclass lacks the
-required field metadata.
+The `AttrsInstance` protocol requires `__attrs_attrs__`. `attrs.fields` accepts
+`type[AttrsInstance] | AttrsInstance`, while `attrs.asdict` expects an `AttrsInstance`. An ordinary
+dataclass lacks the required member.
 
 ```py
 from dataclasses import dataclass
 
+attrs.fields(User1)
 attrs.fields(User2)
+attrs.asdict(user1)
 attrs.asdict(user2)
 
-class Child(User1): ...
+class Child1(User1): ...
+class Child2(User2): ...
 
-attr.fields(Child)
+attr.fields(Child1)
+attr.fields(Child2)
 
 @dataclass
 class Other:
