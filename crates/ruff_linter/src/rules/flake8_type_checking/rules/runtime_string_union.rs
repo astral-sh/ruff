@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::preview::is_fix_runtime_string_union_enabled;
 use crate::rules::flake8_type_checking::helpers::{
-    quote_annotation, quotes_are_unremovable, unquote_annotation_string,
+    contains_embedded_comment, quote_annotation, quotes_are_unremovable, unquote_annotation_string,
 };
 use crate::{Fix, FixAvailability, Violation};
 
@@ -137,7 +137,7 @@ pub(crate) fn runtime_string_union(
 
     // A comment inside a quoted annotation is absent from the source's comment ranges.
     // Removing the quotes can comment out trailing union members or assignment values.
-    let applicability = if annotation_expr.value.to_string().contains('#')
+    let applicability = if contains_embedded_comment(&annotation_expr.value.to_string())
         || checker.comment_ranges().intersects(edit.range())
     {
         Applicability::Unsafe
