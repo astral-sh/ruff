@@ -42,6 +42,13 @@ impl<I: Idx, N> InternedNodes<I, N> {
         self.nodes.raw.len()
     }
 
+    /// Returns whether this node has been marked for retention during compaction.
+    pub(crate) fn is_used(&self, id: I) -> bool {
+        let index = id.index();
+        let mask = 1 << (CHUNK_SIZE - 1 - index % CHUNK_SIZE);
+        self.used[index / CHUNK_SIZE] & mask != 0
+    }
+
     /// Marks a node as used and returns whether this is its first visit.
     pub(crate) fn mark_used(&mut self, id: I) -> bool {
         // Use the same most-significant-bit-first order as `RankBitBox`.
