@@ -1370,6 +1370,36 @@ struct ConstraintSetStorage<'db> {
     exists_cache: FxHashMap<ExistsCacheKey<'db>, Projection<'db>>,
 }
 
+/// Small builders can look up interned values in their dense local arena. On the
+/// first miss beyond the cutoff, populate the index with the existing IDs.
+/// Overlays always use the index because their IDs can also refer to compacted data.
+fn lookup_in_arena<I: Idx, T, K: Clone + Eq + std::hash::Hash>(
+    arena: &IndexVec<I, T>,
+    index: &mut FxHashMap<K, I>,
+    overlay: bool,
+    value: &K,
+    key: impl Fn(&T) -> &K,
+) -> Option<I> {
+    const SCAN_LIMIT: usize = 4;
+
+    if overlay || !index.is_empty() {
+        return index.get(value).copied();
+    }
+    for (id, entry) in arena.iter_enumerated() {
+        if key(entry) == value {
+            return Some(id);
+        }
+    }
+    if arena.len() == SCAN_LIMIT {
+        index.extend(
+            arena
+                .iter_enumerated()
+                .map(|(id, entry)| (key(entry).clone(), id)),
+        );
+    }
+    None
+}
+
 impl<'db> ConstraintSetStorage<'db> {
     fn ensure_overlay_identity_caches(&mut self) {
         let Some(compacted) = &self.compacted else {
@@ -1604,6 +1634,18 @@ impl<'c, 'db> Construction<'_, 'c, 'db> {
 impl<'db> ConstraintSetStorage<'db> {
     /// Interns a single typevar, giving it a stable order in this builder
     fn intern_typevar(&mut self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarId {
+        // Avoid building an identity index for a single variable. Different
+        // instances can share an identity, so only an exact match skips the read.
+        if self.compacted.is_none() && self.typevar_cache.is_empty() {
+            let Some(&first) = self.typevars.first() else {
+                return self.typevars.push(typevar);
+            };
+            let id = TypeVarId::from_usize(0);
+            if first == typevar {
+                return id;
+            }
+            self.typevar_cache.insert(first.identity(db), id);
+        }
         self.ensure_overlay_identity_caches();
         self.ensure_overlay_typevar_identity_cache(db);
         let identity = typevar.identity(db);
@@ -1671,15 +1713,23 @@ impl<'db> ConstraintSetStorage<'db> {
         data: Constraint<'db>,
     ) -> ConstraintId {
         self.ensure_overlay_identity_caches();
-        if let Some(id) = self.constraint_cache.get(&data) {
-            return *id;
+        if let Some(id) = lookup_in_arena(
+            &self.constraints,
+            &mut self.constraint_cache,
+            self.compacted.is_some(),
+            &data,
+            |entry| entry,
+        ) {
+            return id;
         }
         let support = self.intern_constraint_typevars(db, env, &data);
         let support_id = self.intern_support(support);
         let id = self.constraints.push(data.clone());
         self.constraint_supports.push(support_id);
         let id = self.adjusted_constraint_id(id);
-        self.constraint_cache.insert(data, id);
+        if self.compacted.is_some() || !self.constraint_cache.is_empty() {
+            self.constraint_cache.insert(data, id);
+        }
         id
     }
 
@@ -1695,8 +1745,14 @@ impl<'db> ConstraintSetStorage<'db> {
 
     fn intern_interior_node(&mut self, data: InteriorNodeData) -> NodeId {
         self.ensure_overlay_identity_caches();
-        if let Some(id) = self.node_cache.get(&data) {
-            return *id;
+        if let Some(id) = lookup_in_arena(
+            &self.nodes,
+            &mut self.node_cache,
+            self.compacted.is_some(),
+            &data,
+            |entry| &entry.data,
+        ) {
+            return id;
         }
 
         let mut support = Support::default();
@@ -1708,7 +1764,9 @@ impl<'db> ConstraintSetStorage<'db> {
 
         let id = self.nodes.push(BuilderNode { data, support });
         let id = self.adjusted_node_id(id);
-        self.node_cache.insert(data, id);
+        if self.compacted.is_some() || !self.node_cache.is_empty() {
+            self.node_cache.insert(data, id);
+        }
         id
     }
 
@@ -1750,6 +1808,13 @@ impl<'db> ConstraintSetStorage<'db> {
     }
 
     fn typevar_id(&mut self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarId {
+        if self.compacted.is_none()
+            && self.typevar_cache.is_empty()
+            && let Some(&first) = self.typevars.first()
+            && (first == typevar || first.identity(db) == typevar.identity(db))
+        {
+            return TypeVarId::from_usize(0);
+        }
         let identity = typevar.identity(db);
         self.ensure_overlay_identity_caches();
         self.ensure_overlay_typevar_identity_cache(db);
@@ -1812,12 +1877,20 @@ impl<'db> ConstraintSetStorage<'db> {
 
     fn intern_source_order(&mut self, data: SourceOrder) -> SourceOrderId {
         self.ensure_overlay_identity_caches();
-        if let Some(id) = self.source_order_cache.get(&data) {
-            return *id;
+        if let Some(id) = lookup_in_arena(
+            &self.source_orders,
+            &mut self.source_order_cache,
+            self.compacted.is_some(),
+            &data,
+            |entry| entry,
+        ) {
+            return id;
         }
         let id = self.source_orders.push(data);
         let id = self.adjusted_source_order_id(id);
-        self.source_order_cache.insert(data, id);
+        if self.compacted.is_some() || !self.source_order_cache.is_empty() {
+            self.source_order_cache.insert(data, id);
+        }
         id
     }
 
@@ -5823,6 +5896,33 @@ mod tests {
     }
 
     #[test]
+    fn growing_constraint_arenas_reuse_existing_ids() {
+        let db = &setup_db();
+        let builder = ConstraintSetBuilder::new();
+        let build = builder.unlimited();
+        let intern = |name| {
+            let var = create_typevar(db, name);
+            let ConstraintSet::Valid(diagram) = create_constraint(db, build, var, KnownClass::Int)
+            else {
+                panic!("unlimited construction");
+            };
+            (
+                builder.storage.borrow_mut().typevar_id(db, var),
+                diagram.node,
+                diagram.source_order,
+            )
+        };
+        let names = ["A", "B", "C", "D", "E", "F"];
+        let mut ids = Vec::new();
+        for name in names {
+            ids.push(intern(name));
+            for (&name, id) in names.iter().zip(&ids) {
+                assert_eq!(intern(name), *id);
+            }
+        }
+    }
+
+    #[test]
     fn lazy_negation_shares_the_construction_budget() {
         let db = setup_db();
         let db = &db;
@@ -7986,6 +8086,40 @@ class E: ...
         });
     }
 
+    #[test]
+    fn typevar_ids_preserve_identity_across_bounds_and_overlays() {
+        fn check<'db>(db: &'db TestDb, builder: &ConstraintSetBuilder<'db>) {
+            let t = create_typevar(db, "T");
+            let int = KnownClass::Int.to_instance(db, &db.program_environment());
+            let bounded = t
+                .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(int)));
+            assert_ne!(t, bounded);
+            assert_eq!(t.identity(db), bounded.identity(db));
+
+            let mut storage = builder.storage.borrow_mut();
+            let id = storage.intern_typevar(db, t);
+            assert_eq!(storage.typevar_id(db, bounded), id);
+            assert_eq!(storage.intern_typevar(db, bounded), id);
+            assert_eq!(storage.typevar_data(id), t);
+            let u = create_typevar(db, "U");
+            let other = storage.intern_typevar(db, u);
+            assert_ne!(other, id);
+            assert_eq!(storage.typevar_id(db, u), other);
+            assert_eq!(storage.typevar_id(db, bounded), id);
+            assert_eq!(storage.typevar_data(other), u);
+        }
+
+        let db = &setup_db();
+        check(db, &ConstraintSetBuilder::new());
+        let t = create_typevar(db, "T");
+        let owned = ConstraintSetBuilder::new()
+            .into_owned(|build| create_constraint(db, build, t, KnownClass::Int));
+        owned.query(|builder, _| {
+            assert!(builder.storage.borrow().compacted.is_some());
+            check(db, builder);
+        });
+    }
+
     fn create_compacted_owned_set(db: &TestDb) -> OwnedConstraintSet<'_> {
         let t = create_typevar(db, "T");
         let u = create_typevar(db, "U");
@@ -8267,6 +8401,36 @@ class E: ...
             assert!(storage.nodes.is_empty());
             assert!(storage.constraints.is_empty());
             assert!(storage.typevars.is_empty());
+        });
+    }
+
+    #[test]
+    fn owned_constraint_set_reuses_retained_and_new_ids() {
+        let db = &setup_db();
+        // Only the last of three constraints survives compaction. Its original
+        // ID differs from its position in the compacted array.
+        let owned = create_compacted_owned_set(db);
+        owned.query(|builder, set| {
+            let build = builder.unlimited();
+            let intern = |name| {
+                let var = create_typevar(db, name);
+                let diagram = create_constraint(db, build, var, KnownClass::Bool)
+                    .diagram()
+                    .unwrap();
+                (diagram.node, diagram.source_order)
+            };
+            let retained = set.diagram().unwrap();
+            let names = ["V", "A", "B", "C", "D", "E"];
+            let mut ids = vec![(retained.node, retained.source_order)];
+            assert_eq!(intern("V"), ids[0]);
+            for name in &names[1..] {
+                let next = intern(name);
+                assert!(!ids.contains(&next));
+                ids.push(next);
+                for (&name, &expected) in names.iter().zip(&ids) {
+                    assert_eq!(intern(name), expected);
+                }
+            }
         });
     }
 
