@@ -360,7 +360,10 @@ impl MainLoop {
         tracing::debug!("Starting watch mode");
         let sender = self.sender.clone();
         let watcher = watch::directory_watcher(move |event| {
-            sender.send(MainLoopMessage::ApplyChanges(event)).unwrap();
+            // A final batch of file changes can arrive after Ctrl+C has closed the receiver.
+            if sender.send(MainLoopMessage::ApplyChanges(event)).is_err() {
+                tracing::debug!("Ignoring file changes after the main loop exited");
+            }
         })?;
 
         self.watcher = Some(ProjectWatcher::new(watcher, db));
