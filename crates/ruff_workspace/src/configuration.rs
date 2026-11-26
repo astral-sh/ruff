@@ -1805,7 +1805,7 @@ mod tests {
     use strum::IntoEnumIterator;
 
     use crate::configuration::{
-        Configuration, FormatConfiguration, LintConfiguration, RuleSelection, clamp_target_version
+        Configuration, FormatConfiguration, LintConfiguration, RuleSelection, clamp_target_version,
     };
     use crate::options::PydocstyleOptions;
 
