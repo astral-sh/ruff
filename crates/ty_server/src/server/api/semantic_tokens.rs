@@ -28,6 +28,9 @@ pub(crate) fn generate_semantic_tokens(
     };
 
     for token in &*semantic_token_data {
+        // Let edits interrupt encoding while we hold the database snapshot.
+        db.unwind_if_revision_cancelled();
+
         // Only notebooks need to translate file offsets to cell-relative positions.
         let lsp_range = if source.as_notebook().is_some() {
             let Some(range) = token.range().to_lsp_range(db, file, encoding) else {
@@ -35,7 +38,6 @@ pub(crate) fn generate_semantic_tokens(
             };
             range.local_range()
         } else {
-            db.unwind_if_revision_cancelled();
             text_range_to_lsp_range(token.range(), &source, &line_index, encoding)
         };
 
