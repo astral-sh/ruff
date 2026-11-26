@@ -297,18 +297,6 @@ these mapped extensions in file discovery:
     extension = {mdx="markdown", qmd="markdown"}
     ```
 
-If you run Ruff via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit), Markdown
-support needs to be explicitly included by adding it to `types_or`:
-
-```yaml title=".pre-commit-config.yaml"
-repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.17.6
-    hooks:
-      - id: ruff-format
-        types_or: [python, pyi, jupyter, markdown]
-```
-
 To *disable* formatting of Markdown files, add them to
 [`extend-exclude`](settings.md#extend-exclude) in your project settings:
 
