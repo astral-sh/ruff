@@ -385,9 +385,11 @@ impl<'db> SequentMap<'db> {
     pub(super) fn for_constraint(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        constraint: AtomicConstraint<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        id: AtomicConstraintId,
         inferable: TypeVarSet<'db>,
     ) -> Option<&'db Self> {
+        let constraint = storage.atomic_constraint_data(id);
         // Most individual constraints produce no sequents. Avoid interning the query arguments
         // and retaining an empty Salsa result for those cases. Keep the checks in sync with the
         // single-constraint `add_sequents` methods below.
@@ -439,7 +441,7 @@ impl<'db> SequentMap<'db> {
         Some(for_constraint_inner(
             db,
             env.program(db),
-            InternedSequentConstraint::new(db, constraint),
+            storage.sequent_constraint(db, id),
             inferable,
         ))
     }
@@ -455,10 +457,13 @@ impl<'db> SequentMap<'db> {
     pub(super) fn for_constraint_pair(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        left: AtomicConstraint<'db>,
-        right: AtomicConstraint<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        left_id: AtomicConstraintId,
+        right_id: AtomicConstraintId,
         inferable: TypeVarSet<'db>,
     ) -> Option<&'db Self> {
+        let left = storage.atomic_constraint_data(left_id);
+        let right = storage.atomic_constraint_data(right_id);
         // If neither lower bound can imply the other and their union cannot simplify,
         // the pair contributes no sequent. The union itself would be split back into
         // these two lower bounds.
@@ -516,8 +521,8 @@ impl<'db> SequentMap<'db> {
         Some(for_constraint_pair_inner(
             db,
             env.program(db),
-            InternedSequentConstraint::new(db, left),
-            InternedSequentConstraint::new(db, right),
+            storage.sequent_constraint(db, left_id),
+            storage.sequent_constraint(db, right_id),
             inferable,
         ))
     }
@@ -2218,6 +2223,18 @@ mod tests {
     };
     use ruff_python_ast::name::Name;
 
+    fn for_pair<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        left: AtomicConstraint<'db>,
+        right: AtomicConstraint<'db>,
+    ) -> Option<&'db SequentMap<'db>> {
+        let mut storage = ConstraintSetStorage::default();
+        let left = storage.intern_atomic_constraint(db, env, left);
+        let right = storage.intern_atomic_constraint(db, env, right);
+        SequentMap::for_constraint_pair(db, env, &mut storage, left, right, TypeVarSet::All)
+    }
+
     fn create_typevar<'db>(db: &'db TestDb, name: &'static str) -> BoundTypeVarInstance<'db> {
         BoundTypeVarInstance::synthetic(
             db,
@@ -2276,8 +2293,7 @@ mod tests {
                 AtomicConstraint::from(ConcreteUpperBound::new(provenance, t, int)),
                 AtomicConstraint::from(ConcreteEquivalenceBound::new(provenance, t, int)),
             ] {
-                let sequents =
-                    SequentMap::for_constraint_pair(db, &env, lower, replacement, TypeVarSet::All);
+                let sequents = for_pair(db, &env, lower, replacement);
                 if provenance == ConstraintProvenance::VALIDITY {
                     assert!(
                         sequents.is_none_or(|sequents| sequents.all_sequents().next().is_none()),
@@ -2347,7 +2363,7 @@ mod tests {
                 p,
                 expected_bound,
             ));
-            let sequents = SequentMap::for_constraint_pair(db, &env, lower, upper, TypeVarSet::All);
+            let sequents = for_pair(db, &env, lower, upper);
             assert!(sequents.is_some_and(|sequents| {
                 sequents.all_sequents().any(|sequent| {
                     matches!(sequent, Sequent::PairImplication { post, .. }
@@ -2405,8 +2421,7 @@ mod tests {
             p,
             captured.substitute_one_typevar(db, &env, q, overloads, AliasPolicy::Expand),
         ));
-        let sequents =
-            SequentMap::for_constraint_pair(db, &env, lower, replacement, TypeVarSet::All);
+        let sequents = for_pair(db, &env, lower, replacement);
         assert!(sequents.is_some_and(|sequents| {
             sequents.all_sequents().any(|sequent| {
                 matches!(sequent, Sequent::PairImplication { post, .. }
@@ -2432,13 +2447,29 @@ mod tests {
             Type::int_literal(1),
         ));
 
-        assert!(SequentMap::for_constraint(db, &env, left, TypeVarSet::All).is_none());
-        assert!(SequentMap::for_constraint(db, &env, right, TypeVarSet::All).is_none());
+        let mut storage = ConstraintSetStorage::default();
+        let left = storage.intern_atomic_constraint(db, &env, left);
+        let right = storage.intern_atomic_constraint(db, &env, right);
+        assert!(
+            SequentMap::for_constraint(db, &env, &mut storage, left, TypeVarSet::All).is_none()
+        );
+        assert!(
+            SequentMap::for_constraint(db, &env, &mut storage, right, TypeVarSet::All).is_none()
+        );
         for (left, right) in [(left, right), (right, left)] {
             assert!(
-                SequentMap::for_constraint_pair(db, &env, left, right, TypeVarSet::All).is_none()
+                SequentMap::for_constraint_pair(
+                    db,
+                    &env,
+                    &mut storage,
+                    left,
+                    right,
+                    TypeVarSet::All
+                )
+                .is_none()
             );
         }
+        assert!(storage.sequent_constraints.is_empty());
     }
 
     #[test]
@@ -2463,8 +2494,18 @@ mod tests {
             bool_class,
         ));
 
+        let mut storage = ConstraintSetStorage::default();
+        let left = storage.intern_atomic_constraint(db, &env, left);
+        let right = storage.intern_atomic_constraint(db, &env, right);
         for (left, right) in [(left, right), (right, left)] {
-            let sequents = SequentMap::for_constraint_pair(db, &env, left, right, TypeVarSet::All);
+            let sequents = SequentMap::for_constraint_pair(
+                db,
+                &env,
+                &mut storage,
+                left,
+                right,
+                TypeVarSet::All,
+            );
 
             assert!(sequents.is_some_and(|sequents| {
                 sequents

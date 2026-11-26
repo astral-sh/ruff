@@ -1345,6 +1345,9 @@ struct ConstraintSetStorage<'db> {
     constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
     node_cache: FxHashMap<InteriorNodeData, NodeId>,
+    /// Salsa handles for atoms used in sequent queries, indexed by builder IDs, including
+    /// IDs from compacted storage. Populate this only after ruling out trivial queries.
+    sequent_constraints: IndexVec<ConstraintId, Option<sequents::InternedSequentConstraint<'db>>>,
     /// Pairs whose sequent maps are empty need no work on subsequent walks in the same
     /// inference scope. A different scope may allow the pair to imply new constraints.
     empty_sequent_pairs: FxHashSet<(
@@ -1778,6 +1781,23 @@ impl<'db> ConstraintSetStorage<'db> {
             panic!("atomic constraint should be atomic");
         };
         *atomic
+    }
+
+    fn sequent_constraint(
+        &mut self,
+        db: &'db dyn Db,
+        id: AtomicConstraintId,
+    ) -> sequents::InternedSequentConstraint<'db> {
+        let index = id.into_inner();
+        if self.sequent_constraints.len() <= index.index() {
+            self.sequent_constraints.resize(index.index() + 1, None);
+        }
+        if let Some(handle) = self.sequent_constraints[index] {
+            return handle;
+        }
+        let handle = sequents::InternedSequentConstraint::new(db, self.atomic_constraint_data(id));
+        self.sequent_constraints[index] = Some(handle);
+        handle
     }
 
     fn cached_constraint_bound_depth(

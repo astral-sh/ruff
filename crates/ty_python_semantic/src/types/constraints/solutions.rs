@@ -263,7 +263,7 @@ impl<'db, 'budget> SolutionWalker<'db, 'budget> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        storage: &ConstraintSetStorage<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
         mut node: NodeId,
         validations: &Validations<'db>,
         limits: &BoundedSolutionLimits,
@@ -337,18 +337,11 @@ impl<'db, 'budget> SolutionWalker<'db, 'budget> {
         atoms.sort_unstable_by_key(|atom| self.source_orders.get_index_of(atom));
         atoms.push(*upper);
         for (i, &id) in atoms.iter().enumerate() {
-            let atom = storage.atomic_constraint_data(id);
-            if SequentMap::for_constraint(db, env, atom, self.inferable)
+            if SequentMap::for_constraint(db, env, storage, id, self.inferable)
                 .is_some_and(|map| !map.sequents.is_empty())
                 || atoms[i + 1..].iter().any(|&other| {
-                    SequentMap::for_constraint_pair(
-                        db,
-                        env,
-                        atom,
-                        storage.atomic_constraint_data(other),
-                        self.inferable,
-                    )
-                    .is_some_and(|map| !map.sequents.is_empty())
+                    SequentMap::for_constraint_pair(db, env, storage, id, other, self.inferable)
+                        .is_some_and(|map| !map.sequents.is_empty())
                 })
             {
                 return None;

@@ -796,7 +796,7 @@ impl PathAssignments {
         }
 
         let constraint_data = storage.atomic_constraint_data(constraint);
-        if let Some(map) = SequentMap::for_constraint(db, env, constraint_data, inferable) {
+        if let Some(map) = SequentMap::for_constraint(db, env, storage, constraint, inferable) {
             let added = self.add_sequents(db, env, storage, map);
 
             // `projection_source_order` depends on knowing the order that sequents were discovered for
@@ -825,7 +825,6 @@ impl PathAssignments {
                 continue;
             }
 
-            let existing_data = storage.atomic_constraint_data(*existing);
             let existing_support = storage.constraint_support(existing.into_inner());
             let constraint_support = storage.constraint_support(constraint.into_inner());
 
@@ -841,16 +840,19 @@ impl PathAssignments {
                     .any(|typevar| self.independent_typevars.contains(&typevar));
 
                 if independent
-                    || !can_interact_without_shared_typevars(existing_data, constraint_data)
+                    || !can_interact_without_shared_typevars(
+                        storage.atomic_constraint_data(*existing),
+                        constraint_data,
+                    )
                 {
                     continue;
                 }
             }
 
-            let (a, a_data, b, b_data) = if existing_index < constraint_index {
-                (*existing, existing_data, constraint, constraint_data)
+            let (a, b) = if existing_index < constraint_index {
+                (*existing, constraint)
             } else {
-                (constraint, constraint_data, *existing, existing_data)
+                (constraint, *existing)
             };
             let key = (env.program(db), inferable, a, b);
             if storage.empty_sequent_pairs.contains(&key)
@@ -859,7 +861,7 @@ impl PathAssignments {
                 continue;
             }
 
-            let Some(map) = SequentMap::for_constraint_pair(db, env, a_data, b_data, inferable)
+            let Some(map) = SequentMap::for_constraint_pair(db, env, storage, a, b, inferable)
             else {
                 continue;
             };
