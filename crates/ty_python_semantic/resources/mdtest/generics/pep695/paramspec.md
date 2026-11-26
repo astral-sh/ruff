@@ -2444,8 +2444,8 @@ callback.call(1, 2)  # error: [too-many-positional-arguments]
 
 ### An overloaded callable receiver expands one method overload
 
-The forwarded overload accepts either signature of `__call__`. The trailing overload still
-accepts its own arguments.
+The forwarded overload accepts either signature of `__call__`. The trailing overload still accepts
+its own arguments.
 
 ```py
 from typing import Callable, overload
