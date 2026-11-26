@@ -34,7 +34,7 @@ pub use scope::FileScopeId;
 use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness};
 use symbol::ScopedSymbolId;
 pub use use_def::{
-    ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
+    ApplicableConstraints, BindingKind, BindingWithConstraints, BindingWithConstraintsIterator,
     BindingsSnapshotId, DeclarationSources, DeclarationWithConstraint, DeclarationsIterator,
     ImportedFinalCandidate, ImportedFinalCandidatesIterator, LiveBinding, LoopHeaderId,
     NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, UseDefMap,
@@ -1631,6 +1631,61 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
     }
 
     #[test]
+    fn retains_synthetic_binding_kinds() {
+        let TestCase { db, file } = test_case(
+            r#"
+value = 0
+while value < 3:
+    value += 1
+
+def update():
+    global value
+    value = 4
+
+items = {"key": value}
+"#,
+        );
+        let index = semantic_index(&db, program_file(&db, file));
+        let scope = FileScopeId::global();
+        let use_def = index.use_def_map(scope);
+        let kinds = |place| {
+            use_def
+                .reachable_bindings(place)
+                .filter_map(|entry| {
+                    let definition = entry.binding.definition()?;
+                    let expected = match definition.kind(&db) {
+                        DefinitionKind::LoopHeader(_) => BindingKind::LoopHeader,
+                        DefinitionKind::NestedBindings(_) => BindingKind::NestedBindings,
+                        DefinitionKind::DictKeyAssignment(_) => BindingKind::DictKeyAssignment,
+                        _ => BindingKind::Ordinary,
+                    };
+                    assert_eq!(entry.kind, expected);
+                    Some(entry.kind)
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let value = index.place_table(scope).symbol_id("value").unwrap();
+        assert_eq!(
+            kinds(value.into()),
+            [
+                BindingKind::Ordinary,
+                BindingKind::LoopHeader,
+                BindingKind::Ordinary,
+                BindingKind::NestedBindings,
+            ]
+        );
+        let key = use_def
+            .definitions_with_usage()
+            .find_map(|(_, definition, _)| {
+                matches!(definition.kind(&db), DefinitionKind::DictKeyAssignment(_))
+                    .then(|| definition.place(&db))
+            })
+            .unwrap();
+        assert_eq!(kinds(key), [BindingKind::DictKeyAssignment]);
+    }
+
+    #[test]
     fn stub_parameter_bindings_belong_to_their_own_function() {
         let TestCase { db, file } = test_case(
             "def first(a, /, *rest: int, b: str, **options): ...\n\
@@ -1661,6 +1716,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                         PreviousDefinitions::AreShadowed,
                         FutureDefinitions::ShadowThisOne,
                         ImportedQualifierAction::Preserve,
+                        crate::BindingKind::Ordinary,
                     );
                 }
             }
