@@ -14,6 +14,7 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
 use ruff_linter::package::PackageRoot;
+use ruff_linter::packaging::detect_package_root;
 use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{LinterSettings, flags};
 use ruff_linter::source_kind::{SourceError, SourceKind, SourceKindDiff};
@@ -23,10 +24,12 @@ use ruff_notebook::{NotebookError, NotebookIndex};
 use ruff_python_ast::{SourceType, TomlSourceType};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::TextRange;
-use ruff_workspace::Settings;
+use ruff_workspace::resolver::Project;
+use ruff_workspace::script::script;
 use rustc_hash::FxHashMap;
 
-use crate::cache::{Cache, FileCache, FileCacheKey};
+use crate::args::ConfigArguments;
+use crate::cache::{Cache, FileCache, FileCacheKey, ScriptCacheMode};
 
 /// A collection of [`Diagnostic`]s and additional information needed to render them.
 ///
@@ -179,23 +182,30 @@ impl AddAssign for FixMap {
 }
 
 /// Lint the source code at the given `Path`.
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn lint_path(
     path: &Path,
     package: Option<PackageRoot<'_>>,
-    settings: &LinterSettings,
+    package_roots: &FxHashMap<&Path, Option<PackageRoot<'_>>>,
+    project: &Project,
+    overrides: &ConfigArguments,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
     unsafe_fixes: UnsafeFixes,
 ) -> Result<Diagnostics> {
+    let settings = &project.settings.linter;
+    let source_type = settings.extension.get_source_type(path);
+    let script_mode = ScriptCacheMode::new(project.settings.preview, source_type, overrides);
     // Check the cache.
-    let caching = match cache {
+    let mut caching = match cache {
         Some(cache) if noqa.is_enabled() => {
             let relative_path = cache
                 .relative_path(path)
                 .expect("wrong package cache for file");
 
-            let cache_key = FileCacheKey::from_path(path).context("Failed to create cache key")?;
+            let cache_key =
+                FileCacheKey::from_path(path, script_mode).context("Failed to create cache key")?;
             let cached_diagnostics = cache
                 .get(relative_path, &cache_key)
                 .is_some_and(FileCache::linted);
@@ -212,7 +222,7 @@ pub(crate) fn lint_path(
 
     debug!("Checking: {}", path.display());
 
-    let source_type = match settings.extension.get_source_type(path) {
+    let source_type = match source_type {
         SourceType::Toml(source_type @ (TomlSourceType::Pyproject | TomlSourceType::Ruff)) => {
             let (diagnostics, fixed) = if settings
                 .rules
@@ -283,6 +293,30 @@ pub(crate) fn lint_path(
             return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
         }
     };
+
+    let script = match script(
+        project,
+        overrides,
+        overrides.script_configuration(),
+        Some(path),
+        SourceType::Python(source_type),
+        source_kind.source_code(),
+    ) {
+        Ok(script) => script,
+        Err(error) => {
+            return Ok(Diagnostics::new(
+                vec![error.diagnostic],
+                FxHashMap::default(),
+            ));
+        }
+    };
+    caching = caching.filter(|_| script_mode.allows(script.as_ref()));
+    let package = script.as_ref().map_or(package, |script| {
+        script.package_root(path, &project.settings.linter, package, package_roots)
+    });
+    let settings = script.as_ref().map_or(settings, |script| {
+        &script.settings(&project.settings).linter
+    });
 
     // Lint the file.
     let (result, transformed, fixed) =
@@ -382,79 +416,73 @@ pub(crate) fn lint_path(
 /// Generate `Diagnostic`s from source code content derived from stdin.
 pub(crate) fn lint_stdin(
     path: Option<&Path>,
-    package: Option<PackageRoot<'_>>,
+    source_type: SourceType,
     contents: String,
-    settings: &Settings,
+    settings: &LinterSettings,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
+    unsafe_fixes: UnsafeFixes,
 ) -> Result<Diagnostics> {
-    let (source_type, py_source_type) = match path
-        .map(|path| settings.linter.extension.get_source_type(path))
-        .unwrap_or_default()
-    {
-        SourceType::Toml(source_type @ (TomlSourceType::Pyproject | TomlSourceType::Ruff)) => {
-            if !settings
-                .linter
-                .rules
-                .iter_enabled()
-                .any(|rule_code| rule_code.lint_source().is_toml())
-            {
-                return Ok(Diagnostics::default());
+    let py_source_type = match source_type {
+        SourceType::Toml(source_type) => match source_type {
+            TomlSourceType::Pyproject | TomlSourceType::Ruff => {
+                if !settings
+                    .rules
+                    .iter_enabled()
+                    .any(|rule_code| rule_code.lint_source().is_toml())
+                {
+                    return Ok(Diagnostics::default());
+                }
+
+                let path = path.context("Expected a filename for TOML input")?;
+
+                let (diagnostics, fixed) =
+                    if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
+                        let TomlFixerResult {
+                            diagnostics,
+                            transformed,
+                            fixed,
+                        } = lint_fix_toml(path, &contents, settings, source_type, unsafe_fixes);
+
+                        match fix_mode {
+                            flags::FixMode::Apply => {
+                                write!(&mut io::stdout().lock(), "{transformed}")?;
+                            }
+                            flags::FixMode::Diff => {
+                                if !fixed.is_empty() {
+                                    write!(
+                                        &mut io::stdout().lock(),
+                                        "{}",
+                                        SourceKindDiff::from_text(
+                                            &contents,
+                                            transformed.as_ref(),
+                                            Some(path),
+                                        )
+                                    )?;
+                                }
+                            }
+                            flags::FixMode::Generate => {}
+                        }
+
+                        (diagnostics, fixed)
+                    } else {
+                        (
+                            lint_toml(path, &contents, settings, source_type),
+                            FixTable::default(),
+                        )
+                    };
+
+                return Ok(Diagnostics {
+                    inner: diagnostics,
+                    fixed: FixMap::from_iter([(fs::relativize_path(path), fixed)]),
+                    notebook_indexes: FxHashMap::default(),
+                });
             }
 
-            let path = path.unwrap();
-
-            let (diagnostics, fixed) =
-                if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
-                    let TomlFixerResult {
-                        diagnostics,
-                        transformed,
-                        fixed,
-                    } = lint_fix_toml(
-                        path,
-                        &contents,
-                        &settings.linter,
-                        source_type,
-                        settings.unsafe_fixes,
-                    );
-
-                    match fix_mode {
-                        flags::FixMode::Apply => {
-                            write!(&mut io::stdout().lock(), "{transformed}")?;
-                        }
-                        flags::FixMode::Diff => {
-                            if !fixed.is_empty() {
-                                write!(
-                                    &mut io::stdout().lock(),
-                                    "{}",
-                                    SourceKindDiff::from_text(
-                                        &contents,
-                                        transformed.as_ref(),
-                                        Some(path),
-                                    )
-                                )?;
-                            }
-                        }
-                        flags::FixMode::Generate => {}
-                    }
-
-                    (diagnostics, fixed)
-                } else {
-                    (
-                        lint_toml(path, &contents, &settings.linter, source_type),
-                        FixTable::default(),
-                    )
-                };
-
-            return Ok(Diagnostics {
-                inner: diagnostics,
-                fixed: FixMap::from_iter([(fs::relativize_path(path), fixed)]),
-                notebook_indexes: FxHashMap::default(),
-            });
-        }
-
-        SourceType::Toml(_) | SourceType::Markdown => return Ok(Diagnostics::default()),
-        source_type @ SourceType::Python(py_source_type) => (source_type, py_source_type),
+            _ => return Ok(Diagnostics::default()),
+        },
+        SourceType::Markdown => return Ok(Diagnostics::default()),
+        SourceType::Python(py_source_type) => py_source_type,
     };
 
     // Extract the sources from the file.
@@ -462,11 +490,14 @@ pub(crate) fn lint_stdin(
         Ok(Some(source_kind)) => source_kind,
         Ok(None) => return Ok(Diagnostics::default()),
         Err(err) => {
-            return Ok(Diagnostics::from_source_error(&err, path, &settings.linter));
+            return Ok(Diagnostics::from_source_error(&err, path, settings));
         }
     };
 
     // Lint the inputs.
+    let package = path.and_then(Path::parent).and_then(|parent| {
+        detect_package_root(parent, &settings.namespace_packages).map(PackageRoot::root)
+    });
     let (LinterResult { diagnostics, .. }, transformed, fixed) =
         if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
             if let Ok(FixerResult {
@@ -477,8 +508,8 @@ pub(crate) fn lint_stdin(
                 path.unwrap_or_else(|| Path::new("-")),
                 package,
                 noqa,
-                settings.unsafe_fixes,
-                &settings.linter,
+                unsafe_fixes,
+                settings,
                 &source_kind,
                 py_source_type,
             ) {
@@ -510,7 +541,7 @@ pub(crate) fn lint_stdin(
                 let result = lint_only(
                     path.unwrap_or_else(|| Path::new("-")),
                     package,
-                    &settings.linter,
+                    settings,
                     noqa,
                     &source_kind,
                     py_source_type,
@@ -530,7 +561,7 @@ pub(crate) fn lint_stdin(
             let result = lint_only(
                 path.unwrap_or_else(|| Path::new("-")),
                 package,
-                &settings.linter,
+                settings,
                 noqa,
                 &source_kind,
                 py_source_type,

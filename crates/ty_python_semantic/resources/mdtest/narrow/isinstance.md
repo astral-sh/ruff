@@ -833,6 +833,35 @@ def f(x: Foo, y: Intersection[type[Bar], type[list[int]]]):
         reveal_type(x.attribute)  # revealed: int
 ```
 
+## Truthiness checks on a tuple of classes
+
+A truthiness check on the tuple preserves its element type for a subsequent `isinstance()` check.
+
+```py
+def narrow(exc: BaseException, classes: tuple[type[ValueError], ...]) -> ValueError | None:
+    assert classes
+    if isinstance(exc, classes):
+        return exc
+    return None
+```
+
+## Narrowing after excluding a tuple subclass
+
+Ruling out a tuple subclass preserves the element type for a subsequent `isinstance()` check. If the
+check fails, the tuple could be empty, so the subject can still be a `bool`.
+
+```py
+class Special(tuple[type[bool], ...]): ...
+
+def exclude_tuple_subclass(value: object, classes: tuple[type[bool], ...]):
+    if isinstance(classes, Special):
+        return
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: bool
+    else:
+        reveal_type(value)  # revealed: object
+```
+
 ## Narrowing with generics
 
 ### Strict mode
@@ -1486,7 +1515,7 @@ class Box[T]:
 def narrow_box[T: str](value: Box[T] | T) -> Box[T]:
     if isinstance(value, Box):
         reveal_type(value)  # revealed: Box[T@narrow_box] | (T@narrow_box & Top[Box[Unknown]])
-        return value  # error: [invalid-return-type]
+        return value  # error: [invalid-explicit-return]
 
     reveal_type(value)  # revealed: T@narrow_box & ~Top[Box[Unknown]]
     raise TypeError
@@ -1841,7 +1870,7 @@ def narrow_defaulted_tuple(value: object) -> None:
 
 After an `isinstance(..., classmethod)` branch unwraps and replaces a generic `classmethod`, the
 false-branch residual should be impossible. This avoids retaining a `classmethod[...] & Top[...]`
-arm that later causes `call-top-callable` false positives.
+arm that later causes `call-to-function-with-unknown-signature` false positives.
 
 ```toml
 [environment]
@@ -1945,11 +1974,11 @@ def narrow_typed_dict_to_dict(value: int | Payload) -> None:
         value["optional"] = "present"
         reveal_type(value.pop("optional"))  # revealed: str
 
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         value.clear()
         # error: [invalid-argument-type] "Cannot pop required field 'key' from TypedDict `Payload`"
         value.pop("key")
-        # error: [invalid-key] "Unknown key "unexpected" for TypedDict `Payload`"
+        # error: [invalid-typed-dict-key] "Unknown key "unexpected" for TypedDict `Payload`"
         value["unexpected"] = 1
         # error: [invalid-argument-type] "Cannot delete required key "key" from TypedDict `Payload`"
         del value["key"]
@@ -1961,7 +1990,7 @@ Same for `MutableMapping`:
 def narrow_typed_dict_to_mutable_mapping(value: Payload) -> None:
     if isinstance(value, MutableMapping):
         reveal_type(value)  # revealed: Payload
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         value.clear()
 ```
 
@@ -1971,7 +2000,7 @@ And for `Mapping`:
 def narrow_typed_dict_to_mapping(value: Payload) -> None:
     if isinstance(value, Mapping):
         reveal_type(value)  # revealed: Payload
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         value.clear()
 ```
 
@@ -1983,7 +2012,7 @@ PayloadAlias = Payload
 def narrow_aliased_typed_dict_to_dict(value: PayloadAlias) -> None:
     if isinstance(value, dict):
         reveal_type(value)  # revealed: Payload
-        # error: [unresolved-attribute]
+        # error: [missing-attribute]
         value.clear()
 ```
 
@@ -1992,8 +2021,7 @@ def narrow_aliased_typed_dict_to_dict(value: PayloadAlias) -> None:
 After narrowing `Iterable[T] | T` to a non-sized iterable, `T` might itself be an iterable whose
 items have a different type. Permissive narrowing represents that possibility with `Unknown`, so the
 constructor infers `list[T | Unknown]`. Its acceptance as `Collection[T] | T` is unsound; it does
-not establish that all elements have type `T`. The same inferred type appears with and without a
-return context.
+not establish that all elements have type `T`.
 
 ```toml
 [environment]
@@ -2010,7 +2038,7 @@ def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
     if isinstance(value, Iterable) and not isinstance(value, Sized):
         # revealed: list[T@maybe_iterable_to_list | Unknown]
         reveal_type(list(value))
-        # revealed: list[T@maybe_iterable_to_list | Unknown]
+        # revealed: list[T@maybe_iterable_to_list]
         return reveal_type(list(value))
     raise NotImplementedError
 ```
@@ -2035,7 +2063,7 @@ def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
     if isinstance(value, Iterable) and not isinstance(value, Sized):
         # revealed: list[object]
         reveal_type(list(value))
-        # error: [invalid-return-type]
+        # error: [invalid-explicit-return]
         # revealed: list[object]
         return reveal_type(list(value))
     raise NotImplementedError

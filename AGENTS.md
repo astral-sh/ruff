@@ -29,7 +29,7 @@ available labels or a Rooster configuration could not be inspected, say so when 
 ## Code Review Rules
 
 For security reviews of Ruff and ty runtime changes, use the
-[threat models](agents/references/threat-models.md) to assess trust boundaries and
+[threat models](.agents/references/threat-models.md) to assess trust boundaries and
 calibrate severity.
 
 When reviewing a branch or pull request, be deliberately nitpicky. Report not
@@ -45,7 +45,7 @@ meaningful violations introduced by the changes; do not apply agent-only workflo
 instructions to PR authors or flag unrelated pre-existing issues.
 
 For security reviews of repository, CI, and release changes, use the
-[repository threat model](agents/references/repository-threat-model.md) to assess
+[repository threat model](.agents/references/repository-threat-model.md) to assess
 trust boundaries and calibrate severity.
 
 ## Writing for human readers
@@ -120,6 +120,8 @@ When running tests with `INSTA_FORCE_PASS=1`, check for `.pending-snap` files if
 Never edit snapshot files or inline snapshot bodies manually. Regenerate them by running the relevant tests with the snapshot-update environment variables documented above, then review the generated diff.
 
 ## Writing mdtests
+
+- To check an inferred type, use `reveal_type` without an import, as in `reveal_type(1)  # revealed: Literal[1]`. The mdtest harness checks that ty displays exactly the type written after `# revealed:`. Reserve `assert_type` for tests of the directive itself or of type equivalence that the displayed type alone cannot establish.
 
 - Write mdtests as readable, literate specifications, and minimize the context a reader must hold in mind. Prefer short, focused code blocks, and define types, fixtures, and helpers close to the assertions that use them. Sections and subsections can be long when they develop a coherent topic through many short examples interspersed with prose. Do not split a subsection, or flag it in review, solely because of its length. Give independent scenarios separate sibling Markdown test headings at the same level; only introduce child headings if any existing code beneath their parent is first moved into child sections. When scenarios need shared setup, interleave short prose-and-code blocks under the same heading.
 
@@ -222,9 +224,8 @@ Salsa caching can occur due to a function/method having `#[salsa::tracked]` on i
 
 ## Development Guidelines
 
-- All significant changes must be tested. Add or update focused tests for semantic changes when existing coverage does not already establish the intended behavior.
+- Prefer microbenchmarks over tests for regression coverage of hangs or pathological performance issues.
 - Look to see if your tests could go in an existing file before adding a new file for your tests.
-- Get your tests to pass. If you didn't run the tests, your code does not work.
 - Follow existing code style. Check neighboring files for patterns.
 - Prefer narrow visibility by default because this workspace is generally its own consumer. However, do not add workarounds solely to avoid `pub`: make an item public when another workspace crate needs it and that produces the cleaner implementation.
 - Rust imports should always go at the top of the file, never locally in functions.
@@ -233,7 +234,7 @@ Salsa caching can occur due to a function/method having `#[salsa::tracked]` on i
 - Try hard to avoid patterns that require `panic!`, `unreachable!`, `.unwrap()` or `.expect()`. Instead, try to encode those constraints in the type system. Don't be afraid to write code that's more verbose or requires largeish refactors if it enables you to avoid these unsafe calls.
 - Prefer let chains (`if let` combined with `&&`) and let guards (`PAT if let ... =>`) over nested `if let` statements to reduce indentation and improve readability. At the end of a task, always check your work to see if you missed opportunities to use `let` chains or `let` guards.
 - If you _have_ to suppress a Clippy lint, prefer to use `#[expect()]` over `[allow()]`, where possible. But if a lint is complaining about unused/dead code, it's usually best to just delete the unused code.
-- Don't use comments to narrate code, but do use them to explain invariants and why something unusual was done a particular way. Make sure that a comment will make sense to somebody who's reading the code for the first time. Prefer plain language, avoid jargon, and don't be afraid to be more verbose if it's necessary to explain something well. Giving examples of the kind of Python code we're trying to model at this particular point in Ruff or ty can often be very helpful for future readers of the code.
+- Use comments to explain invariants and why something unusual was done a particular way. Make sure that a comment will make sense to somebody who's reading the code for the first time. Prefer plain language, avoid jargon, and don't be afraid to be more verbose if it's necessary to explain something well. Giving examples of the kind of Python code we're trying to model at this particular point in Ruff or ty can often be very helpful for future readers of the code.
 - Run `cargo dev generate-all` after changing configuration options, CLI arguments, lint rules, or environment variable definitions, as these changes require regeneration of schemas, docs, and CLI references.
 - Don't prefix tests with `test_`.
 - Don't separate struct definitions from their `impl` blocks unless the `impl` is deliberately placed in a separate file, as for large structs.

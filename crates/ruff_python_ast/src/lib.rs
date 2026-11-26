@@ -22,7 +22,6 @@ mod node;
 mod node_index;
 mod nodes;
 pub mod operator_precedence;
-pub mod parenthesize;
 mod python_version;
 pub mod relocate;
 pub mod script;

@@ -17,7 +17,7 @@ mod tests {
 
     use super::settings::Settings;
 
-    #[test_case(Rule::DocstringMissingException, Path::new("DOC501.py"))]
+    #[test_case(Rule::UndocumentedRaisedException, Path::new("DOC501.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -28,13 +28,13 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::DocstringExtraneousParameter, Path::new("DOC102_google.py"))]
-    #[test_case(Rule::DocstringMissingReturns, Path::new("DOC201_google.py"))]
-    #[test_case(Rule::DocstringExtraneousReturns, Path::new("DOC202_google.py"))]
-    #[test_case(Rule::DocstringMissingYields, Path::new("DOC402_google.py"))]
-    #[test_case(Rule::DocstringExtraneousYields, Path::new("DOC403_google.py"))]
-    #[test_case(Rule::DocstringMissingException, Path::new("DOC501_google.py"))]
-    #[test_case(Rule::DocstringExtraneousException, Path::new("DOC502_google.py"))]
+    #[test_case(Rule::ExtraneousDocstringParameter, Path::new("DOC102_google.py"))]
+    #[test_case(Rule::MissingDocstringReturnsSection, Path::new("DOC201_google.py"))]
+    #[test_case(Rule::ExtraneousDocstringReturnsSection, Path::new("DOC202_google.py"))]
+    #[test_case(Rule::MissingDocstringYieldsSection, Path::new("DOC402_google.py"))]
+    #[test_case(Rule::ExtraneousDocstringYieldsSection, Path::new("DOC403_google.py"))]
+    #[test_case(Rule::UndocumentedRaisedException, Path::new("DOC501_google.py"))]
+    #[test_case(Rule::ExtraneousDocstringException, Path::new("DOC502_google.py"))]
     fn rules_google_style(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -51,13 +51,13 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::DocstringExtraneousParameter, Path::new("DOC102_numpy.py"))]
-    #[test_case(Rule::DocstringMissingReturns, Path::new("DOC201_numpy.py"))]
-    #[test_case(Rule::DocstringExtraneousReturns, Path::new("DOC202_numpy.py"))]
-    #[test_case(Rule::DocstringMissingYields, Path::new("DOC402_numpy.py"))]
-    #[test_case(Rule::DocstringExtraneousYields, Path::new("DOC403_numpy.py"))]
-    #[test_case(Rule::DocstringMissingException, Path::new("DOC501_numpy.py"))]
-    #[test_case(Rule::DocstringExtraneousException, Path::new("DOC502_numpy.py"))]
+    #[test_case(Rule::ExtraneousDocstringParameter, Path::new("DOC102_numpy.py"))]
+    #[test_case(Rule::MissingDocstringReturnsSection, Path::new("DOC201_numpy.py"))]
+    #[test_case(Rule::ExtraneousDocstringReturnsSection, Path::new("DOC202_numpy.py"))]
+    #[test_case(Rule::MissingDocstringYieldsSection, Path::new("DOC402_numpy.py"))]
+    #[test_case(Rule::ExtraneousDocstringYieldsSection, Path::new("DOC403_numpy.py"))]
+    #[test_case(Rule::UndocumentedRaisedException, Path::new("DOC501_numpy.py"))]
+    #[test_case(Rule::ExtraneousDocstringException, Path::new("DOC502_numpy.py"))]
     fn rules_numpy_style(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -74,9 +74,9 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::DocstringMissingReturns, Path::new("DOC201_google.py"))]
-    #[test_case(Rule::DocstringMissingYields, Path::new("DOC402_google.py"))]
-    #[test_case(Rule::DocstringMissingException, Path::new("DOC501_google.py"))]
+    #[test_case(Rule::MissingDocstringReturnsSection, Path::new("DOC201_google.py"))]
+    #[test_case(Rule::MissingDocstringYieldsSection, Path::new("DOC402_google.py"))]
+    #[test_case(Rule::UndocumentedRaisedException, Path::new("DOC501_google.py"))]
     fn rules_google_style_ignore_one_line(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "{}_{}_ignore_one_line",

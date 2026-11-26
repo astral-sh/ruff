@@ -1,7 +1,205 @@
 use anyhow::Result;
 use insta::assert_json_snapshot;
+use lsp_types::{
+    DocumentDiagnosticReport, TextDocumentContentChangeEvent,
+    TextDocumentContentChangeWholeDocument,
+};
+use ruff_python_trivia::textwrap::dedent;
 
-use crate::TestServerBuilder;
+use crate::{TestServer, TestServerBuilder};
+
+#[test]
+fn invalid_script_configuration_blocks_edits() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_server_preview(true)
+        .build();
+    server.open_text_document(
+        "script.py",
+        dedent(
+            r"
+            # /// script
+            # tool.ruff.line-length = 'wide'
+            # ///
+            import os
+            x= 1
+            ",
+        ),
+        1,
+    );
+    let diagnostics = server.document_diagnostic_request("script.py", None);
+    assert_json_snapshot!(diagnostics, @r#"
+    {
+      "items": [
+        {
+          "range": {
+            "start": {
+              "line": 2,
+              "character": 26
+            },
+            "end": {
+              "line": 2,
+              "character": 32
+            }
+          },
+          "severity": 1,
+          "code": "invalid-script-metadata",
+          "source": "Ruff",
+          "message": "invalid type: string \"wide\", expected i64",
+          "tags": []
+        }
+      ],
+      "kind": "full"
+    }
+    "#);
+    assert_json_snapshot!(server.code_action_request("script.py", vec![]), @"[]");
+    assert_json_snapshot!(server.format_request("script.py"), @"null");
+    Ok(())
+}
+
+#[test]
+fn inline_script_preserves_project_exclusions() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_server_preview(true)
+        .with_file("ruff.toml", "exclude = ['script.py']")?
+        .build();
+    server.open_text_document(
+        "script.py",
+        dedent(
+            r"
+            # /// script
+            # [tool.ruff]
+            # ///
+            import os
+            ",
+        ),
+        1,
+    );
+    assert_json_snapshot!(server.document_diagnostic_request("script.py", None), @r#"
+    {
+      "items": [],
+      "kind": "full"
+    }
+    "#);
+    Ok(())
+}
+
+#[test]
+fn inline_script_configuration_in_open_document() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file("ruff.toml", "lint.ignore = ['F401']")?
+        .with_server_preview(true)
+        .build();
+    server.open_text_document(
+        "script.py",
+        dedent(
+            r"
+            # /// script
+            # [tool.ruff]
+            # ///
+            import os
+            ",
+        ),
+        1,
+    );
+    assert_json_snapshot!(script_diagnostic_codes(&mut server)?, @r#"
+    [
+      "unused-import"
+    ]
+    "#);
+
+    server.change_text_document(
+        "script.py",
+        vec![
+            TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: "import os".into(),
+                },
+            ),
+        ],
+        2,
+    );
+    assert_json_snapshot!(script_diagnostic_codes(&mut server)?, @"[]");
+    Ok(())
+}
+
+#[test]
+fn script_diagnostic_names_use_project_preview() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file("ruff.toml", "preview = true")?
+        .build();
+    server.open_text_document(
+        "script.py",
+        dedent(
+            r"
+            # /// script
+            # [tool.ruff]
+            # ///
+            import os
+            ",
+        ),
+        1,
+    );
+    assert_json_snapshot!(script_diagnostic_codes(&mut server)?, @r#"
+    [
+      "unused-import"
+    ]
+    "#);
+    Ok(())
+}
+
+#[test]
+fn script_requires_python_in_open_document() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file(
+            "ruff.toml",
+            dedent(
+                r"
+                preview = true
+                per-file-target-version = { 'script.py' = 'py39' }
+                lint.select = ['UP045']
+                ",
+            ),
+        )?
+        .build();
+    server.open_text_document(
+        "script.py",
+        dedent(
+            r"
+            # /// script
+            # requires-python = '>=3.10'
+            # ///
+            from typing import Optional
+            x: Optional[int]
+            ",
+        ),
+        1,
+    );
+    assert_json_snapshot!(script_diagnostic_codes(&mut server)?, @r#"
+    [
+      "non-pep604-annotation-optional"
+    ]
+    "#);
+    Ok(())
+}
+
+fn script_diagnostic_codes(server: &mut TestServer) -> Result<Vec<Option<lsp_types::Code>>> {
+    let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) =
+        server.document_diagnostic_request("script.py", None)
+    else {
+        anyhow::bail!("expected a full diagnostic report");
+    };
+    Ok(report
+        .full_document_diagnostic_report
+        .items
+        .into_iter()
+        .map(|diagnostic| diagnostic.code)
+        .collect())
+}
 
 #[test]
 fn uses_human_readable_names_in_preview() -> Result<()> {

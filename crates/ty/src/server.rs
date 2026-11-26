@@ -29,7 +29,7 @@ pub(crate) fn run(args: &ServerCommand) -> Result<ExitStatus> {
 fn find_executable() -> Result<ExitStatus> {
     let verbosity = VerbosityLevel::Quiet;
     let printer = Printer::new(verbosity, true);
-    let _guard = setup_tracing(verbosity, TerminalColor::default())?;
+    let _guard = setup_tracing(verbosity, TerminalColor::default(), std::io::stderr)?;
     let cwd = current_directory()?;
     let system = OsSystem::new(&cwd);
 

@@ -7,18 +7,17 @@ use ruff_db::files::File;
 use ruff_db::source::{is_notebook, source_text};
 use ruff_python_ast::script::ScriptTag;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 use serde::Deserialize;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, UseDefaultStrategy};
 use ty_python_semantic::PythonVersionWithSource;
 use ty_python_semantic::dependency::DependencyMetadata;
 
-use crate::metadata::options::{EnvironmentOptions, Options, OptionsContext};
+use crate::metadata::options::{AnalysisOptionsContext, Options, OptionsContext};
 use crate::metadata::pyproject::Tool;
-use crate::metadata::settings::Settings;
 use crate::metadata::value::RelativePathBuf;
-use crate::uv::{DependencyMetadataError, UvMetadata, script_environment};
+use crate::uv::{DependencyMetadataError, UvMetadata, add_uv_setting_info, script_environment};
 use crate::{Db, ProjectMetadata};
 
 /// A standalone PEP 723 script and its resolved settings.
@@ -26,10 +25,6 @@ use crate::{Db, ProjectMetadata};
 pub(crate) struct Script<'db> {
     #[returns(copy)]
     pub(crate) file: File,
-
-    #[tracked]
-    #[returns(ref)]
-    pub(crate) settings: Settings,
 
     #[tracked]
     #[returns(copy)]
@@ -92,50 +87,111 @@ impl get_size2::GetSize for Script<'_> {}
 /// Resolve the `Script` for `file` if it has a PEP 723 metadata block or `None` otherwise.
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
-    // Files without script metadata must not depend on the low-durability open-file set.
+    // Ordinary files must not depend on project membership.
     let tag = script_tag(db, file)?;
-
-    // Never treat third-party files as scripts.
     if !crate::is_project_file(db, file) {
         return None;
     }
 
     let mut diagnostics = ScriptConfigurationDiagnostics::default();
-    let metadata = parse_script_metadata(file, tag, &mut diagnostics);
-    let environment = script_environment(db, file);
-    let uv_metadata = environment.and_then(|environment| environment.uv_metadata(db));
+    let fallback_metadata;
+    let metadata = match script_metadata(db, file)? {
+        Ok(metadata) => metadata,
+        Err(error) => {
+            diagnostics.report_invalid(error.clone());
+            // Build a best-effort program for editor features using empty inline metadata.
+            fallback_metadata = ScriptMetadata::default();
+            &fallback_metadata
+        }
+    };
 
-    if let Some(diagnostic) =
-        environment.and_then(|environment| environment.initialization_error(db))
-    {
-        let mut diagnostic = diagnostic.clone();
+    let environment = script_environment(db, file);
+
+    let project_metadata = db.project().metadata(db);
+    let (mut options, root) = if let Some(inline_options) = inline_script_options(db, file) {
+        // A script with it's own `tool.ty` table uses its own inline settings over the project settings.
+        // Merge and validate the settings (`file_settings` can't report diagnostics).
+        let mut script_options = inline_options.clone();
+        metadata.apply_requires_python(file, &mut script_options, &mut diagnostics);
+        let options = merge_script_options(project_metadata, &script_options);
+
+        diagnostics.extend(
+            inline_options
+                .lint_unmerged(db)
+                .into_iter()
+                .map(|diagnostic| diagnostic.to_diagnostic()),
+        );
+
+        // Report diagnostics for other options that need resolving: e.g. invalid globs.
+        if let Some(analysis) = &options.analysis {
+            let mut errors = Vec::new();
+            analysis.to_settings(db, AnalysisOptionsContext::TopLevel, &mut errors);
+            if let Some(error) = errors.first() {
+                diagnostics.report_invalid(error.to_diagnostic());
+            }
+        }
+
+        // Future: Consider reporting a diagnostic for unused tables, e.g. `tool.src`
+        let root = file
+            .path(db)
+            .as_system_path()
+            .and_then(|path| path.parent())
+            .unwrap_or_else(|| db.system().current_directory());
+
+        (options, root)
+    } else {
+        // A script without its own `tool.ty` table. Use the project settings instead.
+        // The settings were already validated by the project.
+        let mut script_options = Options::default();
+        let base_options = if project_metadata.config_file_override().is_some() {
+            project_metadata.options()
+        } else {
+            // Respect a script's `requires-python` option
+            metadata.apply_requires_python(file, &mut script_options, &mut diagnostics);
+            script_options.combine_with(project_metadata.options().clone());
+            if let Some(environment) = &mut script_options.environment {
+                // Each script is a standalone program with its own first-party roots.
+                environment.root = None;
+            }
+            &script_options
+        };
+
+        (
+            merge_script_options(project_metadata, base_options),
+            project_metadata.root(),
+        )
+    };
+    if let Some(error) = environment.and_then(|environment| environment.initialization_error(db)) {
+        let mut diagnostic = error.diagnostic.clone();
+        if error.explain_uv_setting
+            && let Some(setting) = options.script_project_manager()
+        {
+            add_uv_setting_info(
+                db,
+                &mut diagnostic,
+                setting,
+                "project-manager.script",
+                "install this script's dependencies",
+            );
+        }
         let mut annotation = Annotation::primary(Span::from(file).with_range(tag.range()));
         annotation.hide_snippet(true);
         diagnostic.annotate(annotation);
         diagnostics.report_invalid(diagnostic);
     }
 
-    let configuration_root = file
-        .path(db)
-        .as_system_path()
-        .and_then(|path| path.parent())
-        .unwrap_or_else(|| db.system().current_directory());
-    let context = OptionsContext::Script(configuration_root);
-
-    let project_metadata = db.project().metadata(db);
-
-    let options = resolve_script_options(
-        project_metadata,
-        &metadata,
-        uv_metadata,
-        file,
-        &mut diagnostics,
-    );
-    let settings = resolve_script_settings(db, &options, context, &mut diagnostics);
+    if options.script_uses_uv() == Some(true) {
+        // Isolate the script from the project's Python environment, even before uv provides
+        // the script's own environment.
+        options.environment.get_or_insert_default().python = environment
+            .and_then(|environment| environment.uv_metadata(db))
+            .and_then(UvMetadata::environment)
+            .map(|path| RelativePathBuf::new(path, ValueSource::UvMetadata));
+    }
     let program_settings = resolve_script_program_settings(
         db,
         &options,
-        context,
+        OptionsContext::Script(root),
         project_metadata.name(),
         file,
         &mut diagnostics,
@@ -148,12 +204,46 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     Some(Script::new(
         db,
         file,
-        settings,
         program,
         program_settings.python_version,
         !diagnostics.has_invalid_settings,
         diagnostics.diagnostics.into_boxed_slice(),
     ))
+}
+
+/// Whether to prepare and use uv's environment for this PEP 723 script.
+///
+/// `TY_UV` takes precedence over script and project settings so users can set `TY_UV=off`
+/// when they don't trust the configuration. A script with its own `[tool.ty]` table uses
+/// that table for `project-manager.script`. Otherwise, it inherits the project settings,
+/// including user configuration.
+pub(crate) fn use_uv_for_script(db: &dyn Db, file: File) -> bool {
+    let project = db.project().metadata(db);
+    if let Some(enabled) = project.script_uv_override() {
+        return enabled;
+    }
+
+    let options = inline_script_options(db, file).unwrap_or_else(|| project.options());
+    project
+        .options_in_precedence_order(options, None)
+        .find_map(Options::script_uses_uv)
+        .unwrap_or(false)
+}
+
+/// Returns the script's inline `[tool.ty]` options unless `--config-file` takes precedence.
+///
+/// Callers can read these unmerged options before indexing the project.
+/// User configuration, LSP, CLI etc. have not been applied.
+pub(crate) fn inline_script_options(db: &dyn Db, file: File) -> Option<&Options> {
+    // Check the tag first so ordinary files skip the project lookup and avoid caching
+    // a second `None` in `script_metadata`.
+    script_tag(db, file)?;
+
+    if db.project().metadata(db).config_file_override().is_some() {
+        return None;
+    }
+    let script = script_metadata(db, file)?.as_ref().ok()?;
+    script.ty()
 }
 
 /// Returns the PEP 723 script tag embedded in `file`.
@@ -172,14 +262,15 @@ pub fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
     }
 
     let source = source_text(db, file);
-    ScriptTag::parse(source.as_bytes()).map(Box::new)
+    ScriptTag::parse(&source).map(Box::new)
 }
 
-fn parse_script_metadata(
-    file: File,
-    tag: &ScriptTag,
-    diagnostics: &mut ScriptConfigurationDiagnostics,
-) -> ScriptMetadata {
+/// Parses a script's inline metadata. Edits that move an option must invalidate its diagnostic
+/// spans even when the option's value compares equal.
+#[salsa::tracked(returns(as_deref), no_eq, heap_size=ruff_memory_usage::heap_size)]
+fn script_metadata(db: &dyn Db, file: File) -> Option<Box<Result<ScriptMetadata, Diagnostic>>> {
+    let tag = script_tag(db, file)?;
+
     let result = {
         let _guard = ValueSourceGuard::with_source_map(
             ValueSource::ScriptMetadata(file),
@@ -191,66 +282,30 @@ fn parse_script_metadata(
     let mut metadata = match result {
         Ok(metadata) => metadata,
         Err(error) => {
-            let range = error.span().and_then(|span| {
-                let start = TextSize::try_from(span.start).ok()?;
-                let end = TextSize::try_from(span.end).ok()?;
-                Some(tag.source_map().map_range(TextRange::new(start, end)))
-            });
-
-            diagnostics.report_invalid(invalid_script_metadata_diagnostic(
+            let range = tag.source_map().map_toml_span(error.span());
+            return Some(Box::new(Err(invalid_script_metadata_diagnostic(
                 file,
                 error.message(),
                 range,
-            ));
-            return ScriptMetadata::default();
+            ))));
         }
     };
 
     if let Some(options) = metadata.tool.as_mut().and_then(|tool| tool.ty.as_mut()) {
-        options.prioritize_all_selectors();
+        options.order_rule_selectors(db.lint_registry());
     }
 
-    metadata
+    Some(Box::new(Ok(metadata)))
 }
 
-fn resolve_script_options(
-    project_metadata: &ProjectMetadata,
-    metadata: &ScriptMetadata,
-    uv_metadata: Option<&UvMetadata>,
-    file: File,
-    diagnostics: &mut ScriptConfigurationDiagnostics,
-) -> Options {
-    // When using `--config-file <FILE>`, use the settings from `<FILE>`
-    let inline = if project_metadata.config_file_override().is_some() {
-        project_metadata.options().clone()
-    } else {
-        // Otherwise use the script's settings.
-        metadata.to_options(file, diagnostics)
-    };
-
-    let uv_options = uv_metadata.map(|metadata| Options {
-        environment: Some(EnvironmentOptions {
-            python: metadata
-                .environment()
-                .map(|path| RelativePathBuf::new(path, ValueSource::UvMetadata)),
-            ..EnvironmentOptions::default()
-        }),
-        ..Options::default()
-    });
-
+fn merge_script_options(project_metadata: &ProjectMetadata, base_options: &Options) -> Options {
     let mut options = Options::default();
     // Merge the options with CLI, LSP, user configuration, and fallback options
-    for layer in project_metadata.options_in_precedence_order(&inline, uv_options.as_ref()) {
+    for layer in project_metadata.options_in_precedence_order(base_options, None) {
         options.combine_with(layer.clone());
     }
 
-    // An explicit Python environment selects uv's interpreter, not the script's site-packages.
-    if let Some(environment) = uv_metadata.and_then(UvMetadata::environment) {
-        options.environment.get_or_insert_default().python =
-            Some(RelativePathBuf::new(environment, ValueSource::UvMetadata));
-    }
-
-    // Unlike Project's, default to `[]` for scripts (unless explicitly specified).
+    // Unlike projects, standalone scripts default to `root = []`.
     options
         .environment
         .get_or_insert_default()
@@ -258,29 +313,6 @@ fn resolve_script_options(
         .get_or_insert_default();
 
     options
-}
-
-fn resolve_script_settings(
-    db: &dyn Db,
-    options: &Options,
-    context: OptionsContext<'_>,
-    diagnostics: &mut ScriptConfigurationDiagnostics,
-) -> Settings {
-    let (settings, settings_diagnostics) = match options.to_settings(db, context, &FallibleStrategy)
-    {
-        Ok(settings) => settings,
-        Err(error) => {
-            diagnostics.report_invalid(error.into_diagnostic().to_diagnostic());
-            let Ok(settings) = options.to_settings(db, context, &UseDefaultStrategy);
-            settings
-        }
-    };
-    diagnostics.extend(
-        settings_diagnostics
-            .into_iter()
-            .map(|diagnostic| diagnostic.to_diagnostic()),
-    );
-    settings
 }
 
 fn resolve_script_program_settings(
@@ -331,16 +363,28 @@ fn resolve_script_program_settings(
 }
 
 /// PEP 723 metadata, whose Python requirement belongs at the top level rather than in `project`.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
 #[serde(rename_all = "kebab-case")]
 struct ScriptMetadata {
+    // VersionSpecifiers does not expose its heap allocation.
+    #[get_size(ignore)]
     requires_python: Option<RangedValue<VersionSpecifiers>>,
     tool: Option<Tool>,
 }
 
 impl ScriptMetadata {
-    fn to_options(&self, file: File, diagnostics: &mut ScriptConfigurationDiagnostics) -> Options {
-        let mut options = self.ty().cloned().unwrap_or_default();
+    /// Returns the script's `[tool.ty]` options (if any).
+    fn ty(&self) -> Option<&Options> {
+        self.tool.as_ref()?.ty.as_ref()
+    }
+
+    /// Applies the `requires-python` constraint to `options`.
+    fn apply_requires_python(
+        &self,
+        file: File,
+        options: &mut Options,
+        diagnostics: &mut ScriptConfigurationDiagnostics,
+    ) {
         if let Err(error) = options.apply_requires_python(self.requires_python.as_ref()) {
             let range = self.requires_python.as_ref().and_then(RangedValue::range);
             let mut diagnostic = invalid_script_metadata_diagnostic(file, error.message(), range);
@@ -349,11 +393,6 @@ impl ScriptMetadata {
             }
             diagnostics.report_invalid(diagnostic);
         }
-        options
-    }
-
-    fn ty(&self) -> Option<&Options> {
-        self.tool.as_ref().and_then(|tool| tool.ty.as_ref())
     }
 }
 

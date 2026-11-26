@@ -4,10 +4,14 @@ use crate::script::script_tag;
 use crate::{Db, GlobFilterCheckMode, IncludeResult, Project};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::system_path_to_file;
-use ruff_db::system::walk_directory::{ErrorKind, WalkDirectoryBuilder, WalkState};
+use ruff_db::system::walk_directory::{
+    self, DirectoryEntry, ErrorKind, WalkDirectoryBuilder, WalkState,
+};
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use std::collections::BTreeSet;
+use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use thiserror::Error;
 
 /// Filter that decides which files are included in the project.
@@ -46,7 +50,9 @@ impl<'a> ProjectFilesFilter<'a> {
         mode: GlobFilterCheckMode,
     ) -> Option<CheckPathMatch> {
         match mode {
-            GlobFilterCheckMode::TopDown => Some(CheckPathMatch::Partial),
+            GlobFilterCheckMode::TopDown | GlobFilterCheckMode::WalkRoot => {
+                Some(CheckPathMatch::Partial)
+            }
             GlobFilterCheckMode::Adhoc => {
                 self.included_paths
                     .iter()
@@ -113,7 +119,7 @@ impl<'a> ProjectFilesFilter<'a> {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum CheckPathMatch {
-    /// The path is a partial match of the checked path (it's a sub path)
+    /// The path is under a check path or is a check path subject to `--force-exclude`.
     Partial,
 
     /// The path matches a check path exactly.
@@ -178,6 +184,7 @@ impl ProjectFilesWalker {
         let exclude_scripts = project.settings(db).src().exclude_scripts;
         let files = std::sync::Mutex::new(Vec::new());
         let diagnostics = std::sync::Mutex::new(Vec::new());
+        let cancellation = OnceLock::new();
 
         walker.run(|| {
             let db = Db::dyn_clone(db);
@@ -185,11 +192,12 @@ impl ProjectFilesWalker {
             let incremental_paths = &self.incremental_paths;
             let files = &files;
             let diagnostics = &diagnostics;
+            let cancellation = &cancellation;
             let force_exclude = filter.force_exclude();
 
             // The memory walker runs on the caller's thread, where a different database may
             // already be attached. The caller tracks the file-set input, not this visitor's reads.
-            Box::new(move |entry| {
+            let visit = move |entry: Result<DirectoryEntry, walk_directory::Error>| {
                 salsa::attach_allow_change(&*db, || {
                     db.unwind_if_revision_cancelled();
 
@@ -202,7 +210,7 @@ impl ProjectFilesWalker {
                             }
 
                             let match_mode = if entry.depth() == 0 && force_exclude {
-                                GlobFilterCheckMode::Adhoc
+                                GlobFilterCheckMode::WalkRoot
                             } else {
                                 GlobFilterCheckMode::TopDown
                             };
@@ -313,9 +321,21 @@ impl ProjectFilesWalker {
 
                     WalkState::Continue
                 })
+            };
+            // The OS walker joins its workers with unwrap(), losing the Salsa cancellation
+            // payload if it unwinds across a worker thread. Propagate it on the caller instead.
+            Box::new(move |entry| match salsa::Cancelled::catch(AssertUnwindSafe(|| visit(entry))) {
+                Ok(state) => state,
+                Err(reason) => {
+                    let _ = cancellation.set(reason);
+                    WalkState::Quit
+                }
             })
         });
 
+        if let Some(reason) = cancellation.into_inner() {
+            std::panic::resume_unwind(Box::new(reason));
+        }
         (
             files.into_inner().unwrap(),
             diagnostics.into_inner().unwrap(),

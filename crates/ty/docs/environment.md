@@ -56,6 +56,10 @@ Python environment for each script with [inline metadata](https://peps.python.or
 When set to `1` or `true`, ty also uses uv to discover the workspace root and its Python
 environment.
 
+Set to `off` to disable all uv integration, even when `project-manager.project` or
+`project-manager.script` is set to `"uv"`. An explicit `TY_UV` takes precedence over ty
+configuration.
+
 ## Externally-defined variables
 
 ty also reads the following externally defined environment variables:
@@ -80,8 +84,9 @@ Used to determine the name of the active Conda environment.
 
 ### `CONDA_PREFIX`
 
-Used to detect the path of an active Conda environment.
-If both `VIRTUAL_ENV` and `CONDA_PREFIX` are present, `VIRTUAL_ENV` will be preferred.
+The path to the active Conda or Pixi environment. If it contains no Python interpreter,
+ty continues searching, including in the project's `.venv`.
+A non-empty `VIRTUAL_ENV` takes precedence.
 
 ### `FORCE_COLOR`
 

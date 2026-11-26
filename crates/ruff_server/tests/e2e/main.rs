@@ -196,6 +196,7 @@ impl TestServer {
         test_context: TestContext,
         capabilities: ClientCapabilities,
         initialization_options: Option<serde_json::Value>,
+        preview: Option<bool>,
     ) -> Self {
         setup_tracing();
 
@@ -210,7 +211,7 @@ impl TestServer {
             match Server::new(
                 worker_threads,
                 server_connection,
-                None,
+                preview,
                 WorkspaceTrust::Trusted,
                 true,
             ) {
@@ -716,7 +717,6 @@ impl TestServer {
     }
 
     /// Send a `textDocument/didChange` notification with the given content changes
-    #[expect(dead_code)]
     pub(crate) fn change_text_document(
         &mut self,
         path: impl AsRef<Path>,
@@ -974,6 +974,7 @@ pub(crate) struct TestServerBuilder {
     workspaces: Vec<WorkspaceFolder>,
     initialization_options: Option<serde_json::Value>,
     client_capabilities: ClientCapabilities,
+    preview: Option<bool>,
 }
 
 impl TestServerBuilder {
@@ -1007,6 +1008,7 @@ impl TestServerBuilder {
             workspaces: Vec::new(),
             test_context: TestContext::new()?,
             initialization_options: None,
+            preview: None,
             client_capabilities,
         })
     }
@@ -1015,6 +1017,11 @@ impl TestServerBuilder {
     #[expect(dead_code)]
     pub(crate) fn with_initialization_options(mut self, options: serde_json::Value) -> Self {
         self.initialization_options = Some(options);
+        self
+    }
+
+    pub(crate) fn with_server_preview(mut self, preview: bool) -> Self {
+        self.preview = Some(preview);
         self
     }
 
@@ -1155,6 +1162,7 @@ impl TestServerBuilder {
             self.test_context,
             self.client_capabilities,
             self.initialization_options,
+            self.preview,
         )
     }
 }

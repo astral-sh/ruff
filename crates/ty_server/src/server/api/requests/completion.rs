@@ -91,7 +91,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                         .local_range();
                     Some(TextEdit {
                         range,
-                        new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
+                        new_text: edit.content().map_or_default(ToString::to_string),
                     })
                 });
 

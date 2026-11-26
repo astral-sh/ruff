@@ -38,7 +38,7 @@ use crate::codes::Category;
 /// ## References
 /// - [Python documentation: `tarfile.TarFile`](https://docs.python.org/3/library/tarfile.html#tarfile.TarFile)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Security)]
+#[violation_metadata(preview_since = "0.17.4", category = Category::Security)]
 pub(crate) struct TarfileIgnoreZerosTrue {
     is_exact: bool,
 }

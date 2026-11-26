@@ -12,7 +12,8 @@ use tracing::Metadata;
 use tracing::level_filters::LevelFilter;
 use tracing::subscriber::Interest;
 use tracing_subscriber::Layer;
-use tracing_subscriber::fmt::time::ChronoLocal;
+use tracing_subscriber::fmt::format::Writer;
+use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::fmt::writer::BoxMakeWriter;
 use tracing_subscriber::layer::SubscriberExt;
 
@@ -51,7 +52,7 @@ pub fn init_logging(log_level: LogLevel, log_file: Option<&SystemPath>) {
     let is_trace_level = log_level == LogLevel::Trace;
     let subscriber = tracing_subscriber::Registry::default().with(
         tracing_subscriber::fmt::layer()
-            .with_timer(ChronoLocal::new("%Y-%m-%d %H:%M:%S.%f".to_string()))
+            .with_timer(LocalTime)
             .with_thread_names(is_trace_level)
             .with_target(is_trace_level)
             .with_ansi(false)
@@ -61,6 +62,18 @@ pub fn init_logging(log_level: LogLevel, log_file: Option<&SystemPath>) {
 
     tracing::subscriber::set_global_default(subscriber)
         .expect("should be able to set global default subscriber");
+}
+
+struct LocalTime;
+
+impl FormatTime for LocalTime {
+    fn format_time(&self, writer: &mut Writer<'_>) -> std::fmt::Result {
+        write!(
+            writer,
+            "{}",
+            jiff::Zoned::now().strftime("%Y-%m-%d %H:%M:%S.%9f")
+        )
+    }
 }
 
 /// The log level for the server as provided by the client during initialization.

@@ -48,7 +48,7 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
         };
 
         let document_path = query.virtual_file_path();
-        let settings = query.settings();
+        let settings = query.project_settings();
 
         if is_document_excluded_for_linting(
             &document_path,
@@ -56,6 +56,10 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
             &settings.linter,
             query.text_document_language_id(),
         ) {
+            return Ok(Some(response));
+        }
+
+        if query.settings().is_err() {
             return Ok(Some(response));
         }
 

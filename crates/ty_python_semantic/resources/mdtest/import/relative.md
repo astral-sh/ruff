@@ -110,7 +110,7 @@ reveal_type(X)  # revealed: int
 `package/bar.py`:
 
 ```py
-from . import X  # error: [import-not-found]
+from . import X  # error: [missing-module-member]
 
 reveal_type(X)  # revealed: Unknown
 ```
@@ -178,7 +178,7 @@ x  # error: [unresolved-reference]
 `package/bar.py`:
 
 ```py
-from .foo import x  # error: [import-not-found]
+from .foo import x  # error: [missing-module-member]
 
 reveal_type(x)  # revealed: Unknown
 ```
@@ -217,7 +217,7 @@ nor an attribute of `package`.
 `package/bar.py`:
 
 ```py
-from . import foo  # error: [import-not-found]
+from . import foo  # error: [missing-module-member]
 
 reveal_type(foo)  # revealed: Unknown
 ```

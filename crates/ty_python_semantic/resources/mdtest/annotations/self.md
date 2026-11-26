@@ -141,8 +141,9 @@ class A:
 
         return self
 
-    def implicit_self_generic[T](self, x: T) -> T:
-        reveal_type(self)  # revealed: Self@implicit_self_generic
+    def implicit_self_generic[T](receiver, /, other, x: T) -> T:
+        reveal_type(receiver)  # revealed: Self@implicit_self_generic
+        reveal_type(other)  # revealed: Unknown
 
         return x
 
@@ -413,7 +414,7 @@ class GenericShape[T]:
     @classmethod
     def baz[U](cls, u: U) -> "GenericShape[U]":
         reveal_type(cls)  # revealed: type[Self@baz]
-        # error: [invalid-return-type]
+        # error: [invalid-explicit-return]
         return cls()
 
 class GenericCircle[T](GenericShape[T]): ...
@@ -571,7 +572,8 @@ class LinkedList:
 reveal_type(LinkedList().next())  # revealed: LinkedList
 ```
 
-Dataclass fields can also use `Self` in their annotations:
+Dataclass fields can also use `Self` in their annotations. The generated methods infer `Self` from
+their arguments, just like handwritten methods. A base-class argument can widen the inferred type:
 
 ```py
 from dataclasses import dataclass
@@ -581,8 +583,20 @@ from typing import Self
 class Node:
     parent: Self | None = None
 
-Node(Node())
+class Child(Node): ...
+
+Node(Node())  # ok
+Child(Child())  # ok
+Child(Node())  # ok
+Child().__replace__(parent=Child())  # ok
+Child().__replace__(parent=Node())  # ok
 ```
+
+`Child` is not itself decorated with `@dataclass`, so it inherits `Node.__init__`. That method's
+`Self` is a method-scoped type variable whose upper bound remains `Node`, allowing `Child(Node())`
+just as a handwritten initializer would. This is unsound for `Child.parent`, but reflects the
+existing unsoundness of mutable `Self` attributes: assigning `node.parent = Node()` through a `Node`
+reference also permits a `Node` parent on a `Child` instance.
 
 Attributes annotated with `Self` can be assigned on instances:
 
@@ -935,7 +949,7 @@ b: Self
 class Foo:
     def return_concrete_type(self) -> Self:
         # TODO: We could emit a hint that suggests annotating with `Foo` instead of `Self`
-        # error: [invalid-return-type]
+        # error: [invalid-explicit-return]
         return Foo()
 
     @staticmethod

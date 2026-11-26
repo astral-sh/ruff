@@ -165,6 +165,7 @@ export default function Editor({
   return (
     <Moncao
       key={files.playgroundRevision}
+      className="monaco-component"
       onMount={handleMount}
       options={{
         fixedOverflowWidgets: true,

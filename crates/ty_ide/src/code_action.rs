@@ -217,10 +217,10 @@ mod tests {
         );
 
         let lint = default_lint_registry()
-            .get("ignore-comment-unknown-rule")
+            .get("unknown-rule-in-ignore-comment")
             .unwrap();
         assert_snapshot!(test.code_actions(&lint), @"
-        info[code-action]: Ignore 'ignore-comment-unknown-rule' for this line
+        info[code-action]: Ignore 'unknown-rule-in-ignore-comment' for this line
          --> main.py:3:27
           |
         3 | # ty:ignore[] # ty:ignore[not-a-rule] # ty:ignore[division-by-zero]
@@ -228,7 +228,7 @@ mod tests {
           |
         2 | seen_code = True
           - # ty:ignore[] # ty:ignore[not-a-rule] # ty:ignore[division-by-zero]
-        3 + # ty:ignore[ignore-comment-unknown-rule] # ty:ignore[not-a-rule] # ty:ignore[division-by-zero]
+        3 + # ty:ignore[unknown-rule-in-ignore-comment] # ty:ignore[not-a-rule] # ty:ignore[division-by-zero]
         4 | value = 1 / 0
           |
         ");

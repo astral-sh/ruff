@@ -397,10 +397,10 @@ error[not-subscriptable]: Cannot specialize non-generic type alias `AliasB`
 type A = int
 type B[T] = T
 
-# error: [call-non-callable] "Object of type `TypeAliasType` is not callable"
+# error: [not-callable] "Object of type `TypeAliasType` is not callable"
 reveal_type(A())  # revealed: Unknown
 
-# error: [call-non-callable] "Object of type `GenericAlias` is not callable"
+# error: [not-callable] "Object of type `GenericAlias` is not callable"
 reveal_type(B[int]())  # revealed: Unknown
 ```
 
@@ -426,7 +426,7 @@ r2: RecursiveList[int] = [1, [1, 2, 3]]
 r3: RecursiveList[int] = "a"
 # error: [invalid-assignment]
 r4: RecursiveList[int] = ["a"]
-# error: [invalid-assignment] "Object of type `list[int | list[RecursiveList[int]] | list[int | list[RecursiveList[int]] | str]]` is not assignable to `RecursiveList[int]`"
+# error: [invalid-assignment] "Object of type `list[int | list[str]]` is not assignable to `RecursiveList[int]`"
 r5: RecursiveList[int] = [1, ["a"]]
 
 def _(x: RecursiveList[int]):
@@ -466,7 +466,7 @@ d1: DivergentList[int] = []
 d2: DivergentList[int] = [1]
 # error: [invalid-assignment]
 d3: DivergentList[int] = ["a"]
-# error: [invalid-assignment] "Object of type `list[list[DivergentList[int]] | list[list[DivergentList[int]] | int]]` is not assignable to `DivergentList[int]`"
+# error: [invalid-assignment] "Object of type `list[list[int]]` is not assignable to `DivergentList[int]`"
 d4: DivergentList[int] = [[1]]
 
 def _(x: DivergentList[int]):
@@ -499,6 +499,20 @@ def growing(value): ...
 def _(value: Any):
     reveal_type(wrapped(value))  # revealed: dict[str, list[Unknown]]
     reveal_type(growing(value))  # revealed: tuple[Unknown, list[Unknown]]
+```
+
+## Recursive calls returning a generic alias
+
+```py
+type Chain[T] = tuple[T, Chain[T] | None]
+
+def chain[T](value: T, recurse: bool) -> Chain[T]:
+    if recurse:
+        _, tail = chain(1, False)
+        if tail is not None:
+            # revealed: Literal[1]
+            reveal_type(tail[0])
+    return value, (value, None)
 ```
 
 ## Negation after specializing a recursive alias
@@ -660,8 +674,8 @@ def test[X: int](items: list[X]) -> list[X]:
     # The annotation MaybeList[str | int] expands to `list[str | int] | str | int`.
     # Bidirectional inference should infer list[str | int] from the list() call.
     a: MaybeList[str | int] = list(items)
-    # The revealed type is list[str | int] because that's what list() returns.
-    reveal_type(a)  # revealed: list[str | int]
+    # The revealed type is list[int | str] because that's what list() returns.
+    reveal_type(a)  # revealed: list[int | str]
     return items
 ```
 
@@ -794,7 +808,7 @@ class Box[T]:
 type RefBox[T] = Box[T]
 
 def transmute_inner[T, V](x: RefBox[T]) -> RefBox[V]:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `RefBox[V@transmute_inner]`, found `RefBox[T@transmute_inner]`"
+    # error: [invalid-explicit-return] "Return type does not match returned value: expected `RefBox[V@transmute_inner]`, found `RefBox[T@transmute_inner]`"
     return x
 ```
 
@@ -830,6 +844,70 @@ class Container2:
 def j(x: Container1.Item, y: Container2.Item) -> None:
     # error: [invalid-assignment] "Object of type `mdtest_snippet.Container2.Item` is not assignable to `mdtest_snippet.Container1.Item`"
     a: Container1.Item = y
+```
+
+## Capturing an enclosing type parameter
+
+An alias defined inside a generic function refers to that function's type parameter.
+
+```py
+def outer[T](value: T) -> T:
+    type Captured = T
+
+    def identity(other: Captured) -> Captured:
+        return other
+
+    return identity(value)  # ok
+```
+
+The alias can also have its own parameters. Specializing them preserves the captured parameter.
+
+```py
+def generic_outer[T](value: T) -> tuple[T, int]:
+    type Pair[U] = tuple[T, U]
+
+    def integers(other: Pair[int]) -> Pair[int]:
+        return other
+
+    def strings(other: Pair[str]) -> Pair[str]:
+        return other
+
+    strings((value, "text"))  # ok
+    integers((value, "text"))  # error: [invalid-argument-type]
+    return integers((value, 1))  # ok
+```
+
+## Constructor inference through captured alias parameters
+
+A class-local alias captures its class's type parameter. Constructing another instance inside the
+class infers a new specialization without constraining the enclosing instance's type parameter.
+
+```py
+class Box[T]:
+    type Items = list[T]
+
+    def __init__(self, value: Items) -> None: ...
+    def copy(self, value: list[T]) -> None:
+        # revealed: Box[T@Box]
+        reveal_type(Box(value))
+        # revealed: Box[int]
+        reveal_type(Box([1]))
+```
+
+The alias's own parameters retain their specialization while its captured class parameter is
+inferred for the new instance.
+
+```py
+class PairBox[T]:
+    type Pair[U] = tuple[T, U]
+
+    def __init__(self, value: Pair[int]) -> None: ...
+    def copy(self, value: T) -> None:
+        # revealed: PairBox[T@PairBox]
+        reveal_type(PairBox((value, 1)))
+        # revealed: PairBox[str]
+        reveal_type(PairBox(("text", 1)))
+        PairBox((value, "wrong"))  # error: [invalid-argument-type]
 ```
 
 ## Default type parameter after `TypeVarTuple`

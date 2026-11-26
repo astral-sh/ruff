@@ -68,25 +68,34 @@ pub(crate) fn invalid_escape_sequence(checker: &Checker, string_like: StringLike
     let locator = checker.locator();
 
     for part in string_like.parts() {
-        if part.flags().is_raw_string() {
+        let flags = part.flags();
+        if flags.is_raw_string() {
             continue;
         }
         let state = match part {
-            StringLikePart::String(_) | StringLikePart::Bytes(_) => {
-                analyze_escape_chars(locator, part.range(), part.flags())
+            // The parser accepts unknown escapes like `\q` and preserves their backslash.
+            // If a successfully decoded value has no backslash, its source had no unknown escapes.
+            StringLikePart::String(literal)
+                if !literal.flags.is_invalid() && !literal.value.as_bytes().contains(&b'\\') =>
+            {
+                continue;
             }
-            StringLikePart::FString(f_string) => analyze_escape_chars_in_interpolated_string(
-                AnyStringFlags::from(f_string.flags),
-                &f_string.elements,
-                locator,
-            ),
-            StringLikePart::TString(t_string) => analyze_escape_chars_in_interpolated_string(
-                AnyStringFlags::from(t_string.flags),
-                &t_string.elements,
-                locator,
-            ),
+            StringLikePart::Bytes(literal)
+                if !literal.flags.is_invalid() && !literal.value.contains(&b'\\') =>
+            {
+                continue;
+            }
+            StringLikePart::String(_) | StringLikePart::Bytes(_) => {
+                analyze_escape_chars(locator, part.range(), flags)
+            }
+            StringLikePart::FString(f_string) => {
+                analyze_escape_chars_in_interpolated_string(flags, &f_string.elements, locator)
+            }
+            StringLikePart::TString(t_string) => {
+                analyze_escape_chars_in_interpolated_string(flags, &t_string.elements, locator)
+            }
         };
-        check(checker, locator, part.start(), part.flags(), state);
+        check(checker, locator, part.start(), flags, state);
     }
 }
 

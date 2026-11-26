@@ -127,3 +127,41 @@ while True:
                 y = 0
             case 0, *x:
                 pass  # no warning
+
+
+# Regression: return inside an if-else branch.
+def regression_if_else(condition):
+    try:
+        pass
+    finally:
+        if condition:
+            pass
+        else:
+            return 1  # warning
+
+
+# Regression: return inside an except handler.
+def regression_except():
+    try:
+        pass
+    finally:
+        try:
+            pass
+        except ValueError:
+            return 2  # warning
+
+
+# Regression: ordinary return outside finally.
+def regression_no_warning():
+    if True:
+        return 3  # no warning
+
+
+def regression_loop_else():
+    try:
+        pass
+    finally:
+        for item in []:
+            pass
+        else:
+            return 6  # warning

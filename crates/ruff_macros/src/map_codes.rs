@@ -139,15 +139,9 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 fn from(linter: #linter) -> Self {
                     let prefix = RuleCodePrefix::#linter(linter);
                     if let Some(rule) = prefix.as_rule() {
-                        Self::Rule {
-                            rule,
-                            redirected_from: None,
-                        }
+                        Self::Rule { rule }
                     } else {
-                        Self::Prefix {
-                            prefix,
-                            redirected_from: None,
-                        }
+                        Self::Prefix { prefix }
                     }
                 }
             }
@@ -465,6 +459,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
         #[derive(
             EnumIter,
+            ::strum_macros::VariantArray,
             Debug,
             PartialEq,
             Eq,

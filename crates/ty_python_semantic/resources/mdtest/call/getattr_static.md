@@ -184,8 +184,8 @@ the raw `classmethod` or `staticmethod` descriptors (this is a regression test f
 <https://github.com/astral-sh/ty/issues/1452>):
 
 ```py
-some_classmethod.__kwdefaults__  # error: [unresolved-attribute]
-some_staticmethod.__kwdefaults__  # error: [unresolved-attribute]
+some_classmethod.__kwdefaults__  # error: [missing-attribute]
+some_staticmethod.__kwdefaults__  # error: [missing-attribute]
 ```
 
 [official documentation]: https://docs.python.org/3/library/inspect.html#inspect.getattr_static

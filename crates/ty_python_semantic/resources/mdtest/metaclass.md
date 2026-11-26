@@ -1038,7 +1038,7 @@ class Child(WeakSet[object]): ...
 reveal_type(type(Child))  # revealed: <class 'ABCMeta'>
 
 def f(child: Child):
-    child.__abstractmethods__  # error: [unresolved-attribute]
+    child.__abstractmethods__  # error: [missing-attribute]
 ```
 
 The fallback also does not constrain the types of attributes defined in the class namespace. For
@@ -1348,7 +1348,7 @@ def _(meta: type[Meta]):
                 assert_never(cls)
 
     def as_int(cls: type[C]) -> int:
-        return cls  # error: [invalid-return-type]
+        return cls  # error: [invalid-explicit-return]
 ```
 
 ## Diagnostic range

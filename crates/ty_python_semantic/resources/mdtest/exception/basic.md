@@ -65,6 +65,65 @@ def foo(
         reveal_type(j)  # revealed: ValueError
 ```
 
+## Previously narrowed tuple of exception classes
+
+Checking that the tuple is nonempty preserves the type of the caught exception.
+
+```py
+def catch(classes: tuple[type[ValueError], ...]):
+    assert classes
+    try:
+        help()
+    except classes as exc:
+        reveal_type(exc)  # revealed: ValueError
+```
+
+## Previously narrowed union of exception tuples
+
+The caught exception can come from any tuple in the union.
+
+```py
+def catch(classes: tuple[type[ValueError], ...] | tuple[type[RuntimeError], ...]):
+    assert classes
+    try:
+        help()
+    except classes as exc:
+        reveal_type(exc)  # revealed: ValueError | RuntimeError
+```
+
+## Aliases for exception classes and tuples
+
+The caught type comes from the exception classes and tuple elements described by the alias.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import AlwaysFalsy, Intersection, Not
+
+type Errors = tuple[type[ValueError], ...]
+type NonemptyErrors = Intersection[tuple[type[ValueError], ...], Not[AlwaysFalsy]]
+type MixedErrors = type[ValueError] | tuple[type[RuntimeError], ...]
+
+def catch(classes: NonemptyErrors, plain: Errors, mixed: MixedErrors):
+    try:
+        help()
+    except classes as exc:
+        reveal_type(exc)  # revealed: ValueError
+
+    try:
+        help()
+    except plain as exc:
+        reveal_type(exc)  # revealed: ValueError
+
+    try:
+        help()
+    except mixed as exc:
+        reveal_type(exc)  # revealed: ValueError | RuntimeError
+```
+
 ## Negated dynamic type aliases
 
 A negated alias of `Any` behaves like `Any` in both single and tuple exception handlers.

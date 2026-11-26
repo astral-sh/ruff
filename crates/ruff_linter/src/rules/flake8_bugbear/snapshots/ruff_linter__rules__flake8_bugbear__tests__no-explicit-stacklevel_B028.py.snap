@@ -75,3 +75,40 @@ help: Set `stacklevel=2`
 33 |
    |
 note: This is an unsafe fix and may change runtime behavior
+
+B028 [*] No explicit `stacklevel` keyword argument found
+  --> B028.py:38:1
+   |
+37 | # The first keyword argument has a parenthesized value
+38 | warnings.warn("test", category=(DeprecationWarning))
+   | ^^^^^^^^^^^^^
+39 | warnings.warn(
+40 |     message=(
+   |
+help: Set `stacklevel=2`
+   |
+37 | # The first keyword argument has a parenthesized value
+   - warnings.warn("test", category=(DeprecationWarning))
+38 + warnings.warn("test", stacklevel=2, category=(DeprecationWarning))
+39 | warnings.warn(
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+B028 [*] No explicit `stacklevel` keyword argument found
+  --> B028.py:39:1
+   |
+37 | # The first keyword argument has a parenthesized value
+38 | warnings.warn("test", category=(DeprecationWarning))
+39 | warnings.warn(
+   | ^^^^^^^^^^^^^
+40 |     message=(
+41 |         "a"
+   |
+help: Set `stacklevel=2`
+   |
+39 | warnings.warn(
+   -     message=(
+40 +     stacklevel=2, message=(
+41 |         "a"
+   |
+note: This is an unsafe fix and may change runtime behavior

@@ -59,7 +59,7 @@ fn format_text_document_range(
     encoding: PositionEncoding,
     backend: crate::format::FormatBackend,
 ) -> Result<super::FormatResponse> {
-    let settings = query.settings();
+    let settings = query.project_settings();
     let file_path = query.virtual_file_path();
     let source_type = query.source_type_for_format();
 
@@ -73,6 +73,17 @@ fn format_text_document_range(
         return Ok(None);
     }
 
+    let settings = match query.settings() {
+        Ok(settings) => settings,
+        Err(diagnostic) => {
+            tracing::warn!(
+                "Unable to format range in {} due to invalid script metadata: {}",
+                file_path.display(),
+                diagnostic.concise_message()
+            );
+            return Ok(None);
+        }
+    };
     let text = text_document.contents();
     let index = text_document.index();
     let range = range.to_text_range(text, index, encoding);

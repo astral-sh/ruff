@@ -1,0 +1,46 @@
+{% block introduction %}{% endblock %}
+{% for reproducer in reproducers %}
+
+### Seed {{ reproducer.seed }}
+
+{% if reproducer.failure_description %}
+{{ reproducer.failure_description }}
+
+{% endif %}
+{% if reproducer.bug.minimization_succeeded %}
+Minimized reproducer
+
+{% else %}
+<details>
+<summary>Original source (minimization did not complete)</summary>
+
+{% endif %}
+{{ reproducer.fence }}python
+{{ reproducer.bug.source }}
+{{ reproducer.fence }}
+{% if not reproducer.bug.minimization_succeeded %}
+
+</details>
+{% endif %}
+{% endfor %}
+{% if omitted %}
+
+{% block omitted_notice %}
+Some reproducers were omitted. The workflow logs list all failing seeds.
+{% endblock %}
+{% endif %}
+{% if unchecked_count %}
+
+### Unchecked seeds
+
+The time budget expired before {{ unchecked_count }} seed{{ 's' if unchecked_count != 1 else '' }} could be checked.
+
+{% for seed in unchecked_seeds %}
+- `{{ seed }}`
+{% endfor %}
+{% if seeds_omitted %}
+
+The full list of unchecked seeds is in the workflow logs.
+{% endif %}
+{% endif %}
+{% block rerun %}{% endblock %}

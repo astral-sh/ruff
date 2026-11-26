@@ -71,8 +71,7 @@ def process(padding):
 ## Phantom property inference
 
 An overloaded helper method can encode a type mapping for a property whose own receiver is a
-protocol. The nonempty-shape overload contributes the concrete array type alongside the generic
-fallback.
+protocol. For a nonempty shape, the property returns an array with the receiver's shape and dtype.
 
 ```pyi
 from typing import Generic, Protocol, TypeVar, overload, type_check_only
@@ -112,6 +111,5 @@ class Normal(
 
 def make_normal() -> Normal[tuple[int], np.float32]: ...
 
-# revealed: ndarray[ShapeT@phantom_parameter, dtype[ScalarT@phantom_parameter]] | ndarray[tuple[int], dtype[floating[_32Bit]]]
-reveal_type(make_normal().value)
+reveal_type(make_normal().value)  # revealed: ndarray[tuple[int], dtype[floating[_32Bit]]]
 ```

@@ -649,6 +649,17 @@ def literal_string(value: object, text: LiteralString) -> None:
         reveal_type(value)  # revealed: LiteralString
 ```
 
+An identity check against an inferred union narrows to the shared literals in that union's order.
+Those literals still widen when inferring the element type of a mutable list.
+
+```py
+def overlapping_literals(value: Literal["a", "b", "c"], flag: bool) -> None:
+    other = "b" if flag else "a"
+    if value is other:
+        reveal_type(value)  # revealed: Literal["b", "a"]
+        reveal_type([value])  # revealed: list[str]
+```
+
 The same string object (same memory address) can be referenced by multiple different expressions
 (due to aliasing or interning). Some of those expressions may be validly typed as having literal
 origin and others may not. Checking string identity does not assume this is impossible:

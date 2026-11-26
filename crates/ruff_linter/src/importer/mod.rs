@@ -10,7 +10,7 @@ use libcst_native as cst;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::token::Tokens;
-use ruff_python_ast::{self as ast, Expr, ModModule, Stmt};
+use ruff_python_ast::{self as ast, Expr, ModModule, PythonVersion, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_importer::Insertion;
 use ruff_python_parser::Parsed;
@@ -34,6 +34,8 @@ pub(crate) struct Importer<'a> {
     source: &'a str,
     /// The [`Stylist`] for the Python AST.
     stylist: &'a Stylist<'a>,
+    /// The target Python version.
+    target_version: PythonVersion,
     /// The list of visited, top-level runtime imports in the Python AST.
     runtime_imports: Vec<&'a Stmt>,
     /// The list of visited, top-level `if TYPE_CHECKING:` blocks in the Python AST.
@@ -45,12 +47,14 @@ impl<'a> Importer<'a> {
         parsed: &'a Parsed<ModModule>,
         source: &'a str,
         stylist: &'a Stylist<'a>,
+        target_version: PythonVersion,
     ) -> Self {
         Self {
             python_ast: parsed.suite(),
             tokens: parsed.tokens(),
             source,
             stylist,
+            target_version,
             runtime_imports: Vec::default(),
             type_checking_blocks: Vec::default(),
         }
@@ -555,7 +559,7 @@ impl<'a> Importer<'a> {
 
         body.take_while(|stmt| {
             stmt.as_import_from_stmt().is_some_and(|import_from| {
-                !import_from.is_lazy && import_from.module.as_deref() == Some("__future__")
+                !import_from.is_lazy && import_from.is_future_import(self.target_version)
             })
         })
         .last()

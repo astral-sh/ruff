@@ -902,15 +902,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let builder = ConstraintSetBuilder::new();
+        let build = builder.unlimited();
 
         let generator = KnownClass::GeneratorType.to_specialized_instance(db, env, BOTTOM_SPEC);
 
         let check = |source: Type<'db>, target: Type<'db>| {
-            source.when_subtype_of(db, env, target, &builder, TypeVarSet::None)
+            source.when_subtype_of(db, env, target, build, TypeVarSet::None)
         };
 
         check(generator, value_type)
-            .and(db, &builder, || {
+            .and(db, build, || {
                 let iterable = KnownClass::Iterable.to_specialized_instance(db, env, TOP_SPEC);
                 check(value_type, iterable)
             })

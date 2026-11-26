@@ -187,3 +187,12 @@ class NonlocalDunderClass:
     def foo():
         nonlocal __class__
         __class__ = 1
+
+
+# OK, these names are read by debuggers and traceback tools via frame locals.
+def traceback_hiding():
+    __tracebackhide__ = True
+    __traceback_hide__ = True
+    __traceback_info__ = "info"
+    __traceback_supplement__ = (object,)
+    __debuggerskip__ = True

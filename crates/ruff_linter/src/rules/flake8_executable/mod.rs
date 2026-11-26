@@ -14,12 +14,12 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
 
-    #[test_case(Rule::ShebangNotExecutable, Path::new("EXE001_1.py"))]
-    #[test_case(Rule::ShebangNotExecutable, Path::new("EXE001_2.py"))]
-    #[test_case(Rule::ShebangNotExecutable, Path::new("EXE001_3.py"))]
-    #[test_case(Rule::ShebangMissingExecutableFile, Path::new("EXE002_1.py"))]
-    #[test_case(Rule::ShebangMissingExecutableFile, Path::new("EXE002_2.py"))]
-    #[test_case(Rule::ShebangMissingExecutableFile, Path::new("EXE002_3.py"))]
+    #[test_case(Rule::NonExecutableFileWithShebang, Path::new("EXE001_1.py"))]
+    #[test_case(Rule::NonExecutableFileWithShebang, Path::new("EXE001_2.py"))]
+    #[test_case(Rule::NonExecutableFileWithShebang, Path::new("EXE001_3.py"))]
+    #[test_case(Rule::ExecutableFileWithoutShebang, Path::new("EXE002_1.py"))]
+    #[test_case(Rule::ExecutableFileWithoutShebang, Path::new("EXE002_2.py"))]
+    #[test_case(Rule::ExecutableFileWithoutShebang, Path::new("EXE002_3.py"))]
     #[test_case(Rule::ShebangMissingPython, Path::new("EXE003.py"))]
     #[test_case(Rule::ShebangMissingPython, Path::new("EXE003_uv.py"))]
     #[test_case(Rule::ShebangMissingPython, Path::new("EXE003_uv_tool.py"))]

@@ -336,6 +336,7 @@ pub fn is_immutable_return_type(qualified_name: &[&str]) -> bool {
             | ["pathlib", "Path"]
             | ["types", "MappingProxyType"]
             | ["re", "compile"]
+            | ["", "frozendict", "fromkeys"]
             | [
                 "",
                 "bool"

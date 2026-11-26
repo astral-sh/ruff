@@ -27,7 +27,7 @@ class Person:
 We can see in the signature of `__init__` that `db` is included as an argument:
 
 ```py
-reveal_type(Person.__init__)  # revealed: (self: Person, db: Database, name: str, age: int) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, /, db: Database, name: str, age: int) -> None
 ```
 
 However, when we create an instance of this dataclass, the `db` attribute is not accessible:
@@ -36,13 +36,13 @@ However, when we create an instance of this dataclass, the `db` attribute is not
 db = Database()
 alice = Person(db, "Alice", 30)
 
-alice.db  # error: [unresolved-attribute]
+alice.db  # error: [missing-attribute]
 ```
 
 The `db` attribute is also not accessible on the class itself:
 
 ```py
-Person.db  # error: [unresolved-attribute]
+Person.db  # error: [missing-attribute]
 ```
 
 Other fields can still be accessed normally:
@@ -67,7 +67,7 @@ class Person:
 
     metadata: InitVar[str] = "default"
 
-reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int, metadata: str = "default") -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, /, name: str, age: int, metadata: str = "default") -> None
 
 alice = Person("Alice", 30)
 bob = Person("Bob", 25, "custom metadata")
@@ -89,7 +89,7 @@ class C:
     a: Top[int]
     int: InitVar[int] = 0
 
-reveal_type(C.__init__)  # revealed: (self: C, a: int, int: int = 0) -> None
+reveal_type(C.__init__)  # revealed: (self: C, /, a: int, int: int = 0) -> None
 C()  # error: [missing-argument] "No argument provided for required parameter `a`"
 ```
 
@@ -163,10 +163,10 @@ class AlsoWrong:
     # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression: Did you mean `tuple[()]`?"
     x: InitVar[(),]
 
-# revealed: (self: AlsoWrong, x: Unknown) -> None
+# revealed: (self: AlsoWrong, /, x: Unknown) -> None
 reveal_type(AlsoWrong.__init__)
 
-# error: [unresolved-attribute]
+# error: [missing-attribute]
 reveal_type(AlsoWrong(42).x)  # revealed: Unknown
 ```
 

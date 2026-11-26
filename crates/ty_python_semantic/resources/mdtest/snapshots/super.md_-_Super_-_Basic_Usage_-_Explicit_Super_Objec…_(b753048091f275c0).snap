@@ -32,15 +32,15 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
  17 | 
  18 | super(C, C()).a
  19 | super(C, C()).b
- 20 | super(C, C()).c  # error: [unresolved-attribute]
+ 20 | super(C, C()).c  # error: [missing-attribute]
  21 | 
  22 | super(B, C()).a
- 23 | super(B, C()).b  # error: [unresolved-attribute]
- 24 | super(B, C()).c  # error: [unresolved-attribute]
+ 23 | super(B, C()).b  # error: [missing-attribute]
+ 24 | super(B, C()).c  # error: [missing-attribute]
  25 | 
- 26 | super(A, C()).a  # error: [unresolved-attribute]
- 27 | super(A, C()).b  # error: [unresolved-attribute]
- 28 | super(A, C()).c  # error: [unresolved-attribute]
+ 26 | super(A, C()).a  # error: [missing-attribute]
+ 27 | super(A, C()).b  # error: [missing-attribute]
+ 28 | super(A, C()).c  # error: [missing-attribute]
  29 | 
  30 | reveal_type(super(C, C()).a)  # revealed: bound method C.a() -> Unknown
  31 | reveal_type(super(C, C()).b)  # revealed: bound method C.b() -> Unknown
@@ -124,55 +124,55 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
 # Diagnostics
 
 ```
-error[unresolved-attribute]: Object of type `<super: <class 'C'>, C>` has no attribute `c`
+error[missing-attribute]: Object of type `<super: <class 'C'>, C>` has no attribute `c`
   --> src/mdtest_snippet.py:20:1
    |
-20 | super(C, C()).c  # error: [unresolved-attribute]
+20 | super(C, C()).c  # error: [missing-attribute]
    | ^^^^^^^^^^^^^^^
 
 ```
 
 ```
-error[unresolved-attribute]: Object of type `<super: <class 'B'>, C>` has no attribute `b`
+error[missing-attribute]: Object of type `<super: <class 'B'>, C>` has no attribute `b`
   --> src/mdtest_snippet.py:23:1
    |
-23 | super(B, C()).b  # error: [unresolved-attribute]
+23 | super(B, C()).b  # error: [missing-attribute]
    | ^^^^^^^^^^^^^^^
 
 ```
 
 ```
-error[unresolved-attribute]: Object of type `<super: <class 'B'>, C>` has no attribute `c`
+error[missing-attribute]: Object of type `<super: <class 'B'>, C>` has no attribute `c`
   --> src/mdtest_snippet.py:24:1
    |
-24 | super(B, C()).c  # error: [unresolved-attribute]
+24 | super(B, C()).c  # error: [missing-attribute]
    | ^^^^^^^^^^^^^^^
 
 ```
 
 ```
-error[unresolved-attribute]: Object of type `<super: <class 'A'>, C>` has no attribute `a`
+error[missing-attribute]: Object of type `<super: <class 'A'>, C>` has no attribute `a`
   --> src/mdtest_snippet.py:26:1
    |
-26 | super(A, C()).a  # error: [unresolved-attribute]
+26 | super(A, C()).a  # error: [missing-attribute]
    | ^^^^^^^^^^^^^^^
 
 ```
 
 ```
-error[unresolved-attribute]: Object of type `<super: <class 'A'>, C>` has no attribute `b`
+error[missing-attribute]: Object of type `<super: <class 'A'>, C>` has no attribute `b`
   --> src/mdtest_snippet.py:27:1
    |
-27 | super(A, C()).b  # error: [unresolved-attribute]
+27 | super(A, C()).b  # error: [missing-attribute]
    | ^^^^^^^^^^^^^^^
 
 ```
 
 ```
-error[unresolved-attribute]: Object of type `<super: <class 'A'>, C>` has no attribute `c`
+error[missing-attribute]: Object of type `<super: <class 'A'>, C>` has no attribute `c`
   --> src/mdtest_snippet.py:28:1
    |
-28 | super(A, C()).c  # error: [unresolved-attribute]
+28 | super(A, C()).c  # error: [missing-attribute]
    | ^^^^^^^^^^^^^^^
 
 ```

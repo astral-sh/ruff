@@ -1100,6 +1100,18 @@ def test_union_class_pattern_uses_members_from_matching_class(
             reveal_type(value)  # revealed: IndirectIntPattern
 ```
 
+Failing to match `PatternClass()` can leave an `IndirectPattern` instance because `PatternClass` may
+be a proper subclass.
+
+```py
+def match_possible_subclass(value: IndirectPattern, PatternClass: type[IndirectPattern]) -> None:
+    match value:
+        case PatternClass():
+            pass
+        case _:
+            reveal_type(value)  # revealed: IndirectPattern
+```
+
 ## Class pattern aliases
 
 The same rule applies outside sequence patterns. A class pattern keeps the generic arguments of a
@@ -1710,7 +1722,7 @@ def test_union_alias_capture(value: AliasPatternBase[Item]) -> None:
             # revealed: int | str
             reveal_type(item)
 
-            # error: [unresolved-attribute] "Object of type `int | str` has no attribute `nonexistent`"
+            # error: [missing-attribute] "Object of type `int | str` has no attribute `nonexistent`"
             item.nonexistent()
 ```
 
@@ -2075,7 +2087,7 @@ class GenericOverlapB(Generic[OverlapT]):
     member: OverlapT
 
 class GenericOverlapC(GenericOverlapB[str], GenericOverlapA):
-    member: str  # error: [invalid-attribute-override]
+    member: str  # error: [incompatible-attribute-override]
 
 class GenericListOverlapA: ...
 
@@ -2695,7 +2707,7 @@ def intersected_typed_dict_mapping_is_exhaustive(
 
 def optional_key_is_not_exhaustive(
     value: OptionalPayload,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case {"value": _}:
@@ -2703,7 +2715,7 @@ def optional_key_is_not_exhaustive(
 
 def absent_key_is_not_exhaustive(
     value: RequiredPayload,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case {"missing": _}:
@@ -2711,7 +2723,7 @@ def absent_key_is_not_exhaustive(
 
 def non_string_key_is_not_exhaustive(
     value: RequiredPayload,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case {1: _}:
@@ -2802,7 +2814,7 @@ def builtin_subclass_positional_pattern_is_exhaustive(value: MyInt) -> int:
 
 def builtin_positional_literal_is_not_exhaustive(
     value: MyInt,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case MyInt(0):
@@ -2848,7 +2860,7 @@ class IntWithMissingMatchArg(int):
 
 def missing_match_arg_is_not_exhaustive(
     value: IntWithMissingMatchArg,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case IntWithMissingMatchArg(_):
@@ -2861,7 +2873,7 @@ class IntWithMetaclassMatchArgs(int, metaclass=MatchArgsMeta): ...
 
 def metaclass_match_args_is_not_exhaustive(
     value: IntWithMetaclassMatchArgs,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case IntWithMetaclassMatchArgs(_):
@@ -2873,7 +2885,7 @@ class WidenedMatchArgs:
 
 def widened_match_args_is_not_exhaustive(
     value: WidenedMatchArgs,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case WidenedMatchArgs(_):
@@ -2890,7 +2902,7 @@ class ConditionalIntMatchArgs(int):
 
 def conditional_match_args_disables_builtin_behavior(
     value: ConditionalIntMatchArgs,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case ConditionalIntMatchArgs(_):
@@ -3000,7 +3012,7 @@ class IntPlainChild(int, PlainBase): ...
 
 def builtin_positional_behavior_comes_from_pattern_class(
     value: IntPlainChild,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case PlainBase(_):  # error: [invalid-match-pattern]
@@ -3068,7 +3080,7 @@ class PossiblyMissingAttribute:
 
 def possibly_missing_attribute_is_not_exhaustive(
     value: PossiblyMissingAttribute,
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case PossiblyMissingAttribute(x=_):
@@ -3190,7 +3202,7 @@ def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) 
 # Matching the element would succeed, but a one-element pattern cannot match a two-element tuple.
 def sequence_length_is_still_checked(
     value: tuple[HasX, HasX],
-    # error: [invalid-return-type]
+    # error: [invalid-implicit-return]
 ) -> int:
     match value:
         case [HasX(x=_)]:
@@ -3920,19 +3932,19 @@ class ReflexivePatternValues:
     TYPE_VAR = T
     NEW_TYPE = UserId
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def generic_alias_value_pattern() -> int:
     match list[int]:
         case ReflexivePatternValues.LIST_INT:
             return 1
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def cross_origin_generic_alias_value_pattern() -> int:
     match list[int]:
         case ReflexivePatternValues.LEGACY_LIST_INT:
             return 1
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def cross_origin_special_form_value_pattern() -> int:
     match Literal:
         case ReflexivePatternValues.EXTENSIONS_LITERAL:
@@ -3943,13 +3955,13 @@ def singleton_special_form_value_pattern() -> int:
         case ReflexivePatternValues.OPTIONAL:
             return 1
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def type_var_value_pattern() -> int:
     match T:
         case ReflexivePatternValues.TYPE_VAR:
             return 1
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def new_type_value_pattern() -> int:
     match UserId:
         case ReflexivePatternValues.NEW_TYPE:
@@ -3972,7 +3984,7 @@ def target(value: int) -> int:
 class PartialPatternValues:
     VALUE = partial(target, 1)
 
-# error: [invalid-return-type]
+# error: [invalid-implicit-return]
 def partial_value_pattern() -> int:
     match partial(target, 1):
         case PartialPatternValues.VALUE:

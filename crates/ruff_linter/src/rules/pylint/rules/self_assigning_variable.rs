@@ -46,6 +46,12 @@ pub(crate) fn self_assignment(checker: &Checker, assign: &ast::StmtAssign) {
         return;
     }
 
+    // For `x = value`, `array_combinations` would allocate a buffer just to yield one pair.
+    if let [target] = assign.targets.as_slice() {
+        visit_assignments(checker, target, assign.value.as_ref());
+        return;
+    }
+
     for [left, right] in assign
         .targets
         .iter()

@@ -521,6 +521,27 @@ def consume_explicit(value: E | F) -> None: ...
 reveal_type(infer_from_consumers(consume_first, consume_second, consume_explicit))  # revealed: Unknown
 ```
 
+## Independent bounds after inference exhausts its budget
+
+Matching each string against both `T` and `Sequence[T]` can exhaust the construction budget. The
+callback still violates the upper bound on `U` in either argument order.
+
+```py
+from collections.abc import Callable, Sequence
+from typing import Literal, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U", bound=int)
+Words = Literal[
+    "abcdefghijklmnop", "aa", "bb", "cc", "dd", "ee", "ff", "gg", "hh", "ii", "jj", "kk", "ll", "mm", "nn", "oo", "pp"
+]
+
+def consume(value: T | Sequence[T], other: Callable[[], U]) -> None: ...
+def check(value: Words, other: Callable[[], str]) -> None:
+    consume(value=value, other=other)  # error: [invalid-argument-type] "does not satisfy upper bound `int`"
+    consume(other=other, value=value)  # error: [invalid-argument-type] "does not satisfy upper bound `int`"
+```
+
 ## Narrowing negated intersection aliases
 
 The negation of an aliased intersection acts as a union of negations. Intersecting three such upper
@@ -697,6 +718,14 @@ def swap(value: int | str) -> int | str:
 
 def _() -> None:
     reveal_type(infer_pair(swap))  # revealed: Result[tuple[int, str]] & Result[tuple[str, int]]
+```
+
+The refined return type is retained even with an explicit declared type annotation:
+
+```py
+def _() -> None:
+    result: Result[tuple[int, str] | tuple[str, int]] = infer_pair(swap)
+    reveal_type(result)  # revealed: Result[tuple[int, str]] & Result[tuple[str, int]]
 ```
 
 ## Returning callables with generic overloads
@@ -1127,7 +1156,7 @@ def _(callback: Restricted[str]):
 F = TypeVar("F", bound=Restricted[str])
 
 def _(callback: F):
-    consume(callback)  # TODO: This should error.
+    consume(callback)  # error: [invalid-argument-type]
     x: Callable[[int], str] = callback  # error: [invalid-assignment]
 ```
 
@@ -1142,8 +1171,7 @@ G = TypeVar("G", bound=Restricted[int])
 
 def _(callback: G):
     consume(callback)
-    # TODO: This should not error.
-    x: Callable[[int], str] = callback  # error: [invalid-assignment]
+    x: Callable[[int], str] = callback  # ok
 ```
 
 Note that a compatible receiver bound does not satisfy an incompatible return type:
@@ -1151,6 +1179,33 @@ Note that a compatible receiver bound does not satisfy an incompatible return ty
 ```py
 def _(callback: G):
     wrong: Callable[[int], bytes] = callback  # error: [invalid-assignment]
+```
+
+## Overloaded methods on a bounded type variable
+
+Both overloads accept any receiver, so together they cover the protocol's input union even when the
+receiver is `T`. The bound method's return type must account for both overloads.
+
+```py
+from typing import Callable, Protocol, TypeVar, overload
+
+class Parser:
+    @overload
+    def parse(self: object, value: int, /) -> int: ...
+    @overload
+    def parse(self: object, value: str, /) -> str: ...
+    def parse(self: object, value: int | str, /) -> int | str:
+        return value
+
+class SupportsParse(Protocol):
+    def parse(self, value: int | str, /) -> int | str: ...
+
+T = TypeVar("T", bound=Parser)
+
+def check(parser: T):
+    impl: SupportsParse = parser  # ok
+    parse: Callable[[int | str], int | str] = parser.parse  # ok
+    wrong: Callable[[int | str], int] = parser.parse  # error: [invalid-assignment]
 ```
 
 ## Constructor bounds in callable inference
@@ -1219,6 +1274,24 @@ def _(callback: Wrapper[Wrapper[Callable[[int], str]]]):
 
 def _(callback: H):
     reveal_type(apply(callback))  # revealed: str
+```
+
+## Type variables captured by a generic callback
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+Pair = tuple[T, U]
+
+def pairs(captured: T):
+    def pair(value: U) -> Pair[T, U]:
+        return captured, value
+
+    callbacks = {pair}
+    callbacks |= {pair}
+    reveal_type(callbacks.pop()(1))  # revealed: tuple[T@pairs, Literal[1]]
 ```
 
 ## Multiple occurrences of a higher-order generic callable
@@ -1366,6 +1439,61 @@ class Closed:
     @decorate  # ok
     @classmethod
     def method(cls, value: int) -> None: ...
+```
+
+## Decorating a binary method with a bounded receiver
+
+Both `self` and `abs(self)` satisfy the bound on `M`. The decorated method accepts another matrix,
+even though the decorator's signature doesn't tell us whether the result keeps the receiver's type.
+
+```py
+from typing import Callable, TypeVar
+from typing_extensions import Self
+
+A = TypeVar("A")
+B = TypeVar("B")
+R = TypeVar("R")
+M = TypeVar("M", bound="Matrix")
+
+def decorate(fn: Callable[[A, B], R]) -> Callable[[A, B], R]:
+    return fn
+
+class Matrix:
+    def __abs__(self) -> Self:
+        return self
+
+    @decorate
+    def __add__(self: M, other: M) -> M:
+        return self
+
+    def check(self):
+        reveal_type(abs(self))  # revealed: Self@check
+        reveal_type(self + self)  # revealed: Unknown
+        reveal_type(abs(self) + self)  # revealed: Unknown
+        abs(self) + 1  # error: [unsupported-operator]
+```
+
+## Decorating a generic function with a bounded decorator
+
+`identity` accepts any value, but the decorator limits the wrapped function to integers.
+
+```py
+from typing import Callable, TypeVar
+
+A = TypeVar("A", bound=int)
+R = TypeVar("R", bound=int)
+T = TypeVar("T")
+
+def integers(fn: Callable[[A], R]) -> Callable[[A], R]:
+    return fn
+
+@integers
+def identity(value: T) -> T:
+    return value
+
+identity("x")  # error: [invalid-argument-type]
+# TODO: Solve for the decorator's bounded variables and accept this call.
+identity(1)  # error: [invalid-argument-type]
 ```
 
 ## Gradual class parameters
@@ -1588,6 +1716,273 @@ class IPolys(Protocol[T]):
     def __getitem__(self, key: int) -> IPolys[T]: ...
     @overload
     def __getitem__(self, key: slice) -> IPolys[T] | Domain[T]: ...
+```
+
+## Specializing generic methods
+
+A method can use its own type parameter as the class argument of another instance. That class
+argument stays fixed whether the method is called directly or saved as a bound method.
+
+```py
+from typing import Generic, TypeVar
+
+C = TypeVar("C")
+T = TypeVar("T")
+
+class Box(Generic[C]):
+    def __init__(self) -> None:
+        self.callback = self.method
+
+    def method(self, value: T) -> tuple[C, T]:
+        def check(other: Box[T], arg: int) -> None:
+            result = other.method(arg)
+            # revealed: tuple[T@method, int]
+            reveal_type(result)
+            pair: tuple[T, int] = result  # no diagnostic
+            # revealed: tuple[T@method, int]
+            reveal_type(other.callback(arg))
+
+        raise NotImplementedError
+```
+
+The same applies when the class argument comes from a separate generic function.
+
+```py
+def check(other: Box[T], arg: int) -> None:
+    result = other.method(arg)
+    # revealed: tuple[T@check, int]
+    reveal_type(result)
+    pair: tuple[T, int] = result  # no diagnostic
+```
+
+## Aliases in the owner of a generic method
+
+Calling a generic method leaves the enclosing method's type parameter fixed, whether an alias
+receives it as an argument or captures it in its definition.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import TypeAliasType
+
+A = TypeVar("A")
+C = TypeVar("C")
+T = TypeVar("T")
+Items = TypeAliasType("Items", list[A], type_params=(A,))
+Nested = TypeAliasType("Nested", "A | list[Nested[tuple[A]]]", type_params=(A,))
+
+class Box(Generic[C]):
+    @staticmethod
+    def get(value: T) -> C:
+        LocalItems = TypeAliasType("LocalItems", list[T])
+
+        def check(explicit: "Box[Items[T]]", captured: "Box[LocalItems]", n: int) -> None:
+            from_argument = explicit.get(n)
+            ok: list[T] = from_argument
+            wrong: list[int] = from_argument  # error: [invalid-assignment]
+
+            from_definition = captured.get(n)
+            ok_again: list[T] = from_definition
+            wrong_again: list[int] = from_definition  # error: [invalid-assignment]
+
+        def recursive(other: "Box[Nested[T]]", n: int) -> None:
+            result = other.get(n)
+            ok: Nested[T] = result
+            wrong: Nested[int] = result  # error: [invalid-assignment]
+
+        raise NotImplementedError
+```
+
+## `Self` as a protocol's type argument
+
+When a method takes its owner's type argument and returns `Self`, binding the method fixes its
+return type to the receiver. The argument keeps the type supplied when specializing the protocol.
+
+```py
+from typing import Callable, Protocol, TypeVar
+from typing_extensions import Self
+
+C = TypeVar("C")
+
+class P(Protocol[C]):
+    def method(self, value: C) -> tuple[C, Self]:
+        def check(other: "P[Self]", value: Self) -> None:
+            # revealed: tuple[Self@method, P[Self@method]]
+            reveal_type(other.method(value))
+            callback: Callable[[Self], tuple[Self, P[Self]]] = other.method  # ok
+            other.method(object())  # error: [invalid-argument-type]
+
+        raise NotImplementedError
+```
+
+## Inferred returns of specialized generic methods
+
+An inferred return can refer to both the owner's type argument and the called method's type
+argument. Only the latter is inferred from the call.
+
+```toml
+[analysis]
+return-type-inference = "always"
+```
+
+```py
+from typing import Generic, TypeVar, final
+
+C = TypeVar("C")
+T = TypeVar("T")
+
+@final
+class Box(Generic[C]):
+    value: C
+
+    def pair(self, arg: T):
+        def check(other: Box[T], n: int) -> tuple[T, T]:
+            result = other.pair(n)
+            # revealed: tuple[T@pair, int]
+            reveal_type(result)
+            return result  # error: [invalid-explicit-return]
+
+        return self.value, arg
+```
+
+## Specializing generic constructors
+
+A constructor's method type parameter is independent of an explicitly supplied class argument, even
+when that argument is the type parameter of an enclosing call to the same constructor.
+
+```py
+from typing import Generic, TypeVar
+
+C = TypeVar("C")
+T = TypeVar("T")
+
+class Box(Generic[C]):
+    def __init__(self, value: tuple[C, T]) -> None:
+        def check(arg: tuple[T, int]) -> None:
+            # revealed: Box[T@__init__]
+            reveal_type(Box[T](arg))
+
+        def check_class_parameter(arg: tuple[C, int]) -> None:
+            # revealed: Box[C@Box]
+            reveal_type(Box[C](arg))
+```
+
+## Inferring a callback parameter through a protocol member
+
+`Box` has no type arguments, but its `value` attribute carries the type variable from `put`.
+Comparing the result of `put` with `HasValue` supplies the upper bound of `int` for `X`.
+
+```py
+from typing import Callable, Protocol, TypeVar
+
+T = TypeVar("T", bound=int)
+X = TypeVar("X")
+
+class HasValue(Protocol):
+    @property
+    def value(self) -> int: ...
+
+class Box:
+    def put(self, x: T) -> "Box":
+        self.value = x
+        return self
+
+def argument(f: Callable[[X], HasValue]) -> X:
+    raise NotImplementedError
+
+def check(box: Box):
+    reveal_type(argument(box.put))  # revealed: int
+```
+
+## Specializing generic protocol methods
+
+A method can use its own type parameter as the class argument of another instance of its protocol.
+That class argument stays fixed while the other instance's method accepts independently chosen
+argument types. An implementation that always returns `int` in the first tuple element therefore
+satisfies `Required[int]`, but cannot satisfy `Required[T]` for an arbitrary `T`. The local `accept`
+function captures `method`'s `T`, so passing an argument cannot infer a new value for it.
+
+```py
+from typing import Protocol, TypeVar
+
+C = TypeVar("C", covariant=True)
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Implementation:
+    def method(self, value: U) -> tuple[int, U]:
+        raise NotImplementedError
+
+class Required(Protocol[C]):
+    def method(self, value: T) -> tuple[C, T]:
+        def accept(value: Required[T]) -> None: ...
+
+        accept(Implementation())  # error: [invalid-argument-type]
+        raise NotImplementedError
+
+def accept_int(value: Required[int]) -> None: ...
+def accept_str(value: Required[str]) -> None: ...
+
+accept_int(Implementation())  # no diagnostic
+accept_str(Implementation())  # error: [invalid-argument-type]
+```
+
+## Specializing overloaded generic protocol methods
+
+Each overload's type parameter is independent of the class argument. The local `accept` function
+captures the first overload's type parameter. The second overload's return type places no
+restriction on the class argument.
+
+```toml
+[rules]
+useless-overload-body = "ignore"
+```
+
+```py
+from typing import Literal, Protocol, TypeVar, overload
+
+C = TypeVar("C", covariant=True)
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Implementation:
+    def method(self, value: U, flag: bool) -> tuple[int, U]:
+        raise NotImplementedError
+
+class Required(Protocol[C]):
+    @overload
+    def method(self, value: T, flag: Literal[False]) -> tuple[C, T]:
+        def accept(value: Required[T]) -> None: ...
+
+        accept(Implementation())  # error: [invalid-argument-type]
+        raise NotImplementedError
+    @overload
+    def method(self, value: T, flag: Literal[True]) -> object: ...
+
+def accept_int(value: Required[int]) -> None: ...
+def accept_str(value: Required[str]) -> None: ...
+
+accept_int(Implementation())  # no diagnostic
+accept_str(Implementation())  # error: [invalid-argument-type]
+```
+
+## An invariant parameter shared with the return type
+
+The return requires `T` to include `str`. The parameter must then accept `list[int | str]`.
+
+```pyi
+from typing import Callable, TypeVar
+from typing_extensions import assert_type
+
+T = TypeVar("T")
+S = TypeVar("S", int | str, bytes)
+I = TypeVar("I", bound=int)
+
+def infer(f: Callable[[list[int | T]], list[int | T]]) -> T: ...
+def append(xs: list[S]) -> list[S | str]: ...
+def only_ints(xs: list[I]) -> list[I | str]: ...
+
+assert_type(infer(append), str)
+infer(only_ints)  # error: [invalid-argument-type]
 ```
 
 ## Returned callables with recursive parameter aliases

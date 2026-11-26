@@ -78,8 +78,7 @@ impl Visitor<'_> for AttributeSearcher<'_> {
         if expr.is_attribute_expr()
             && self
                 .semantic
-                .resolve_qualified_name(expr)
-                .is_some_and(|qualified_name| qualified_name == self.attribute_to_find)
+                .matches_qualified_name(expr, self.attribute_to_find.segments())
         {
             self.found_attribute = true;
             return;

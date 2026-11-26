@@ -68,11 +68,15 @@ impl EnvVars {
     ///
     /// When set to `1` or `true`, ty also uses uv to discover the workspace root and its Python
     /// environment.
+    ///
+    /// Set to `off` to disable all uv integration, even when `project-manager.project` or
+    /// `project-manager.script` is set to `"uv"`. An explicit `TY_UV` takes precedence over ty
+    /// configuration.
     pub const TY_UV: &'static str = "TY_UV";
 
     /// The path to the uv executable to use for workspace discovery and script environments.
     ///
-    /// ty uses this path when uv integration is enabled by `TY_UV`.
+    /// ty uses this path when uv integration is enabled.
     #[attr_hidden]
     pub const UV: &'static str = "UV";
 
@@ -88,8 +92,9 @@ impl EnvVars {
     /// Used to determine the name of the active Conda environment.
     pub const CONDA_DEFAULT_ENV: &'static str = "CONDA_DEFAULT_ENV";
 
-    /// Used to detect the path of an active Conda environment.
-    /// If both `VIRTUAL_ENV` and `CONDA_PREFIX` are present, `VIRTUAL_ENV` will be preferred.
+    /// The path to the active Conda or Pixi environment. If it contains no Python interpreter,
+    /// ty continues searching, including in the project's `.venv`.
+    /// A non-empty `VIRTUAL_ENV` takes precedence.
     pub const CONDA_PREFIX: &'static str = "CONDA_PREFIX";
 
     /// Used to determine the root install path of Conda.

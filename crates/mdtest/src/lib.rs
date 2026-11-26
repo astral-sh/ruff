@@ -465,11 +465,7 @@ pub fn validate_inline_snapshot(
         }
     }
 
-    if failures.is_empty() {
-        Ok(())
-    } else {
-        Err(failures)
-    }
+    failures.is_empty().ok_or(failures)
 }
 
 fn render_diff(f: &mut dyn std::fmt::Write, expected: &str, actual: &str) -> std::fmt::Result {

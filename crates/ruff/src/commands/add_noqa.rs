@@ -11,23 +11,22 @@ use ruff_linter::linter::add_suppressions_to_path;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_workspace::resolver::{
-    PyprojectConfig, ResolvedFile, match_exclusion, project_files_in_path,
-};
+use ruff_workspace::resolver::{ResolvedFile, RootProject, match_exclusion, project_files_in_path};
+use ruff_workspace::script::{ScriptSettingsError, script};
 
 use crate::args::ConfigArguments;
 
 /// Add suppression directives to a collection of files.
 pub(crate) fn add_noqa(
     files: &[PathBuf],
-    pyproject_config: &PyprojectConfig,
+    root_project: &RootProject,
     config_arguments: &ConfigArguments,
     reason: Option<&str>,
     suppression_kind: SuppressionKind,
 ) -> Result<usize> {
     // Collect all the files to check.
     let start = Instant::now();
-    let (mut paths, resolver) = project_files_in_path(files, pyproject_config, config_arguments)?;
+    let (mut paths, resolver) = project_files_in_path(files, root_project, config_arguments)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {duration:?}");
 
@@ -69,7 +68,8 @@ pub(crate) fn add_noqa(
                 .parent()
                 .and_then(|parent| package_roots.get(parent))
                 .and_then(|package| *package);
-            let settings = resolver.resolve(path);
+            let project = resolver.resolve_with_path(path);
+            let settings = &project.settings;
             if (settings.file_resolver.force_exclude || !resolved_file.is_root())
                 && match_exclusion(
                     resolved_file.path(),
@@ -87,12 +87,28 @@ pub(crate) fn add_noqa(
                     return Ok(0);
                 }
             };
+            let script = script(
+                project,
+                config_arguments,
+                config_arguments.script_configuration(),
+                Some(path),
+                source_type,
+                source_kind.source_code(),
+            )
+            .map_err(ScriptSettingsError::into_anyhow)?;
+            let package = script.as_ref().map_or(package, |script| {
+                script.package_root(path, &settings.linter, package, &package_roots)
+            });
+            let linter = match &script {
+                Some(script) => &script.settings(settings).linter,
+                None => &settings.linter,
+            };
             match add_suppressions_to_path(
                 path,
                 package,
                 &source_kind,
                 source_type.expect_python(),
-                &settings.linter,
+                linter,
                 reason,
                 suppression_kind,
             ) {

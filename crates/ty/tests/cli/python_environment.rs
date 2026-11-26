@@ -30,7 +30,7 @@ fn config_override_python_version() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-attribute]: Module `sys` has no member `last_exc`
+    error[missing-attribute]: Module `sys` has no member `last_exc`
      --> test.py:5:7
       |
     5 | print(sys.last_exc)
@@ -190,7 +190,7 @@ fn src_subdirectory_takes_precedence_over_repo_root() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package` has no member `nonexistent_submodule`
+    error[missing-module-member]: Module `package` has no member `nonexistent_submodule`
      --> src/package/__init__.py:1:15
       |
     1 | from . import nonexistent_submodule
@@ -1263,7 +1263,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-attribute]: Module `os` has no member `grantpt`
+    error[missing-attribute]: Module `os` has no member `grantpt`
      --> main.py:4:1
       |
     4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
@@ -1275,7 +1275,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     3 | python-version = "3.11"
       |                  ^^^^^^ Python version configuration
 
-    error[import-not-found]: Module `typing` has no member `TypeAliasType`
+    error[missing-module-member]: Module `typing` has no member `TypeAliasType`
      --> main.py:6:20
       |
     6 | from typing import TypeAliasType  # added in Python 3.12
@@ -1325,14 +1325,27 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// The `site-packages` directory is used by ty for external import.
-/// Ty does the following checks to discover the `site-packages` directory in the order:
-/// 1) If `VIRTUAL_ENV` environment variable is set
-/// 2) If `CONDA_PREFIX` environment variable is set (and .filename == `CONDA_DEFAULT_ENV`)
+fn write_conda_interpreters(case: &CliTest) -> anyhow::Result<()> {
+    let python = if cfg!(windows) {
+        "python.exe"
+    } else {
+        "bin/python"
+    };
+    for prefix in ["conda", "conda/envs/conda-env"] {
+        case.write_file(format!("{prefix}/{python}"), "")?;
+    }
+    Ok(())
+}
+
+/// The `site-packages` directory is used by ty for external imports.
+/// ty does the following checks to discover the `site-packages` directory in the order:
+/// 1) If the `VIRTUAL_ENV` environment variable is set to a non-empty value
+/// 2) If `CONDA_PREFIX` points to a child environment (e.g. its directory name matches
+///    `CONDA_DEFAULT_ENV`)
 /// 3) If a `.venv` directory exists at the project root
-/// 4) If `CONDA_PREFIX` environment variable is set (and .filename != `CONDA_DEFAULT_ENV`)
-///    or if `_CONDA_ROOT` is set (and `_CONDA_ROOT` == `CONDA_PREFIX`)
+/// 4) If `CONDA_PREFIX` points to the base environment (e.g. `_CONDA_ROOT` == `CONDA_PREFIX`)
 ///
+/// A Conda environment is considered only if it contains a Python interpreter.
 /// This test (and the next one) is aiming at validating the logic around these cases.
 ///
 /// To do this we create a program that has these 4 imports:
@@ -1373,6 +1386,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
 /// │               └── package1
 /// │                   └── __init__.py
 /// └── conda
+///     ├── bin/python
 ///     ├── lib
 ///     │   └── python3.13
 ///     │       └── site-packages
@@ -1380,6 +1394,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
 ///     │               └── __init__.py
 ///     └── envs
 ///         └── conda-env
+///             ├── bin/python
 ///             └── lib
 ///                 └── python3.13
 ///                     └── site-packages
@@ -1387,7 +1402,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
 ///                             └── __init__.py
 ///
 /// test.py imports package1
-/// And the command is run in the `child` directory.
+/// And the command is run in the `project` directory.
 #[test]
 fn check_venv_resolution_with_working_venv() -> anyhow::Result<()> {
     let child_conda_package1_path = if cfg!(windows) {
@@ -1472,13 +1487,15 @@ home = ./
         ),
     ])?;
 
+    write_conda_interpreters(&case)?;
+
     // Run with nothing set, should find the working venv
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `WorkingVenv`
+    error[missing-module-member]: Module `package1` has no member `WorkingVenv`
      --> test.py:4:22
       |
     4 | from package1 import WorkingVenv
@@ -1496,7 +1513,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[unresolved-import]: Module `package1` has no member `WorkingVenv`
+    error[missing-module-member]: Module `package1` has no member `WorkingVenv`
      --> test.py:4:22
       |
     4 | from package1 import WorkingVenv
@@ -1514,7 +1531,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ActiveVenv`
+    error[missing-module-member]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
@@ -1532,7 +1549,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ChildConda`
+    error[missing-module-member]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1551,7 +1568,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `WorkingVenv`
+    error[missing-module-member]: Module `package1` has no member `WorkingVenv`
      --> test.py:4:22
       |
     4 | from package1 import WorkingVenv
@@ -1572,7 +1589,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ActiveVenv`
+    error[missing-module-member]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
@@ -1583,7 +1600,7 @@ home = ./
     ----- stderr -----
     ");
 
-    // run with CONDA_PREFIX and CONDA_DEFAULT_ENV (equal!) set, should find ChildConda
+    // run with CONDA_DEFAULT_ENV set to the directory name of CONDA_PREFIX, should find ChildConda
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
@@ -1591,7 +1608,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ChildConda`
+    error[missing-module-member]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1606,11 +1623,11 @@ home = ./
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
-        .env("_CONDA_ROOT", "conda"), @"
+        .env("_CONDA_ROOT", case.root().join("conda")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ChildConda`
+    error[missing-module-member]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1621,19 +1638,19 @@ home = ./
     ----- stderr -----
     ");
 
-    // run with _CONDA_ROOT and CONDA_PREFIX (equal!) set, should find BaseConda
+    // run with _CONDA_ROOT and CONDA_PREFIX (equal!) set, should find WorkingVenv
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("_CONDA_ROOT", "conda"), @"
+        .env("_CONDA_ROOT", case.root().join("conda")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `BaseConda`
-     --> test.py:5:22
+    error[missing-module-member]: Module `package1` has no member `WorkingVenv`
+     --> test.py:4:22
       |
-    5 | from package1 import BaseConda
-      |                      ^^^^^^^^^
+    4 | from package1 import WorkingVenv
+      |                      ^^^^^^^^^^^
 
     Found 1 diagnostic
 
@@ -1709,6 +1726,8 @@ home = ./
         ),
     ])?;
 
+    write_conda_interpreters(&case)?;
+
     // Run with nothing set, should fail to find anything
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project")), @"
@@ -1767,7 +1786,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ActiveVenv`
+    error[missing-module-member]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
@@ -1785,7 +1804,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ChildConda`
+    error[missing-module-member]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1804,7 +1823,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `BaseConda`
+    error[missing-module-member]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
     5 | from package1 import BaseConda
@@ -1825,7 +1844,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ActiveVenv`
+    error[missing-module-member]: Module `package1` has no member `ActiveVenv`
      --> test.py:2:22
       |
     2 | from package1 import ActiveVenv
@@ -1844,7 +1863,7 @@ home = ./
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `BaseConda`
+    error[missing-module-member]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
     5 | from package1 import BaseConda
@@ -1859,11 +1878,11 @@ home = ./
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda/envs/conda-env"))
-        .env("_CONDA_ROOT", "conda"), @"
+        .env("_CONDA_ROOT", case.root().join("conda")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `ChildConda`
+    error[missing-module-member]: Module `package1` has no member `ChildConda`
      --> test.py:3:22
       |
     3 | from package1 import ChildConda
@@ -1878,11 +1897,11 @@ home = ./
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("CONDA_PREFIX", case.root().join("conda"))
-        .env("_CONDA_ROOT", "conda"), @"
+        .env("_CONDA_ROOT", case.root().join("conda")), @"
     success: false
     exit_code: 1
     ----- stdout -----
-    error[import-not-found]: Module `package1` has no member `BaseConda`
+    error[missing-module-member]: Module `package1` has no member `BaseConda`
      --> test.py:5:22
       |
     5 | from package1 import BaseConda

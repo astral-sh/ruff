@@ -4,6 +4,7 @@ use ruff_benchmark::real_world_projects::{
     InstalledProject, RealWorldProject, TY_ECOSYSTEM_PIN, check_project,
 };
 
+use std::cell::LazyCell;
 use std::fmt::Write;
 use std::ops::Range;
 
@@ -221,6 +222,54 @@ fn benchmark_micro_case(criterion: &mut Criterion, name: &str, code: &str) {
             BatchSize::SmallInput,
         );
     });
+}
+
+/// Shared recursive references should reuse constructor bodies when aliases are unfolded.
+fn benchmark_mutually_recursive_aliases(criterion: &mut Criterion) {
+    // Cover both sparse and dense references between specialized aliases.
+    for (aliases, references) in [(16, 3), (8, 8)] {
+        let mut code = String::from("from typing import TypeVar\nT = TypeVar('T')\n");
+        for alias in 0..aliases {
+            write!(code, "A{alias} = tuple[T").unwrap();
+            for target in 0..aliases {
+                if (target + aliases - alias) % aliases < references {
+                    write!(code, ", 'A{target}[T] | None'").unwrap();
+                }
+            }
+            writeln!(code, "]").unwrap();
+        }
+        for alias in 0..aliases {
+            writeln!(
+                code,
+                "def inspect_{alias}(value: A{alias}[int]) -> int:\n    return value[0]"
+            )
+            .unwrap();
+        }
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[mutually_recursive_aliases_{aliases}_{references}]"),
+            &code,
+        );
+    }
+}
+
+/// Dense recursive definitions should not accumulate obsolete cycle-recovery results.
+fn benchmark_dense_recursive_alias_definitions(criterion: &mut Criterion) {
+    let aliases = 8;
+    let mut code = String::new();
+    for alias in 0..aliases {
+        write!(code, "A{alias} = tuple[int").unwrap();
+        for target in 0..aliases {
+            write!(code, ", 'A{target}'").unwrap();
+        }
+        writeln!(code, "]").unwrap();
+    }
+    // Only define aliases: using them would also measure recursive unfolding.
+    benchmark_micro_case(
+        criterion,
+        &format!("ty_micro[dense_recursive_alias_definitions_{aliases}]"),
+        &code,
+    );
 }
 
 fn benchmark_many_string_assignments(criterion: &mut Criterion) {
@@ -814,6 +863,66 @@ fn benchmark_mixed_str_enum_comparison(criterion: &mut Criterion) {
     benchmark_micro_case(criterion, "ty_micro[mixed_str_enum_comparison]", &code);
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4924>.
+fn benchmark_string_literal_union_comparison(criterion: &mut Criterion) {
+    for num_members in [100, 200, 400] {
+        let literal_members = |start| {
+            (start..start + num_members)
+                .map(|index| format!("'k{index}'"))
+                .join(", ")
+        };
+        let members = literal_members(0);
+        let other_members = literal_members(num_members / 2);
+        let overlapping_generator_filter = format!(
+            "
+        OtherKind = Literal[{other_members}]
+
+        class Target:
+            kind: OtherKind
+
+        def find(items: list[Item], target: Target) -> str | None:
+            return next((item.kind for item in items if item.kind == target.kind), None)
+            "
+        );
+        for (name, body) in [
+            (
+                "equality",
+                "
+        def compare(left: Item, right: Item) -> bool:
+            return left.kind == right.kind
+                ",
+            ),
+            (
+                "generator_filter",
+                "
+        def find(items: list[Item], target: Item) -> Item | None:
+            return next((item for item in items if item.kind == target.kind), None)
+                ",
+            ),
+            (
+                "overlapping_generator_filter",
+                overlapping_generator_filter.as_str(),
+            ),
+        ] {
+            let code = format!(
+                "
+        from typing import Literal
+
+        Kind = Literal[{members}]
+
+        class Item:
+            kind: Kind
+        {body}"
+            );
+            benchmark_micro_case(
+                criterion,
+                &format!("ty_micro[string_literal_union_{name}_{num_members}]"),
+                &code,
+            );
+        }
+    }
+}
+
 /// Micro-benchmark that tests our performance when slicing and unpacking
 /// a very large tuple that has many varied literal strings inside it.
 ///
@@ -1058,6 +1167,180 @@ fn benchmark_inherited_recursive_protocol(criterion: &mut Criterion) {
     }
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4961>.
+///
+/// The inner constructor call matches both arms of `V | Declaration[K, V]`. Even without an
+/// expected type for the outer call, feeding the merged binding back into the inner call can
+/// add another `Declaration` layer on every inference pass.
+fn benchmark_nested_generic_constructor_arguments(criterion: &mut Criterion) {
+    for (suffix, choices) in [
+        ("", "V | Declaration[K, V]"),
+        ("_aliased", "Choice[K, V] | None"),
+    ] {
+        let code = format!(
+            r#"
+            from __future__ import annotations
+
+            type Choice[K, V] = V | Declaration[K, V]
+
+            class Declaration[K, V]:
+                def __init__(self, key: K | None = None, *choices: {choices}): ...
+
+            class Attribute[V](Declaration[str, V]): ...
+            class SubFactory[V](Declaration[str, V]): ...
+
+            Declaration("name", Declaration("name", Attribute(), SubFactory()), None)
+        "#
+        );
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[nested_generic_constructor_arguments{suffix}]"),
+            &code,
+        );
+    }
+
+    // Keep the attribute unannotated. An explicit `: object` lets the solver prefer the expected
+    // type in nested calls, which can mask repeated growth of the type arguments of A and B.
+    let attr = "
+            class Example:
+                tree = object()
+
+                def update(self):
+                    self.tree";
+
+    for (suffix, field, target) in [
+        ("inferred_attribute", "", attr),
+        // Adding a writable `value` makes `Tree` invariant in `T`.
+        ("inferred_attribute_invariant", "value: T", attr),
+        ("annotated", "", "tree: Tree[A[Any] | int | None]"),
+        ("annotated_any", "", "tree: Tree[A[Any] | Any | int | None]"),
+    ] {
+        let code = format!(
+            r#"
+            from typing import Any
+
+            class Tree[T]:
+                {field}
+                def __init__(self, *xs: "T | Tree[T]"): ...
+
+            class A[T](Tree[T]): ...
+            class B[T](Tree[T]): ...
+
+            {target} = Tree(Tree(Tree(A(), B()), None), None)
+        "#
+        );
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[nested_generic_constructor_arguments_{suffix}]"),
+            &code,
+        );
+    }
+
+    // A inherits the constructor. A and B forward T, specialize K differently, and
+    // introduce a type parameter that doesn't occur in Tree.
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[nested_generic_constructor_arguments_inferred_attribute_inherited]",
+        &format!(
+            r#"
+            class Tree[T, K]:
+                def __init__(self, *xs: "T | Tree[T, K]"): ...
+
+            class A[T, Tag](Tree[T, int]): ...
+            class B[T, Tag](Tree[T, bool]): ...
+
+            {attr} = Tree(Tree(A(A(), B()), None), None)
+        "#
+        ),
+    );
+
+    // In Bokeh's Either constructor, the literal union comes from a fixed sibling.
+    // Solving again without the nested call is expensive even though no hint can grow.
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[nested_generic_constructor_arguments_literal_union]",
+        r#"
+        from typing import Literal
+
+        class Property[G]:
+            get: G
+
+        class Either[G, S]:
+            values: tuple[G, S]
+
+            def __init__[A, B](self: "Either[A | B, A | B]", x: type[Property[A]], y: Property[B]): ...
+
+        type Marker = Literal[
+            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p"
+        ]
+        MarkerType = Property[Marker]
+        Either(MarkerType, Property[str]())
+        "#,
+    );
+}
+
+/// Each additional argument allows more inference passes. Using the whole list as
+/// context for its own elements can add a layer of `list` on every pass.
+fn benchmark_generic_list_arguments(criterion: &mut Criterion) {
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[generic_intersection_arguments]",
+        "
+        from ty_extensions import Intersection
+
+        def first[T](*xs: Intersection[T, list[T]]) -> T:
+            return xs[0]
+
+        first([], [], [], [], [], [], [], [], [], [])
+        ",
+    );
+
+    // The union is inside the tuple, so the argument can't be restricted to list[T].
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[tuple_with_ambiguous_list_arguments]",
+        "
+        def f[T](*xs: tuple[T | list[T]]) -> None: ...
+
+        f(([1],), ([1],), ([1],), ([1],), ([1],), ([1],), ([1],), ([1],), ([1],))
+        ",
+    );
+
+    // Even when the tuple arguments don't get the combined hint, a list[T]
+    // sibling can pass it back to them on the next inference pass.
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[tuple_with_ambiguous_list_arguments_and_sibling]",
+        r#"
+        def f[T](out: list[T], *xs: tuple[T | list[T]]) -> T:
+            return out[0]
+
+        f([], ([1],), (["s"],), ([],), ([],), ([],), ([],), ([],), ([],), ([],), ([],))
+        "#,
+    );
+
+    // The typed lists can't both match list[T] with the same T. Even a
+    // nonempty literal can pass a growing hint to its siblings.
+    for (suffix, value) in [
+        ("", "[]"),
+        ("_nested", "[[1]]"),
+        ("_conditional", "[[1]] if flag else 0"),
+    ] {
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[conflicting_list_arguments{suffix}]"),
+            &format!(
+                "
+                def f[T](*xs: T | list[T]) -> None: ...
+
+                def _(a: list[int], b: list[str], flag: bool):
+                    f(a, b, {value}, {value}, {value}, {value}, {value}, {value})
+                "
+            ),
+        );
+    }
+}
+
 /// Regression benchmark for ty#4269: inherited receiver binding with nested type variables.
 ///
 /// The nominal relation constrains `T` inside the source's union argument. Ignoring that
@@ -1194,16 +1477,45 @@ fn benchmark_recursive_protocol_materialization_scaling(criterion: &mut Criterio
     }
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/5041>.
+///
+/// Applying `Top` to a nested generic isolates the cost of materialization in overloaded calls.
+/// Covariant layers reuse the top materialization. Contravariant layers alternate between top
+/// and bottom, so computing an unused top materialization can also lead to exponential work.
+fn benchmark_nested_generic_materialization(criterion: &mut Criterion) {
+    for depth in [12, 20] {
+        let nested = format!("{}Any{}", "Row[".repeat(depth), "]".repeat(depth));
+        for variance in ["covariant", "contravariant"] {
+            let code = format!(
+                r#"
+                from typing import Any, Generic, TypeVar
+                from ty_extensions import Top
+
+                T = TypeVar("T", {variance}=True)
+                class Row(Generic[T]): ...
+
+                def f(x: Top[{nested}]): ...
+                "#
+            );
+            benchmark_micro_case(
+                criterion,
+                &format!("ty_micro[nested_{variance}_materialization_{depth}]"),
+                &code,
+            );
+        }
+    }
+}
+
 /// Materializing nested callables reuses shared parameter and return types. A recursive leaf
 /// permits reuse after its cycle closes; a cycle through the whole graph also needs reuse while
 /// the cycle is still active. Both cases should avoid exponential work as the nesting grows.
 fn benchmark_recursive_callable_materialization(criterion: &mut Criterion) {
-    for depth in [8, 12] {
+    for (leaf_depth, cycle_depth) in [(8, 8), (12, 10)] {
         // Implicit aliases in the leaf case expose shared callables directly, without an
         // intervening cache for each named type alias.
-        for (name, recursive_target, alias_prefix) in [
-            ("leaf", "Recursive".to_string(), ""),
-            ("cycle", format!("A{depth}"), "type "),
+        for (name, depth, recursive_target, alias_prefix) in [
+            ("leaf", leaf_depth, "Recursive".to_string(), ""),
+            ("cycle", cycle_depth, format!("A{cycle_depth}"), "type "),
         ] {
             let mut code = format!(
                 "
@@ -1350,6 +1662,25 @@ fn benchmark_gradual_vararg_call(criterion: &mut Criterion) {
     benchmark_micro_case(criterion, "ty_micro[gradual_vararg_call]", &code);
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4990>.
+fn benchmark_list_of_generic_callable(criterion: &mut Criterion) {
+    let code = "
+        type Box[T] = list[T]
+
+        def f[
+            A: (int, str, bytes, range, slice),
+            B: (int, str, bytes, range, slice),
+            C: (int, str, bytes, range, slice),
+            D: (int, str, bytes, range, slice),
+            E: (int, str, bytes, range, slice),
+        ](a: Box[A], b: Box[B], c: Box[C], d: Box[D], e: Box[E]) -> None: ...
+
+        funcs = [f]
+    ";
+
+    benchmark_micro_case(criterion, "ty_micro[list_of_generic_callable]", code);
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/4796>.
 ///
 /// Capturing independently bounded generic overloads must not enumerate every combination of
@@ -1463,6 +1794,96 @@ fn benchmark_typed_dict_get_large_literal_union(criterion: &mut Criterion) {
     );
 }
 
+fn benchmark_typed_dict_union_assignability(criterion: &mut Criterion) {
+    let variants = |name: &str, count| {
+        (0..count)
+            .map(|i| format!("{name}[Literal[{i}]]"))
+            .join(", ")
+    };
+
+    // Each source only matches Default. Checking child before tag compares Leaf to Nodes
+    // for every source and target pair. The trailing None prevents caching the whole union
+    // result, so each comparison walks all the arms even when the Node results are cached.
+    let [nodes, sources, targets] = ["Node", "Source", "Target"].map(|name| variants(name, 160));
+    let nullable = format!(
+        "
+        from typing import Literal, TypedDict, Union
+
+        class Leaf(TypedDict):
+            extra: int
+
+        class Node[T](TypedDict):
+            value: T
+
+        Nodes = Union[{nodes}, None]
+
+        class Source[T](TypedDict):
+            child: Leaf
+            tag: T
+
+        class Target[T](TypedDict):
+            child: Nodes
+            tag: T
+
+        class Default(TypedDict):
+            child: Leaf
+
+        Sources = Union[{sources}]
+        Targets = Union[{targets}, Default]
+
+        def assign(source: Sources) -> Targets:
+            return source
+        "
+    );
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[nullable_typed_dict_union_assignability]",
+        &nullable,
+    );
+
+    // The envelopes compare the same two recursive schemas before checking their tags.
+    // Once the individual comparisons complete, each source node can reuse its result
+    // against the entire target schema.
+    let [sources, targets, source_envelopes, target_envelopes] =
+        ["Source", "Target", "SourceEnvelope", "TargetEnvelope"].map(|name| variants(name, 59));
+    let recursive = format!(
+        "
+        from typing import Literal, NotRequired, TypedDict, Union
+        from typing_extensions import ReadOnly
+
+        class Source[T](TypedDict):
+            tag: T
+            child: ReadOnly[NotRequired['Sources']]
+
+        class Target[T](TypedDict):
+            tag: T
+            child: ReadOnly[NotRequired['Targets']]
+
+        Sources = Union[{sources}]
+        Targets = Union[{targets}]
+
+        class SourceEnvelope[T](TypedDict):
+            child: ReadOnly[Sources]
+            tag: T
+
+        class TargetEnvelope[T](TypedDict):
+            child: ReadOnly[Targets]
+            tag: T
+
+        SourceEnvelopes = Union[{source_envelopes}]
+        TargetEnvelopes = Union[{target_envelopes}]
+
+        def assign(source: SourceEnvelopes) -> TargetEnvelopes:
+            return source
+        "
+    );
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[recursive_typed_dict_union_assignability]",
+        &recursive,
+    );
+}
+
 fn benchmark_union_construction(criterion: &mut Criterion) {
     const NUM_CLASSES: usize = 256;
 
@@ -1503,6 +1924,44 @@ fn benchmark_union_construction(criterion: &mut Criterion) {
         writeln!(split, "U{i} = U{} | Literal[{i}]", i - 1).ok();
     }
     benchmark_micro_case(criterion, "ty_micro[split_literal_union_1024]", &split);
+}
+
+fn benchmark_literal_union_aliases(criterion: &mut Criterion) {
+    let members = (1..=4000).join(", ");
+
+    // Keeping the single literal alongside Codes should not require negating all of Codes.
+    let codes = format!(
+        "
+        from typing import Literal
+
+        type Codes = Literal[{members}]
+
+        def zero() -> Literal[0] | Codes:
+            return 0
+        "
+    );
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[literal_union_alias_of_literals_4000]",
+        &codes,
+    );
+
+    // Integer covers every literal in the group. Returning an arbitrary int forces ty to check it.
+    let integer = format!(
+        "
+        from typing import Literal
+
+        type Integer = int
+
+        def identity(value: int) -> Literal[{members}] | Integer:
+            return value
+        "
+    );
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[literal_union_alias_of_int_4000]",
+        &integer,
+    );
 }
 
 /// Benchmark for narrowing a large union type through multiple match statements.
@@ -1888,6 +2347,17 @@ fn benchmark_literal_match_fallthrough(criterion: &mut Criterion) {
     );
 }
 
+/// Each failed case adds another literal exclusion to the type of `opcode`.
+fn benchmark_int_match_fallthrough(criterion: &mut Criterion) {
+    let mut code = String::from("def decode(opcode: int) -> int:\n    match opcode:\n");
+    for opcode in 0..128 {
+        writeln!(code, "        case {opcode}: return {opcode}").unwrap();
+    }
+    code.push_str("    return opcode\n");
+
+    benchmark_micro_case(criterion, "ty_micro[int_match_fallthrough]", &code);
+}
+
 /// Benchmarks guarded `match` fallthrough over a gradual literal subject.
 ///
 /// This generates a large version of this Python shape:
@@ -2161,6 +2631,35 @@ fn benchmark_literal_or_pattern_reachability(criterion: &mut Criterion) {
         "ty_micro[literal_or_pattern_reachability]",
         &code,
     );
+}
+
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4893>.
+///
+/// Checking for an implicit return requires proving that the two OR patterns cover every member.
+fn benchmark_enum_or_pattern_exhaustiveness(criterion: &mut Criterion) {
+    for num_members in [100, 200, 400] {
+        let mut code = "from enum import StrEnum\n\nclass Status(StrEnum):\n".to_string();
+        for index in 0..num_members {
+            writeln!(code, "    M{index} = \"m{index}\"").ok();
+        }
+
+        code.push_str("\n    @property\n    def is_active(self) -> bool:\n        match self:\n");
+        let split = num_members * 3 / 10;
+        for (group, result) in [(0..split, "True"), (split..num_members, "False")] {
+            let alternatives = group.map(|index| format!("Status.M{index}")).join(" | ");
+            writeln!(
+                code,
+                "            case {alternatives}:\n                return {result}"
+            )
+            .ok();
+        }
+
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[enum_or_pattern_exhaustiveness_{num_members}]"),
+            &code,
+        );
+    }
 }
 
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/4676>.
@@ -2464,6 +2963,25 @@ fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
     }
 }
 
+/// Each call adds a reachability constraint for the next statement. Passing an extra argument
+/// forces a diagnostic at every call, so scanning all ranges for each diagnostic is quadratic.
+fn benchmark_diagnostic_range_reachability(criterion: &mut Criterion) {
+    const CALLS: usize = 4_000;
+    let code = format!(
+        "def f(value: str) -> None:\n{}",
+        "    value.upper(0)\n".repeat(CALLS)
+    );
+
+    setup_rayon();
+    criterion.bench_function("ty_micro[diagnostic_range_reachability]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| assert_eq!(case.db.check().len(), CALLS),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Exercises repeated control-flow gates with and without interleaved statement-call predicates.
 ///
 /// Each suppressing context manager merges the old binding with a reassigned binding. Repeating
@@ -2562,34 +3080,21 @@ fn benchmark_repeated_narrowed_assignments(criterion: &mut Criterion) {
     }
 }
 
-struct ProjectBenchmark<'a> {
+struct PreparedProject<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
-    freeze_inputs: bool,
-    rules: Option<Rules>,
 }
 
-impl<'a> ProjectBenchmark<'a> {
+impl<'a> PreparedProject<'a> {
     fn new(project: RealWorldProject<'a>) -> Self {
-        let setup_project = project.setup().expect("Failed to setup project");
-        let fs = setup_project
+        let project = project.setup().expect("Failed to set up project");
+        let fs = project
             .copy_to_memory_fs()
             .expect("Failed to copy project to memory fs");
-
-        Self {
-            project: setup_project,
-            fs,
-            freeze_inputs: false,
-            rules: None,
-        }
+        Self { project, fs }
     }
 
-    fn freeze_inputs(mut self) -> Self {
-        self.freeze_inputs = true;
-        self
-    }
-
-    fn setup_iteration(&self) -> ProjectDatabase {
+    fn setup_iteration(&self, variant: ProjectVariant) -> ProjectDatabase {
         let system = TestSystem::new(InMemorySystem::from_memory_fs(self.fs.clone()));
 
         let src_root = SystemPath::new("/");
@@ -2601,7 +3106,12 @@ impl<'a> ProjectBenchmark<'a> {
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
                 ..EnvironmentOptions::default()
             }),
-            rules: self.rules.clone(),
+            rules: matches!(variant, ProjectVariant::AllRules).then(|| {
+                Rules::from_iter([(
+                    RangedValue::cli("all".to_owned()),
+                    RangedValue::cli(Level::Error),
+                )])
+            }),
             ..Options::default()
         });
 
@@ -2616,7 +3126,7 @@ impl<'a> ProjectBenchmark<'a> {
                 .collect(),
         );
 
-        if self.freeze_inputs {
+        if matches!(variant, ProjectVariant::FrozenInputs) {
             db.freeze();
         }
 
@@ -2624,32 +3134,45 @@ impl<'a> ProjectBenchmark<'a> {
     }
 }
 
-#[track_caller]
-fn bench_project(benchmark: &ProjectBenchmark, criterion: &mut Criterion) {
-    bench_project_named(benchmark, criterion, benchmark.project.config.name);
+#[derive(Clone, Copy)]
+enum ProjectVariant {
+    Default,
+    FrozenInputs,
+    AllRules,
 }
 
 #[track_caller]
-fn bench_project_named(
-    benchmark: &ProjectBenchmark,
+fn bench_project(
     criterion: &mut Criterion,
-    benchmark_name: &str,
+    project: RealWorldProject<'_>,
+    variants: &[ProjectVariant],
 ) {
     setup_rayon();
 
+    let name = project.name;
+    let prepared = LazyCell::new(|| PreparedProject::new(project));
     let mut group = criterion.benchmark_group("project");
     group.sampling_mode(criterion::SamplingMode::Flat);
-    group.bench_function(benchmark_name, |b| {
-        b.iter_batched_ref(
-            || benchmark.setup_iteration(),
-            |db| check_project(db, benchmark_name),
-            BatchSize::SmallInput,
-        );
-    });
+    for &variant in variants {
+        let benchmark_name = match variant {
+            ProjectVariant::Default => name.to_owned(),
+            ProjectVariant::FrozenInputs => format!("{name} (frozen inputs)"),
+            ProjectVariant::AllRules => format!("{name} (all rules)"),
+        };
+        group.bench_function(&benchmark_name, |b| {
+            // Prepare the project once, when its first selected variant runs.
+            let project = LazyCell::force(&prepared);
+            b.iter_batched_ref(
+                || project.setup_iteration(variant),
+                |db| check_project(db, &benchmark_name),
+                BatchSize::SmallInput,
+            );
+        });
+    }
 }
 
 fn hydra(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(RealWorldProject {
+    let project = RealWorldProject {
         name: "hydra-zen",
         repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
         commit: "03a01096ea6a7c574fdf0b9990056506e566df2d",
@@ -2657,13 +3180,13 @@ fn hydra(criterion: &mut Criterion) {
         dependencies: &["pydantic", "beartype", "hydra-core"],
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
-    });
+    };
 
-    bench_project(&benchmark, criterion);
+    bench_project(criterion, project, &[ProjectVariant::Default]);
 }
 
 fn attrs(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(RealWorldProject {
+    let project = RealWorldProject {
         name: "attrs",
         repository: "https://github.com/python-attrs/attrs",
         commit: "89fae8300f484544c1b7678cea5efe58c551fbb9",
@@ -2671,28 +3194,22 @@ fn attrs(criterion: &mut Criterion) {
         dependencies: &[],
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
-    });
-
-    bench_project(&benchmark, criterion);
-
-    // Keep one real-world benchmark frozen to catch regressions from newly added inputs.
-    let frozen_benchmark = benchmark.freeze_inputs();
-    bench_project_named(&frozen_benchmark, criterion, "attrs (frozen inputs)");
-
-    let all_rules_benchmark = ProjectBenchmark {
-        freeze_inputs: false,
-        rules: Some(Rules::from_iter([(
-            RangedValue::cli("all".to_owned()),
-            RangedValue::cli(Level::Error),
-        )])),
-        ..frozen_benchmark
     };
 
-    bench_project_named(&all_rules_benchmark, criterion, "attrs (all rules)");
+    bench_project(
+        criterion,
+        project,
+        &[
+            ProjectVariant::Default,
+            // Keep one real-world benchmark frozen to catch regressions from newly added inputs.
+            ProjectVariant::FrozenInputs,
+            ProjectVariant::AllRules,
+        ],
+    );
 }
 
 fn anyio(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(RealWorldProject {
+    let project = RealWorldProject {
         name: "anyio",
         repository: "https://github.com/agronholm/anyio",
         commit: "ffe91331adb912c5d150f5d373f7cd28a0e96a62",
@@ -2700,13 +3217,13 @@ fn anyio(criterion: &mut Criterion) {
         dependencies: &["exceptiongroup", "idna", "pytest"],
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
-    });
+    };
 
-    bench_project(&benchmark, criterion);
+    bench_project(criterion, project, &[ProjectVariant::Default]);
 }
 
 fn datetype(criterion: &mut Criterion) {
-    let benchmark = ProjectBenchmark::new(RealWorldProject {
+    let project = RealWorldProject {
         name: "DateType",
         repository: "https://github.com/glyph/DateType",
         commit: "a6ebb954cd18302a031a29b2f65e077b8e7776d4",
@@ -2714,14 +3231,16 @@ fn datetype(criterion: &mut Criterion) {
         dependencies: &[],
         max_dep_date: TY_ECOSYSTEM_PIN,
         python_version: SupportedPythonVersion::Py311,
-    });
+    };
 
-    bench_project(&benchmark, criterion);
+    bench_project(criterion, project, &[ProjectVariant::Default]);
 }
 
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_group!(
     micro,
+    benchmark_mutually_recursive_aliases,
+    benchmark_dense_recursive_alias_definitions,
     benchmark_many_string_assignments,
     benchmark_many_tuple_assignments,
     benchmark_tuple_implicit_instance_attributes,
@@ -2738,27 +3257,35 @@ criterion_group!(
     benchmark_repeated_str_enum_comparisons,
     benchmark_cross_str_enum_comparison,
     benchmark_mixed_str_enum_comparison,
+    benchmark_string_literal_union_comparison,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
     benchmark_inherited_recursive_protocol,
+    benchmark_nested_generic_constructor_arguments,
+    benchmark_generic_list_arguments,
     benchmark_nested_recursive_protocol_receiver,
     benchmark_materialized_recursive_protocol_overload,
     benchmark_materialized_recursive_protocol_subtyping,
     benchmark_recursive_protocol_materialization_scaling,
+    benchmark_nested_generic_materialization,
     benchmark_recursive_callable_materialization,
     benchmark_recursive_protocol_growing_specialization,
     benchmark_recursive_protocol_specialized_receiver,
     benchmark_async_context_manager_recursive_protocol,
+    benchmark_list_of_generic_callable,
     benchmark_paramspec_bounded_overloads,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
+    benchmark_typed_dict_union_assignability,
     benchmark_very_large_tuple,
     benchmark_nested_tuple_comparison,
     benchmark_union_construction,
+    benchmark_literal_union_aliases,
     benchmark_large_union_narrowing,
     benchmark_class_or_pattern_captures,
     benchmark_large_isinstance_narrowing,
     benchmark_literal_match_fallthrough,
+    benchmark_int_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
     benchmark_enum_union_equality,
@@ -2767,12 +3294,14 @@ criterion_group!(
     benchmark_gradual_intersection_union_equality,
     benchmark_gradual_intersection_negation,
     benchmark_literal_or_pattern_reachability,
+    benchmark_enum_or_pattern_exhaustiveness,
     benchmark_tuple_class_pattern_captures,
     benchmark_nested_class_pattern_capture,
     benchmark_nested_class_pattern_exhaustiveness,
     benchmark_nested_mapping_pattern_exhaustiveness,
     benchmark_typeis_narrowing,
     benchmark_repeated_statement_calls,
+    benchmark_diagnostic_range_reachability,
     benchmark_repeated_suppressing_context_managers,
     benchmark_repeated_narrowed_assignments,
 );

@@ -97,8 +97,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::InvalidStrReturnType) {
                 pylint::rules::invalid_str_return(checker, function_def);
             }
-            if checker.is_rule_enabled(Rule::InvalidFunctionName) {
-                pep8_naming::rules::invalid_function_name(
+            if checker.is_rule_enabled(Rule::NonLowercaseFunctionName) {
+                pep8_naming::rules::non_lowercase_function_name(
                     checker,
                     stmt,
                     name,
@@ -132,11 +132,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     parameters,
                 );
             }
-            if checker.is_rule_enabled(Rule::GeneratorReturnFromIterMethod) {
-                flake8_pyi::rules::bad_generator_return_type(function_def, checker);
+            if checker.is_rule_enabled(Rule::IterMethodWithGeneratorReturnAnnotation) {
+                flake8_pyi::rules::iter_method_with_generator_return_annotation(
+                    function_def,
+                    checker,
+                );
             }
-            if checker.is_rule_enabled(Rule::StopIterationReturn) {
-                pylint::rules::stop_iteration_return(checker, function_def);
+            if checker.is_rule_enabled(Rule::RaiseStopIterationInGenerator) {
+                pylint::rules::raise_stop_iteration_in_generator(checker, function_def);
             }
             if checker.source_type.is_stub() {
                 if checker.is_rule_enabled(Rule::StrOrReprDefinedInStub) {
@@ -144,8 +147,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.source_type.is_stub() || checker.target_version() >= PythonVersion::PY311 {
-                if checker.is_rule_enabled(Rule::NoReturnArgumentAnnotationInStub) {
-                    flake8_pyi::rules::no_return_argument_annotation(checker, parameters);
+                if checker.is_rule_enabled(Rule::ParameterAnnotatedWithNoReturn) {
+                    flake8_pyi::rules::parameter_annotated_with_no_return(checker, parameters);
                 }
             }
             if checker.is_rule_enabled(Rule::BadExitAnnotation) {
@@ -169,9 +172,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::GlobalStatement) {
                 pylint::rules::global_statement(checker, name);
             }
-            if checker.is_rule_enabled(Rule::LRUCacheWithoutParameters) {
+            if checker.is_rule_enabled(Rule::LRUCacheCallWithoutArguments) {
                 if checker.target_version() >= PythonVersion::PY38 {
-                    pyupgrade::rules::lru_cache_without_parameters(checker, decorator_list);
+                    pyupgrade::rules::lru_cache_call_without_arguments(checker, decorator_list);
                 }
             }
             if checker.is_rule_enabled(Rule::LRUCacheWithMaxsizeNone) {
@@ -185,8 +188,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::CachedInstanceMethod) {
                 flake8_bugbear::rules::cached_instance_method(checker, function_def);
             }
-            if checker.is_rule_enabled(Rule::MutableArgumentDefault) {
-                flake8_bugbear::rules::mutable_argument_default(checker, function_def);
+            if checker.is_rule_enabled(Rule::MutableParameterDefault) {
+                flake8_bugbear::rules::mutable_parameter_default(checker, function_def);
             }
             if checker.is_rule_enabled(Rule::ReturnInGenerator) {
                 flake8_bugbear::rules::return_in_generator(checker, function_def);
@@ -201,10 +204,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::UnnecessaryReturnNone,
                 Rule::ImplicitReturnValue,
                 Rule::ImplicitReturn,
-                Rule::SuperfluousElseReturn,
-                Rule::SuperfluousElseRaise,
-                Rule::SuperfluousElseContinue,
-                Rule::SuperfluousElseBreak,
+                Rule::UnnecessaryElseAfterReturn,
+                Rule::UnnecessaryElseAfterRaise,
+                Rule::UnnecessaryElseAfterContinue,
+                Rule::UnnecessaryElseAfterBreak,
             ]) {
                 flake8_return::rules::function(checker, function_def);
             }
@@ -225,8 +228,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.settings().mccabe.max_complexity,
                 );
             }
-            if checker.is_rule_enabled(Rule::HardcodedPasswordDefault) {
-                flake8_bandit::rules::hardcoded_password_default(checker, parameters);
+            if checker.is_rule_enabled(Rule::HardcodedPasswordParameterDefault) {
+                flake8_bandit::rules::hardcoded_password_parameter_default(checker, parameters);
             }
             if checker.is_rule_enabled(Rule::SuspiciousMarkSafeUsage) {
                 for decorator in decorator_list {
@@ -236,11 +239,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::PropertyWithParameters) {
                 pylint::rules::property_with_parameters(checker, stmt, decorator_list, parameters);
             }
-            if checker.is_rule_enabled(Rule::TooManyArguments) {
-                pylint::rules::too_many_arguments(checker, function_def);
+            if checker.is_rule_enabled(Rule::TooManyParameters) {
+                pylint::rules::too_many_parameters(checker, function_def);
             }
-            if checker.is_rule_enabled(Rule::TooManyPositionalArguments) {
-                pylint::rules::too_many_positional_arguments(checker, function_def);
+            if checker.is_rule_enabled(Rule::TooManyPositionalParameters) {
+                pylint::rules::too_many_positional_parameters(checker, function_def);
             }
             if checker.is_rule_enabled(Rule::TooManyReturnStatements) {
                 pylint::rules::too_many_return_statements(
@@ -268,9 +271,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.any_rule_enabled(&[
                 Rule::PytestFixtureIncorrectParenthesesStyle,
-                Rule::PytestFixturePositionalArgs,
+                Rule::PytestFixturePositionalArguments,
                 Rule::PytestExtraneousScopeFunction,
-                Rule::PytestFixtureParamWithoutValue,
+                Rule::PytestFixtureParameterWithoutValue,
                 Rule::PytestDeprecatedYieldFixture,
                 Rule::PytestFixtureFinalizerCallback,
                 Rule::PytestUselessYieldFixture,
@@ -289,20 +292,20 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
 
             if checker.any_rule_enabled(&[
                 Rule::PytestIncorrectMarkParenthesesStyle,
-                Rule::PytestUseFixturesWithoutParameters,
+                Rule::PytestUseFixturesWithoutArguments,
             ]) {
                 flake8_pytest_style::rules::marks(checker, decorator_list);
             }
-            if checker.is_rule_enabled(Rule::BooleanTypeHintPositionalArgument) {
-                flake8_boolean_trap::rules::boolean_type_hint_positional_argument(
+            if checker.is_rule_enabled(Rule::BooleanAnnotatedPositionalParameter) {
+                flake8_boolean_trap::rules::boolean_annotated_positional_parameter(
                     checker,
                     name,
                     decorator_list,
                     parameters,
                 );
             }
-            if checker.is_rule_enabled(Rule::BooleanDefaultValuePositionalArgument) {
-                flake8_boolean_trap::rules::boolean_default_value_positional_argument(
+            if checker.is_rule_enabled(Rule::BooleanPositionalParameterDefault) {
+                flake8_boolean_trap::rules::boolean_positional_parameter_default(
                     checker,
                     name,
                     decorator_list,
@@ -348,8 +351,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::PostInitDefault) {
                 ruff::rules::post_init_default(checker, function_def);
             }
-            if checker.is_rule_enabled(Rule::PytestParameterWithDefaultArgument) {
-                flake8_pytest_style::rules::parameter_with_default_argument(checker, function_def);
+            if checker.is_rule_enabled(Rule::PytestParameterWithDefaultValue) {
+                flake8_pytest_style::rules::pytest_parameter_with_default_value(
+                    checker,
+                    function_def,
+                );
             }
             if checker.is_rule_enabled(Rule::AirflowTaskBranchAsShortCircuit) {
                 airflow::rules::task_branch_as_short_circuit(checker, function_def);
@@ -366,8 +372,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::NonPEP695GenericFunction) {
                 pyupgrade::rules::non_pep695_generic_function(checker, function_def);
             }
-            if checker.is_rule_enabled(Rule::InvalidArgumentName) {
-                pep8_naming::rules::invalid_argument_name_function(checker, function_def);
+            if checker.is_rule_enabled(Rule::NonLowercaseParameterName) {
+                pep8_naming::rules::non_lowercase_parameter_name_function(checker, function_def);
             }
             if checker.is_rule_enabled(Rule::PropertyWithoutReturn) {
                 ruff::rules::property_without_return(checker, function_def);
@@ -392,11 +398,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 node_index: _,
             },
         ) => {
-            if checker.is_rule_enabled(Rule::NoClassmethodDecorator) {
-                pylint::rules::no_classmethod_decorator(checker, stmt);
+            if checker.is_rule_enabled(Rule::NonDecoratorClassmethod) {
+                pylint::rules::non_decorator_classmethod(checker, stmt);
             }
-            if checker.is_rule_enabled(Rule::NoStaticmethodDecorator) {
-                pylint::rules::no_staticmethod_decorator(checker, stmt);
+            if checker.is_rule_enabled(Rule::NonDecoratorStaticmethod) {
+                pylint::rules::non_decorator_staticmethod(checker, stmt);
             }
             if checker.is_rule_enabled(Rule::DjangoNullableModelStringField) {
                 flake8_django::rules::nullable_model_string_field(checker, body);
@@ -440,9 +446,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::UselessClassMetaclassType) {
                 pyupgrade::rules::useless_class_metaclass_type(checker, class_def);
             }
-            if checker.is_rule_enabled(Rule::ReplaceStrEnum) {
+            if checker.is_rule_enabled(Rule::ManualStrEnum) {
                 if checker.target_version() >= PythonVersion::PY311 {
-                    pyupgrade::rules::replace_str_enum(checker, class_def);
+                    pyupgrade::rules::manual_str_enum(checker, class_def);
                 }
             }
             if checker.is_rule_enabled(Rule::UnnecessaryClassParentheses) {
@@ -451,16 +457,16 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::AmbiguousClassName) {
                 pycodestyle::rules::ambiguous_class_name(checker, name);
             }
-            if checker.is_rule_enabled(Rule::InvalidClassName) {
-                pep8_naming::rules::invalid_class_name(
+            if checker.is_rule_enabled(Rule::NonCamelCaseClassName) {
+                pep8_naming::rules::non_camel_case_class_name(
                     checker,
                     stmt,
                     name,
                     &checker.settings().pep8_naming.ignore_names,
                 );
             }
-            if checker.is_rule_enabled(Rule::ErrorSuffixOnExceptionName) {
-                pep8_naming::rules::error_suffix_on_exception_name(
+            if checker.is_rule_enabled(Rule::ExceptionClassWithoutErrorSuffix) {
+                pep8_naming::rules::exception_class_without_error_suffix(
                     checker,
                     stmt,
                     arguments.as_deref(),
@@ -486,8 +492,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.is_rule_enabled(Rule::PassStatementStubBody) {
                     flake8_pyi::rules::pass_statement_stub_body(checker, body);
                 }
-                if checker.is_rule_enabled(Rule::PassInClassBody) {
-                    flake8_pyi::rules::pass_in_class_body(checker, class_def);
+                if checker.is_rule_enabled(Rule::PassInStubClassBody) {
+                    flake8_pyi::rules::pass_in_stub_class_body(checker, class_def);
                 }
             }
             if checker.is_rule_enabled(Rule::EllipsisInNonEmptyClassBody) {
@@ -660,8 +666,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             &checker.settings().pep8_naming.ignore_names,
                         );
                     }
-                    if checker.is_rule_enabled(Rule::CamelcaseImportedAsLowercase) {
-                        pep8_naming::rules::camelcase_imported_as_lowercase(
+                    if checker.is_rule_enabled(Rule::CamelCaseImportedAsLowercase) {
+                        pep8_naming::rules::camel_case_imported_as_lowercase(
                             checker,
                             name,
                             asname,
@@ -670,8 +676,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             &checker.settings().pep8_naming.ignore_names,
                         );
                     }
-                    if checker.is_rule_enabled(Rule::CamelcaseImportedAsConstant) {
-                        pep8_naming::rules::camelcase_imported_as_constant(
+                    if checker.is_rule_enabled(Rule::CamelCaseImportedAsConstant) {
+                        pep8_naming::rules::camel_case_imported_as_constant(
                             checker,
                             name,
                             asname,
@@ -680,8 +686,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             &checker.settings().pep8_naming.ignore_names,
                         );
                     }
-                    if checker.is_rule_enabled(Rule::CamelcaseImportedAsAcronym) {
-                        pep8_naming::rules::camelcase_imported_as_acronym(
+                    if checker.is_rule_enabled(Rule::CamelCaseImportedAsAcronym) {
+                        pep8_naming::rules::camel_case_imported_as_acronym(
                             name, asname, alias, stmt, checker,
                         );
                     }
@@ -823,10 +829,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             for alias in names {
-                if module != Some("__future__") && &alias.name == "*" {
+                if !import_from.is_future_import(checker.parser_version()) && &alias.name == "*" {
                     // F403
                     checker.report_diagnostic_if_enabled(
-                        pyflakes::rules::UndefinedLocalWithImportStar {
+                        pyflakes::rules::StarImport {
                             name: helpers::format_import_from(level, module).to_string(),
                         },
                         stmt.range(),
@@ -879,8 +885,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             &checker.settings().pep8_naming.ignore_names,
                         );
                     }
-                    if checker.is_rule_enabled(Rule::CamelcaseImportedAsLowercase) {
-                        pep8_naming::rules::camelcase_imported_as_lowercase(
+                    if checker.is_rule_enabled(Rule::CamelCaseImportedAsLowercase) {
+                        pep8_naming::rules::camel_case_imported_as_lowercase(
                             checker,
                             &alias.name,
                             asname,
@@ -889,8 +895,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             &checker.settings().pep8_naming.ignore_names,
                         );
                     }
-                    if checker.is_rule_enabled(Rule::CamelcaseImportedAsConstant) {
-                        pep8_naming::rules::camelcase_imported_as_constant(
+                    if checker.is_rule_enabled(Rule::CamelCaseImportedAsConstant) {
+                        pep8_naming::rules::camel_case_imported_as_constant(
                             checker,
                             &alias.name,
                             asname,
@@ -899,8 +905,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             &checker.settings().pep8_naming.ignore_names,
                         );
                     }
-                    if checker.is_rule_enabled(Rule::CamelcaseImportedAsAcronym) {
-                        pep8_naming::rules::camelcase_imported_as_acronym(
+                    if checker.is_rule_enabled(Rule::CamelCaseImportedAsAcronym) {
+                        pep8_naming::rules::camel_case_imported_as_acronym(
                             &alias.name,
                             asname,
                             alias,
@@ -935,7 +941,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     &checker.settings().flake8_import_conventions.banned_from,
                 );
             }
-            if checker.is_rule_enabled(Rule::ByteStringUsage) {
+            if checker.is_rule_enabled(Rule::DeprecatedByteStringType) {
                 flake8_pyi::rules::bytestring_import(checker, import_from);
             }
         }
@@ -951,9 +957,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.any_rule_enabled(&[
-                Rule::RawStringInException,
+                Rule::StringLiteralInException,
                 Rule::FStringInException,
-                Rule::DotFormatInException,
+                Rule::StrFormatInException,
             ]) {
                 if let Some(exc) = exc {
                     flake8_errmsg::rules::string_in_exception(checker, stmt, exc);
@@ -971,14 +977,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
             }
-            if checker.is_rule_enabled(Rule::RaiseVanillaClass) {
+            if checker.is_rule_enabled(Rule::RaiseExceptionOrBaseException) {
                 if let Some(expr) = exc {
-                    tryceratops::rules::raise_vanilla_class(checker, expr);
+                    tryceratops::rules::raise_exception_or_base_exception(checker, expr);
                 }
             }
-            if checker.is_rule_enabled(Rule::RaiseVanillaArgs) {
+            if checker.is_rule_enabled(Rule::RaiseExceptionWithMessage) {
                 if let Some(expr) = exc {
-                    tryceratops::rules::raise_vanilla_args(checker, expr);
+                    tryceratops::rules::raise_exception_with_message(checker, expr);
                 }
             }
             if checker.is_rule_enabled(Rule::UnnecessaryParenOnRaiseException) {
@@ -1026,8 +1032,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.semantic.current_statement_parent(),
                 );
             }
-            if checker.is_rule_enabled(Rule::IfWithSameArms) {
-                flake8_simplify::rules::if_with_same_arms(checker, if_);
+            if checker.is_rule_enabled(Rule::IfWithIdenticalBranches) {
+                flake8_simplify::rules::if_with_identical_branches(checker, if_);
             }
             if checker.is_rule_enabled(Rule::NeedlessBool) {
                 flake8_simplify::rules::needless_bool(checker, stmt);
@@ -1035,8 +1041,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::IfElseBlockInsteadOfDictLookup) {
                 flake8_simplify::rules::if_else_block_instead_of_dict_lookup(checker, if_);
             }
-            if checker.is_rule_enabled(Rule::IfElseBlockInsteadOfIfExp) {
-                flake8_simplify::rules::if_else_block_instead_of_if_exp(checker, if_);
+            if checker.is_rule_enabled(Rule::IfElseAssignmentToSameVariable) {
+                flake8_simplify::rules::if_else_assignment_to_same_variable(checker, if_);
             }
             if checker.is_rule_enabled(Rule::IfElseBlockInsteadOfDictGet) {
                 flake8_simplify::rules::if_else_block_instead_of_dict_get(checker, if_);
@@ -1068,9 +1074,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.source_type.is_stub() {
                 if checker.any_rule_enabled(&[
-                    Rule::UnrecognizedVersionInfoCheck,
-                    Rule::PatchVersionComparison,
-                    Rule::WrongTupleLengthVersionComparison,
+                    Rule::UnrecognizedVersionInfoCheckInStub,
+                    Rule::PatchVersionComparisonInStub,
+                    Rule::WrongTupleLengthVersionComparisonInStub,
                 ]) {
                     if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
                         for value in values {
@@ -1081,8 +1087,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
                 if checker.any_rule_enabled(&[
-                    Rule::UnrecognizedPlatformCheck,
-                    Rule::UnrecognizedPlatformName,
+                    Rule::UnrecognizedPlatformCheckInStub,
+                    Rule::UnrecognizedPlatformNameInStub,
                 ]) {
                     if let Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test.as_ref() {
                         for value in values {
@@ -1177,8 +1183,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     msg.as_deref(),
                 );
             }
-            if checker.is_rule_enabled(Rule::AssertOnStringLiteral) {
-                pylint::rules::assert_on_string_literal(checker, test);
+            if checker.is_rule_enabled(Rule::AssertStringLiteral) {
+                pylint::rules::assert_string_literal(checker, test);
             }
             if checker.is_rule_enabled(Rule::InvalidMockAccess) {
                 pygrep_hooks::rules::non_existent_mock_method(checker, test);
@@ -1186,16 +1192,16 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::AssertWithPrintMessage) {
                 ruff::rules::assert_with_print_message(checker, assert_stmt);
             }
-            if checker.is_rule_enabled(Rule::InvalidAssertMessageLiteralArgument) {
-                ruff::rules::invalid_assert_message_literal_argument(checker, assert_stmt);
+            if checker.is_rule_enabled(Rule::NonStringLiteralAsAssertMessage) {
+                ruff::rules::non_string_literal_as_assert_message(checker, assert_stmt);
             }
         }
         Stmt::With(with_stmt @ ast::StmtWith { items, body, .. }) => {
             if checker.is_rule_enabled(Rule::TooManyNestedBlocks) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
-            if checker.is_rule_enabled(Rule::AssertRaisesException) {
-                flake8_bugbear::rules::assert_raises_exception(checker, items);
+            if checker.is_rule_enabled(Rule::AssertRaisesExceptionOrBaseException) {
+                flake8_bugbear::rules::assert_raises_exception_or_base_exception(checker, items);
             }
             if checker.is_rule_enabled(Rule::PytestRaisesWithMultipleStatements) {
                 flake8_pytest_style::rules::complex_raises(checker, stmt, items, body);
@@ -1210,10 +1216,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.semantic.current_statement_parent(),
                 );
             }
-            if checker.is_rule_enabled(Rule::RedefinedLoopName) {
-                pylint::rules::redefined_loop_name(checker, stmt);
+            if checker.is_rule_enabled(Rule::RedefinedForOrWithTarget) {
+                pylint::rules::redefined_for_or_with_target(checker, stmt);
             }
-            if checker.any_rule_enabled(&[Rule::ReadWholeFile, Rule::WriteWholeFile]) {
+            if checker.any_rule_enabled(&[Rule::ManualPathRead, Rule::ManualPathWrite]) {
                 checker
                     .analyze
                     .with_statements
@@ -1265,7 +1271,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.any_rule_enabled(&[
                 Rule::DictIndexMissingItems,
-                Rule::EnumerateForLoop,
+                Rule::ManualLoopCounter,
                 Rule::IncorrectDictIterator,
                 Rule::LoopIteratorMutation,
                 Rule::UnnecessaryEnumerate,
@@ -1288,8 +1294,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::UselessElseOnLoop) {
                 pylint::rules::useless_else_on_loop(checker, stmt, body, orelse);
             }
-            if checker.is_rule_enabled(Rule::RedefinedLoopName) {
-                pylint::rules::redefined_loop_name(checker, stmt);
+            if checker.is_rule_enabled(Rule::RedefinedForOrWithTarget) {
+                pylint::rules::redefined_for_or_with_target(checker, stmt);
             }
             if checker.is_rule_enabled(Rule::IterationOverSet) {
                 pylint::rules::iteration_over_set(checker, iter);
@@ -1404,8 +1410,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::VerboseRaise) {
                 tryceratops::rules::verbose_raise(checker, handlers);
             }
-            if checker.is_rule_enabled(Rule::VerboseLogMessage) {
-                tryceratops::rules::verbose_log_message(checker, handlers);
+            if checker.is_rule_enabled(Rule::RedundantExceptionInLoggingMessage) {
+                tryceratops::rules::redundant_exception_in_logging_message(checker, handlers);
             }
             if checker.is_rule_enabled(Rule::RaiseWithinTry) {
                 tryceratops::rules::raise_within_try(checker, body, handlers);
@@ -1413,8 +1419,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::UselessTryExcept) {
                 tryceratops::rules::useless_try_except(checker, handlers);
             }
-            if checker.is_rule_enabled(Rule::ErrorInsteadOfException) {
-                tryceratops::rules::error_instead_of_exception(checker, handlers);
+            if checker.is_rule_enabled(Rule::LoggingErrorInsteadOfException) {
+                tryceratops::rules::logging_error_instead_of_exception(checker, handlers);
             }
             if checker.is_rule_enabled(Rule::NeedlessElse) {
                 ruff::rules::needless_else(checker, try_stmt.into());
@@ -1453,15 +1459,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::UselessMetaclassType) {
                 pyupgrade::rules::useless_metaclass_type(checker, stmt, value, targets);
             }
-            if checker.is_rule_enabled(Rule::ConvertTypedDictFunctionalToClass) {
-                pyupgrade::rules::convert_typed_dict_functional_to_class(
-                    checker, stmt, targets, value,
-                );
+            if checker.is_rule_enabled(Rule::FunctionalTypedDict) {
+                pyupgrade::rules::functional_typed_dict(checker, stmt, targets, value);
             }
-            if checker.is_rule_enabled(Rule::ConvertNamedTupleFunctionalToClass) {
-                pyupgrade::rules::convert_named_tuple_functional_to_class(
-                    checker, stmt, targets, value,
-                );
+            if checker.is_rule_enabled(Rule::FunctionalNamedTuple) {
+                pyupgrade::rules::functional_named_tuple(checker, stmt, targets, value);
             }
             if checker.is_rule_enabled(Rule::PandasDfVariableName) {
                 pandas_vet::rules::assignment_to_df(checker, targets);
@@ -1492,11 +1494,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.source_type.is_stub() {
                 if checker.any_rule_enabled(&[
-                    Rule::UnprefixedTypeParam,
+                    Rule::PublicTypeVarInStub,
                     Rule::AssignmentDefaultInStub,
                     Rule::UnannotatedAssignmentInStub,
                     Rule::ComplexAssignmentInStub,
-                    Rule::TypeAliasWithoutAnnotation,
+                    Rule::UnannotatedTypeAliasInStub,
                 ]) {
                     // Ignore assignments in function bodies; those are covered by other rules.
                     if !checker
@@ -1504,8 +1506,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         .current_scopes()
                         .any(|scope| scope.kind.is_function())
                     {
-                        if checker.is_rule_enabled(Rule::UnprefixedTypeParam) {
-                            flake8_pyi::rules::prefix_type_params(checker, value, targets);
+                        if checker.is_rule_enabled(Rule::PublicTypeVarInStub) {
+                            flake8_pyi::rules::public_type_var_in_stub(checker, value, targets);
                         }
                         if checker.is_rule_enabled(Rule::AssignmentDefaultInStub) {
                             flake8_pyi::rules::assignment_default_in_stub(checker, targets, value);
@@ -1518,8 +1520,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         if checker.is_rule_enabled(Rule::ComplexAssignmentInStub) {
                             flake8_pyi::rules::complex_assignment_in_stub(checker, assign);
                         }
-                        if checker.is_rule_enabled(Rule::TypeAliasWithoutAnnotation) {
-                            flake8_pyi::rules::type_alias_without_annotation(
+                        if checker.is_rule_enabled(Rule::UnannotatedTypeAliasInStub) {
+                            flake8_pyi::rules::unannotated_type_alias_in_stub(
                                 checker, value, targets,
                             );
                         }

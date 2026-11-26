@@ -1,10 +1,9 @@
 use crate::Db;
 use crate::FxOrderSet;
-use crate::ProgramEnvironment;
 use crate::place::PlaceAndQualifiers;
 use crate::types::class::{DynamicClassLiteral, metaclass_instance_type};
 use crate::types::constraints::ConstraintSet;
-use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, try_constraint};
 use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral, ClassType,
@@ -13,6 +12,7 @@ use crate::types::{
     TypeQualifiers, TypeRecursionContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
     todo_type,
 };
+use crate::{Program, ProgramEnvironment};
 use ty_python_core::definition::Definition;
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
@@ -273,10 +273,14 @@ impl<'db> SubclassOfType<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> Option<PlaceAndQualifiers<'db>> {
-        if let SubclassOfInner::Protocol(protocol) = self.subclass_of
-            && let Some(member) = protocol.interface(db).meta_member(db, env, name)
-        {
-            return Some(member);
+        if let SubclassOfInner::Protocol(protocol) = self.subclass_of {
+            let interface = protocol.interface(db);
+            if let Some(member) = interface.meta_member(db, env, name) {
+                return Some(member);
+            }
+            if name == "__hash__" && interface.includes_member(db, "__eq__") {
+                return Some(Type::unspecified_protocol_hash(db, env, policy));
+            }
         }
 
         let class_like = match self.subclass_of.with_transposed_type_var(db, env) {
@@ -321,6 +325,10 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return a type representing "the set of all instances of the metaclass of this type".
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None when the metaclass participates in a cycle"
+    )]
     pub(crate) fn to_metaclass_instance(
         self,
         db: &'db dyn Db,
@@ -331,7 +339,19 @@ impl<'db> SubclassOfType<'db> {
         // And `to_meta_type` will transpose `type[T: C]` into `T: type[C]`, collapse to
         // the upper bound `type[C]`, and transform that to the meta-type `type[M]`, which
         // `to_instance` then resolves to `M`.
-        metaclass_instance_type(db, env, self.to_meta_type(db, env))
+        #[salsa::tracked(returns(copy), cycle_result=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn cached<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            ty: SubclassOfType<'db>,
+        ) -> Option<Type<'db>> {
+            let env = &ProgramEnvironment::from_program(program);
+            Some(metaclass_instance_type(db, env, ty.to_meta_type(db, env)))
+        }
+
+        // When the metaclass depends on a provisional type, compute the instance in the caller.
+        cached(db, env.program(db), self)
+            .unwrap_or_else(|| metaclass_instance_type(db, env, self.to_meta_type(db, env)))
     }
 
     /// Compute the metatype of this `type[T]`.
@@ -436,16 +456,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         match (source.subclass_of, target.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from_bool(self.constraints, !self.relation.is_subtyping())
+                self.when(!self.relation.is_subtyping())
             }
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(target_class)) => {
-                ConstraintSet::from_bool(
-                    self.constraints,
-                    target_class.is_object(db) || self.relation.is_assignability(),
-                )
+                self.when(target_class.is_object(db) || self.relation.is_assignability())
             }
             (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+                self.when(self.relation.is_assignability())
             }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
@@ -480,19 +497,14 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         {
             // Protocols are open structural types, so their meta-types can generally overlap with
             // concrete class-object types and with other protocol meta-types.
-            return ConstraintSet::from_bool(self.constraints, false);
+            return self.never();
         }
 
         match (left.subclass_of, right.subclass_of) {
-            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from_bool(self.constraints, false)
-            }
-            (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => {
-                ConstraintSet::from_bool(
-                    self.constraints,
-                    !left.could_coexist_in_mro_with_disjointness_checker(db, self.env, right, self),
-                )
-            }
+            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => self.never(),
+            (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => self.when(
+                !try_constraint!(left.try_could_coexist_in_mro_with(db, right, self)),
+            ),
             (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
                 unreachable!()
             }

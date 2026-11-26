@@ -4,6 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
+use indoc::indoc;
 use insta_cmd::assert_cmd_snapshot;
 
 use super::CliTest;
@@ -39,6 +40,34 @@ if condition:
 
     ----- stderr -----
     "#);
+    Ok(())
+}
+
+#[test]
+fn stdin_read_error() -> Result<()> {
+    let test = CliTest::new()?;
+
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--stdin-filename", "input.py", "-"])
+        .pass_stdin([0xff]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Failed to read input.py: stream did not contain valid UTF-8
+    ");
+
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--silent", "--stdin-filename", "input.py", "-"])
+        .pass_stdin([0xff]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+
     Ok(())
 }
 
@@ -668,12 +697,7 @@ if __name__ == "__main__":
     say_hy("dear Ruff contributor")
 "#;
 
-    let test = CliTest::with_settings(|_project_dir, mut settings| {
-        // JSON double escapes backslashes
-        settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
-
-        settings
-    })?;
+    let test = CliTest::with_settings(crate::output_format_settings)?;
     test.write_file("input.py", CONTENT)?;
 
     let snapshot = format!("output_format_{output_format}");
@@ -864,6 +888,26 @@ fn check_default_mode_shows_diagnostics_and_summary() -> Result<()> {
       -                 pass
     1 + def foo():
     2 +     pass
+      |
+
+    1 file would be reformatted
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn check_bom_only_file() -> Result<()> {
+    let test = CliTest::with_file("example.py", "\u{feff}")?;
+    assert_cmd_snapshot!(test.format_command().args(["--check", "example.py"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    unformatted: File would be reformatted
+     --> example.py:1:1
+      |
+      - �
       |
 
     1 file would be reformatted
@@ -1376,8 +1420,8 @@ def say_hy(name: str):
     1 file reformatted
 
     ----- stderr -----
-    warning: `incorrect-blank-line-before-class` (D203) and `blank-line-before-class` (D211) are incompatible. Ignoring `incorrect-blank-line-before-class`.
-    warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
+    warning: `incorrect-blank-line-before-class-docstring` (D203) and `blank-line-before-class-docstring` (D211) are incompatible. Ignoring `incorrect-blank-line-before-class-docstring`.
+    warning: `multiline-docstring-summary-on-separate-line` (D212) and `multiline-docstring-summary-on-first-line` (D213) are incompatible. Ignoring `multiline-docstring-summary-on-first-line`.
     warning: The following rule may cause conflicts when used with the formatter: `missing-trailing-comma` (`COM812`). To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
     ");
     Ok(())
@@ -2457,6 +2501,278 @@ fn range_formatting_notebook() -> Result<()> {
     ----- stderr -----
     error: Failed to format main.ipynb: Range formatting is only supported for Python files.
     ");
+    Ok(())
+}
+
+#[test]
+fn inline_script_configuration() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # tool.ruff.format.quote-style = 'single'
+            # ///
+            x = "hello"
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(test.format_command().args(["--no-preview", "script.py"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file reformatted
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(test.format_command().args(["--preview", "--diff", "script.py"]), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    --- script.py
+    +++ script.py
+    @@ -1,4 +1,4 @@
+     # /// script
+     # tool.ruff.format.quote-style = 'single'
+     # ///
+    -x = "hello"
+    +x = 'hello'
+
+
+    ----- stderr -----
+    1 file would be reformatted
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn formatting_activates_script_settings() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            #/// script
+            # tool.ruff.format.quote-style = "single"
+            # ///
+            x = "hello"
+        "#,
+    )?;
+    let args = ["format", "--preview", "--quiet", "script.py"];
+
+    assert_cmd_snapshot!(test.command().args(args), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+    assert_cmd_snapshot!(test.command().args(args).arg("--check"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    unformatted: File would be reformatted
+     --> script.py:4:5
+      |
+    3 | # ///
+      - x = "hello"
+    4 + x = 'hello'
+      |
+
+
+    ----- stderr -----
+    "#);
+    Ok(())
+}
+
+#[test]
+fn inline_script_conflicts() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "comma.py",
+            r#"
+                # /// script
+                # tool.ruff.lint.select = ['COM812']
+                # ///
+                pass
+            "#,
+        ),
+        (
+            "docstring.py",
+            r#"
+                # /// script
+                # tool.ruff.lint.select = ['D203']
+                # ///
+                pass
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(test.format_command()
+        .env("RAYON_NUM_THREADS", "1")
+        .args(["--preview", "comma.py", "docstring.py"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    2 files reformatted
+
+    ----- stderr -----
+    warning: The following rule may cause conflicts when used with the formatter: `missing-trailing-comma` (`COM812`). To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
+    warning: The following rule may cause conflicts when used with the formatter: `incorrect-blank-line-before-class-docstring` (`D203`). To avoid unexpected behavior, we recommend disabling this rule, either by removing it from the `lint.select` or `lint.extend-select` configuration, or adding it to the `lint.ignore` configuration.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn stdin_inline_script_conflict() -> Result<()> {
+    let test = CliTest::new()?;
+
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--preview", "--stdin-filename=script.py", "-"])
+        .pass_stdin(indoc! {r#"
+            # /// script
+            # tool.ruff.lint.select = ['Q000']
+            # tool.ruff.format.quote-style = 'single'
+            # ///
+            x = "hello"
+        "#}), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # /// script
+    # tool.ruff.lint.select = ['Q000']
+    # tool.ruff.format.quote-style = 'single'
+    # ///
+    x = 'hello'
+
+    ----- stderr -----
+    warning: The `flake8-quotes.inline-quotes="double"` option is incompatible with the formatter's `format.quote-style="single"`. We recommend disabling `bad-quotes-inline-string` (`Q000`) and `avoidable-escaped-quote` (`Q003`) when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `"single"` or `"double"`.
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn stdin_script_python_version() -> Result<()> {
+    let test = CliTest::with_file(
+        "ruff.toml",
+        r#"
+            preview = true
+            target-version = 'py38'
+        "#,
+    )?;
+    let script = indoc! {r#"
+        # /// script
+        # requires-python = '>=3.10'
+        # ///
+        with open('a_really_long_foo') as foo, open('a_really_long_bar') as bar, open('a_really_long_baz') as baz:
+            pass
+    "#};
+
+    assert_cmd_snapshot!(test.format_command().args(["--stdin-filename=script.py", "-"]).pass_stdin(script), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # /// script
+    # requires-python = '>=3.10'
+    # ///
+    with (
+        open("a_really_long_foo") as foo,
+        open("a_really_long_bar") as bar,
+        open("a_really_long_baz") as baz,
+    ):
+        pass
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn invalid_script_metadata_check() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # requires-python = 42
+            # ///
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(test.format_command().args(["--preview", "--check", "script.py"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+    invalid-script-metadata: invalid type: integer `42`, expected a string
+     --> script.py:3:21
+      |
+    2 | # /// script
+    3 | # requires-python = 42
+      |                     ^^
+    4 | # ///
+      |
+
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn invalid_inline_setting_location() -> Result<()> {
+    let test = CliTest::with_file(
+        "bad.py",
+        r#"
+            # /// script
+            # tool.ruff.format.quote-style = "custom"
+            # ///
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(test.format_command().args(["--preview", "."]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Failed to parse script metadata in bad.py:3:34: unknown variant `custom`, expected one of `single`, `double`, `preserve`
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn stdin_invalid_script_metadata() -> Result<()> {
+    let test = CliTest::new()?;
+
+    let script = indoc! {r#"
+        # /// script
+        # requires-python = 42
+        # ///
+    "#};
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--preview", "--stdin-filename=script.py", "-"])
+        .pass_stdin(script), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Failed to parse script metadata in script.py:2:21: invalid type: integer `42`, expected a string
+    ");
+
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--preview", "--silent", "--stdin-filename=script.py", "-"])
+        .pass_stdin(script), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+
     Ok(())
 }
 

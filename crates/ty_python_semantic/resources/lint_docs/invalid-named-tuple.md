@@ -1,11 +1,11 @@
 ## What it does
 
-Checks for invalidly defined `NamedTuple` classes.
+Checks for invalid definitions of `typing.NamedTuple` and `collections.namedtuple` classes.
 
 ## Why is this bad?
 
 An invalidly defined `NamedTuple` class may lead to the type checker drawing incorrect conclusions.
-It may also lead to `TypeError`s or `AttributeError`s at runtime.
+It may also lead to errors at runtime, such as `ValueError`, `TypeError`, or `AttributeError`.
 
 ## Examples
 
@@ -26,6 +26,32 @@ Further, `NamedTuple` field names cannot start with an underscore:
 >>> class Foo(NamedTuple):
 ...     _bar: int
 ValueError: Field names cannot start with an underscore: '_bar'
+```
+
+Nor can they be keywords:
+
+```pycon
+>>> from collections import namedtuple
+>>> X = namedtuple("X", ["class"])
+ValueError: Type names and field names cannot be a keyword: 'class'
+```
+
+or invalid identifiers:
+
+```pycon
+>>> from collections import namedtuple
+>>> X = namedtuple("X", ["-"])
+ValueError: Type names and field names must be valid identifiers: '-
+```
+
+Similar restrictions apply to the `typename` argument:
+
+```pycon
+>>> from typing import NamedTuple
+>>> X = NamedTuple("class", [])
+ValueError: Type names and field names cannot be a keyword: 'class'
+>>> X = NamedTuple("x-", [])
+ValueError: Type names and field names must be valid identifiers: 'x-'
 ```
 
 `NamedTuple` classes also have certain synthesized attributes (like `_asdict`, `_make`, `_replace`,

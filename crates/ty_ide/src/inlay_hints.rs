@@ -17,7 +17,7 @@ use ty_python_semantic::importer::{ImportAction, ImportRequest, Importer, Member
 use ty_python_semantic::types::ide_support::{
     inlay_hint_call_argument_details, inlay_hint_return_type,
 };
-use ty_python_semantic::types::{Type, TypeDetail, TypeDisplayDetails};
+use ty_python_semantic::types::{Type, TypeDetail, TypeDisplayDetails, is_valid_annotation_target};
 use ty_python_semantic::{HasType, SemanticModel};
 
 #[derive(Debug, Clone)]
@@ -55,7 +55,7 @@ impl InlayHint {
             range.end(),
             &details,
             ": ",
-            annotations_are_valid_syntax(assignment),
+            matches!(assignment.targets.as_slice(), [target] if is_valid_annotation_target(db, file, target)),
         ))
     }
 
@@ -488,7 +488,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         navigation_target: Option<NavigationTarget>,
         mode: ArgumentHintMode,
     ) {
-        if !self.settings.call_argument_names || name.starts_with('_') {
+        if name.starts_with('_') {
             return;
         }
 
@@ -585,8 +585,12 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                 source_order::walk_expr(self, expr);
             }
             Expr::Call(call) => {
-                let details = inlay_hint_call_argument_details(self.db, &self.model, call)
-                    .unwrap_or_default();
+                let details =
+                    if self.settings.call_argument_names && !call.arguments.args.is_empty() {
+                        inlay_hint_call_argument_details(self.db, &self.model, call)
+                    } else {
+                        None
+                    };
 
                 self.visit_expr(&call.func);
 
@@ -595,8 +599,9 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                 let mut positional_index = 0;
                 for arg_or_keyword in call.arguments.iter_source_order() {
                     if let ArgOrKeyword::Arg(argument) = arg_or_keyword {
-                        if let Some((name, parameter_label_offset)) =
-                            details.argument_names.get(&positional_index)
+                        if let Some(details) = &details
+                            && let Some((name, parameter_label_offset)) =
+                                details.argument_names.get(&positional_index)
                             && !arg_matches_name(argument, name)
                         {
                             // A keyword cannot precede a plain positional argument. `args` also
@@ -748,22 +753,6 @@ fn type_hint_is_excessive_for_expr(expr: &Expr) -> bool {
 
 fn should_skip_import(db: &dyn Db, module: ty_module_resolver::Module, ty: Type) -> bool {
     module.is_known(db, ty_module_resolver::KnownModule::Builtins) || ty.is_none(db)
-}
-
-fn annotations_are_valid_syntax(stmt_assign: &StmtAssign) -> bool {
-    if stmt_assign.targets.len() > 1 {
-        return false;
-    }
-
-    if stmt_assign
-        .targets
-        .iter()
-        .any(|target| matches!(target, Expr::Tuple(_)))
-    {
-        return false;
-    }
-
-    true
 }
 
 fn is_ignored_variable_assignment_target(expr: &Expr) -> bool {
@@ -2542,6 +2531,39 @@ Source with applied edits:
         8 | a.y = int(3)
           |
         ");
+    }
+
+    #[test]
+    fn attribute_hint_edits_require_a_method_receiver() {
+        let test = inlay_hint_test(
+            "
+            class C:
+                def method(this, other: C, s: str) -> None:
+                    this.a = len(s)
+                    other.a = len(s)
+                    def inner() -> None:
+                        this.b = len(s)
+
+                @staticmethod
+                def static(self: C, s: str) -> None:
+                    self.a = len(s)
+            ",
+        );
+        let hints = test.collect_hints(&InlayHintSettings {
+            variable_types: true,
+            call_argument_names: false,
+            return_types: false,
+        });
+        let [receiver, other, captured, static_param] = hints.as_slice() else {
+            panic!("Expected four attribute hints, got {hints:?}");
+        };
+        for hint in &hints {
+            assert_eq!(hint.display().to_string(), ": int");
+        }
+        assert!(!receiver.text_edits.is_empty());
+        assert!(other.text_edits.is_empty());
+        assert!(!captured.text_edits.is_empty());
+        assert!(static_param.text_edits.is_empty());
     }
 
     #[test]
@@ -5759,10 +5781,10 @@ Source with applied edits:
         my_func(x="hello")
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/typing_extensions.pyi:LL:9
+          --> stdlib/typing.pyi:LL:5
            |
-        LL |         LiteralString as LiteralString,
-           |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        LL |     LiteralString: _SpecialForm
+           |     ^^^^^^^^^^^^^
         info: Source
           --> main2.py:LL:9
            |

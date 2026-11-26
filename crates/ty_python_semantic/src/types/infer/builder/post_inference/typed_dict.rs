@@ -102,6 +102,10 @@ fn validate_typed_dict_field_overrides<'db>(
     class: StaticClassLiteral<'db>,
     direct_bases: &[ClassType<'db>],
 ) {
+    if direct_bases.is_empty() {
+        return;
+    }
+
     let db = context.db();
     let env = context.program_environment();
     let child_fields = TypedDictType::new(class.identity_specialization(db)).items(db);
@@ -152,12 +156,6 @@ fn validate_typed_dict_openness<'db>(
     class_node: &ast::StmtClassDef,
     direct_bases: &[ClassType<'db>],
 ) {
-    let db = context.db();
-    let env = context.program_environment();
-    let child = TypedDictType::new(class.identity_specialization(db));
-    let child_openness = child.openness(db);
-    let child_items = child.items(db);
-
     if let Some(arguments) = class_node.arguments.as_deref()
         && arguments.find_keyword("closed").is_some()
         && arguments.find_keyword("extra_items").is_some()
@@ -168,6 +166,16 @@ fn validate_typed_dict_openness<'db>(
             "`closed` and `extra_items` cannot both be specified",
         );
     }
+
+    if direct_bases.is_empty() {
+        return;
+    }
+
+    let db = context.db();
+    let env = context.program_environment();
+    let child = TypedDictType::new(class.identity_specialization(db));
+    let child_openness = child.openness(db);
+    let child_items = child.items(db);
 
     for base in direct_bases {
         let base_typed_dict = TypedDictType::new(*base);

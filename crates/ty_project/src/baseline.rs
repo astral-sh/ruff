@@ -65,6 +65,7 @@
 //!
 //! [basedpyright]: https://github.com/DetachHead/basedpyright/blob/fa4b52d9428c0f355c95af2056cfd4edd4e6e5da/packages/pyright-internal/src/baseline.ts#L212-L225
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::ops::Range;
 
@@ -79,7 +80,6 @@ use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use similar::{Algorithm, DiffTag, capture_diff_slices};
-use ty_python_semantic::lint::LintId;
 
 use crate::Db;
 
@@ -97,13 +97,29 @@ pub(crate) fn demote_diagnostics(db: &dyn Db, file: File, diagnostics: &mut [Dia
         return;
     };
 
+    let registry = db.lint_registry();
+    let mut stored = Cow::Borrowed(baseline.entries);
+    // The writer records all entries for a file together, so each rule has one spelling in
+    // that file. Keep that spelling to reproduce the writer's ordering for equal ranges.
+    let mut stored_names = FxHashMap::default();
+    for (index, entry) in baseline.entries.iter().enumerate() {
+        if let Some(lint) = registry.alias_target(&entry.rule) {
+            stored.to_mut()[index].rule = CompactString::const_new(lint.name().as_str());
+            stored_names.insert(lint.name(), entry.rule.as_str());
+        }
+    }
+
     let mut current: Vec<_> = diagnostics
         .iter_mut()
         .filter_map(|diagnostic| {
             Some((BaselineDiagnostic::from_diagnostic(diagnostic)?, diagnostic))
         })
         .collect();
-    current.sort_by_key(|(location, _)| location.sort_key());
+    current.sort_by_key(|(location, _)| {
+        let (start, end, rule) = location.sort_key();
+        let name = stored_names.get(&rule).copied().unwrap_or(rule.as_str());
+        (start, end, name)
+    });
 
     let source = source_text(db, file);
     let entries: Vec<_> = current
@@ -121,11 +137,11 @@ pub(crate) fn demote_diagnostics(db: &dyn Db, file: File, diagnostics: &mut [Dia
         }
     };
 
-    if entries == baseline.entries {
+    if entries == stored.as_ref() {
         demote(0..entries.len());
         return;
     }
-    for op in capture_diff_slices(Algorithm::Myers, baseline.entries, &entries) {
+    for op in capture_diff_slices(Algorithm::Myers, stored.as_ref(), &entries) {
         if op.tag() == DiffTag::Equal {
             demote(op.new_range());
         }
@@ -205,7 +221,7 @@ fn baselines(db: &dyn Db) -> Result<Option<BaselineFile>, Error> {
         });
     }
 
-    let mut baseline: BaselineFile =
+    let baseline: BaselineFile =
         serde_json::from_str(source.as_str()).map_err(|error| Error::Parse {
             path: path.to_path_buf(),
             file,
@@ -217,19 +233,6 @@ fn baselines(db: &dyn Db) -> Result<Option<BaselineFile>, Error> {
             file,
             version: baseline.version,
         });
-    }
-
-    // Resolve stored rule aliases to their current names so older baselines still match.
-    let aliases: FxHashMap<&'static str, LintId> = db
-        .lint_registry()
-        .aliases()
-        .map(|(name, lint)| (name.as_str(), lint))
-        .collect();
-
-    for entry in baseline.files.values_mut().flatten() {
-        if let Some(lint) = aliases.get(entry.rule.as_str()) {
-            entry.rule = CompactString::const_new(lint.name().as_str());
-        }
     }
 
     Ok(Some(baseline))
@@ -399,7 +402,7 @@ impl BaselineDiagnostic {
         })
     }
 
-    /// Break ties at the same position consistently when writing and matching the baseline.
+    /// Sort by source range, breaking ties by the current rule name.
     fn sort_key(&self) -> (TextSize, TextSize, LintName) {
         (self.range.start(), self.range.end(), self.rule)
     }

@@ -9,6 +9,10 @@ standardized, or be subject to breaking changes. There are also tools and librar
 and/or evaluate type annotations at runtime, including stringized annotations (e.g. Pydantic,
 typeguard or beartype). Using experimental syntax may lead to runtime errors in this context.
 
+If you need Python to evaluate these annotations, install
+[`ty-extensions`](https://pypi.org/project/ty-extensions/) and use `Intersection[A, B]` and `Not[A]`
+from `ty_extensions` instead of `A & B` and `~A`.
+
 Conversely, if you are only using ty as your type checker, and if you are not relying on runtime
 inspection of type annotations, you can safely ignore this rule.
 

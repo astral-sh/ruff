@@ -21,3 +21,55 @@ help: Alias `pandas` to `pd`
 8 |     except ImportError:
   |
 note: This is an unsafe fix and may change runtime behavior
+
+ICN001 `datetime` should be imported as `dt`
+  --> tricky.py:13:8
+   |
+12 | # The expected alias is a local variable in the scope of a reference.
+13 | import datetime
+   |        ^^^^^^^^
+help: Alias `datetime` to `dt`
+
+ICN001 `pandas` should be imported as `pd`
+  --> tricky.py:22:12
+   |
+21 | def parameter_collision():
+22 |     import pandas
+   |            ^^^^^^
+23 |
+24 |     def frame(pd):
+   |
+help: Alias `pandas` to `pd`
+
+ICN001 `numpy` should be imported as `np`
+  --> tricky.py:31:12
+   |
+30 | def enclosing_scope_collision():
+31 |     import numpy
+   |            ^^^^^
+32 |
+33 |     def outer():
+   |
+help: Alias `numpy` to `np`
+
+ICN001 [*] `pandas` should be imported as `pd`
+  --> tricky.py:45:12
+   |
+44 | def alias_available():
+45 |     import pandas
+   |            ^^^^^^
+46 |
+47 |     def frame(data):
+   |
+help: Alias `pandas` to `pd`
+   |
+44 | def alias_available():
+   -     import pandas
+45 +     import pandas as pd
+46 |
+47 |     def frame(data):
+   -         return pandas.DataFrame(data)
+48 +         return pd.DataFrame(data)
+49 |
+   |
+note: This is an unsafe fix and may change runtime behavior

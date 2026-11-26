@@ -60,7 +60,7 @@ pub(super) struct LegacyTypeAliasDefinition<'db> {
 /// a candidate whose right-hand side still needs to be validated by type-expression inference.
 ///
 /// This query keeps callers independent of the defining file's AST.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn legacy_type_alias_definition<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -170,7 +170,7 @@ pub(super) fn legacy_type_alias_definition<'db>(
 /// produces the existing `int` class, whereas a recognized `NamedTuple` or `type` call
 /// creates a class whose definition is the assignment itself. Unknown source definitions
 /// remain eligible for the usual fallback, including unresolved and ambiguous imports.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn non_alias_assignment<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -416,7 +416,7 @@ fn unique_forwarding_target<'db>(
 /// This can seed a separate non-generic alias query while parameter discovery is incomplete.
 /// Parameters are part of the alias query's key: discovering them later selects a generic
 /// constructor rather than reusing that provisional non-generic value.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 pub(in crate::types) fn legacy_type_alias_parameters<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,

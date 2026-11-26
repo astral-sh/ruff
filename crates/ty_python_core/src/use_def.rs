@@ -169,7 +169,7 @@
 //! this in the future for some closures, but for now this is where we start.)
 //!
 //! The data structure we build to answer these questions is the `UseDefMap`. It has a
-//! `bindings_by_use` vector of [`InternedBindingsId`] indexed by [`ScopedUseId`]
+//! `bindings_by_use` table of reaching bindings indexed by [`ScopedUseId`]
 //! (plus an interned bindings table), a
 //! `definitions_by_definition` map of [`DefinitionsAtDefinition`], and `symbol_states` and
 //! `member_states` vectors indexed by [`ScopedSymbolId`]/[`ScopedMemberId`]. The values are (in
@@ -246,8 +246,8 @@
 //! [`SemanticIndexBuilder`](crate::builder::SemanticIndexBuilder), e.g. where it
 //! visits a `StmtIf` node.
 
-use std::collections::hash_map::Entry;
-use std::hash::{Hash as _, Hasher as _};
+use hashbrown::hash_table::Entry;
+use std::hash::{BuildHasher as _, Hash as _, Hasher as _};
 use std::ops::Index;
 use std::rc::Rc;
 use std::sync::{Arc, LazyLock};
@@ -255,13 +255,13 @@ use std::sync::{Arc, LazyLock};
 use ruff_index::{FrozenIndexVec, Idx, IndexVec, newtype_index};
 use ruff_python_ast::NodeIndex;
 use ruff_text_size::TextRange;
-use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHasher};
 use smallvec::SmallVec;
 use thin_vec::ThinVec;
 
 use crate::ast_ids::ScopedUseId;
 use crate::definition::{Definition, DefinitionCategory, DefinitionState};
-use crate::frozen::FrozenMap;
+use crate::frozen::{FrozenMap, PackedIds};
 use crate::member::ScopedMemberId;
 use crate::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, ScopedNarrowingConstraint,
@@ -348,11 +348,13 @@ struct PlaceStateInterner {
     interned_bindings: RetainedBindingsBuilder,
     interned_ids_by_bindings: hashbrown::HashTable<InternedBindingsId>,
     interned_declarations: RetainedDeclarationsBuilder,
-    interned_ids_by_declarations: FxHashMap<Declarations, InternedDeclarationsId>,
+    interned_ids_by_declarations: hashbrown::HashTable<InternedDeclarationsId>,
     // Undeclared states are common and can be interned by their dense constraint IDs.
     undeclared_declarations_by_constraint:
         IndexVec<ScopedReachabilityConstraintId, Option<InternedDeclarationsId>>,
     // These values are extremely common, so avoid repeatedly hashing their small vectors.
+    empty_bindings: Option<InternedBindingsId>,
+    empty_declarations: Option<InternedDeclarationsId>,
     always_unbound_bindings: Option<InternedBindingsId>,
     always_undeclared_declarations: Option<InternedDeclarationsId>,
 }
@@ -363,17 +365,22 @@ impl PlaceStateInterner {
             interned_bindings: RetainedBindingsBuilder::with_capacity(bindings),
             interned_ids_by_bindings: hashbrown::HashTable::with_capacity(bindings),
             interned_declarations: RetainedDeclarationsBuilder::with_capacity(declarations),
-            interned_ids_by_declarations: FxHashMap::with_capacity_and_hasher(
-                declaration_map,
-                FxBuildHasher,
-            ),
+            interned_ids_by_declarations: hashbrown::HashTable::with_capacity(declaration_map),
             undeclared_declarations_by_constraint: IndexVec::new(),
+            empty_bindings: None,
+            empty_declarations: None,
             always_unbound_bindings: None,
             always_undeclared_declarations: None,
         }
     }
 
     fn intern_bindings(&mut self, bindings: &Bindings) -> InternedBindingsId {
+        // Reachable places with no explicit bindings share an empty slice.
+        if bindings.as_slice().is_empty() {
+            return *self
+                .empty_bindings
+                .get_or_insert_with(|| self.interned_bindings.push(bindings));
+        }
         if bindings.is_always_unbound() {
             if let Some(interned_id) = self.always_unbound_bindings {
                 return interned_id;
@@ -386,16 +393,16 @@ impl PlaceStateInterner {
 
         // The retained representation discards the unbound narrowing constraint, so it isn't
         // part of the interned identity.
-        let hash = Self::hash_bindings(bindings.as_slice());
+        let hash = Self::hash(bindings.as_slice());
         let interned_bindings = &mut self.interned_bindings;
         let entry = self.interned_ids_by_bindings.entry(
             hash,
             |id| interned_bindings.get(*id) == bindings.as_slice(),
-            |id| Self::hash_bindings(interned_bindings.get(*id)),
+            |id| Self::hash(interned_bindings.get(*id)),
         );
         match entry {
-            hashbrown::hash_table::Entry::Occupied(entry) => *entry.get(),
-            hashbrown::hash_table::Entry::Vacant(entry) => {
+            Entry::Occupied(entry) => *entry.get(),
+            Entry::Vacant(entry) => {
                 let interned_id = interned_bindings.push(bindings);
                 entry.insert(interned_id);
                 interned_id
@@ -403,19 +410,24 @@ impl PlaceStateInterner {
         }
     }
 
-    fn hash_bindings(live_bindings: &[LiveBinding]) -> u64 {
+    fn hash<T: std::hash::Hash>(values: &[T]) -> u64 {
         let mut hasher = FxHasher::default();
-        live_bindings.hash(&mut hasher);
+        values.hash(&mut hasher);
         hasher.finish()
     }
 
-    fn intern_declarations(&mut self, declarations: Declarations) -> InternedDeclarationsId {
+    fn intern_declarations(&mut self, declarations: &Declarations) -> InternedDeclarationsId {
+        if declarations.as_slice().is_empty() {
+            return *self
+                .empty_declarations
+                .get_or_insert_with(|| self.interned_declarations.push(declarations));
+        }
         if declarations.is_always_undeclared() {
             if let Some(interned_id) = self.always_undeclared_declarations {
                 return interned_id;
             }
 
-            let interned_id = self.interned_declarations.push(&declarations);
+            let interned_id = self.interned_declarations.push(declarations);
             self.always_undeclared_declarations = Some(interned_id);
             return interned_id;
         }
@@ -434,15 +446,21 @@ impl PlaceStateInterner {
                 return interned_id;
             }
 
-            let interned_id = self.interned_declarations.push(&declarations);
+            let interned_id = self.interned_declarations.push(declarations);
             self.undeclared_declarations_by_constraint[reachability_constraint] = Some(interned_id);
             return interned_id;
         }
 
-        match self.interned_ids_by_declarations.entry(declarations) {
+        let interned = &mut self.interned_declarations;
+        let entry = self.interned_ids_by_declarations.entry(
+            Self::hash(declarations.as_slice()),
+            |id| interned.get(*id) == declarations.as_slice(),
+            |id| Self::hash(interned.get(*id)),
+        );
+        match entry {
             Entry::Occupied(entry) => *entry.get(),
             Entry::Vacant(entry) => {
-                let interned_id = self.interned_declarations.push(entry.key());
+                let interned_id = interned.push(declarations);
                 entry.insert(interned_id);
                 interned_id
             }
@@ -452,7 +470,7 @@ impl PlaceStateInterner {
     fn intern_place_state(
         &mut self,
         bindings: &Bindings,
-        declarations: Declarations,
+        declarations: &Declarations,
     ) -> InternedPlaceStateId {
         InternedPlaceStateId(
             self.intern_bindings(bindings),
@@ -463,14 +481,14 @@ impl PlaceStateInterner {
     fn retain_place_state(
         &mut self,
         bindings: &Bindings,
-        declarations: Declarations,
+        declarations: &Declarations,
     ) -> InternedPlaceStateId {
         // Other retained declarations rarely repeat. Keep the compact IDs without hashing every
         // declaration vector to find the occasional duplicate.
         let declarations_id = if declarations.undeclared_reachability_constraint().is_some() {
             self.intern_declarations(declarations)
         } else {
-            self.interned_declarations.push(&declarations)
+            self.interned_declarations.push(declarations)
         };
         InternedPlaceStateId(self.intern_bindings(bindings), declarations_id)
     }
@@ -661,17 +679,19 @@ impl PredicateNarrowingTargets {
         Self(entries.into_boxed_slice())
     }
 
-    /// Returns whether `predicate` may narrow `place`.
-    pub fn contains(&self, predicate: ScopedPredicateId, place: ScopedPlaceId) -> bool {
-        self.0
-            .binary_search_by_key(&(place, predicate), |&(predicate, place)| {
-                (place, predicate)
-            })
-            .is_ok()
+    /// Returns the predicate entries for a single place, in predicate order.
+    pub fn for_place(&self, place: ScopedPlaceId) -> &[(ScopedPredicateId, ScopedPlaceId)] {
+        let start = self.0.partition_point(|&(_, target)| target < place);
+        let remaining = &self.0[start..];
+        if remaining.first().is_none_or(|&(_, target)| target != place) {
+            return &[];
+        }
+        let len = remaining.partition_point(|&(_, target)| target == place);
+        &remaining[..len]
     }
 
     /// Returns whether any predicate may narrow `place`.
-    pub fn contains_place(&self, place: ScopedPlaceId) -> bool {
+    fn contains_place(&self, place: ScopedPlaceId) -> bool {
         self.0
             .binary_search_by_key(&place, |&(_, target)| target)
             .is_ok()
@@ -685,7 +705,7 @@ impl PredicateNarrowingTargets {
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 struct UseDefMapExtra {
     /// [`Bindings`] reaching a [`ScopedUseId`].
-    bindings_by_use: FrozenIndexVec<ScopedUseId, InternedBindingsId>,
+    bindings_by_use: PackedIds<InternedBindingsId>,
 
     /// Bindings before an `if` chain, for uses in its final `elif` condition.
     if_chain_start_by_use: FrozenMap<ScopedUseId, InternedBindingsId>,
@@ -812,11 +832,6 @@ pub struct UseDefMap<'db> {
     /// Interned [`Declarations`] values.
     interned_declarations: Arc<RetainedDeclarations>,
 
-    /// Tracks the reachability constraint for statements and certain sub-expressions
-    /// (e.g. ternary branches, boolean operator operands), keyed by their text range.
-    /// Used to suppress diagnostics in unreachable code.
-    range_reachability: Box<[(TextRange, RangeInfo)]>,
-
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
     /// [`Declarations`] to know whether this binding is permitted by the live declarations and
     /// imported qualifiers.
@@ -846,24 +861,67 @@ pub struct UseDefMap<'db> {
     /// Collection fields omitted when they would all be empty.
     extra: Option<Box<UseDefMapExtra>>,
 
-    /// Whether or not the end of the scope is reachable.
-    ///
-    /// This is used to check if the function can implicitly return `None`.
-    /// For example:
-    /// ```py
-    /// def f(cond: bool) -> int | None:
-    ///     if cond:
-    ///        return 1
-    ///
-    /// def g() -> int:
-    ///     if True:
-    ///        return 1
-    /// ```
-    ///
-    /// Function `f` may implicitly return `None`, but `g` cannot.
-    ///
-    /// This is used by `is_end_of_scope_reachable` in the `ty_python_semantic` crate.
-    end_of_scope_reachability: ScopedReachabilityConstraintId,
+    reachability: ScopeReachability,
+}
+
+/// How to find containing ranges without changing their evaluation order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+enum RangeSearch {
+    /// Nested expressions or evaluation out of source order can require a full scan.
+    Linear,
+    /// Both the start offsets and the end offsets are nondecreasing.
+    Binary,
+}
+
+/// Reachability within a scope and at its end.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+struct ScopeReachability {
+    /// Ranges of statements and certain sub-expressions, such as ternary branches
+    /// and boolean operands, in evaluation order.
+    ranges: Box<[(TextRange, RangeInfo)]>,
+    search: RangeSearch,
+    end_of_scope: ScopedReachabilityConstraintId,
+}
+
+impl ScopeReachability {
+    fn new(
+        mut ranges: Vec<(TextRange, RangeInfo)>,
+        end_of_scope: ScopedReachabilityConstraintId,
+    ) -> Self {
+        // Default ranges kept non-contiguous ranges with the same reachability from merging.
+        ranges.retain(|(_, info)| *info != RangeInfo::default());
+        let search =
+            if ranges.is_sorted_by(|(a, _), (b, _)| a.start() <= b.start() && a.end() <= b.end()) {
+                RangeSearch::Binary
+            } else {
+                RangeSearch::Linear
+            };
+        Self {
+            ranges: ranges.into_boxed_slice(),
+            search,
+            end_of_scope,
+        }
+    }
+
+    /// Returns information about each retained range that fully contains `range`.
+    fn ranges_containing(&self, range: TextRange) -> impl Iterator<Item = &RangeInfo> {
+        let candidates = match self.search {
+            RangeSearch::Linear => &self.ranges[..],
+            RangeSearch::Binary => {
+                // The containing ranges form a contiguous slice. Skip those that end
+                // too early, then stop before those that start too late.
+                let first = self
+                    .ranges
+                    .partition_point(|(entry, _)| entry.end() < range.end());
+                let remaining = &self.ranges[first..];
+                let count = remaining.partition_point(|(entry, _)| entry.start() <= range.start());
+                &remaining[..count]
+            }
+        };
+        candidates
+            .iter()
+            .filter_map(move |(entry, info)| entry.contains_range(range).then_some(info))
+    }
 }
 
 /// Shares equivalent scope-local binding and declaration tables within a file.
@@ -872,27 +930,130 @@ pub struct UseDefMap<'db> {
 /// identical tables can share storage without sharing the scope-specific data they reference.
 #[derive(Default)]
 pub(super) struct UseDefMapInterner {
-    bindings: FxHashSet<Arc<RetainedBindings>>,
-    declarations: FxHashSet<Arc<RetainedDeclarations>>,
+    bindings: hashbrown::HashTable<(u64, Arc<RetainedBindings>)>,
+    declarations: hashbrown::HashTable<(u64, Arc<RetainedDeclarations>)>,
+    stub_layouts: FxHashMap<SmallVec<[bool; 8]>, StubParameterLayout>,
+}
+
+/// Binding and declaration tables for a function whose body contains only `pass` or `...`.
+/// Each distinct parameter binds its symbol once. An annotated parameter also declares it.
+/// These functions share a layout because the tables refer to definitions by scope-local index.
+///
+/// ```python
+/// def first(x: int, y): ...
+/// def second(a: str, b): pass
+/// ```
+struct StubParameterLayout {
+    bindings: Arc<RetainedBindings>,
+    declarations: Arc<RetainedDeclarations>,
+    symbols: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub(super) struct StubParameter<'db> {
+    pub(super) symbol: ScopedSymbolId,
+    pub(super) definition: Definition<'db>,
+    pub(super) annotated: bool,
+}
+
+impl StubParameterLayout {
+    /// Returns the annotation pattern in definition order. A repeated symbol shadows an
+    /// earlier parameter, so the annotation pattern alone cannot describe that scope.
+    fn key(parameters: &[StubParameter<'_>]) -> Option<SmallVec<[bool; 8]>> {
+        let mut key = SmallVec::with_capacity(parameters.len());
+        for (index, parameter) in parameters.iter().enumerate() {
+            if parameter.symbol.index() != index {
+                return None;
+            }
+            key.push(parameter.annotated);
+        }
+        Some(key)
+    }
+
+    /// Pairs the shared tables with the definitions their indices refer to in this function.
+    /// The function also keeps its own reachability information for source ranges.
+    fn instantiate<'db>(
+        &self,
+        parameters: Vec<StubParameter<'db>>,
+        reachability: ScopeReachability,
+    ) -> UseDefMap<'db> {
+        UseDefMap {
+            all_definitions: RetainedDefinitions {
+                states: parameters
+                    .into_iter()
+                    .map(|p| DefinitionEntry::Unused(p.definition))
+                    .collect(),
+            },
+            constraint_tables: None,
+            interned_bindings: Arc::clone(&self.bindings),
+            interned_declarations: Arc::clone(&self.declarations),
+            definitions_by_definition: FrozenMap::default(),
+            symbol_states: self.symbols.clone(),
+            extra: None,
+            reachability,
+        }
+    }
 }
 
 impl UseDefMapInterner {
-    pub(super) fn intern<'db>(&mut self, mut map: UseDefMap<'db>) -> Arc<UseDefMap<'db>> {
+    /// Reuses the layout of an earlier stub in this file when the same parameter positions
+    /// have annotations. The first occurrence and signatures with duplicate names build
+    /// their binding and declaration tables from the individual parameters.
+    pub(super) fn finish<'db>(
+        &mut self,
+        mut builder: Box<UseDefMapBuilder<'db>>,
+    ) -> Arc<UseDefMap<'db>> {
+        let Some(parameters) = builder.stub_parameters.take() else {
+            return self.intern(builder.finish());
+        };
+        let shape = StubParameterLayout::key(&parameters);
+        if let Some(layout) = shape
+            .as_ref()
+            .and_then(|shape| self.stub_layouts.get(shape))
+        {
+            let reachability =
+                ScopeReachability::new(builder.range_reachability, builder.reachability);
+            return Arc::new(layout.instantiate(parameters, reachability));
+        }
+
+        builder.record_stub_parameters(parameters);
+        let map = self.intern(builder.finish());
+        if let Some(shape) = shape {
+            self.stub_layouts.insert(
+                shape,
+                StubParameterLayout {
+                    bindings: Arc::clone(&map.interned_bindings),
+                    declarations: Arc::clone(&map.interned_declarations),
+                    symbols: map.symbol_states.clone(),
+                },
+            );
+        }
+        map
+    }
+
+    fn intern<'db>(&mut self, mut map: UseDefMap<'db>) -> Arc<UseDefMap<'db>> {
         map.interned_bindings = Self::intern_table(&mut self.bindings, map.interned_bindings);
         map.interned_declarations =
             Self::intern_table(&mut self.declarations, map.interned_declarations);
         Arc::new(map)
     }
 
+    /// Hash each scope's table once, even when the interner grows.
     fn intern_table<T: Eq + std::hash::Hash>(
-        values: &mut FxHashSet<Arc<T>>,
+        values: &mut hashbrown::HashTable<(u64, Arc<T>)>,
         value: Arc<T>,
     ) -> Arc<T> {
-        if let Some(existing) = values.get(value.as_ref()) {
-            Arc::clone(existing)
-        } else {
-            values.insert(Arc::clone(&value));
-            value
+        let hash = FxBuildHasher.hash_one(value.as_ref());
+        match values.entry(
+            hash,
+            |(stored_hash, existing)| *stored_hash == hash && *existing == value,
+            |(stored_hash, _)| *stored_hash,
+        ) {
+            Entry::Occupied(entry) => Arc::clone(&entry.get().1),
+            Entry::Vacant(entry) => {
+                entry.insert((hash, Arc::clone(&value)));
+                value
+            }
         }
     }
 }
@@ -968,13 +1129,39 @@ impl<'db> UseDefMap<'db> {
     pub fn range_reachability(
         &self,
     ) -> impl Iterator<Item = (TextRange, ScopedReachabilityConstraintId)> + '_ {
-        self.range_reachability
+        self.reachability
+            .ranges
             .iter()
-            .map(|&(range, RangeInfo { reachability, .. })| (range, reachability))
+            .map(|(range, info)| (*range, info.reachability))
     }
 
+    /// Returns the constraints on ranges that fully contain `range`, in evaluation order.
+    /// If any constraint is false, `range` is unreachable.
+    pub fn reachability_constraints_for(
+        &self,
+        range: TextRange,
+    ) -> impl Iterator<Item = ScopedReachabilityConstraintId> + '_ {
+        self.reachability
+            .ranges_containing(range)
+            .map(|info| info.reachability)
+    }
+
+    /// The constraint that determines whether control can reach the end of this scope.
+    ///
+    /// In a function, this determines whether it can implicitly return `None`.
+    /// Here `f` can implicitly return `None`, but `g` cannot.
+    ///
+    /// ```python
+    /// def f(cond: bool) -> int | None:
+    ///     if cond:
+    ///         return 1
+    ///
+    /// def g() -> int:
+    ///     if True:
+    ///         return 1
+    /// ```
     pub fn end_of_scope_reachability(&self) -> ScopedReachabilityConstraintId {
-        self.end_of_scope_reachability
+        self.reachability.end_of_scope
     }
 
     /// Definitions relevant to usage analysis, including standalone declarations.
@@ -996,7 +1183,7 @@ impl<'db> UseDefMap<'db> {
     }
 
     pub fn bindings_at_use(&self, use_id: ScopedUseId) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings_id = self.extra().bindings_by_use[use_id];
+        let bindings_id = self.extra().bindings_by_use.get(use_id.index());
         self.bindings_iterator(
             &self.interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -1080,6 +1267,13 @@ impl<'db> UseDefMap<'db> {
         self.all_definitions.get(id).state()
     }
 
+    /// Returns whether any predicate in this scope may narrow `place`.
+    pub fn may_narrow(&self, place: ScopedPlaceId) -> bool {
+        self.constraint_tables()
+            .predicate_narrowing_targets
+            .contains_place(place)
+    }
+
     pub fn narrowing_evaluator(
         &self,
         constraint: ScopedNarrowingConstraint,
@@ -1091,7 +1285,8 @@ impl<'db> UseDefMap<'db> {
     }
 
     pub(crate) fn is_range_in_type_checking_block(&self, range: TextRange) -> bool {
-        self.range_reachability
+        self.reachability
+            .ranges
             .iter()
             .take_while(|(entry_range, _)| entry_range.start() <= range.start())
             .any(|&(entry_range, block)| {
@@ -1671,11 +1866,42 @@ impl FlowSnapshot {
 #[newtype_index]
 struct PendingReachabilityId;
 
+/// How control flow continues from a node in the pending constraint tree.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PendingNodeKind {
+    Linear,
+    /// Restoring a snapshot here lets another path start at this node.
+    Fork,
+}
+
+/// Narrowing from the node that stores this prefix through `fork`, starting at `ALWAYS_TRUE`.
+#[derive(Clone, Copy, Debug)]
+struct NarrowingPrefix {
+    fork: PendingReachabilityId,
+    constraint: ScopedNarrowingConstraint,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PendingNarrowing {
+    Constraint(ScopedNarrowingConstraint),
+    /// Tips of two paths that start at this node's parent.
+    Join(PendingReachabilityId, PendingReachabilityId),
+}
+
+impl PendingNarrowing {
+    const ALWAYS_TRUE: Self = Self::Constraint(ScopedNarrowingConstraint::ALWAYS_TRUE);
+}
+
 #[derive(Debug)]
 struct PendingReachabilityConstraint {
     parent: PendingReachabilityId,
+    kind: PendingNodeKind,
+    narrowing_prefix: Option<NarrowingPrefix>,
     reachability_constraint: ScopedReachabilityConstraintId,
-    narrowing_constraint: ScopedNarrowingConstraint,
+    narrowing_constraint: PendingNarrowing,
+    scope_reachability: ScopedReachabilityConstraintId,
+    /// Gates through the last merge are visible even to reads of unchanged places.
+    last_join: PendingReachabilityId,
 }
 
 /// An append-only tree of scope-wide reachability constraints and narrowing gates.
@@ -1684,6 +1910,9 @@ struct PendingReachabilityConstraint {
 /// snapshots can share place states and defer applying subsequent constraints until needed.
 #[derive(Debug)]
 struct PendingReachability {
+    /// Bindings with the same narrowing constraint at a fork share the result of its join.
+    join_cache:
+        FxHashMap<(PendingReachabilityId, ScopedNarrowingConstraint), ScopedNarrowingConstraint>,
     constraints: IndexVec<PendingReachabilityId, PendingReachabilityConstraint>,
     current: PendingReachabilityId,
 }
@@ -1694,26 +1923,42 @@ impl Default for PendingReachability {
         let root = constraints.next_index();
         constraints.push(PendingReachabilityConstraint {
             parent: root,
+            kind: PendingNodeKind::Linear,
+            narrowing_prefix: None,
             reachability_constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
-            narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
+            narrowing_constraint: PendingNarrowing::ALWAYS_TRUE,
+            scope_reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            last_join: root,
         });
         Self {
             constraints,
+            join_cache: FxHashMap::default(),
             current: root,
         }
     }
 }
 
 impl PendingReachability {
+    fn restore(&mut self, cursor: PendingReachabilityId) {
+        self.current = cursor;
+        self.constraints[cursor].kind = PendingNodeKind::Fork;
+    }
+
     fn push(
         &mut self,
         reachability_constraint: ScopedReachabilityConstraintId,
         narrowing_constraint: ScopedNarrowingConstraint,
+        scope_reachability: ScopedReachabilityConstraintId,
     ) {
+        let parent = &self.constraints[self.current];
         self.current = self.constraints.push(PendingReachabilityConstraint {
             parent: self.current,
+            kind: PendingNodeKind::Linear,
+            narrowing_prefix: None,
             reachability_constraint,
-            narrowing_constraint,
+            narrowing_constraint: PendingNarrowing::Constraint(narrowing_constraint),
+            scope_reachability,
+            last_join: parent.last_join,
         });
     }
 
@@ -1722,7 +1967,7 @@ impl PendingReachability {
     /// The place's node must be an ancestor of `target`. After materialization, the place is
     /// uniquely owned for mutation and records `target` as its last applied node.
     fn materialize<'a>(
-        &self,
+        &mut self,
         pending: &'a mut PendingPlaceState,
         target: PendingReachabilityId,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
@@ -1735,18 +1980,18 @@ impl PendingReachability {
     }
 
     fn materialize_narrowing(
-        &self,
+        &mut self,
         pending: &mut PendingPlaceState,
         target: PendingReachabilityId,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
     ) {
         if pending.narrowing != target {
-            let mut unapplied = SmallVec::<[ScopedNarrowingConstraint; 4]>::new();
+            let mut unapplied = SmallVec::<[PendingReachabilityId; 4]>::new();
             let mut current = target;
             while current != pending.narrowing {
                 let event = &self.constraints[current];
-                if event.narrowing_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE {
-                    unapplied.push(event.narrowing_constraint);
+                if event.narrowing_constraint != PendingNarrowing::ALWAYS_TRUE {
+                    unapplied.push(current);
                 }
                 assert_ne!(
                     current, event.parent,
@@ -1758,7 +2003,14 @@ impl PendingReachability {
             if !unapplied.is_empty() {
                 let state = Rc::make_mut(&mut pending.state);
                 for constraint in unapplied.into_iter().rev() {
-                    state.record_narrowing_constraint(narrowing_constraints, constraint);
+                    match self.constraints[constraint].narrowing_constraint {
+                        PendingNarrowing::Constraint(gate) => {
+                            state.record_narrowing_constraint(narrowing_constraints, gate);
+                        }
+                        PendingNarrowing::Join(..) => state.map_narrowing_constraints(|prefix| {
+                            self.apply_join(constraint, prefix, narrowing_constraints)
+                        }),
+                    }
                 }
             }
             pending.narrowing = target;
@@ -1771,27 +2023,40 @@ impl PendingReachability {
         target: PendingReachabilityId,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) -> &'a mut PlaceState {
-        if pending.reachability != target {
-            let mut unapplied = SmallVec::<[ScopedReachabilityConstraintId; 4]>::new();
-            let mut current = target;
-            while current != pending.reachability {
-                let event = &self.constraints[current];
-                unapplied.push(event.reachability_constraint);
-                assert_ne!(
-                    current, event.parent,
-                    "pending reachability must be an ancestor"
-                );
-                current = event.parent;
-            }
-
-            let state = Rc::make_mut(&mut pending.state);
-            for constraint in unapplied.into_iter().rev() {
-                state.record_reachability_constraint(reachability_constraints, constraint);
-            }
-            pending.reachability = target;
+        let state = Rc::make_mut(&mut pending.state);
+        if pending.reachability == target {
+            return state;
         }
 
-        Rc::make_mut(&mut pending.state)
+        let previous = pending.reachability;
+        pending.reachability = target;
+        let target_event = &self.constraints[target];
+        // At each step the scope and a place with the same reachability follow
+        // the same path, including across merges.
+        if state.try_replace_reachability(
+            self.constraints[previous].scope_reachability,
+            target_event.scope_reachability,
+        ) {
+            return state;
+        }
+
+        let mut unapplied = SmallVec::<[ScopedReachabilityConstraintId; 4]>::new();
+        let mut current = target;
+        while current != previous {
+            let event = &self.constraints[current];
+            if event.reachability_constraint != ScopedReachabilityConstraintId::ALWAYS_TRUE {
+                unapplied.push(event.reachability_constraint);
+            }
+            assert_ne!(
+                current, event.parent,
+                "pending reachability must be an ancestor"
+            );
+            current = event.parent;
+        }
+        for constraint in unapplied.into_iter().rev() {
+            state.record_reachability_constraint(reachability_constraints, constraint);
+        }
+        state
     }
 
     /// Returns the materialized place state for immutable access.
@@ -1800,7 +2065,7 @@ impl PendingReachability {
     /// constraints are already materialized, this preserves the shared [`Rc`] instead of making
     /// the state uniquely owned.
     fn materialize_ref<'a>(
-        &self,
+        &mut self,
         pending: &'a mut PendingPlaceState,
         target: PendingReachabilityId,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
@@ -1819,57 +2084,48 @@ impl PendingReachability {
 
     /// Returns the place state needed to resolve a use.
     ///
-    /// Pending narrowing gates are only needed to preserve path correlations across a later place
-    /// change or merge, so they are not materialized here.
+    /// Materialize narrowing through the last merge, but leave subsequent gates pending
+    /// until the next place change or merge.
     fn materialize_ref_at_use<'a>(
-        &self,
+        &mut self,
         pending: &'a mut PendingPlaceState,
         target: PendingReachabilityId,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) -> &'a PlaceState {
         self.materialize_reachability(pending, target, reachability_constraints);
-        &pending.state
-    }
-
-    /// Combines the constraints after `ancestor` through `target` into a single constraint.
-    ///
-    /// `ancestor` must be an ancestor of `target`.
-    fn constraint_between(
-        &self,
-        ancestor: PendingReachabilityId,
-        target: PendingReachabilityId,
-        reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) -> ScopedReachabilityConstraintId {
-        let mut constraint = ScopedReachabilityConstraintId::ALWAYS_TRUE;
-        let mut current = target;
-        while current != ancestor {
-            let event = &self.constraints[current];
-            constraint = reachability_constraints
-                .add_and_constraint(constraint, event.reachability_constraint);
-            assert_ne!(
-                current, event.parent,
-                "pending reachability must be an ancestor"
-            );
-            current = event.parent;
+        let joined = self.constraints[target].last_join;
+        if pending.narrowing.index() < joined.index() {
+            self.materialize_narrowing(pending, joined, narrowing_constraints);
         }
-        constraint
+        &pending.state
     }
 
     /// Combines the narrowing gates after `ancestor` through `target` into one constraint.
     ///
     /// `ancestor` must be an ancestor of `target`.
     fn narrowing_constraint_between(
-        &self,
+        &mut self,
         ancestor: PendingReachabilityId,
         target: PendingReachabilityId,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
     ) -> ScopedNarrowingConstraint {
-        let mut unapplied = SmallVec::<[ScopedNarrowingConstraint; 4]>::new();
+        let mut unapplied = SmallVec::<[PendingReachabilityId; 4]>::new();
         let mut current = target;
+        let mut constraint = ScopedNarrowingConstraint::ALWAYS_TRUE;
+        let prefix = self.constraints[ancestor].narrowing_prefix;
         while current != ancestor {
+            // The previous fork need not be on this path. Only reuse its
+            // conjunction if the walk actually reaches it.
+            if let Some(prefix) = prefix
+                && current == prefix.fork
+            {
+                constraint = prefix.constraint;
+                break;
+            }
             let event = &self.constraints[current];
-            if event.narrowing_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE {
-                unapplied.push(event.narrowing_constraint);
+            if event.narrowing_constraint != PendingNarrowing::ALWAYS_TRUE {
+                unapplied.push(current);
             }
             assert_ne!(
                 current, event.parent,
@@ -1878,27 +2134,119 @@ impl PendingReachability {
             current = event.parent;
         }
 
-        let mut constraint = ScopedNarrowingConstraint::ALWAYS_TRUE;
         for pending in unapplied.into_iter().rev() {
-            constraint = narrowing_constraints.add_and_constraint(constraint, pending);
+            constraint = match self.constraints[pending].narrowing_constraint {
+                PendingNarrowing::Constraint(gate) => {
+                    narrowing_constraints.add_and_constraint(constraint, gate)
+                }
+                PendingNarrowing::Join(..) => {
+                    self.apply_join(pending, constraint, narrowing_constraints)
+                }
+            };
         }
         constraint
     }
 
-    /// Returns the lowest common ancestor of two nodes in the pending-constraint tree.
+    /// Narrows along both paths starting from the same prefix before taking their union.
+    ///
+    /// A flat `if`/`elif` chain can produce deeply nested joins, so use an explicit stack.
+    fn apply_join(
+        &mut self,
+        join: PendingReachabilityId,
+        prefix: ScopedNarrowingConstraint,
+        constraints: &mut NarrowingConstraintsBuilder,
+    ) -> ScopedNarrowingConstraint {
+        enum Step {
+            Apply(PendingReachabilityId),
+            Right {
+                join: PendingReachabilityId,
+                tip: PendingReachabilityId,
+                input: ScopedNarrowingConstraint,
+            },
+            Merge {
+                join: PendingReachabilityId,
+                input: ScopedNarrowingConstraint,
+                left: ScopedNarrowingConstraint,
+            },
+        }
+
+        if let Some(&result) = self.join_cache.get(&(join, prefix)) {
+            return result;
+        }
+
+        let mut steps = SmallVec::<[Step; 8]>::new();
+        steps.push(Step::Apply(join));
+        // Each Right step saves the input while we evaluate the left path.
+        // Each Merge step saves that result while we evaluate the right path.
+        let mut value = prefix;
+        while let Some(step) = steps.pop() {
+            let (fork, mut tip) = match step {
+                Step::Apply(id) => {
+                    let node = &self.constraints[id];
+                    match node.narrowing_constraint {
+                        PendingNarrowing::Constraint(gate) => {
+                            value = constraints.add_and_constraint(value, gate);
+                            continue;
+                        }
+                        PendingNarrowing::Join(left, right) => {
+                            if let Some(&result) = self.join_cache.get(&(id, value)) {
+                                value = result;
+                                continue;
+                            }
+                            steps.push(Step::Right {
+                                join: id,
+                                tip: right,
+                                input: value,
+                            });
+                            (node.parent, left)
+                        }
+                    }
+                }
+                Step::Right { join, tip, input } => {
+                    steps.push(Step::Merge {
+                        join,
+                        input,
+                        left: value,
+                    });
+                    value = input;
+                    (self.constraints[join].parent, tip)
+                }
+                Step::Merge { join, input, left } => {
+                    value = constraints.add_or_constraint(left, value);
+                    self.join_cache.insert((join, input), value);
+                    continue;
+                }
+            };
+            // Push gates backwards so they apply in source order.
+            while tip != fork {
+                let node = &self.constraints[tip];
+                if node.narrowing_constraint != PendingNarrowing::ALWAYS_TRUE {
+                    steps.push(Step::Apply(tip));
+                }
+                tip = node.parent;
+            }
+        }
+        value
+    }
+
+    /// Returns the lowest common ancestor and whether either path applies narrowing after it.
     fn common_ancestor(
         &self,
         mut left: PendingReachabilityId,
         mut right: PendingReachabilityId,
-    ) -> PendingReachabilityId {
+    ) -> (PendingReachabilityId, bool) {
+        let mut has_narrowing = false;
         while left != right {
-            if left.index() > right.index() {
-                left = self.constraints[left].parent;
+            let cursor = if left.index() > right.index() {
+                &mut left
             } else {
-                right = self.constraints[right].parent;
-            }
+                &mut right
+            };
+            let event = &self.constraints[*cursor];
+            has_narrowing |= event.narrowing_constraint != PendingNarrowing::ALWAYS_TRUE;
+            *cursor = event.parent;
         }
-        left
+        (left, has_narrowing)
     }
 }
 
@@ -1931,116 +2279,210 @@ fn pending_place_state_mut<'a>(
     }
 }
 
+/// The path of an incoming branch, shared by all symbol and member merges.
+#[derive(Clone, Copy)]
+struct PendingBranch {
+    tip: PendingReachabilityId,
+    joined: PendingReachabilityId,
+    last_fork: PendingReachabilityId,
+}
+
 impl PendingReachability {
+    /// Creates the pending path after a merge and locates the last fork of the incoming path.
+    fn branch_to_merge(
+        &mut self,
+        tip: PendingReachabilityId,
+        scope_reachability: ScopedReachabilityConstraintId,
+        narrowing: &mut NarrowingConstraintsBuilder,
+    ) -> PendingBranch {
+        let (common_ancestor, has_narrowing) = self.common_ancestor(self.current, tip);
+        let mut last_fork = tip;
+        while last_fork != common_ancestor
+            && self.constraints[last_fork].kind != PendingNodeKind::Fork
+        {
+            last_fork = self.constraints[last_fork].parent;
+        }
+        // Keep the common prefix shared. Changed places are merged eagerly and resume
+        // at the join. Unchanged places apply the prefix and the joined gates on demand.
+        let joined = if self.current == tip {
+            tip
+        } else {
+            let narrowing_constraint = if !has_narrowing
+                || common_ancestor == self.current
+                || common_ancestor == tip
+            {
+                PendingNarrowing::ALWAYS_TRUE
+            } else if self.constraints[self.current].last_join != self.constraints[tip].last_join {
+                // At least one path crosses a merge after the fork. Eager narrowing
+                // would have applied the binding's prefix there, giving us
+                // (prefix & left) | (prefix & right). Simplifying left | right first
+                // can remove a test of a Never value, even though neither outcome
+                // of that test is possible.
+                PendingNarrowing::Join(self.current, tip)
+            } else {
+                let current =
+                    self.narrowing_constraint_between(common_ancestor, self.current, narrowing);
+                let incoming = self.narrowing_constraint_between(common_ancestor, tip, narrowing);
+                PendingNarrowing::Constraint(narrowing.add_or_constraint(current, incoming))
+            };
+            let parent = &self.constraints[common_ancestor];
+            // Every binding and declaration reaching the fork already requires the
+            // common prefix. The merged scope therefore supplies the remaining guard
+            // without rebuilding either path relative to the fork.
+            let reachability_constraint = if scope_reachability == parent.scope_reachability {
+                ScopedReachabilityConstraintId::ALWAYS_TRUE
+            } else {
+                scope_reachability
+            };
+            // Keep a distinct last_join even when both constraints cancel. An outer
+            // merge still needs to know that this path went through a merge.
+            self.constraints.push(PendingReachabilityConstraint {
+                parent: common_ancestor,
+                kind: PendingNodeKind::Linear,
+                narrowing_prefix: None,
+                reachability_constraint,
+                narrowing_constraint,
+                scope_reachability,
+                last_join: self.constraints.next_index(),
+            })
+        };
+        PendingBranch {
+            tip,
+            joined,
+            last_fork,
+        }
+    }
+
+    /// Materializes a place on the incoming branch, reusing narrowing up to its last fork.
+    ///
+    /// When all bindings start at `ALWAYS_TRUE`, they follow the same sequence of ANDs.
+    /// Computing that prefix once preserves the order even at the constraint limit.
+    fn materialize_branch<'a>(
+        &mut self,
+        pending: &'a mut PendingPlaceState,
+        branch: PendingBranch,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) -> &'a PlaceState {
+        let start = pending.narrowing;
+        let fork = branch.last_fork;
+        let bindings = pending.state.bindings().as_slice();
+        // Both cursors lie on the path to the tip, so their indices give their order.
+        if start.index() < fork.index()
+            && !bindings.is_empty()
+            && bindings.iter().all(|binding| {
+                binding.narrowing_constraint() == ScopedNarrowingConstraint::ALWAYS_TRUE
+            })
+        {
+            let constraint = self.narrowing_constraint_between(start, fork, narrowing_constraints);
+            self.constraints[start].narrowing_prefix = Some(NarrowingPrefix { fork, constraint });
+            Rc::make_mut(&mut pending.state)
+                .record_narrowing_constraint(narrowing_constraints, constraint);
+            pending.narrowing = fork;
+        }
+        self.materialize_ref(
+            pending,
+            branch.tip,
+            narrowing_constraints,
+            reachability_constraints,
+        )
+    }
+
     /// Merges an alternative branch's place states into the current control-flow path.
     ///
     /// States shared by both branches only need their path constraints merged. States that differ
     /// are materialized before their bindings and declarations are merged, while places absent
     /// from the alternative branch are treated as undefined on that path.
     fn merge_place_states<I: Idx>(
-        &self,
+        &mut self,
         current_states: &mut IndexVec<I, PendingPlaceState>,
         branch_states: IndexVec<I, PendingPlaceState>,
-        branch: PendingReachabilityId,
+        branch: PendingBranch,
         branch_reachability: ScopedReachabilityConstraintId,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
-        let branch_ancestor = self.common_ancestor(self.current, branch);
-        let current_narrowing =
-            self.narrowing_constraint_between(branch_ancestor, self.current, narrowing_constraints);
-        let branch_narrowing =
-            self.narrowing_constraint_between(branch_ancestor, branch, narrowing_constraints);
-        let merged_narrowing =
-            narrowing_constraints.add_or_constraint(current_narrowing, branch_narrowing);
-        // Consecutive places often share their last applied reachability node, so their
-        // merged path constraint can be reused even when they have distinct place states.
-        let mut last_merged_reachability = None;
+        let mut last_singleton_merge = None;
         let mut branch_states = branch_states.into_iter();
         for current in current_states {
             let Some(mut branch_state) = branch_states.next() else {
-                let current = self.materialize(
+                let state = self.materialize(
                     current,
                     self.current,
                     narrowing_constraints,
                     reachability_constraints,
                 );
-                current.merge(
-                    PlaceState::undefined(branch_reachability),
+                state.merge(
+                    &PlaceState::undefined(branch_reachability),
                     narrowing_constraints,
                     reachability_constraints,
                 );
+                current.reachability = branch.joined;
+                current.narrowing = branch.joined;
                 continue;
             };
 
-            // If neither branch changed the place itself, merge just the path constraints. The
-            // common case is a truthy/falsy pair whose constraints cancel to `ALWAYS_TRUE`, leaving
-            // the shared state untouched.
+            // Both paths lead to the same place. Its pending gates now
+            // include the joined branch, so its state can remain shared.
             if current.reachability == branch_state.reachability
                 && current.narrowing == branch_state.narrowing
                 && Rc::ptr_eq(&current.state, &branch_state.state)
             {
-                if self.current == branch {
-                    continue;
-                }
-
-                // Preserve gates that precede the branch, then merge gates introduced on the
-                // individual branch paths. If either path has no gate, the merged gate simplifies
-                // to `ALWAYS_TRUE` and can be discarded.
-                self.materialize_narrowing(current, branch_ancestor, narrowing_constraints);
-                if merged_narrowing != ScopedNarrowingConstraint::ALWAYS_TRUE {
-                    Rc::make_mut(&mut current.state)
-                        .record_narrowing_constraint(narrowing_constraints, merged_narrowing);
-                }
-
-                let merged_constraint = match last_merged_reachability {
-                    Some((ancestor, constraint)) if ancestor == current.reachability => constraint,
-                    _ => {
-                        let current_constraint = self.constraint_between(
-                            current.reachability,
-                            self.current,
-                            reachability_constraints,
-                        );
-                        let branch_constraint = self.constraint_between(
-                            current.reachability,
-                            branch,
-                            reachability_constraints,
-                        );
-                        let merged_constraint = reachability_constraints
-                            .add_or_constraint(current_constraint, branch_constraint);
-                        last_merged_reachability = Some((current.reachability, merged_constraint));
-                        merged_constraint
-                    }
-                };
-                if merged_constraint != ScopedReachabilityConstraintId::ALWAYS_TRUE {
-                    Rc::make_mut(&mut current.state).record_reachability_constraint(
-                        reachability_constraints,
-                        merged_constraint,
-                    );
-                }
-                current.reachability = self.current;
-                current.narrowing = self.current;
                 continue;
             }
 
-            self.materialize(
+            // Distinct definitions can carry the same path constraints. When both branches
+            // retain the same binding and declaration for a place, only these constraints
+            // change. Reuse an earlier eager merge with identical inputs and pending paths.
+            let inputs = current
+                .state
+                .singleton_merge_inputs(&branch_state.state)
+                .map(|constraints| {
+                    (
+                        current.reachability,
+                        current.narrowing,
+                        branch_state.reachability,
+                        branch_state.narrowing,
+                        constraints,
+                    )
+                });
+            if let (Some(inputs), Some((previous, merged))) = (inputs, last_singleton_merge)
+                && inputs == previous
+            {
+                Rc::make_mut(&mut current.state).set_singleton_constraints(merged);
+                current.reachability = branch.joined;
+                current.narrowing = branch.joined;
+                continue;
+            }
+
+            let branch_state = self.materialize_branch(
                 &mut branch_state,
                 branch,
                 narrowing_constraints,
                 reachability_constraints,
             );
-            let branch_state = Rc::unwrap_or_clone(branch_state.state);
-            let current = self.materialize(
+            let state = self.materialize(
                 current,
                 self.current,
                 narrowing_constraints,
                 reachability_constraints,
             );
-            current.merge(
-                branch_state,
-                narrowing_constraints,
-                reachability_constraints,
-            );
+            if let Some(inputs) = inputs {
+                let merged = state.merge_singleton(
+                    branch_state,
+                    narrowing_constraints,
+                    reachability_constraints,
+                );
+                last_singleton_merge = Some((inputs, merged));
+            } else {
+                state.merge(
+                    branch_state,
+                    narrowing_constraints,
+                    reachability_constraints,
+                );
+            }
+            current.reachability = branch.joined;
+            current.narrowing = branch.joined;
         }
     }
 }
@@ -2054,6 +2496,7 @@ pub(super) struct SingleSymbolSnapshot {
 
 #[derive(Debug)]
 pub(super) struct UseDefMapBuilder<'db> {
+    pub(super) stub_parameters: Option<Vec<StubParameter<'db>>>,
     /// Append-only history of declarations and bindings, including their usage state.
     all_definitions: IndexVec<ScopedDefinitionId, DefinitionEntry<'db>>,
 
@@ -2069,7 +2512,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Builder of narrowing constraints.
     pub(super) narrowing_constraints: NarrowingConstraintsBuilder,
 
-    /// Live bindings at each so-far-recorded use.
+    /// Live bindings at each use.
     bindings_by_use: IndexVec<ScopedUseId, Bindings>,
 
     /// Live bindings associated with each so-far-recorded use.
@@ -2140,6 +2583,7 @@ pub(super) struct UseDefMapBuilder<'db> {
 impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn new(scope_kind: ScopeKind) -> Self {
         Self {
+            stub_parameters: None,
             all_definitions: IndexVec::from_iter([DefinitionEntry::Undefined]),
             predicates: PredicatesBuilder::default(),
             predicate_narrowing_targets: Vec::new(),
@@ -2572,7 +3016,7 @@ impl<'db> UseDefMapBuilder<'db> {
         );
 
         symbol_state.merge(
-            post_definition_state,
+            &post_definition_state,
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
         );
@@ -2603,7 +3047,7 @@ impl<'db> UseDefMapBuilder<'db> {
             );
 
             member_state.merge(
-                post_definition_state,
+                &post_definition_state,
                 &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,
             );
@@ -2644,11 +3088,15 @@ impl<'db> UseDefMapBuilder<'db> {
         reachability_constraint: ScopedReachabilityConstraintId,
         narrowing_constraint: ScopedNarrowingConstraint,
     ) {
+        let previous_scope_reachability = self.reachability;
         self.reachability = self
             .reachability_constraints
-            .add_and_constraint(self.reachability, reachability_constraint);
-        self.pending_reachability
-            .push(reachability_constraint, narrowing_constraint);
+            .add_and_constraint(previous_scope_reachability, reachability_constraint);
+        self.pending_reachability.push(
+            reachability_constraint,
+            narrowing_constraint,
+            self.reachability,
+        );
     }
 
     pub(super) fn record_declaration(
@@ -2774,7 +3222,9 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
-    pub(super) fn record_use(&mut self, place: ScopedPlaceId, use_id: ScopedUseId) {
+    /// Appends the bindings for a source use and returns its scope-local ordinal.
+    pub(super) fn record_use(&mut self, place: ScopedPlaceId) -> ScopedUseId {
+        let use_id = self.bindings_by_use.next_index();
         if let Some(snapshot) = &mut self.if_chain_start {
             let state = match place {
                 ScopedPlaceId::Symbol(symbol) => snapshot.symbol_states.get_mut(symbol),
@@ -2787,6 +3237,7 @@ impl<'db> UseDefMapBuilder<'db> {
                         .materialize_ref_at_use(
                             state,
                             snapshot.pending_reachability,
+                            &mut self.narrowing_constraints,
                             &mut self.reachability_constraints,
                         )
                         .bindings()
@@ -2802,11 +3253,12 @@ impl<'db> UseDefMapBuilder<'db> {
         let place_state = self.pending_reachability.materialize_ref_at_use(
             place_state,
             pending,
+            &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
         );
         let bindings = place_state.bindings().clone();
 
-        self.record_use_bindings(bindings, use_id);
+        self.record_use_bindings(bindings)
     }
 
     pub(super) fn set_if_chain_start(&mut self, snapshot: Option<FlowSnapshot>) {
@@ -2816,8 +3268,8 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn record_multi_use(
         &mut self,
         places: impl Iterator<Item = ScopedPlaceId>,
-        use_id: ScopedUseId,
-    ) {
+    ) -> ScopedUseId {
+        let use_id = self.bindings_by_use.next_index();
         let pending = self.pending_reachability.current;
         for place in places {
             let place_state =
@@ -2825,6 +3277,7 @@ impl<'db> UseDefMapBuilder<'db> {
             let place_state = self.pending_reachability.materialize_ref_at_use(
                 place_state,
                 pending,
+                &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,
             );
             let bindings = place_state.bindings().clone();
@@ -2839,17 +3292,16 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         // Record a placeholder use of the parent expression to preserve the indices of `bindings_by_use`.
-        self.record_use_bindings(Bindings::default(), use_id);
+        self.record_use_bindings(Bindings::default())
     }
 
-    fn record_use_bindings(&mut self, bindings: Bindings, use_id: ScopedUseId) {
+    fn record_use_bindings(&mut self, bindings: Bindings) -> ScopedUseId {
         let binding_definition_ids = bindings.iter().map(LiveBinding::binding);
         self.mark_definition_ids_used(binding_definition_ids);
 
         // We have a use of a place; clone the current bindings for that place, and record them
         // as the live bindings for this use.
-        let new_use = self.bindings_by_use.push(bindings);
-        debug_assert_eq!(use_id, new_use);
+        self.bindings_by_use.push(bindings)
     }
 
     pub(super) fn symbol_binding_definition_ids(
@@ -2993,8 +3445,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,
             )
-            .bindings()
-            .clone();
+            .bindings();
         match self.enclosing_snapshots.get_mut(snapshot_id) {
             Some(EnclosingSnapshot::Bindings(bindings)) => {
                 bindings.merge(
@@ -3038,6 +3489,18 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
+    /// Get the current binding IDs for a place without materializing pending constraints.
+    pub(super) fn current_binding_ids(
+        &self,
+        place: ScopedPlaceId,
+    ) -> impl Iterator<Item = ScopedDefinitionId> + '_ {
+        let pending = match place {
+            ScopedPlaceId::Symbol(symbol) => &self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &self.member_states[member],
+        };
+        pending.state.bindings().iter().map(LiveBinding::binding)
+    }
+
     /// Get the current live bindings for a place.
     pub(super) fn current_bindings(
         &mut self,
@@ -3059,9 +3522,8 @@ impl<'db> UseDefMapBuilder<'db> {
         bindings.iter().copied()
     }
 
-    /// Restore the current builder places state to the given snapshot.
-    pub(super) fn restore(&mut self, snapshot: FlowSnapshot) {
-        self.checkpoint_state.restore(snapshot.checkpoint_state);
+    /// Restore a snapshot, returning the outgoing state without cloning its place tables.
+    pub(super) fn restore(&mut self, snapshot: FlowSnapshot) -> FlowSnapshot {
         // We never remove places from `place_states` (it's an IndexVec, and the place
         // IDs must line up), so the current number of known places must always be equal to or
         // greater than the number of known places in a previously-taken snapshot.
@@ -3070,11 +3532,19 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert!(num_symbols >= snapshot.symbol_states.len());
 
         // Restore the current visible-definitions state to the given snapshot.
-        self.symbol_states = snapshot.symbol_states;
-        self.member_states = snapshot.member_states;
+        let previous = FlowSnapshot {
+            symbol_states: std::mem::replace(&mut self.symbol_states, snapshot.symbol_states),
+            member_states: std::mem::replace(&mut self.member_states, snapshot.member_states),
+            reachability: self.reachability,
+            checkpoint_flow: self.checkpoint_flow,
+            checkpoint_state: self.checkpoint_state.snapshot(),
+            pending_reachability: self.pending_reachability.current,
+        };
+        self.checkpoint_state.restore(snapshot.checkpoint_state);
         self.reachability = snapshot.reachability;
         self.checkpoint_flow = snapshot.checkpoint_flow;
-        self.pending_reachability.current = snapshot.pending_reachability;
+        self.pending_reachability
+            .restore(snapshot.pending_reachability);
 
         // If the snapshot we are restoring is missing some places we've recorded since, we need
         // to fill them in so the place IDs continue to line up. Since they don't exist in the
@@ -3085,6 +3555,7 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         self.symbol_states.resize(num_symbols, undefined.clone());
         self.member_states.resize(num_members, undefined);
+        previous
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
@@ -3114,7 +3585,14 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert!(self.symbol_states.len() >= snapshot.symbol_states.len());
         debug_assert!(self.member_states.len() >= snapshot.member_states.len());
 
-        let branch = snapshot.pending_reachability;
+        self.reachability = self
+            .reachability_constraints
+            .add_or_constraint(self.reachability, snapshot.reachability);
+        let branch = self.pending_reachability.branch_to_merge(
+            snapshot.pending_reachability,
+            self.reachability,
+            &mut self.narrowing_constraints,
+        );
         self.pending_reachability.merge_place_states(
             &mut self.symbol_states,
             snapshot.symbol_states,
@@ -3134,26 +3612,56 @@ impl<'db> UseDefMapBuilder<'db> {
             );
         }
 
-        self.reachability = self
-            .reachability_constraints
-            .add_or_constraint(self.reachability, snapshot.reachability);
+        self.pending_reachability.current = branch.joined;
         self.checkpoint_flow = self
             .reachability_constraints
             .add_or_constraint(self.checkpoint_flow, snapshot.checkpoint_flow);
     }
 
+    /// Records deferred stub parameters in definition order so duplicate names retain
+    /// their earlier bindings and declarations during construction.
+    fn record_stub_parameters(&mut self, parameters: Vec<StubParameter<'db>>) {
+        for StubParameter {
+            symbol,
+            definition,
+            annotated,
+        } in parameters
+        {
+            let place = symbol.into();
+            if symbol == self.symbol_states.next_index() {
+                self.add_place(place);
+            }
+            if annotated {
+                self.record_combined_definition(
+                    place,
+                    definition,
+                    DefinitionCategory::DeclarationAndBinding,
+                );
+            } else {
+                self.record_binding(
+                    place,
+                    definition,
+                    PreviousDefinitions::AreShadowed,
+                    FutureDefinitions::ShadowThisOne,
+                    ImportedQualifierAction::Preserve,
+                );
+            }
+        }
+    }
+
     pub(super) fn finish(mut self: Box<Self>) -> UseDefMap<'db> {
+        let reachability = ScopeReachability::new(self.range_reachability, self.reachability);
         let pending = self.pending_reachability.current;
         for state in self
             .symbol_states
             .iter_mut()
             .chain(self.member_states.iter_mut())
         {
-            // No later place change or merge can require the path correlation represented by
-            // pending narrowing gates, so only reachability needs to be finalized here.
-            self.pending_reachability.materialize_reachability(
+            // End-of-scope lookups see the same gates as a read after the last merge.
+            self.pending_reachability.materialize_ref_at_use(
                 state,
                 pending,
+                &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,
             );
         }
@@ -3186,31 +3694,35 @@ impl<'db> UseDefMapBuilder<'db> {
             self.definitions_by_definition,
             &mut place_state_interner,
         );
-        let bindings_by_use =
-            Self::intern_bindings_by_use(self.bindings_by_use, &mut place_state_interner);
+        let has_uses = !self.bindings_by_use.is_empty();
+        let bindings_by_use = self
+            .bindings_by_use
+            .into_iter()
+            .map(|bindings| place_state_interner.intern_bindings(&bindings))
+            .collect::<Vec<_>>()
+            .into();
         let if_chain_start_by_use = FrozenMap::from_entries(
             self.if_chain_start_by_use
                 .into_iter()
                 .map(|(use_id, bindings)| (use_id, place_state_interner.intern_bindings(&bindings)))
                 .collect(),
         );
-        let symbol_states = self
+        let end_of_scope_symbols = self
             .symbol_states
             .into_iter()
-            .map(|state| Rc::unwrap_or_clone(state.state))
+            .map(|pending| {
+                place_state_interner
+                    .retain_place_state(pending.state.bindings(), pending.state.declarations())
+            })
             .collect();
-        let member_states = self
+        let end_of_scope_members = self
             .member_states
             .into_iter()
-            .map(|state| Rc::unwrap_or_clone(state.state))
+            .map(|pending| {
+                place_state_interner
+                    .intern_place_state(pending.state.bindings(), pending.state.declarations())
+            })
             .collect();
-        let end_of_scope_symbols = Self::intern_place_states(
-            symbol_states,
-            PlaceState::into_parts,
-            &mut place_state_interner,
-        );
-        let end_of_scope_members =
-            Self::intern_end_of_scope_members(member_states, &mut place_state_interner);
         let symbol_states = Self::intern_reachable_place_states(
             end_of_scope_symbols,
             self.reachable_symbol_definitions,
@@ -3245,35 +3757,31 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.reachability_constraints,
             );
         }
-        // Keep default entries while building so they remain barriers between non-contiguous
-        // ranges with the same metadata. Once construction is complete, absence represents the
-        // default of reachable code outside a `TYPE_CHECKING` block.
-        self.range_reachability
-            .retain(|(_, info)| *info != RangeInfo::default());
-        for &(_, RangeInfo { reachability, .. }) in &self.range_reachability {
-            self.reachability_constraints.mark_used(reachability);
+        for (_, info) in &reachability.ranges {
+            self.reachability_constraints.mark_used(info.reachability);
         }
+        self.reachability_constraints
+            .mark_used(reachability.end_of_scope);
         for enclosing_snapshot in &enclosing_snapshots {
             // Bindings are already marked above.
             if let InternedEnclosingSnapshotId::Constraint(constraint) = enclosing_snapshot {
                 self.narrowing_constraints.mark_used(*constraint);
             }
         }
-        self.reachability_constraints.mark_used(self.reachability);
         let multi_bindings_by_use = MultiBindingsByUse::from_map(self.multi_bindings_by_use);
         let loop_headers = self.loop_headers;
         let mut boolean_test_roots = self.boolean_test_roots;
         // In `body if test else other`, we visit `test` before `body`, but node indices follow
         // source order. Sort the recorded IDs so root membership can use binary search.
         boolean_test_roots.sort_unstable();
-        let extra = (!bindings_by_use.is_empty()
+        let extra = (has_uses
             || !member_states.is_empty()
             || !enclosing_snapshots.is_empty()
             || !loop_headers.is_empty()
             || !boolean_test_roots.is_empty())
         .then(|| {
             Box::new(UseDefMapExtra {
-                bindings_by_use: bindings_by_use.into(),
+                bindings_by_use,
                 if_chain_start_by_use,
                 multi_bindings_by_use,
                 member_states,
@@ -3304,11 +3812,10 @@ impl<'db> UseDefMapBuilder<'db> {
             constraint_tables,
             interned_bindings: Arc::new(interned_bindings),
             interned_declarations: Arc::new(interned_declarations),
-            range_reachability: self.range_reachability.into_boxed_slice(),
             symbol_states,
             definitions_by_definition,
             extra,
-            end_of_scope_reachability: self.reachability,
+            reachability,
         }
     }
 
@@ -3344,7 +3851,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 {
                     end_of_scope.declarations_id()
                 } else {
-                    place_state_interner.intern_declarations(declarations)
+                    place_state_interner.intern_declarations(&declarations)
                 };
                 RetainedPlaceStates {
                     end_of_scope,
@@ -3386,7 +3893,7 @@ impl<'db> UseDefMapBuilder<'db> {
         {
             let bindings = place_state_interner.intern_bindings(&bindings);
             let declarations = declarations
-                .map(|declarations| place_state_interner.intern_declarations(declarations));
+                .map(|declarations| place_state_interner.intern_declarations(&declarations));
             interned_ids_by_definition.push((
                 definition,
                 DefinitionsAtDefinition {
@@ -3397,64 +3904,6 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         FrozenMap::from_entries(interned_ids_by_definition)
-    }
-
-    fn intern_bindings_by_use(
-        bindings_by_use: IndexVec<ScopedUseId, Bindings>,
-        place_state_interner: &mut PlaceStateInterner,
-    ) -> IndexVec<ScopedUseId, InternedBindingsId> {
-        let mut interned_ids_by_use: IndexVec<ScopedUseId, InternedBindingsId> =
-            IndexVec::with_capacity(bindings_by_use.len());
-
-        for bindings in bindings_by_use {
-            let interned_id = place_state_interner.intern_bindings(&bindings);
-            interned_ids_by_use.push(interned_id);
-        }
-
-        interned_ids_by_use
-    }
-
-    fn intern_place_states<I: Idx, T>(
-        place_states: IndexVec<I, T>,
-        get_parts: impl Fn(T) -> (Bindings, Declarations),
-        place_state_interner: &mut PlaceStateInterner,
-    ) -> IndexVec<I, InternedPlaceStateId> {
-        let mut interned_ids_by_place = IndexVec::with_capacity(place_states.len());
-
-        for place_state in place_states {
-            let (bindings, declarations) = get_parts(place_state);
-            let interned_id = place_state_interner.retain_place_state(&bindings, declarations);
-            interned_ids_by_place.push(interned_id);
-        }
-
-        interned_ids_by_place
-    }
-
-    fn intern_end_of_scope_members(
-        end_of_scope_members: IndexVec<ScopedMemberId, PlaceState>,
-        place_state_interner: &mut PlaceStateInterner,
-    ) -> IndexVec<ScopedMemberId, InternedPlaceStateId> {
-        let mut interned_ids_by_member = IndexVec::with_capacity(end_of_scope_members.len());
-        let mut interned_ids_by_place_state =
-            FxHashMap::with_capacity_and_hasher(end_of_scope_members.len(), FxBuildHasher);
-
-        for place_state in end_of_scope_members {
-            let interned_id = match interned_ids_by_place_state.entry(place_state) {
-                Entry::Occupied(entry) => *entry.get(),
-                Entry::Vacant(entry) => {
-                    let place_state = entry.key();
-                    let interned_id = place_state_interner.intern_place_state(
-                        place_state.bindings(),
-                        place_state.declarations().clone(),
-                    );
-                    entry.insert(interned_id);
-                    interned_id
-                }
-            };
-            interned_ids_by_member.push(interned_id);
-        }
-
-        interned_ids_by_member
     }
 
     fn intern_enclosing_snapshots(

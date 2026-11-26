@@ -155,6 +155,7 @@ pub(crate) struct InferContext<'db, 'ast> {
     module: &'ast ParsedModuleRef,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
     has_invalid_type_form: Cell<bool>,
+    has_failed_call: Cell<bool>,
     diagnostic_mode: DiagnosticMode,
     /// This field tracks various flags that control how type inference should behave in the current context.
     pub(crate) inference_flags: InferenceFlags,
@@ -183,6 +184,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             program_file,
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
             has_invalid_type_form: Cell::new(false),
+            has_failed_call: Cell::new(false),
             diagnostic_mode: DiagnosticMode::Normal,
             inference_flags: InferenceFlags::empty(),
             bomb: DebugDropBomb::new(
@@ -248,6 +250,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
     pub(crate) fn extend(&mut self, other: &InferContextResult) {
         *self.has_invalid_type_form.get_mut() |= other.has_invalid_type_form;
+        *self.has_failed_call.get_mut() |= other.has_failed_call;
         let diagnostics = self.diagnostics.get_mut();
         if self.diagnostic_mode == DiagnosticMode::TypeExpressionExplanation {
             let invalid_type_form = DiagnosticId::Lint(INVALID_TYPE_FORM.name());
@@ -271,6 +274,22 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
     pub(super) fn has_diagnostics(&self) -> bool {
         !self.diagnostics.borrow().is_empty()
+    }
+
+    /// Records a reachable failed call even when its diagnostic is suppressed. A recovery type
+    /// does not establish that speculative inference succeeded.
+    pub(super) fn mark_failed_call(&self, call: impl Ranged) {
+        if self.is_range_reachable(call.range()) {
+            self.has_failed_call.set(true);
+        }
+    }
+
+    pub(super) fn has_failed_call(&self) -> bool {
+        self.has_failed_call.get()
+    }
+
+    pub(super) fn clear_failed_call(&self) {
+        self.has_failed_call.set(false);
     }
 
     /// Records an invalid type form even when its diagnostic is suppressed or inferred separately.
@@ -429,6 +448,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         InferContextResult {
             diagnostics: self.diagnostics.into_inner(),
             has_invalid_type_form: self.has_invalid_type_form.get(),
+            has_failed_call: self.has_failed_call.get(),
         }
     }
 }
@@ -442,6 +462,7 @@ impl fmt::Debug for InferContext<'_, '_> {
             .field("program_file", &self.program_file)
             .field("diagnostics", &self.diagnostics)
             .field("has_invalid_type_form", &self.has_invalid_type_form)
+            .field("has_failed_call", &self.has_failed_call)
             .field("diagnostic_mode", &self.diagnostic_mode)
             .field("inference_flags", &self.inference_flags)
             .finish()
@@ -457,11 +478,13 @@ pub(crate) struct InferContextResult {
     pub(super) diagnostics: TypeCheckDiagnostics,
     /// Whether inference encountered an invalid type form, regardless of diagnostic emission.
     pub(super) has_invalid_type_form: bool,
+    /// Whether an expression used a recovery type after call binding failed.
+    pub(super) has_failed_call: bool,
 }
 
 impl InferContextResult {
     pub(super) fn is_empty(&self) -> bool {
-        self.diagnostics.is_empty() && !self.has_invalid_type_form
+        self.diagnostics.is_empty() && !self.has_invalid_type_form && !self.has_failed_call
     }
 }
 

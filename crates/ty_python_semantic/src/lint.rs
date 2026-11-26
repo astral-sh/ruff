@@ -369,7 +369,7 @@ pub struct LintRegistryBuilder {
 
 impl LintRegistryBuilder {
     #[track_caller]
-    pub(crate) fn register_lint(&mut self, lint: &'static LintMetadata) {
+    pub fn register_lint(&mut self, lint: &'static LintMetadata) {
         assert_eq!(
             self.by_name.insert(&*lint.name, lint.into()),
             None,
@@ -383,7 +383,7 @@ impl LintRegistryBuilder {
     }
 
     #[track_caller]
-    pub(crate) fn register_alias(&mut self, from: LintName, to: &'static LintMetadata) {
+    pub fn register_alias(&mut self, from: LintName, to: &'static LintMetadata) {
         let target = match self.by_name.get(to.name.as_str()) {
             Some(LintEntry::Lint(target) | LintEntry::Removed(target)) => target,
             Some(LintEntry::Alias(target)) => {
@@ -406,7 +406,7 @@ impl LintRegistryBuilder {
         );
     }
 
-    pub(crate) fn build(self) -> LintRegistry {
+    pub fn build(self) -> LintRegistry {
         LintRegistry {
             lints: self.lints,
             by_name: self.by_name,
@@ -424,15 +424,16 @@ impl LintRegistry {
     /// Looks up a lint by its name.
     pub fn get(&self, code: &str) -> Result<LintId, GetLintError> {
         match self.by_name.get(code) {
-            Some(LintEntry::Lint(metadata)) => Ok(*metadata),
-            Some(LintEntry::Alias(lint)) => {
-                if lint.status.is_removed() {
-                    Err(GetLintError::Removed(lint.name()))
-                } else {
-                    Ok(*lint)
+            Some(entry) => {
+                let lint = entry.id();
+                match lint.status {
+                    LintStatus::Removed { reason, .. } => Err(GetLintError::Removed {
+                        code: lint.name(),
+                        reason,
+                    }),
+                    _ => Ok(lint),
                 }
             }
-            Some(LintEntry::Removed(lint)) => Err(GetLintError::Removed(lint.name())),
             None => {
                 if let Some(without_prefix) = DiagnosticId::strip_category(code) {
                     if let Some(entry) = self.by_name.get(without_prefix) {
@@ -456,6 +457,19 @@ impl LintRegistry {
     /// Returns all registered, non-removed lints.
     pub fn lints(&self) -> &[LintId] {
         &self.lints
+    }
+
+    /// Returns whether `name` is a registered alias for a lint.
+    pub fn is_alias(&self, name: &str) -> bool {
+        self.alias_target(name).is_some()
+    }
+
+    /// Returns the target of a registered alias.
+    pub fn alias_target(&self, name: &str) -> Option<LintId> {
+        match self.by_name.get(name)? {
+            LintEntry::Alias(lint) => Some(*lint),
+            _ => None,
+        }
     }
 
     /// Returns an iterator over all known aliases and to their target lints.
@@ -508,7 +522,10 @@ impl LintRegistry {
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum GetLintError {
     /// The name maps to this removed lint.
-    Removed(LintName),
+    Removed {
+        code: LintName,
+        reason: &'static str,
+    },
 
     /// No lint with the given name is known.
     Unknown {
@@ -524,12 +541,21 @@ pub enum GetLintError {
     },
 }
 
+impl GetLintError {
+    pub fn info(&self) -> Option<&'static str> {
+        match self {
+            Self::Removed { reason, .. } => Some(reason),
+            Self::Unknown { .. } | Self::PrefixedWithCategory { .. } => None,
+        }
+    }
+}
+
 impl Error for GetLintError {}
 
 impl std::fmt::Display for GetLintError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            GetLintError::Removed(code) => write!(f, "Removed rule `{code}`"),
+            GetLintError::Removed { code, .. } => write!(f, "Rule `{code}` has been removed"),
             GetLintError::Unknown { code, suggestion } => match suggestion {
                 None => write!(f, "Unknown rule `{code}`"),
                 Some(suggestion) => {

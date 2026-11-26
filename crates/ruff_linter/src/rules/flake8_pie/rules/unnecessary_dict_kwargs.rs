@@ -100,12 +100,16 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
             continue;
         };
 
+        let value_source = |value: &Expr| {
+            let range = parenthesized_range(value.into(), dict.into(), checker.tokens())
+                .unwrap_or_else(|| value.range());
+            checker.locator().slice(range)
+        };
+
         // Ex) `foo(**{**bar})`
         if let [ast::DictItem { key: None, value }] = dict.items.as_slice() {
-            let edit = Edit::range_replacement(
-                format!("**{}", checker.locator().slice(value)),
-                keyword.range(),
-            );
+            let edit =
+                Edit::range_replacement(format!("**{}", value_source(value)), keyword.range());
             checker
                 .report_diagnostic(UnnecessaryDictKwargs, keyword.range())
                 .set_fix(Fix::safe_edit(edit));
@@ -151,20 +155,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
                         kwargs
                             .iter()
                             .zip(dict.iter_values())
-                            .map(|(kwarg, value)| {
-                                format!(
-                                    "{}={}",
-                                    kwarg,
-                                    checker.locator().slice(
-                                        parenthesized_range(
-                                            value.into(),
-                                            dict.into(),
-                                            checker.tokens()
-                                        )
-                                        .unwrap_or(value.range())
-                                    )
-                                )
-                            })
+                            .map(|(kwarg, value)| format!("{kwarg}={}", value_source(value)))
                             .join(", "),
                         keyword.range(),
                     );

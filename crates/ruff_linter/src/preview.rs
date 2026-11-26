@@ -51,6 +51,11 @@ pub(crate) const fn is_legacy_type_comment_in_non_stub_enabled(settings: &Linter
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/15635
+pub(crate) const fn is_fix_runtime_string_union_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 /// <https://github.com/astral-sh/ruff/pull/19303>
 pub(crate) const fn is_fix_f_string_logging_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -251,7 +256,7 @@ pub(crate) const fn is_b006_unsafe_fix_preserve_assignment_expr_enabled(
 }
 
 // https://github.com/astral-sh/ruff/pull/21395
-pub(crate) const fn is_enumerate_for_loop_int_index_enabled(settings: &LinterSettings) -> bool {
+pub(crate) const fn is_manual_loop_counter_int_index_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
@@ -298,7 +303,12 @@ pub(crate) const fn is_expanded_import_conventions_enabled(preview: PreviewMode)
 }
 
 // https://github.com/astral-sh/ruff/pull/23535
-pub(crate) const fn is_file_level_invalid_rule_code_enabled(settings: &LinterSettings) -> bool {
+pub(crate) const fn is_file_level_unknown_rule_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/issues/26282
+pub(crate) const fn is_redirected_suppression_code_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
@@ -343,6 +353,11 @@ pub(crate) const fn is_pyi048_fix_enabled(settings: &LinterSettings) -> bool {
 // TODO(brent) Remove ecosystem selector normalization when stabilizing human-readable rule names:
 // https://github.com/astral-sh/ruff/pull/27158
 pub const fn is_human_readable_names_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/29768
+pub const fn is_script_metadata_enabled(preview: PreviewMode) -> bool {
     preview.is_enabled()
 }
 

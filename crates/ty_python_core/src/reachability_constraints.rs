@@ -7,7 +7,7 @@ use std::cmp::Ordering;
 use ruff_index::Idx;
 use rustc_hash::FxHashMap;
 
-use crate::interned_nodes::InternedNodes;
+use crate::interned_nodes::{BinaryConstraintCache, ConstraintId, InternedNodes};
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
 use crate::predicate::ScopedPredicateId;
 use crate::rank::{RankBitBox, RankBitBoxVec};
@@ -111,6 +111,15 @@ impl ScopedReachabilityConstraintId {
     }
 }
 
+impl ConstraintId for ScopedReachabilityConstraintId {
+    const EMPTY: Self = ALWAYS_TRUE;
+
+    fn cache_key(a: Self, b: Self) -> (Self, Self) {
+        // AMBIGUOUS sorts after every interior node and never has an arena index.
+        if b == AMBIGUOUS { (a, b) } else { (b, a) }
+    }
+}
+
 impl Idx for ScopedReachabilityConstraintId {
     #[inline]
     fn new(value: usize) -> Self {
@@ -178,20 +187,8 @@ pub struct ReachabilityConstraintsBuilder {
     interiors: InternedNodes<ScopedReachabilityConstraintId, InteriorNode>,
     interior_used: RankBitBoxVec,
     not_cache: FxHashMap<ScopedReachabilityConstraintId, ScopedReachabilityConstraintId>,
-    and_cache: FxHashMap<
-        (
-            ScopedReachabilityConstraintId,
-            ScopedReachabilityConstraintId,
-        ),
-        ScopedReachabilityConstraintId,
-    >,
-    or_cache: FxHashMap<
-        (
-            ScopedReachabilityConstraintId,
-            ScopedReachabilityConstraintId,
-        ),
-        ScopedReachabilityConstraintId,
-    >,
+    and_cache: BinaryConstraintCache<ScopedReachabilityConstraintId>,
+    or_cache: BinaryConstraintCache<ScopedReachabilityConstraintId>,
 }
 
 impl ReachabilityConstraintsBuilder {
@@ -425,6 +422,7 @@ impl ReachabilityConstraintsBuilder {
     }
 
     /// Adds a new reachability constraint that is the ternary OR of two existing ones.
+    #[inline]
     pub(crate) fn add_or_constraint(
         &mut self,
         a: ScopedReachabilityConstraintId,
@@ -439,10 +437,20 @@ impl ReachabilityConstraintsBuilder {
 
         // OR is commutative, which lets us halve the cache requirements
         let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
-        if let Some(cached) = self.or_cache.get(&(a, b)) {
-            return *cached;
+        if let Some(cached) = self.or_cache.get(a, b) {
+            return cached;
         }
 
+        self.or_uncached(a, b)
+    }
+
+    /// Compute the disjunction on a cache miss with the operands in ascending ID order.
+    /// The first operand is an interior node and the second can be `AMBIGUOUS`.
+    fn or_uncached(
+        &mut self,
+        a: ScopedReachabilityConstraintId,
+        b: ScopedReachabilityConstraintId,
+    ) -> ScopedReachabilityConstraintId {
         if self.interiors.len() >= MAX_INTERIOR_NODES {
             return AMBIGUOUS;
         }
@@ -490,11 +498,12 @@ impl ReachabilityConstraintsBuilder {
             if_ambiguous,
             if_false,
         });
-        self.or_cache.insert((a, b), result);
+        self.or_cache.insert(a, b, result);
         result
     }
 
     /// Adds a new reachability constraint that is the ternary AND of two existing ones.
+    #[inline]
     pub(crate) fn add_and_constraint(
         &mut self,
         a: ScopedReachabilityConstraintId,
@@ -509,10 +518,20 @@ impl ReachabilityConstraintsBuilder {
 
         // AND is commutative, which lets us halve the cache requirements
         let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
-        if let Some(cached) = self.and_cache.get(&(a, b)) {
-            return *cached;
+        if let Some(cached) = self.and_cache.get(a, b) {
+            return cached;
         }
 
+        self.and_uncached(a, b)
+    }
+
+    /// Compute the conjunction on a cache miss with the operands in ascending ID order.
+    /// The first operand is an interior node and the second can be `AMBIGUOUS`.
+    fn and_uncached(
+        &mut self,
+        a: ScopedReachabilityConstraintId,
+        b: ScopedReachabilityConstraintId,
+    ) -> ScopedReachabilityConstraintId {
         if self.interiors.len() >= MAX_INTERIOR_NODES {
             return AMBIGUOUS;
         }
@@ -560,7 +579,7 @@ impl ReachabilityConstraintsBuilder {
             if_ambiguous,
             if_false,
         });
-        self.and_cache.insert((a, b), result);
+        self.and_cache.insert(a, b, result);
         result
     }
 }

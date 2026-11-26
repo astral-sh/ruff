@@ -5749,6 +5749,54 @@ if fixed:  # error: [redundant-condition] "Nonempty string `fixed` is always tru
     pass
 ```
 
+## Environment-dependent constants in bundled stubs
+
+The default pickle protocol changed in Python 3.14, and the value of `os.SEEK_HOLE` varies by
+platform. Both constants have literal types for a given target, but conditions that depend on them
+remain exempt.
+
+### Python 3.14 on Linux
+
+```py
+import os
+import pickle
+
+reveal_type(pickle.DEFAULT_PROTOCOL)  # revealed: Literal[5]
+override = None if pickle.DEFAULT_PROTOCOL == 5 else 5  # ok
+reveal_type(override)  # revealed: None
+if override:  # ok
+    pass
+
+# The same stub defines HIGHEST_PROTOCOL unconditionally.
+if pickle.HIGHEST_PROTOCOL == 5:  # error: [redundant-condition-strict]
+    pass
+
+reveal_type(os.SEEK_HOLE)  # revealed: Literal[4]
+if os.SEEK_HOLE == 4:  # ok
+    pass
+```
+
+### Python 3.13 on macOS
+
+```toml
+[environment]
+python-version = "3.13"
+python-platform = "darwin"
+```
+
+```py
+import os
+import pickle
+
+reveal_type(pickle.DEFAULT_PROTOCOL)  # revealed: Literal[4]
+if pickle.DEFAULT_PROTOCOL == 5:  # ok
+    pass
+
+reveal_type(os.SEEK_HOLE)  # revealed: Literal[3]
+if os.SEEK_HOLE == 4:  # ok
+    pass
+```
+
 ## Environment-dependent loop targets
 
 Loop targets inherit the environment-dependent origin of their iterable, including when the target

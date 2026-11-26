@@ -74,6 +74,6 @@ python-version = "3.10"
 ```
 
 ```py
-# error: [import-not-found]
+# error: [missing-module-member]
 from typing import Never
 ```
