@@ -269,18 +269,26 @@ pub(crate) fn infer_definition_types<'db>(
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
     let program_file = definition.program_file(db);
-    let python_file = program_file.python_file(db);
-    let module = parsed_module(db, python_file).load(db);
+    let index = semantic_index(db, program_file);
+    let module = index.module(db);
     let _span = tracing::trace_span!(
         "infer_definition_types",
         range = ?definition.kind(db).target_range(&module),
-        ?python_file
+        python_file = ?program_file.python_file(db)
     )
     .entered();
 
     let env = ProgramEnvironment::from_file(program_file);
-    TypeInferenceBuilder::for_definition(db, &env, definition, &module)
-        .finish_definition(definition)
+    TypeInferenceBuilder::new(
+        db,
+        &env,
+        InferenceRegion::Definition(definition),
+        module.module().file(),
+        program_file,
+        index,
+        &module,
+    )
+    .finish_definition(definition)
 }
 
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.
@@ -323,9 +331,8 @@ pub(crate) fn function_known_decorators<'db>(
     definition: Definition<'db>,
 ) -> FunctionDecoratorInference<'db> {
     let program_file = definition.program_file(db);
-    let python_file = program_file.python_file(db);
-    let module = parsed_module(db, python_file).load(db);
     let index = semantic_index(db, program_file);
+    let module = index.module(db);
 
     let env = ProgramEnvironment::from_file(program_file);
 
@@ -333,7 +340,7 @@ pub(crate) fn function_known_decorators<'db>(
         db,
         &env,
         InferenceRegion::FunctionDecorators(definition),
-        python_file.file(db),
+        module.module().file(),
         program_file,
         index,
         &module,
@@ -426,17 +433,15 @@ pub(crate) fn infer_deferred_types<'db>(
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
     let program_file = definition.program_file(db);
-    let python_file = program_file.python_file(db);
-    let module = parsed_module(db, python_file).load(db);
+    let index = semantic_index(db, program_file);
+    let module = index.module(db);
     let _span = tracing::trace_span!(
         "infer_deferred_types",
         definition = ?definition.as_id(),
         range = ?definition.kind(db).target_range(&module),
-        ?python_file
+        python_file = ?program_file.python_file(db)
     )
     .entered();
-
-    let index = semantic_index(db, program_file);
 
     let env = ProgramEnvironment::from_file(program_file);
 
@@ -444,7 +449,7 @@ pub(crate) fn infer_deferred_types<'db>(
         db,
         &env,
         InferenceRegion::Deferred(definition),
-        python_file.file(db),
+        module.module().file(),
         program_file,
         index,
         &module,
@@ -472,16 +477,15 @@ pub(crate) fn infer_function_default_types<'db>(
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
     let program_file = definition.program_file(db);
-    let python_file = program_file.python_file(db);
-    let module = parsed_module(db, python_file).load(db);
     let index = semantic_index(db, program_file);
+    let module = index.module(db);
     let env = ProgramEnvironment::from_file(program_file);
 
     TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::FunctionDefaults(definition),
-        python_file.file(db),
+        module.module().file(),
         program_file,
         index,
         &module,
@@ -547,15 +551,13 @@ pub(crate) fn infer_scope_types_impl<'db>(
 ) -> ScopeInference<'db> {
     let (scope, tcx) = input.into_inner(db);
     let program_file = scope.program_file(db);
-    let python_file = program_file.python_file(db);
     let _span =
-        tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), ?python_file).entered();
-
-    let module = parsed_module(db, python_file).load(db);
+        tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), python_file = ?program_file.python_file(db)).entered();
 
     // Using the index here is fine because the code below depends on the AST anyway.
     // The isolation of the query is by the return inferred types.
     let index = semantic_index(db, program_file);
+    let module = index.module(db);
 
     let env = ProgramEnvironment::from_file(program_file);
 
@@ -563,7 +565,7 @@ pub(crate) fn infer_scope_types_impl<'db>(
         db,
         &env,
         InferenceRegion::Scope(scope, tcx),
-        python_file.file(db),
+        module.module().file(),
         program_file,
         index,
         &module,
@@ -653,17 +655,15 @@ pub(super) fn infer_expression_types_impl<'db>(
     let (expression, tcx) = input.into_inner(db);
 
     let program_file = expression.program_file(db);
-    let python_file = program_file.python_file(db);
-    let module = parsed_module(db, python_file).load(db);
+    let index = semantic_index(db, program_file);
+    let module = index.module(db);
     let _span = tracing::trace_span!(
         "infer_expression_types",
         expression = ?expression.as_id(),
         range = ?expression.node_ref(db).node(&module).range(),
-        ?python_file
+        python_file = ?program_file.python_file(db)
     )
     .entered();
-
-    let index = semantic_index(db, program_file);
 
     let env = ProgramEnvironment::from_file(program_file);
 
@@ -671,7 +671,7 @@ pub(super) fn infer_expression_types_impl<'db>(
         db,
         &env,
         InferenceRegion::Expression(expression, tcx),
-        python_file.file(db),
+        module.module().file(),
         program_file,
         index,
         &module,
@@ -774,17 +774,15 @@ fn infer_statement_types_impl<'db>(
     statement: StatementInner<'db>,
 ) -> StatementInferenceInner<'db> {
     let program_file = statement.program_file(db);
-    let python_file = program_file.python_file(db);
-    let module = parsed_module(db, python_file).load(db);
+    let index = semantic_index(db, program_file);
+    let module = index.module(db);
     let _span = tracing::trace_span!(
         "infer_statement_types",
         statement = ?statement.as_id(),
         range = ?statement.node_ref(db).node(&module).range(),
-        ?python_file
+        python_file = ?program_file.python_file(db)
     )
     .entered();
-
-    let index = semantic_index(db, program_file);
 
     let env = ProgramEnvironment::from_file(program_file);
 
@@ -792,7 +790,7 @@ fn infer_statement_types_impl<'db>(
         db,
         &env,
         InferenceRegion::Statement(statement),
-        python_file.file(db),
+        module.module().file(),
         program_file,
         index,
         &module,

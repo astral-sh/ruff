@@ -3416,8 +3416,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let ast_ids = self.ast_ids.finish();
 
-        let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
-        semantic_syntax_errors.shrink_to_fit();
+        let semantic_syntax_errors = self.semantic_syntax_errors.into_inner().into_boxed_slice();
         // Node indices follow source order, while semantic visitation may not.
         self.annotations.sort_unstable();
         let uses_by_collection = FrozenMap::from_entries(
@@ -3459,6 +3458,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .collect();
 
         SemanticIndex {
+            module: self.module.module().downgrade(),
             place_tables,
             scopes: self.scopes.into(),
             definitions_by_node: DefinitionsByNode::from_map(self.definitions_by_node),

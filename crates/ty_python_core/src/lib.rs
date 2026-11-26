@@ -6,7 +6,7 @@ use ruff_python_ast as ast;
 use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::parsed::{ParsedModuleRef, WeakParsedModule, parsed_module};
 
 use ruff_index::{FrozenIndexVec, IndexSlice};
 use ruff_python_ast::name::Name;
@@ -323,6 +323,8 @@ impl<'db> DefinitionsByNode<'db> {
 /// The place tables and use-def maps for all scopes in a file.
 #[derive(Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SemanticIndex<'db> {
+    module: WeakParsedModule,
+
     /// List of all place tables in this file, indexed by scope.
     place_tables: FrozenIndexVec<FileScopeId, Arc<PlaceTable>>,
 
@@ -375,7 +377,7 @@ pub struct SemanticIndex<'db> {
     enclosing_snapshots: FrozenMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
 
     /// List of all semantic syntax errors in this file.
-    semantic_syntax_errors: Vec<SemanticSyntaxError>,
+    semantic_syntax_errors: Box<[SemanticSyntaxError]>,
 
     /// Set of all generator functions in this file.
     generator_functions: FrozenSet<FileScopeId>,
@@ -404,6 +406,16 @@ pub struct NarrowingAliasPredicate<'db> {
 }
 
 impl<'db> SemanticIndex<'db> {
+    /// Loads the AST used to build this index. A query that read the index
+    /// already depends on the parsed module through `semantic_index`, which
+    /// is invalidated whenever parsing runs again.
+    pub fn module(&self, db: &'db dyn Db) -> ParsedModuleRef {
+        self.module.try_load().unwrap_or_else(|| {
+            let file = self.scope_id(FileScopeId::global()).python_file(db);
+            parsed_module(db, file).load(db)
+        })
+    }
+
     /// Returns the recorded use of an expression, if it loads a tracked place.
     pub fn try_expression_use_id(
         &self,
@@ -1211,6 +1223,7 @@ mod tests {
     use ruff_db::{
         files::{File, system_path_to_file},
         parsed::ParsedModuleRef,
+        system::DbWithWritableSystem as _,
     };
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
@@ -1499,6 +1512,40 @@ mod tests {
             .unwrap();
 
         assert_matches!(binding.kind(&db), DefinitionKind::AugmentedAssignment(_));
+    }
+
+    #[test]
+    fn index_resolves_nodes_after_ast_collection() {
+        let TestCase { db, file } = test_case("class C: pass");
+        let file = program_file(&db, file);
+        let index = semantic_index(&db, file);
+        let (id, _) = index.child_scopes(FileScopeId::global()).next().unwrap();
+
+        parsed_module(&db, file.python_file(&db)).clear();
+        assert_eq!(id.to_scope_id(&db, file).name(&db, &index.module(&db)), "C");
+    }
+
+    #[test]
+    fn index_uses_edited_ast_while_old_snapshot_is_alive() {
+        let TestCase { mut db, file } = test_case("class Old: pass");
+        let old = semantic_index(&db, program_file(&db, file)).module(&db);
+
+        db.write_file("test.py", "class New: pass").unwrap();
+        let file = program_file(&db, file);
+        let index = semantic_index(&db, file);
+        let (id, _) = index.child_scopes(FileScopeId::global()).next().unwrap();
+        let scope = index.scope_id(id);
+        assert_eq!(scope.name(&db, &index.module(&db)), "New");
+        old.module().clear();
+        assert_eq!(scope.name(&db, &index.module(&db)), "New");
+        assert_eq!(
+            old.syntax().body[0]
+                .as_class_def_stmt()
+                .unwrap()
+                .name
+                .as_str(),
+            "Old"
+        );
     }
 
     #[test]

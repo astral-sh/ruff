@@ -1,5 +1,5 @@
 use std::fmt::Formatter;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use arc_swap::ArcSwapOption;
 use get_size2::GetSize;
@@ -179,6 +179,15 @@ impl ParsedModule {
         }
     }
 
+    /// Keep access to this module without preventing Salsa from evicting it.
+    pub fn downgrade(&self) -> WeakParsedModule {
+        WeakParsedModule {
+            file: self.file,
+            python_version: self.python_version,
+            inner: Arc::downgrade(&self.inner),
+        }
+    }
+
     /// Clear the parsed module, dropping the AST once all references to it are dropped.
     pub fn clear(&self) {
         self.inner.store(None);
@@ -208,6 +217,31 @@ impl PartialEq for ParsedModule {
 }
 
 impl Eq for ParsedModule {}
+
+/// A weak reference to the cache for a particular version of a module.
+#[derive(Debug, get_size2::GetSize)]
+pub struct WeakParsedModule {
+    file: File,
+    python_version: PythonVersion,
+    #[get_size(ignore)]
+    inner: Weak<ArcSwapOption<indexed::IndexedModule>>,
+}
+
+impl WeakParsedModule {
+    /// Returns the cached AST, if neither the module nor its AST has been evicted.
+    pub fn try_load(&self) -> Option<ParsedModuleRef> {
+        let inner = self.inner.upgrade()?;
+        let indexed = inner.load_full()?;
+        Some(ParsedModuleRef {
+            module: ParsedModule {
+                file: self.file,
+                python_version: self.python_version,
+                inner,
+            },
+            indexed,
+        })
+    }
+}
 
 /// Cheap cloneable wrapper around an instance of a module AST.
 #[derive(Clone)]
@@ -998,6 +1032,7 @@ mod tests {
     };
     use crate::tests::TestDb;
     use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
+    use get_size2::GetSize;
     use ruff_python_ast::PythonVersion;
     use salsa::EventKind;
     use zip::CompressionMethod;
@@ -1016,6 +1051,31 @@ mod tests {
 
         assert!(parsed.has_valid_syntax());
 
+        Ok(())
+    }
+
+    #[test]
+    fn weak_module_respects_clear_and_eviction() -> crate::system::Result<()> {
+        let mut db = TestDb::new();
+        db.write_file("test.py", "x = 10")?;
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        let version = PythonVersion::latest_ty();
+        let module =
+            super::ParsedModule::new(file, version, super::parsed_module_impl(&db, file, version));
+        let weak = module.downgrade();
+        let snapshot = weak.try_load().unwrap();
+        assert!(module.get_heap_size() > 0);
+        assert_eq!(weak.get_heap_size(), 0);
+
+        snapshot.module().clear();
+        assert_eq!(module.get_heap_size(), 0);
+        assert!(weak.try_load().is_none());
+        assert!(snapshot.has_valid_syntax());
+
+        let reloaded = module.load(&db);
+        assert!(weak.try_load().is_some());
+        drop((reloaded, snapshot, module));
+        assert!(weak.try_load().is_none());
         Ok(())
     }
 
