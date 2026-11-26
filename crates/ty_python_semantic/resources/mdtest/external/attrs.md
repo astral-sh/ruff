@@ -49,13 +49,19 @@ instances expose this tuple.
 import attr
 import attrs
 
+@attr.s
+class User1:
+    name: str = attr.ib()
+
 @attrs.define
-class User:
+class User2:
     name: str
 
-user = User("Ada")
-reveal_type(User.__attrs_attrs__)  # revealed: tuple[Attribute[Unknown], ...]
-reveal_type(user.__attrs_attrs__[0].name)  # revealed: str
+reveal_type(User1.__attrs_attrs__)  # revealed: tuple[Attribute[Unknown], ...]
+reveal_type(User2.__attrs_attrs__)  # revealed: tuple[Attribute[Unknown], ...]
+
+user2 = User2("Ada")
+reveal_type(user2.__attrs_attrs__[0].name)  # revealed: str
 ```
 
 This member lets attrs classes satisfy the `AttrsInstance` protocol. An ordinary dataclass lacks the
@@ -64,14 +70,10 @@ required field metadata.
 ```py
 from dataclasses import dataclass
 
-attrs.fields(User)
-attrs.asdict(user)
+attrs.fields(User2)
+attrs.asdict(user2)
 
-@attr.s
-class Legacy:
-    name: str = attr.ib()
-
-class Child(Legacy): ...
+class Child(User1): ...
 
 attr.fields(Child)
 
