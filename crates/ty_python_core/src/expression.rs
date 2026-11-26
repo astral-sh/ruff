@@ -137,6 +137,9 @@ pub struct Expression<'db> {
     #[returns(copy)]
     pub scope_id: ScopeId<'db>,
 
+    /// The expression node and its optional enclosing assignment statement.
+    /// The assignment is present only when this expression is its entire right-hand side.
+    ///
     /// Salsa treats both AST references as changed whenever the semantic index recreates
     /// the expression. Tracking them together lets them share a revision.
     #[no_eq]
