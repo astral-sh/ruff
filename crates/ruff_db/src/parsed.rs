@@ -28,10 +28,10 @@ use crate::{Db, PythonFile};
 /// The other reason is that Ruff's AST doesn't implement `Eq` which Salsa requires
 /// for determining if a query result is unchanged.
 ///
-/// The LRU capacity of 200 was picked without any empirical evidence that it's optimal,
+/// The eviction capacity of 200 was picked without any empirical evidence that it's optimal,
 /// instead it's a wild guess that it should be unlikely that incremental changes involve
 /// more than 200 modules. Parsed ASTs within the same revision are never evicted by Salsa.
-#[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size, lru=200)]
+#[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size, eviction(policy = sieve, capacity = 200))]
 pub fn parsed_module(db: &dyn Db, file: PythonFile<'_>) -> ParsedModule {
     let source_file = file.file(db);
     let python_version = file.python_version(db);
@@ -42,8 +42,8 @@ pub fn parsed_module(db: &dyn Db, file: PythonFile<'_>) -> ParsedModule {
     ParsedModule::new(source_file, python_version, parsed)
 }
 
-pub(super) fn disable_lru(db: &mut dyn Db) {
-    parsed_module::set_lru_capacity(db, 0);
+pub(super) fn disable_eviction(db: &mut dyn Db) {
+    parsed_module::set_eviction_capacity(db, 0);
 }
 
 fn parsed_module_impl(db: &dyn Db, file: File, target_version: PythonVersion) -> Parsed<ModModule> {
