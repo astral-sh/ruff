@@ -27,7 +27,7 @@ pub(in crate::types) fn is_attrs_class<'db>(
         .is_some_and(|params| params.flags(db).contains(DataclassFlags::ATTRS))
 }
 
-/// attrs [omits] `__attrs_attrs__: ClassVar[Any]` from its protocol for checkers that
+/// attrs [omits] `__attrs_attrs__: ClassVar[Any]` from its protocol for type-checkers that
 /// cannot synthesize this member. Supply it on the public protocol (`attrs.AttrsInstance`
 /// re-exports `attr.AttrsInstance`) unless the stubs already declare it.
 ///
