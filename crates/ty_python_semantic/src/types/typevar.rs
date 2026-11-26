@@ -1477,11 +1477,25 @@ impl<'db> BoundTypeVarInstance<'db> {
                 && specialization.specialize_self_domain()
                 && let Some(specialization) = specialization.as_specialization(db)
             {
-                Type::TypeVar(self.apply_specialization_to_bound_or_constraints(
+                // Bound specialization always starts a separate traversal using only the
+                // enclosing environment, so its result is independent of the mapping mode.
+                if let Some(cached) = visitor.specialized_self.get()
+                    && cached.original == self
+                    && cached.specialization == specialization
+                {
+                    return Type::TypeVar(cached.result);
+                }
+                let result = self.apply_specialization_to_bound_or_constraints(
                     db,
                     specialization,
                     visitor.env,
-                ))
+                );
+                visitor.specialized_self.set(Some(super::SpecializedSelf {
+                    original: self,
+                    specialization,
+                    result,
+                }));
+                Type::TypeVar(result)
             } else {
                 Type::TypeVar(self)
             }
