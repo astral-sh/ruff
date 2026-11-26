@@ -67,9 +67,9 @@ use crate::statement::StatementInner;
 use crate::symbol::{ScopedSymbolId, Symbol};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
-    EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, ImportedQualifierAction, LiveBinding,
-    LiveBindingStatus, PreviousDefinitions, ScopedDefinitionId, ScopedEnclosingSnapshotId,
-    StubParameter, UseDefMapBuilder, UseDefMapInterner,
+    BindingKind, EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, ImportedQualifierAction,
+    LiveBinding, LiveBindingStatus, PreviousDefinitions, ScopedDefinitionId,
+    ScopedEnclosingSnapshotId, StubParameter, UseDefMapBuilder, UseDefMapInterner,
 };
 use crate::{
     AncestorsIter, DefinitionsByNode, EvaluationMode, LoopHeader, LoopHeaderId,
@@ -1648,6 +1648,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     _ => ImportedQualifierAction::Preserve,
                 };
+                let binding_kind = match kind {
+                    DefinitionKind::LoopHeader(_) => BindingKind::LoopHeader,
+                    DefinitionKind::NestedBindings(_) => BindingKind::NestedBindings,
+                    DefinitionKind::DictKeyAssignment(_) => BindingKind::DictKeyAssignment,
+                    _ => BindingKind::Default,
+                };
                 let previous = previous_definitions.unwrap_or(if kind.is_loop_header() {
                     PreviousDefinitions::AreKept
                 } else {
@@ -1660,6 +1666,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         previous,
                         FutureDefinitions::ShadowThisOne,
                         imported_qualifier_action,
+                        binding_kind,
                     );
                 });
             }
@@ -1991,6 +1998,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 PreviousDefinitions::AreKept,
                 FutureDefinitions::DontShadowThisOne,
                 ImportedQualifierAction::Preserve,
+                BindingKind::NestedBindings,
             );
         }
     }

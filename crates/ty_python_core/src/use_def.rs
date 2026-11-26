@@ -750,6 +750,43 @@ static ALWAYS_UNBOUND_BINDINGS: LazyLock<Bindings> =
 static ALWAYS_UNDECLARED_DECLARATIONS: LazyLock<Declarations> =
     LazyLock::new(|| Declarations::undeclared(ScopedReachabilityConstraintId::ALWAYS_TRUE));
 
+/// Distinguishes bindings that need special handling during place resolution.
+///
+/// Recording this alongside usage avoids reading the tracked definition kind
+/// each time we resolve a binding, including from other files.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum BindingKind {
+    /// A binding that needs no special handling during lookup, such as `x` here.
+    ///
+    /// ```python
+    /// x = 1
+    /// ```
+    Default,
+    /// A binding for `d["key"]` synthesized from a dictionary literal.
+    ///
+    /// ```python
+    /// d = {"key": 1}
+    /// ```
+    DictKeyAssignment,
+    /// A binding that carries writes to `x` from one loop iteration to the next.
+    ///
+    /// ```python
+    /// x = 0
+    /// while x < 3:
+    ///     x += 1
+    /// ```
+    LoopHeader,
+    /// A binding in the enclosing scope that accounts for writes from a nested scope.
+    ///
+    /// ```python
+    /// x = 0
+    /// def update():
+    ///     global x
+    ///     x = 1
+    /// ```
+    NestedBindings,
+}
+
 /// One event in a scope's use-def history.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 enum DefinitionEntry<'db> {
@@ -757,8 +794,8 @@ enum DefinitionEntry<'db> {
     /// It participates in declaration lookup, but not in binding-usage analysis.
     DeclarationPart(Definition<'db>),
     /// A binding or standalone declaration with no recorded use.
-    Unused(Definition<'db>),
-    Used(Definition<'db>),
+    Unused(Definition<'db>, BindingKind),
+    Used(Definition<'db>, BindingKind),
     Undefined,
     Deleted,
 }
@@ -767,8 +804,8 @@ impl<'db> DefinitionEntry<'db> {
     fn state(self) -> DefinitionState<'db> {
         match self {
             Self::DeclarationPart(definition)
-            | Self::Unused(definition)
-            | Self::Used(definition) => DefinitionState::Defined(definition),
+            | Self::Unused(definition, _)
+            | Self::Used(definition, _) => DefinitionState::Defined(definition),
             Self::Undefined => DefinitionState::Undefined,
             Self::Deleted => DefinitionState::Deleted,
         }
@@ -981,7 +1018,7 @@ impl StubParameterLayout {
             all_definitions: RetainedDefinitions {
                 states: parameters
                     .into_iter()
-                    .map(|p| DefinitionEntry::Unused(p.definition))
+                    .map(|p| DefinitionEntry::Unused(p.definition, BindingKind::Default))
                     .collect(),
             },
             constraint_tables: None,
@@ -1174,8 +1211,8 @@ impl<'db> UseDefMap<'db> {
         self.all_definitions
             .iter_enumerated()
             .filter_map(|(id, entry)| match entry {
-                DefinitionEntry::Unused(definition) => Some((id, definition, false)),
-                DefinitionEntry::Used(definition) => Some((id, definition, true)),
+                DefinitionEntry::Unused(definition, _) => Some((id, definition, false)),
+                DefinitionEntry::Used(definition, _) => Some((id, definition, true)),
                 DefinitionEntry::DeclarationPart(_)
                 | DefinitionEntry::Undefined
                 | DefinitionEntry::Deleted => None,
@@ -1633,6 +1670,26 @@ pub struct BindingWithConstraintsIterator<'map, 'db> {
 }
 
 impl<'map, 'db> BindingWithConstraintsIterator<'map, 'db> {
+    /// Returns the only remaining binding if there is exactly one.
+    pub fn as_single(&self) -> Option<BindingWithConstraints<'map, 'db>> {
+        let len = self.inner.len() + usize::from(self.initial_unbound.is_some());
+        if len == 1 { self.clone().next() } else { None }
+    }
+
+    /// Returns the sole definition if it has no reachability or narrowing constraints
+    /// and needs no special handling during lookup.
+    pub fn single_unconstrained_binding(&self) -> Option<Definition<'db>> {
+        let row = self.as_single()?;
+        if row.reachability_constraint != ScopedReachabilityConstraintId::ALWAYS_TRUE
+            || row.narrowing_constraint.constraint() != ScopedNarrowingConstraint::ALWAYS_TRUE
+        {
+            return None;
+        }
+
+        let definition = row.binding.definition()?;
+        (row.kind == BindingKind::Default).then_some(definition)
+    }
+
     pub const fn predicates(&self) -> &'map Predicates<'db> {
         &self.constraint_tables.predicates
     }
@@ -1654,6 +1711,7 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
             return Some(BindingWithConstraints {
                 binding: DefinitionState::Undefined,
                 binding_order: ScopedDefinitionId::UNBOUND,
+                kind: BindingKind::Default,
                 narrowing_constraint: NarrowingEvaluator {
                     constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
                     constraint_tables: self.constraint_tables,
@@ -1662,17 +1720,22 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
             });
         }
 
-        self.inner
-            .next()
-            .map(|live_binding| BindingWithConstraints {
-                binding: self.all_definitions.get(live_binding.binding()).state(),
+        self.inner.next().map(|live_binding| {
+            let entry = self.all_definitions.get(live_binding.binding());
+            BindingWithConstraints {
+                binding: entry.state(),
+                kind: match entry {
+                    DefinitionEntry::Unused(_, kind) | DefinitionEntry::Used(_, kind) => kind,
+                    _ => BindingKind::Default,
+                },
                 binding_order: live_binding.binding(),
                 narrowing_constraint: NarrowingEvaluator {
                     constraint: live_binding.narrowing_constraint(),
                     constraint_tables: self.constraint_tables,
                 },
                 reachability_constraint: live_binding.reachability_constraint(),
-            })
+            }
+        })
     }
 }
 
@@ -1682,6 +1745,7 @@ pub struct BindingWithConstraints<'map, 'db> {
     pub binding: DefinitionState<'db>,
     /// Stable binding order within the containing scope.
     pub binding_order: ScopedDefinitionId,
+    pub kind: BindingKind,
     pub narrowing_constraint: NarrowingEvaluator<'map, 'db>,
     pub reachability_constraint: ScopedReachabilityConstraintId,
 }
@@ -2698,9 +2762,10 @@ impl<'db> UseDefMapBuilder<'db> {
         previous_definitions: PreviousDefinitions,
         can_be_shadowed: FutureDefinitions,
         imported_qualifier_action: ImportedQualifierAction,
+        kind: BindingKind,
     ) {
         let pending = self.pending_reachability.current;
-        let def_id = self.push_definition(DefinitionEntry::Unused(binding));
+        let def_id = self.push_definition(DefinitionEntry::Unused(binding, kind));
         let place_state =
             pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
         let place_state = self.pending_reachability.materialize(
@@ -3116,7 +3181,8 @@ impl<'db> UseDefMapBuilder<'db> {
         place: ScopedPlaceId,
         declaration: Definition<'db>,
     ) {
-        let def_id = self.push_definition(DefinitionEntry::Unused(declaration));
+        let def_id =
+            self.push_definition(DefinitionEntry::Unused(declaration, BindingKind::Default));
         let pending = self.pending_reachability.current;
         let place_state =
             pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
@@ -3165,7 +3231,7 @@ impl<'db> UseDefMapBuilder<'db> {
         // We don't need to store prior state for a definition that is both a declaration and a
         // binding.
         let entry = if part.is_binding() {
-            DefinitionEntry::Unused(definition)
+            DefinitionEntry::Unused(definition, BindingKind::Default)
         } else {
             DefinitionEntry::DeclarationPart(definition)
         };
@@ -3484,8 +3550,8 @@ impl<'db> UseDefMapBuilder<'db> {
 
     fn mark_definition_used(&mut self, definition_id: ScopedDefinitionId) {
         let entry = &mut self.all_definitions[definition_id];
-        if let DefinitionEntry::Unused(definition) = *entry {
-            *entry = DefinitionEntry::Used(definition);
+        if let DefinitionEntry::Unused(definition, kind) = *entry {
+            *entry = DefinitionEntry::Used(definition, kind);
         }
     }
 
@@ -3656,6 +3722,7 @@ impl<'db> UseDefMapBuilder<'db> {
                     PreviousDefinitions::AreShadowed,
                     FutureDefinitions::ShadowThisOne,
                     ImportedQualifierAction::Preserve,
+                    BindingKind::Default,
                 );
             }
         }

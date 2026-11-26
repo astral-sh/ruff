@@ -34,7 +34,7 @@ pub use scope::FileScopeId;
 use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness};
 use symbol::ScopedSymbolId;
 pub use use_def::{
-    ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
+    ApplicableConstraints, BindingKind, BindingWithConstraints, BindingWithConstraintsIterator,
     BindingsSnapshotId, DeclarationSources, DeclarationWithConstraint, DeclarationsIterator,
     ImportedFinalCandidate, ImportedFinalCandidatesIterator, LiveBinding, LoopHeaderId,
     NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, UseDefMap,
@@ -1661,6 +1661,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                         PreviousDefinitions::AreShadowed,
                         FutureDefinitions::ShadowThisOne,
                         ImportedQualifierAction::Preserve,
+                        BindingKind::Default,
                     );
                 }
             }
