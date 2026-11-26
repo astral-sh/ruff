@@ -514,6 +514,39 @@ struct DiagnosticInner {
     header_offset: usize,
 }
 
+/// Sort project diagnostics in rendering order, resolving each primary file path up front.
+///
+/// Use [`Diagnostic::rendering_sort_key`] for single-file diagnostics, where comparisons
+/// typically need no path lookup.
+pub fn sort_project_diagnostics(
+    diagnostics: Vec<Diagnostic>,
+    resolver: &dyn FileResolver,
+) -> Vec<Diagnostic> {
+    if diagnostics.len() < 2 {
+        return diagnostics;
+    }
+
+    let mut located: Vec<_> = diagnostics
+        .iter()
+        .map(|diagnostic| {
+            let path = diagnostic
+                .primary_span_ref()
+                .map(|span| span.file().path(resolver));
+            (path, diagnostic)
+        })
+        .collect();
+    located.sort_by(|(left_path, left), (right_path, right)| {
+        left_path.cmp(right_path).then_with(|| {
+            left.rendering_sort_key(resolver)
+                .cmp(&right.rendering_sort_key(resolver))
+        })
+    });
+    located
+        .into_iter()
+        .map(|(_, diagnostic)| diagnostic.clone())
+        .collect()
+}
+
 struct RenderingSortKey<'a> {
     resolver: &'a dyn FileResolver,
     diagnostic: &'a Diagnostic,
