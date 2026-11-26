@@ -3620,13 +3620,21 @@ impl<'db> OverloadFilterCandidate<'db> {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+struct OverloadFilterCandidates<'db> {
+    prefix: Box<[OverloadFilterCandidate<'db>]>,
+    /// Only shorter prefixes are tested for coverage. The last candidate still contributes
+    /// its slot count and variadic arguments to the argument tuple for each prefix.
+    last_variadic_arguments: Box<[Option<Type<'db>>]>,
+}
+
 /// The specialized argument and parameter types that affect step 5 of overload resolution.
 #[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
 struct OverloadFilter<'db> {
     #[returns(copy)]
     program: Program<'db>,
-    #[returns(deref)]
-    candidates: Box<[OverloadFilterCandidate<'db>]>,
+    #[returns(ref)]
+    candidates: OverloadFilterCandidates<'db>,
 }
 
 impl<'db> OverloadFilter<'db> {
@@ -3662,7 +3670,7 @@ impl<'db> OverloadFilter<'db> {
         max_slot_count: usize,
     ) -> bool {
         // Contextual inference can give the same argument different types in other groups.
-        if group.len() != self.candidates(db).len() - 1 {
+        if group.len() != self.candidates(db).prefix.len() {
             return false;
         }
 
@@ -3683,12 +3691,15 @@ impl<'db> OverloadFilter<'db> {
 
     fn compute_covering_prefix_len(self, db: &'db dyn Db) -> usize {
         let env = &ProgramEnvironment::from_program(self.program(db));
-        let candidates = self.candidates(db);
-        let max_slot_count = candidates
+        let OverloadFilterCandidates {
+            prefix,
+            last_variadic_arguments,
+        } = self.candidates(db);
+        let candidate_count = prefix.len() + 1;
+        let max_slot_count = prefix
             .iter()
             .map(|candidate| candidate.slots.len())
-            .max()
-            .unwrap_or(0);
+            .fold(last_variadic_arguments.len(), usize::max);
 
         // Each overload adds its parameter types to the same prefix. Keep the builders so
         // earlier parameters don't need to be compared for redundancy again at every step.
@@ -3699,7 +3710,7 @@ impl<'db> OverloadFilter<'db> {
         // Variadic contributions come from the entire candidate set. Only the ordinary
         // argument types can change between prefixes, through contextual inference.
         let mut prefix_len = 0;
-        for group in candidates[..candidates.len() - 1].chunk_by(|left, right| {
+        for group in prefix.chunk_by(|left, right| {
             left.slots
                 .iter()
                 .map(|slot| slot.argument)
@@ -3711,16 +3722,22 @@ impl<'db> OverloadFilter<'db> {
                     .take(max_slot_count)
                     .collect::<Vec<_>>();
 
-            for candidate in candidates {
+            let mut add_argument = |slot_index: usize, variadic_argument: Option<Type<'db>>| {
+                let argument_type = variadic_argument.unwrap_or_else(|| {
+                    arguments
+                        .get(slot_index)
+                        .map_or(Type::unknown(), |slot| slot.argument)
+                });
+                union_argument_type_builders[slot_index]
+                    .add_in_place(argument_type.top_materialization(db, env));
+            };
+            for candidate in prefix {
                 for (slot_index, slot) in candidate.slots.iter().enumerate() {
-                    let argument_type = slot.variadic_argument.unwrap_or_else(|| {
-                        arguments
-                            .get(slot_index)
-                            .map_or(Type::unknown(), |slot| slot.argument)
-                    });
-                    union_argument_type_builders[slot_index]
-                        .add_in_place(argument_type.top_materialization(db, env));
+                    add_argument(slot_index, slot.variadic_argument);
                 }
+            }
+            for (slot_index, &argument) in last_variadic_arguments.iter().enumerate() {
+                add_argument(slot_index, argument);
             }
 
             let argument_types = TupleSpec::heterogeneous(
@@ -3731,7 +3748,7 @@ impl<'db> OverloadFilter<'db> {
             );
 
             if self.can_rule_out_shorter_prefixes(db, env, group, &argument_types, max_slot_count) {
-                return candidates.len();
+                return candidate_count;
             }
 
             let top_materialized_argument_type =
@@ -3762,7 +3779,7 @@ impl<'db> OverloadFilter<'db> {
             }
         }
 
-        candidates.len()
+        candidate_count
     }
 }
 
@@ -4680,7 +4697,10 @@ impl<'db> CallableBinding<'db> {
 
         // Project every overload onto the same participating slots. Calls that differ only
         // in the other arguments can share the search for a covering prefix.
-        let candidates = matching_overload_slots
+        let Some(((_, last_slots), prefix)) = matching_overload_slots.split_last() else {
+            return;
+        };
+        let prefix = prefix
             .iter()
             .map(|(index, slots)| OverloadFilterCandidate {
                 inferable: self.overloads[*index].inferable_typevars,
@@ -4690,6 +4710,15 @@ impl<'db> CallableBinding<'db> {
                     .collect(),
             })
             .collect::<Box<[_]>>();
+        let last_variadic_arguments = participating_slot_indices
+            .iter()
+            .filter_map(|&index| last_slots.get(index))
+            .map(|slot| slot.variadic_argument)
+            .collect();
+        let candidates = OverloadFilterCandidates {
+            prefix,
+            last_variadic_arguments,
+        };
         let prefix_len =
             OverloadFilter::new(db, env.program(db), candidates).covering_prefix_len(db);
         for &index in &matching_overload_indexes[prefix_len..] {
