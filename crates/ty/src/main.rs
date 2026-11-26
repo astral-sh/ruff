@@ -1,6 +1,6 @@
 use colored::Colorize;
 use std::io;
-use ty::{ExitStatus, run};
+use ty::ExitStatus;
 
 #[cfg(all(
     not(target_os = "macos"),
@@ -18,8 +18,42 @@ use ty::{ExitStatus, run};
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+/// Return unused pages promptly in long-running processes without overriding user settings.
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[expect(unsafe_code, reason = "Call mimalloc's C API before worker startup")]
+fn configure_purging() {
+    use std::ffi::{c_int, c_long};
+
+    // The Rust bindings do not expose this option. Use the value from the
+    // [vendored 2.3.2 header](https://docs.rs/crate/libmimalloc-sys/0.1.49/source/c_src/mimalloc/v2/include/mimalloc.h#411).
+    const MI_OPTION_PURGE_DELAY: c_int = 15;
+    const MI_VERSION_2_3_2: c_int = 20302;
+
+    unsafe extern "C" {
+        fn mi_version() -> c_int;
+        fn mi_option_set_default(option: c_int, value: c_long);
+    }
+
+    // SAFETY: main calls this once before starting workers. Both functions use
+    // the C ABI above. Restrict the option index to the known library version.
+    unsafe {
+        if mi_version() == MI_VERSION_2_3_2 {
+            mi_option_set_default(MI_OPTION_PURGE_DELAY, 0);
+        }
+    }
+}
+
 fn main() -> ExitStatus {
-    run().unwrap_or_else(|error| {
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    let result = ty::run_with_persistent_setup(configure_purging);
+    #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+    let result = ty::run();
+
+    result.unwrap_or_else(|error| {
         use io::Write;
 
         // Exit "gracefully" on broken pipe errors.

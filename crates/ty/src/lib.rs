@@ -48,12 +48,30 @@ pub use args::Cli;
 
 pub fn run() -> anyhow::Result<ExitStatus> {
     setup_rayon();
+    run_inner(|_| {})
+}
+
+/// Run the standalone binary, configuring persistent commands before starting workers.
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+pub fn run_with_persistent_setup(setup: impl FnOnce()) -> anyhow::Result<ExitStatus> {
+    run_inner(|args| {
+        if matches!(&args.command, Command::Server(_))
+            || matches!(&args.command, Command::Check(check) if check.watch)
+        {
+            setup();
+        }
+        setup_rayon();
+    })
+}
+
+fn run_inner(setup: impl FnOnce(&Cli)) -> anyhow::Result<ExitStatus> {
     ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
 
     let args = wild::args_os();
     let args =
         ruff_command_line::expand_args(args).context("Failed to read CLI arguments from file")?;
     let args = Cli::parse_from(args);
+    setup(&args);
 
     match args.command {
         Command::Check(check_args) => run_check(check_args),
