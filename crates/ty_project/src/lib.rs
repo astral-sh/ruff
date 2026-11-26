@@ -15,11 +15,13 @@ use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use rayon::prelude::*;
+use ruff_db::Db as _;
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
 };
 use ruff_db::files::{File, system_path_to_directory, system_path_to_file};
 use ruff_db::parsed::parsed_module;
+use ruff_db::source::source_text;
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
@@ -29,8 +31,8 @@ use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
-use ty_python_core::ProgramFile;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, PythonEnvironmentError};
+use ty_python_core::{ProgramFile, semantic_index};
 pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::dependency::{DependencyMetadata, DependencyProjectKind};
 use ty_python_semantic::lint::RuleSelection;
@@ -543,6 +545,8 @@ impl Project {
         let check_start = ruff_db::Instant::now();
 
         let files: Vec<_> = (&files).into_iter().collect();
+        // On incremental checks, the whole file may already have cached diagnostics.
+        let share_scopes = db.files().is_frozen() && rayon::current_num_threads() > 1;
 
         files
             .into_par_iter()
@@ -562,6 +566,11 @@ impl Project {
                     tracing::debug_span!(parent: &project_span, "check_file", ?file);
                 let _entered = check_file_span.entered();
                 let program_file = db.program_file(file);
+
+                if share_scopes && let Err(diagnostic) = infer_large_file_scopes(db, program_file) {
+                    reporter.report_checked_file(db, file, std::slice::from_ref(&diagnostic));
+                    return;
+                }
 
                 match check_file_impl(db, program_file) {
                     Ok(diagnostics) => {
@@ -1014,6 +1023,54 @@ pub enum ProjectReloadResult {
         /// Whether the indexed project files changed.
         files_changed: bool,
     },
+}
+
+/// Let workers that run out of files take batches of scopes from a large file.
+///
+/// This must run outside any Salsa query so Rayon can attach a different database for
+/// each job. The tracked file check then reads the cached results and collects diagnostics
+/// in the usual order.
+fn infer_large_file_scopes(db: &dyn Db, program_file: ProgramFile<'_>) -> Result<(), Diagnostic> {
+    const MIN_SCOPES: usize = 256;
+    const BATCH_SIZE: usize = 32;
+
+    let file = program_file.file(db);
+    let count = catch(
+        db,
+        file,
+        AssertUnwindSafe(|| {
+            // Leave invalid scripts and read errors for the regular file check to report.
+            if Script::for_file(db, file).is_some_and(|script| !script.has_valid_settings(db))
+                || source_text(db, file).read_error().is_some()
+            {
+                return 0;
+            }
+            semantic_index(db, program_file).scope_ids().count()
+        }),
+    )?;
+    if count < MIN_SCOPES {
+        return Ok(());
+    }
+
+    (0..count)
+        .into_par_iter()
+        .step_by(BATCH_SIZE)
+        .map_with_db(db, |db, start| {
+            // Capture a panic on the worker where it occurred, preserving its backtrace.
+            catch(
+                db,
+                file,
+                AssertUnwindSafe(|| {
+                    let end = (start + BATCH_SIZE).min(count);
+                    ty_python_semantic::types::infer_scope_batch(
+                        db,
+                        db.program_file(file),
+                        start..end,
+                    );
+                }),
+            )
+        })
+        .try_for_each(std::convert::identity)
 }
 
 #[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]

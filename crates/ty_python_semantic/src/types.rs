@@ -47,7 +47,8 @@ pub(crate) use self::infer::{
     is_discarded_dict_key_assignment, original_class_type,
 };
 use self::infer::{
-    infer_function_default_types, infer_legacy_type_alias, legacy_type_alias_parameters,
+    ScopeInference, infer_function_default_types, infer_legacy_type_alias,
+    legacy_type_alias_parameters,
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
@@ -199,6 +200,26 @@ pub(crate) mod definition_resolution;
 mod property_tests;
 mod subscript;
 
+/// Compute the same scope queries that [`check_types`] will read, without collecting diagnostics.
+/// The range uses the order of scopes in the file's semantic index.
+pub fn infer_scope_batch(db: &dyn Db, file: ProgramFile<'_>, scopes: std::ops::Range<usize>) {
+    for scope in semantic_index(db, file)
+        .scope_ids()
+        .skip(scopes.start)
+        .take(scopes.len())
+    {
+        infer_independent_scope(db, scope);
+    }
+}
+
+/// Scopes that can take a type context must be inferred by their enclosing scope.
+fn infer_independent_scope<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+) -> Option<&'db ScopeInference<'db>> {
+    (!scope.accepts_type_context(db)).then(|| infer_scope_types(db, scope, TypeContext::default()))
+}
+
 pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
     let source_file = file.file(db);
     let _span = tracing::trace_span!("check_types", ?source_file).entered();
@@ -211,13 +232,9 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
     let mut legacy_aliases = Vec::new();
 
     for scope_id in index.scope_ids() {
-        // Scopes that may require type context are inferred during the inference of
-        // their outer scope.
-        if scope_id.accepts_type_context(db) {
+        let Some(result) = infer_independent_scope(db, scope_id) else {
             continue;
-        }
-
-        let result = infer_scope_types(db, scope_id, TypeContext::default());
+        };
 
         if let Some(scope_diagnostics) = result.diagnostics() {
             diagnostics.extend(scope_diagnostics);

@@ -964,6 +964,8 @@ pub(crate) mod testing {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write as _;
+
     use ruff_db::Db as _;
     use ruff_db::files::{FileRootKind, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf, TestSystem};
@@ -1109,6 +1111,36 @@ mod tests {
         db.freeze();
 
         assert_eq!(db.check().len(), 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn large_file_checks_collect_diagnostics_across_scope_batches() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let project = SystemPathBuf::from("/project");
+        let mut source = String::from("def first() -> str: return last()\n");
+        for i in 0..256 {
+            writeln!(source, "def middle_{i}() -> int: return last()")?;
+        }
+        source.push_str("def last() -> int: return 'wrong'\n");
+        system
+            .memory_file_system()
+            .write_file_all(project.join("main.py"), source)?;
+
+        let metadata = ProjectMetadata::discover(&project, &system)?;
+        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        db.freeze();
+
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(2)
+            .stack_size(ruff_db::STACK_SIZE)
+            .build()?;
+        let diagnostics = pool.install(move || db.check());
+        assert_eq!(diagnostics.len(), 2);
+        for diagnostic in diagnostics {
+            assert_eq!(diagnostic.id().as_str(), "invalid-explicit-return");
+        }
 
         Ok(())
     }
