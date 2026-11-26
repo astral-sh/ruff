@@ -49,7 +49,16 @@ impl StyledBuffer {
         let capacity = self.lines.iter().map(|line| line.len()).sum();
         str.reserve(capacity);
 
+        let plain = *stylesheet == Stylesheet::plain();
         for (i, line) in self.lines.iter().enumerate() {
+            if i > 0 {
+                str.push('\n');
+            }
+            if plain {
+                str.extend(line.iter().map(|cell| cell.ch));
+                continue;
+            }
+
             let mut current_style = stylesheet.none;
             for StyledChar { ch, style } in line {
                 let ch_style = style.color_spec(level, stylesheet);
@@ -63,9 +72,6 @@ impl StyledBuffer {
                 str.push(*ch);
             }
             write!(str, "{current_style:#}")?;
-            if i != self.lines.len() - 1 {
-                str.push('\n');
-            }
         }
         Ok(())
     }

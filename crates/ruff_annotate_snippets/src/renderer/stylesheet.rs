@@ -1,6 +1,6 @@
 use anstyle::Style;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Stylesheet {
     pub(crate) error: Style,
     pub(crate) warning: Style,

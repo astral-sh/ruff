@@ -5663,3 +5663,10 @@ error[W391][*]: Too many newlines at end of cell
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
 }
+
+#[test]
+fn plain_renderer_with_custom_emphasis() {
+    let group = Group::with_title(Level::ERROR.primary_title("résumé"));
+    let renderer = Renderer::plain().emphasis(annotate_snippets::renderer::Style::new().bold());
+    assert_eq!(renderer.render(&[group]), "error\x1b[1m: résumé\x1b[0m");
+}
