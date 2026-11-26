@@ -10,7 +10,8 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::registry::Rule;
 use crate::rules::flake8_type_checking::helpers::{
-    quote_type_expression, quotes_are_unremovable, unquote_annotation_string,
+    contains_embedded_comment, quote_type_expression, quotes_are_unremovable,
+    unquote_annotation_string,
 };
 use crate::{AlwaysFixableViolation, Fix, FixAvailability, Violation};
 
@@ -298,7 +299,7 @@ pub(crate) fn quoted_type_alias(
     let mut diagnostic = checker.report_diagnostic(QuotedTypeAlias, range);
     // Comments inside string annotations are not in the source's comment ranges.
     // Unquoting one could comment out trailing code, so never mark this fix safe.
-    if annotation_expr.value.to_string().contains('#')
+    if contains_embedded_comment(&annotation_expr.value.to_string())
         || checker.comment_ranges().intersects(range)
     {
         diagnostic.set_fix(Fix::unsafe_edit(edit));
