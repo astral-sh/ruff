@@ -200,8 +200,11 @@ impl<'db> DynamicClassLiteral<'db> {
         #[salsa::tracked(returns(deref), cycle_initial=|_, _, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
         fn deferred_explicit_bases<'db>(
             db: &'db dyn Db,
-            definition: Definition<'db>,
+            class: DynamicClassLiteral<'db>,
         ) -> Box<[Type<'db>]> {
+            let definition = class
+                .definition(db)
+                .expect("deferred inference requires a definition");
             let program_file = definition.program_file(db);
             let python_file = program_file.python_file(db);
             let env = ProgramEnvironment::from_file(program_file);
@@ -230,7 +233,7 @@ impl<'db> DynamicClassLiteral<'db> {
             // For dangling calls, bases are stored directly on the anchor.
             DynamicClassAnchor::ScopeOffset { explicit_bases, .. } => explicit_bases.as_ref(),
             // For assigned calls, use deferred inference.
-            DynamicClassAnchor::Definition(definition) => deferred_explicit_bases(db, *definition),
+            DynamicClassAnchor::Definition(_) => deferred_explicit_bases(db, self),
         }
     }
 
