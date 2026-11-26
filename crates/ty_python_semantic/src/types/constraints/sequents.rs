@@ -459,25 +459,32 @@ impl<'db> SequentMap<'db> {
         right: AtomicConstraint<'db>,
         inferable: TypeVarSet<'db>,
     ) -> Option<&'db Self> {
-        // Currently, the only pattern we look for is when two concrete lower-bound constraints
-        // have disjoint bounds. Given `l₁ ≤ T ∧ l₂ ≤ T`, the only sequent we could theoretically
-        // produce is `(l₁ | l₂) ≤ T`. But we don't store that as a single constraint; we always
-        // break that apart into the two smaller constraints that we started with.
+        // If neither lower bound can imply the other and their union cannot simplify,
+        // the pair contributes no sequent. The union itself would be split back into
+        // these two lower bounds.
         if let AtomicConstraint::ConcreteLower(left) = left
             && let AtomicConstraint::ConcreteLower(right) = right
             && left.typevar.is_same_typevar_as(db, right.typevar)
-            && left
-                .bound
-                .when_trivially_disjoint_from(
-                    db,
-                    env,
-                    right.bound,
-                    ConstraintSetBuilder::new().unlimited(),
-                    TypeVarSet::None,
-                )
-                .is_trivially_always_satisfied()
         {
-            return None;
+            let incomparable = match (left.bound, right.bound) {
+                // The cheap disjointness check never rules out a pair of callables.
+                // Their parameter lists can still rule out both subtype relations.
+                (Type::Callable(left), Type::Callable(right)) => left
+                    .signatures(db)
+                    .has_incomparable_parameters(right.signatures(db)),
+                (left, right) => left
+                    .when_trivially_disjoint_from(
+                        db,
+                        env,
+                        right,
+                        ConstraintSetBuilder::new().unlimited(),
+                        TypeVarSet::None,
+                    )
+                    .is_trivially_always_satisfied(),
+            };
+            if incomparable {
+                return None;
+            }
         }
 
         #[salsa::tracked(

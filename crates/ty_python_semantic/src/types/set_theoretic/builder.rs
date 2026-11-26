@@ -1204,6 +1204,9 @@ impl<'db> UnionBuilder<'db> {
             (Type::Divergent(left), Type::Divergent(right)) => {
                 left.materialization_kind().is_none() && right.materialization_kind().is_none()
             }
+            (Type::Callable(left), Type::Callable(right)) => left
+                .signatures(db)
+                .has_incomparable_parameters(right.signatures(db)),
             (Type::ClassLiteral(_), Type::ClassLiteral(_))
             | (Type::ModuleLiteral(_), Type::ModuleLiteral(_)) => true,
             // Distributing `Any & Literal["a", "b"]` produces one intersection per

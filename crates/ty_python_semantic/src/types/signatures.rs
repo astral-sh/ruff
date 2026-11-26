@@ -181,6 +181,36 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
+    /// Whether the parameter lists rule out subtyping in both directions, even
+    /// after bottom materialization.
+    pub(super) fn has_incomparable_parameters(&self, other: &Self) -> bool {
+        let ([left], [right]) = (self.overloads.as_slice(), other.overloads.as_slice()) else {
+            return false;
+        };
+        let (left, right) = (left.parameters(), right.parameters());
+        if !left.is_standard() || !right.is_standard() {
+            return false;
+        }
+
+        for pair in left.iter().zip_longest(right.iter()) {
+            match pair {
+                EitherOrBoth::Both(a, b) if a.is_positional() && b.is_positional() => {
+                    if let (Some(x), Some(y)) = (a.keyword_name(), b.keyword_name())
+                        && x != y
+                    {
+                        // An optional slot can be omitted if another parameter accepts the keyword.
+                        return !a.has_default() && !b.has_default();
+                    }
+                }
+                EitherOrBoth::Left(extra) | EitherOrBoth::Right(extra) => {
+                    return extra.is_positional() && !extra.has_default();
+                }
+                EitherOrBoth::Both(..) => break,
+            }
+        }
+        false
+    }
+
     /// Returns the union of all overload return types, or `Unknown` if there are no overloads.
     pub(crate) fn overload_return_type_or_unknown(
         &self,
