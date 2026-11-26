@@ -257,6 +257,41 @@ fn expected_types_are_collected_only_for_open_files() -> anyhow::Result<()> {
 }
 
 #[test]
+fn functional_class_fields_track_edits_to_their_definitions() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from typing import reveal_type
+        from fields import Record, Row
+
+        def read(record: Record, row: Row):
+            reveal_type((record["field"], row.field))
+        "#,
+    )?;
+
+    for value_type in ["int", "str"] {
+        db.write_dedented(
+            "/src/fields.py",
+            &format!(
+                r#"
+                from typing import NamedTuple, TypedDict
+
+                Record = TypedDict("Record", {{"field": {value_type}}})
+                Row = NamedTuple("Row", [("field", {value_type})])
+                "#
+            ),
+        )?;
+        assert_revealed_type(
+            &db,
+            "/src/main.py",
+            &format!("tuple[{value_type}, {value_type}]"),
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
     assert!(
         std::mem::size_of::<DefinitionTypes>()

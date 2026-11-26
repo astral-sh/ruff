@@ -220,6 +220,11 @@ fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 #[salsa::tracked]
 impl<'db> PEP695TypeAliasType<'db> {
+    /// The alias at its declaration, without specialization or pending materialization.
+    pub(super) fn unspecialized(self, db: &'db dyn Db) -> Self {
+        Self::new(db, self.name(db), self.definition(db), None, None)
+    }
+
     /// The RHS type of a PEP-695 style type alias with specialization applied.
     #[salsa::tracked(
         returns(copy),
@@ -672,13 +677,7 @@ impl<'db> TypeAliasType<'db> {
     /// Returns the alias without an applied specialization or pending materialization.
     pub(super) fn unspecialized(self, db: &'db dyn Db) -> Self {
         match self {
-            TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(PEP695TypeAliasType::new(
-                db,
-                alias.name(db),
-                alias.definition(db),
-                None,
-                None,
-            )),
+            TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(alias.unspecialized(db)),
             TypeAliasType::ManualPEP695(alias) => {
                 TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
                     db,
