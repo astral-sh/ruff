@@ -3,11 +3,13 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
 use rustc_hash::FxHashSet;
+use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::{
     DeclarationsIterator, ast_ids::HasScopedUseId, definition::DefinitionKind,
     place::ScopedPlaceId, use_def_map,
 };
 
+use crate::place::known_module_symbol;
 use crate::types::known_instance::{FieldInstance, FieldInstanceKind};
 use crate::types::{
     BoundTypeVarInstance, DataclassFlags, FunctionType, GenericContext, KnownFunction, Parameter,
@@ -23,6 +25,46 @@ pub(in crate::types) fn is_attrs_class<'db>(
     class
         .dataclass_params(db)
         .is_some_and(|params| params.flags(db).contains(DataclassFlags::ATTRS))
+}
+
+/// attrs [omits] `__attrs_attrs__: ClassVar[Any]` for type-checkers that are not Mypy.
+/// Supply it on the public protocol (`attrs.AttrsInstance` re-exports `attr.AttrsInstance`)
+/// unless the stubs already declare it.
+///
+/// TODO: Remove this fallback once the attrs stubs declare `__attrs_attrs__` for ty.
+///
+/// [omits]: https://github.com/python-attrs/attrs/blob/4a8098356659f37a5832be17aa1d8a40be7d7cec/src/attr/_typing_compat.pyi#L6-L15
+pub(in crate::types) fn protocol_metadata_type<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<Type<'db>> {
+    if class.name(db) != "AttrsInstance"
+        || !file_to_module(db, class.program_file(db).resolver_file(db))?
+            .is_known(db, KnownModule::Attr)
+    {
+        return None;
+    }
+    let protocol = class.into_protocol_class(db)?;
+    (!protocol.has_member_declaration(db, "__attrs_attrs__")).then_some(Type::any())
+}
+
+/// The type of the synthesized `__attrs_attrs__` class variable.
+pub(in crate::types) fn field_metadata_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: StaticClassLiteral<'db>,
+) -> Option<Type<'db>> {
+    if is_attrs_class(db, class) {
+        let attribute = known_module_symbol(db, env, KnownModule::Attr, "Attribute")
+            .place
+            .ignore_possibly_undefined()
+            .and_then(|ty| ty.to_instance_approximation(db, env))
+            .unwrap_or_else(Type::unknown);
+        Some(Type::homogeneous_tuple(db, env, attribute))
+    } else {
+        // Allow reads of `__attrs_attrs__` on values typed as `AttrsInstance`.
+        protocol_metadata_type(db, class)
+    }
 }
 
 /// Returns whether `decorator` resolves to `attr.attrs`, `attrs.define`, or `attrs.frozen`.

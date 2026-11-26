@@ -40,6 +40,73 @@ reveal_type(user.id)  # revealed: int
 reveal_type(user.internal_name)  # revealed: str
 ```
 
+## Field metadata and the `AttrsInstance` protocol
+
+attrs stores field metadata in the `__attrs_attrs__` class variable. Both the class and its
+instances expose this tuple.
+
+```py
+import attr
+import attrs
+
+@attr.s
+class User1:
+    name: str = attr.ib()
+
+@attrs.define
+class User2:
+    name: str
+
+reveal_type(User1.__attrs_attrs__)  # revealed: tuple[Attribute[Unknown], ...]
+reveal_type(User2.__attrs_attrs__)  # revealed: tuple[Attribute[Unknown], ...]
+
+user1 = User1("Ada")
+user2 = User2("Ada")
+
+reveal_type(user1.__attrs_attrs__[0].name)  # revealed: str
+reveal_type(user2.__attrs_attrs__[0].name)  # revealed: str
+```
+
+The `AttrsInstance` protocol requires `__attrs_attrs__`. `attrs.fields` accepts
+`type[AttrsInstance] | AttrsInstance`, while `attrs.asdict` expects an `AttrsInstance`.
+
+```py
+attrs.fields(User1)
+attrs.fields(User2)
+attrs.fields(user1)
+attrs.fields(user2)
+
+attrs.asdict(user1)
+attrs.asdict(user2)
+
+class Child1(User1): ...
+class Child2(User2): ...
+
+attr.fields(Child1)
+attr.fields(Child2)
+```
+
+An ordinary dataclass lacks the required member.
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Other:
+    name: str
+
+attrs.fields(Other)  # error: [invalid-argument-type]
+attrs.asdict(Other("Ada"))  # error: [invalid-argument-type]
+```
+
+`attrs.has` narrows a class to `type[AttrsInstance]`.
+
+```py
+def inspect_class(cls: type):
+    if attrs.has(cls):
+        reveal_type(cls.__attrs_attrs__)  # revealed: Any
+```
+
 ## Private fields
 
 attrs strips leading underscores from field names when generating constructor parameters.

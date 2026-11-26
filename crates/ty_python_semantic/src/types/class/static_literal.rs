@@ -1716,6 +1716,13 @@ impl<'db> StaticClassLiteral<'db> {
 
         let namespace = self.class_namespace(db);
         let code_generator = namespace.generator;
+        if name == "__attrs_attrs__"
+            && let Some(ty) = attrs::field_metadata_type(db, env, self)
+        {
+            return Member {
+                inner: Place::declared(ty).with_qualifiers(TypeQualifiers::CLASS_VAR),
+            };
+        }
         if code_generator.is_some_and(CodeGeneratorKind::is_dataclass_like) {
             if name == "__dataclass_fields__" {
                 // Make this class look like a subclass of the `DataClassInstance` protocol
