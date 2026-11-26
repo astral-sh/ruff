@@ -509,6 +509,11 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// Returns the parsed type annotation if the checker is in a string type annotation.
+    pub(crate) const fn parsed_type_annotation(&self) -> Option<&'a ParsedAnnotation> {
+        self.parsed_type_annotation
+    }
+
     /// Returns the [`Tokens`] for the parsed source file.
     ///
     ///

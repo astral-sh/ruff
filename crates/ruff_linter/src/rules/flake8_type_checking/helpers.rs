@@ -9,7 +9,7 @@ use ruff_python_ast::{
     self as ast, Decorator, Expr, ExprContext, Operator, PythonVersion, StringLiteralFlags,
 };
 use ruff_python_codegen::{Generator, Stylist};
-use ruff_python_parser::typing::parse_type_annotation;
+use ruff_python_parser::typing::{AnnotationKind, parse_type_annotation};
 use ruff_python_semantic::{
     Binding, BindingKind, Modules, NodeId, ScopeKind, SemanticModel, analyze,
 };
@@ -433,13 +433,18 @@ pub(crate) fn unquote_annotation_string(
             checker.source_tokens(),
         )
         .is_none()
-        && parenthesized_range(
-            // Check for parentheses inside the string """(...)"""
-            expr.into(),
-            annotation_expr.into(),
-            checker.tokens(),
-        )
-        .is_none()
+        // Node ranges in complex annotations (e.g. `"""\nint\n"""`) don't match their tokens,
+        // so always add parentheses.
+        && (checker
+            .parsed_type_annotation()
+            .is_some_and(|parsed| matches!(parsed.kind(), AnnotationKind::Complex))
+            || parenthesized_range(
+                // Check for parentheses inside the string """(...)"""
+                expr.into(),
+                annotation_expr.into(),
+                checker.tokens(),
+            )
+            .is_none())
     {
         format!("({fix_string})")
     } else {
