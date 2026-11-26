@@ -1417,60 +1417,56 @@ impl<'db> UseDefMap<'db> {
         &self,
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
-        self.declarations_iterator(
-            self.retained_declarations_at_binding(binding),
-            BoundnessAnalysis::BasedOnUnboundVisibility,
-        )
+        self.declaration_sources_at_binding(binding)
+            .unwrap_or_else(|| DeclarationSources {
+                map: self,
+                live: ALWAYS_UNDECLARED_DECLARATIONS.as_slice(),
+            })
+            .declarations()
     }
 
-    /// Imports that may contribute a `Final` qualifier at this binding.
+    /// Returns the declarations and imports reaching this binding in its own scope.
     ///
-    /// These imports do not declare a type. Whether their source is actually `Final` is
-    /// determined during type inference.
-    pub fn imported_final_candidates_at_binding(
+    /// A missing entry means that the place was unbound and undeclared here. Declarations
+    /// in other scopes, including annotations inherited from a base class, can still apply.
+    pub fn declaration_sources_at_binding(
         &self,
         binding: Definition<'db>,
-    ) -> ImportedFinalCandidatesIterator<'_, 'db> {
-        self.imported_final_candidates_iterator(self.retained_declarations_at_binding(binding))
+    ) -> Option<DeclarationSources<'_, 'db>> {
+        let definitions = self.definitions_by_definition.get(&binding)?;
+        let id = definitions
+            .declarations
+            .expect("binding definition should have retained declarations");
+        Some(DeclarationSources {
+            map: self,
+            live: &self.interned_declarations[id],
+        })
     }
 
-    fn retained_declarations_at_binding(&self, binding: Definition<'db>) -> &[LiveDeclaration] {
-        self.definitions_by_definition.get(&binding).map_or_else(
-            || ALWAYS_UNDECLARED_DECLARATIONS.as_slice(),
-            |definitions| {
-                &self.interned_declarations[definitions
-                    .declarations
-                    .expect("binding definition should have retained declarations")]
-            },
-        )
-    }
-
-    pub fn end_of_scope_declarations<'map>(
-        &'map self,
+    /// Returns the declarations and imports that reach the end of this scope.
+    pub fn end_of_scope_declaration_sources(
+        &self,
         place: ScopedPlaceId,
-    ) -> DeclarationsIterator<'map, 'db> {
-        match place {
-            ScopedPlaceId::Symbol(symbol) => self.end_of_scope_symbol_declarations(symbol),
-            ScopedPlaceId::Member(member) => self.end_of_scope_member_declarations(member),
+    ) -> DeclarationSources<'_, 'db> {
+        let state = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].end_of_scope,
+            ScopedPlaceId::Member(member) => self.extra().member_states[member].end_of_scope,
+        };
+        DeclarationSources {
+            map: self,
+            live: &self.interned_declarations[state.declarations_id()],
         }
     }
 
-    pub fn end_of_scope_symbol_declarations<'map>(
-        &'map self,
-        symbol: ScopedSymbolId,
-    ) -> DeclarationsIterator<'map, 'db> {
-        let place_state_id = self.symbol_states[symbol].end_of_scope;
-        let declarations = &self.interned_declarations[place_state_id.declarations_id()];
-        self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
+    pub fn end_of_scope_declarations(&self, place: ScopedPlaceId) -> DeclarationsIterator<'_, 'db> {
+        self.end_of_scope_declaration_sources(place).declarations()
     }
 
-    fn end_of_scope_member_declarations<'map>(
-        &'map self,
-        member: ScopedMemberId,
-    ) -> DeclarationsIterator<'map, 'db> {
-        let place_state_id = self.extra().member_states[member].end_of_scope;
-        let declarations = &self.interned_declarations[place_state_id.declarations_id()];
-        self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
+    pub fn end_of_scope_symbol_declarations(
+        &self,
+        symbol: ScopedSymbolId,
+    ) -> DeclarationsIterator<'_, 'db> {
+        self.end_of_scope_declarations(symbol.into())
     }
 
     pub fn reachable_symbol_declarations(
@@ -1504,13 +1500,8 @@ impl<'db> UseDefMap<'db> {
         &self,
         place: ScopedPlaceId,
     ) -> ImportedFinalCandidatesIterator<'_, 'db> {
-        let place_state_id = match place {
-            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].end_of_scope,
-            ScopedPlaceId::Member(member) => self.extra().member_states[member].end_of_scope,
-        };
-        self.imported_final_candidates_iterator(
-            &self.interned_declarations[place_state_id.declarations_id()],
-        )
+        self.end_of_scope_declaration_sources(place)
+            .imported_final_candidates()
     }
 
     /// Imports that may contribute a `Final` qualifier anywhere in the scope.
@@ -1715,6 +1706,27 @@ impl<'map, 'db> NarrowingEvaluator<'map, 'db> {
 
     pub fn narrowing_constraints(&self) -> &'map NarrowingConstraints {
         &self.constraint_tables.narrowing_constraints
+    }
+}
+
+/// Declarations and imports live at the same point in control flow.
+///
+/// An import can contribute a qualifier without declaring a type. Each iterator reads
+/// the same history independently, so consuming one never skips entries in the other.
+#[derive(Clone, Copy)]
+pub struct DeclarationSources<'map, 'db> {
+    map: &'map UseDefMap<'db>,
+    live: &'map [LiveDeclaration],
+}
+
+impl<'map, 'db> DeclarationSources<'map, 'db> {
+    pub fn declarations(self) -> DeclarationsIterator<'map, 'db> {
+        self.map
+            .declarations_iterator(self.live, BoundnessAnalysis::BasedOnUnboundVisibility)
+    }
+
+    pub fn imported_final_candidates(self) -> ImportedFinalCandidatesIterator<'map, 'db> {
+        self.map.imported_final_candidates_iterator(self.live)
     }
 }
 

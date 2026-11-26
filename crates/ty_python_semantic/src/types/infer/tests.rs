@@ -2073,6 +2073,198 @@ fn declared_instance_attribute_avoids_inferring_method_assignments() -> anyhow::
 }
 
 #[test]
+fn inherited_annotation_added_and_removed() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file(
+        "/src/child.py",
+        "from parent import Parent\nclass Child(Parent):\n    items = []\nitems = Child.items",
+    )?;
+
+    for (body, expected) in [
+        ("pass", "list[Unknown]"),
+        ("items: list[int]", "list[int]"),
+        ("items: list[str]", "list[str]"),
+        ("pass", "list[Unknown]"),
+    ] {
+        db.write_file("/src/parent.py", format!("class Parent: {body}"))?;
+        let child = system_path_to_file(&db, "/src/child.py").unwrap();
+        let items = global_symbol(&db, child, "items").place.expect_type();
+        assert_eq!(
+            items.display(&db, &db.program_environment()).to_string(),
+            expected
+        );
+    }
+    Ok(())
+}
+
+fn infer_class_body(db: &TestDb, path: &str, name: &str) {
+    let file = program_file(db, system_path_to_file(db, path).unwrap());
+    let module = parsed_module(db, file.python_file(db)).load(db);
+    let scope = semantic_index(db, file)
+        .scope_ids()
+        .find(|scope| scope.name(db, &module) == name)
+        .unwrap();
+    infer_complete_scope_types(db, scope);
+}
+
+#[test]
+fn recursive_inherited_annotation_after_looking_up_subclass_attribute() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY312)
+        .build()?;
+    let path = "/src/main.py";
+    db.write_dedented(
+        path,
+        r#"
+        from typing import NamedTuple, Protocol, overload, reveal_type
+
+        class Result:
+            type Item = int
+
+        class HasStrKind(Protocol):
+            kind: type[str] | None
+
+        class Base:
+            kind: type["Selected.Item"] | None
+
+        class Record(NamedTuple):
+            item: "Selected.Item"
+
+        @overload
+        def choose[T: HasStrKind](cls: type[T]) -> type[T]: ...
+        @overload
+        def choose(cls: type[Base]) -> type[Result]: ...
+        def choose(cls):
+            return Result if issubclass(cls, Base) else cls
+
+        class Child(Base, Record):
+            kind = int
+            Item = kind
+
+        Selected = choose(Child)
+        reveal_type(Selected)
+        "#,
+    )?;
+
+    // Hovering over `kind` can start inference here, before we check the call to `choose`.
+    infer_class_body(&db, path, "Child");
+    assert_revealed_type(&db, path, "type[Result]");
+    Ok(())
+}
+
+fn setup_recursive_inheritance() -> anyhow::Result<TestDb> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY312)
+        .build()?;
+    db.write_dedented(
+        "/src/choose.py",
+        r#"
+        from typing import Protocol, overload
+
+        class Fallback:
+            type Item = int
+
+        class HasStr(Protocol):
+            x: type[str]
+
+        @overload
+        def choose[T: HasStr](cls: type[T]) -> type[T]: ...
+        @overload
+        def choose(cls: type) -> type[Fallback]: ...
+        def choose(cls):
+            return cls if cls.x is str else Fallback
+        "#,
+    )?;
+    Ok(db)
+}
+
+#[test]
+fn recursive_inherited_annotation_after_editing_generic_base() -> anyhow::Result<()> {
+    let mut db = setup_recursive_inheritance()?;
+    let parent = "class Base[T]:\n    x: type[T]\n";
+    let child = "/src/child.py";
+    db.write_file("/src/parent.py", parent)?;
+    db.write_dedented(
+        child,
+        r#"
+        from typing import TypeAlias
+        from choose import choose
+        from parent import Base
+
+        @choose
+        class Child(Base["Selected.Item"]):
+            y = 1
+            x = str
+
+        class Other(Child):
+            x = str
+            y = 1
+            Item: TypeAlias = x
+
+        Selected = choose(Other)
+        "#,
+    )?;
+
+    // Hover over Child.x, edit the base, then hover over Other.y.
+    infer_class_body(&db, child, "Child");
+    db.write_file("/src/parent.py", format!("{parent}\n"))?;
+    infer_class_body(&db, child, "Other");
+    assert_file_diagnostics(&db, child, &[]);
+    Ok(())
+}
+
+#[test]
+fn recursive_inherited_annotation_with_multiple_assignments() -> anyhow::Result<()> {
+    let mut db = setup_recursive_inheritance()?;
+    let parent = indoc::indoc! {r#"
+        from typing import TYPE_CHECKING
+        if TYPE_CHECKING:
+            from child import Selected
+
+        class Base[T]: pass
+        class OtherBase:
+            x: "Selected.Item"
+    "#};
+    let child = "/src/child.py";
+    db.write_file("/src/parent.py", parent)?;
+    db.write_dedented(
+        child,
+        r#"
+        from choose import choose
+        from parent import Base, OtherBase
+
+        class Child(Base["SelectedOther.Item"]):
+            x = 0
+            x = 1
+
+        Selected = choose(Child)
+
+        class Other(OtherBase):
+            x = 1
+
+        SelectedOther = choose(Other)
+        attr = Child.x
+        "#,
+    )?;
+
+    // Looking up `Child.x` uses the last assignment. Hovering in `Child` infers both.
+    let file = system_path_to_file(&db, child)?;
+    let attr = global_symbol(&db, file, "attr").place.expect_type();
+    assert_eq!(
+        attr.display(&db, &db.program_environment()).to_string(),
+        "int"
+    );
+    db.write_file("/src/parent.py", format!("{parent}\n"))?;
+    infer_class_body(&db, child, "Child");
+    db.write_file(
+        "/src/parent.py",
+        parent.replace("x: \"Selected.Item\"", "pass"),
+    )?;
+    assert_file_diagnostics(&db, child, &[]);
+    Ok(())
+}
+
+#[test]
 fn inherited_class_defaults_avoid_inferring_instance_assignments() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_file("/src/dependency.py", "value = 'updated'")?;

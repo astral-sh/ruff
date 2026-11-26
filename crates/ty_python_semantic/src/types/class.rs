@@ -2934,7 +2934,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 }) {
                     continue;
                 }
-                inherited_class_body_declaration(db, scope, symbol)?
+                *inherited_class_body_declaration(db, scope, symbol)?
             } else if declared.qualifiers.contains(TypeQualifiers::FINAL)
                 || !declarations.contains_only_annotated_assignments(db)
             {

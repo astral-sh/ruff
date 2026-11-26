@@ -1365,6 +1365,40 @@ reveal_type(m.augmented)  # revealed: str | Descriptor
 reveal_type(m.conditional)  # revealed: str | Descriptor | bytes
 ```
 
+#### A nested global write leaves the inherited annotation intact
+
+```py
+items = 1
+
+class Base:
+    items: list[int] = []
+
+class Child(Base):
+    def update(self):
+        global items
+        items = 2
+
+class Grandchild(Child):
+    items = []
+
+reveal_type(Child.items)  # revealed: list[int]
+reveal_type(Grandchild.items)  # revealed: list[int]
+```
+
+#### Deleting a class-level default
+
+An inherited annotation still guides the initializer if the subclass later deletes the name.
+
+```py
+class Base:
+    items: list[int]
+
+class Child(Base):
+    items = []
+    reveal_type(items)  # revealed: list[int]
+    del items
+```
+
 #### Augmented assignments to overriding class-level defaults
 
 An unannotated class-level default retains the inherited declaration, including through a diamond.

@@ -38,8 +38,8 @@ use crate::diagnostic::format_enumeration;
 use crate::place::{
     DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers, TypeOrigin,
     loop_header_reachability, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol, place_from_bindings_with_reachability_cache,
-    place_from_declarations_with_reachability_cache,
+    module_type_implicit_global_symbol, place_from_binding_declarations,
+    place_from_bindings_with_reachability_cache,
 };
 use crate::place_load::{
     ConstraintKeys, ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolver, PlaceLoadSourceKind,
@@ -1649,10 +1649,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Add a binding for the given definition.
-    ///
-    /// Returns the result of the `infer_value_ty` closure, which is called with the declared type
-    /// as type context.
+    /// Resolve the declarations that guide inference of the value. Once inferred, pass its
+    /// type to [`AddBinding::insert`] to check the assignment and record the binding.
     fn add_binding<'a>(
         &mut self,
         node: AnyNodeRef<'a>,
@@ -1666,77 +1664,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .is_binding()
         );
 
-        let db = self.db();
         let file_scope_id = binding.file_scope(db);
         let place_table = self.index.place_table(file_scope_id);
         let use_def = self.index.use_def_map(file_scope_id);
-
-        let place_id = binding.place(self.db());
+        let place_id = binding.place(db);
         let place = place_table.place(place_id);
-
-        let (declarations, imported_final_candidates, is_local) = if let Some(symbol) =
-            place_id.as_symbol()
-            && let Some((owner_scope, owner_symbol)) =
-                self.forwarded_assignment_owner(file_scope_id, symbol)
-        {
-            let owner_use_def = self.index.use_def_map(owner_scope);
-            (
-                owner_use_def.end_of_scope_symbol_declarations(owner_symbol),
-                owner_use_def.end_of_scope_imported_final_candidates(owner_symbol.into()),
-                false,
-            )
+        let env = self.program_environment();
+        let owner = place_id
+            .as_symbol()
+            .and_then(|symbol| self.forwarded_assignment_owner(file_scope_id, symbol));
+        let is_local = owner.is_none();
+        let is_import = binding.kind(db).is_import();
+        let resolve = |sources| {
+            place_from_binding_declarations(db, env, sources, is_import, self.reachability_cache())
+        };
+        let declared = if let Some((scope, symbol)) = owner {
+            let mut declared = resolve(
+                self.index
+                    .use_def_map(scope)
+                    .end_of_scope_declaration_sources(symbol.into()),
+            );
+            if !is_import && let Some(local) = use_def.declaration_sources_at_binding(binding) {
+                declared = declared.with_forwarding_scope(&resolve(local));
+            }
+            declared
         } else {
-            (
-                use_def.declarations_at_binding(binding),
-                use_def.imported_final_candidates_at_binding(binding),
-                true,
-            )
+            use_def
+                .declaration_sources_at_binding(binding)
+                .map_or_default(resolve)
         };
 
-        let env = self.program_environment();
-        let is_import = binding.kind(db).is_import();
-        let mut declared = place_from_declarations_with_reachability_cache(
-            db,
-            env,
-            declarations,
-            self.reachability_cache(),
-        );
-        let mut has_final_declaration = declared.qualifiers().contains(TypeQualifiers::FINAL);
-        if !is_import {
-            declared = declared.with_imported_final_for_assignment(
-                db,
-                env,
-                imported_final_candidates,
-                self.reachability_cache(),
-            );
-        }
-        let mut qualifier_only = declared.is_qualifier_only();
+        let has_final_declaration = declared.has_final_declaration();
+        let qualifier_only = declared.is_qualifier_only();
         let (mut place_and_quals, conflicting) = declared.into_place_and_conflicting_declarations();
-
-        // Imports into `global` and `nonlocal` names retain their qualifiers in the forwarding
-        // scope, while the owner's declarations continue to supply the declared type.
-        if !is_local && !is_import {
-            let local_declared = place_from_declarations_with_reachability_cache(
-                db,
-                env,
-                use_def.declarations_at_binding(binding),
-                self.reachability_cache(),
-            );
-            has_final_declaration |= local_declared.qualifiers().contains(TypeQualifiers::FINAL);
-            let local_declared = local_declared.with_imported_final_for_assignment(
-                db,
-                env,
-                use_def.imported_final_candidates_at_binding(binding),
-                self.reachability_cache(),
-            );
-            let local_place = local_declared.ignore_conflicting_declarations();
-
-            place_and_quals.qualifiers |= local_place.qualifiers;
-            if place_and_quals.place.is_undefined() {
-                place_and_quals.place = local_place.place;
-                qualifier_only = local_declared.is_qualifier_only();
-            }
-        }
 
         if let Some(conflicting) = conflicting {
             // TODO point out the conflicting declarations in the diagnostic?
@@ -14049,19 +14009,14 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         inferred_ty: Type<'db>,
     ) -> Type<'db> {
         let env = builder.program_environment();
-        let declared_ty = self
-            .type_context
-            .expected_type()
-            .unwrap_or_else(Type::unknown);
-
+        let declared_ty = self.type_context.expected_type();
         let db = builder.db();
-        let file_scope_id = self.binding.file_scope(db);
-        let use_def = builder.index.use_def_map(file_scope_id);
-        let place_table = builder.index.place_table(file_scope_id);
 
         let mut bound_ty = inferred_ty;
 
         if self.qualifiers.contains(TypeQualifiers::FINAL) {
+            let file_scope_id = self.binding.file_scope(db);
+            let use_def = builder.index.use_def_map(file_scope_id);
             let mut previous_bindings = use_def.bindings_at_definition(self.binding);
 
             // An assignment to a local `Final`-qualified symbol is only an error if there are prior bindings
@@ -14069,7 +14024,10 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             let previous_definition = previous_bindings.find_map(|r| r.binding.definition());
 
             if !self.is_local || previous_definition.is_some() {
-                let place = place_table.place(self.binding.place(db));
+                let place = builder
+                    .index
+                    .place_table(file_scope_id)
+                    .place(self.binding.place(db));
                 if let Some(diag_builder) = builder.context.report_lint(
                     &INVALID_ASSIGNMENT,
                     self.binding.full_range(builder.db(), builder.module()),
@@ -14105,13 +14063,15 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             }
         }
 
-        if !builder.validate_assignment_type(
-            self.node,
-            self.binding,
-            AssignmentDeclaration::Ordinary(self.declaration),
-            declared_ty,
-            bound_ty,
-        ) {
+        if let Some(declared_ty) = declared_ty
+            && !builder.validate_assignment_type(
+                self.node,
+                self.binding,
+                AssignmentDeclaration::Ordinary(self.declaration),
+                declared_ty,
+                bound_ty,
+            )
+        {
             builder.discard_dict_key_assignments_for(self.binding);
 
             // Allow declarations to override inference in case of invalid assignment.
@@ -14167,7 +14127,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                     })
             {
                 builder.discard_dict_key_assignments_for(self.binding);
-                bound_ty = declared_ty;
+                bound_ty = declared_ty.unwrap_or_else(Type::unknown);
             }
         } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript { value, .. }) = self.node {
             let value_ty = builder
@@ -14176,7 +14136,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
 
             if !value_ty.is_typed_dict() && !Self::is_safe_mutable_class(db, env, value_ty) {
                 builder.discard_dict_key_assignments_for(self.binding);
-                bound_ty = declared_ty;
+                bound_ty = declared_ty.unwrap_or_else(Type::unknown);
             }
         }
 
