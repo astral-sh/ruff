@@ -47,6 +47,12 @@ use crate::printer::Printer;
 pub use args::Cli;
 
 pub fn run() -> anyhow::Result<ExitStatus> {
+    run_with_check_setup(|| {})
+}
+
+/// Run the CLI, letting the binary configure its allocator for a one-shot check.
+#[doc(hidden)]
+pub fn run_with_check_setup(setup: fn()) -> anyhow::Result<ExitStatus> {
     setup_rayon();
     ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
 
@@ -56,7 +62,7 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     let args = Cli::parse_from(args);
 
     match args.command {
-        Command::Check(check_args) => run_check(check_args),
+        Command::Check(check_args) => run_check(check_args, setup),
         Command::Server(server_args) => server::run(&server_args),
         Command::Version { output_format } => version(output_format).map(|()| ExitStatus::Success),
         Command::GenerateShellCompletion { shell } => {
@@ -97,7 +103,7 @@ fn version(output_format: HelpFormat) -> Result<()> {
     Ok(())
 }
 
-fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
+fn run_check(args: CheckCommand, setup: fn()) -> anyhow::Result<ExitStatus> {
     // Enabled ANSI colors on Windows 10.
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
@@ -224,6 +230,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     // source-text overrides, and memory reports measure the database without this optimization, so
     // they must keep the inputs mutable.
     if !watch && matches!(mode, MainLoopMode::Check) && memory_report.is_none() {
+        setup();
         db.freeze();
     }
 

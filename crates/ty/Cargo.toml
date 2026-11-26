@@ -57,6 +57,10 @@ wild = { workspace = true }
 [target.'cfg(all(not(target_os = "macos"), not(target_os = "windows"), not(target_os = "openbsd"), not(target_os = "aix"), not(target_os = "android"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dependencies]
 tikv-jemallocator = { workspace = true }
 
+[target.'cfg(all(target_os = "linux", target_arch = "x86_64"))'.dependencies]
+libc = { workspace = true }
+tikv-jemalloc-sys = { workspace = true }
+
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing"] }
 ruff_python_trivia = { workspace = true }
