@@ -1331,7 +1331,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "Inferring deferred types should not add more deferred definitions"
         );
 
-        if self.db().should_check_file(self.file()) {
+        if self.context.should_check_file() {
             let mut seen_overloaded_places = FxHashSet::default();
             let mut seen_public_functions = FxHashSet::default();
 
