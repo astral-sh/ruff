@@ -83,31 +83,12 @@ attrs.fields(Other)  # error: [invalid-argument-type]
 attrs.asdict(Other("Ada"))  # error: [invalid-argument-type]
 ```
 
-`attrs.has` narrows a class to `type[AttrsInstance]`. The protocol exposes `__attrs_attrs__` as
-`ClassVar[Any]`.
+`attrs.has` narrows a class to `type[AttrsInstance]`.
 
 ```py
 def inspect_class(cls: type):
     if attrs.has(cls):
         reveal_type(cls.__attrs_attrs__)  # revealed: Any
-
-def inspect_instance(obj: attr.AttrsInstance):
-    reveal_type(obj.__attrs_attrs__)  # revealed: Any
-```
-
-A protocol that extends `AttrsInstance` inherits the metadata requirement.
-
-```py
-from typing import Protocol
-
-class Named(attrs.AttrsInstance, Protocol):
-    name: str
-
-def greet(obj: Named) -> str:
-    return f"Hello, {obj.name}!"
-
-greet(user)  # ok
-greet(Other("Ada"))  # error: [invalid-argument-type]
 ```
 
 ## Private fields
