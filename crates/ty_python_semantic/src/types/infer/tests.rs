@@ -96,6 +96,25 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
 }
 
 #[test]
+fn final_without_value_tracks_imported_qualifier() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file("src/qual.py", "from builtins import int as Q")?;
+    db.write_file("src/main.py", "from qual import Q\nx: Q")?;
+    assert_file_diagnostics(&db, "src/main.py", &[]);
+
+    db.write_file("src/qual.py", "from typing import Final as Q")?;
+    assert_file_diagnostics(
+        &db,
+        "src/main.py",
+        &["`Final` symbol `x` is not assigned a value"],
+    );
+
+    db.write_file("src/qual.py", "from builtins import int as Q")?;
+    assert_file_diagnostics(&db, "src/main.py", &[]);
+    Ok(())
+}
+
+#[test]
 fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     let mut db = TestDbBuilder::new()
         .with_python_version(PythonVersion::PY311)
