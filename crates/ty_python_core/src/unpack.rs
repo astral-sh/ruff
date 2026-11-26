@@ -36,9 +36,6 @@ pub struct Unpack<'db> {
     pub program_file: ProgramFile<'db>,
 
     #[returns(copy)]
-    pub(crate) value_file_scope: FileScopeId,
-
-    #[returns(copy)]
     pub(crate) target_file_scope: FileScopeId,
 
     /// The target expression that is being unpacked. For example, in `(a, b) = (1, 2)`, the target

@@ -3367,24 +3367,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         ScopeKind::Comprehension
                     );
                 }
-                // The first iterator of the comprehension is evaluated in the outer scope, while all subsequent
-                // nodes are evaluated in the inner scope.
-                // SAFETY: The current scope is the comprehension, and the comprehension scope must have a parent scope.
-                let value_file_scope =
-                    if let Unpackable::Comprehension { first: true, .. } = unpackable {
-                        self.scope_stack
-                            .iter()
-                            .rev()
-                            .nth(1)
-                            .expect("The comprehension scope must have a parent scope")
-                            .file_scope_id
-                    } else {
-                        self.current_scope()
-                    };
                 let unpack = Unpack::new(
                     self.db,
                     self.file,
-                    value_file_scope,
                     self.current_scope(),
                     // Note `target` belongs to the `self.module` tree
                     AstNodeRef::new(self.module, target),
