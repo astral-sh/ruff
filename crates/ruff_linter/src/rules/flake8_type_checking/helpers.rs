@@ -414,6 +414,27 @@ pub(crate) fn quote_type_expression(
     Edit::range_replacement(quote_annotator.into_annotation(expr), expr.range())
 }
 
+/// Whether unquoting could expose a Python comment and hide following code.
+///
+/// Comments inside a string annotation aren't recorded in the outer source's
+/// comment ranges, but become syntax after the quotes have been removed.
+pub(crate) fn contains_embedded_comment(annotation: &str) -> bool {
+    annotation.contains('#')
+}
+
+#[cfg(test)]
+mod embedded_comment_tests {
+    use super::contains_embedded_comment;
+
+    #[test]
+    fn comment_like_annotation_is_unsafe_to_unquote() {
+        assert!(contains_embedded_comment("int # comment"));
+        assert!(contains_embedded_comment("int # comment\\n"));
+        assert!(!contains_embedded_comment("int | None"));
+        assert!(!contains_embedded_comment("list[int]"));
+    }
+}
+
 /// Safely remove quotes from a type expression.
 ///
 /// This function handles edge cases like multiline strings correctly
