@@ -219,7 +219,12 @@ impl Configuration {
             validate_required_version(required_version)?;
         }
 
-        let target_version = self.target_version.map(clamp_target_version);
+        let target_version = self.target_version.map(|version| {
+            clamp_target_version(
+                version,
+                "the project's Ruff configuration, such as `[tool.ruff]` in `pyproject.toml`",
+            )
+        });
         let linter_target_version = TargetVersion(target_version);
         let target_version = target_version.unwrap_or_default();
         let global_preview = self.preview.unwrap_or_default();
@@ -1435,7 +1440,13 @@ fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> {
 /// The range comes from [`PythonVersion`] itself, so a version outside it can only be inferred from
 /// `requires-python`. This includes versions that are only supported in preview, which can be newer
 /// than [`ast::PythonVersion::latest`].
-fn clamp_target_version(version: ast::PythonVersion) -> ast::PythonVersion {
+///
+/// `configuration` names where to set `target-version` to silence the warning, which depends on
+/// where the `requires-python` came from.
+pub(crate) fn clamp_target_version(
+    version: ast::PythonVersion,
+    configuration: &str,
+) -> ast::PythonVersion {
     let supported = PythonVersion::iter().map(ast::PythonVersion::from);
     // `PythonVersion` always has variants, so this `else` branch only exists to avoid an `unwrap`.
     let (Some(oldest), Some(newest)) = (supported.clone().min(), supported.max()) else {
@@ -1451,7 +1462,7 @@ fn clamp_target_version(version: ast::PythonVersion) -> ast::PythonVersion {
         "The minimum Python version allowed by `requires-python` ({version}) is {comparison} \
         version supported by Ruff ({clamped}). Rules that depend on the target version will assume \
         Python {clamped}. To silence this warning, set `target-version = \"py{major}{minor}\"` in \
-        the project's Ruff configuration, such as `[tool.ruff]` in `pyproject.toml`.",
+        {configuration}.",
         major = clamped.major,
         minor = clamped.minor,
     );
@@ -2325,20 +2336,21 @@ mod tests {
     #[test]
     fn clamp_target_version_to_supported_range() {
         let newest = PythonVersion::iter().map(ast::PythonVersion::from).max();
+        let clamp = |version| clamp_target_version(version, "the test configuration");
 
         // Lower than the oldest `target-version`.
         assert_eq!(
-            clamp_target_version(ast::PythonVersion { major: 2, minor: 7 }),
+            clamp(ast::PythonVersion { major: 2, minor: 7 }),
             ast::PythonVersion::PY37
         );
         assert_eq!(
-            clamp_target_version(ast::PythonVersion { major: 3, minor: 4 }),
+            clamp(ast::PythonVersion { major: 3, minor: 4 }),
             ast::PythonVersion::PY37
         );
 
         // Higher than the newest `target-version`.
         assert_eq!(
-            Some(clamp_target_version(ast::PythonVersion {
+            Some(clamp(ast::PythonVersion {
                 major: 3,
                 minor: 99
             })),
@@ -2346,15 +2358,9 @@ mod tests {
         );
 
         // Within the range of `target-version` values.
-        assert_eq!(
-            clamp_target_version(ast::PythonVersion::PY37),
-            ast::PythonVersion::PY37
-        );
-        assert_eq!(
-            clamp_target_version(ast::PythonVersion::PY310),
-            ast::PythonVersion::PY310
-        );
+        assert_eq!(clamp(ast::PythonVersion::PY37), ast::PythonVersion::PY37);
+        assert_eq!(clamp(ast::PythonVersion::PY310), ast::PythonVersion::PY310);
         // The newest `target-version` is kept as-is.
-        assert_eq!(newest.map(clamp_target_version), newest);
+        assert_eq!(newest.map(clamp), newest);
     }
 }

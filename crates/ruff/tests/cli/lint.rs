@@ -5069,6 +5069,68 @@ fn cli_target_version_overrides_script_requirement() -> Result<()> {
     Ok(())
 }
 
+/// A script's `requires-python` older than the oldest supported version is clamped to that
+/// version, and replaces the project's target version. UP006 requires Python 3.9, so it doesn't
+/// apply when targeting Python 3.7.
+#[test]
+fn script_requires_python_older_than_supported() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r"
+            # /// script
+            # requires-python = '>=3.4'
+            # ///
+            from typing import List
+            x: List[int]
+        ",
+    )?;
+    test.write_file("ruff.toml", "target-version = 'py312'")?;
+    let args = ["--preview", "--select=UP006", "script.py"];
+    assert_cmd_snapshot!(test.check_command().args(args), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: The minimum Python version allowed by `requires-python` (3.4) is older than the oldest version supported by Ruff (3.7). Rules that depend on the target version will assume Python 3.7. To silence this warning, set `target-version = "py37"` in the `[tool.ruff]` table of the script metadata in `[TMP]/script.py`.
+    "#);
+
+    // An explicit `--target-version` overrides the script's requirement without a warning.
+    assert_cmd_snapshot!(test.check_command().args(args).arg("--target-version=py39"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:6:4: non-pep585-annotation: Use `list` instead of `List` for type annotation
+    Found 1 error.
+    1 unsafe fix available with `--fix --unsafe-fixes`.
+
+    ----- stderr -----
+    ");
+
+    // So does a `target-version` in the script's own `[tool.ruff]` table.
+    test.write_file(
+        "script.py",
+        r"
+            # /// script
+            # requires-python = '>=3.4'
+            # tool.ruff.target-version = 'py37'
+            # ///
+            from typing import List
+            x: List[int]
+        ",
+    )?;
+    assert_cmd_snapshot!(test.check_command().args(args), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
 #[test]
 fn isolated_ignores_script_settings() -> Result<()> {
     let test = CliTest::with_file(

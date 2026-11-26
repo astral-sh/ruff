@@ -248,7 +248,7 @@ fn get_fallback_target_version(dir: &Path) -> Option<PythonVersion> {
 /// which is then treated as Python 3.7, unless a `--target-version` argument overrides it.
 ///
 /// A minimum version that can't be a valid Python version, such as `>=4` or `>=3.300`, is ignored
-/// with a warning, and Ruff continues as if `requires-python` were not set..
+/// with a warning, and Ruff continues as if `requires-python` were not set.
 pub(super) fn get_minimum_supported_version(
     requires_version: &VersionSpecifiers,
     path: &Path,

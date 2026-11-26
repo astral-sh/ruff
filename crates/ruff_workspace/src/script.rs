@@ -25,7 +25,7 @@ use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use ruff_source_file::{SourceFile, SourceFileBuilder};
 
 use crate::Settings;
-use crate::configuration::Configuration;
+use crate::configuration::{Configuration, clamp_target_version};
 use crate::options::Options;
 use crate::pyproject::{Tools, check_required_version, get_minimum_supported_version};
 use crate::resolver::{
@@ -170,10 +170,21 @@ pub fn script(
 
     let config_error = |err| ScriptSettingsError::configuration(path, &err);
     let resolve = |configuration, root: &Path| {
-        overrides
-            .transform(configuration)
-            .into_settings(root)
-            .map_err(config_error)
+        let mut configuration = overrides.transform(configuration);
+        // The script's `requires-python` replaces the project's target version, so setting
+        // `target-version` in the project configuration wouldn't silence the warning about an
+        // unsupported version. Clamp it here, after a `--target-version` override is applied,
+        // so the warning points to the script instead.
+        configuration.target_version = configuration.target_version.map(|version| {
+            clamp_target_version(
+                version,
+                &format!(
+                    "the `[tool.ruff]` table of the script metadata in `{path}`",
+                    path = path.unwrap_or(Path::new("-")).display()
+                ),
+            )
+        });
+        configuration.into_settings(root).map_err(config_error)
     };
 
     let mut config_path = None;
