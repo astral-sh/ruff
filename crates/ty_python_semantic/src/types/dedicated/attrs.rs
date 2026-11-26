@@ -27,9 +27,11 @@ pub(in crate::types) fn is_attrs_class<'db>(
         .is_some_and(|params| params.flags(db).contains(DataclassFlags::ATTRS))
 }
 
-/// attrs [omits] `__attrs_attrs__: ClassVar[Any]` from its protocol for type-checkers that
-/// cannot synthesize this member. Supply it on the public protocol (`attrs.AttrsInstance`
-/// re-exports `attr.AttrsInstance`) unless the stubs already declare it.
+/// attrs [omits] `__attrs_attrs__: ClassVar[Any]` for type-checkers that are not Mypy.
+/// Supply it on the public protocol (`attrs.AttrsInstance` re-exports `attr.AttrsInstance`)
+/// unless the stubs already declare it.
+///
+/// TODO: Remove this fallback once the attrs stubs declare `__attrs_attrs__` for ty.
 ///
 /// [omits]: https://github.com/python-attrs/attrs/blob/4a8098356659f37a5832be17aa1d8a40be7d7cec/src/attr/_typing_compat.pyi#L6-L15
 pub(in crate::types) fn protocol_metadata_type<'db>(
