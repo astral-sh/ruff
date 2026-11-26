@@ -1158,32 +1158,6 @@ fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definit
 }
 
 #[test]
-fn star_import_infers_unused_bindings_on_demand() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    db.write_files([
-        ("/src/main.py", "from dependency import *"),
-        ("/src/dependency.py", "value: int = 1"),
-    ])?;
-
-    let main = system_path_to_file(&db, "/src/main.py")?;
-    db.clear_salsa_events();
-    assert_file_diagnostics(&db, "/src/main.py", &[]);
-    let check_events = db.take_salsa_events();
-
-    let ty = global_symbol(&db, main, "value").place.expect_type();
-    assert_eq!(
-        ty.display(&db, &db.program_environment()).to_string(),
-        "int"
-    );
-    let lookup_events = db.take_salsa_events();
-
-    let binding = first_public_binding(&db, main, "value");
-    assert_function_query_was_not_run(&db, infer_definition_types, binding, &check_events);
-    assert_function_query_was_run(&db, infer_definition_types, binding, &lookup_events);
-    Ok(())
-}
-
-#[test]
 fn importing_an_annotated_global_skips_its_initializer() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_files([
@@ -1237,6 +1211,32 @@ fn importing_value_dependent_declarations_still_infers_the_initializer() -> anyh
         ),
     ])?;
     assert_file_diagnostics(&db, "/src/main.py", &[]);
+    Ok(())
+}
+
+#[test]
+fn star_import_infers_unused_bindings_on_demand() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_files([
+        ("/src/main.py", "from dependency import *"),
+        ("/src/dependency.py", "value: int = 1"),
+    ])?;
+
+    let main = system_path_to_file(&db, "/src/main.py")?;
+    db.clear_salsa_events();
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    let check_events = db.take_salsa_events();
+
+    let ty = global_symbol(&db, main, "value").place.expect_type();
+    assert_eq!(
+        ty.display(&db, &db.program_environment()).to_string(),
+        "int"
+    );
+    let lookup_events = db.take_salsa_events();
+
+    let binding = first_public_binding(&db, main, "value");
+    assert_function_query_was_not_run(&db, infer_definition_types, binding, &check_events);
+    assert_function_query_was_run(&db, infer_definition_types, binding, &lookup_events);
     Ok(())
 }
 
