@@ -756,9 +756,34 @@ static ALWAYS_UNDECLARED_DECLARATIONS: LazyLock<Declarations> =
 /// each time we resolve a binding, including from other files.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum BindingKind {
-    Ordinary,
+    /// A binding that needs no special handling during lookup, such as `x` here.
+    ///
+    /// ```python
+    /// x = 1
+    /// ```
+    Default,
+    /// A binding for `d["key"]` synthesized from a dictionary literal.
+    ///
+    /// ```python
+    /// d = {"key": 1}
+    /// ```
     DictKeyAssignment,
+    /// A binding that carries writes to `x` from one loop iteration to the next.
+    ///
+    /// ```python
+    /// x = 0
+    /// while x < 3:
+    ///     x += 1
+    /// ```
     LoopHeader,
+    /// A binding in the enclosing scope that accounts for writes from a nested scope.
+    ///
+    /// ```python
+    /// x = 0
+    /// def update():
+    ///     global x
+    ///     x = 1
+    /// ```
     NestedBindings,
 }
 
@@ -993,7 +1018,7 @@ impl StubParameterLayout {
             all_definitions: RetainedDefinitions {
                 states: parameters
                     .into_iter()
-                    .map(|p| DefinitionEntry::Unused(p.definition, BindingKind::Ordinary))
+                    .map(|p| DefinitionEntry::Unused(p.definition, BindingKind::Default))
                     .collect(),
             },
             constraint_tables: None,
@@ -1651,6 +1676,20 @@ impl<'map, 'db> BindingWithConstraintsIterator<'map, 'db> {
         if len == 1 { self.clone().next() } else { None }
     }
 
+    /// Returns the sole definition if it has no reachability or narrowing constraints
+    /// and needs no special handling during lookup.
+    pub fn single_unconstrained_binding(&self) -> Option<Definition<'db>> {
+        let row = self.as_single()?;
+        if row.reachability_constraint != ScopedReachabilityConstraintId::ALWAYS_TRUE
+            || row.narrowing_constraint.constraint() != ScopedNarrowingConstraint::ALWAYS_TRUE
+        {
+            return None;
+        }
+
+        let definition = row.binding.definition()?;
+        (row.kind == BindingKind::Default).then_some(definition)
+    }
+
     pub const fn predicates(&self) -> &'map Predicates<'db> {
         &self.constraint_tables.predicates
     }
@@ -1672,7 +1711,7 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
             return Some(BindingWithConstraints {
                 binding: DefinitionState::Undefined,
                 binding_order: ScopedDefinitionId::UNBOUND,
-                kind: BindingKind::Ordinary,
+                kind: BindingKind::Default,
                 narrowing_constraint: NarrowingEvaluator {
                     constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
                     constraint_tables: self.constraint_tables,
@@ -1687,7 +1726,7 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
                 binding: entry.state(),
                 kind: match entry {
                     DefinitionEntry::Unused(_, kind) | DefinitionEntry::Used(_, kind) => kind,
-                    _ => BindingKind::Ordinary,
+                    _ => BindingKind::Default,
                 },
                 binding_order: live_binding.binding(),
                 narrowing_constraint: NarrowingEvaluator {
@@ -3143,7 +3182,7 @@ impl<'db> UseDefMapBuilder<'db> {
         declaration: Definition<'db>,
     ) {
         let def_id =
-            self.push_definition(DefinitionEntry::Unused(declaration, BindingKind::Ordinary));
+            self.push_definition(DefinitionEntry::Unused(declaration, BindingKind::Default));
         let pending = self.pending_reachability.current;
         let place_state =
             pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
@@ -3192,7 +3231,7 @@ impl<'db> UseDefMapBuilder<'db> {
         // We don't need to store prior state for a definition that is both a declaration and a
         // binding.
         let entry = if part.is_binding() {
-            DefinitionEntry::Unused(definition, BindingKind::Ordinary)
+            DefinitionEntry::Unused(definition, BindingKind::Default)
         } else {
             DefinitionEntry::DeclarationPart(definition)
         };
@@ -3683,7 +3722,7 @@ impl<'db> UseDefMapBuilder<'db> {
                     PreviousDefinitions::AreShadowed,
                     FutureDefinitions::ShadowThisOne,
                     ImportedQualifierAction::Preserve,
-                    BindingKind::Ordinary,
+                    BindingKind::Default,
                 );
             }
         }

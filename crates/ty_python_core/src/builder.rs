@@ -1652,7 +1652,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     DefinitionKind::LoopHeader(_) => BindingKind::LoopHeader,
                     DefinitionKind::NestedBindings(_) => BindingKind::NestedBindings,
                     DefinitionKind::DictKeyAssignment(_) => BindingKind::DictKeyAssignment,
-                    _ => BindingKind::Ordinary,
+                    _ => BindingKind::Default,
                 };
                 let previous = previous_definitions.unwrap_or(if kind.is_loop_header() {
                     PreviousDefinitions::AreKept

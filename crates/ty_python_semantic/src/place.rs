@@ -861,7 +861,7 @@ pub(crate) fn has_bound_prefix<'db>(
     if let Some(row) = bindings.as_single() {
         match row.binding {
             DefinitionState::Undefined => return false,
-            DefinitionState::Defined(_) if row.kind == BindingKind::Ordinary => {
+            DefinitionState::Defined(_) if row.kind == BindingKind::Default => {
                 // With no unbound or deleted alternative, even an unreachable binding gives
                 // a defined place of type Never. Either way the outer prefix is shadowed.
                 return true;
@@ -1840,19 +1840,11 @@ fn place_from_bindings_impl<'db>(
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
 ) -> PlaceWithDefinition<'db> {
-    // With one unconditional binding and no narrowing or export restrictions, the
-    // result is exactly the type of that definition.
     if !requires_explicit_reexport.is_yes()
-        && let Some(row) = bindings_with_constraints.as_single()
-        && row.reachability_constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE
-        && row.narrowing_constraint.constraint() == ScopedNarrowingConstraint::ALWAYS_TRUE
-        && let DefinitionState::Defined(binding) = row.binding
-        && row.kind == BindingKind::Ordinary
+        && let Some(binding) = bindings_with_constraints.single_unconstrained_binding()
     {
         return PlaceWithDefinition {
-            place: Place::Defined(
-                DefinedPlace::new(binding_type(db, binding)).with_definition(binding),
-            ),
+            place: Place::bound(binding_type(db, binding)).with_definition(binding),
             first_definition: Some(binding),
         };
     }
