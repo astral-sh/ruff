@@ -296,7 +296,11 @@ pub(crate) fn quoted_type_alias(
     let edit = unquote_annotation_string(expr, annotation_expr, checker);
     let range = edit.range();
     let mut diagnostic = checker.report_diagnostic(QuotedTypeAlias, range);
-    if checker.comment_ranges().intersects(range) {
+    // Comments inside string annotations are not in the source's comment ranges.
+    // Unquoting one could comment out trailing code, so never mark this fix safe.
+    if annotation_expr.value.to_string().contains('#')
+        || checker.comment_ranges().intersects(range)
+    {
         diagnostic.set_fix(Fix::unsafe_edit(edit));
     } else {
         diagnostic.set_fix(Fix::safe_edit(edit));
