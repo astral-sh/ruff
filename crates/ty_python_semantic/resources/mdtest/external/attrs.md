@@ -68,12 +68,9 @@ reveal_type(user2.__attrs_attrs__[0].name)  # revealed: str
 ```
 
 The `AttrsInstance` protocol requires `__attrs_attrs__`. `attrs.fields` accepts
-`type[AttrsInstance] | AttrsInstance`, while `attrs.asdict` expects an `AttrsInstance`. An ordinary
-dataclass lacks the required member.
+`type[AttrsInstance] | AttrsInstance`, while `attrs.asdict` expects an `AttrsInstance`.
 
 ```py
-from dataclasses import dataclass
-
 attrs.fields(User1)
 attrs.fields(User2)
 attrs.asdict(user1)
@@ -84,6 +81,12 @@ class Child2(User2): ...
 
 attr.fields(Child1)
 attr.fields(Child2)
+```
+
+An ordinary dataclass lacks the required member.
+
+```py
+from dataclasses import dataclass
 
 @dataclass
 class Other:
