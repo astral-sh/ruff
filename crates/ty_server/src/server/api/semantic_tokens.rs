@@ -1,12 +1,10 @@
 use lsp_types::SemanticToken;
-use ruff_db::source::{line_index, source_text};
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextRange};
-use salsa::Database as _;
 use ty_ide::{SemanticTokenModifier, SemanticTokenType, semantic_tokens};
 use ty_project::{ProjectDatabase, SemanticDb as _};
 
-use crate::document::{PositionEncoding, ToRangeExt, text_range_to_lsp_range};
+use crate::document::{LocalRangeConverter, PositionEncoding};
 
 /// Common logic for generating semantic tokens, either for full document or a specific range.
 /// If no range is provided, the entire file is processed.
@@ -17,8 +15,7 @@ pub(crate) fn generate_semantic_tokens(
     encoding: PositionEncoding,
     multiline_token_support: bool,
 ) -> Vec<SemanticToken> {
-    let source = source_text(db, file);
-    let line_index = line_index(db, file);
+    let ranges = LocalRangeConverter::new(db, file, encoding);
     let semantic_token_data = semantic_tokens(db, db.program_file(file), range);
 
     let mut encoder = Encoder {
@@ -28,17 +25,8 @@ pub(crate) fn generate_semantic_tokens(
     };
 
     for token in &*semantic_token_data {
-        // Let edits interrupt encoding while we hold the database snapshot.
-        db.unwind_if_revision_cancelled();
-
-        // Only notebooks need to translate file offsets to cell-relative positions.
-        let lsp_range = if source.as_notebook().is_some() {
-            let Some(range) = token.range().to_lsp_range(db, file, encoding) else {
-                continue;
-            };
-            range.local_range()
-        } else {
-            text_range_to_lsp_range(token.range(), &source, &line_index, encoding)
+        let Some(lsp_range) = ranges.convert(token.range()) else {
+            continue;
         };
 
         if lsp_range.start.line == lsp_range.end.line {
@@ -50,11 +38,7 @@ pub(crate) fn generate_semantic_tokens(
             let mut len = 0;
 
             for line in lsp_range.start.line..lsp_range.end.line {
-                let line_len = line_index.line_len(
-                    OneIndexed::from_zero_indexed(line as usize),
-                    &source,
-                    encoding.into(),
-                );
+                let line_len = ranges.file_line_len(OneIndexed::from_zero_indexed(line as usize));
 
                 len += u32::try_from(line_len).unwrap();
             }
@@ -83,11 +67,8 @@ pub(crate) fn generate_semantic_tokens(
                 let end = if line == lsp_range.end.line {
                     lsp_range.end.character
                 } else {
-                    let line_len = line_index.line_len(
-                        OneIndexed::from_zero_indexed(line as usize),
-                        &source,
-                        encoding.into(),
-                    );
+                    let line_len =
+                        ranges.file_line_len(OneIndexed::from_zero_indexed(line as usize));
                     u32::try_from(line_len).unwrap()
                 };
 

@@ -16,8 +16,8 @@ use crate::system::AnySystemPath;
 pub(crate) use location::ToLink;
 pub use notebook::NotebookDocument;
 pub(crate) use range::{
-    FileRangeExt, PositionExt, RangeExt, TextSizeExt, ToRangeExt, cell_range,
-    resolve_file_uri_range, text_range_to_lsp_range,
+    FileRangeExt, LocalRangeConverter, PositionExt, RangeExt, TextSizeExt, ToRangeExt, cell_range,
+    resolve_file_uri_range,
 };
 pub use text_document::TextDocument;
 pub(crate) use text_document::{DocumentVersion, LanguageId};
