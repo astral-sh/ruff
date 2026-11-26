@@ -287,17 +287,7 @@ pub(crate) fn infer_definition_types<'db>(
 /// PEP 613 aliases and bare qualifiers still need full definition inference.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _, _| Some(DeclaredType::from_type(Type::divergent(id))),
-    cycle_fn=|db, cycle, previous: &Option<DeclaredType<'db>>, result: Option<DeclaredType<'db>>, definition: Definition<'db>| {
-        let env = ProgramEnvironment::from_definition(definition);
-        result.map(|declared| declared.map_type(|ty| {
-            if let Some(previous) = previous.and_then(|declared| declared.inner_type()) {
-                ty.cycle_normalized(db, &env, previous, cycle)
-            } else {
-                ty.recursive_type_normalized(db, &env, cycle)
-            }
-        }))
-    },
+    cycle_result=|_, _, _| None,
     heap_size=ruff_memory_usage::heap_size
 )]
 pub(super) fn annotated_global_declaration<'db>(
@@ -309,8 +299,21 @@ pub(super) fn annotated_global_declaration<'db>(
     };
     let module = parsed_module(db, definition.python_file(db)).load(db);
     let env = ProgramEnvironment::from_definition(definition);
-    TypeInferenceBuilder::for_definition(db, &env, definition, &module)
-        .finish_annotated_global_declaration(assignment)
+    // Looking up an annotation can itself depend on the type of the binding.
+    // Keep full definition inference for those cycles. Only project an explicit
+    // collection annotation whose outer type matches the literal initializer.
+    assignment.annotation(&module).as_subscript_expr()?;
+    let class = match assignment.value(&module)? {
+        ast::Expr::List(_) => KnownClass::List,
+        ast::Expr::Dict(_) => KnownClass::Dict,
+        ast::Expr::Set(_) => KnownClass::Set,
+        _ => return None,
+    };
+    let declared = TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+        .finish_annotated_global_declaration(assignment)?;
+    let ty = declared.inner_type()?;
+    // A dynamic element type can be provisional even when the outer type is known.
+    (ty.is_instance_of(db, class) && ty.is_fully_static(db, &env)).then_some(declared)
 }
 
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.

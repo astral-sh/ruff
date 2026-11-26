@@ -394,7 +394,10 @@ pub(crate) fn inferred_declaration<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> InferredDeclaration<'db> {
-    if definition.is_annotated_global(db)
+    // Checking the defining file requires the initializer anyway and also
+    // infers the declaration. Avoid doing that work twice.
+    if definition.is_annotated_collection(db)
+        && !db.should_check_file(definition.file(db))
         && let Some(declared) = infer::annotated_global_declaration(db, definition)
     {
         return InferredDeclaration::Declared(declared);
@@ -2555,6 +2558,19 @@ impl<'db> Type<'db> {
                 ..
             })
         )
+    }
+
+    /// Discard a provisional bound before deciding that a call cannot return
+    /// or that a type assertion holds. Bounds remain useful during inference.
+    pub(crate) const fn without_recursive_bound(self) -> Self {
+        if let Self::Divergent(mut marker) = self
+            && self.is_recursive_divergent()
+        {
+            marker.materialization = None;
+            Self::Divergent(marker)
+        } else {
+            self
+        }
     }
 
     const fn is_recursive_divergent(&self) -> bool {

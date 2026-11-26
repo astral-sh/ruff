@@ -71,14 +71,14 @@ impl<'db> Definition<'db> {
         kind: DefinitionKind<'db>,
         is_reexported: bool,
     ) -> Self {
-        let is_annotated_global = matches!(
-            &kind, DefinitionKind::AnnotatedAssignment(assignment) if assignment.has_value()
+        let is_annotated_collection = matches!(
+            &kind, DefinitionKind::AnnotatedAssignment(assignment) if assignment.is_collection
         ) && scope_id.file_scope_id(db).is_global();
 
         Self::new_internal(
             db,
             scope_id,
-            DefinitionPlace::new(place, is_reexported, is_annotated_global),
+            DefinitionPlace::new(place, is_reexported, is_annotated_collection),
             kind,
         )
     }
@@ -115,17 +115,14 @@ impl<'db> Definition<'db> {
         self.place_info(db).is_reexported()
     }
 
-    /// Whether this definition binds a module-level name with an annotated assignment.
+    /// Whether this global has a subscripted annotation and a collection literal initializer.
     ///
     /// This is part of the definition's identity so importers can select a declaration
     /// query without depending on the syntax of the defining file.
-    pub fn is_annotated_global(self, db: &'db dyn Db) -> bool {
+    pub fn is_annotated_collection(self, db: &'db dyn Db) -> bool {
         matches!(
             self.place_info(db),
-            DefinitionPlace::Symbol {
-                is_annotated_global: true,
-                ..
-            }
+            DefinitionPlace::AnnotatedCollection { .. }
         )
     }
 
@@ -242,38 +239,43 @@ pub enum DefinitionPlace {
     Symbol {
         id: ScopedSymbolId,
         is_reexported: bool,
-        is_annotated_global: bool,
     },
     Member {
         id: ScopedMemberId,
         is_reexported: bool,
     },
+    /// A symbol whose declared type may be available without inferring its initializer.
+    AnnotatedCollection {
+        id: ScopedSymbolId,
+        is_reexported: bool,
+    },
 }
 
 impl DefinitionPlace {
-    fn new(place: ScopedPlaceId, is_reexported: bool, is_annotated_global: bool) -> Self {
+    fn new(place: ScopedPlaceId, is_reexported: bool, is_annotated_collection: bool) -> Self {
         match place {
-            ScopedPlaceId::Symbol(id) => Self::Symbol {
-                id,
-                is_reexported,
-                is_annotated_global,
-            },
+            ScopedPlaceId::Symbol(id) if is_annotated_collection => {
+                Self::AnnotatedCollection { id, is_reexported }
+            }
+            ScopedPlaceId::Symbol(id) => Self::Symbol { id, is_reexported },
             ScopedPlaceId::Member(id) => Self::Member { id, is_reexported },
         }
     }
 
     fn place(self) -> ScopedPlaceId {
         match self {
-            Self::Symbol { id, .. } => ScopedPlaceId::Symbol(id),
+            Self::Symbol { id, .. } | Self::AnnotatedCollection { id, .. } => {
+                ScopedPlaceId::Symbol(id)
+            }
             Self::Member { id, .. } => ScopedPlaceId::Member(id),
         }
     }
 
     fn is_reexported(self) -> bool {
         match self {
-            Self::Symbol { is_reexported, .. } | Self::Member { is_reexported, .. } => {
-                is_reexported
-            }
+            Self::Symbol { is_reexported, .. }
+            | Self::AnnotatedCollection { is_reexported, .. }
+            | Self::Member { is_reexported, .. } => is_reexported,
         }
     }
 }
@@ -765,6 +767,11 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }) => DefinitionKind::AnnotatedAssignment(AnnotatedAssignmentDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
                 has_value: node.value.is_some(),
+                is_collection: node.annotation.is_subscript_expr()
+                    && matches!(
+                        node.value.as_deref(),
+                        Some(ast::Expr::List(_) | ast::Expr::Dict(_) | ast::Expr::Set(_))
+                    ),
             }),
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
@@ -1559,6 +1566,7 @@ impl<'db> AssignmentDefinitionKind<'db> {
 pub struct AnnotatedAssignmentDefinitionKind {
     node: AstNodeRef<ast::StmtAnnAssign>,
     has_value: bool,
+    is_collection: bool,
 }
 
 impl AnnotatedAssignmentDefinitionKind {
