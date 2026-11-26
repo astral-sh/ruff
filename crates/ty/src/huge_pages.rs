@@ -17,10 +17,10 @@ struct Hooks {
 
 static HOOKS: OnceLock<Hooks> = OnceLock::new();
 
-/// Install hooks only for the arenas used by the check workers. Installing hooks
-/// for every arena would initialize many otherwise unused arenas.
+/// Configure the automatic arenas before the check workers start. Jemalloc
+/// chooses its metadata hooks when an arena is first initialized.
 #[expect(unsafe_code)]
-pub(super) fn enable() {
+pub(super) fn enable(workers: usize) {
     // Custom hooks can interfere with non-default settings such as guard
     // pages. Leave explicitly configured allocators alone.
     // SAFETY: jemalloc's per-binary configuration is initialized before main and
@@ -63,17 +63,19 @@ pub(super) fn enable() {
         return;
     }
 
-    rayon::broadcast(|_| {
-        // SAFETY: `thread.arena` has type `unsigned`.
-        let Some(arena) = (unsafe { read::<c_uint>(c"thread.arena") }) else {
-            return;
-        };
+    // The main thread uses arena zero. By default jemalloc assigns new
+    // threads to unused automatic arenas. Initializing them here also covers
+    // metadata allocations, without changing how oversized requests are routed.
+    // SAFETY: `opt.narenas` has type `unsigned`.
+    let Some(arenas) = (unsafe { read::<c_uint>(c"opt.narenas") }) else {
+        return;
+    };
+    for arena in (1..arenas).take(workers) {
         let Ok(key) = CString::new(format!("arena.{arena}.extent_hooks")) else {
             return;
         };
         // SAFETY: This binary uses the default hooks, which have static lifetime
-        // and ignore the hooks pointer passed to their callbacks. An arena shared
-        // by multiple workers may already have our own static replacement.
+        // and ignore the hooks pointer passed to their callbacks.
         let Some(original) =
             (unsafe { read::<*const extent_hooks_t>(&key).and_then(|hooks| hooks.as_ref()) })
         else {
@@ -100,7 +102,7 @@ pub(super) fn enable() {
                 );
             }
         }
-    });
+    }
 }
 
 /// The caller must use the documented C type for the given key.
@@ -132,6 +134,8 @@ unsafe extern "C" fn allocate(
     commit: *mut bool,
     arena: c_uint,
 ) -> *mut c_void {
+    const HUGE_PAGE: usize = 2 * 1024 * 1024;
+
     // The allocator can invoke this while holding arena locks. Never allocate
     // or wait here. HOOKS is initialized before installing the callback.
     let Some(hooks) = HOOKS.get() else {
@@ -152,9 +156,10 @@ unsafe extern "C" fn allocate(
             arena,
         )
     };
-    // The size is the arena growth extent, which can back many small allocations.
-    // Avoid backing sparsely used initial extents with huge pages.
-    if !ptr.is_null() && size >= 8 * 1024 * 1024 {
+    // Leave the small initial growth extents unhinted. Metadata extents
+    // already request huge-page alignment and can benefit after the first one.
+    let large = size >= 4 * HUGE_PAGE || (size >= 2 * HUGE_PAGE && alignment >= HUGE_PAGE);
+    if !ptr.is_null() && large {
         // SAFETY: The allocator just mapped this memory. The hint doesn't
         // change the contents or protection of any pages.
         unsafe { libc::madvise(ptr, size, libc::MADV_HUGEPAGE) };

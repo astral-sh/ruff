@@ -47,19 +47,22 @@ use crate::printer::Printer;
 pub use args::Cli;
 
 pub fn run() -> anyhow::Result<ExitStatus> {
-    run_with_check_setup(|| {})
+    run_with_check_setup(|_| {})
 }
 
 /// Run the CLI, letting the binary configure its allocator for a one-shot check.
 #[doc(hidden)]
-pub fn run_with_check_setup(setup: fn()) -> anyhow::Result<ExitStatus> {
-    setup_rayon();
+pub fn run_with_check_setup(setup: fn(usize)) -> anyhow::Result<ExitStatus> {
     ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
 
     let args = wild::args_os();
     let args =
         ruff_command_line::expand_args(args).context("Failed to read CLI arguments from file")?;
     let args = Cli::parse_from(args);
+
+    if !matches!(args.command, Command::Check(_)) {
+        setup_rayon(|_| {});
+    }
 
     match args.command {
         Command::Check(check_args) => run_check(check_args, setup),
@@ -103,7 +106,7 @@ fn version(output_format: HelpFormat) -> Result<()> {
     Ok(())
 }
 
-fn run_check(args: CheckCommand, setup: fn()) -> anyhow::Result<ExitStatus> {
+fn run_check(args: CheckCommand, setup: fn(usize)) -> anyhow::Result<ExitStatus> {
     // Enabled ANSI colors on Windows 10.
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
@@ -166,6 +169,9 @@ fn run_check(args: CheckCommand, setup: fn()) -> anyhow::Result<ExitStatus> {
     let watch = args.watch;
     let exit_zero = args.exit_zero;
     let memory_report = std::env::var(EnvVars::TY_MEMORY_REPORT).ok();
+    let freeze = !watch && matches!(mode, MainLoopMode::Check) && memory_report.is_none();
+    setup_rayon(if freeze { setup } else { |_| {} });
+
     let config_file = args
         .config_file
         .as_ref()
@@ -229,8 +235,7 @@ fn run_check(args: CheckCommand, setup: fn()) -> anyhow::Result<ExitStatus> {
     // unnecessary Salsa dependencies. Watch mode updates inputs incrementally, fix modes apply
     // source-text overrides, and memory reports measure the database without this optimization, so
     // they must keep the inputs mutable.
-    if !watch && matches!(mode, MainLoopMode::Check) && memory_report.is_none() {
-        setup();
+    if freeze {
         db.freeze();
     }
 
@@ -1006,15 +1011,17 @@ fn current_directory() -> Result<SystemPathBuf> {
 
 /// Initializes the global Rayon thread pool. A positive `TY_MAX_PARALLELISM` takes
 /// precedence over `RAYON_NUM_THREADS` for both file discovery and type checking.
-fn setup_rayon() {
+fn setup_rayon(setup: fn(usize)) {
     if let Ok(value) = std::env::var(EnvVars::TY_MAX_PARALLELISM)
         && let Ok(limit) = value.parse()
     {
         ruff_db::set_max_parallelism(limit).expect("parallelism already initialized");
     }
 
+    let workers = max_parallelism().get();
+    setup(workers);
     ThreadPoolBuilder::default()
-        .num_threads(max_parallelism().get())
+        .num_threads(workers)
         .stack_size(STACK_SIZE)
         .build_global()
         .unwrap();
