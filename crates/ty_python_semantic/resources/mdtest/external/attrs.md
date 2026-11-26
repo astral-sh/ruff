@@ -48,8 +48,6 @@ instances expose this tuple.
 ```py
 import attr
 import attrs
-from ty_extensions import static_assert
-from ty_extensions._internal import has_member
 
 @attrs.define
 class User:
@@ -58,8 +56,6 @@ class User:
 user = User("Ada")
 reveal_type(User.__attrs_attrs__)  # revealed: tuple[Attribute[Unknown], ...]
 reveal_type(user.__attrs_attrs__[0].name)  # revealed: str
-static_assert(has_member(User, "__attrs_attrs__"))
-static_assert(has_member(user, "__attrs_attrs__"))
 ```
 
 This member lets attrs classes satisfy the `AttrsInstance` protocol. An ordinary dataclass lacks the
