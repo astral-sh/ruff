@@ -283,6 +283,36 @@ pub(crate) fn infer_definition_types<'db>(
         .finish_definition(definition)
 }
 
+/// Infer the public type of an initialized, annotated global without checking its value.
+/// PEP 613 aliases and bare qualifiers still need full definition inference.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, id, _, _| Some(DeclaredType::from_type(Type::divergent(id))),
+    cycle_fn=|db, cycle, previous: &Option<DeclaredType<'db>>, result: Option<DeclaredType<'db>>, definition: Definition<'db>| {
+        let env = ProgramEnvironment::from_definition(definition);
+        result.map(|declared| declared.map_type(|ty| {
+            if let Some(previous) = previous.and_then(|declared| declared.inner_type()) {
+                ty.cycle_normalized(db, &env, previous, cycle)
+            } else {
+                ty.recursive_type_normalized(db, &env, cycle)
+            }
+        }))
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(super) fn annotated_global_declaration<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<DeclaredType<'db>> {
+    let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) else {
+        unreachable!("Expected an annotated global");
+    };
+    let module = parsed_module(db, definition.python_file(db)).load(db);
+    let env = ProgramEnvironment::from_definition(definition);
+    TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+        .finish_annotated_global_declaration(assignment)
+}
+
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.
 ///
 /// For example, inference synthesizes an `x["a"] = "bad"` binding for:

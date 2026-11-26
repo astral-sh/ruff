@@ -4841,56 +4841,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.finish_inferred_definition(definition)
     }
 
-    /// Infer the types in an annotated assignment definition.
-    fn infer_annotated_assignment_definition(
+    /// Infer just the public declaration. Checking the definition collects the diagnostics.
+    pub(super) fn finish_annotated_global_declaration(
+        mut self,
+        assignment: &AnnotatedAssignmentDefinitionKind,
+    ) -> Option<DeclaredType<'db>> {
+        self.context.suppress_diagnostics();
+        self.context.defuse();
+        let (declared, is_type_alias) = self.infer_annotated_assignment_declaration(assignment);
+        (!is_type_alias && declared.inner_type().is_some()).then_some(declared)
+    }
+
+    /// Infer the declared type and whether a PEP 613 alias takes its type from the value.
+    fn infer_annotated_assignment_declaration(
         &mut self,
-        assignment: &'db AnnotatedAssignmentDefinitionKind,
-        definition: Definition<'db>,
-    ) {
+        assignment: &AnnotatedAssignmentDefinitionKind,
+    ) -> (DeclaredType<'db>, bool) {
         let db = self.db();
         let env = self.program_environment();
         let target = assignment.target(self.module());
         let value = assignment.value(self.module());
-
-        if !is_valid_annotation_target(db, self.program_file(), target) {
-            // Omit this definition from `self.declarations`; declaration lookup treats an absent
-            // inferred declaration as rejected.
-            if !definition
-                .kind(self.db())
-                .category(self.in_stub(), self.module())
-                .is_binding()
-            {
-                return;
-            }
-
-            let node = target.into();
-            let add = AddBinding {
-                type_context: self.fallback_member_type_context(node),
-                declaration: None,
-                binding: definition,
-                node,
-                qualifiers: TypeQualifiers::empty(),
-                is_local: true,
-                has_final_declaration: false,
-            };
-            let target_ty = if let Some(value) = value {
-                // Infer the value as an ordinary assignment without using the rejected annotation
-                // as its declared type.
-                let value_ty = self.infer_maybe_standalone_expression(value, add.type_context);
-                self.stub_placeholder_binding_type(value)
-                    .unwrap_or(value_ty)
-            } else {
-                // Annotation-only definitions are bindings in stubs.
-                add.type_context
-                    .expected_type()
-                    .unwrap_or_else(Type::unknown)
-            };
-            self.store_expression_type(target, target_ty);
-            add.insert(self, target_ty);
-
-            return;
-        }
-
         let annotation = assignment.annotation(self.module());
         let mut declared = self.infer_annotated_assignment_annotation(assignment);
 
@@ -5096,6 +5066,63 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             declared.inner = Some(Type::SpecialForm(special_form));
         }
+
+        (declared, is_pep_613_type_alias)
+    }
+
+    /// Infer the types in an annotated assignment definition.
+    fn infer_annotated_assignment_definition(
+        &mut self,
+        assignment: &'db AnnotatedAssignmentDefinitionKind,
+        definition: Definition<'db>,
+    ) {
+        let db = self.db();
+        let env = self.program_environment();
+        let target = assignment.target(self.module());
+        let value = assignment.value(self.module());
+
+        if !is_valid_annotation_target(db, self.program_file(), target) {
+            // Omit this definition from `self.declarations`; declaration lookup treats an absent
+            // inferred declaration as rejected.
+            if !definition
+                .kind(self.db())
+                .category(self.in_stub(), self.module())
+                .is_binding()
+            {
+                return;
+            }
+
+            let node = target.into();
+            let add = AddBinding {
+                type_context: self.fallback_member_type_context(node),
+                declaration: None,
+                binding: definition,
+                node,
+                qualifiers: TypeQualifiers::empty(),
+                is_local: true,
+                has_final_declaration: false,
+            };
+            let target_ty = if let Some(value) = value {
+                // Infer the value as an ordinary assignment without using the rejected annotation
+                // as its declared type.
+                let value_ty = self.infer_maybe_standalone_expression(value, add.type_context);
+                self.stub_placeholder_binding_type(value)
+                    .unwrap_or(value_ty)
+            } else {
+                // Annotation-only definitions are bindings in stubs.
+                add.type_context
+                    .expected_type()
+                    .unwrap_or_else(Type::unknown)
+            };
+            self.store_expression_type(target, target_ty);
+            add.insert(self, target_ty);
+
+            return;
+        }
+
+        let annotation = assignment.annotation(self.module());
+        let (mut declared, is_pep_613_type_alias) =
+            self.infer_annotated_assignment_declaration(assignment);
 
         // If the target of an assignment is not one of the place expressions we support,
         // then they are not definitions, so we can only be here if the target is in a form supported as a place expression.

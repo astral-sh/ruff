@@ -1184,6 +1184,63 @@ fn star_import_infers_unused_bindings_on_demand() -> anyhow::Result<()> {
 }
 
 #[test]
+fn importing_an_annotated_global_skips_its_initializer() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_files([
+        (
+            "/src/main.py",
+            "from dependency import items\nfrom typing import reveal_type\nreveal_type(items)",
+        ),
+        ("/src/dependency.py", "items: list[int] = 'wrong'"),
+    ])?;
+
+    let dependency = system_path_to_file(&db, "/src/dependency.py")?;
+    db.clear_salsa_events();
+    assert_revealed_type(&db, "/src/main.py", "list[int]");
+    let events = db.take_salsa_events();
+    let items = first_public_binding(&db, dependency, "items");
+    assert_function_query_was_not_run(&db, infer_definition_types, items, &events);
+
+    let diagnostics = check_types(&db, program_file(&db, dependency));
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].id(),
+        DiagnosticId::lint("invalid-assignment")
+    );
+
+    db.write_file("/src/dependency.py", "items: list[int] = [1, 2]")?;
+    db.clear_salsa_events();
+    assert_revealed_type(&db, "/src/main.py", "list[int]");
+    let events = db.take_salsa_events();
+    let main = system_path_to_file(&db, "/src/main.py")?;
+    let import = first_public_binding(&db, main, "items");
+    assert_function_query_was_not_run(&db, infer_definition_types, import, &events);
+    assert_file_diagnostics(&db, "/src/dependency.py", &[]);
+
+    db.write_file("/src/dependency.py", "items: list[str] = []")?;
+    assert_revealed_type(&db, "/src/main.py", "list[str]");
+    Ok(())
+}
+
+#[test]
+fn importing_value_dependent_declarations_still_infers_the_initializer() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_files([
+        (
+            "/src/dependency.py",
+            "from typing import Final, TypeAlias as TA\nItems: TA = list[int]\nsize: Final = 3",
+        ),
+        (
+            "/src/main.py",
+            "from dependency import Items, size\nfrom typing import assert_type, Literal\n\
+             def f(items: Items):\n    assert_type(items, list[int])\n    assert_type(size, Literal[3])",
+        ),
+    ])?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    Ok(())
+}
+
+#[test]
 fn changing_a_name_use_keeps_an_imported_declaration_cached() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_files([
@@ -1992,9 +2049,14 @@ fn dependency_implicit_alias_definition() -> anyhow::Result<()> {
         let events = db.take_salsa_events();
         let definition = first_public_binding(&db, main, "value");
         if should_run {
-            assert_function_query_was_run(&db, infer_definition_types, definition, &events);
+            assert_function_query_was_run(&db, annotated_global_declaration, definition, &events);
         } else {
-            assert_function_query_was_not_run(&db, infer_definition_types, definition, &events);
+            assert_function_query_was_not_run(
+                &db,
+                annotated_global_declaration,
+                definition,
+                &events,
+            );
         }
     }
     Ok(())

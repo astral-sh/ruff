@@ -48,7 +48,7 @@ pub struct Definition<'db> {
     #[returns(copy)]
     pub scope_id: ScopeId<'db>,
 
-    /// The place ID and re-export state of the definition.
+    /// The place ID and lookup flags of the definition.
     #[returns(copy)]
     place_info: DefinitionPlace,
 
@@ -71,10 +71,14 @@ impl<'db> Definition<'db> {
         kind: DefinitionKind<'db>,
         is_reexported: bool,
     ) -> Self {
+        let is_annotated_global = matches!(
+            &kind, DefinitionKind::AnnotatedAssignment(assignment) if assignment.has_value()
+        ) && scope_id.file_scope_id(db).is_global();
+
         Self::new_internal(
             db,
             scope_id,
-            DefinitionPlace::new(place, is_reexported),
+            DefinitionPlace::new(place, is_reexported, is_annotated_global),
             kind,
         )
     }
@@ -109,6 +113,20 @@ impl<'db> Definition<'db> {
 
     pub fn is_reexported(self, db: &'db dyn Db) -> bool {
         self.place_info(db).is_reexported()
+    }
+
+    /// Whether this definition binds a module-level name with an annotated assignment.
+    ///
+    /// This is part of the definition's identity so importers can select a declaration
+    /// query without depending on the syntax of the defining file.
+    pub fn is_annotated_global(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self.place_info(db),
+            DefinitionPlace::Symbol {
+                is_annotated_global: true,
+                ..
+            }
+        )
     }
 
     /// Whether a bundled stub defines this value under a guard folded during indexing.
@@ -215,16 +233,16 @@ impl<'db> Definition<'db> {
     }
 }
 
-/// The identity of the place defined by a [`Definition`] and whether it is re-exported.
+/// The identity of the place defined by a [`Definition`] and flags used during lookup.
 ///
-/// Keeping the re-export state in the enum lets it share the place ID's otherwise-unused
-/// representation space. Storing it as a separate field on [`Definition`] would add padding to
-/// every tracked definition.
+/// Keeping the flags in the enum lets them share the place ID's otherwise-unused
+/// representation space without adding padding to every tracked definition.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub enum DefinitionPlace {
     Symbol {
         id: ScopedSymbolId,
         is_reexported: bool,
+        is_annotated_global: bool,
     },
     Member {
         id: ScopedMemberId,
@@ -233,9 +251,13 @@ pub enum DefinitionPlace {
 }
 
 impl DefinitionPlace {
-    fn new(place: ScopedPlaceId, is_reexported: bool) -> Self {
+    fn new(place: ScopedPlaceId, is_reexported: bool, is_annotated_global: bool) -> Self {
         match place {
-            ScopedPlaceId::Symbol(id) => Self::Symbol { id, is_reexported },
+            ScopedPlaceId::Symbol(id) => Self::Symbol {
+                id,
+                is_reexported,
+                is_annotated_global,
+            },
             ScopedPlaceId::Member(id) => Self::Member { id, is_reexported },
         }
     }

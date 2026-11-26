@@ -394,6 +394,11 @@ pub(crate) fn inferred_declaration<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> InferredDeclaration<'db> {
+    if definition.is_annotated_global(db)
+        && let Some(declared) = infer::annotated_global_declaration(db, definition)
+    {
+        return InferredDeclaration::Declared(declared);
+    }
     let inference = infer_definition_types(db, definition);
     inference.inferred_declaration(definition)
 }
