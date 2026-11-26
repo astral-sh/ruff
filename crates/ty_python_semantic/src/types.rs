@@ -6878,9 +6878,10 @@ impl<'db> Type<'db> {
                     ty.map_or_default(Place::bound).into()
                 }
 
-                // attrs defines the methods `validator` and `default` on field instances.
+                // attrs defines the methods `validator`, `default`, and `converter` on field instances.
                 Type::KnownInstance(KnownInstanceType::Field(field))
-                    if matches!(name_str, "validator" | "default") && field.kind(db).is_attrs() =>
+                    if matches!(name_str, "validator" | "default" | "converter")
+                        && field.kind(db).is_attrs() =>
                 {
                     Place::bound(dedicated::attrs::generic_identity_function(db, env)).into()
                 }
