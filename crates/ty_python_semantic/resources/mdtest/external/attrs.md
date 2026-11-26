@@ -358,6 +358,71 @@ class WrongDefault:
         return "0"
 ```
 
+## Field converters
+
+A field converter can be specified with `field(converter=...)` or by decorating a method with
+`@<field>.converter`. The method receives the instance, the field, and the value to convert.
+
+```py
+from attrs import define, field
+
+def decode_name(value: bytes) -> str:
+    return value.decode()
+
+@define
+class Person:
+    name: str = field(converter=decode_name)
+    age: int = field()
+
+    @age.converter
+    def _convert_age(self, attr: object, value: str | float) -> int:
+        return int(value)
+
+reveal_type(Person.__init__)  # revealed: (self: Person, /, name: bytes, age: str | float) -> None
+
+person = Person(name=b"Ada", age="36")
+Person(name=b"Ada", age=36.5)
+Person(name="Ada", age=36.5)  # error: [invalid-argument-type]
+Person(name=b"Ada", age=None)  # error: [invalid-argument-type]
+Person(name=b"Ada")  # error: [missing-argument]
+```
+
+Assignments accept the converter's input type. Reading the field gives its declared type.
+
+```py
+reveal_type(person.name)  # revealed: str
+reveal_type(person.age)  # revealed: int
+
+person.age = "37"
+reveal_type(person.age)  # revealed: int
+person.age = None  # error: [invalid-assignment]
+```
+
+The decorator preserves the method's signature.
+
+```py
+reveal_type(person._convert_age)  # revealed: bound method Person._convert_age(attr: object, value: str | float) -> int
+```
+
+Decorated converters run in definition order. The first converter determines the input type.
+
+```py
+@define
+class User:
+    age: int = field()
+
+    @age.converter
+    def _decode_age(self, attr: object, value: bytes) -> str:
+        return value.decode()
+
+    @age.converter
+    def _parse_age(self, attr: object, value: str) -> int:
+        return int(value)
+
+reveal_type(User.__init__)  # revealed: (self: User, /, age: bytes) -> None
+reveal_type(User(b"36").age)  # revealed: int
+```
+
 ## Custom initialization
 
 With `init=False`, attrs generates an `__attrs_init__` method that a custom `__init__` can call to
