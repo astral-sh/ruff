@@ -40,6 +40,80 @@ reveal_type(user.id)  # revealed: int
 reveal_type(user.internal_name)  # revealed: str
 ```
 
+## Field metadata and the `AttrsInstance` protocol
+
+attrs stores field metadata in the `__attrs_attrs__` class variable. Both the class and its
+instances expose this tuple.
+
+```py
+import attr
+import attrs
+from ty_extensions import static_assert
+from ty_extensions._internal import has_member
+
+@attrs.define
+class User:
+    name: str
+
+user = User("Ada")
+reveal_type(User.__attrs_attrs__)  # revealed: tuple[Attribute[Unknown], ...]
+reveal_type(user.__attrs_attrs__[0].name)  # revealed: str
+static_assert(has_member(User, "__attrs_attrs__"))
+static_assert(has_member(user, "__attrs_attrs__"))
+```
+
+This member lets attrs classes satisfy the `AttrsInstance` protocol. An ordinary dataclass lacks the
+required field metadata.
+
+```py
+from dataclasses import dataclass
+
+attrs.fields(User)
+attrs.asdict(user)
+
+@attr.s
+class Legacy:
+    name: str = attr.ib()
+
+class Child(Legacy): ...
+
+attr.fields(Child)
+
+@dataclass
+class Other:
+    name: str
+
+attrs.fields(Other)  # error: [invalid-argument-type]
+attrs.asdict(Other("Ada"))  # error: [invalid-argument-type]
+```
+
+`attrs.has` narrows a class to `type[AttrsInstance]`. The protocol exposes `__attrs_attrs__` as
+`ClassVar[Any]`.
+
+```py
+def inspect_class(cls: type):
+    if attrs.has(cls):
+        reveal_type(cls.__attrs_attrs__)  # revealed: Any
+
+def inspect_instance(obj: attr.AttrsInstance):
+    reveal_type(obj.__attrs_attrs__)  # revealed: Any
+```
+
+A protocol that extends `AttrsInstance` inherits the metadata requirement.
+
+```py
+from typing import Protocol
+
+class Named(attrs.AttrsInstance, Protocol):
+    name: str
+
+def greet(obj: Named) -> str:
+    return f"Hello, {obj.name}!"
+
+greet(user)  # ok
+greet(Other("Ada"))  # error: [invalid-argument-type]
+```
+
 ## Private fields
 
 attrs strips leading underscores from field names when generating constructor parameters.
