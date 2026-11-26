@@ -729,18 +729,14 @@ impl<'db> Type<'db> {
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
         fn when_assignable_to_impl<'db>(
             db: &'db dyn Db,
-            types: TypePair<'db>,
+            program: Program<'db>,
+            source: Type<'db>,
+            target: Type<'db>,
             inferable: TypeVarSet<'db>,
         ) -> OwnedConstraintSet<'db> {
-            let env = ProgramEnvironment::from_program(types.program(db));
+            let env = ProgramEnvironment::from_program(program);
             ConstraintSetBuilder::new().into_owned(|constraints| {
-                types.first(db).when_assignable_to(
-                    db,
-                    &env,
-                    types.second(db),
-                    constraints,
-                    inferable,
-                )
+                source.when_assignable_to(db, &env, target, constraints, inferable)
             })
         }
 
@@ -753,20 +749,28 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             types: TypePair<'db>,
         ) -> OwnedConstraintSet<'db> {
-            when_assignable_to_impl(db, types, TypeVarSet::None)
+            when_assignable_to_impl(
+                db,
+                types.program(db),
+                types.first(db),
+                types.second(db),
+                TypeVarSet::None,
+            )
         }
 
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _, _, _| OwnedConstraintSet::always(),
+            cycle_initial=|_, _, _, _, _, _, _| OwnedConstraintSet::always(),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn when_assignable_to_owned_with_inferable_impl<'db>(
             db: &'db dyn Db,
-            types: TypePair<'db>,
+            program: Program<'db>,
+            source: Type<'db>,
+            target: Type<'db>,
             inferable: TypeVarSet<'db>,
         ) -> OwnedConstraintSet<'db> {
-            when_assignable_to_impl(db, types, inferable)
+            when_assignable_to_impl(db, program, source, target, inferable)
         }
 
         self.assert_not_recursive_var();
@@ -781,11 +785,15 @@ impl<'db> Type<'db> {
             }));
         }
 
-        let types = TypePair::new(db, env.program(db), self, target);
+        // The pair ID is the query key on its own. With additional arguments, Salsa interns
+        // the whole argument tuple, so pass the fields directly to avoid a second lookup.
+        let program = env.program(db);
         Cow::Borrowed(match inferable {
-            TypeVarSet::None => when_assignable_to_owned_impl(db, types),
+            TypeVarSet::None => {
+                when_assignable_to_owned_impl(db, TypePair::new(db, program, self, target))
+            }
             TypeVarSet::Some(_) | TypeVarSet::All => {
-                when_assignable_to_owned_with_inferable_impl(db, types, inferable)
+                when_assignable_to_owned_with_inferable_impl(db, program, self, target, inferable)
             }
         })
     }
@@ -987,20 +995,22 @@ impl<'db> Type<'db> {
 
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _, _, _, _| Some(OwnedConstraintSet::always()),
+            cycle_initial=|_, _, _, _, _, _, _, _| Some(OwnedConstraintSet::always()),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn inference_relation_impl<'db>(
             db: &'db dyn Db,
-            types: TypePair<'db>,
+            program: Program<'db>,
+            source: Type<'db>,
+            target: Type<'db>,
             inferable: TypeVarSet<'db>,
             provenance: ConstraintProvenance,
         ) -> Option<OwnedConstraintSet<'db>> {
             build(
                 db,
-                &ProgramEnvironment::from_program(types.program(db)),
-                types.first(db),
-                types.second(db),
+                &ProgramEnvironment::from_program(program),
+                source,
+                target,
                 inferable,
                 provenance,
             )
@@ -1012,8 +1022,7 @@ impl<'db> Type<'db> {
         if should_inline_assignability_check(self, target) {
             return build(db, env, self, target, inferable, provenance).map(Cow::Owned);
         }
-        let types = TypePair::new(db, env.program(db), self, target);
-        inference_relation_impl(db, types, inferable, provenance)
+        inference_relation_impl(db, env.program(db), self, target, inferable, provenance)
             .as_ref()
             .map(Cow::Borrowed)
     }
