@@ -816,10 +816,12 @@ impl<'db> Type<'db> {
                 .known_class()
                 .is_some_and(|class| instance.has_known_class(db, class)),
             // An argument for a parameter such as `str | None` otherwise creates
-            // a separate cached relation for each distinct string literal.
+            // a separate cached relation for each distinct string literal. Match
+            // the same built-in classes as check_sequence_literal.
             (Type::LiteralValue(literal), Type::Union(union))
-                if let [Type::NominalInstance(first), Type::NominalInstance(second)] =
-                    union.elements(db) =>
+                if (literal.is_string() || literal.is_bytes())
+                    && let [Type::NominalInstance(first), Type::NominalInstance(second)] =
+                        union.elements(db) =>
             {
                 literal.kind().known_class().is_some_and(|class| {
                     first.has_known_class(db, class) || second.has_known_class(db, class)
