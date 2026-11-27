@@ -266,7 +266,7 @@ def _(
     reveal_type(bytes_last)  # revealed: LengthOne | Literal[b"ab"]
 ```
 
-## Unions of class objects and string literals
+## Unions of class objects and built-in literals
 
 ```py
 from typing import Literal
@@ -275,6 +275,10 @@ def _(dtype: type[float] | Literal["float", "double"]):
     reveal_type(dtype)  # revealed: type[float] | Literal["float", "double"]
     if isinstance(dtype, str):
         reveal_type(dtype)  # revealed: Literal["float", "double"]
+
+def _(a: type[float] | Literal[b"f", b"d"], b: Literal[1, 2] | type[float]):
+    reveal_type(a)  # revealed: type[float] | Literal[b"f", b"d"]
+    reveal_type(b)  # revealed: Literal[1, 2] | type[float]
 ```
 
 If the metaclass never returns, there is no class object to include in the union.
@@ -289,6 +293,22 @@ class C(metaclass=meta): ...
 
 def _(x: type[C] | Literal["a"]):
     reveal_type(x)  # revealed: Literal["a"]
+
+def _(x: type[C] | Literal[1, 2], y: type[C] | Literal[b"a", b"b"]):
+    reveal_type(x)  # revealed: Literal[1, 2]
+    reveal_type(y)  # revealed: Literal[b"a", b"b"]
+```
+
+## A specialized sequence can distinguish literals of the same kind
+
+The sequence covers only strings made up entirely of `"a"`.
+
+```py
+from collections.abc import Sequence
+from typing import Literal
+
+def _(x: Sequence[Literal["a"]] | type[float] | Literal["ab", "aa", "ac"]):
+    reveal_type(x)  # revealed: Sequence[Literal["a"]] | type[float] | Literal["ab", "ac"]
 ```
 
 ## Do not erase `Unknown`

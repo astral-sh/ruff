@@ -325,10 +325,6 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return a type representing "the set of all instances of the metaclass of this type".
-    #[expect(
-        clippy::unnecessary_wraps,
-        reason = "Salsa supplies None when the metaclass participates in a cycle"
-    )]
     pub(crate) fn to_metaclass_instance(
         self,
         db: &'db dyn Db,
@@ -339,6 +335,21 @@ impl<'db> SubclassOfType<'db> {
         // And `to_meta_type` will transpose `type[T: C]` into `T: type[C]`, collapse to
         // the upper bound `type[C]`, and transform that to the meta-type `type[M]`, which
         // `to_instance` then resolves to `M`.
+        // When the metaclass depends on a provisional type, compute the instance in the caller.
+        self.try_metaclass_instance(db, env)
+            .unwrap_or_else(|| metaclass_instance_type(db, env, self.to_meta_type(db, env)))
+    }
+
+    /// Return the metaclass instance unless its computation participates in an inference cycle.
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None when the metaclass participates in a cycle"
+    )]
+    pub(super) fn try_metaclass_instance(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
         #[salsa::tracked(returns(copy), cycle_result=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn cached<'db>(
             db: &'db dyn Db,
@@ -349,9 +360,7 @@ impl<'db> SubclassOfType<'db> {
             Some(metaclass_instance_type(db, env, ty.to_meta_type(db, env)))
         }
 
-        // When the metaclass depends on a provisional type, compute the instance in the caller.
         cached(db, env.program(db), self)
-            .unwrap_or_else(|| metaclass_instance_type(db, env, self.to_meta_type(db, env)))
     }
 
     /// Compute the metatype of this `type[T]`.
