@@ -327,8 +327,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
 
-                    if is_end_of_scope_reachable(db, self.scope())
-                        && !Type::none(db, env).is_assignable_to(db, env, expected_return_ty)
+                    // We already know the generator's return type. If it accepts None,
+                    // there's no need to analyze control flow to check for an implicit return.
+                    if !Type::none(db, env).is_assignable_to(db, env, expected_return_ty)
+                        && is_end_of_scope_reachable(db, self.scope())
                     {
                         let no_return = self.return_types_and_ranges.is_empty();
                         report_implicit_return_type(
