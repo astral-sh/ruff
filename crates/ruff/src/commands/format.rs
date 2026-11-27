@@ -254,52 +254,40 @@ fn format_streaming(
     config_arguments: &ConfigArguments,
     threads: usize,
 ) -> Result<Option<FormatOutcome>> {
-    // Both stages share the thread budget. Batching amortizes channel and iterator locks.
     let start = Instant::now();
     debug!("Overlapping file discovery with uncached format checking");
-    let discovery_threads = (threads / 3).clamp(1, 12);
-    let format_threads = threads - discovery_threads;
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(format_threads)
-        .stack_size(ruff_db::STACK_SIZE)
-        .build()?;
-    let (tx, rx) = mpsc::sync_channel(format_threads * 2);
+    // Keep the formatting pool intact. A separate walker can discover more work while
+    // formatter threads are busy, and blocks when the bounded queue fills.
+    let (tx, rx) = mpsc::sync_channel(threads * 2);
 
     thread::scope(|scope| {
         let walk = thread::Builder::new().spawn_scoped(scope, move || {
-            visit_project_files_in_path(
-                path,
-                root_project,
-                config_arguments,
-                discovery_threads,
-                &|batch| {
-                    // The receiver only disconnects if formatting is unwinding.
-                    let _ = tx.send(batch);
-                },
-            )
+            visit_project_files_in_path(path, root_project, config_arguments, &|batch| {
+                // The receiver only disconnects if formatting is unwinding.
+                let _ = tx.send(batch);
+            })
         })?;
 
         let project = &root_project.project;
         let saw_entries = AtomicBool::new(false);
-        let (results, errors): FormatOutcome = pool.install(|| {
-            rx.into_iter()
-                .par_bridge()
-                .flat_map_iter(|batch| {
-                    saw_entries.store(true, Ordering::Relaxed);
-                    batch.into_iter().filter_map(|entry| match entry {
-                        Ok(file) => format_entry(
-                            &file,
-                            project,
-                            config_arguments,
-                            FormatMode::Check,
-                            None,
-                            || None,
-                        ),
-                        Err(err) => Some(Err(FormatCommandError::Ignore(err))),
-                    })
+        let (results, errors): FormatOutcome = rx
+            .into_iter()
+            .par_bridge()
+            .flat_map_iter(|batch| {
+                saw_entries.store(true, Ordering::Relaxed);
+                batch.into_iter().filter_map(|entry| match entry {
+                    Ok(file) => format_entry(
+                        &file,
+                        project,
+                        config_arguments,
+                        FormatMode::Check,
+                        None,
+                        || None,
+                    ),
+                    Err(err) => Some(Err(FormatCommandError::Ignore(err))),
                 })
-                .partition_map(partition_result)
-        });
+            })
+            .partition_map(partition_result);
         match walk.join() {
             Ok(result) => result?,
             Err(panic) => std::panic::resume_unwind(panic),

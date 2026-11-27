@@ -496,11 +496,11 @@ pub fn project_files_in_path<'a>(
 ///
 /// A single input prevents duplicates between an explicitly passed file and a directory walk.
 /// Fixed settings ensure the caller can process files without waiting for configuration discovery.
+/// The caller is responsible for running the walk alongside the consumer.
 pub fn visit_project_files_in_path(
     path: &Path,
     root_project: &RootProject,
     transformer: &(dyn ConfigurationTransformer + Sync),
-    threads: usize,
     visit: &(dyn Fn(Vec<Result<ResolvedFile, ignore::Error>>) + Sync),
 ) -> Result<()> {
     anyhow::ensure!(
@@ -511,7 +511,7 @@ pub fn visit_project_files_in_path(
         &[path.to_path_buf()],
         root_project,
         transformer,
-        Some(threads),
+        Some(1),
         Some(visit),
     )?;
     Ok(())
