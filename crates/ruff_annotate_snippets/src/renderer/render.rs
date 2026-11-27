@@ -2693,7 +2693,7 @@ pub(crate) fn normalize_whitespace(s: &str) -> Cow<'_, str> {
             Err(_) if let Some(visible) = terminal_escape(ch) => visible,
             Err(_) => continue,
         };
-        // Allow for the first replacement so a single expanded character needs no reallocation.
+        // Reserve space for the first replacement and the rest of the input.
         let output = normalized.get_or_insert_with(|| {
             String::with_capacity(s.len() - ch.len_utf8() + replacement.len())
         });
