@@ -1,11 +1,13 @@
-use ruff_index::newtype_index;
+use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::ExprRef;
+use rustc_hash::FxHashMap;
 
 use crate::Db;
 use crate::HasTrackedScope;
 use crate::ProgramFile;
-use crate::frozen::PackedIds;
+use crate::definition::{Definition, DefinitionNodeKey};
+use crate::frozen::{FrozenMap, PackedIds};
 use crate::member::ScopedMemberId;
 use crate::place::ScopedPlaceId;
 use crate::scope::FileScopeId;
@@ -14,9 +16,13 @@ use crate::symbol::ScopedSymbolId;
 
 pub use node_key::ExpressionNodeKey;
 
-/// The scope and use IDs recorded for one AST node during indexing.
+#[newtype_index]
+struct NodeDefinitionId;
+
+/// The scope, definition and use IDs recorded for one AST node during indexing.
 #[derive(Clone, Copy, Default, Debug)]
 struct NodeIds {
+    definition: Option<NodeDefinitionId>,
     scope: Option<FileScopeId>,
     use_id: Option<ScopedUseId>,
     /// Zero for non-expression uses, such as function names and splatted keywords.
@@ -45,7 +51,9 @@ pub struct PlaceUse {
 /// Indexed by root AST node while the flow builder visits expressions in evaluation order.
 /// Inference parses quoted annotations separately and resolves their names from syntax.
 #[derive(Debug)]
-pub(super) struct AstIdsBuilder {
+pub(super) struct AstIdsBuilder<'db> {
+    definitions: IndexVec<NodeDefinitionId, Definition<'db>>,
+    star_import_definitions: FxHashMap<DefinitionNodeKey, Vec<Definition<'db>>>,
     root: Box<[NodeIds]>,
 }
 
@@ -54,9 +62,49 @@ fn root_index(node: ast::NodeIndex) -> usize {
         .expect("expected an indexed node from the root AST") as usize
 }
 
-impl AstIdsBuilder {
+impl<'db> AstIdsBuilder<'db> {
+    /// Associates a node with a single definition, returning any previous definition.
+    pub(super) fn record_single_definition(
+        &mut self,
+        key: DefinitionNodeKey,
+        definition: Definition<'db>,
+    ) -> Option<Definition<'db>> {
+        let row = &mut self.root[root_index(key.index())];
+        if let Some(id) = row.definition {
+            return Some(std::mem::replace(&mut self.definitions[id], definition));
+        }
+        row.definition = Some(self.definitions.push(definition));
+        None
+    }
+
+    /// Keeps the alias queryable even if the wildcard import is invalid, cannot be
+    /// resolved, or binds no names.
+    pub(super) fn register_star_import(&mut self, key: DefinitionNodeKey) {
+        self.star_import_definitions.entry(key).or_default();
+    }
+
+    /// Records one name bound by a wildcard import. If the alias binds exactly one name,
+    /// [`Self::finish`] packs its definition alongside the regular definitions.
+    pub(super) fn record_star_import_definition(
+        &mut self,
+        key: DefinitionNodeKey,
+        definition: Definition<'db>,
+    ) {
+        self.star_import_definitions
+            .entry(key)
+            .or_default()
+            .push(definition);
+    }
+
+    pub(super) fn definition(&self, key: DefinitionNodeKey) -> Option<&Definition<'db>> {
+        let row = &self.root[root_index(key.index())];
+        Some(&self.definitions[row.definition?])
+    }
+
     pub(super) fn with_node_count(node_count: usize) -> Self {
         Self {
+            definitions: IndexVec::new(),
+            star_import_definitions: FxHashMap::default(),
             root: vec![NodeIds::default(); node_count].into_boxed_slice(),
         }
     }
@@ -90,11 +138,10 @@ impl AstIdsBuilder {
             ScopedPlaceId::Symbol(id) => id.as_u32(),
             ScopedPlaceId::Member(id) => id.as_u32(),
         };
-        *self.entry(ExpressionNodeKey::from(expr).index()) = NodeIds {
-            scope: Some(scope),
-            use_id: Some(use_id),
-            place_plus_one: ordinal + 1,
-        };
+        let row = self.entry(ExpressionNodeKey::from(expr).index());
+        row.scope = Some(scope);
+        row.use_id = Some(use_id);
+        row.place_plus_one = ordinal + 1;
     }
 
     pub(super) fn try_scoped_use(
@@ -107,9 +154,24 @@ impl AstIdsBuilder {
         row.use_id.filter(|_| row.scope == Some(scope))
     }
 
-    /// Stores use IDs and their lexical places in node-index order.
+    /// Packs definitions, use IDs and their lexical places in node-index order.
     /// The IDs themselves keep the order in which the flow builder visited uses in each scope.
-    pub(super) fn finish(self) -> AstIds {
+    pub(super) fn finish(mut self) -> AstIds<'db> {
+        let star_imports = std::mem::take(&mut self.star_import_definitions);
+        let mut non_single_star_imports = Vec::with_capacity(star_imports.len());
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "each wildcard import is independently partitioned by definition count"
+        )]
+        for (key, definitions) in star_imports {
+            if let [definition] = definitions.as_slice() {
+                self.record_single_definition(key, *definition);
+            } else {
+                non_single_star_imports.push((key, definitions.into_boxed_slice()));
+            }
+        }
+
+        let mut definitions = Vec::with_capacity(self.definitions.len());
         let mut pages = Vec::with_capacity(self.root.len().div_ceil(NODES_PER_PAGE));
         let mut use_ids = Vec::new();
         let mut places_plus_one = Vec::new();
@@ -119,27 +181,38 @@ impl AstIdsBuilder {
             .zip(self.root.chunks(NODES_PER_PAGE))
         {
             let first_use = u32::try_from(use_ids.len()).expect("more uses than node indices");
-            let mut mask = 0;
+            let first_definition =
+                u32::try_from(definitions.len()).expect("more definitions than node indices");
+            let mut use_mask = 0;
+            let mut definition_mask = 0;
             for (offset, row) in (0_u32..).zip(rows) {
+                if let Some(id) = row.definition {
+                    definition_mask |= 1_u64 << offset;
+                    definitions.push(self.definitions[id]);
+                }
                 if let Some(scope) = row.scope {
                     let node = ast::NodeIndex::from(first_node + offset);
                     ScopeRange::record(&mut scopes, node, scope);
                 }
                 if let Some(use_id) = row.use_id {
-                    mask |= 1_u64 << offset;
+                    use_mask |= 1_u64 << offset;
                     use_ids.push(use_id);
                     places_plus_one.push(row.place_plus_one);
                 }
             }
-            pages.push(UsePage {
+            pages.push(NodePage {
                 first_use,
+                first_definition,
                 scope_count: u32::try_from(scopes.len())
                     .expect("more scope ranges than node indices"),
-                mask,
+                use_mask,
+                definition_mask,
             });
         }
         AstIds {
             pages: pages.into_boxed_slice(),
+            definitions: definitions.into_boxed_slice(),
+            non_single_star_imports: FrozenMap::from_entries(non_single_star_imports),
             use_ids: use_ids.into(),
             places_plus_one: places_plus_one.into(),
             scopes: scopes.into_boxed_slice(),
@@ -147,19 +220,24 @@ impl AstIdsBuilder {
     }
 }
 
-/// Number of nodes in a full [`UsePage`], one per bit in its use mask.
+/// Number of nodes in a full [`NodePage`], one per bit in each mask.
 const NODES_PER_PAGE: usize = u64::BITS as usize;
 
-/// Indexes uses and scope ranges for up to [`NODES_PER_PAGE`] consecutive nodes in the root AST.
+/// Indexes definitions, uses and scope ranges for up to [`NODES_PER_PAGE`] root AST nodes.
+/// Keeping the masks and offsets as separate fields saves eight bytes of padding on x86-64.
 #[derive(Debug, get_size2::GetSize)]
-struct UsePage {
+struct NodePage {
     /// Number of uses on earlier pages. This is the page's starting offset in
     /// `use_ids` and `places_plus_one`.
     first_use: u32,
+    /// Number of single definitions on earlier pages.
+    first_definition: u32,
     /// Number of scope ranges that start on this page or an earlier page.
     scope_count: u32,
     /// Bit `i` is set if the node at offset `i` on this page has a use ID.
-    mask: u64,
+    use_mask: u64,
+    /// Bit `i` is set if the node at offset `i` has exactly one definition.
+    definition_mask: u64,
 }
 
 #[derive(Debug, get_size2::GetSize)]
@@ -186,9 +264,12 @@ impl ScopeRange {
     }
 }
 
-#[derive(Debug, get_size2::GetSize)]
-pub(crate) struct AstIds {
-    pages: Box<[UsePage]>,
+#[derive(Debug, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct AstIds<'db> {
+    pages: Box<[NodePage]>,
+    definitions: Box<[Definition<'db>]>,
+    /// Wildcard imports that bind zero or multiple names.
+    non_single_star_imports: FrozenMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
     use_ids: PackedIds<ScopedUseId>,
     /// Symbol or member ordinals in the same order as `use_ids`. The expression determines
     /// which table to use. Keeping these in the AST index lets an edit change a read's place
@@ -197,18 +278,34 @@ pub(crate) struct AstIds {
     scopes: Box<[ScopeRange]>,
 }
 
-impl AstIds {
-    /// Looks up a node in the packed use array. Each earlier set bit on the same page
-    /// accounts for one preceding entry in the array.
+/// Each earlier set bit on the same page accounts for one preceding array entry.
+fn packed_index(node: usize, mask: u64, first: u32) -> Option<usize> {
+    let bit = 1_u64 << (node % NODES_PER_PAGE);
+    if mask & bit == 0 {
+        return None;
+    }
+    let preceding = (mask & (bit - 1)).count_ones();
+    Some((first + preceding) as usize)
+}
+
+impl<'db> AstIds<'db> {
+    pub(super) fn definition(&self, key: DefinitionNodeKey) -> Option<&Definition<'db>> {
+        let node = key.index().as_u32()? as usize;
+        let page = self.pages.get(node / NODES_PER_PAGE)?;
+        let index = packed_index(node, page.definition_mask, page.first_definition)?;
+        Some(&self.definitions[index])
+    }
+
+    pub(super) fn definitions(&self, key: DefinitionNodeKey) -> Option<&[Definition<'db>]> {
+        self.definition(key)
+            .map(std::slice::from_ref)
+            .or_else(|| self.non_single_star_imports.get(&key).map(AsRef::as_ref))
+    }
+
     fn use_index(&self, node: ast::NodeIndex) -> Option<usize> {
         let node = node.as_u32()? as usize;
         let page = self.pages.get(node / NODES_PER_PAGE)?;
-        let bit = 1_u64 << (node % NODES_PER_PAGE);
-        if page.mask & bit == 0 {
-            return None;
-        }
-        let preceding = (page.mask & (bit - 1)).count_ones();
-        Some((page.first_use + preceding) as usize)
+        packed_index(node, page.use_mask, page.first_use)
     }
 
     fn scope_at(&self, node: ast::NodeIndex) -> Option<FileScopeId> {
@@ -257,7 +354,7 @@ impl AstIds {
     }
 }
 
-fn ast_ids<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> &'db AstIds {
+fn ast_ids<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> &'db AstIds<'db> {
     semantic_index(db, file).ast_ids()
 }
 
