@@ -251,8 +251,7 @@ impl PlaceTable {
     pub fn defined_instance_attribute_names(&self) -> impl Iterator<Item = &str> {
         self.members
             .iter()
-            .filter(|member| member.is_bound() || member.is_declared())
-            .filter_map(Member::as_instance_attribute)
+            .filter_map(Member::as_defined_instance_attribute)
     }
 
     /// Receiver attributes declared in this scope, such as `self.value: int`.

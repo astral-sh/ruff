@@ -125,6 +125,15 @@ impl Member {
             None
         }
     }
+
+    /// Returns the attribute name if this scope binds or declares the receiver member.
+    pub(crate) fn as_defined_instance_attribute(&self) -> Option<&str> {
+        if self.is_bound() || self.is_declared() {
+            self.as_instance_attribute()
+        } else {
+            None
+        }
+    }
 }
 
 impl std::fmt::Display for Member {

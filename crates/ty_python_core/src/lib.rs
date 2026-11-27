@@ -228,7 +228,7 @@ pub fn attribute_scopes<'db>(
         })
 }
 
-/// Receiver attributes in method scopes, grouped by name in scope traversal order.
+/// Receiver attributes bound or declared in method scopes, grouped by name in scope traversal order.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 fn receiver_attribute_locations<'db>(
     db: &'db dyn Db,
@@ -238,7 +238,7 @@ fn receiver_attribute_locations<'db>(
     let mut locations = Vec::new();
     for method in attribute_scopes(db, scope) {
         for (id, member) in index.place_table(method).members().enumerate() {
-            if let Some(name) = member.as_instance_attribute() {
+            if let Some(name) = member.as_defined_instance_attribute() {
                 locations.push((Name::new(name), method, ScopedMemberId::from_usize(id)));
             }
         }
@@ -250,7 +250,7 @@ fn receiver_attribute_locations<'db>(
     locations.into_boxed_slice()
 }
 
-/// Returns the first matching receiver member in each method scope that uses this name.
+/// Returns the first matching receiver member in each method scope that defines this name.
 pub fn receiver_attribute_places<'db, 's>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -1497,6 +1497,33 @@ mod tests {
             .unwrap();
 
         assert_matches!(binding.kind(&db), DefinitionKind::AugmentedAssignment(_));
+    }
+
+    #[test]
+    fn receiver_attribute_locations_follow_edits_to_method_bodies() {
+        let read = "class C:\n    def method(self): self.value\n";
+        let TestCase { mut db, file } = test_case(read);
+        let locations = |db: &TestDb| {
+            let index = semantic_index(db, program_file(db, file));
+            let (class, _) = index.child_scopes(FileScopeId::global()).next().unwrap();
+            receiver_attribute_places(db, index.scope_id(class), "value").count()
+        };
+
+        assert_eq!(locations(&db), 0);
+        db.write_file(
+            "test.py",
+            "class C:\n    def method(self): self.value = 1\n",
+        )
+        .unwrap();
+        assert_eq!(locations(&db), 1);
+        db.write_file(
+            "test.py",
+            "class C:\n    def method(self): self.value: int\n",
+        )
+        .unwrap();
+        assert_eq!(locations(&db), 1);
+        db.write_file("test.py", read).unwrap();
+        assert_eq!(locations(&db), 0);
     }
 
     #[test]
