@@ -31,7 +31,6 @@ use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, PythonEnvironmentError};
 use ty_python_core::{ProgramFile, semantic_index};
@@ -547,19 +546,13 @@ impl Project {
         let check_start = ruff_db::Instant::now();
 
         let files: Vec<_> = (&files).into_iter().collect();
-        let workers = rayon::current_num_threads();
         // On incremental checks, the whole file may already have cached diagnostics.
-        let share_scopes = db.files().is_frozen() && workers > 1;
-        let unstarted = AtomicUsize::new(files.len());
+        let share_scopes = db.files().is_frozen() && rayon::current_num_threads() > 1;
 
         files
             .into_par_iter()
             .for_each_with_project_db(db, |db, file| {
                 db.unwind_if_revision_cancelled();
-
-                // Prefer whole files while there is enough work to keep the pool busy.
-                let share_scopes =
-                    share_scopes && unstarted.fetch_sub(1, Ordering::Relaxed) <= workers;
 
                 if db.uv_environments().is_initialization_pending(db, file) {
                     tracing::debug!(
