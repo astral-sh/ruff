@@ -152,6 +152,24 @@ def can_only_return_int(flag: bool):
 reveal_type(can_only_return_int(True))  # revealed: Literal[1]
 ```
 
+When several paths return `None`, at least one must be reachable for `None` to contribute to the
+inferred return type.
+
+```py
+def later_return():
+    if False:
+        return None
+    return None
+
+def no_reachable_return():
+    if False:
+        return None
+    raise ValueError
+
+reveal_type(later_return())  # revealed: None
+reveal_type(no_reachable_return())  # revealed: Never
+```
+
 ### Branches that do not return
 
 Here, the `else` branch never returns, so there is no path that implicitly returns `None`:

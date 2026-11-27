@@ -46,7 +46,7 @@ use crate::place_load::{
     ResolvedPlaceLoadSource,
 };
 use crate::reachability::{
-    ReachabilityEvaluationCache, evaluate_reachability_with_cache, is_end_of_scope_reachable,
+    ReachabilityEvaluationCache, evaluate_reachability_with_cache, is_reachable,
 };
 use crate::types::abstract_methods::{AbstractMethods, decorator_preserves_concreteness};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -166,6 +166,7 @@ use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::node_key::NodeKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::predicate::PatternPredicate;
+use ty_python_core::reachability_constraints::ScopedReachabilityConstraintId;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::ScopedSymbolId;
 use ty_python_core::{
@@ -13045,12 +13046,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // TODO: Support return type inference for async functions and generators
-        if function.is_async
-            || self
-                .scope()
-                .file_scope_id(db)
-                .is_generator_function(self.index)
-        {
+        let scope = self.scope().file_scope_id(db);
+        if function.is_async || scope.is_generator_function(self.index) {
             return None;
         }
 
@@ -13063,16 +13060,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return_type = return_type.add(fallback);
         }
 
-        // Union the types of all expressions in reachable `return` statements
+        // Only check reachability when a return can contribute to the union.
         for returned in &self.return_types_and_ranges {
-            if self.context.is_range_reachable(returned.range) {
-                return_type = return_type.add(returned.ty);
-            }
+            return_type.add_if(returned.ty, || {
+                self.context.is_range_reachable(returned.range)
+            });
         }
 
-        // Add `None` if the function can implicitly return it
-        if is_end_of_scope_reachable(db, self.scope()) {
-            return_type = return_type.add(Type::none(db, env));
+        // Avoid looking up NoneType when the function can't fall through.
+        let use_def = self.index.use_def_map(scope);
+        let end = use_def.end_of_scope_reachability();
+        if end != ScopedReachabilityConstraintId::ALWAYS_FALSE {
+            return_type.add_if(Type::none(db, env), || is_reachable(db, use_def, end));
         }
 
         Some(return_type.build())

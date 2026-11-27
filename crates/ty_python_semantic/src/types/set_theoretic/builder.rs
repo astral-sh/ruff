@@ -821,6 +821,23 @@ impl<'db> UnionBuilder<'db> {
         self.add_in_place_impl(ty, &mut vec![]);
     }
 
+    /// Add `ty` conditionally, skipping the predicate for `Never` and exact matches
+    /// among individually stored types. Grouped literals still go through the normal
+    /// insertion logic because adding a literal can trigger widening.
+    pub(crate) fn add_if(&mut self, ty: Type<'db>, include: impl FnOnce() -> bool) {
+        if ty == Type::Never
+            || self
+                .elements
+                .iter()
+                .any(|element| matches!(element, UnionElement::Type(existing) if *existing == ty))
+        {
+            return;
+        }
+        if include() {
+            self.add_in_place(ty);
+        }
+    }
+
     fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         let db = self.db;
         let cycle_recovery = self.cycle_recovery;
