@@ -124,12 +124,11 @@ pub struct ParsedModule {
 
 impl ParsedModule {
     fn new(file: File, python_version: PythonVersion, parsed: Parsed<ModModule>) -> Self {
+        let indexed = indexed::IndexedModule::new(file, python_version, parsed);
         Self {
             file,
             python_version,
-            inner: Arc::new(ArcSwapOption::new(Some(indexed::IndexedModule::new(
-                parsed,
-            )))),
+            inner: Arc::new(ArcSwapOption::new(Some(indexed))),
         }
     }
     /// Loads a reference to the parsed module.
@@ -141,11 +140,8 @@ impl ParsedModule {
             Some(parsed) => parsed,
             None => {
                 // Re-parse the file.
-                let parsed = indexed::IndexedModule::new(parsed_module_impl(
-                    db,
-                    self.file,
-                    self.python_version,
-                ));
+                let parsed = parsed_module_impl(db, self.file, self.python_version);
+                let parsed = indexed::IndexedModule::new(self.file, self.python_version, parsed);
                 tracing::debug!(
                     "File `{}` was reparsed after being collected in the current Salsa revision",
                     self.file.path(db)
@@ -156,10 +152,7 @@ impl ParsedModule {
             }
         };
 
-        ParsedModuleRef {
-            module: self.clone(),
-            indexed: parsed,
-        }
+        ParsedModuleRef { indexed: parsed }
     }
 
     /// Loads the parsed module and simultaneously notes whether the underlying
@@ -175,7 +168,7 @@ impl ParsedModule {
     pub fn load_then_clear_on_drop(&self, db: &dyn Db) -> ParsedModuleGuard {
         ParsedModuleGuard {
             module: self.load(db),
-            clear_on_drop: !db.system().is_file_open(self.file.path(db)),
+            clear_on_drop: (!db.system().is_file_open(self.file.path(db))).then(|| self.clone()),
         }
     }
 
@@ -212,14 +205,18 @@ impl Eq for ParsedModule {}
 /// Cheap cloneable wrapper around an instance of a module AST.
 #[derive(Clone)]
 pub struct ParsedModuleRef {
-    module: ParsedModule,
     indexed: Arc<indexed::IndexedModule>,
 }
 
 impl ParsedModuleRef {
-    /// Returns a reference to the [`ParsedModule`] that this instance was loaded from.
-    pub fn module(&self) -> &ParsedModule {
-        &self.module
+    /// Returns the file associated with this AST.
+    pub fn file(&self) -> File {
+        self.indexed.file
+    }
+
+    /// Returns the Python version used to parse this AST.
+    pub fn python_version(&self) -> PythonVersion {
+        self.indexed.python_version
     }
 
     /// Number of indexed nodes in the root AST.
@@ -244,7 +241,7 @@ impl std::ops::Deref for ParsedModuleRef {
 /// A parsed module reference that clears the cached AST on drop if the file was closed when loaded.
 pub struct ParsedModuleGuard {
     module: ParsedModuleRef,
-    clear_on_drop: bool,
+    clear_on_drop: Option<ParsedModule>,
 }
 
 impl std::ops::Deref for ParsedModuleGuard {
@@ -257,8 +254,8 @@ impl std::ops::Deref for ParsedModuleGuard {
 
 impl Drop for ParsedModuleGuard {
     fn drop(&mut self) {
-        if self.clear_on_drop {
-            self.module.module().clear();
+        if let Some(module) = &self.clear_on_drop {
+            module.clear();
         }
     }
 }
@@ -282,11 +279,15 @@ mod indexed {
     use ruff_python_ast::*;
     use ruff_python_parser::Parsed;
 
+    use crate::files::File;
+
     /// A wrapper around the AST that allows access to AST nodes by index.
     #[derive(Debug, get_size2::GetSize)]
     pub struct IndexedModule {
         index: IndexedNodes,
         pub parsed: Parsed<ModModule>,
+        pub(super) file: File,
+        pub(super) python_version: PythonVersion,
     }
 
     /// Compact storage for the address and [`RootNodeKind`] of every indexed AST node.
@@ -619,7 +620,11 @@ mod indexed {
 
     impl IndexedModule {
         /// Create a new [`IndexedModule`] from the given AST.
-        pub fn new(parsed: Parsed<ModModule>) -> Arc<Self> {
+        pub fn new(
+            file: File,
+            python_version: PythonVersion,
+            parsed: Parsed<ModModule>,
+        ) -> Arc<Self> {
             let mut visitor = Visitor {
                 nodes: Some(IndexedNodesBuilder::new()),
                 index: 0,
@@ -628,6 +633,8 @@ mod indexed {
             };
 
             let mut inner = Arc::new(IndexedModule {
+                file,
+                python_version,
                 parsed,
                 index: IndexedNodes::default(),
             });
@@ -867,6 +874,20 @@ mod indexed {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use crate::PythonFile;
+        use crate::files::system_path_to_file;
+        use crate::parsed::parsed_module;
+        use crate::system::DbWithWritableSystem as _;
+        use crate::tests::TestDb;
+
+        fn index_source(db: &mut TestDb, source: &str) -> Arc<IndexedModule> {
+            db.write_file("test.py", source).unwrap();
+            let file = system_path_to_file(db, "test.py").unwrap();
+            let python_file = PythonFile::new(db, file, PythonVersion::latest_ty());
+            let module = parsed_module(db, python_file).load(db);
+            assert!(module.has_valid_syntax());
+            module.indexed
+        }
 
         #[test]
         #[should_panic(expected = "index out of bounds: the len is 1 but the index is 1")]
@@ -909,8 +930,8 @@ mod indexed {
         #[test]
         #[should_panic(expected = "index out of bounds: the len is 65 but the index is 65")]
         fn indexed_nodes_chunk_boundary() {
-            let parsed = ruff_python_parser::parse_module(&"pass\n".repeat(65)).unwrap();
-            let indexed = IndexedModule::new(parsed);
+            let mut db = TestDb::new();
+            let indexed = index_source(&mut db, &"pass\n".repeat(65));
 
             assert_eq!(indexed.index.len(), 65);
             assert_eq!(indexed.index.get(63).1, RootNodeKind::Stmt);
@@ -920,7 +941,9 @@ mod indexed {
 
         #[test]
         fn indexed_nodes_round_trip() {
-            let parsed = ruff_python_parser::parse_module(
+            let mut db = TestDb::new();
+            let indexed = index_source(
+                &mut db,
                 r#"
 import os as imported_os
 
@@ -942,9 +965,7 @@ class C[T](Base, metaclass=Meta):
                 case _:
                     return b"bytes"
 "#,
-            )
-            .expect("test source should parse");
-            let indexed = IndexedModule::new(parsed);
+            );
             let mut visitor = Visitor {
                 nodes: Some(IndexedNodesBuilder::new()),
                 index: 0,
