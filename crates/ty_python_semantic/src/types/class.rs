@@ -2783,10 +2783,8 @@ pub(crate) enum FieldKind<'db> {
         kw_only: Option<bool>,
         /// The name for this field in the `__init__` signature, if specified.
         alias: Option<Box<str>>,
-        /// The converter types for this field, if a `converter` was specified.
-        /// The first element is the input type (first positional parameter), the second is the
-        /// output type (return type of the converter callable).
-        converter: Option<(Type<'db>, Type<'db>)>,
+        /// The converter input type for this field, if a `converter` was specified.
+        converter_input_ty: Option<Type<'db>>,
     },
     /// Pydantic model field metadata
     Pydantic {
@@ -2934,7 +2932,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 }) {
                     continue;
                 }
-                inherited_class_body_declaration(db, scope, symbol)?
+                *inherited_class_body_declaration(db, scope, symbol)?
             } else if declared.qualifiers.contains(TypeQualifiers::FINAL)
                 || !declarations.contains_only_annotated_assignments(db)
             {

@@ -29,9 +29,10 @@ use ty_python_core::reachability_constraints::{
 };
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
-    BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
-    DeclarationWithConstraint, DeclarationsIterator, ImportedFinalCandidatesIterator, ProgramFile,
-    Truthiness, global_scope, place_table, use_def_map,
+    BindingKind, BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
+    DeclarationSources, DeclarationWithConstraint, DeclarationsIterator,
+    ImportedFinalCandidatesIterator, ProgramFile, Truthiness, global_scope, place_table,
+    use_def_map,
 };
 
 pub(crate) use implicit_globals::{
@@ -857,21 +858,15 @@ pub(crate) fn has_bound_prefix<'db>(
     bindings: BindingWithConstraintsIterator<'_, 'db>,
     cache: Option<&ReachabilityEvaluationCache<'db>>,
 ) -> bool {
-    let mut rows = bindings.clone();
-    if let Some(row) = rows.next()
-        && rows.next().is_none()
-    {
+    if let Some(row) = bindings.as_single() {
         match row.binding {
             DefinitionState::Undefined => return false,
-            DefinitionState::Defined(definition) => {
-                let kind = definition.kind(db);
-                if kind.is_user_visible() && !matches!(kind, DefinitionKind::DictKeyAssignment(_)) {
-                    // With no unbound or deleted alternative, even an unreachable binding gives
-                    // a defined place of type Never. Either way the outer prefix is shadowed.
-                    return true;
-                }
+            DefinitionState::Defined(_) if row.kind == BindingKind::Default => {
+                // With no unbound or deleted alternative, even an unreachable binding gives
+                // a defined place of type Never. Either way the outer prefix is shadowed.
+                return true;
             }
-            DefinitionState::Deleted => {}
+            DefinitionState::Defined(_) | DefinitionState::Deleted => {}
         }
     }
     !place_from_bindings_impl(db, env, bindings, RequiresExplicitReExport::No, cache)
@@ -895,18 +890,33 @@ pub(crate) fn place_from_declarations<'db>(
     place_from_declarations_impl(db, env, declarations, RequiresExplicitReExport::No, None)
 }
 
-pub(crate) fn place_from_declarations_with_reachability_cache<'db>(
+/// Resolve the declarations and imported qualifiers that constrain a binding.
+/// An import replaces previous imports. For other bindings, an imported `Final`
+/// can supply an expected type if there is no annotation.
+pub(crate) fn place_from_binding_declarations<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    declarations: DeclarationsIterator<'_, 'db>,
+    sources: DeclarationSources<'_, 'db>,
+    is_import: bool,
     reachability_cache: &ReachabilityEvaluationCache<'db>,
 ) -> PlaceFromDeclarationsResult<'db> {
-    place_from_declarations_impl(
+    let declared = place_from_declarations_impl(
         db,
         env,
-        declarations,
+        sources.declarations(),
         RequiresExplicitReExport::No,
         Some(reachability_cache),
+    );
+    if is_import {
+        return declared;
+    }
+    declared.with_imported_final_impl(
+        db,
+        env,
+        sources.imported_final_candidates(),
+        RequiresExplicitReExport::No,
+        Some(reachability_cache),
+        true,
     )
 }
 
@@ -920,7 +930,8 @@ type DeclaredTypeAndConflictingTypes<'db> = (
 pub(crate) struct PlaceFromDeclarationsResult<'db> {
     /// A reachable declaration can supply qualifiers without specifying a type.
     place: Option<DefinedPlace<'db, Option<Type<'db>>>>,
-    qualifiers: TypeQualifiers,
+    declared_qualifiers: TypeQualifiers,
+    imported_qualifiers: TypeQualifiers,
     conflicting_types: Option<Box<indexmap::set::Slice<Type<'db>>>>,
     /// At least one reachable declaration supplies qualifiers without a type, even if other
     /// declarations of the same place specify a type.
@@ -932,7 +943,11 @@ pub(crate) struct PlaceFromDeclarationsResult<'db> {
 
 impl<'db> PlaceFromDeclarationsResult<'db> {
     pub(crate) fn qualifiers(&self) -> TypeQualifiers {
-        self.qualifiers
+        self.declared_qualifiers | self.imported_qualifiers
+    }
+
+    pub(crate) fn has_final_declaration(&self) -> bool {
+        self.declared_qualifiers.contains(TypeQualifiers::FINAL)
     }
 
     pub(crate) fn is_qualifier_only(&self) -> bool {
@@ -957,24 +972,20 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
         )
     }
 
-    /// Also use an imported `Final`'s source type to constrain an assignment when the target has
-    /// no declared type. An existing annotation always takes precedence over that source type.
+    /// For a `global` or `nonlocal` assignment, keep qualifiers from both scopes.
+    /// The owner supplies the type and any conflicting declarations. Fall back to
+    /// the forwarding scope's type only when the owner has no declaration.
     #[must_use]
-    pub(crate) fn with_imported_final_for_assignment(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        candidates: ImportedFinalCandidatesIterator<'_, 'db>,
-        reachability_cache: &ReachabilityEvaluationCache<'db>,
-    ) -> Self {
-        self.with_imported_final_impl(
-            db,
-            env,
-            candidates,
-            RequiresExplicitReExport::No,
-            Some(reachability_cache),
-            true,
-        )
+    pub(crate) fn with_forwarding_scope(self, local: &Self) -> Self {
+        let source = if self.place.is_some() { &self } else { local };
+        Self {
+            place: source.place,
+            first_declaration: source.first_declaration,
+            has_qualifier_only_declaration: source.has_qualifier_only_declaration,
+            declared_qualifiers: self.declared_qualifiers | local.declared_qualifiers,
+            imported_qualifiers: self.imported_qualifiers | local.imported_qualifiers,
+            conflicting_types: self.conflicting_types,
+        }
     }
 
     /// This can be called cross-module, so resolve imports through semantic queries without
@@ -1028,7 +1039,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
                 continue;
             }
 
-            self.qualifiers.insert(TypeQualifiers::FINAL);
+            self.imported_qualifiers.insert(TypeQualifiers::FINAL);
 
             // Public lookup must still regard this symbol as undeclared. Only assignment
             // inference without an annotation needs the imported source type as a constraint.
@@ -1082,7 +1093,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
             .map_or(Place::Undefined, |place| {
                 Place::Defined(place.with_type(place.ty.unwrap_or_else(Type::unknown)))
             })
-            .with_qualifiers(self.qualifiers)
+            .with_qualifiers(self.qualifiers())
     }
 
     pub(crate) fn into_place_and_conflicting_declarations(
@@ -1450,6 +1461,22 @@ pub(crate) fn place_by_id<'db>(
                 }
             }
 
+            // Module-level globals can be mutated externally, and strict application of the
+            // gradual guarantee would suggest that if not annotated, all such external mutations
+            // should be valid. However, external modifications (or modifications through `global`
+            // statements) that would require a different public type are relatively rare. From a
+            // practical perspective, we get a better user experience by trusting the inferred type
+            // by default, and only requiring annotation for the rare case.
+            if inferred.is_undefined() || scope.file_scope_id(db).is_global() {
+                return inferred.with_qualifiers(qualifiers);
+            }
+
+            // Private scopes cannot be modified externally. We also trust undeclared places
+            // in stubs and expose their raw type.
+            if scope.scope(db).visibility().is_private() || scope.file(db).is_stub(db) {
+                return inferred.with_qualifiers(qualifiers);
+            }
+
             // `__slots__` is a symbol with special behavior in Python's runtime. It can be
             // modified externally, but those changes do not take effect. We therefore issue
             // a diagnostic if we see it being modified externally. In type inference, we
@@ -1466,26 +1493,7 @@ pub(crate) fn place_by_id<'db>(
                 )
             });
 
-            // Module-level globals can be mutated externally, and strict application of the
-            // gradual guarantee would suggest that if not annotated, all such external mutations
-            // should be valid. However, external modifications (or modifications through `global`
-            // statements) that would require a different public type are relatively rare. From a
-            // practical perspective, we get a better user experience by trusting the inferred type
-            // by default, and only requiring annotation for the rare case.
-            let is_module_global = scope.node(db).scope_kind().is_module();
-
-            // If the visibility of the scope is private (like for a function scope), we also keep
-            // the raw type, because the symbol cannot be modified externally.
-            let scope_has_private_visibility = scope.scope(db).visibility().is_private();
-
-            // We generally trust undeclared places in stubs and expose the raw type.
-            let in_stub_file = scope.file(db).is_stub(db);
-
-            if !(is_considered_non_modifiable
-                || is_module_global
-                || scope_has_private_visibility
-                || in_stub_file)
-            {
+            if !is_considered_non_modifiable {
                 // Public inferred types should expose a promoted view rather than their raw
                 // inferred literal form. The adjustment is applied lazily when converting to
                 // `LookupResult` via `into_lookup_result`.
@@ -1832,6 +1840,15 @@ fn place_from_bindings_impl<'db>(
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
 ) -> PlaceWithDefinition<'db> {
+    if !requires_explicit_reexport.is_yes()
+        && let Some(binding) = bindings_with_constraints.single_unconstrained_binding()
+    {
+        return PlaceWithDefinition {
+            place: Place::bound(binding_type(db, binding)).with_definition(binding),
+            first_definition: Some(binding),
+        };
+    }
+
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
     let boundness_analysis = bindings_with_constraints.boundness_analysis();
@@ -1875,13 +1892,15 @@ fn place_from_bindings_impl<'db>(
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
              binding,
+             kind,
              narrowing_constraint,
              reachability_constraint,
              ..
          }| {
             let binding = match binding {
                 DefinitionState::Defined(binding)
-                    if is_discarded_dict_key_assignment(db, binding) =>
+                    if kind == BindingKind::DictKeyAssignment
+                        && is_discarded_dict_key_assignment(db, binding) =>
                 {
                     // This synthesized `d[key] = value` binding was derived from an assignment such
                     // as `d = {key: value}`. If the RHS is not known to be stored unchanged, discard
@@ -1975,8 +1994,7 @@ fn place_from_bindings_impl<'db>(
             // We need to "look through" loop header definitions to do boundness analysis. The
             // actual type is computed by `infer_loop_header_definition` via `binding_type` below,
             // like all other bindings, so that it can participate in fixpoint iteration.
-            let binding_kind = binding.kind(db);
-            if binding_kind.is_loop_header() {
+            if kind == BindingKind::LoopHeader {
                 let loop_header = loop_header_reachability(db, binding);
                 deleted_reachability = deleted_reachability.or(loop_header.deleted_reachability);
                 // If all the bindings in the loop are in statically false branches, it might be
@@ -1986,7 +2004,7 @@ fn place_from_bindings_impl<'db>(
                 if loop_header.reachable_bindings.is_empty() {
                     return None;
                 }
-            } else if matches!(binding_kind, DefinitionKind::NestedBindings(_)) {
+            } else if kind == BindingKind::NestedBindings {
                 // Nested bindings definitions similar to loop header definitions, synthetic
                 // bindings with special shadowing behavior. They can also coexist with `UNBOUND`.
             } else {
@@ -2326,7 +2344,8 @@ fn place_from_declarations_impl<'db>(
                     .with_definedness(boundness)
                     .with_provenance(provenance),
             ),
-            qualifiers: declared.qualifiers(),
+            declared_qualifiers: declared.qualifiers(),
+            imported_qualifiers: TypeQualifiers::empty(),
             conflicting_types: conflicting,
             has_qualifier_only_declaration,
             first_declaration,

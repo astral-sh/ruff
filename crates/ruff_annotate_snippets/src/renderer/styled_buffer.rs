@@ -51,16 +51,14 @@ impl StyledBuffer {
 
         for (i, line) in self.lines.iter().enumerate() {
             let mut current_style = stylesheet.none;
-            for StyledChar { ch, style } in line {
-                let ch_style = style.color_spec(level, stylesheet);
-                if ch_style != current_style {
-                    if !line.is_empty() {
-                        write!(str, "{current_style:#}")?;
-                    }
-                    current_style = ch_style;
+            for run in line.chunk_by(|a, b| a.style == b.style) {
+                let style = run[0].style.color_spec(level, stylesheet);
+                if style != current_style {
+                    write!(str, "{current_style:#}")?;
+                    current_style = style;
                     write!(str, "{current_style}")?;
                 }
-                str.push(*ch);
+                str.extend(run.iter().map(|c| c.ch));
             }
             write!(str, "{current_style:#}")?;
             if i != self.lines.len() - 1 {

@@ -31,6 +31,42 @@ The inferred `Callable` type is function-like, i.e. we can still access attribut
 reveal_type(x[0].__name__)  # revealed: str
 ```
 
+## Lists of functions with different parameter lists
+
+The inferred union keeps both signatures if each accepts a call that the other rejects.
+
+```pyi
+def left(x: int) -> int: ...
+def right(y: int) -> int: ...
+def two(x: int, y: int) -> int: ...
+def optional(x: int, y: int = 0) -> int: ...
+def positional(y: int, /) -> int: ...
+def other(y: int = 0) -> int: ...
+def fallback(y: int = 0, *args: object, **kwargs: object) -> int: ...
+
+reveal_type([left, right])  # revealed: list[((x: int) -> int) | ((y: int) -> int)]
+reveal_type([left, two])  # revealed: list[((x: int) -> int) | ((x: int, y: int) -> int)]
+reveal_type([left, other])  # revealed: list[((x: int) -> int) | ((y: int = 0) -> int)]
+
+# All three pairs still simplify to one signature.
+reveal_type([left, fallback])  # revealed: list[(x: int) -> int]
+reveal_type([left, optional])  # revealed: list[(x: int) -> int]
+reveal_type([left, positional])  # revealed: list[(y: int, /) -> int]
+```
+
+A later overload can accept every call to `left` even when the first overload cannot.
+
+```pyi
+from typing import overload
+
+@overload
+def one_or_two(x: int, y: int) -> int: ...
+@overload
+def one_or_two(x: int) -> int: ...
+
+reveal_type([left, one_or_two])  # revealed: list[(x: int) -> int]
+```
+
 ## Mixed list
 
 ```py

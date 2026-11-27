@@ -40,6 +40,73 @@ reveal_type(user.id)  # revealed: int
 reveal_type(user.internal_name)  # revealed: str
 ```
 
+## Field metadata and the `AttrsInstance` protocol
+
+attrs stores field metadata in the `__attrs_attrs__` class variable. Both the class and its
+instances expose this tuple.
+
+```py
+import attr
+import attrs
+
+@attr.s
+class User1:
+    name: str = attr.ib()
+
+@attrs.define
+class User2:
+    name: str
+
+reveal_type(User1.__attrs_attrs__)  # revealed: tuple[Attribute[Unknown], ...]
+reveal_type(User2.__attrs_attrs__)  # revealed: tuple[Attribute[Unknown], ...]
+
+user1 = User1("Ada")
+user2 = User2("Ada")
+
+reveal_type(user1.__attrs_attrs__[0].name)  # revealed: str
+reveal_type(user2.__attrs_attrs__[0].name)  # revealed: str
+```
+
+The `AttrsInstance` protocol requires `__attrs_attrs__`. `attrs.fields` accepts
+`type[AttrsInstance] | AttrsInstance`, while `attrs.asdict` expects an `AttrsInstance`.
+
+```py
+attrs.fields(User1)
+attrs.fields(User2)
+attrs.fields(user1)
+attrs.fields(user2)
+
+attrs.asdict(user1)
+attrs.asdict(user2)
+
+class Child1(User1): ...
+class Child2(User2): ...
+
+attr.fields(Child1)
+attr.fields(Child2)
+```
+
+An ordinary dataclass lacks the required member.
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Other:
+    name: str
+
+attrs.fields(Other)  # error: [invalid-argument-type]
+attrs.asdict(Other("Ada"))  # error: [invalid-argument-type]
+```
+
+`attrs.has` narrows a class to `type[AttrsInstance]`.
+
+```py
+def inspect_class(cls: type):
+    if attrs.has(cls):
+        reveal_type(cls.__attrs_attrs__)  # revealed: Any
+```
+
 ## Private fields
 
 attrs strips leading underscores from field names when generating constructor parameters.
@@ -289,6 +356,71 @@ class WrongDefault:
     @age.default
     def _default_age(self) -> str:
         return "0"
+```
+
+## Field converters
+
+A field converter can be specified with `field(converter=...)` or by decorating a method with
+`@<field>.converter`. The method receives the instance, the field, and the value to convert.
+
+```py
+from attrs import define, field
+
+def decode_name(value: bytes) -> str:
+    return value.decode()
+
+@define
+class Person:
+    name: str = field(converter=decode_name)
+    age: int = field()
+
+    @age.converter
+    def _convert_age(self, attr: object, value: str | float) -> int:
+        return int(value)
+
+reveal_type(Person.__init__)  # revealed: (self: Person, /, name: bytes, age: str | float) -> None
+
+person = Person(name=b"Ada", age="36")
+Person(name=b"Ada", age=36.5)
+Person(name="Ada", age=36.5)  # error: [invalid-argument-type]
+Person(name=b"Ada", age=None)  # error: [invalid-argument-type]
+Person(name=b"Ada")  # error: [missing-argument]
+```
+
+Assignments accept the converter's input type. Reading the field gives its declared type.
+
+```py
+reveal_type(person.name)  # revealed: str
+reveal_type(person.age)  # revealed: int
+
+person.age = "37"
+reveal_type(person.age)  # revealed: int
+person.age = None  # error: [invalid-assignment]
+```
+
+The decorator preserves the method's signature.
+
+```py
+reveal_type(person._convert_age)  # revealed: bound method Person._convert_age(attr: object, value: str | float) -> int
+```
+
+Decorated converters run in definition order. The first converter determines the input type.
+
+```py
+@define
+class User:
+    age: int = field()
+
+    @age.converter
+    def _decode_age(self, attr: object, value: bytes) -> str:
+        return value.decode()
+
+    @age.converter
+    def _parse_age(self, attr: object, value: str) -> int:
+        return int(value)
+
+reveal_type(User.__init__)  # revealed: (self: User, /, age: bytes) -> None
+reveal_type(User(b"36").age)  # revealed: int
 ```
 
 ## Custom initialization

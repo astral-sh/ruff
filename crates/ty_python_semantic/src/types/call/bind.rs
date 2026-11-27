@@ -3771,46 +3771,29 @@ impl<'db> CallableBinding<'db> {
         signature_type: Type<'db>,
         overloads: impl IntoIterator<Item = Signature<'db>>,
     ) -> Self {
-        Self::from_indexed_overloads(
-            signature_type,
-            overloads.into_iter().enumerate().map(|(index, signature)| {
-                (
-                    signature.source_overload_index().unwrap_or(index),
-                    signature,
-                )
-            }),
-        )
+        let overloads = overloads.into_iter();
+        let mut binding = Self::with_capacity(signature_type, overloads.size_hint().0);
+        for signature in overloads {
+            binding.push_overload(signature);
+        }
+        binding
     }
 
-    /// Constructs a callable binding from overloads while preserving each overload's position in
-    /// the defining function's overload list.
-    ///
-    /// The preserved indexes are used for diagnostics so filtered or reordered bindings can still
-    /// point back to the correct overload declaration.
-    fn from_indexed_overloads(
-        signature_type: Type<'db>,
-        overloads: impl IntoIterator<Item = (usize, Signature<'db>)>,
-    ) -> Self {
-        let overloads = overloads
-            .into_iter()
-            .map(|(source_overload_index, signature)| {
-                Binding::single(signature_type, signature)
-                    .with_source_overload_index(source_overload_index)
-            })
-            .collect();
-        Self {
-            callable_type: signature_type,
-            signature_type,
-            is_implicitly_invoked: false,
-            dunder_call_is_possibly_unbound: false,
-            bound_type: None,
-            overload_call_result: None,
-            matching_overload_before_type_checking: None,
-            overloads,
-        }
+    /// Preserve the original declaration index when signatures were filtered or reordered.
+    pub(crate) fn push_overload(&mut self, signature: Signature<'db>) {
+        let index = signature
+            .source_overload_index()
+            .unwrap_or(self.overloads.len());
+        self.overloads.push(
+            Binding::single(self.signature_type, signature).with_source_overload_index(index),
+        );
     }
 
     pub(crate) fn not_callable(signature_type: Type<'db>) -> Self {
+        Self::with_capacity(signature_type, 0)
+    }
+
+    pub(crate) fn with_capacity(signature_type: Type<'db>, capacity: usize) -> Self {
         Self {
             callable_type: signature_type,
             signature_type,
@@ -3819,7 +3802,7 @@ impl<'db> CallableBinding<'db> {
             bound_type: None,
             overload_call_result: None,
             matching_overload_before_type_checking: None,
-            overloads: smallvec![],
+            overloads: SmallVec::with_capacity(capacity),
         }
     }
 
@@ -4099,12 +4082,23 @@ impl<'db> CallableBinding<'db> {
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) {
-        // If this callable is a bound method, prepend the self instance onto the arguments list
-        // before checking.
-        let bound_arguments = arguments.with_self(self.bound_type);
-
+        // Positional matches only need the receiver's position. Avoid cloning the arguments
+        // to prepend it until an overload needs the full argument matcher.
+        let positional = arguments.iter().all(|argument| {
+            matches!(
+                argument,
+                CallArgument::Positional(_) | CallArgument::Synthetic(_)
+            )
+        });
+        let count = arguments.len() + usize::from(self.bound_type.is_some());
+        let mut bound_arguments = None;
         for overload in &mut self.overloads {
-            overload.match_parameters(db, env, bound_arguments.as_ref());
+            if positional && overload.try_match_positional_prefix(count) {
+                continue;
+            }
+            let arguments =
+                bound_arguments.get_or_insert_with(|| arguments.with_self(self.bound_type));
+            overload.match_parameters(db, env, arguments.as_ref());
         }
     }
 
@@ -10092,6 +10086,33 @@ impl<'db> Binding<'db> {
             .cloned()
             .unwrap_or_else(|| self.signature.freshen_bound_typevars(db, env, delta));
         self.return_ty = self.initial_return_type(db);
+    }
+
+    /// A positional prefix followed only by defaulted parameters maps directly by index.
+    /// Variadic parameters have no defaults and always go through the full matcher.
+    fn try_match_positional_prefix(&mut self, count: usize) -> bool {
+        let parameters = self.signature.parameters();
+        if count > parameters.len()
+            || !parameters.iter().take(count).all(Parameter::is_positional)
+            || !parameters.iter().skip(count).all(Parameter::has_default)
+        {
+            return false;
+        }
+
+        self.argument_matches = (0..count)
+            .map(|index| MatchedArgument {
+                parameters: smallvec![MatchedParameter {
+                    index,
+                    argument_type: None,
+                    expected_type: None,
+                    provenance: InvalidArgumentTypeProvenance::Argument,
+                }],
+                matched: true,
+            })
+            .collect();
+        self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
+        self.variadic_argument_matched_to_variadic_parameter = false;
+        true
     }
 
     fn match_parameters(

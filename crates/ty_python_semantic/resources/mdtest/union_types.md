@@ -529,6 +529,24 @@ def f(
     reveal_type(h)  # revealed: tuple[Any | str, ...]
 ```
 
+Two tuples can share their first class object and differ in a later element. Even if `B` inherits
+from `A`, the class objects `A` and `B` are distinct. A `type[A]` element covers both, just as an
+`int` element covers both integer literals.
+
+```py
+class A: ...
+class B(A): ...
+
+def _(flag: bool, cls: type[A], n: int):
+    classes = (A, A) if flag else (A, B)
+    reveal_type(classes)  # revealed: tuple[<class 'A'>, <class 'A'>] | tuple[<class 'A'>, <class 'B'>]
+    reveal_type(classes if flag else (A, cls))  # revealed: tuple[<class 'A'>, type[A]]
+
+    values = (A, 1) if flag else (A, 2)
+    reveal_type(values)  # revealed: tuple[<class 'A'>, Literal[1]] | tuple[<class 'A'>, Literal[2]]
+    reveal_type(values if flag else (A, n))  # revealed: tuple[<class 'A'>, int]
+```
+
 ## Tuple unions with narrowed built-in elements
 
 A tuple alternative is redundant when its element type is covered by another alternative, including

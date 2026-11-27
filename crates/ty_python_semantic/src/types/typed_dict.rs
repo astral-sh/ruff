@@ -12,7 +12,9 @@ use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
-use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field, KnownClass};
+use super::class::{
+    ClassLiteral, ClassType, CodeGeneratorKind, DynamicTypedDictLiteral, Field, KnownClass,
+};
 use super::context::InferContext;
 use super::diagnostic::{
     self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_TYPED_DICT_KEY,
@@ -1446,8 +1448,11 @@ impl<'db> VarianceInferable<'db> for TypedDictType<'db> {
 )]
 pub(super) fn deferred_functional_typed_dict_schema<'db>(
     db: &'db dyn Db,
-    definition: Definition<'db>,
+    class: DynamicTypedDictLiteral<'db>,
 ) -> TypedDictSchema<'db> {
+    let definition = class
+        .definition(db)
+        .expect("deferred inference requires a definition");
     let program_file = definition.program_file(db);
     let python_file = program_file.python_file(db);
     let env = ProgramEnvironment::from_file(program_file);
@@ -1511,8 +1516,11 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
 )]
 pub(super) fn deferred_functional_typed_dict_openness<'db>(
     db: &'db dyn Db,
-    definition: Definition<'db>,
+    class: DynamicTypedDictLiteral<'db>,
 ) -> TypedDictOpenness<'db> {
+    let definition = class
+        .definition(db)
+        .expect("deferred inference requires a definition");
     let program_file = definition.program_file(db);
     let python_file = program_file.python_file(db);
     let env = ProgramEnvironment::from_file(program_file);

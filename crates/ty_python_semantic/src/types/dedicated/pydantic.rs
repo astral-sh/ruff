@@ -26,6 +26,7 @@ use crate::types::infer::{
 use crate::types::known_instance::FieldInstance;
 use crate::types::member::class_member;
 use crate::types::special_form::SpecialFormType;
+use crate::types::type_alias::PEP695TypeAliasType;
 use crate::types::{
     ClassBase, ClassType, DataclassTransformerParams, FunctionType, KnownClass, KnownFunction,
     KnownInstanceType, KnownUnion, MemberLookupPolicy, Parameter, Parameters, Signature,
@@ -436,7 +437,8 @@ fn field_expression_type<'db>(
 }
 
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-fn type_alias_strictness<'db>(db: &'db dyn Db, definition: Definition<'db>) -> ConfigBoolean {
+fn type_alias_strictness<'db>(db: &'db dyn Db, alias: PEP695TypeAliasType<'db>) -> ConfigBoolean {
+    let definition = TypeAliasType::PEP695(alias).definition(db);
     let mut metadata = FieldMetadata::default();
     metadata.collect_from_annotation(db, definition, None);
     metadata.strict
@@ -456,9 +458,10 @@ pub(in crate::types) fn field_metadata<'db>(
     }
     metadata.collect_from_rhs_type(db, rhs_type);
     if metadata.strict.is_unspecified()
-        && let Type::TypeAlias(alias @ TypeAliasType::PEP695(_)) = declared_ty
+        && let Type::TypeAlias(TypeAliasType::PEP695(alias)) = declared_ty
     {
-        metadata.strict = type_alias_strictness(db, alias.definition(db));
+        // Strictness comes from the declaration and is shared by every specialization.
+        metadata.strict = type_alias_strictness(db, alias.unspecialized(db));
     }
     metadata
 }

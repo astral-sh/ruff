@@ -434,8 +434,9 @@ def enclosing() -> None:
 
 ### Imported `Final` qualifiers apply inside `global` scopes
 
-Importing a final value into a name declared `global` preserves the qualifier for subsequent
-assignments in the same forwarding scope.
+When a function imports a `Final` value into a global name, the module's annotation still determines
+which types are assignable. Without an annotation, the imported type applies. In both cases, `Final`
+prevents reassignment.
 
 `source.py`:
 
@@ -448,13 +449,19 @@ VALUE: Final[int] = 1
 `main.py`:
 
 ```py
-value: int = 0
+value: int | str = 0
+unannotated = 0
 
 def replace_global() -> None:
-    global value
+    global value, unannotated
     from source import VALUE as value
+    from source import VALUE as unannotated
 
-    value = 2  # error: [invalid-assignment]
+    value = "text"  # error: [invalid-assignment] "Reassignment of `Final` symbol `value` is not allowed"
+
+    # error: [invalid-assignment] "Reassignment of `Final` symbol `unannotated` is not allowed"
+    # error: [invalid-assignment] "Object of type `Literal["text"]` is not assignable to `int`"
+    unannotated = "text"
 ```
 
 ### Non-final imports replace forwarded imported `Final` qualifiers
@@ -493,8 +500,9 @@ def replace_global() -> None:
 
 ### Imported `Final` qualifiers apply to class members
 
-An imported `Final` qualifier prevents subclass overrides and assignments through the class object
-or its instances. An earlier class-member annotation retains its declared type.
+An imported `Final` qualifier prevents reassignment in the class body, subclass overrides, and
+assignments through the class object or its instances. An earlier class-member annotation retains
+its declared type.
 
 `source.py`:
 
@@ -518,6 +526,11 @@ class Derived(Base):
 
 Base.VALUE = 3  # error: [invalid-assignment]
 Base().VALUE = 4  # error: [invalid-assignment]
+
+class Unannotated:
+    from source import VALUE
+
+    VALUE = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `VALUE` is not allowed"
 ```
 
 ### Conditional imports preserve `Final` qualifiers

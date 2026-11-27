@@ -2209,6 +2209,74 @@ enum SourceOrder {
     AtomicConstraint(AtomicConstraintId),
 }
 
+/// A disjunction of lower-bound clauses accumulated for one typevar.
+///
+/// The same type can be both evidence and a validity restriction. Keep each clause's
+/// provenance and deduplicate types only after selecting the clauses for a union.
+#[derive(Default)]
+struct LowerBound<'db> {
+    clauses: SmallVec<[(ConstraintProvenance, Type<'db>); 1]>,
+}
+
+impl<'db> LowerBound<'db> {
+    fn add_clause(&mut self, provenance: ConstraintProvenance, ty: Type<'db>) {
+        // `Never` imposes no lower bound on a valid solution but can still be evidence.
+        if provenance.is_evidence() || !ty.is_never() {
+            self.clauses.push((provenance, ty));
+        }
+    }
+
+    fn iter_matching(
+        &self,
+        include: impl Fn(ConstraintProvenance) -> bool,
+    ) -> impl Iterator<Item = Type<'db>> {
+        self.clauses
+            .iter()
+            .filter_map(move |&(provenance, ty)| include(provenance).then_some(ty))
+    }
+
+    fn iter_evidence_without_validity(&self) -> impl Iterator<Item = Type<'db>> {
+        self.iter_matching(|provenance| {
+            provenance.is_evidence() && !provenance.contains(ConstraintProvenance::VALIDITY)
+        })
+    }
+
+    /// Returns `None` when no clause matches, preserving explicit evidence of `Never`.
+    fn union_matching(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        include: impl Fn(ConstraintProvenance) -> bool,
+    ) -> Option<Type<'db>> {
+        let mut bounds = self.iter_matching(include);
+        if self.clauses.len() <= 1 {
+            return bounds.next();
+        }
+        let bounds: FxIndexSet<_> = bounds.collect();
+        (!bounds.is_empty()).then(|| UnionType::from_elements(db, env, bounds))
+    }
+
+    fn evidence(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        source: EvidenceSource,
+    ) -> Option<Type<'db>> {
+        // Prefer the declared type as written by the caller. Exclude declarations
+        // derived using validity constraints when forming the declared candidate.
+        self.union_matching(db, env, |provenance| {
+            source.includes(provenance)
+                && !(matches!(source, EvidenceSource::Declared)
+                    && provenance.contains(ConstraintProvenance::VALIDITY))
+        })
+    }
+
+    fn validity(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        self.union_matching(db, env, |provenance| !provenance.is_evidence())
+            .unwrap_or(Type::Never)
+    }
+}
+
 /// A factored conjunction of upper-bound clauses accumulated for one typevar.
 ///
 /// Each clause is stored along with its provenance. Clauses may be unions, keeping bounds such as
@@ -3581,7 +3649,7 @@ struct BuilderNode {
 /// factored to avoid distributing intersections over unions.
 #[derive(Default)]
 struct CandidateTypeVarSolver<'db> {
-    lower: FxIndexSet<(ConstraintProvenance, Type<'db>)>,
+    lower: LowerBound<'db>,
     upper: UpperBound<'db>,
     has_declared_evidence: bool,
     has_declared_lower_evidence: bool,
@@ -3632,15 +3700,9 @@ impl<'db> CandidateTypeVarSolver<'db> {
     }
 
     fn add_lower(&mut self, provenance: ConstraintProvenance, ty: Type<'db>) {
-        // Lower bounds are unioned. Our type representation is in DNF, so unioning a new
-        // element is typically cheap (in that it does not involve a combinatorial
-        // explosion from distributing the clause through an existing disjunction). So we
-        // don't need to be as clever here as in `add_upper`.
         self.has_declared_evidence |= provenance.contains(ConstraintProvenance::DECLARED);
         self.has_declared_lower_evidence |= provenance.contains(ConstraintProvenance::DECLARED);
-        if provenance.is_evidence() || !ty.is_never() {
-            self.lower.insert((provenance, ty));
-        }
+        self.lower.add_clause(provenance, ty);
     }
 
     fn add_upper(&mut self, provenance: ConstraintProvenance, ty: Type<'db>) {
@@ -3667,25 +3729,14 @@ impl<'db> CandidateTypeVarSolver<'db> {
             has_declared_lower_evidence,
         } = self;
 
-        let iter_lower_bounds = |source: EvidenceSource, include_validity| {
-            lower.iter().filter_map(move |&(provenance, ty)| {
-                if source.includes(provenance)
-                    && (include_validity || !provenance.contains(ConstraintProvenance::VALIDITY))
-                {
-                    Some(ty)
-                } else {
-                    None
-                }
-            })
-        };
-
         // Classify the original evidence bounds before aggregation, as gradual and static argument
         // evidence may collapse into a single gradual union.
         //
         // Note that we only compute this flag for constrained type variables.
         let has_only_non_concrete_evidence =
             bound_typevar.typevar(db).is_constrained(db).then(|| {
-                let mut evidence = iter_lower_bounds(EvidenceSource::All, false)
+                let mut evidence = lower
+                    .iter_evidence_without_validity()
                     .chain(upper.iter_evidence_without_validity(EvidenceSource::All))
                     .filter(|ty| !ty.has_unspecialized_type_var(db, env))
                     .peekable();
@@ -3703,30 +3754,16 @@ impl<'db> CandidateTypeVarSolver<'db> {
                     })
             });
 
-        let union_lower_bounds = |source, include_validity| {
-            let bounds: FxIndexSet<_> = iter_lower_bounds(source, include_validity).collect();
-            (!bounds.is_empty()).then(|| UnionType::from_elements(db, env, bounds))
-        };
-
-        // Exclude bounds derived using validity constraints from the declared candidate, so as to
-        // prefer the declared type as written by the caller.
-        let evidence_lower = union_lower_bounds(EvidenceSource::All, true);
+        let evidence_lower = lower.evidence(db, env, EvidenceSource::All);
         let (inferred_lower, declared_lower) = if has_declared_lower_evidence {
             (
-                union_lower_bounds(EvidenceSource::Inferred, true),
-                union_lower_bounds(EvidenceSource::Declared, false),
+                lower.evidence(db, env, EvidenceSource::Inferred),
+                lower.evidence(db, env, EvidenceSource::Declared),
             )
         } else {
             (evidence_lower, None)
         };
-        let validity_lower = UnionType::from_elements(
-            db,
-            env,
-            lower
-                .iter()
-                .filter_map(|&(provenance, ty)| (!provenance.is_evidence()).then_some(ty))
-                .collect::<FxIndexSet<_>>(),
-        );
+        let validity_lower = lower.validity(db, env);
         upper.shrink_to_fit();
 
         let range = CandidateTypeVarSolution {

@@ -149,25 +149,40 @@ pub(super) fn class_member_with_symbol<'db>(
 /// A subclass assignment such as `items = []` retains an inherited `items: list[int]`
 /// declaration. Both initializer inference and public member lookup use that declaration,
 /// while an explicit annotation or a new method definition supplies its own public type.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+///
+/// Resolving the bases can recurse through another assignment to the same name.
+/// Keep that work in one query per class and symbol. Boxing the result keeps
+/// the common case of a new attribute with no inherited declaration small.
+#[salsa::tracked(returns(as_deref), cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn inherited_class_body_declaration<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     symbol: ScopedSymbolId,
-) -> Option<ClassBodyDeclaration<'db>> {
-    scope.node(db).as_class()?;
-    let use_def = use_def_map(db, scope);
+) -> Option<Box<ClassBodyDeclaration<'db>>> {
+    let index = semantic_index(db, scope.program_file(db));
+    let scope_id = scope.file_scope_id(db);
+    index.scope(scope_id).node().as_class()?;
+    let table = index.place_table(scope_id);
     let env = ProgramEnvironment::from_scope(scope);
-    if !place_from_declarations(db, &env, use_def.end_of_scope_symbol_declarations(symbol))
+
+    // If the class has no declaration for this name, the bases are the only
+    // possible source of an annotation.
+    if table.symbol(symbol).is_declared()
+        && !place_from_declarations(
+            db,
+            &env,
+            index
+                .use_def_map(scope_id)
+                .end_of_scope_symbol_declarations(symbol),
+        )
         .ignore_conflicting_declarations()
         .is_undefined()
     {
         return None;
     }
 
-    let class = nearest_enclosing_class(db, semantic_index(db, scope.program_file(db)), scope)?;
-    let table = place_table(db, scope);
-    class_body_declaration_from_bases(db, &env, class, table.symbol(symbol).name())
+    let class = nearest_enclosing_class(db, index, scope)?;
+    class_body_declaration_from_bases(db, &env, class, table.symbol(symbol).name()).map(Box::new)
 }
 
 pub(super) fn class_body_declaration_from_bases<'db>(

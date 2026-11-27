@@ -39,11 +39,11 @@ fn bit_box_size(bits: &RankBitBoxStorage) -> usize {
 
 // bitvec does not support `u64` as a Store type on 32-bit platforms
 #[cfg(target_pointer_width = "64")]
-type Chunk = u64;
+pub(crate) type Chunk = u64;
 #[cfg(not(target_pointer_width = "64"))]
-type Chunk = u32;
+pub(crate) type Chunk = u32;
 
-const CHUNK_SIZE: usize = Chunk::BITS as usize;
+pub(crate) const CHUNK_SIZE: usize = Chunk::BITS as usize;
 
 impl RankBitBox {
     pub fn bits_with_capacity(cap: usize) -> RankBitBoxVec {

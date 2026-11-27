@@ -447,7 +447,13 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             cycle_initial=|db, _, _, _| NamedTupleSpec::unknown(db),
             heap_size=ruff_memory_usage::heap_size
         )]
-        fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> NamedTupleSpec<'db> {
+        fn deferred_spec<'db>(
+            db: &'db dyn Db,
+            class: DynamicNamedTupleLiteral<'db>,
+        ) -> NamedTupleSpec<'db> {
+            let definition = class
+                .definition(db)
+                .expect("deferred inference requires a definition");
             let python_file = definition.python_file(db);
             let module = parsed_module(db, python_file).load(db);
             let node = definition
@@ -465,7 +471,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         match self.anchor(db) {
             DynamicNamedTupleAnchor::CollectionsDefinition { spec, .. }
             | DynamicNamedTupleAnchor::ScopeOffset { spec, .. } => *spec,
-            DynamicNamedTupleAnchor::TypingDefinition(definition) => deferred_spec(db, *definition),
+            DynamicNamedTupleAnchor::TypingDefinition(_) => deferred_spec(db, self),
         }
     }
 

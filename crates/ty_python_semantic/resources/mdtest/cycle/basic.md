@@ -506,6 +506,45 @@ Example("example")
 Example(123)  # error: [invalid-argument-type] "Expected `str`, found `Literal[123]`"
 ```
 
+## Inherited annotations depend on the result of overload resolution
+
+Looking up `kind` to select a decorator overload requires resolving the bases, which refer back to
+the decorated class. Since `kind` is `int`, the second overload applies and `Child.Item` resolves to
+the type alias on `Result`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing import NamedTuple, Protocol, overload
+
+class Result:
+    type Item = int
+
+class HasStrKind(Protocol):
+    kind: type[str] | None
+
+class Base:
+    kind: type["Child.Item"] | None
+
+class Record(NamedTuple):
+    item: "Child.Item"
+
+@overload
+def choose[T: HasStrKind](cls: type[T]) -> type[T]: ...
+@overload
+def choose(cls: type[Base]) -> type[Result]: ...
+
+@choose
+class Child(Base, Record):
+    kind = int
+    Item = kind
+
+reveal_type(Child)  # revealed: type[Result]
+```
+
 ## Dataclass outside a decorator whose annotations depend on the class
 
 An outer `@dataclass` still generates an initializer when the inner decorator's annotations depend
