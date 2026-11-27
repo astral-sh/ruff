@@ -52,7 +52,7 @@
 //! imported-`Final` queries.
 
 use itertools::{EitherOrBoth, Itertools};
-use ruff_index::newtype_index;
+use ruff_index::{Idx, newtype_index};
 use smallvec::{SmallVec, smallvec};
 
 use crate::ReachabilityConstraintsBuilder;
@@ -441,6 +441,81 @@ impl LiveBinding {
 
 static_assertions::assert_eq_size!(LiveBinding, [u32; 3]);
 
+/// A retained binding whose constraint IDs fit below the reserved terminal values.
+/// Keep the entire packed definition, including its shadowing policy.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub(super) struct CompactLiveBinding {
+    binding: PackedDefinitionId,
+    narrowing_constraint: u16,
+    reachability_constraint: u16,
+}
+
+impl CompactLiveBinding {
+    const NARROWING_ALWAYS_TRUE: u16 = u16::MAX;
+    const NARROWING_ALWAYS_FALSE: u16 = u16::MAX - 1;
+    const REACHABILITY_ALWAYS_TRUE: u16 = u16::MAX;
+    const REACHABILITY_AMBIGUOUS: u16 = u16::MAX - 1;
+    const REACHABILITY_ALWAYS_FALSE: u16 = u16::MAX - 2;
+
+    pub(super) fn expand(self) -> LiveBinding {
+        LiveBinding {
+            binding: self.binding,
+            narrowing_constraint: self.narrowing_constraint(),
+            reachability_constraint: self.reachability_constraint(),
+        }
+    }
+
+    pub(super) fn try_from_live_binding(binding: &LiveBinding) -> Option<Self> {
+        Some(Self {
+            binding: binding.binding,
+            narrowing_constraint: Self::encode_narrowing(binding.narrowing_constraint())?,
+            reachability_constraint: Self::encode_reachability(binding.reachability_constraint())?,
+        })
+    }
+
+    fn encode_narrowing(constraint: ScopedNarrowingConstraint) -> Option<u16> {
+        match constraint {
+            ScopedNarrowingConstraint::ALWAYS_TRUE => Some(Self::NARROWING_ALWAYS_TRUE),
+            ScopedNarrowingConstraint::ALWAYS_FALSE => Some(Self::NARROWING_ALWAYS_FALSE),
+            _ => {
+                let index = u16::try_from(constraint.index()).ok()?;
+                (index < Self::NARROWING_ALWAYS_FALSE).then_some(index)
+            }
+        }
+    }
+
+    fn encode_reachability(constraint: ScopedReachabilityConstraintId) -> Option<u16> {
+        match constraint {
+            ScopedReachabilityConstraintId::ALWAYS_TRUE => Some(Self::REACHABILITY_ALWAYS_TRUE),
+            ScopedReachabilityConstraintId::AMBIGUOUS => Some(Self::REACHABILITY_AMBIGUOUS),
+            ScopedReachabilityConstraintId::ALWAYS_FALSE => Some(Self::REACHABILITY_ALWAYS_FALSE),
+            _ => {
+                let index = u16::try_from(constraint.index()).ok()?;
+                (index < Self::REACHABILITY_ALWAYS_FALSE).then_some(index)
+            }
+        }
+    }
+
+    fn narrowing_constraint(self) -> ScopedNarrowingConstraint {
+        match self.narrowing_constraint {
+            Self::NARROWING_ALWAYS_TRUE => ScopedNarrowingConstraint::ALWAYS_TRUE,
+            Self::NARROWING_ALWAYS_FALSE => ScopedNarrowingConstraint::ALWAYS_FALSE,
+            index => ScopedNarrowingConstraint::new(usize::from(index)),
+        }
+    }
+
+    fn reachability_constraint(self) -> ScopedReachabilityConstraintId {
+        match self.reachability_constraint {
+            Self::REACHABILITY_ALWAYS_TRUE => ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            Self::REACHABILITY_AMBIGUOUS => ScopedReachabilityConstraintId::AMBIGUOUS,
+            Self::REACHABILITY_ALWAYS_FALSE => ScopedReachabilityConstraintId::ALWAYS_FALSE,
+            index => ScopedReachabilityConstraintId::new(usize::from(index)),
+        }
+    }
+}
+
+static_assertions::assert_eq_size!(CompactLiveBinding, [u32; 2]);
+
 pub(super) type LiveBindingsIterator<'a> = std::slice::Iter<'a, LiveBinding>;
 
 impl Bindings {
@@ -813,7 +888,6 @@ impl From<&LiveBinding> for SingletonConstraints {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ruff_index::Idx;
 
     use crate::predicate::ScopedPredicateId;
 
@@ -1193,5 +1267,62 @@ mod tests {
         );
 
         assert_declarations(&sym, &["undeclared", "1"]);
+    }
+
+    #[test]
+    fn compact_binding_round_trips() {
+        for (narrowing, reachability) in [
+            (
+                ScopedNarrowingConstraint::ALWAYS_TRUE,
+                ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            ),
+            (
+                ScopedNarrowingConstraint::ALWAYS_FALSE,
+                ScopedReachabilityConstraintId::ALWAYS_FALSE,
+            ),
+            (
+                ScopedNarrowingConstraint::new(0),
+                ScopedReachabilityConstraintId::AMBIGUOUS,
+            ),
+            (
+                ScopedNarrowingConstraint::new(usize::from(u16::MAX - 2)),
+                ScopedReachabilityConstraintId::new(usize::from(u16::MAX - 3)),
+            ),
+        ] {
+            let binding = LiveBinding::new(
+                ScopedDefinitionId::UNBOUND,
+                narrowing,
+                reachability,
+                FutureDefinitions::DontShadowThisOne,
+            );
+            assert_eq!(
+                CompactLiveBinding::try_from_live_binding(&binding)
+                    .unwrap()
+                    .expand(),
+                binding
+            );
+        }
+    }
+
+    #[test]
+    fn interior_ids_that_would_overlap_terminals_need_wide_bindings() {
+        for (narrowing, reachability) in [
+            (
+                ScopedNarrowingConstraint::new(usize::from(u16::MAX - 1)),
+                ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            ),
+            (
+                ScopedNarrowingConstraint::ALWAYS_TRUE,
+                ScopedReachabilityConstraintId::new(usize::from(u16::MAX - 2)),
+            ),
+        ] {
+            let binding = LiveBinding::new(
+                ScopedDefinitionId::UNBOUND,
+                narrowing,
+                reachability,
+                FutureDefinitions::ShadowThisOne,
+            );
+            assert!(CompactLiveBinding::try_from_live_binding(&binding).is_none());
+        }
     }
 }

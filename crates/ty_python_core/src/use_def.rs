@@ -274,7 +274,7 @@ use crate::reachability_constraints::{
 use crate::scope::{FileScopeId, ScopeKind, ScopeLaziness};
 use crate::symbol::ScopedSymbolId;
 use crate::use_def::place_state::{
-    Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
+    Bindings, CompactLiveBinding, Declarations, EnclosingSnapshot, LiveDeclaration,
     LiveDeclarationsIterator, PlaceState,
 };
 use crate::{
@@ -531,7 +531,27 @@ fn retained_state_range<I: Idx>(ends: &IndexSlice<I, u32>, index: I) -> std::ops
 #[derive(Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 struct RetainedBindings {
     ends: FrozenIndexVec<InternedBindingsId, u32>,
-    live_bindings: Box<[LiveBinding]>,
+    live_bindings: RetainedLiveBindings,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
+enum RetainedLiveBindings {
+    Compact(Box<[CompactLiveBinding]>),
+    Wide(Box<[LiveBinding]>),
+}
+
+impl RetainedLiveBindings {
+    /// Choose one width for the whole scope so individual bindings need no tag.
+    fn new(bindings: Vec<LiveBinding>) -> Self {
+        let mut compact = Vec::with_capacity(bindings.len());
+        for binding in &bindings {
+            let Some(binding) = CompactLiveBinding::try_from_live_binding(binding) else {
+                return Self::Wide(bindings.into_boxed_slice());
+            };
+            compact.push(binding);
+        }
+        Self::Compact(compact.into_boxed_slice())
+    }
 }
 
 struct RetainedBindingsBuilder {
@@ -566,16 +586,48 @@ impl RetainedBindingsBuilder {
         }
         RetainedBindings {
             ends: self.ends.into(),
-            live_bindings: self.live_bindings.into_boxed_slice(),
+            live_bindings: RetainedLiveBindings::new(self.live_bindings),
         }
     }
 }
 
-impl Index<InternedBindingsId> for RetainedBindings {
-    type Output = [LiveBinding];
+impl RetainedBindings {
+    fn iter(&self, index: InternedBindingsId) -> RetainedBindingsIter<'_> {
+        let range = retained_state_range(&self.ends, index);
+        match &self.live_bindings {
+            RetainedLiveBindings::Compact(bindings) => {
+                RetainedBindingsIter::Compact(bindings[range].iter())
+            }
+            RetainedLiveBindings::Wide(bindings) => {
+                RetainedBindingsIter::Wide(bindings[range].iter())
+            }
+        }
+    }
+}
 
-    fn index(&self, index: InternedBindingsId) -> &Self::Output {
-        &self.live_bindings[retained_state_range(&self.ends, index)]
+#[derive(Clone, Debug)]
+enum RetainedBindingsIter<'a> {
+    Compact(std::slice::Iter<'a, CompactLiveBinding>),
+    Wide(std::slice::Iter<'a, LiveBinding>),
+}
+
+impl ExactSizeIterator for RetainedBindingsIter<'_> {}
+
+impl Iterator for RetainedBindingsIter<'_> {
+    type Item = LiveBinding;
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            Self::Compact(iter) => iter.size_hint(),
+            Self::Wide(iter) => iter.size_hint(),
+        }
+    }
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Compact(iter) => iter.next().map(|binding| binding.expand()),
+            Self::Wide(iter) => iter.next().copied(),
+        }
     }
 }
 
@@ -1224,7 +1276,7 @@ impl<'db> UseDefMap<'db> {
     pub fn bindings_at_use(&self, use_id: ScopedUseId) -> BindingWithConstraintsIterator<'_, 'db> {
         let bindings_id = self.extra().bindings_by_use.get(use_id.index());
         self.bindings_iterator(
-            &self.interned_bindings[bindings_id],
+            self.interned_bindings.iter(bindings_id),
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -1245,7 +1297,7 @@ impl<'db> UseDefMap<'db> {
         snapshot: BindingsSnapshotId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         self.bindings_iterator(
-            &self.interned_bindings[snapshot.0],
+            self.interned_bindings.iter(snapshot.0),
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -1260,7 +1312,7 @@ impl<'db> UseDefMap<'db> {
             .map(|member_bindings| {
                 member_bindings.iter().map(|bindings| {
                     self.bindings_iterator(
-                        bindings.as_slice(),
+                        RetainedBindingsIter::Wide(bindings.iter()),
                         BoundnessAnalysis::BasedOnUnboundVisibility,
                     )
                 })
@@ -1364,7 +1416,7 @@ impl<'db> UseDefMap<'db> {
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         let place_state_id = self.symbol_states[symbol].end_of_scope;
         self.bindings_iterator(
-            &self.interned_bindings[place_state_id.bindings_id()],
+            self.interned_bindings.iter(place_state_id.bindings_id()),
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -1375,7 +1427,7 @@ impl<'db> UseDefMap<'db> {
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         let place_state_id = self.extra().member_states[member].end_of_scope;
         self.bindings_iterator(
-            &self.interned_bindings[place_state_id.bindings_id()],
+            self.interned_bindings.iter(place_state_id.bindings_id()),
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -1388,7 +1440,7 @@ impl<'db> UseDefMap<'db> {
             ScopedPlaceId::Symbol(symbol) => &self.symbol_states[symbol],
             ScopedPlaceId::Member(member) => &self.extra().member_states[member],
         };
-        let bindings = &self.interned_bindings[state.reachable.bindings_id()];
+        let bindings = self.interned_bindings.iter(state.reachable.bindings_id());
         BindingWithConstraintsIterator {
             initial_unbound: Some(state.initial_reachability),
             ..self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
@@ -1430,12 +1482,10 @@ impl<'db> UseDefMap<'db> {
                 EnclosingSnapshotResult::FoundConstraint(*constraint)
             }
             Some(InternedEnclosingSnapshotId::Bindings(bindings_id)) => {
-                EnclosingSnapshotResult::FoundBindings(
-                    self.bindings_iterator(
-                        &self.interned_bindings[*bindings_id],
-                        boundness_analysis,
-                    ),
-                )
+                EnclosingSnapshotResult::FoundBindings(self.bindings_iterator(
+                    self.interned_bindings.iter(*bindings_id),
+                    boundness_analysis,
+                ))
             }
             None => EnclosingSnapshotResult::NotFound,
         }
@@ -1446,8 +1496,8 @@ impl<'db> UseDefMap<'db> {
         definition: Definition<'db>,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         let bindings = self.definitions_by_definition.get(&definition).map_or_else(
-            || ALWAYS_UNBOUND_BINDINGS.as_slice(),
-            |definitions| &self.interned_bindings[definitions.bindings],
+            || RetainedBindingsIter::Wide(ALWAYS_UNBOUND_BINDINGS.iter()),
+            |definitions| self.interned_bindings.iter(definitions.bindings),
         );
         self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
@@ -1594,7 +1644,7 @@ impl<'db> UseDefMap<'db> {
 
     fn bindings_iterator<'map>(
         &'map self,
-        bindings: &'map [LiveBinding],
+        bindings: RetainedBindingsIter<'map>,
         boundness_analysis: BoundnessAnalysis,
     ) -> BindingWithConstraintsIterator<'map, 'db> {
         BindingWithConstraintsIterator {
@@ -1602,7 +1652,7 @@ impl<'db> UseDefMap<'db> {
             constraint_tables: self.constraint_tables(),
             boundness_analysis,
             initial_unbound: None,
-            inner: bindings.iter(),
+            inner: bindings,
         }
     }
 
@@ -1668,7 +1718,7 @@ pub struct BindingWithConstraintsIterator<'map, 'db> {
     constraint_tables: &'map ConstraintTables<'db>,
     boundness_analysis: BoundnessAnalysis,
     initial_unbound: Option<ScopedReachabilityConstraintId>,
-    inner: LiveBindingsIterator<'map>,
+    inner: RetainedBindingsIter<'map>,
 }
 
 impl<'map, 'db> BindingWithConstraintsIterator<'map, 'db> {
