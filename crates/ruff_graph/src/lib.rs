@@ -2,11 +2,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::Result;
 
+use ruff_db::files::system_path_to_file;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_linter::source_kind::SourceKind;
-use ruff_python_ast::helpers::to_module_path;
 use ruff_python_parser::{ParseOptions, parse};
 pub use ty_module_resolver::ResolverEnvironment;
+use ty_module_resolver::{ResolverFile, file_to_module};
 
 use crate::collector::Collector;
 pub use crate::db::{ModuleDb, resolve_search_paths};
@@ -29,7 +30,6 @@ impl ModuleImports {
         environment: ResolverEnvironment<'db>,
         source: &SourceKind,
         path: &SystemPath,
-        package: Option<&SystemPath>,
         string_imports: StringImports,
         type_checking_imports: bool,
     ) -> Result<Self> {
@@ -38,8 +38,19 @@ impl ModuleImports {
             .with_target_version(environment.python_version(db));
         let parsed = parse(source.source_code(), parse_options)?;
 
-        let module_path =
-            package.and_then(|package| to_module_path(package.as_std_path(), path.as_std_path()));
+        // Derive the module path from the search paths, so relative imports resolve within them.
+        let module_path = system_path_to_file(db, path)
+            .ok()
+            .and_then(|file| file_to_module(db, ResolverFile::new(db, file, environment)))
+            .map(|module| {
+                let mut module_path: Vec<String> =
+                    module.name(db).components().map(String::from).collect();
+                // The collector drops the last component for `.`, which is `__init__` in a package.
+                if module.kind(db).is_package() {
+                    module_path.push("__init__".to_string());
+                }
+                module_path
+            });
 
         // Collect the imports.
         let imports = Collector::new(
