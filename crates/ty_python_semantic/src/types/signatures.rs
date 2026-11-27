@@ -5732,7 +5732,7 @@ impl<'db> Parameters<'db> {
             .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
             .collect();
         let parameters = Self::new(value, kind);
-        if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. })
+        if matches!(*type_mapping, TypeMapping::FreshenBoundTypeVars { .. })
             && let Some((_, variadic)) = parameters.variadic()
             && variadic.has_starred_annotation()
             && variadic
