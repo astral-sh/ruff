@@ -94,6 +94,7 @@ use std::cell::{Cell, LazyCell, RefCell};
 use std::cmp::Ordering;
 use std::convert::Infallible;
 use std::fmt::{Debug, Display};
+use std::hash::Hash;
 use std::iter;
 use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
@@ -1294,6 +1295,67 @@ struct Projection<'db> {
     scope: TypeVarSet<'db>,
 }
 
+/// Interns entries by the part of each entry that determines its identity. Small arenas
+/// scan their local entries directly. Larger arenas and overlays use a hash index.
+#[derive(Debug)]
+struct InternedArena<I, K, T = K> {
+    local: IndexVec<I, T>,
+    index: Option<FxHashMap<K, I>>,
+    first_local: usize,
+}
+
+impl<I: Idx, K, T> Default for InternedArena<I, K, T> {
+    fn default() -> Self {
+        Self {
+            local: IndexVec::default(),
+            index: None,
+            first_local: 0,
+        }
+    }
+}
+
+impl<I: Idx, K: Clone + Eq + Hash, T: std::borrow::Borrow<K>> InternedArena<I, K, T> {
+    /// Compaction can leave gaps in the IDs. Index retained entries by their original IDs
+    /// and start assigning local IDs after the entire retained range.
+    fn index_overlay(&mut self, first_local: usize, retained: impl Iterator<Item = (K, I)>) {
+        debug_assert!(self.local.is_empty());
+        self.index = Some(retained.collect());
+        self.first_local = first_local;
+    }
+
+    /// Returns the ID of a previously interned key.
+    fn lookup(&self, key: &K) -> Option<I> {
+        if let Some(index) = &self.index {
+            return index.get(key).copied();
+        }
+        self.local
+            .iter_enumerated()
+            .find_map(|(id, entry)| (entry.borrow() == key).then_some(id))
+    }
+
+    /// Assigns an ID after a lookup miss. Callers can compute support for a new entry
+    /// between lookup and insertion without holding a mutable borrow of the arena.
+    fn insert(&mut self, entry: T) -> I {
+        const SCAN_LIMIT: usize = 4;
+
+        let local_id = self.local.push(entry);
+        if let Some(index) = &mut self.index {
+            let id = I::new(self.first_local + local_id.index());
+            index.insert(self.local[local_id].borrow().clone(), id);
+            return id;
+        }
+        if self.local.len() > SCAN_LIMIT {
+            self.index = Some(
+                self.local
+                    .iter_enumerated()
+                    .map(|(id, entry)| (entry.borrow().clone(), id))
+                    .collect(),
+            );
+        }
+        local_id
+    }
+}
+
 #[derive(Debug, Default)]
 struct ConstraintSetStorage<'db> {
     /// Compacted owned storage overlaid onto this builder. This is used by
@@ -1311,7 +1373,7 @@ struct ConstraintSetStorage<'db> {
     /// identity. Constraints are added to this arena as they are encountered when constructing
     /// constraint sets. The ordering within the arena defines the BDD variable ordering in our BDD
     /// structures.
-    constraints: IndexVec<ConstraintId, Constraint<'db>>,
+    constraints: InternedArena<ConstraintId, Constraint<'db>>,
 
     /// Typevars are interned so that they have a stable ordering within this builder, which does
     /// not depend on their salsa IDs. (The salsa IDs are not stable, since each typevar can be
@@ -1323,7 +1385,7 @@ struct ConstraintSetStorage<'db> {
     typevars: IndexVec<TypeVarId, BoundTypeVarInstance<'db>>,
 
     /// The BDD nodes that appear in any of the constraint sets constructed in this builder.
-    nodes: IndexVec<NodeId, BuilderNode>,
+    nodes: InternedArena<NodeId, InteriorNodeData, BuilderNode>,
 
     supports: IndexVec<SupportId, Support>,
     constraint_supports: IndexVec<ConstraintId, SupportId>,
@@ -1339,12 +1401,10 @@ struct ConstraintSetStorage<'db> {
     ///
     /// This is encoded as an interned binary DAG over [`ConstraintId`]s. The first occurrence of
     /// each constraint in a left-first traversal defines the ordering.
-    source_orders: IndexVec<SourceOrderId, SourceOrder>,
+    source_orders: InternedArena<SourceOrderId, SourceOrder>,
 
     // Everything below are the memoization tables for the arenas and for our BDD operations.
-    constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
-    node_cache: FxHashMap<InteriorNodeData, NodeId>,
     /// Pairs whose sequent maps are empty need no work on subsequent walks in the same
     /// inference scope. A different scope may allow the pair to imply new constraints.
     empty_sequent_pairs: FxHashSet<(
@@ -1356,7 +1416,6 @@ struct ConstraintSetStorage<'db> {
     /// Avoid repeatedly walking deep constraint bounds without imposing Salsa-query overhead on
     /// the many shallow bounds that are cheap to walk once.
     constraint_bound_depth_cache: FxHashMap<AtomicConstraintId, (u16, u16)>,
-    source_order_cache: FxHashMap<SourceOrder, SourceOrderId>,
     /// Only caches completed top-level results. Recursive results depend on active path
     /// assignments and must not use this cache. A BDD's satisfiability does not depend on the
     /// source order used to traverse it.
@@ -1370,60 +1429,33 @@ struct ConstraintSetStorage<'db> {
     exists_cache: FxHashMap<ExistsCacheKey<'db>, Projection<'db>>,
 }
 
-/// Small builders can look up interned values in their dense local arena. On the
-/// first miss beyond the cutoff, populate the index with the existing IDs.
-/// Overlays always use the index because their IDs can also refer to compacted data.
-fn lookup_in_arena<I: Idx, T, K: Clone + Eq + std::hash::Hash>(
-    arena: &IndexVec<I, T>,
-    index: &mut FxHashMap<K, I>,
-    overlay: bool,
-    value: &K,
-    key: impl Fn(&T) -> &K,
-) -> Option<I> {
-    const SCAN_LIMIT: usize = 4;
-
-    if overlay || !index.is_empty() {
-        return index.get(value).copied();
-    }
-    for (id, entry) in arena.iter_enumerated() {
-        if key(entry) == value {
-            return Some(id);
-        }
-    }
-    if arena.len() == SCAN_LIMIT {
-        index.extend(
-            arena
-                .iter_enumerated()
-                .map(|(id, entry)| (key(entry).clone(), id)),
-        );
-    }
-    None
-}
-
 impl<'db> ConstraintSetStorage<'db> {
     fn ensure_overlay_identity_caches(&mut self) {
         let Some(compacted) = &self.compacted else {
             return;
         };
-        if !self.node_cache.is_empty() {
+        if self.nodes.index.is_some() {
             return;
         }
 
-        self.constraint_cache.extend(
+        self.constraints.index_overlay(
+            compacted.constraint_indices.len(),
             compacted
                 .constraint_indices
                 .iter_ones()
                 .zip(compacted.constraints.iter().cloned())
                 .map(|(old_index, constraint)| (constraint, ConstraintId::from_usize(old_index))),
         );
-        self.node_cache.extend(
+        self.nodes.index_overlay(
+            compacted.node_indices.len(),
             compacted
                 .node_indices
                 .iter_ones()
                 .zip(compacted.nodes.iter().copied())
                 .map(|(old_index, node)| (node, NodeId::from_usize(old_index))),
         );
-        self.source_order_cache.extend(
+        self.source_orders.index_overlay(
+            compacted.source_orders.len(),
             compacted
                 .source_orders
                 .iter()
@@ -1450,30 +1482,9 @@ impl<'db> ConstraintSetStorage<'db> {
         );
     }
 
-    fn adjusted_node_id(&self, id: NodeId) -> NodeId {
-        if let Some(compacted) = &self.compacted {
-            return id + compacted.node_indices.len();
-        }
-        id
-    }
-
-    fn adjusted_constraint_id(&self, id: ConstraintId) -> ConstraintId {
-        if let Some(compacted) = &self.compacted {
-            return id + compacted.constraint_indices.len();
-        }
-        id
-    }
-
     fn adjusted_support_id(&self, id: SupportId) -> SupportId {
         if let Some(compacted) = &self.compacted {
             return id + compacted.support_indices.len();
-        }
-        id
-    }
-
-    fn adjusted_source_order_id(&self, id: SourceOrderId) -> SourceOrderId {
-        if let Some(compacted) = &self.compacted {
-            return id + compacted.source_orders.len();
         }
         id
     }
@@ -1493,7 +1504,7 @@ impl<'db> ConstraintSetBuilder<'db> {
 
     #[cfg(test)]
     pub(super) fn allocated_nodes(&self) -> usize {
-        self.storage.borrow().nodes.len()
+        self.storage.borrow().nodes.local.len()
     }
 
     pub(super) fn with_budget<'a, 'c>(
@@ -1713,24 +1724,13 @@ impl<'db> ConstraintSetStorage<'db> {
         data: Constraint<'db>,
     ) -> ConstraintId {
         self.ensure_overlay_identity_caches();
-        if let Some(id) = lookup_in_arena(
-            &self.constraints,
-            &mut self.constraint_cache,
-            self.compacted.is_some(),
-            &data,
-            |entry| entry,
-        ) {
+        if let Some(id) = self.constraints.lookup(&data) {
             return id;
         }
         let support = self.intern_constraint_typevars(db, env, &data);
         let support_id = self.intern_support(support);
-        let id = self.constraints.push(data.clone());
         self.constraint_supports.push(support_id);
-        let id = self.adjusted_constraint_id(id);
-        if self.compacted.is_some() || !self.constraint_cache.is_empty() {
-            self.constraint_cache.insert(data, id);
-        }
-        id
+        self.constraints.insert(data)
     }
 
     fn intern_atomic_constraint(
@@ -1745,13 +1745,7 @@ impl<'db> ConstraintSetStorage<'db> {
 
     fn intern_interior_node(&mut self, data: InteriorNodeData) -> NodeId {
         self.ensure_overlay_identity_caches();
-        if let Some(id) = lookup_in_arena(
-            &self.nodes,
-            &mut self.node_cache,
-            self.compacted.is_some(),
-            &data,
-            |entry| &entry.data,
-        ) {
+        if let Some(id) = self.nodes.lookup(&data) {
             return id;
         }
 
@@ -1762,12 +1756,7 @@ impl<'db> ConstraintSetStorage<'db> {
         support |= self.node_support(data.if_false);
         let support = self.intern_support(support);
 
-        let id = self.nodes.push(BuilderNode { data, support });
-        let id = self.adjusted_node_id(id);
-        if self.compacted.is_some() || !self.node_cache.is_empty() {
-            self.node_cache.insert(data, id);
-        }
-        id
+        self.nodes.insert(BuilderNode { data, support })
     }
 
     /// Tries to prove that `left` needs fewer true atoms than `right`.
@@ -1787,6 +1776,7 @@ impl<'db> ConstraintSetStorage<'db> {
         let end = left.index().max(right.index()) + 1;
         for node in self
             .nodes
+            .local
             .iter()
             .take(end)
             .skip(minima.len())
@@ -1832,9 +1822,9 @@ impl<'db> ConstraintSetStorage<'db> {
                 let compacted_index = compacted.retained_constraint_index(constraint);
                 return &compacted.constraints[compacted_index];
             }
-            return &self.constraints[ConstraintId::from_usize(index - split)];
+            return &self.constraints.local[ConstraintId::from_usize(index - split)];
         }
-        &self.constraints[constraint]
+        &self.constraints.local[constraint]
     }
 
     fn atomic_constraint_data(&self, constraint: AtomicConstraintId) -> AtomicConstraint<'db> {
@@ -1870,28 +1860,17 @@ impl<'db> ConstraintSetStorage<'db> {
                 let compacted_index = compacted.retained_node_index(node);
                 return compacted.nodes[compacted_index];
             }
-            return self.nodes[NodeId::from_usize(index - split)].data;
+            return self.nodes.local[NodeId::from_usize(index - split)].data;
         }
-        self.nodes[node].data
+        self.nodes.local[node].data
     }
 
     fn intern_source_order(&mut self, data: SourceOrder) -> SourceOrderId {
         self.ensure_overlay_identity_caches();
-        if let Some(id) = lookup_in_arena(
-            &self.source_orders,
-            &mut self.source_order_cache,
-            self.compacted.is_some(),
-            &data,
-            |entry| entry,
-        ) {
+        if let Some(id) = self.source_orders.lookup(&data) {
             return id;
         }
-        let id = self.source_orders.push(data);
-        let id = self.adjusted_source_order_id(id);
-        if self.compacted.is_some() || !self.source_order_cache.is_empty() {
-            self.source_order_cache.insert(data, id);
-        }
-        id
+        self.source_orders.insert(data)
     }
 
     /// Repeating a source-order tree cannot change the first occurrence of any constraint, so
@@ -1931,9 +1910,9 @@ impl<'db> ConstraintSetStorage<'db> {
             if index < split {
                 return compacted.source_orders[index];
             }
-            return self.source_orders[SourceOrderId::from_usize(index - split)];
+            return self.source_orders.local[SourceOrderId::from_usize(index - split)];
         }
-        self.source_orders[source_order]
+        self.source_orders.local[source_order]
     }
 
     fn calculate_source_orders(
@@ -2030,9 +2009,9 @@ impl<'db> ConstraintSetStorage<'db> {
                 let compacted_index = compacted.retained_node_index(node);
                 return Some(compacted.node_supports[compacted_index]);
             }
-            return Some(self.nodes[NodeId::from_usize(index - split)].support);
+            return Some(self.nodes.local[NodeId::from_usize(index - split)].support);
         }
-        Some(self.nodes[node].support)
+        Some(self.nodes.local[node].support)
     }
 
     fn node_support(&self, node: NodeId) -> Option<&Support> {
@@ -3713,6 +3692,12 @@ struct InteriorNodeData {
 struct BuilderNode {
     data: InteriorNodeData,
     support: SupportId,
+}
+
+impl std::borrow::Borrow<InteriorNodeData> for BuilderNode {
+    fn borrow(&self) -> &InteriorNodeData {
+        &self.data
+    }
 }
 
 /// Accumulates validity and evidence bounds for a single typevar on one TDD path.
@@ -7757,7 +7742,7 @@ class E: ...
                 })
                 .collect();
         }
-        let nodes = builder.storage.borrow().nodes.len();
+        let nodes = builder.storage.borrow().nodes.local.len();
         assert!(nodes < 4 * count * count, "allocated {nodes} nodes");
     }
 
@@ -7900,7 +7885,7 @@ class E: ...
 
         for original in [t_int, combined, alternatives] {
             let storage = builder.storage.borrow();
-            let original_source_order_count = storage.source_orders.len();
+            let original_source_order_count = storage.source_orders.local.len();
             drop(storage);
             let intersection = original.and(db, build, || original);
             let union = original.or(db, build, || original);
@@ -7912,7 +7897,10 @@ class E: ...
                 assert_eq!(combined.source_order, original.source_order);
             }
             let storage = builder.storage.borrow();
-            assert_eq!(storage.source_orders.len(), original_source_order_count);
+            assert_eq!(
+                storage.source_orders.local.len(),
+                original_source_order_count
+            );
         }
     }
 
@@ -8398,8 +8386,8 @@ class E: ...
 
             let storage = builder.storage.borrow();
             assert!(storage.compacted.is_some());
-            assert!(storage.nodes.is_empty());
-            assert!(storage.constraints.is_empty());
+            assert!(storage.nodes.local.is_empty());
+            assert!(storage.constraints.local.is_empty());
             assert!(storage.typevars.is_empty());
         });
     }
@@ -8491,8 +8479,8 @@ class E: ...
             assert!(!combined.is_never_satisfied(db, &env, TypeVarSet::All));
 
             let storage = builder.storage.borrow();
-            assert!(!storage.nodes.is_empty());
-            assert!(!storage.constraints.is_empty());
+            assert!(!storage.nodes.local.is_empty());
+            assert!(!storage.constraints.local.is_empty());
             assert!(!storage.typevars.is_empty());
         });
     }
@@ -8536,8 +8524,8 @@ class E: ...
             assert!(set.is_always_satisfied(db, &env, TypeVarSet::All));
             let storage = builder.storage.borrow();
             assert!(storage.compacted.is_none());
-            assert!(storage.nodes.is_empty());
-            assert!(storage.constraints.is_empty());
+            assert!(storage.nodes.local.is_empty());
+            assert!(storage.constraints.local.is_empty());
             assert!(storage.typevars.is_empty());
         });
 

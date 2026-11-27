@@ -26,8 +26,8 @@ impl OwnedConstraintSetBuilder {
         source_order: SourceOrderId,
     ) -> OwnedConstraintSet<'_> {
         let mut builder = Self {
-            used_nodes: RankBitBox::bits_with_capacity(storage.nodes.len()),
-            used_constraints: RankBitBox::bits_with_capacity(storage.constraints.len()),
+            used_nodes: RankBitBox::bits_with_capacity(storage.nodes.local.len()),
+            used_constraints: RankBitBox::bits_with_capacity(storage.constraints.local.len()),
             used_supports: RankBitBox::bits_with_capacity(storage.supports.len()),
             live_support: storage.node_support(root.node()).cloned(),
             source_orders: IndexVec::default(),
@@ -150,12 +150,14 @@ impl OwnedConstraintSetBuilder {
 
         let nodes = storage
             .nodes
+            .local
             .iter()
             .zip(&self.used_nodes)
             .filter_map(|(node, used)| used.then_some(node.data))
             .collect();
         let node_supports = storage
             .nodes
+            .local
             .into_iter()
             .zip(&self.used_nodes)
             .filter_map(|(node, used)| used.then_some(node.support))
@@ -164,6 +166,7 @@ impl OwnedConstraintSetBuilder {
 
         let constraints = storage
             .constraints
+            .local
             .into_iter()
             .zip(&self.used_constraints)
             .filter_map(|(constraint, used)| used.then_some(constraint))
