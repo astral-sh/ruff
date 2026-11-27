@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/with.py
 ---
 ## Input
 ```python
@@ -741,7 +740,9 @@ if True:
         pass
 
 with Child(aaaaaaaaa, bbbbbbbbbbbbbbb, cccccc), Document(
-    aaaaa, bbbbbbbbbb, ddddddddddddd
+    aaaaa,
+    bbbbbbbbbb,
+    ddddddddddddd,
 ):
     pass
 

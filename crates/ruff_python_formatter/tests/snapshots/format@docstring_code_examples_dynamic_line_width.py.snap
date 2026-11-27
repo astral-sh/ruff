@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/docstring_code_examples_dynamic_line_width.py
 ---
 ## Input
 ```python
@@ -320,7 +319,20 @@ def simple():
 
     ```py
     class Abcdefghijklmopqrstuvwxyz(
-        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+        Abc,
+        Def,
+        Ghi,
+        Jkl,
+        Mno,
+        Pqr,
+        Stu,
+        Vwx,
+        Yz,
+        A1,
+        A2,
+        A3,
+        A4,
+        A5,
     ):
         def abcdefghijklmnopqrstuvwxyz(
             self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -350,7 +362,20 @@ def repeated():
 
     ```py
     class Abcdefghijklmopqrstuvwxyz(
-        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+        Abc,
+        Def,
+        Ghi,
+        Jkl,
+        Mno,
+        Pqr,
+        Stu,
+        Vwx,
+        Yz,
+        A1,
+        A2,
+        A3,
+        A4,
+        A5,
     ):
         def abcdefghijklmnopqrstuvwxyz(
             self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -404,7 +429,20 @@ def repeated():
 
 
     class Abcdefghijklmopqrstuvwxyz(
-        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+        Abc,
+        Def,
+        Ghi,
+        Jkl,
+        Mno,
+        Pqr,
+        Stu,
+        Vwx,
+        Yz,
+        A1,
+        A2,
+        A3,
+        A4,
+        A5,
     ):
         def abcdefghijklmnopqrstuvwxyz(
             self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -470,7 +508,20 @@ def barely_exceeds_limit():
 
     ```py
     class Abcdefghijklmopqrstuvwxyz(
-        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+        Abc,
+        Def,
+        Ghi,
+        Jkl,
+        Mno,
+        Pqr,
+        Stu,
+        Vwx,
+        Yz,
+        A1,
+        A2,
+        A3,
+        A4,
+        A5,
     ):
         def abcdefghijklmnopqrstuvwxyz(
             self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -482,7 +533,20 @@ def barely_exceeds_limit():
                 # more than the limit. Therefore, it should get wrapped for
                 # indent_width >= 4.
                 print(
-                    abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a5678
+                    abc,
+                    ddef,
+                    ghi,
+                    jkl,
+                    mno,
+                    pqr,
+                    stu,
+                    vwx,
+                    yz,
+                    a1,
+                    a2,
+                    a3,
+                    a4,
+                    a5678,
                 )
                 return 5
 
@@ -502,7 +566,20 @@ def unindented():
 
     ```py
     class Abcdefghijklmopqrstuvwxyz(
-        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+        Abc,
+        Def,
+        Ghi,
+        Jkl,
+        Mno,
+        Pqr,
+        Stu,
+        Vwx,
+        Yz,
+        A1,
+        A2,
+        A3,
+        A4,
+        A5,
     ):
         def abcdefghijklmnopqrstuvwxyz(
             self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -532,7 +609,20 @@ def unindented_barely_exceeds_limit():
 
     ```py
     class Abcdefghijklmopqrstuvwxyz(
-        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+        Abc,
+        Def,
+        Ghi,
+        Jkl,
+        Mno,
+        Pqr,
+        Stu,
+        Vwx,
+        Yz,
+        A1,
+        A2,
+        A3,
+        A4,
+        A5,
     ):
         def abcdefghijklmnopqrstuvwxyz(
             self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -544,7 +634,20 @@ def unindented_barely_exceeds_limit():
                 # more than the limit. Therefore, it should get wrapped for
                 # indent_width >= 4.
                 print(
-                    abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a5678
+                    abc,
+                    ddef,
+                    ghi,
+                    jkl,
+                    mno,
+                    pqr,
+                    stu,
+                    vwx,
+                    yz,
+                    a1,
+                    a2,
+                    a3,
+                    a4,
+                    a5678,
                 )
                 return 5
 
@@ -600,7 +703,10 @@ def doctest_extra_indent3():
     Examples
     --------
     >>> af1, af2, af3 = pl.align_frames(
-    ...     df1, df2, df3, on="dt"
+    ...     df1,
+    ...     df2,
+    ...     df3,
+    ...     on="dt",
     ... )  # doctest: +IGNORE_RESULT
     """
 
@@ -690,7 +796,7 @@ def length_rst_in_section():
 ```diff
 --- Stable
 +++ Preview
-@@ -270,9 +270,11 @@
+@@ -374,9 +374,11 @@
  
          Examples
          --------
@@ -705,7 +811,7 @@ def length_rst_in_section():
          """
  
  
-@@ -300,9 +302,28 @@
+@@ -407,9 +409,28 @@
          Integer length of the list of numbers.
  
      Example:
@@ -737,7 +843,7 @@ def length_rst_in_section():
          20
      """
  
-@@ -317,9 +338,28 @@
+@@ -424,9 +445,28 @@
              Integer length of the list of numbers.
  
      Example:
@@ -769,7 +875,7 @@ def length_rst_in_section():
          20
      """
  
-@@ -337,9 +377,29 @@
+@@ -444,9 +484,29 @@
      Example:
  
          ```
@@ -802,7 +908,7 @@ def length_rst_in_section():
          ```
      """
  
-@@ -349,9 +409,29 @@
+@@ -456,9 +516,29 @@
      """
      Do cool stuff::
  
@@ -835,7 +941,7 @@ def length_rst_in_section():
      """
      pass
  
-@@ -362,8 +442,27 @@
+@@ -469,8 +549,27 @@
      Examples:
          Do cool stuff::
  
@@ -892,7 +998,20 @@ def simple():
 
   ```py
   class Abcdefghijklmopqrstuvwxyz(
-    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+    Abc,
+    Def,
+    Ghi,
+    Jkl,
+    Mno,
+    Pqr,
+    Stu,
+    Vwx,
+    Yz,
+    A1,
+    A2,
+    A3,
+    A4,
+    A5,
   ):
     def abcdefghijklmnopqrstuvwxyz(
       self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -922,7 +1041,20 @@ def repeated():
 
   ```py
   class Abcdefghijklmopqrstuvwxyz(
-    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+    Abc,
+    Def,
+    Ghi,
+    Jkl,
+    Mno,
+    Pqr,
+    Stu,
+    Vwx,
+    Yz,
+    A1,
+    A2,
+    A3,
+    A4,
+    A5,
   ):
     def abcdefghijklmnopqrstuvwxyz(
       self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -976,7 +1108,20 @@ def repeated():
 
 
   class Abcdefghijklmopqrstuvwxyz(
-    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+    Abc,
+    Def,
+    Ghi,
+    Jkl,
+    Mno,
+    Pqr,
+    Stu,
+    Vwx,
+    Yz,
+    A1,
+    A2,
+    A3,
+    A4,
+    A5,
   ):
     def abcdefghijklmnopqrstuvwxyz(
       self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -1042,7 +1187,20 @@ def barely_exceeds_limit():
 
   ```py
   class Abcdefghijklmopqrstuvwxyz(
-    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+    Abc,
+    Def,
+    Ghi,
+    Jkl,
+    Mno,
+    Pqr,
+    Stu,
+    Vwx,
+    Yz,
+    A1,
+    A2,
+    A3,
+    A4,
+    A5,
   ):
     def abcdefghijklmnopqrstuvwxyz(
       self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -1072,7 +1230,20 @@ def unindented():
 
   ```py
   class Abcdefghijklmopqrstuvwxyz(
-    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+    Abc,
+    Def,
+    Ghi,
+    Jkl,
+    Mno,
+    Pqr,
+    Stu,
+    Vwx,
+    Yz,
+    A1,
+    A2,
+    A3,
+    A4,
+    A5,
   ):
     def abcdefghijklmnopqrstuvwxyz(
       self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -1102,7 +1273,20 @@ def unindented_barely_exceeds_limit():
 
   ```py
   class Abcdefghijklmopqrstuvwxyz(
-    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+    Abc,
+    Def,
+    Ghi,
+    Jkl,
+    Mno,
+    Pqr,
+    Stu,
+    Vwx,
+    Yz,
+    A1,
+    A2,
+    A3,
+    A4,
+    A5,
   ):
     def abcdefghijklmnopqrstuvwxyz(
       self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -1252,7 +1436,7 @@ def length_rst_in_section():
 ```diff
 --- Stable
 +++ Preview
-@@ -290,9 +290,28 @@
+@@ -368,9 +368,28 @@
        Integer length of the list of numbers.
  
    Example:
@@ -1284,7 +1468,7 @@ def length_rst_in_section():
        20
    """
  
-@@ -307,9 +326,28 @@
+@@ -385,9 +404,28 @@
            Integer length of the list of numbers.
  
    Example:
@@ -1316,7 +1500,7 @@ def length_rst_in_section():
        20
    """
  
-@@ -327,9 +365,29 @@
+@@ -405,9 +443,29 @@
    Example:
  
        ```
@@ -1349,7 +1533,7 @@ def length_rst_in_section():
        ```
    """
  
-@@ -339,9 +397,29 @@
+@@ -417,9 +475,29 @@
    """
    Do cool stuff::
  
@@ -1382,7 +1566,7 @@ def length_rst_in_section():
    """
    pass
  
-@@ -352,8 +430,27 @@
+@@ -430,8 +508,27 @@
    Examples:
        Do cool stuff::
  
@@ -1439,7 +1623,20 @@ def simple():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+	    Abc,
+	    Def,
+	    Ghi,
+	    Jkl,
+	    Mno,
+	    Pqr,
+	    Stu,
+	    Vwx,
+	    Yz,
+	    A1,
+	    A2,
+	    A3,
+	    A4,
+	    A5,
 	):
 	    def abcdefghijklmnopqrstuvwxyz(
 	        self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -1469,7 +1666,20 @@ def repeated():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+	    Abc,
+	    Def,
+	    Ghi,
+	    Jkl,
+	    Mno,
+	    Pqr,
+	    Stu,
+	    Vwx,
+	    Yz,
+	    A1,
+	    A2,
+	    A3,
+	    A4,
+	    A5,
 	):
 	    def abcdefghijklmnopqrstuvwxyz(
 	        self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -1523,7 +1733,20 @@ def repeated():
 
 
 	class Abcdefghijklmopqrstuvwxyz(
-	    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+	    Abc,
+	    Def,
+	    Ghi,
+	    Jkl,
+	    Mno,
+	    Pqr,
+	    Stu,
+	    Vwx,
+	    Yz,
+	    A1,
+	    A2,
+	    A3,
+	    A4,
+	    A5,
 	):
 	    def abcdefghijklmnopqrstuvwxyz(
 	        self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -1589,7 +1812,20 @@ def barely_exceeds_limit():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+	    Abc,
+	    Def,
+	    Ghi,
+	    Jkl,
+	    Mno,
+	    Pqr,
+	    Stu,
+	    Vwx,
+	    Yz,
+	    A1,
+	    A2,
+	    A3,
+	    A4,
+	    A5,
 	):
 	    def abcdefghijklmnopqrstuvwxyz(
 	        self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -1601,7 +1837,20 @@ def barely_exceeds_limit():
 	            # more than the limit. Therefore, it should get wrapped for
 	            # indent_width >= 4.
 	            print(
-	                abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a5678
+	                abc,
+	                ddef,
+	                ghi,
+	                jkl,
+	                mno,
+	                pqr,
+	                stu,
+	                vwx,
+	                yz,
+	                a1,
+	                a2,
+	                a3,
+	                a4,
+	                a5678,
 	            )
 	            return 5
 
@@ -1621,7 +1870,20 @@ def unindented():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+	    Abc,
+	    Def,
+	    Ghi,
+	    Jkl,
+	    Mno,
+	    Pqr,
+	    Stu,
+	    Vwx,
+	    Yz,
+	    A1,
+	    A2,
+	    A3,
+	    A4,
+	    A5,
 	):
 	    def abcdefghijklmnopqrstuvwxyz(
 	        self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -1651,7 +1913,20 @@ def unindented_barely_exceeds_limit():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+	    Abc,
+	    Def,
+	    Ghi,
+	    Jkl,
+	    Mno,
+	    Pqr,
+	    Stu,
+	    Vwx,
+	    Yz,
+	    A1,
+	    A2,
+	    A3,
+	    A4,
+	    A5,
 	):
 	    def abcdefghijklmnopqrstuvwxyz(
 	        self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
@@ -1663,7 +1938,20 @@ def unindented_barely_exceeds_limit():
 	            # more than the limit. Therefore, it should get wrapped for
 	            # indent_width >= 4.
 	            print(
-	                abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a5678
+	                abc,
+	                ddef,
+	                ghi,
+	                jkl,
+	                mno,
+	                pqr,
+	                stu,
+	                vwx,
+	                yz,
+	                a1,
+	                a2,
+	                a3,
+	                a4,
+	                a5678,
 	            )
 	            return 5
 
@@ -1719,7 +2007,10 @@ def doctest_extra_indent3():
 	Examples
 	--------
 	>>> af1, af2, af3 = pl.align_frames(
-	...     df1, df2, df3, on="dt"
+	...     df1,
+	...     df2,
+	...     df3,
+	...     on="dt",
 	... )  # doctest: +IGNORE_RESULT
 	"""
 
@@ -1809,7 +2100,7 @@ def length_rst_in_section():
 ```diff
 --- Stable
 +++ Preview
-@@ -270,9 +270,11 @@
+@@ -374,9 +374,11 @@
  
  		Examples
  		--------
@@ -1824,7 +2115,7 @@ def length_rst_in_section():
  		"""
  
  
-@@ -300,9 +302,28 @@
+@@ -407,9 +409,28 @@
  	    Integer length of the list of numbers.
  
  	Example:
@@ -1856,7 +2147,7 @@ def length_rst_in_section():
  	    20
  	"""
  
-@@ -317,9 +338,28 @@
+@@ -424,9 +445,28 @@
  	        Integer length of the list of numbers.
  
  	Example:
@@ -1888,7 +2179,7 @@ def length_rst_in_section():
  	    20
  	"""
  
-@@ -337,9 +377,29 @@
+@@ -444,9 +484,29 @@
  	Example:
  
  	    ```
@@ -1921,7 +2212,7 @@ def length_rst_in_section():
  	    ```
  	"""
  
-@@ -349,9 +409,29 @@
+@@ -456,9 +516,29 @@
  	"""
  	Do cool stuff::
  
@@ -1954,7 +2245,7 @@ def length_rst_in_section():
  	"""
  	pass
  
-@@ -362,8 +442,27 @@
+@@ -469,8 +549,27 @@
  	Examples:
  	    Do cool stuff::
  
@@ -2011,7 +2302,20 @@ def simple():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+	        Abc,
+	        Def,
+	        Ghi,
+	        Jkl,
+	        Mno,
+	        Pqr,
+	        Stu,
+	        Vwx,
+	        Yz,
+	        A1,
+	        A2,
+	        A3,
+	        A4,
+	        A5,
 	):
 	        def abcdefghijklmnopqrstuvwxyz(
 	                self,
@@ -2081,7 +2385,20 @@ def repeated():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+	        Abc,
+	        Def,
+	        Ghi,
+	        Jkl,
+	        Mno,
+	        Pqr,
+	        Stu,
+	        Vwx,
+	        Yz,
+	        A1,
+	        A2,
+	        A3,
+	        A4,
+	        A5,
 	):
 	        def abcdefghijklmnopqrstuvwxyz(
 	                self,
@@ -2269,7 +2586,20 @@ def repeated():
 
 
 	class Abcdefghijklmopqrstuvwxyz(
-	        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+	        Abc,
+	        Def,
+	        Ghi,
+	        Jkl,
+	        Mno,
+	        Pqr,
+	        Stu,
+	        Vwx,
+	        Yz,
+	        A1,
+	        A2,
+	        A3,
+	        A4,
+	        A5,
 	):
 	        def abcdefghijklmnopqrstuvwxyz(
 	                self,
@@ -2469,7 +2799,20 @@ def barely_exceeds_limit():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+	        Abc,
+	        Def,
+	        Ghi,
+	        Jkl,
+	        Mno,
+	        Pqr,
+	        Stu,
+	        Vwx,
+	        Yz,
+	        A1,
+	        A2,
+	        A3,
+	        A4,
+	        A5,
 	):
 	        def abcdefghijklmnopqrstuvwxyz(
 	                self,
@@ -2539,7 +2882,20 @@ def unindented():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+	        Abc,
+	        Def,
+	        Ghi,
+	        Jkl,
+	        Mno,
+	        Pqr,
+	        Stu,
+	        Vwx,
+	        Yz,
+	        A1,
+	        A2,
+	        A3,
+	        A4,
+	        A5,
 	):
 	        def abcdefghijklmnopqrstuvwxyz(
 	                self,
@@ -2609,7 +2965,20 @@ def unindented_barely_exceeds_limit():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+	        Abc,
+	        Def,
+	        Ghi,
+	        Jkl,
+	        Mno,
+	        Pqr,
+	        Stu,
+	        Vwx,
+	        Yz,
+	        A1,
+	        A2,
+	        A3,
+	        A4,
+	        A5,
 	):
 	        def abcdefghijklmnopqrstuvwxyz(
 	                self,
@@ -2721,7 +3090,10 @@ def doctest_extra_indent3():
 	Examples
 	--------
 	>>> af1, af2, af3 = pl.align_frames(
-	...         df1, df2, df3, on="dt"
+	...         df1,
+	...         df2,
+	...         df3,
+	...         on="dt",
 	... )  # doctest: +IGNORE_RESULT
 	"""
 
@@ -2918,7 +3290,7 @@ def length_rst_in_section():
 ```diff
 --- Stable
 +++ Preview
-@@ -700,9 +700,11 @@
+@@ -778,9 +778,11 @@
  
  		Examples
  		--------
@@ -2933,7 +3305,7 @@ def length_rst_in_section():
  		"""
  
  
-@@ -730,30 +732,28 @@
+@@ -811,30 +813,28 @@
  	    Integer length of the list of numbers.
  
  	Example:
@@ -2986,7 +3358,7 @@ def length_rst_in_section():
  	    20
  	"""
  
-@@ -768,30 +768,28 @@
+@@ -849,30 +849,28 @@
  	        Integer length of the list of numbers.
  
  	Example:
@@ -3039,7 +3411,7 @@ def length_rst_in_section():
  	    20
  	"""
  
-@@ -809,31 +807,29 @@
+@@ -890,31 +888,29 @@
  	Example:
  
  	    ```
@@ -3094,7 +3466,7 @@ def length_rst_in_section():
  	    ```
  	"""
  
-@@ -843,31 +839,29 @@
+@@ -924,31 +920,29 @@
  	"""
  	Do cool stuff::
  
@@ -3149,7 +3521,7 @@ def length_rst_in_section():
  	"""
  	pass
  
-@@ -878,29 +872,27 @@
+@@ -959,29 +953,27 @@
  	Examples:
  	    Do cool stuff::
  
