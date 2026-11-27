@@ -2972,6 +2972,81 @@ print( 'hello' )
     Ok(())
 }
 
+fn markdown_with_syntax_error() -> Result<CliTest> {
+    CliTest::with_file(
+        "test.md",
+        r#"# Example
+
+- An invalid code block in a list item:
+
+    ```py
+    if True:
+        print "hello"
+    ```
+"#,
+    )
+}
+
+#[test]
+fn markdown_syntax_error() -> Result<()> {
+    let test = markdown_with_syntax_error()?;
+
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--isolated", "--check", "test.md"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file already formatted
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn markdown_syntax_error_preview() -> Result<()> {
+    let test = markdown_with_syntax_error()?;
+
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--isolated", "--preview", "test.md"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Failed to parse test.md:7:15: Simple statements must be separated by newlines or semicolons
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn markdown_syntax_error_preview_check() -> Result<()> {
+    let test = markdown_with_syntax_error()?;
+
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--isolated", "--preview", "--check", "test.md"]), @r#"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+    invalid-syntax: Simple statements must be separated by newlines or semicolons
+     --> test.md:7:15
+      |
+    5 |     ```py
+    6 |     if True:
+    7 |         print "hello"
+      |               ^^^^^^^
+    8 |     ```
+      |
+
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
 #[test]
 fn format_mapped_extension_files() -> Result<()> {
     let test = CliTest::with_files([

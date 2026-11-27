@@ -91,8 +91,15 @@ fn format_internal(
         }
         SourceType::Markdown => {
             match format_code_blocks(document.contents(), Some(path), formatter_settings) {
-                MarkdownResult::Formatted(formatted) => Ok(FormatResult::Formatted(formatted)),
-                MarkdownResult::Unchanged => Ok(FormatResult::Unchanged),
+                Ok(MarkdownResult::Formatted(formatted)) => Ok(FormatResult::Formatted(formatted)),
+                Ok(MarkdownResult::Unchanged) => Ok(FormatResult::Unchanged),
+                // Like for Python documents, syntax errors in code blocks are logged instead of
+                // being propagated as visible server errors.
+                Err(FormatModuleError::ParseError(error)) => {
+                    tracing::warn!("Unable to format document: {error}");
+                    Ok(FormatResult::Unchanged)
+                }
+                Err(err) => Err(err.into()),
             }
         }
         SourceType::Toml(_) => {
@@ -380,6 +387,7 @@ mod tests {
     use insta::assert_snapshot;
     use ruff_linter::settings::types::{CompiledPerFileTargetVersionList, PerFileTargetVersion};
     use ruff_python_ast::{PySourceType, PythonVersion, SourceType};
+    use ruff_python_formatter::PreviewMode;
     use ruff_text_size::{TextRange, TextSize};
     use ruff_workspace::FormatterSettings;
 
@@ -525,6 +533,28 @@ sys.exit(
         "#);
 
         Ok(())
+    }
+
+    #[test]
+    fn format_markdown_syntax_error_preview() {
+        let document = TextDocument::new(
+            "```py\nprint( 'hello' )\n```\n\n```py\nprint 'hello'\n```\n".to_string(),
+            0,
+        );
+
+        let result = format(
+            &document,
+            SourceType::Markdown,
+            &FormatterSettings {
+                preview: PreviewMode::Enabled,
+                ..Default::default()
+            },
+            Path::new("test.md"),
+            FormatBackend::Internal,
+        )
+        .expect("Expected syntax errors to be logged instead of returned");
+
+        assert_eq!(result, FormatResult::Unchanged);
     }
 
     #[cfg(feature = "test-uv")]

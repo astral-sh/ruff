@@ -518,10 +518,14 @@ pub(crate) fn format_source(
             }
 
             match format_code_blocks(unformatted_document, path, settings) {
-                MarkdownResult::Formatted(formatted) => {
+                Ok(MarkdownResult::Formatted(formatted)) => {
                     Ok(FormattedSource::Formatted(SourceKind::Markdown(formatted)))
                 }
-                MarkdownResult::Unchanged => Ok(FormattedSource::Unchanged),
+                Ok(MarkdownResult::Unchanged) => Ok(FormattedSource::Unchanged),
+                Err(FormatModuleError::ParseError(err)) => {
+                    Err(FormatCommandError::parse(err, path, source_kind))
+                }
+                Err(err) => Err(FormatCommandError::Format(path.map(Path::to_path_buf), err)),
             }
         }
     }

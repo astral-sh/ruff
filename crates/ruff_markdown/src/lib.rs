@@ -2,7 +2,7 @@ use std::{path::Path, sync::LazyLock};
 
 use regex::Regex;
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_python_formatter::format_module_source;
+use ruff_python_formatter::{FormatModuleError, format_module_source};
 use ruff_python_trivia::textwrap::{dedent, indent};
 use ruff_source_file::{Line, UniversalNewlines};
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -46,6 +46,14 @@ enum MarkdownState {
     Off,
 }
 
+/// Returns `true` if code blocks that fail to format, for example because they contain a syntax
+/// error, are reported as errors instead of being skipped.
+///
+/// See <https://github.com/astral-sh/ruff/issues/25523>.
+const fn is_code_block_errors_enabled(settings: &FormatterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 fn is_closing_code_fence(line: &str, opening_fence: &str) -> bool {
     let Some(fence_byte) = opening_fence.as_bytes().first().copied() else {
         return false;
@@ -65,7 +73,7 @@ pub fn format_code_blocks(
     source: &str,
     path: Option<&Path>,
     settings: &FormatterSettings,
-) -> MarkdownResult {
+) -> Result<MarkdownResult, FormatModuleError> {
     let mut state = MarkdownState::On;
     let mut changed = false;
     let mut formatted = String::with_capacity(source.len());
@@ -106,21 +114,27 @@ pub fn format_code_blocks(
                 };
 
                 let end = code_line.start();
-                let unformatted_code = dedent(&source[TextRange::new(start, end)]);
+                let block = &source[TextRange::new(start, end)];
+                let unformatted_code = dedent(block);
 
                 let formatted_code = match language.as_str() {
                     "python" | "py" | "python3" | "py3" | "pyi" => {
                         let options =
                             settings.to_format_options(py_source_type, &unformatted_code, path);
-                        // Using `Printed::into_code` requires adding `ruff_formatter` as a direct
-                        // dependency, and I suspect that Rust can optimize the closure away regardless.
-                        #[expect(clippy::redundant_closure_for_method_calls)]
                         format_module_source(&unformatted_code, options)
-                            .map(|formatted| formatted.into_code())
-                            .ok()
+                            .map(|formatted| Some(formatted.into_code()))
                     }
                     "pycon" => format_pycon_block(&unformatted_code, path, settings),
-                    _ => None,
+                    _ => Ok(None),
+                };
+
+                let formatted_code = match formatted_code {
+                    Ok(formatted_code) => formatted_code,
+                    Err(mut error) if is_code_block_errors_enabled(settings) => {
+                        relocate_parse_error(&mut error, block, &unformatted_code, start);
+                        return Err(error);
+                    }
+                    Err(_) => None,
                 };
 
                 // Formatting produced changes
@@ -141,17 +155,41 @@ pub fn format_code_blocks(
 
     if changed {
         formatted.push_str(&source[last_match.to_usize()..]);
-        MarkdownResult::Formatted(formatted)
+        Ok(MarkdownResult::Formatted(formatted))
     } else {
-        MarkdownResult::Unchanged
+        Ok(MarkdownResult::Unchanged)
     }
+}
+
+fn relocate_parse_error(
+    error: &mut FormatModuleError,
+    original: &str,
+    extracted: &str,
+    original_start: TextSize,
+) {
+    if let FormatModuleError::ParseError(error) = error {
+        error.location = TextRange::new(
+            original_start + map_offset_to_original(original, extracted, error.location.start()),
+            original_start + map_offset_to_original(original, extracted, error.location.end()),
+        );
+    }
+}
+
+fn map_offset_to_original(original: &str, extracted: &str, offset: TextSize) -> TextSize {
+    original
+        .universal_newlines()
+        .zip(extracted.universal_newlines())
+        .find(|(_, extracted_line)| offset < extracted_line.full_end())
+        .map_or(original.text_len(), |(original_line, extracted_line)| {
+            original_line.full_end() - (extracted_line.full_end() - offset)
+        })
 }
 
 fn format_pycon_block(
     source: &str,
     path: Option<&Path>,
     settings: &FormatterSettings,
-) -> Option<String> {
+) -> Result<Option<String>, FormatModuleError> {
     static FIRST_LINE: &str = ">>> ";
     static CONTINUATION: &str = "... ";
     static CONTINUATION_BLANK: &str = "...";
@@ -179,13 +217,14 @@ fn format_pycon_block(
                 unformatted.push_str(&source[TextRange::new(start, end)]);
             }
             let options = settings.to_format_options(PySourceType::Python, &unformatted, path);
-            // Using `Printed::into_code` requires adding `ruff_formatter` as a direct
-            // dependency, and I suspect that Rust can optimize the closure away regardless.
-            #[expect(clippy::redundant_closure_for_method_calls)]
-            let Ok(formatted) =
-                format_module_source(&unformatted, options).map(|formatted| formatted.into_code())
-            else {
-                continue;
+            let formatted = match format_module_source(&unformatted, options) {
+                Ok(formatted) => formatted.into_code(),
+                Err(mut error) if is_code_block_errors_enabled(settings) => {
+                    let statement = &source[TextRange::new(start, end)];
+                    relocate_parse_error(&mut error, statement, &unformatted, start);
+                    return Err(error);
+                }
+                Err(_) => continue,
             };
 
             if formatted.len() != unformatted.len() || formatted != unformatted {
@@ -208,9 +247,9 @@ fn format_pycon_block(
 
     if changed {
         result.push_str(&source[last_match.to_usize()..]);
-        Some(result)
+        Ok(Some(result))
     } else {
-        None
+        Ok(None)
     }
 }
 
@@ -218,6 +257,8 @@ fn format_pycon_block(
 mod tests {
     use insta::assert_snapshot;
     use ruff_linter::settings::types::{ExtensionMapping, ExtensionPair, Language};
+    use ruff_python_formatter::{FormatModuleError, PreviewMode};
+    use ruff_source_file::LineIndex;
     use ruff_workspace::FormatterSettings;
 
     use crate::{MarkdownResult, format_code_blocks};
@@ -228,6 +269,30 @@ mod tests {
                 Self::Formatted(source) => write!(f, "{source}"),
                 Self::Unchanged => write!(f, "Unchanged"),
             }
+        }
+    }
+
+    fn preview_settings() -> FormatterSettings {
+        FormatterSettings {
+            preview: PreviewMode::Enabled,
+            ..FormatterSettings::default()
+        }
+    }
+
+    /// Formats `code` in preview mode and renders the resulting parse error as
+    /// `line:column: message (text at the error location)`, where the line and column are
+    /// relative to the Markdown document.
+    fn preview_syntax_error(code: &str) -> String {
+        match format_code_blocks(code, None, &preview_settings()) {
+            Err(FormatModuleError::ParseError(error)) => {
+                let location =
+                    LineIndex::from_source_text(code).line_column(error.location.start(), code);
+                format!(
+                    "{}:{}: {} ({:?})",
+                    location.line, location.column, error.error, &code[error.location]
+                )
+            }
+            result => panic!("Expected a parse error, got {result:?}"),
         }
     }
 
@@ -243,7 +308,7 @@ print( "hello" )
 More text.
         "#;
         assert_snapshot!(
-            format_code_blocks(code, None, &FormatterSettings::default()),
+            format_code_blocks(code, None, &FormatterSettings::default()).unwrap(),
             @r#"
 
         This is poorly formatted code:
@@ -269,7 +334,7 @@ print("hello")
 More text.
         "#;
         assert_snapshot!(
-            format_code_blocks(code, None, &FormatterSettings::default()),
+            format_code_blocks(code, None, &FormatterSettings::default()).unwrap(),
             @"Unchanged");
     }
 
@@ -285,7 +350,63 @@ print "hello"
 More text.
         "#;
         assert_snapshot!(
-            format_code_blocks(code, None, &FormatterSettings::default()),
+            format_code_blocks(code, None, &FormatterSettings::default()).unwrap(),
+            @"Unchanged");
+    }
+
+    #[test]
+    fn format_code_blocks_syntax_error_preview() {
+        // The error fails the whole document, so the first code block isn't formatted either.
+        let code = r#"
+This is poorly formatted code:
+
+```py
+print( "hello" )
+```
+
+This is invalid code:
+
+```py
+print "hello"
+```
+        "#;
+        assert_snapshot!(preview_syntax_error(code), @r#"11:7: Simple statements must be separated by newlines or semicolons ("\"hello\"")"#);
+    }
+
+    #[test]
+    fn format_code_blocks_syntax_error_indented_preview() {
+        let code = r#"
+- This is invalid code in a list item:
+
+    ```py
+    if True:
+        print "hello"
+    ```
+        "#;
+        assert_snapshot!(preview_syntax_error(code), @r#"6:15: Simple statements must be separated by newlines or semicolons ("\"hello\"")"#);
+    }
+
+    #[test]
+    fn format_code_blocks_syntax_error_end_of_block_preview() {
+        let code = r#"
+```py
+def foo():
+```
+        "#;
+        assert_snapshot!(preview_syntax_error(code), @r#"3:11: Expected an indented block after function definition ("\n")"#);
+    }
+
+    #[test]
+    fn format_code_blocks_syntax_error_ignore_ruff_off_preview() {
+        let code = r#"
+<!-- fmt:off -->
+```py
+print "hello"
+```
+<!-- fmt:on -->
+        "#;
+        assert_snapshot!(
+            format_code_blocks(code, None, &preview_settings()).unwrap(),
             @"Unchanged");
     }
 
@@ -299,7 +420,7 @@ print( "hello" )
 ```
         "#;
         assert_snapshot!(
-            format_code_blocks(code, None, &FormatterSettings::default()),
+            format_code_blocks(code, None, &FormatterSettings::default()).unwrap(),
             @"Unchanged");
     }
 
@@ -315,7 +436,7 @@ fn (foo: &str) -> &str {
 ```
         "#;
         assert_snapshot!(
-            format_code_blocks(code, None, &FormatterSettings::default()),
+            format_code_blocks(code, None, &FormatterSettings::default()).unwrap(),
             @"Unchanged");
     }
 
@@ -327,7 +448,7 @@ print( 'hello' )
 ~~~
         "#;
         assert_snapshot!(
-            format_code_blocks(code, None, &FormatterSettings::default()),
+            format_code_blocks(code, None, &FormatterSettings::default()).unwrap(),
             @r#"
 
         ~~~py
@@ -347,7 +468,7 @@ print( 'hello' )
 ~~~~~
         "#;
         assert_snapshot!(
-            format_code_blocks(code, None, &FormatterSettings::default()),
+            format_code_blocks(code, None, &FormatterSettings::default()).unwrap(),
             @r#"
 
         ````py
@@ -367,7 +488,7 @@ print( 'hello' )
 ````
         "#;
         assert_snapshot!(
-            format_code_blocks(code, None, &FormatterSettings::default()),
+            format_code_blocks(code, None, &FormatterSettings::default()).unwrap(),
             @r#"
 
         ```py
@@ -386,7 +507,7 @@ print( 'world' )
 ```
         "#;
         assert_snapshot!(
-            format_code_blocks(code, None, &FormatterSettings::default()),
+            format_code_blocks(code, None, &FormatterSettings::default()).unwrap(),
             @"Unchanged");
     }
 
@@ -394,7 +515,7 @@ print( 'world' )
     fn format_code_blocks_invalid_closing_fence_form_feed() {
         let code = "```py\nprint( 'hello' )\n```\x0C\nprint( 'world' )\n```\n";
         assert_eq!(
-            format_code_blocks(code, None, &FormatterSettings::default()),
+            format_code_blocks(code, None, &FormatterSettings::default()).unwrap(),
             MarkdownResult::Unchanged
         );
     }
@@ -409,7 +530,7 @@ print( 'hello' )
 ````
         "#;
         assert_snapshot!(
-            format_code_blocks(code, None, &FormatterSettings::default()),
+            format_code_blocks(code, None, &FormatterSettings::default()).unwrap(),
             @"Unchanged");
     }
 
@@ -434,7 +555,7 @@ print( 'hello' )
             code,
             None,
             &FormatterSettings::default()
-        ), @r#"
+        ).unwrap(), @r#"
 
         ```py
         print("hello")
@@ -473,7 +594,7 @@ print( 'hello' )
             code,
             None,
             &FormatterSettings::default()
-        ), @r#"
+        ).unwrap(), @r#"
 
         ```py
         print("hello")
@@ -507,7 +628,7 @@ print( 'hello' )
             code,
             None,
             &FormatterSettings::default()
-        ), @"Unchanged");
+        ).unwrap(), @"Unchanged");
     }
 
     #[test]
@@ -530,7 +651,7 @@ def bar(): ...
                 extension: mapping,
                 ..Default::default()
             }
-        ), @"Unchanged");
+        ).unwrap(), @"Unchanged");
     }
 
     #[test]
@@ -547,7 +668,7 @@ def foo(): ...
 def bar(): ...
 ~~~
         "#;
-        assert_snapshot!(format_code_blocks(code, None, &FormatterSettings::default()), @r#"
+        assert_snapshot!(format_code_blocks(code, None, &FormatterSettings::default()).unwrap(), @r#"
 
         ```{py}
         print("hello")
@@ -575,7 +696,7 @@ hello there
 thing1 thing2
 ```
         "#;
-        assert_snapshot!(format_code_blocks(code, None, &FormatterSettings::default()), @r#"
+        assert_snapshot!(format_code_blocks(code, None, &FormatterSettings::default()).unwrap(), @r#"
 
         ```pycon
         >>> print("hello there")
@@ -593,5 +714,40 @@ thing1 thing2
         thing1 thing2
         ```
         "#);
+    }
+
+    #[test]
+    fn format_code_blocks_python_console_syntax_error() {
+        // Outside of preview, only the invalid statement is skipped.
+        let code = r#"
+```pycon
+>>> print( 'hello' )
+hello
+>>> print "hello"
+```
+        "#;
+        assert_snapshot!(format_code_blocks(code, None, &FormatterSettings::default()).unwrap(), @r#"
+
+        ```pycon
+        >>> print("hello")
+        hello
+        >>> print "hello"
+        ```
+        "#);
+    }
+
+    #[test]
+    fn format_code_blocks_python_console_syntax_error_preview() {
+        let code = r#"
+- This is an invalid console session in a list item:
+
+    ```pycon
+    >>> print( 'hello' )
+    hello
+    >>> def foo():
+    ...     print "hello"
+    ```
+        "#;
+        assert_snapshot!(preview_syntax_error(code), @r#"8:19: Simple statements must be separated by newlines or semicolons ("\"hello\"")"#);
     }
 }
