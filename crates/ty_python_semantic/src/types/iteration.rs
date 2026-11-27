@@ -429,75 +429,29 @@ impl<'db> Type<'db> {
                 }
             }
 
-            let try_call_dunder_anext_on_iterator = |iterator: Type<'db>| -> Result<
-                Result<Type<'db>, AwaitError<'db>>,
-                CallDunderError<'db>,
-            > {
-                iterator
-                    .try_call_dunder(
+            #[salsa::tracked(
+                returns(copy),
+                cycle_result=|_, _, _, _| None,
+                heap_size=ruff_memory_usage::heap_size
+            )]
+            fn async_iteration_element_type<'db>(
+                db: &'db dyn Db,
+                program: ty_python_core::Program<'db>,
+                iterable: Type<'db>,
+            ) -> Option<Type<'db>> {
+                iterable
+                    .try_async_iteration_element_type(
                         db,
-                        env,
-                        "__anext__",
-                        CallArguments::none(),
-                        TypeContext::default(),
+                        &ProgramEnvironment::from_program(program),
                     )
-                    .map(|dunder_anext_outcome| {
-                        dunder_anext_outcome.return_type(db, env).try_await(db, env)
-                    })
-            };
+                    .ok()
+            }
 
-            return match self.try_call_dunder(
-                db,
-                env,
-                "__aiter__",
-                CallArguments::none(),
-                TypeContext::default(),
-            ) {
-                Ok(dunder_aiter_bindings) => {
-                    let iterator = dunder_aiter_bindings.return_type(db, env);
-                    match try_call_dunder_anext_on_iterator(iterator) {
-                        Ok(Ok(result)) => Ok(Cow::Owned(TupleSpec::homogeneous(result))),
-                        Ok(Err(AwaitError::InvalidReturnType(..))) => {
-                            Err(IterationError::UnboundAiterError)
-                        } // TODO: __anext__ is bound, but is not properly awaitable
-                        Err(dunder_anext_error) | Ok(Err(AwaitError::Call(dunder_anext_error))) => {
-                            Err(IterationError::IterReturnsInvalidIterator {
-                                iterator,
-                                dunder_error: dunder_anext_error,
-                                mode,
-                            })
-                        }
-                    }
-                }
-                Err(CallDunderError::PossiblyUnbound {
-                    bindings: dunder_aiter_bindings,
-                    ..
-                }) => {
-                    let iterator = dunder_aiter_bindings.return_type(db, env);
-                    match try_call_dunder_anext_on_iterator(iterator) {
-                        Ok(_) => Err(IterationError::IterCallError {
-                            kind: CallErrorKind::PossiblyNotCallable,
-                            bindings: dunder_aiter_bindings,
-                            mode,
-                        }),
-                        Err(dunder_anext_error) => {
-                            Err(IterationError::IterReturnsInvalidIterator {
-                                iterator,
-                                dunder_error: dunder_anext_error,
-                                mode,
-                            })
-                        }
-                    }
-                }
-                Err(CallDunderError::CallError(kind, bindings, _)) => {
-                    Err(IterationError::IterCallError {
-                        kind,
-                        bindings,
-                        mode,
-                    })
-                }
-                Err(CallDunderError::MethodNotAvailable) => Err(IterationError::UnboundAiterError),
+            let element = match async_iteration_element_type(db, env.program(db), self) {
+                Some(element) => element,
+                None => self.try_async_iteration_element_type(db, env)?,
             };
+            return Ok(Cow::Owned(TupleSpec::homogeneous(element)));
         }
 
         if let Some(special_case) = non_async_special_case(db, env, self) {
@@ -526,6 +480,82 @@ impl<'db> Type<'db> {
             None => self.try_iteration_element_type(db, env)?,
         };
         Ok(Cow::Owned(TupleSpec::homogeneous(element)))
+    }
+
+    /// Resolve the type yielded by awaiting the async iterator's next item.
+    fn try_async_iteration_element_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Result<Type<'db>, IterationError<'db>> {
+        let mode = EvaluationMode::Async;
+        let try_call_dunder_anext_on_iterator = |iterator: Type<'db>| -> Result<
+            Result<Type<'db>, AwaitError<'db>>,
+            CallDunderError<'db>,
+        > {
+            iterator
+                .try_call_dunder(
+                    db,
+                    env,
+                    "__anext__",
+                    CallArguments::none(),
+                    TypeContext::default(),
+                )
+                .map(|dunder_anext_outcome| {
+                    dunder_anext_outcome.return_type(db, env).try_await(db, env)
+                })
+        };
+
+        match self.try_call_dunder(
+            db,
+            env,
+            "__aiter__",
+            CallArguments::none(),
+            TypeContext::default(),
+        ) {
+            Ok(dunder_aiter_bindings) => {
+                let iterator = dunder_aiter_bindings.return_type(db, env);
+                match try_call_dunder_anext_on_iterator(iterator) {
+                    Ok(Ok(result)) => Ok(result),
+                    Ok(Err(AwaitError::InvalidReturnType(..))) => {
+                        Err(IterationError::UnboundAiterError)
+                    } // TODO: __anext__ is bound, but is not properly awaitable
+                    Err(dunder_anext_error) | Ok(Err(AwaitError::Call(dunder_anext_error))) => {
+                        Err(IterationError::IterReturnsInvalidIterator {
+                            iterator,
+                            dunder_error: dunder_anext_error,
+                            mode,
+                        })
+                    }
+                }
+            }
+            Err(CallDunderError::PossiblyUnbound {
+                bindings: dunder_aiter_bindings,
+                ..
+            }) => {
+                let iterator = dunder_aiter_bindings.return_type(db, env);
+                match try_call_dunder_anext_on_iterator(iterator) {
+                    Ok(_) => Err(IterationError::IterCallError {
+                        kind: CallErrorKind::PossiblyNotCallable,
+                        bindings: dunder_aiter_bindings,
+                        mode,
+                    }),
+                    Err(dunder_anext_error) => Err(IterationError::IterReturnsInvalidIterator {
+                        iterator,
+                        dunder_error: dunder_anext_error,
+                        mode,
+                    }),
+                }
+            }
+            Err(CallDunderError::CallError(kind, bindings, _)) => {
+                Err(IterationError::IterCallError {
+                    kind,
+                    bindings,
+                    mode,
+                })
+            }
+            Err(CallDunderError::MethodNotAvailable) => Err(IterationError::UnboundAiterError),
+        }
     }
 
     /// Resolve synchronous iteration, including the fallback to `__getitem__`.

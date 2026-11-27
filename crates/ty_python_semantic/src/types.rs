@@ -9011,6 +9011,35 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Result<Type<'db>, AwaitError<'db>> {
+        // Cache the result type. Errors need the method bindings for diagnostics, so
+        // reconstruct them on demand instead of retaining them for every awaitable.
+        #[salsa::tracked(
+            returns(copy),
+            cycle_result=|_, _, _, _| None,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn awaited_type<'db>(
+            db: &'db dyn Db,
+            program: ty_python_core::Program<'db>,
+            awaitable: Type<'db>,
+        ) -> Option<Type<'db>> {
+            awaitable
+                .try_await_impl(db, &ProgramEnvironment::from_program(program))
+                .ok()
+        }
+
+        match awaited_type(db, env.program(db), self) {
+            Some(ty) => Ok(ty),
+            None => self.try_await_impl(db, env),
+        }
+    }
+
+    /// Check `__await__` and return the result type of its generator.
+    fn try_await_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Result<Type<'db>, AwaitError<'db>> {
         let await_result = self.try_call_dunder(
             db,
             env,

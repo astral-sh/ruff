@@ -1840,6 +1840,41 @@ def use(items: Items):
 }
 
 #[test]
+fn async_iteration_follows_changes_to_the_awaitable() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file(
+        "/src/main.py",
+        "\
+from typing_extensions import reveal_type
+from source import Items
+
+async def use(items: Items):
+    async for item in items:
+        reveal_type(item)
+",
+    )?;
+    for element in ["int", "str", "int"] {
+        db.write_file(
+            "/src/source.pyi",
+            format!(
+                "\
+from typing import Generator
+
+class Item:
+    def __await__(self) -> Generator[None, None, {element}]: ...
+
+class Items:
+    def __aiter__(self) -> Items: ...
+    def __anext__(self) -> Item: ...
+"
+            ),
+        )?;
+        assert_revealed_type(&db, "/src/main.py", element);
+    }
+    Ok(())
+}
+
+#[test]
 fn field_specifier_default_value_invalidates_caller() -> anyhow::Result<()> {
     let mut db = setup_db();
     let field_source = r#"from typing import Any
