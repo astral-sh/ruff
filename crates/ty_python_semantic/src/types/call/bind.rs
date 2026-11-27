@@ -682,7 +682,7 @@ pub(crate) struct Bindings<'db> {
 
     /// The elements of this binding. For a union, each element is a union variant.
     /// Each element may contain multiple `CallableBinding`s if it came from an intersection.
-    elements: SmallVec<[BindingsElement<'db>; 1]>,
+    elements: Vec<BindingsElement<'db>>,
 
     /// The lexical scope used to detect recursive generic calls.
     call_site_scope: Option<ScopeId<'db>>,
@@ -880,7 +880,7 @@ impl<'db> Bindings<'db> {
             }
         }
         assert!(!inner_items_acc.is_empty());
-        let elements = smallvec![BindingsElement {
+        let elements = vec![BindingsElement {
             callable_type,
             items: inner_items_acc,
         }];
@@ -3463,7 +3463,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
     fn from(from: CallableBinding<'db>) -> Bindings<'db> {
         Bindings {
             callable_type: from.callable_type,
-            elements: smallvec_inline![BindingsElement {
+            elements: vec![BindingsElement {
                 callable_type: from.callable_type,
                 items: smallvec_inline![CallableItem::Regular(from)],
             }],
