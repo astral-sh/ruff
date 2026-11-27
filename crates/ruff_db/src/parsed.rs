@@ -176,16 +176,6 @@ impl ParsedModule {
     pub fn clear(&self) {
         self.inner.store(None);
     }
-
-    /// Returns the file to which this module belongs.
-    pub fn file(&self) -> File {
-        self.file
-    }
-
-    /// Returns the Python version used to parse this module.
-    pub fn python_version(&self) -> PythonVersion {
-        self.python_version
-    }
 }
 
 impl std::fmt::Debug for ParsedModule {
