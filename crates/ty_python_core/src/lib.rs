@@ -279,44 +279,6 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
     NoLongerInEagerContext,
 }
 
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-struct DefinitionsByNode<'db> {
-    single: FrozenMap<DefinitionNodeKey, Definition<'db>>,
-    non_single: FrozenMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
-}
-
-impl<'db> DefinitionsByNode<'db> {
-    fn new(
-        mut single: FxHashMap<DefinitionNodeKey, Definition<'db>>,
-        star_imports: FxHashMap<DefinitionNodeKey, Vec<Definition<'db>>>,
-    ) -> Self {
-        let mut non_single = Vec::with_capacity(star_imports.len());
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "each wildcard import is independently partitioned by definition count"
-        )]
-        for (key, definitions) in star_imports {
-            if let [definition] = definitions.as_slice() {
-                single.insert(key, *definition);
-            } else {
-                non_single.push((key, definitions.into_boxed_slice()));
-            }
-        }
-
-        Self {
-            single: single.into(),
-            non_single: FrozenMap::from_entries(non_single),
-        }
-    }
-
-    fn get(&self, key: DefinitionNodeKey) -> Option<&[Definition<'db>]> {
-        self.single
-            .get(&key)
-            .map(std::slice::from_ref)
-            .or_else(|| self.non_single.get(&key).map(AsRef::as_ref))
-    }
-}
-
 /// The place tables and use-def maps for all scopes in a file.
 #[derive(Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SemanticIndex<'db> {
@@ -325,9 +287,6 @@ pub struct SemanticIndex<'db> {
 
     /// List of all scopes in this file.
     scopes: FrozenIndexVec<FileScopeId, Scope>,
-
-    /// Map from a node creating a definition to its definition.
-    definitions_by_node: DefinitionsByNode<'db>,
 
     /// Map from a standalone expression to its [`Expression`] ingredient.
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
@@ -356,11 +315,11 @@ pub struct SemanticIndex<'db> {
     /// Use-def map for each scope in this file.
     use_def_maps: FrozenIndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
 
-    /// Lexical scopes and scope-local use IDs recorded at source occurrences.
+    /// Definitions, lexical scopes and scope-local use IDs recorded at source occurrences.
     ///
     /// Note: We should not depend on this map when analysing other files or
     /// changing a file invalidates all dependents.
-    ast_ids: AstIds,
+    ast_ids: AstIds<'db>,
 
     /// The set of modules that are imported anywhere within this file.
     imported_modules: FrozenSet<ModuleName>,
@@ -455,7 +414,7 @@ impl<'db> SemanticIndex<'db> {
     }
 
     #[track_caller]
-    fn ast_ids(&self) -> &AstIds {
+    fn ast_ids(&self) -> &AstIds<'db> {
         &self.ast_ids
     }
 
@@ -723,8 +682,8 @@ impl<'db> SemanticIndex<'db> {
     /// if the definitions are created by a wildcard (`*`) import.
     #[track_caller]
     pub fn definitions(&self, definition_key: impl Into<DefinitionNodeKey>) -> &[Definition<'db>] {
-        self.definitions_by_node
-            .get(definition_key.into())
+        self.ast_ids
+            .definitions(definition_key.into())
             .expect("definition should be present in the semantic index")
     }
 
@@ -734,7 +693,7 @@ impl<'db> SemanticIndex<'db> {
         definition_node: ast::AnyNodeRef<'_>,
     ) -> Option<&[Definition<'db>]> {
         let definition_key = DefinitionNodeKey::from_node_ref(definition_node);
-        self.definitions_by_node.get(definition_key)
+        self.ast_ids.definitions(definition_key)
     }
 
     /// Returns the [`definition::Definition`] salsa ingredient for `definition_key`.
@@ -767,10 +726,7 @@ impl<'db> SemanticIndex<'db> {
         &self,
         definition_key: impl Into<DefinitionNodeKey>,
     ) -> Option<Definition<'db>> {
-        self.definitions_by_node
-            .single
-            .get(&definition_key.into())
-            .copied()
+        self.ast_ids.definition(definition_key.into()).copied()
     }
 
     /// Returns the [`Expression`] ingredient for an expression node.
@@ -1269,6 +1225,30 @@ mod tests {
 
     fn program_file(db: &TestDb, file: File) -> ProgramFile<'_> {
         db.program().program_file(db, file)
+    }
+
+    #[test]
+    fn singleton_star_import_interleaved_with_regular_definitions() {
+        // The star import enters the singleton table last, after definitions on later pages.
+        let source = format!("x = 0\nfrom library import *\n{}", "x += 1\n".repeat(64));
+        let db = TestDbBuilder::new()
+            .with_file("/src/test.py", source.as_str())
+            .with_file("/src/library.py", "a = 1")
+            .build()
+            .unwrap();
+        let file = program_file(&db, system_path_to_file(&db, "/src/test.py").unwrap());
+        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, file.python_file(&db)).load(&db);
+        let alias = &module.suite()[1].as_import_from_stmt().unwrap().names[0];
+        let definition = index.try_definition(alias).unwrap();
+        assert_eq!(definition.kind(&db).target_range(&module), alias.range);
+        for stmt in &module.suite()[2..] {
+            let ast::Stmt::AugAssign(assignment) = stmt else {
+                panic!("expected augmented assignment");
+            };
+            let definition = index.try_definition(assignment).unwrap();
+            assert_eq!(definition.kind(&db).full_range(&module), assignment.range);
+        }
     }
 
     fn names(table: &PlaceTable) -> Vec<String> {

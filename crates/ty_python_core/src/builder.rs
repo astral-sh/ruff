@@ -72,8 +72,8 @@ use crate::use_def::{
     ScopedEnclosingSnapshotId, StubParameter, UseDefMapBuilder, UseDefMapInterner,
 };
 use crate::{
-    AncestorsIter, DefinitionsByNode, EvaluationMode, LoopHeader, LoopHeaderId,
-    NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex,
+    AncestorsIter, EvaluationMode, LoopHeader, LoopHeaderId, NarrowingAliasPredicate,
+    PossiblyNarrowedPlaces, SemanticIndex,
 };
 use crate::{Db, Statement, StatementNodeKey};
 
@@ -287,11 +287,10 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes: IndexVec<FileScopeId, Scope>,
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
     place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
-    ast_ids: AstIdsBuilder,
+    ast_ids: AstIdsBuilder<'db>,
     // Box to avoid copying large builders when this index grows.
     use_def_maps: IndexVec<FileScopeId, Box<UseDefMapBuilder<'db>>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
-    definitions_by_node: FxHashMap<DefinitionNodeKey, Definition<'db>>,
     star_import_definitions: FxHashMap<DefinitionNodeKey, Vec<Definition<'db>>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     unpacks_by_target: FxHashMap<ExpressionNodeKey, Unpack<'db>>,
@@ -357,7 +356,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             use_def_maps: IndexVec::new(),
 
             scopes_by_node: FxHashMap::default(),
-            definitions_by_node: FxHashMap::default(),
             star_import_definitions: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
             unpacks_by_target: FxHashMap::default(),
@@ -418,7 +416,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn expect_single_definition(&self, key: impl Into<DefinitionNodeKey>) -> Definition<'db> {
-        self.definitions_by_node[&key.into()]
+        *self
+            .ast_ids
+            .definition(key.into())
+            .expect("missing definition")
     }
 
     /// See [`SemanticIndex::visible_ancestor_scopes`].
@@ -1540,7 +1541,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .push(definition);
             }
             _ => {
-                let previous = self.definitions_by_node.insert(node.key(), definition);
+                let previous = self.ast_ids.record_definition(node.key(), definition);
                 debug_assert!(
                     previous.is_none(),
                     "Attempted to create multiple `Definition`s associated with AST node {definition_node:?}"
@@ -2865,7 +2866,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         match pattern {
             ast::Pattern::MatchAs(pattern) => {
                 if let Some(name) = &pattern.name
-                    && let Some(definition) = self.definitions_by_node.get(&name.into())
+                    && let Some(definition) = self.ast_ids.definition(name.into())
                 {
                     let use_def = self.current_use_def_map();
                     bindings.extend(use_def.symbol_binding_definition_ids(symbol).filter(
@@ -3361,7 +3362,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         assert_eq!(&self.current_assignments, &[]);
 
-        let ast_ids = self.ast_ids.finish();
+        let ast_ids = self.ast_ids.finish(self.star_import_definitions);
 
         let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
         semantic_syntax_errors.shrink_to_fit();
@@ -3408,10 +3409,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         SemanticIndex {
             place_tables,
             scopes: self.scopes.into(),
-            definitions_by_node: DefinitionsByNode::new(
-                self.definitions_by_node,
-                self.star_import_definitions,
-            ),
             expressions_by_node: self.expressions_by_node,
             unpacks_by_target: FrozenMap::from(self.unpacks_by_target),
             statements_by_node: self.statements_by_node,

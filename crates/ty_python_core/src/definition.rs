@@ -1755,6 +1755,10 @@ pub enum NestedBindingExecution {
 pub struct DefinitionNodeKey(NodeKey);
 
 impl DefinitionNodeKey {
+    pub(super) fn index(self) -> ast::NodeIndex {
+        self.0.index()
+    }
+
     pub(crate) fn from_node_ref(node: ast::AnyNodeRef<'_>) -> Self {
         match node {
             ast::AnyNodeRef::ParameterWithDefault(parameter) => parameter.into(),
