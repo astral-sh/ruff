@@ -3363,6 +3363,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 | Type::ModuleLiteral(_),
             ) => self.never(),
 
+            // A function literal already has the signatures that its callable upcast interns.
+            (Type::FunctionLiteral(function), Type::Callable(target_callable)) => self
+                .with_recursion_guard(db, source, target, || {
+                    if let Some(class) = target_callable.runtime_class(db)
+                        && class != function.runtime_class(db)
+                    {
+                        return self.never();
+                    }
+                    self.check_callable_signature_pair(
+                        db,
+                        function.signature(db),
+                        target_callable.signatures(db),
+                    )
+                }),
+
             (Type::Callable(source_callable), Type::Callable(target_callable)) => self
                 .with_recursion_guard(db, source, target, || {
                     self.check_callable_pair(db, source_callable, target_callable)
