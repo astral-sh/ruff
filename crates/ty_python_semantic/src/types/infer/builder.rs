@@ -7234,23 +7234,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return self.infer_expression_uncached(expression, tcx);
         };
 
-        // A matching string literal annotation suppresses promotion. A mismatched
-        // string literal annotation only contributes an expected type for completions.
-        let tcx = if let ast::Expr::StringLiteral(literal) = expression
-            && let Some(expected) = tcx.expected_type().and_then(Type::as_string_literal)
-            && literal.value.to_str() != expected.value(self.db())
-            && !self.collects_expected_types()
-        {
-            TypeContext::default()
-        } else {
-            tcx
+        // For literals and unary expressions such as `-1`, a literal expectation only
+        // affects promotion and string completions. Cache the inference without that
+        // expectation so all overloads expecting a single literal can share one entry.
+        let (cache_tcx, expected_literal) = match tcx.expected_type() {
+            Some(Type::LiteralValue(expected))
+                if expression.is_literal_expr() || expression.is_unary_op_expr() =>
+            {
+                (TypeContext::default(), Some(expected))
+            }
+            _ => (tcx, None),
         };
 
         // See if we already have a cached entry for this expression.
         let expression_key = expression.into();
-        let cache_entry = expression_cache.borrow().get(expression_key, tcx).cloned();
+        let cache_entry = expression_cache
+            .borrow()
+            .get(expression_key, cache_tcx)
+            .cloned();
 
-        match cache_entry {
+        let ty = match cache_entry {
             Some(ExpressionCacheEntry::Small(ty)) => {
                 self.store_expression_type(expression, ty);
                 ty
@@ -7265,7 +7268,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => {
                 // The expression is uncached, infer it independently and cache the inference results.
                 let mut speculative_builder = self.speculate();
-                let ty = speculative_builder.infer_expression_uncached(expression, tcx);
+                let ty = speculative_builder.infer_expression_uncached(expression, cache_tcx);
                 let inference = speculative_builder.into_expression_cache_entry();
 
                 let cached = if inference.is_single_expression(expression_key, ty) {
@@ -7279,12 +7282,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(expression_cache) = &self.expression_cache {
                     expression_cache
                         .borrow_mut()
-                        .insert(expression_key, tcx, cached);
+                        .insert(expression_key, cache_tcx, cached);
                 }
 
                 ty
             }
+        };
+
+        if let Some(expected) = expected_literal {
+            if expression.is_string_literal_expr() {
+                self.store_maybe_expected_type(expression, Type::LiteralValue(expected));
+            }
+
+            // Disjoint literals can't match. Otherwise, `apply_type_context` checks
+            // assignability and suppresses promotion for a match. Update only this
+            // builder's copy so other overloads can still promote the cached type.
+            if let Type::LiteralValue(actual) = ty
+                && !actual.is_disjoint_from(self.db(), expected)
+            {
+                let ty = self.apply_type_context(expression, ty, tcx);
+                self.expressions.insert(expression_key, ty);
+                return ty;
+            }
         }
+
+        ty
     }
 
     fn infer_expression_uncached(

@@ -164,6 +164,30 @@ def color(value: str) -> str:
 reveal_type([color("blue")])  # revealed: list[Literal["blue"]]
 ```
 
+The same applies to negative integers and bytes. A `LiteralString` bound also preserves the specific
+string literal passed to the matching overload.
+
+```py
+from typing_extensions import LiteralString
+
+I = TypeVar("I", bound=Literal[-1])
+B = TypeVar("B", bound=Literal[b"x"])
+S = TypeVar("S", bound=LiteralString)
+
+@overload
+def keep(value: I) -> I: ...
+@overload
+def keep(value: B) -> B: ...
+@overload
+def keep(value: S) -> S: ...
+def keep(value: object) -> object:
+    return value
+
+reveal_type([keep(-1)])  # revealed: list[Literal[-1]]
+reveal_type([keep(b"x")])  # revealed: list[Literal[b"x"]]
+reveal_type([keep("x")])  # revealed: list[Literal["x"]]
+```
+
 ### Type context when no overload matches
 
 Both overloads reject the value, but only the first also rejects the key. The second overload
