@@ -290,11 +290,6 @@ impl Declarations {
         }
     }
 
-    /// Return an iterator over live declarations for this place.
-    pub(super) fn iter(&self) -> LiveDeclarationsIterator<'_> {
-        self.live_declarations.iter()
-    }
-
     pub(super) fn as_slice(&self) -> &[LiveDeclaration] {
         &self.live_declarations
     }
@@ -841,6 +836,7 @@ mod tests {
     fn assert_declarations(place: &PlaceState, expected: &[&str]) {
         let actual = place
             .declarations()
+            .as_slice()
             .iter()
             .map(|live_declaration| {
                 let declaration = live_declaration.declaration();
