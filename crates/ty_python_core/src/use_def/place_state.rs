@@ -78,6 +78,17 @@ impl ScopedDefinitionId {
     }
 }
 
+/// Clone short lists directly so branch snapshots do not need to reserve and extend a vector.
+#[inline]
+fn clone_definitions<T: Clone>(values: &SmallVec<[T; 2]>) -> SmallVec<[T; 2]> {
+    match values.as_slice() {
+        [] => SmallVec::new(),
+        [one] => smallvec![one.clone()],
+        [first, second] => SmallVec::from_buf([first.clone(), second.clone()]),
+        _ => values.clone(),
+    }
+}
+
 /// Merges two lists sorted by definition ID, combining constraints for shared definitions.
 fn merge_definitions<T: Clone>(
     left: &mut SmallVec<[T; 2]>,
@@ -111,7 +122,7 @@ fn merge_definitions<T: Clone>(
 
 /// Live declarations for a single place at some point in control flow, with their
 /// corresponding reachability constraints.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) struct Declarations {
     /// A list of live declarations for this place, sorted by their `ScopedDefinitionId`.
     live_declarations: SmallVec<[LiveDeclaration; 2]>,
@@ -206,6 +217,14 @@ pub(crate) enum FutureDefinitions {
 impl PreviousDefinitions {
     fn are_shadowed(self) -> bool {
         matches!(self, PreviousDefinitions::AreShadowed)
+    }
+}
+
+impl Clone for Declarations {
+    fn clone(&self) -> Self {
+        Self {
+            live_declarations: clone_definitions(&self.live_declarations),
+        }
     }
 }
 
@@ -321,7 +340,7 @@ pub(super) enum EnclosingSnapshot {
 
 /// Live bindings for a single place at some point in control flow. Each live binding comes
 /// with a set of narrowing constraints and a reachability constraint.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) struct Bindings {
     /// The narrowing constraint applicable to the "unbound" binding, if we need access to it even
     /// when it's not visible. This happens in class scopes, where local name bindings are not visible
@@ -330,6 +349,15 @@ pub(super) struct Bindings {
     unbound_narrowing_constraint: Option<ScopedNarrowingConstraint>,
     /// A list of live bindings for this place, sorted by their `ScopedDefinitionId`
     live_bindings: SmallVec<[LiveBinding; 2]>,
+}
+
+impl Clone for Bindings {
+    fn clone(&self) -> Self {
+        Self {
+            unbound_narrowing_constraint: self.unbound_narrowing_constraint,
+            live_bindings: clone_definitions(&self.live_bindings),
+        }
+    }
 }
 
 impl Bindings {
