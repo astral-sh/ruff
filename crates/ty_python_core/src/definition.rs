@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use ruff_db::PythonFile;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -305,39 +303,6 @@ fn attribute_docstring<'a>(
 
     // Only match string literals.
     value.as_string_literal_expr()
-}
-
-/// One or more [`Definition`]s.
-#[derive(Debug, Default, PartialEq, Eq, get_size2::GetSize)]
-pub struct Definitions<'db> {
-    definitions: smallvec::SmallVec<[Definition<'db>; 1]>,
-}
-
-impl<'db> Definitions<'db> {
-    pub(crate) fn push(&mut self, definition: Definition<'db>) {
-        self.definitions.push(definition);
-    }
-
-    pub(crate) fn into_boxed_slice(self) -> Box<[Definition<'db>]> {
-        self.definitions.into_vec().into_boxed_slice()
-    }
-}
-
-impl<'db> Deref for Definitions<'db> {
-    type Target = [Definition<'db>];
-
-    fn deref(&self) -> &Self::Target {
-        &self.definitions
-    }
-}
-
-impl<'a, 'db> IntoIterator for &'a Definitions<'db> {
-    type Item = &'a Definition<'db>;
-    type IntoIter = std::slice::Iter<'a, Definition<'db>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.definitions.iter()
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]

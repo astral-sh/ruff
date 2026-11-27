@@ -24,7 +24,7 @@ pub use crate::statement::{Statement, StatementNodeKey};
 use ast_ids::AstIds;
 pub use ast_ids::ExpressionNodeKey;
 use builder::SemanticIndexBuilder;
-use definition::{Definition, DefinitionNodeKey, Definitions};
+use definition::{Definition, DefinitionNodeKey};
 use expression::Expression;
 use member::ScopedMemberId;
 use narrowing_constraints::ScopedNarrowingConstraint;
@@ -286,28 +286,25 @@ struct DefinitionsByNode<'db> {
 }
 
 impl<'db> DefinitionsByNode<'db> {
-    fn from_map(definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>) -> Self {
-        let single_count = definitions_by_node
-            .values()
-            .filter(|definitions| definitions.len() == 1)
-            .count();
-        let mut single = Vec::with_capacity(single_count);
-        let mut non_single = Vec::with_capacity(definitions_by_node.len() - single_count);
-
+    fn new(
+        mut single: FxHashMap<DefinitionNodeKey, Definition<'db>>,
+        star_imports: FxHashMap<DefinitionNodeKey, Vec<Definition<'db>>>,
+    ) -> Self {
+        let mut non_single = Vec::with_capacity(star_imports.len());
         #[expect(
             clippy::iter_over_hash_type,
-            reason = "each node is independently partitioned by definition count"
+            reason = "each wildcard import is independently partitioned by definition count"
         )]
-        for (key, definitions) in definitions_by_node {
-            if definitions.len() == 1 {
-                single.push((key, definitions[0]));
+        for (key, definitions) in star_imports {
+            if let [definition] = definitions.as_slice() {
+                single.insert(key, *definition);
             } else {
                 non_single.push((key, definitions.into_boxed_slice()));
             }
         }
 
         Self {
-            single: FrozenMap::from_entries(single),
+            single: single.into(),
             non_single: FrozenMap::from_entries(non_single),
         }
     }
@@ -1211,6 +1208,7 @@ mod tests {
     use ruff_db::{
         files::{File, system_path_to_file},
         parsed::ParsedModuleRef,
+        system::DbWithWritableSystem as _,
     };
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
@@ -1743,6 +1741,27 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                 parameter: ParameterDefinitionNodeKind::VariadicKeywordParameter(_)
             })
         );
+    }
+
+    #[test]
+    fn wildcard_import_definitions_track_export_count() {
+        let mut db = TestDbBuilder::new()
+            .with_file("/src/test.py", "from library import *")
+            .with_file("/src/library.py", "")
+            .build()
+            .unwrap();
+        let importer = system_path_to_file(&db, "/src/test.py").unwrap();
+
+        for (source, count) in [("", 0), ("a = 1", 1), ("a = 1\nb = 2", 2), ("b = 2", 1)] {
+            db.write_file("/src/library.py", source).unwrap();
+            let file = program_file(&db, importer);
+            let module = parsed_module(&db, file.python_file(&db)).load(&db);
+            let index = semantic_index(&db, file);
+            let alias = &module.suite()[0].as_import_from_stmt().unwrap().names[0];
+
+            assert_eq!(index.definitions(alias).len(), count);
+            assert_eq!(index.try_definition(alias).is_some(), count == 1);
+        }
     }
 
     /// Test case to validate that the comprehension scope is correctly identified and that the target
