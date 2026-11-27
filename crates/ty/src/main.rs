@@ -3,7 +3,7 @@ use std::io;
 use ty::{ExitStatus, run};
 
 #[cfg(all(
-    not(target_os = "macos"),
+    any(not(target_os = "macos"), target_arch = "aarch64"),
     not(target_os = "windows"),
     not(target_os = "openbsd"),
     not(target_os = "aix"),
