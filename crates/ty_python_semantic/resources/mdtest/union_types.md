@@ -244,6 +244,26 @@ def _(literals_first: Literal[1, 2] | NumeratorOne, protocol_first: NumeratorOne
     reveal_type(protocol_first)  # revealed: NumeratorOne | Literal[2]
 ```
 
+## Unions of string and bytes literals with a sequence
+
+A string is a sequence of its characters, and a bytes object is a sequence of integers. Only
+literals whose elements all satisfy the sequence's element type are redundant in the union.
+
+```py
+from collections.abc import Sequence
+from typing import Literal
+from ty_extensions import Intersection
+
+def _(
+    strings: Literal["aa", "ab"] | Sequence[Literal["a"]],
+    bytes_: Literal[b"ab", b"aa"] | Sequence[Literal[97]],
+    nested: Literal["aa", "ab"] | Intersection[str, Sequence[Literal["a"]]],
+):
+    reveal_type(strings)  # revealed: Literal["ab"] | Sequence[Literal["a"]]
+    reveal_type(bytes_)  # revealed: Literal[b"ab"] | Sequence[Literal[97]]
+    reveal_type(nested)  # revealed: Literal["ab"] | (str & Sequence[Literal["a"]])
+```
+
 ## Unions of string and bytes literals with a length protocol
 
 For both strings and bytes, a protocol can distinguish literals by their length.
