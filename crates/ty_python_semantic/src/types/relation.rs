@@ -815,6 +815,16 @@ impl<'db> Type<'db> {
                 .kind()
                 .known_class()
                 .is_some_and(|class| instance.has_known_class(db, class)),
+            // An argument for a parameter such as `str | None` otherwise creates
+            // a separate cached relation for each distinct string literal.
+            (Type::LiteralValue(literal), Type::Union(union))
+                if let [Type::NominalInstance(first), Type::NominalInstance(second)] =
+                    union.elements(db) =>
+            {
+                literal.kind().known_class().is_some_and(|class| {
+                    first.has_known_class(db, class) || second.has_known_class(db, class)
+                })
+            }
             (_, Type::Union(union)) => {
                 self.materialized_divergent_fallback().is_none() && union.contains_member(db, self)
             }
