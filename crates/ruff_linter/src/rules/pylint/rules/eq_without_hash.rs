@@ -103,31 +103,29 @@ impl EqHash {
         let (mut has_eq, mut has_hash) = (HasMethod::No, HasMethod::No);
 
         any_member_declaration(class, |declaration| {
-            let id = match declaration.kind() {
-                ClassMemberKind::Assign(StmtAssign { targets, .. }) => {
-                    let [Expr::Name(ExprName { id, .. })] = &targets[..] else {
-                        return false;
-                    };
+            let mut record_member = |id: &str| match id {
+                "__eq__" => has_eq = has_eq | declaration.boundness().into(),
+                "__hash__" => has_hash = has_hash | declaration.boundness().into(),
+                _ => {}
+            };
 
-                    id
+            match declaration.kind() {
+                ClassMemberKind::Assign(StmtAssign { targets, .. }) => {
+                    for target in targets {
+                        if let Expr::Name(ExprName { id, .. }) = target {
+                            record_member(id);
+                        }
+                    }
                 }
                 ClassMemberKind::AnnAssign(StmtAnnAssign { target, .. }) => {
-                    let Expr::Name(ExprName { id, .. }) = target.as_ref() else {
-                        return false;
-                    };
-
-                    id
+                    if let Expr::Name(ExprName { id, .. }) = target.as_ref() {
+                        record_member(id);
+                    }
                 }
                 ClassMemberKind::FunctionDef(StmtFunctionDef {
                     name: Identifier { id, .. },
                     ..
-                }) => id.as_str(),
-            };
-
-            match id {
-                "__eq__" => has_eq = has_eq | declaration.boundness().into(),
-                "__hash__" => has_hash = has_hash | declaration.boundness().into(),
-                _ => {}
+                }) => record_member(id.as_str()),
             }
 
             !has_eq.is_no() && !has_hash.is_no()

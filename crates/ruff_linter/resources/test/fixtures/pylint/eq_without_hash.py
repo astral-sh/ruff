@@ -108,6 +108,24 @@ class MaybeEqDeeplyNested:
                 def __eq__(self, other): ...
 
 
+def op(a, b):
+    return a is b
+
+
+class ChainedEqNe:
+    __eq__ = __ne__ = op
+
+
+class CondChainedEq:
+    if ...:
+        __eq__ = __ne__ = op
+
+
+class ChainedNonNameTarget:
+    x = [0]
+    x[0] = __eq__ = op
+
+
 ### OK
 
 class Language:
@@ -141,3 +159,12 @@ class ChildClass(SingleClass):
         return True
 
     __hash__ = SingleClass.__hash__
+
+
+class ChainedHashNone:
+    __eq__ = op
+    __hash__ = _h = None
+
+
+class ChainedEqAndHash:
+    __eq__ = __hash__ = op
