@@ -1357,10 +1357,14 @@ struct ConstraintSetStorage<'db> {
     /// the many shallow bounds that are cheap to walk once.
     constraint_bound_depth_cache: FxHashMap<AtomicConstraintId, (u16, u16)>,
     source_order_cache: FxHashMap<SourceOrder, SourceOrderId>,
-    /// Only caches completed top-level results. Recursive results depend on active path
-    /// assignments and must not use this cache. A BDD's satisfiability does not depend on the
-    /// source order used to traverse it.
-    never_satisfied_cache: FxHashMap<(NodeId, TypeVarSet<'db>), bool>,
+    /// Only caches completed results for checks starting from an empty path. Recursive
+    /// steps within a walk depend on active path assignments and must not use this cache.
+    /// A BDD's satisfiability does not depend on the source order used to traverse it.
+    ///
+    /// `None` marks a check in progress so a nested walk can detect a cycle.
+    never_satisfied_cache: FxHashMap<(NodeId, TypeVarSet<'db>), Option<bool>>,
+    /// A walk that encountered a provisional result must not cache its own result.
+    satisfiability_cycles: usize,
 
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId), NodeId>,
@@ -3091,24 +3095,39 @@ impl NodeId {
         let key = (self, inferable);
         if polarity == Polarity::Positive {
             if let Some(result) = storage.never_satisfied_cache.get(&key) {
-                return Ok(*result);
-            }
-            if simple_conjunction_is_satisfiable(storage, self, &mut limits)? {
-                storage.never_satisfied_cache.insert(key, false);
+                if let Some(result) = result {
+                    return Ok(*result);
+                }
+                // Comparing a candidate's lower and upper bounds can require solving
+                // this same diagram again. As with recursive type relations, assume
+                // the repeated obligation holds and keep checking the other bounds.
+                storage.satisfiability_cycles += 1;
                 return Ok(false);
             }
+            if simple_conjunction_is_satisfiable(storage, self, &mut limits)? {
+                storage.never_satisfied_cache.insert(key, Some(false));
+                return Ok(false);
+            }
+            storage.never_satisfied_cache.insert(key, None);
         }
 
+        let cycles = storage.satisfiability_cycles;
         let orders = storage.calculate_source_orders(source_order);
         let (mut walker, mut path) =
             SolutionWalker::for_node(db, env, storage, orders, inferable, limits, self);
         let result = walker
             .is_never_satisfied(db, env, storage, &mut path, polarity)
-            .continue_ok()?;
+            .continue_ok();
         if polarity == Polarity::Positive {
-            storage.never_satisfied_cache.insert(key, result);
+            if let Ok(result) = result
+                && storage.satisfiability_cycles == cycles
+            {
+                storage.never_satisfied_cache.insert(key, Some(result));
+            } else {
+                storage.never_satisfied_cache.remove(&key);
+            }
         }
-        Ok(result)
+        result
     }
 
     /// Returns the negation of this BDD.
