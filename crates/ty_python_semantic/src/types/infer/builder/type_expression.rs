@@ -18,11 +18,12 @@ use crate::types::diagnostic::{
     report_invalid_concatenate_last_arg, report_missing_type_arguments,
     report_unsupported_binary_operation,
 };
-use crate::types::infer::legacy_type_alias::non_alias_assignment;
+use crate::types::infer::legacy_type_alias::{
+    TypeExpressionAssignment, non_alias_assignment, type_expression_assignment,
+};
 use crate::types::infer::{
     CyclicTypeAliasError, InferenceFlags, LegacyTypeAliasInference, TypeExpressionFlags,
-    infer_legacy_type_alias, legacy_type_alias_definition, legacy_type_alias_parameters,
-    non_alias_type_expression_diagnostics,
+    infer_legacy_type_alias, legacy_type_alias_parameters, non_alias_type_expression_diagnostics,
 };
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
@@ -60,13 +61,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn legacy_type_alias_reference(
         &mut self,
         value_ty: Type<'db>,
-        definition: Option<Definition<'db>>,
+        assignment: Option<TypeExpressionAssignment<'db>>,
         reference: &ast::Expr,
     ) -> LegacyTypeAliasReference<'db> {
         let db = self.db();
-        let Some(alias_definition) =
-            definition.and_then(|definition| legacy_type_alias_definition(db, definition))
-        else {
+        let Some(alias_definition) = assignment.and_then(|assignment| assignment.alias) else {
             return LegacyTypeAliasReference::ValueFallback;
         };
         let definition = alias_definition.definition;
@@ -295,7 +294,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        match self.legacy_type_alias_reference(ty, definition, annotation) {
+        let assignment =
+            definition.and_then(|definition| type_expression_assignment(db, definition));
+        match self.legacy_type_alias_reference(ty, assignment, annotation) {
             LegacyTypeAliasReference::Alias(alias, parameters) => {
                 let specialization =
                     parameters.map(|params| params.default_specialization(db, None));
@@ -317,6 +318,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.typevar_binding_context,
             self.inference_flags(),
         );
+        let definition = assignment.map(|assignment| assignment.definition);
         // Do not add alias diagnostics when value-to-type conversion is still incomplete.
         if result.as_ref().is_ok_and(|result| !result.is_todo())
             && self.reject_non_alias_reference(ty, definition, annotation)
@@ -1510,8 +1512,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         definition: Option<Definition<'db>>,
     ) -> Type<'db> {
         let db = self.db();
+        let assignment =
+            definition.and_then(|definition| type_expression_assignment(db, definition));
         let alias_reference =
-            self.legacy_type_alias_reference(value_ty, definition, &subscript.value);
+            self.legacy_type_alias_reference(value_ty, assignment, &subscript.value);
         if let LegacyTypeAliasReference::Alias(alias, parameters) = alias_reference
             && (parameters.is_some() || !alias.is_dynamic())
         {
@@ -1526,6 +1530,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 },
             );
         }
+        let definition = assignment.map(|assignment| assignment.definition);
         if matches!(alias_reference, LegacyTypeAliasReference::Invalid)
             || self.reject_non_alias_reference(value_ty, definition, &subscript.value)
         {
