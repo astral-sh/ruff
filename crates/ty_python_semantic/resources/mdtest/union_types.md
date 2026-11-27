@@ -414,6 +414,29 @@ def _(
     reveal_type(mixed)  # revealed: (Any & LiteralString) | (Any & Literal[1])
 ```
 
+Even if `B` inherits from `A`, the class objects are distinct. Narrowing `Any` by identity preserves
+both alternatives, including after a truthiness check.
+
+```py
+class A: ...
+class B(A): ...
+
+def _(x: Any):
+    if x is A or x is B:
+        reveal_type(x)  # revealed: (Any & <class 'A'>) | (Any & <class 'B'>)
+        if x:
+            reveal_type(x)  # revealed: (Any & <class 'A'> & ~AlwaysFalsy) | (Any & <class 'B'> & ~AlwaysFalsy)
+```
+
+Reordering the intersection with the same class object adds no new alternative.
+
+```py
+from ty_extensions._internal import TypeOf
+
+def _(same: Intersection[Any, TypeOf[A]] | Intersection[TypeOf[A], Any]):
+    reveal_type(same)  # revealed: Any & <class 'A'>
+```
+
 ## Unions of literals with `AlwaysTruthy` and `AlwaysFalsy`
 
 ```toml
