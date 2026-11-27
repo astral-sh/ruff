@@ -11,11 +11,12 @@ use crate::place::{
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
 use crate::types::{
-    ApplyTypeMappingVisitor, InstanceProjection, LiteralValueType, PromotionKind, PromotionMode,
-    RecursiveTypeNormalizer, Type, TypeContext, TypeMapping, TypePair, TypeQualifiers,
+    ApplyTypeMappingVisitor, InstanceProjection, LiteralValueType, NominalInstanceType,
+    PromotionKind, PromotionMode, RecursiveTypeNormalizer, Type, TypeContext, TypeMapping,
+    TypePair, TypeQualifiers,
 };
 use crate::types::{TypeVarBoundOrConstraints, visitor};
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxOrderMap, FxOrderSet, Program};
 
 pub(crate) mod builder;
 mod generic_gradual_intersections;
@@ -50,12 +51,71 @@ struct OrderedUnionInput<'db> {
 }
 
 impl<'db> OrderedUnionInput<'db> {
+    /// Successive `isinstance` guards can produce a union of intersections with
+    /// one class per guard. If the classes are pairwise unrelated, then two
+    /// distinct choices differ by a required class on each side. Neither can
+    /// subsume the other, and their union cannot cover `object`. Compare
+    /// the classes once instead of comparing every pair of intersections.
+    fn union_of_nominal_intersections(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let mut positions = FxOrderMap::<NominalInstanceType<'db>, usize>::default();
+        let mut intersections = FxOrderSet::default();
+        let mut width = None;
+        let mut recursively_defined = self.recursively_defined(db);
+        for ty in self.elements(db) {
+            let elements = if let Type::Union(union) = ty {
+                recursively_defined = recursively_defined.or(union.recursively_defined(db));
+                union.elements(db)
+            } else {
+                std::slice::from_ref(ty)
+            };
+            for &element in elements {
+                let Type::Intersection(intersection) = element else {
+                    return None;
+                };
+                let bounds = intersection.positive(db);
+                if !intersection.negative(db).is_empty()
+                    || bounds.len() < 2
+                    || bounds.len() != *width.get_or_insert(bounds.len())
+                {
+                    return None;
+                }
+
+                // Each class must always occur at the same position so that
+                // reordered versions of one intersection cannot pass as distinct.
+                for (index, bound) in bounds.iter().enumerate() {
+                    let instance = bound.as_nominal_instance()?;
+                    if *positions.entry(instance).or_insert(index) != index {
+                        return None;
+                    }
+                }
+                intersections.insert(element);
+            }
+        }
+        // Only compare the bounds when there are fewer of them than alternatives.
+        if positions.len() >= intersections.len()
+            || !positions
+                .keys()
+                .array_combinations()
+                .all(|[left, right]| left.has_unrelated_class(db, *right))
+        {
+            return None;
+        }
+        Some(Type::Union(UnionType::new(
+            db,
+            intersections.into_iter().collect::<Box<[_]>>(),
+            recursively_defined,
+        )))
+    }
+
     #[expect(
         clippy::unnecessary_wraps,
         reason = "Salsa supplies None while the normalization query is resolving a cycle"
     )]
     fn normalize(self, db: &'db dyn Db) -> Type<'db> {
         fn build<'db>(db: &'db dyn Db, input: OrderedUnionInput<'db>) -> Type<'db> {
+            if let Some(union) = input.union_of_nominal_intersections(db) {
+                return union;
+            }
             let env = ProgramEnvironment::from_program(input.program(db));
             let mut builder = UnionBuilder::new(db, &env).unpack_aliases(input.unpack_aliases(db));
             for &ty in input.elements(db) {
@@ -540,6 +600,32 @@ impl<'db> UnionType<'db> {
             let new_ty = transform_fn(ty)?;
             // The builder unpacks `TypeAlias` nodes but preserves structural recursive types.
             if &new_ty != ty || matches!(new_ty, Type::TypeAlias(_)) {
+                // Distributing another guard over an intersection can produce
+                // several alternatives per element. Normalize the whole input
+                // so we can prove them irredundant together.
+                if i == 0
+                    && elements.len() >= WIDE_UNION
+                    && matches!(ty, Type::Intersection(_))
+                    && let Type::Union(alternatives) = new_ty
+                    && matches!(
+                        alternatives.elements(db).first(),
+                        Some(Type::Intersection(_))
+                    )
+                {
+                    let mut mapped = Vec::with_capacity(elements.len());
+                    mapped.push(new_ty);
+                    for (_, element) in iter {
+                        mapped.push(transform_fn(element)?);
+                    }
+                    return Ok(OrderedUnionInput::new(
+                        db,
+                        env.program(db),
+                        mapped.into_boxed_slice(),
+                        true,
+                        self.recursively_defined(db),
+                    )
+                    .normalize(db));
+                }
                 let mut builder = UnionBuilder::new(db, env);
                 for prev in &elements[..i] {
                     builder.add_in_place(*prev);

@@ -2086,6 +2086,29 @@ fn benchmark_class_or_pattern_captures(criterion: &mut Criterion) {
     }
 }
 
+/// Each guard doubles the number of intersections of unrelated classes.
+fn benchmark_paired_isinstance_narrowing(criterion: &mut Criterion) {
+    const GUARDS: usize = 8;
+
+    let mut code = String::new();
+    for index in 0..2 * GUARDS {
+        writeln!(&mut code, "class C{index}: pass").ok();
+    }
+    code.push_str("\ndef narrow(value: object):\n");
+    for index in 0..GUARDS {
+        writeln!(
+            &mut code,
+            "    if not isinstance(value, (C{}, C{})):\n        return",
+            2 * index,
+            2 * index + 1,
+        )
+        .ok();
+    }
+    code.push_str("    return value\n");
+
+    benchmark_micro_case(criterion, "ty_micro[paired_isinstance_narrowing]", &code);
+}
+
 /// Benchmark for narrowing through a long `isinstance` elif chain.
 ///
 /// This pattern is common in visitor-style dispatch code (e.g. koda-validate's
@@ -3284,6 +3307,7 @@ criterion_group!(
     benchmark_large_union_narrowing,
     benchmark_class_or_pattern_captures,
     benchmark_large_isinstance_narrowing,
+    benchmark_paired_isinstance_narrowing,
     benchmark_literal_match_fallthrough,
     benchmark_int_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
