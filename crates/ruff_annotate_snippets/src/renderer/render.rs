@@ -2616,24 +2616,40 @@ const OUTPUT_REPLACEMENTS: &[(char, &str)] = &[
 ];
 
 pub(crate) fn normalize_whitespace(s: &str) -> Cow<'_, str> {
-    if !s
-        .chars()
-        .any(|user| OUTPUT_REPLACEMENTS.iter().any(|(bad, _)| user == *bad))
-    {
+    // All non-ASCII characters in OUTPUT_REPLACEMENTS start with 0xE2 in UTF-8.
+    let mut may_need_replacement = false;
+    for byte in s.bytes() {
+        let control = byte.is_ascii_control() && byte != b'\n';
+        may_need_replacement |= control | (byte == 0xe2);
+    }
+    if !may_need_replacement {
         return Cow::Borrowed(s);
     }
 
-    // Scan the input string for a character in the ordered table above.
-    // If it's present, replace it with its alternative string (it can be more than 1 char!).
-    // Otherwise, retain the input char.
-    let normalized = s.chars().fold(String::with_capacity(s.len()), |mut s, c| {
-        match OUTPUT_REPLACEMENTS.binary_search_by_key(&c, |(k, _)| *k) {
-            Ok(i) => s.push_str(OUTPUT_REPLACEMENTS[i].1),
-            _ => s.push(c),
+    let mut normalized = None;
+    let mut start = 0;
+    for (i, ch) in s.char_indices() {
+        if ch.is_ascii_graphic() || ch == ' ' {
+            continue;
         }
-        s
-    });
-    Cow::Owned(normalized)
+        let replacement = match OUTPUT_REPLACEMENTS.binary_search_by_key(&ch, |(k, _)| *k) {
+            Ok(index) => OUTPUT_REPLACEMENTS[index].1,
+            Err(_) => continue,
+        };
+        // Reserve space for the first replacement and the rest of the input.
+        let output = normalized.get_or_insert_with(|| {
+            String::with_capacity(s.len() - ch.len_utf8() + replacement.len())
+        });
+        output.push_str(&s[start..i]);
+        output.push_str(replacement);
+        start = i + ch.len_utf8();
+    }
+    if let Some(mut output) = normalized {
+        output.push_str(&s[start..]);
+        Cow::Owned(output)
+    } else {
+        Cow::Borrowed(s)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq)]
@@ -2860,8 +2876,31 @@ fn newline_count(body: &str) -> usize {
 
 #[cfg(test)]
 mod test {
-    use super::{OUTPUT_REPLACEMENTS, newline_count};
+    use alloc::borrow::Cow;
+
+    use super::{OUTPUT_REPLACEMENTS, newline_count, normalize_whitespace};
     use snapbox::IntoData;
+
+    #[test]
+    fn normalization_covers_all_output_replacements() {
+        for &(ch, replacement) in OUTPUT_REPLACEMENTS {
+            assert_eq!(normalize_whitespace(&ch.to_string()), replacement);
+        }
+    }
+
+    #[test]
+    fn normalization_preserves_text_between_replacements() {
+        assert_eq!(
+            normalize_whitespace("\u{200d}α\t\u{001b}\nβ\u{007f}\u{202e}γ"),
+            "α    ␛\nβ␡�γ"
+        );
+    }
+
+    #[test]
+    fn printable_text_with_matching_lead_bytes_stays_borrowed() {
+        let text = "© →";
+        assert!(matches!(normalize_whitespace(text), Cow::Borrowed(_)));
+    }
 
     fn format_replacements(replacements: Vec<(char, &str)>) -> String {
         replacements
