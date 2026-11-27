@@ -8769,6 +8769,30 @@ def _(
     del extra[key]
 ```
 
+### Deleting items through overlapping aliases
+
+Two aliases that share a `TypedDict` produce a single diagnostic for deleting a required key.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import TypedDict
+
+class Entry(TypedDict, extra_items=int):
+    name: str
+
+type Named = Entry
+type Counts = Entry | dict[str, int]
+type Labels = Entry | dict[str, str]
+
+def remove(entry: Named, items: Counts | Labels):
+    del entry["extra"]  # ok
+    del items["name"]  # error: [invalid-argument-type] "Cannot delete required key"
+```
+
 ### Deleting optional items from closed TypedDicts is permitted
 
 A closed TypedDict with only non-required, mutable items can safely support operations that may

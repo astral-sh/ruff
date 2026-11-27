@@ -2302,7 +2302,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        match object_ty {
+        // Check each alternative once, even when several aliases contain the same member.
+        match object_ty.expand_top_level_aliases(db, env) {
             Type::Union(union) => {
                 for element_ty in union.elements(db) {
                     self.validate_subscript_deletion_impl(
@@ -2343,7 +2344,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 slice_ty,
             ),
 
-            _ => {
+            object_ty => {
                 if let Type::TypedDict(typed_dict) = object_ty {
                     // Known undeclared keys can only refer to explicit extra items, so they can be
                     // deleted whenever those items are mutable. An arbitrary string key could

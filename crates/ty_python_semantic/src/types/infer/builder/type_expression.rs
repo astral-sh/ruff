@@ -18,7 +18,7 @@ use crate::types::diagnostic::{
     report_invalid_concatenate_last_arg, report_missing_type_arguments,
     report_unsupported_binary_operation,
 };
-use crate::types::infer::legacy_type_alias::non_alias_assignment;
+use crate::types::infer::legacy_type_alias::{non_alias_assignment, quoted_union_definition};
 use crate::types::infer::{
     CyclicTypeAliasError, InferenceFlags, LegacyTypeAliasInference, TypeExpressionFlags,
     infer_legacy_type_alias, legacy_type_alias_definition, legacy_type_alias_parameters,
@@ -59,7 +59,7 @@ enum LegacyTypeAliasReference<'db> {
 impl<'db> TypeInferenceBuilder<'db, '_> {
     fn legacy_type_alias_reference(
         &mut self,
-        value_ty: Type<'db>,
+        value_ty: Option<Type<'db>>,
         definition: Option<Definition<'db>>,
         reference: &ast::Expr,
     ) -> LegacyTypeAliasReference<'db> {
@@ -90,7 +90,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // For example, `Number = 1 + 2` is invalid because of its right-hand side,
             // independently of the resulting `Literal[3]` value. Generic subscriptions with
             // invalid arguments, such as `list[1]`, can still recover as `list[Unknown]`.
-            return if self.reject_non_alias_reference(value_ty, Some(definition), reference) {
+            return if value_ty
+                .is_some_and(|ty| self.reject_non_alias_reference(ty, Some(definition), reference))
+            {
                 LegacyTypeAliasReference::Invalid
             } else {
                 LegacyTypeAliasReference::ValueFallback
@@ -287,6 +289,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Apply the default specialization when an alias is used without type arguments.
+    fn infer_bare_alias_reference(
+        &mut self,
+        value_ty: Option<Type<'db>>,
+        definition: Option<Definition<'db>>,
+        annotation: &ast::Expr,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        match self.legacy_type_alias_reference(value_ty, definition, annotation) {
+            LegacyTypeAliasReference::Alias(alias, parameters) => {
+                let specialization =
+                    parameters.map(|params| params.default_specialization(db, None));
+                let ty = alias.apply_optional_specialization(db, specialization);
+                Some(self.check_type_variable_scope(annotation, ty))
+            }
+            LegacyTypeAliasReference::Invalid => Some(Type::unknown()),
+            LegacyTypeAliasReference::ValueFallback => None,
+        }
+    }
+
     pub(super) fn infer_name_or_attribute_type_expression(
         &mut self,
         ty: Type<'db>,
@@ -295,15 +317,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        match self.legacy_type_alias_reference(ty, definition, annotation) {
-            LegacyTypeAliasReference::Alias(alias, parameters) => {
-                let specialization =
-                    parameters.map(|params| params.default_specialization(db, None));
-                let ty = alias.apply_optional_specialization(db, specialization);
-                return self.check_type_variable_scope(annotation, ty);
-            }
-            LegacyTypeAliasReference::Invalid => return Type::unknown(),
-            LegacyTypeAliasReference::ValueFallback => {}
+        if let Some(alias) = self.infer_bare_alias_reference(Some(ty), definition, annotation) {
+            return alias;
         }
         if annotation.is_attribute_expr()
             && let Type::TypeVar(tvar) = ty
@@ -445,6 +460,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         match expression {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => {
+                    if self.in_string_annotation()
+                        && let Some(definition) = quoted_union_definition(db, self.scope(), name)
+                        && let Some(ty) =
+                            self.infer_bare_alias_reference(None, Some(definition), expression)
+                    {
+                        return ty;
+                    }
                     let (ty, definition) = self.infer_type_expression_reference(expression);
                     self.infer_name_or_attribute_type_expression(ty, definition, expression)
                 }
@@ -1511,7 +1533,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let db = self.db();
         let alias_reference =
-            self.legacy_type_alias_reference(value_ty, definition, &subscript.value);
+            self.legacy_type_alias_reference(Some(value_ty), definition, &subscript.value);
         if let LegacyTypeAliasReference::Alias(alias, parameters) = alias_reference
             && (parameters.is_some() || !alias.is_dynamic())
         {
