@@ -3,6 +3,9 @@ use std::fs::File;
 use std::io;
 use std::io::{BufWriter, Write, stderr, stdout};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
+use std::thread;
 use std::time::Instant;
 
 use anyhow::Result;
@@ -10,7 +13,7 @@ use colored::Colorize;
 use itertools::Itertools;
 use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span,
 };
@@ -38,7 +41,8 @@ use ruff_python_formatter::{FormatModuleError, QuoteStyle, format_module_source,
 use ruff_source_file::{LineIndex, LineRanges, OneIndexed, SourceFile, SourceFileBuilder};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::resolver::{
-    Project, ResolvedFile, RootProject, match_exclusion, project_files_in_path,
+    Project, PyprojectDiscoveryStrategy, ResolvedFile, RootProject, match_exclusion,
+    project_files_in_path, visit_project_files_in_path,
 };
 use ruff_workspace::script::{ScriptSettingsError, script};
 use ruff_workspace::{FormatterSettings, Settings};
@@ -77,120 +81,37 @@ pub(crate) fn format(
 ) -> Result<ExitStatus> {
     let mode = FormatMode::from_cli(&cli);
     let files = resolve_default_files(cli.files, false);
-    let (paths, resolver) = project_files_in_path(&files, root_project, config_arguments)?;
-
     let output_format = root_project.project.settings.output_format;
 
-    if paths.is_empty() {
-        warn_user_once!("No Python files found under the given path(s)");
-        return Ok(ExitStatus::Success);
-    }
-
-    if cli.range.is_some() && paths.len() > 1 {
-        return Err(anyhow::anyhow!(
-            "The `--range` option is only supported when formatting a single file but the specified paths resolve to {} files.",
-            paths.len()
-        ));
-    }
-
-    warn_incompatible_formatter_settings(resolver.settings());
-
-    // Discover the package root for each Python file.
-    let package_roots = resolver.package_roots(
-        &paths
-            .iter()
-            .flatten()
-            .map(ResolvedFile::path)
-            .collect::<Vec<_>>(),
-    );
-
-    let caches = if cli.no_cache {
-        None
+    let threads = ruff_db::max_parallelism().get();
+    let outcome = if cli.no_cache
+        && mode.is_check()
+        && cli.range.is_none()
+        && matches!(root_project.strategy, PyprojectDiscoveryStrategy::Fixed)
+        // Preview scripts can issue additional warnings before traversal finishes.
+        && !root_project.project.settings.preview.is_enabled()
+        && threads > 1
+        && std::env::var_os("RUFF_EXPERIMENTAL_FORMAT_CHECK_PIPELINE")
+            .is_some_and(|value| value == "1")
+        && let [path] = files.as_slice()
+        && path.is_dir()
+    {
+        format_streaming(path, root_project, config_arguments, threads)?
     } else {
-        // `--no-cache` doesn't respect code changes, and so is often confusing during
-        // development.
-        #[cfg(debug_assertions)]
-        crate::warn_user!("Detected debug build without --no-cache.");
-
-        Some(PackageCacheMap::init(&package_roots, &resolver))
+        format_collected(
+            &files,
+            root_project,
+            config_arguments,
+            mode,
+            cli.range,
+            cli.no_cache,
+        )?
     };
 
-    let start = Instant::now();
-    let (results, mut errors): (Vec<_>, Vec<_>) = paths
-        .par_iter()
-        .filter_map(|entry| {
-            match entry {
-                Ok(resolved_file) => {
-                    let path = resolved_file.path();
-                    let project = resolver.resolve_with_path(path);
-                    let settings = &project.settings;
-
-                    let source_type = settings.formatter.extension.get_source_type(path);
-                    if source_type.is_toml() {
-                        // Ignore TOML files.
-                        return None;
-                    }
-
-                    // Ignore files that are excluded from formatting
-                    if (settings.file_resolver.force_exclude || !resolved_file.is_root())
-                        && match_exclusion(
-                            path,
-                            resolved_file.file_name(),
-                            &settings.formatter.exclude,
-                        )
-                    {
-                        return None;
-                    }
-
-                    let package = path
-                        .parent()
-                        .and_then(|parent| package_roots.get(parent).copied())
-                        .flatten();
-                    let cache_root = package
-                        .map(PackageRoot::path)
-                        .unwrap_or_else(|| path.parent().unwrap_or(path));
-                    let cache = caches.get(cache_root);
-
-                    Some(
-                        match catch_unwind(|| {
-                            format_path(
-                                path,
-                                project,
-                                config_arguments,
-                                source_type,
-                                mode,
-                                cli.range,
-                                cache,
-                            )
-                        }) {
-                            Ok(inner) => inner.map(|result| FormatPathResult {
-                                path: resolved_file.path().to_path_buf(),
-                                result,
-                            }),
-                            Err(error) => Err(FormatCommandError::Panic(
-                                Some(resolved_file.path().to_path_buf()),
-                                Box::new(error),
-                            )),
-                        },
-                    )
-                }
-                Err(err) => Some(Err(FormatCommandError::Ignore(err.clone()))),
-            }
-        })
-        .partition_map(|result| match result {
-            Ok(diagnostic) => Left(diagnostic),
-            Err(err) => Right(err),
-        });
-    let duration = start.elapsed();
-
-    debug!(
-        "Formatted {} files in {:.2?}",
-        results.len() + errors.len(),
-        duration
-    );
-
-    // Store the caches.
-    caches.persist()?;
+    let Some((results, mut errors)) = outcome else {
+        warn_user_once!("No Python files found under the given path(s)");
+        return Ok(ExitStatus::Success);
+    };
 
     // Report on any errors.
     //
@@ -249,6 +170,204 @@ pub(crate) fn format(
             }
         }
     }
+}
+
+type FormatOutcome = (Vec<FormatPathResult>, Vec<FormatCommandError>);
+
+fn format_collected(
+    files: &[PathBuf],
+    root_project: &RootProject,
+    config_arguments: &ConfigArguments,
+    mode: FormatMode,
+    range: Option<FormatRange>,
+    no_cache: bool,
+) -> Result<Option<FormatOutcome>> {
+    let (paths, resolver) = project_files_in_path(files, root_project, config_arguments)?;
+
+    if paths.is_empty() {
+        return Ok(None);
+    }
+
+    if range.is_some() && paths.len() > 1 {
+        return Err(anyhow::anyhow!(
+            "The `--range` option is only supported when formatting a single file but the specified paths resolve to {} files.",
+            paths.len()
+        ));
+    }
+
+    warn_incompatible_formatter_settings(resolver.settings());
+
+    // Discover the package root for each Python file.
+    let package_roots = resolver.package_roots(
+        &paths
+            .iter()
+            .flatten()
+            .map(ResolvedFile::path)
+            .collect::<Vec<_>>(),
+    );
+
+    let caches = if no_cache {
+        None
+    } else {
+        // `--no-cache` doesn't respect code changes, and so is often confusing during
+        // development.
+        #[cfg(debug_assertions)]
+        crate::warn_user!("Detected debug build without --no-cache.");
+
+        Some(PackageCacheMap::init(&package_roots, &resolver))
+    };
+
+    let start = Instant::now();
+    let (results, errors): FormatOutcome = paths
+        .par_iter()
+        .filter_map(|entry| match entry {
+            Ok(file) => {
+                let path = file.path();
+                let project = resolver.resolve_with_path(path);
+                format_entry(file, project, config_arguments, mode, range, || {
+                    let package = path
+                        .parent()
+                        .and_then(|parent| package_roots.get(parent).copied())
+                        .flatten();
+                    let cache_root = package
+                        .map(PackageRoot::path)
+                        .unwrap_or_else(|| path.parent().unwrap_or(path));
+                    caches.get(cache_root)
+                })
+            }
+            Err(err) => Some(Err(FormatCommandError::Ignore(err.clone()))),
+        })
+        .partition_map(partition_result);
+    debug!(
+        "Formatted {} files in {:.2?}",
+        results.len() + errors.len(),
+        start.elapsed()
+    );
+
+    caches.persist()?;
+    Ok(Some((results, errors)))
+}
+
+fn format_streaming(
+    path: &Path,
+    root_project: &RootProject,
+    config_arguments: &ConfigArguments,
+    threads: usize,
+) -> Result<Option<FormatOutcome>> {
+    // Both stages share the thread budget. Batching amortizes channel and iterator locks.
+    let start = Instant::now();
+    debug!("Overlapping file discovery with uncached format checking");
+    let discovery_threads = (threads / 3).clamp(1, 12);
+    let format_threads = threads - discovery_threads;
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(format_threads)
+        .stack_size(ruff_db::STACK_SIZE)
+        .build()?;
+    let (tx, rx) = mpsc::sync_channel(format_threads * 2);
+
+    thread::scope(|scope| {
+        let walk = thread::Builder::new().spawn_scoped(scope, move || {
+            visit_project_files_in_path(
+                path,
+                root_project,
+                config_arguments,
+                discovery_threads,
+                &|batch| {
+                    // The receiver only disconnects if formatting is unwinding.
+                    let _ = tx.send(batch);
+                },
+            )
+        })?;
+
+        let project = &root_project.project;
+        let saw_entries = AtomicBool::new(false);
+        let (results, errors): FormatOutcome = pool.install(|| {
+            rx.into_iter()
+                .par_bridge()
+                .flat_map_iter(|batch| {
+                    saw_entries.store(true, Ordering::Relaxed);
+                    batch.into_iter().filter_map(|entry| match entry {
+                        Ok(file) => format_entry(
+                            &file,
+                            project,
+                            config_arguments,
+                            FormatMode::Check,
+                            None,
+                            || None,
+                        ),
+                        Err(err) => Some(Err(FormatCommandError::Ignore(err))),
+                    })
+                })
+                .partition_map(partition_result)
+        });
+        match walk.join() {
+            Ok(result) => result?,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
+        if saw_entries.into_inner() {
+            warn_incompatible_formatter_settings(std::iter::once(&project.settings));
+            debug!(
+                "Discovered and formatted {} files in {:.2?}",
+                results.len() + errors.len(),
+                start.elapsed(),
+            );
+            Ok(Some((results, errors)))
+        } else {
+            Ok(None)
+        }
+    })
+}
+
+fn partition_result(
+    result: Result<FormatPathResult, FormatCommandError>,
+) -> rayon::iter::Either<FormatPathResult, FormatCommandError> {
+    match result {
+        Ok(result) => Left(result),
+        Err(err) => Right(err),
+    }
+}
+
+fn format_entry<'a>(
+    file: &ResolvedFile,
+    project: &Project,
+    config_arguments: &ConfigArguments,
+    mode: FormatMode,
+    range: Option<FormatRange>,
+    cache: impl FnOnce() -> Option<&'a Cache>,
+) -> Option<Result<FormatPathResult, FormatCommandError>> {
+    let path = file.path();
+    let settings = &project.settings;
+    let source_type = settings.formatter.extension.get_source_type(path);
+    if source_type.is_toml()
+        || ((settings.file_resolver.force_exclude || !file.is_root())
+            && match_exclusion(path, file.file_name(), &settings.formatter.exclude))
+    {
+        return None;
+    }
+
+    let cache = cache();
+    Some(
+        match catch_unwind(|| {
+            format_path(
+                path,
+                project,
+                config_arguments,
+                source_type,
+                mode,
+                range,
+                cache,
+            )
+        }) {
+            Ok(inner) => inner.map(|result| FormatPathResult {
+                path: path.to_path_buf(),
+                result,
+            }),
+            Err(error) => Err(FormatCommandError::Panic(
+                Some(path.to_path_buf()),
+                Box::new(error),
+            )),
+        },
+    )
 }
 
 /// Format the file at the given [`Path`].

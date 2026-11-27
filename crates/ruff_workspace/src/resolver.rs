@@ -489,6 +489,41 @@ pub fn project_files_in_path<'a>(
     root_project: &'a RootProject,
     transformer: &(dyn ConfigurationTransformer + Sync),
 ) -> Result<(Vec<Result<ResolvedFile, ignore::Error>>, Resolver<'a>)> {
+    project_files_in_path_impl(paths, root_project, transformer, None, None)
+}
+
+/// Visit batches of discovered files while walking a single input under fixed settings.
+///
+/// A single input prevents duplicates between an explicitly passed file and a directory walk.
+/// Fixed settings ensure the caller can process files without waiting for configuration discovery.
+pub fn visit_project_files_in_path(
+    path: &Path,
+    root_project: &RootProject,
+    transformer: &(dyn ConfigurationTransformer + Sync),
+    threads: usize,
+    visit: &(dyn Fn(Vec<Result<ResolvedFile, ignore::Error>>) + Sync),
+) -> Result<()> {
+    anyhow::ensure!(
+        !root_project.strategy.is_hierarchical(),
+        "Streaming discovery requires fixed settings"
+    );
+    project_files_in_path_impl(
+        &[path.to_path_buf()],
+        root_project,
+        transformer,
+        Some(threads),
+        Some(visit),
+    )?;
+    Ok(())
+}
+
+fn project_files_in_path_impl<'a>(
+    paths: &[PathBuf],
+    root_project: &'a RootProject,
+    transformer: &(dyn ConfigurationTransformer + Sync),
+    threads: Option<usize>,
+    visit: Option<&FileBatchVisitor<'_>>,
+) -> Result<(ResolvedFiles, Resolver<'a>)> {
     // Normalize every path (e.g., convert from relative to absolute).
     let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).unique().collect();
 
@@ -549,19 +584,22 @@ pub fn project_files_in_path<'a>(
     builder.standard_filters(resolver.respect_gitignore());
     builder.hidden(false);
 
-    builder.threads(ruff_db::max_parallelism().get().min(12));
+    builder.threads(threads.unwrap_or_else(|| ruff_db::max_parallelism().get().min(12)));
 
     let walker = builder.build_parallel();
 
-    // Run the `WalkParallel` to collect all files.
+    // Collect all files unless the caller can consume batches during the walk.
     let state = WalkPythonFilesState::new(resolver, configuration_cache);
-    let mut visitor = PythonFilesVisitorBuilder::new(transformer, &state);
+    let mut visitor = PythonFilesVisitorBuilder::new(transformer, &state, visit);
     walker.visit(&mut visitor);
 
     state.finish()
 }
 
 type ResolvedFiles = Vec<Result<ResolvedFile, ignore::Error>>;
+type FileBatchVisitor<'a> = dyn Fn(ResolvedFiles) + Sync + 'a;
+
+const FILE_BATCH_SIZE: usize = 32;
 
 struct WalkPythonFilesState<'config> {
     is_hierarchical: bool,
@@ -623,14 +661,20 @@ fn deduplicate_files(mut files: ResolvedFiles) -> ResolvedFiles {
 struct PythonFilesVisitorBuilder<'s, 'config> {
     state: &'s WalkPythonFilesState<'config>,
     transformer: &'s (dyn ConfigurationTransformer + Sync),
+    visit: Option<&'s FileBatchVisitor<'s>>,
 }
 
 impl<'s, 'config> PythonFilesVisitorBuilder<'s, 'config> {
     fn new(
         transformer: &'s (dyn ConfigurationTransformer + Sync),
         state: &'s WalkPythonFilesState<'config>,
+        visit: Option<&'s FileBatchVisitor<'s>>,
     ) -> Self {
-        Self { state, transformer }
+        Self {
+            state,
+            transformer,
+            visit,
+        }
     }
 }
 
@@ -639,6 +683,7 @@ struct PythonFilesVisitor<'s, 'config> {
     local_error: Result<()>,
     global: &'s WalkPythonFilesState<'config>,
     transformer: &'s (dyn ConfigurationTransformer + Sync),
+    visit: Option<&'s FileBatchVisitor<'s>>,
 }
 
 impl<'config, 's> ignore::ParallelVisitorBuilder<'s> for PythonFilesVisitorBuilder<'s, 'config>
@@ -651,6 +696,7 @@ where
             local_error: Ok(()),
             global: self.state,
             transformer: self.transformer,
+            visit: self.visit,
         })
     }
 }
@@ -758,12 +804,27 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
             }
         }
 
+        if let Some(visit) = self.visit
+            && self.local_files.len() == FILE_BATCH_SIZE
+        {
+            visit(std::mem::replace(
+                &mut self.local_files,
+                Vec::with_capacity(FILE_BATCH_SIZE),
+            ));
+        }
         WalkState::Continue
     }
 }
 
 impl Drop for PythonFilesVisitor<'_, '_> {
     fn drop(&mut self) {
+        // The queue can block. Never hold the shared state lock while handing off a batch.
+        if let Some(visit) = self.visit {
+            if !self.local_files.is_empty() {
+                visit(std::mem::take(&mut self.local_files));
+            }
+            return;
+        }
         let mut merged = self.global.merged.lock().unwrap();
         let (files, error) = &mut *merged;
 
