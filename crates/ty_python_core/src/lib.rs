@@ -1258,6 +1258,39 @@ mod tests {
             .collect()
     }
 
+    #[test]
+    fn standalone_expression_nodes_update_together() -> anyhow::Result<()> {
+        let TestCase { mut db, file } = test_case("a = b = []\n");
+        let expression_id = |db: &TestDb, assigned: bool| {
+            let file = program_file(db, file);
+            let module = ruff_db::parsed::parsed_module(db, file.python_file(db)).load(db);
+            let statement = &module.suite()[0];
+            let node = match statement {
+                ast::Stmt::Assign(assign) => assign.value.as_ref(),
+                ast::Stmt::For(for_statement) => for_statement.iter.as_ref(),
+                _ => panic!("expected an assignment or for statement"),
+            };
+            let expression = semantic_index(db, file).expression(node);
+            assert_eq!(expression.node_ref(db).index(), node.node_index().load());
+            let assignment = expression.assigned_to(db);
+            assert_eq!(assignment.is_some(), assigned);
+            if let Some(assignment) = assignment {
+                assert_eq!(
+                    assignment.node(&module).node_index().load(),
+                    statement.node_index().load()
+                );
+            }
+            expression.as_id()
+        };
+
+        let original = expression_id(&db, true);
+        db.write_file("test.py", "for a in []:\n    pass\n")?;
+        assert_eq!(expression_id(&db, false), original);
+        db.write_file("test.py", "a = b = [1]\n")?;
+        assert_eq!(expression_id(&db, true), original);
+        Ok(())
+    }
+
     #[test_case(AlwaysTrue, AlwaysTrue, AlwaysTrue, AlwaysTrue, AlwaysTrue; "true_true")]
     #[test_case(AlwaysTrue, AlwaysFalse, AlwaysFalse, AlwaysTrue, Ambiguous; "true_false")]
     #[test_case(AlwaysTrue, Ambiguous, Ambiguous, AlwaysTrue, Ambiguous; "true_ambiguous")]
