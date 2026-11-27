@@ -20,6 +20,7 @@ use std::{
     borrow::Cow,
     sync::{LazyLock, Mutex},
 };
+use strum::IntoEnumIterator;
 use ty_module_resolver::{ImportingFile, KnownModule, file_to_module};
 use ty_python_core::{SemanticIndex, Truthiness, scope::NodeWithScopeKind};
 
@@ -29,8 +30,7 @@ use ty_python_core::{SemanticIndex, Truthiness, scope::NodeWithScopeKind};
 /// Feel free to expand this enum if you ever find yourself using the same class in multiple
 /// places.
 /// Note: good candidates are any classes in `[ty_module_resolver::module::KnownModule]`
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
-#[cfg_attr(test, derive(strum_macros::EnumIter))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, strum_macros::EnumIter)]
 pub enum KnownClass {
     // To figure out where an stdlib symbol is defined, you can go into `crates/ty_vendored`
     // and grep for the symbol name in any `.pyi` file.
@@ -1245,6 +1245,30 @@ impl KnownClass {
         })
     }
 
+    /// Return the query key for this class in the current program. Interning the keys
+    /// together avoids repeated interner lookups while keeping class resolution lazy.
+    fn argument<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> KnownClassArgument<'db> {
+        #[salsa::tracked(returns(deref), heap_size = ruff_memory_usage::heap_size)]
+        fn known_class_arguments<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+        ) -> Box<[KnownClassArgument<'db>]> {
+            KnownClass::iter()
+                .enumerate()
+                .map(|(index, class)| {
+                    debug_assert_eq!(index, class as usize);
+                    KnownClassArgument::new(db, class, program)
+                })
+                .collect()
+        }
+
+        known_class_arguments(db, env.program(db))[self as usize]
+    }
+
     /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing all
     /// possible instances of the class. If this class is generic, this will use the default
     /// specialization.
@@ -1280,7 +1304,7 @@ impl KnownClass {
                 .unwrap_or_else(Type::unknown)
         }
 
-        known_class_to_instance(db, KnownClassArgument::new(db, self, env.program(db)))
+        known_class_to_instance(db, self.argument(db, env))
     }
 
     /// Similar to [`KnownClass::to_instance`], but returns the Unknown-specialization where each type
@@ -1446,7 +1470,7 @@ impl KnownClass {
             result
         }
 
-        known_class_to_class_literal(db, KnownClassArgument::new(db, self, env.program(db)))
+        known_class_to_class_literal(db, self.argument(db, env))
     }
 
     /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing that
@@ -2235,6 +2259,8 @@ struct KnownClassArgument {
     program: Program<'db>,
 }
 
+impl get_size2::GetSize for KnownClassArgument<'_> {}
+
 /// Enumeration of ways in which looking up a [`KnownClass`] in its canonical module could fail.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum KnownClassLookupError<'db> {
@@ -2306,7 +2332,6 @@ impl<'db> KnownClassLookupError<'db> {
 mod tests {
     use super::*;
     use crate::db::tests::{TestDbBuilder, setup_db};
-    use strum::IntoEnumIterator;
     use ty_module_resolver::resolve_module_confident;
     use ty_python_core::TestProgramDb as _;
     use ty_python_core::program::Program;
