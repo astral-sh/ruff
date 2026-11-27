@@ -1631,10 +1631,38 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
     }
 
     #[test]
+    fn stub_layouts_preserve_type_checking_ranges() {
+        let TestCase { db, file } = test_case(
+            "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    def f(): 'doc'; pass; ...\n    def g(): ...; pass\ndef h(): 'doc'",
+        );
+        let file = program_file(&db, file);
+        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, file.python_file(&db)).load(&db);
+        let ast::Stmt::If(block) = &module.suite()[1] else {
+            panic!("expected a TYPE_CHECKING block");
+        };
+        for (stmt, guarded) in [
+            (&block.body[0], true),
+            (&block.body[1], true),
+            (&module.suite()[2], false),
+        ] {
+            let ast::Stmt::FunctionDef(function) = stmt else {
+                panic!("expected a function");
+            };
+            let scope = index.node_scope(NodeWithScopeRef::Function(function));
+            let mut reference = Box::new(UseDefMapBuilder::new(ScopeKind::Function));
+            for statement in &function.body {
+                reference.record_range_reachability(statement.range(), guarded);
+            }
+            assert_eq!(index.use_def_map(scope), &reference.finish());
+        }
+    }
+
+    #[test]
     fn stub_parameter_bindings_belong_to_their_own_function() {
         let TestCase { db, file } = test_case(
             "def first(a, /, *rest: int, b: str, **options): ...\n\
-             def second(c, /, *values: float, d: bytes, **kwargs): pass",
+             def second(c, /, *values: float, d: bytes, **kwargs): 'doc'; pass",
         );
         let file = program_file(&db, file);
         let index = semantic_index(&db, file);

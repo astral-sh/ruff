@@ -3214,7 +3214,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.flow_restore(included_path)
     }
 
-    fn declare_parameters(&mut self, parameters: &'ast ast::Parameters, is_stub_body: bool) {
+    fn declare_parameters(&mut self, parameters: &'ast ast::Parameters, parameter_only: bool) {
         let nodes = parameters
             .iter_non_variadic_params()
             .map(ParameterDefinitionNodeRef::Parameter)
@@ -3230,7 +3230,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .as_deref()
                     .map(ParameterDefinitionNodeRef::VariadicKeywordParameter),
             );
-        if is_stub_body {
+        if parameter_only {
             let parameters = nodes
                 .map(|node| self.declare_stub_parameter(node))
                 .collect();
@@ -3965,7 +3965,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
 
-                        builder.declare_parameters(parameters, ast::helpers::is_stub_body(body));
+                        // A leading docstring does not change any bindings. Still visit
+                        // it below to record its scope and statement range.
+                        let rest = ast::helpers::body_without_leading_docstring(body);
+                        let parameter_only = (!body.is_empty() && rest.is_empty())
+                            || ast::helpers::is_stub_body(rest);
+                        builder.declare_parameters(parameters, parameter_only);
 
                         let mut first_parameter_name = parameters
                             .iter_non_variadic_params()
