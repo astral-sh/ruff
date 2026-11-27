@@ -530,7 +530,12 @@ impl<'db> SemanticIndex<'db> {
     }
 
     pub fn scope_ids(&self) -> impl Iterator<Item = ScopeId<'db>> + '_ {
-        self.scope_ids_by_scope.iter().copied()
+        self.scope_ids_slice().iter().copied()
+    }
+
+    /// The scopes in index order, for splitting inference into batches.
+    pub fn scope_ids_slice(&self) -> &[ScopeId<'db>] {
+        &self.scope_ids_by_scope.raw
     }
 
     pub fn symbol_is_global_in_scope(&self, symbol: ScopedSymbolId, scope: FileScopeId) -> bool {

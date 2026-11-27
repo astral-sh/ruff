@@ -4,7 +4,7 @@
 )]
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::{OptionDiagnostic, ToProgramSettingsError};
-use crate::parallel::ParallelIteratorExt;
+use crate::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
 use crate::script::Script;
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 #[cfg(feature = "testing")]
@@ -567,7 +567,7 @@ impl Project {
                 let _entered = check_file_span.entered();
                 let program_file = db.program_file(file);
 
-                if share_scopes && let Err(diagnostic) = infer_large_file_scopes(db, program_file) {
+                if share_scopes && let Err(diagnostic) = infer_file_scopes(db, program_file) {
                     reporter.report_checked_file(db, file, std::slice::from_ref(&diagnostic));
                     return;
                 }
@@ -1025,17 +1025,16 @@ pub enum ProjectReloadResult {
     },
 }
 
-/// Let workers that run out of files take batches of scopes from a large file.
+/// Let idle workers infer scopes from a file another worker is checking.
 ///
 /// This must run outside any Salsa query so Rayon can attach a different database for
 /// each job. The tracked file check then reads the cached results and collects diagnostics
 /// in the usual order.
-fn infer_large_file_scopes(db: &dyn Db, program_file: ProgramFile<'_>) -> Result<(), Diagnostic> {
-    const MIN_SCOPES: usize = 256;
-    const BATCH_SIZE: usize = 32;
+fn infer_file_scopes(db: &dyn Db, program_file: ProgramFile<'_>) -> Result<(), Diagnostic> {
+    const MAX_BATCH_SIZE: usize = 32;
 
     let file = program_file.file(db);
-    let count = catch(
+    let scopes = catch(
         db,
         file,
         AssertUnwindSafe(|| {
@@ -1043,30 +1042,24 @@ fn infer_large_file_scopes(db: &dyn Db, program_file: ProgramFile<'_>) -> Result
             if Script::for_file(db, file).is_some_and(|script| !script.has_valid_settings(db))
                 || source_text(db, file).read_error().is_some()
             {
-                return 0;
+                return &[][..];
             }
-            semantic_index(db, program_file).scope_ids().count()
+            semantic_index(db, program_file).scope_ids_slice()
         }),
     )?;
-    if count < MIN_SCOPES {
+    if scopes.len() <= 1 {
         return Ok(());
     }
 
-    (0..count)
-        .into_par_iter()
-        .step_by(BATCH_SIZE)
-        .map_with_db(db, |db, start| {
+    scopes
+        .par_chunks(minimum_parallel_job_len(scopes.len(), MAX_BATCH_SIZE))
+        .map_with_db(db, |db, batch| {
             // Capture a panic on the worker where it occurred, preserving its backtrace.
             catch(
                 db,
                 file,
                 AssertUnwindSafe(|| {
-                    let end = (start + BATCH_SIZE).min(count);
-                    ty_python_semantic::types::infer_scope_batch(
-                        db,
-                        db.program_file(file),
-                        start..end,
-                    );
+                    ty_python_semantic::types::infer_scope_batch(db, batch);
                 }),
             )
         })

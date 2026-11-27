@@ -964,8 +964,6 @@ pub(crate) mod testing {
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Write as _;
-
     use ruff_db::Db as _;
     use ruff_db::files::{FileRootKind, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf, TestSystem};
@@ -1116,30 +1114,45 @@ mod tests {
     }
 
     #[test]
-    fn large_file_checks_collect_diagnostics_across_scope_batches() -> anyhow::Result<()> {
-        let system = TestSystem::default();
+    fn serial_and_parallel_checks_collect_the_same_scope_diagnostics() -> anyhow::Result<()> {
         let project = SystemPathBuf::from("/project");
-        let mut source = String::from("def first() -> str: return last()\n");
-        for i in 0..256 {
-            writeln!(source, "def middle_{i}() -> int: return last()")?;
-        }
-        source.push_str("def last() -> int: return 'wrong'\n");
-        system
-            .memory_file_system()
-            .write_file_all(project.join("main.py"), source)?;
+        let source = dedent(
+            r"
+            from typing import Callable
 
-        let metadata = ProjectMetadata::discover(&project, &system)?;
-        let mut db = ProjectDatabase::fallible(metadata, system)?;
-        db.freeze();
+            def first() -> int:
+                return last('wrong')
 
-        let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(2)
-            .stack_size(ruff_db::STACK_SIZE)
-            .build()?;
-        let diagnostics = pool.install(move || db.check());
-        assert_eq!(diagnostics.len(), 2);
-        for diagnostic in diagnostics {
-            assert_eq!(diagnostic.id().as_str(), "invalid-explicit-return");
+            def last(x: int) -> int:
+                return str(x)
+
+            upper: Callable[[int], str] = lambda x: x.upper()
+            ",
+        );
+
+        for workers in [1, 2] {
+            let system = TestSystem::default();
+            system
+                .memory_file_system()
+                .write_file_all(project.join("main.py"), source.as_ref())?;
+            let metadata = ProjectMetadata::discover(&project, &system)?;
+            let mut db = ProjectDatabase::fallible(metadata, system)?;
+            db.freeze();
+
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(workers)
+                .stack_size(ruff_db::STACK_SIZE)
+                .build()?;
+            let diagnostics = pool.install(move || db.check());
+            let ids: Vec<_> = diagnostics.iter().map(|d| d.id().as_str()).collect();
+            assert_eq!(
+                ids,
+                [
+                    "invalid-argument-type",
+                    "invalid-explicit-return",
+                    "missing-attribute"
+                ]
+            );
         }
 
         Ok(())

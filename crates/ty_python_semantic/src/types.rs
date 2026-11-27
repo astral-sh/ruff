@@ -201,13 +201,8 @@ mod property_tests;
 mod subscript;
 
 /// Compute the same scope queries that [`check_types`] will read, without collecting diagnostics.
-/// The range uses the order of scopes in the file's semantic index.
-pub fn infer_scope_batch(db: &dyn Db, file: ProgramFile<'_>, scopes: std::ops::Range<usize>) {
-    for scope in semantic_index(db, file)
-        .scope_ids()
-        .skip(scopes.start)
-        .take(scopes.len())
-    {
+pub fn infer_scope_batch(db: &dyn Db, scopes: &[ScopeId<'_>]) {
+    for &scope in scopes {
         infer_independent_scope(db, scope);
     }
 }
