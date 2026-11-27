@@ -516,19 +516,15 @@ impl<'db> UnionElement<'db> {
         }
     }
 
-    /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
-    fn try_reduce(
+    /// Reduce a literal group against an incoming ordinary union member.
+    fn reduce_group(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         other_type: Type<'db>,
         cycle_recovery: bool,
         unpack_aliases: bool,
-    ) -> ReduceResult<'db> {
-        if let UnionElement::Type(existing) = self {
-            return ReduceResult::Type(*existing);
-        }
-
+    ) -> ReduceResult {
         if cycle_recovery {
             cold_path();
 
@@ -592,7 +588,7 @@ impl<'db> UnionElement<'db> {
         other_type: Type<'db>,
         kind: LiteralKind<'db>,
         literals: &FxOrderMap<L, bool>,
-    ) -> ReduceResult<'db> {
+    ) -> ReduceResult {
         if !matches!(kind, LiteralKind::Enum { .. }) && other_type.is_class_object_for_literals() {
             return ReduceResult::KeepIf(true);
         }
@@ -652,7 +648,7 @@ impl<'db> UnionElement<'db> {
     }
 }
 
-enum ReduceResult<'db> {
+enum ReduceResult {
     /// Reduction of this `UnionElement` is complete; keep it in the union if the nested
     /// boolean is true, eliminate it from the union if false.
     KeepIf(bool),
@@ -662,9 +658,6 @@ enum ReduceResult<'db> {
     CollapseToObject,
     /// The new element is a subtype of an existing part of the `UnionElement`, ignore it.
     Ignore,
-    /// The given `Type` can stand-in for the entire `UnionElement` for further union
-    /// simplification checks.
-    Type(Type<'db>),
 }
 
 /// Removals to apply if the incoming type is added to the union or merged with an
@@ -1319,31 +1312,31 @@ impl<'db> UnionBuilder<'db> {
         let mut reductions = UnionReductions::default();
 
         for (i, element) in self.elements.iter().enumerate() {
-            let element_type = match element.try_reduce(
-                db,
-                &self.env,
-                ty,
-                self.cycle_recovery,
-                self.unpack_aliases,
-            ) {
-                ReduceResult::KeepIf(keep) => {
-                    if !keep {
-                        reductions.to_remove.push(i);
+            let UnionElement::Type(element_type) = *element else {
+                match element.reduce_group(
+                    db,
+                    &self.env,
+                    ty,
+                    self.cycle_recovery,
+                    self.unpack_aliases,
+                ) {
+                    ReduceResult::KeepIf(keep) => {
+                        if !keep {
+                            reductions.to_remove.push(i);
+                        }
                     }
-                    continue;
+                    ReduceResult::RetainLiterals(keep) => {
+                        reductions.literal_filters.push((i, keep));
+                    }
+                    ReduceResult::CollapseToObject => {
+                        self.collapse_to_object();
+                        return;
+                    }
+                    ReduceResult::Ignore => {
+                        return;
+                    }
                 }
-                ReduceResult::RetainLiterals(keep) => {
-                    reductions.literal_filters.push((i, keep));
-                    continue;
-                }
-                ReduceResult::Type(ty) => ty,
-                ReduceResult::CollapseToObject => {
-                    self.collapse_to_object();
-                    return;
-                }
-                ReduceResult::Ignore => {
-                    return;
-                }
+                continue;
             };
 
             // Comparing `TypedDict`s for redundancy requires iterating over their fields, which is
@@ -1361,6 +1354,30 @@ impl<'db> UnionBuilder<'db> {
             }
 
             if Self::is_incomparable_for_union(db, ty, element_type) {
+                continue;
+            }
+
+            // If two fixed-length tuples have disjoint literals or distinct class objects
+            // at the same position, neither can subsume the other.
+            if should_simplify_full
+                && ty.is_nominal_instance()
+                && let Some(left) =
+                    incoming_tuple.get_or_insert_with(|| ty.exact_tuple_instance_spec(db))
+                && let Some(left) = left.as_fixed_length()
+                && let Some(right) = element_type.exact_tuple_instance_spec(db)
+                && let Some(right) = right.as_fixed_length()
+                && left
+                    .elements_slice()
+                    .iter()
+                    .zip(right.elements_slice())
+                    .any(|(a, b)| match (a, b) {
+                        (Type::LiteralValue(a), Type::LiteralValue(b)) => {
+                            a.is_disjoint_from(db, *b)
+                        }
+                        (Type::ClassLiteral(a), Type::ClassLiteral(b)) => a != b,
+                        _ => false,
+                    })
+            {
                 continue;
             }
 
@@ -1423,28 +1440,6 @@ impl<'db> UnionBuilder<'db> {
                 if let (Type::NominalInstance(left), Type::NominalInstance(right)) =
                     (ty, element_type)
                     && left.has_unrelated_class(db, right)
-                {
-                    continue;
-                }
-
-                // If two fixed-length tuples have disjoint literals or distinct class objects
-                // at the same position, neither can subsume the other.
-                if let Some(left) =
-                    incoming_tuple.get_or_insert_with(|| ty.exact_tuple_instance_spec(db))
-                    && let Some(left) = left.as_fixed_length()
-                    && let Some(right) = element_type.exact_tuple_instance_spec(db)
-                    && let Some(right) = right.as_fixed_length()
-                    && left
-                        .elements_slice()
-                        .iter()
-                        .zip(right.elements_slice())
-                        .any(|(a, b)| match (a, b) {
-                            (Type::LiteralValue(a), Type::LiteralValue(b)) => {
-                                a.is_disjoint_from(db, *b)
-                            }
-                            (Type::ClassLiteral(a), Type::ClassLiteral(b)) => a != b,
-                            _ => false,
-                        })
                 {
                     continue;
                 }
