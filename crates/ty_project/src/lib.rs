@@ -542,10 +542,8 @@ impl Project {
         let open_files = self.open_files(db);
         let check_start = ruff_db::Instant::now();
 
-        let files: Vec<_> = (&files).into_iter().collect();
-
         files
-            .into_par_iter()
+            .parallel_checks(db)
             .for_each_with_project_db(db, |db, file| {
                 db.unwind_if_revision_cancelled();
 
@@ -1078,6 +1076,43 @@ impl<'a> ProjectFiles<'a> {
         }
     }
 
+    /// Schedule one check per file, prioritizing larger files in large one-shot CLI runs.
+    fn parallel_checks(&self, db: &dyn Db) -> impl ParallelIterator<Item = File> + use<> {
+        // Limit the cost of estimating file sizes and synchronizing workers to large projects.
+        const MIN_FILES_TO_PRIORITIZE: usize = 1_024;
+
+        let mut files: Vec<_> = self.into_iter().collect();
+        if files.len() < MIN_FILES_TO_PRIORITIZE
+            || rayon::current_num_threads() == 1
+            || !matches!(self, Self::Indexed(_))
+            || !db.files().is_frozen()
+        {
+            return rayon::iter::Either::Left(files.into_par_iter());
+        }
+
+        // A large file started late can leave most workers idle. Discovery has already
+        // read ordinary sources to scan for script tags. Don't load notebooks just to sort.
+        files.sort_by_cached_key(|&file| {
+            db.unwind_if_revision_cancelled();
+            let bytes = if ruff_db::source::is_notebook(db, file) {
+                0
+            } else {
+                ruff_db::source::source_text(db, file).as_str().len()
+            };
+            std::cmp::Reverse(bytes)
+        });
+
+        // Rayon splits the work into contiguous ranges. Keep its job granularity
+        // but give each worker the next file when it's ready. The counter only
+        // assigns unique indices into an immutable list.
+        let next = std::sync::atomic::AtomicUsize::new(0);
+        rayon::iter::Either::Right(
+            (0..files.len())
+                .into_par_iter()
+                .map(move |_| files[next.fetch_add(1, std::sync::atomic::Ordering::Relaxed)]),
+        )
+    }
+
     fn diagnostics(&self) -> &[Diagnostic] {
         match self {
             ProjectFiles::OpenFiles(_) => &[],
@@ -1206,6 +1241,28 @@ mod tests {
     use ruff_db::testing::assert_function_query_was_not_run;
     use ty_python_semantic::Db as _;
     use ty_python_semantic::types::check_types;
+
+    #[test]
+    fn large_parallel_check_visits_each_file_once() -> anyhow::Result<()> {
+        use rayon::iter::ParallelIterator;
+        use rustc_hash::FxHashSet;
+
+        let pool = rayon::ThreadPoolBuilder::new().num_threads(4).build()?;
+        pool.install(|| {
+            let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/test"));
+            let mut db = TestDb::new(metadata);
+            db.write_files((0..1_024).map(|i| (format!("/test/module_{i}.py"), "")))?;
+            db.write_file("/test/large.py", "value = 42")?;
+            ruff_db::Db::files(&db).freeze();
+
+            let files = super::ProjectFiles::Indexed(db.project().files(&db));
+            let expected: FxHashSet<_> = (&files).into_iter().collect();
+            let checked: Vec<_> = files.parallel_checks(&db).collect();
+            assert_eq!(checked.len(), 1_025);
+            assert_eq!(checked.into_iter().collect::<FxHashSet<_>>(), expected);
+            Ok(())
+        })
+    }
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
