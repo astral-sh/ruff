@@ -1094,13 +1094,13 @@ impl<'db> UnionBuilder<'db> {
                     self.recursively_defined.or(literal.recursively_defined());
                 match literal.kind() {
                     LiteralValueTypeKind::String(_) => {
-                        self.add_builtin_literal(literal, LiteralKind::String, seen_aliases)
+                        self.add_builtin_literal(literal, LiteralKind::String, seen_aliases);
                     }
                     LiteralValueTypeKind::Bytes(_) => {
-                        self.add_builtin_literal(literal, LiteralKind::Bytes, seen_aliases)
+                        self.add_builtin_literal(literal, LiteralKind::Bytes, seen_aliases);
                     }
                     LiteralValueTypeKind::Int(_) => {
-                        self.add_builtin_literal(literal, LiteralKind::Int, seen_aliases)
+                        self.add_builtin_literal(literal, LiteralKind::Int, seen_aliases);
                     }
                     LiteralValueTypeKind::Enum(enum_member_to_add) => {
                         let limit = self.literal_limit();
