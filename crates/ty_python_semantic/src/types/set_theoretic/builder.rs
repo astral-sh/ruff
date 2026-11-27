@@ -397,13 +397,33 @@ enum LiteralKind<'db> {
     Enum { enum_class: ClassLiteral<'db> },
 }
 
-impl<'db> Type<'db> {
-    /// Neither a built-in literal nor its complement can be a subtype of these class object types.
-    fn is_class_object_for_literals(self) -> bool {
-        matches!(self, Type::ClassLiteral(_))
-            || matches!(self, Type::SubclassOf(subclass) if matches!(subclass.subclass_of(), SubclassOfInner::Class(_)))
+impl<'db> SubclassOfType<'db> {
+    /// Whether we can keep both `type[C]` and any string, bytes or integer literal in a union
+    /// without a redundancy check.
+    ///
+    /// Otherwise we still check whether `type[C]` is redundant with the literal. For a concrete
+    /// class, this depends on the metaclass instance, which can be `Never` if a callable
+    /// metaclass never returns.
+    fn is_incomparable_with_builtin_literals(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        match self.subclass_of() {
+            SubclassOfInner::Dynamic(_) | SubclassOfInner::Protocol(_) => true,
+            SubclassOfInner::TypeVar(_) => false,
+            SubclassOfInner::Class(_) => match self.try_metaclass_instance(db, env) {
+                Some(Type::NominalInstance(_)) => true,
+                // An unknown metaclass still produces a class object of type `type[Unknown]`.
+                Some(Type::SubclassOf(meta)) => meta.is_dynamic(),
+                // Keep the reverse check for `Never` and for provisional results (`None`).
+                _ => false,
+            },
+        }
     }
+}
 
+impl<'db> Type<'db> {
     /// Whether this member covers every literal of the same built-in kind as `literal`.
     /// `Some(false)` means both sides survive, including the complement check.
     /// `None` leaves the decision to the individual literal comparisons.
@@ -415,13 +435,8 @@ impl<'db> Type<'db> {
     ) -> Option<bool> {
         match self {
             Type::ClassLiteral(_) => Some(false),
-            // The reverse comparison uses the metaclass instance. A callable metaclass
-            // can return Never, and a provisional result can change during inference.
             Type::SubclassOf(subclass)
-                if self.is_class_object_for_literals()
-                    && subclass
-                        .try_metaclass_instance(db, env)
-                        .is_some_and(Type::is_nominal_instance) =>
+                if subclass.is_incomparable_with_builtin_literals(db, env) =>
             {
                 Some(false)
             }
@@ -593,12 +608,27 @@ impl<'db> UnionElement<'db> {
         kind: LiteralKind<'db>,
         literals: &FxOrderMap<L, bool>,
     ) -> ReduceResult<'db> {
-        if !matches!(kind, LiteralKind::Enum { .. }) && other_type.is_class_object_for_literals() {
-            return ReduceResult::KeepIf(true);
-        }
         let mut types = literals
             .iter()
             .map(|(&literal, &promotable)| Type::from(LiteralValueType::new(literal, promotable)));
+        if !matches!(kind, LiteralKind::Enum { .. }) {
+            match other_type {
+                Type::ClassLiteral(_) => return ReduceResult::KeepIf(true),
+                Type::SubclassOf(subclass) => {
+                    // Only an empty class object type can be a subtype of a built-in literal,
+                    // so it doesn't matter which literal we use for the reverse check.
+                    if !subclass.is_incomparable_with_builtin_literals(db, env)
+                        && types
+                            .next()
+                            .is_some_and(|ty| other_type.is_redundant_with(db, env, ty))
+                    {
+                        return ReduceResult::Ignore;
+                    }
+                    return ReduceResult::KeepIf(true);
+                }
+                _ => {}
+            }
+        }
         if !other_type.splits_literals(db, kind) {
             let ty = types.next().expect("literal groups are nonempty");
             return ReduceResult::KeepIf(!ty.is_redundant_with(db, env, other_type));
@@ -947,9 +977,8 @@ impl<'db> UnionBuilder<'db> {
                             continue;
                         }
 
-                        // Neither a string literal nor its complement is a subtype of type[C].
-                        // The reverse check can still succeed for a metaclass returning Never.
-                        let reverse_only = kind == LiteralKind::String && existing.is_subclass_of();
+                        // Neither a built-in literal nor its complement is a subtype of `type[C]`.
+                        let reverse_only = existing.is_subclass_of();
                         if !reverse_only && ty.is_redundant_with(db, &self.env, existing) {
                             return;
                         }

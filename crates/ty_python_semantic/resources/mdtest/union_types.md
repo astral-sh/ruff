@@ -281,7 +281,22 @@ def _(a: type[float] | Literal[b"f", b"d"], b: Literal[1, 2] | type[float]):
     reveal_type(b)  # revealed: Literal[1, 2] | type[float]
 ```
 
-If the metaclass never returns, there is no class object to include in the union.
+Even if the metaclass returns `Any`, `type[D]` still denotes class objects.
+
+```py
+from typing import Any
+
+def dynamic_meta(*args: object) -> Any: ...
+
+class D(metaclass=dynamic_meta): ...
+
+def _(x: type[D] | Literal[1, 2], y: Literal[b"a", b"b"] | type[D]):
+    reveal_type(x)  # revealed: type[D] | Literal[1, 2]
+    reveal_type(y)  # revealed: Literal[b"a", b"b"] | type[D]
+```
+
+If the metaclass never returns, there is no class object to include in the union, regardless of
+which type comes first.
 
 ```py
 from typing_extensions import Never
@@ -297,6 +312,11 @@ def _(x: type[C] | Literal["a"]):
 def _(x: type[C] | Literal[1, 2], y: type[C] | Literal[b"a", b"b"]):
     reveal_type(x)  # revealed: Literal[1, 2]
     reveal_type(y)  # revealed: Literal[b"a", b"b"]
+
+def _(x: Literal["a"] | type[C], y: Literal[1, 2] | type[C], z: Literal[b"a", b"b"] | type[C]):
+    reveal_type(x)  # revealed: Literal["a"]
+    reveal_type(y)  # revealed: Literal[1, 2]
+    reveal_type(z)  # revealed: Literal[b"a", b"b"]
 ```
 
 ## A specialized sequence can distinguish literals of the same kind
