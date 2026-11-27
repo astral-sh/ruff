@@ -404,6 +404,29 @@ f"aaaaaaaaaaaaaaaa \
     "cccccccccccccc \
             ddddddddddddddddddd"  # comment 4
 )
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/28842.
+# Joining these parts would change the string's value: an octal escape at the
+# end of one part would absorb the octal digit the next part starts with, so
+# they must stay split.
+b"A\0" b"1\0"
+"\1" "2"
+"\12" "3"
+"\1" "" "2"
+f"\1" "2"
+f"{x}\1" "2"
+
+# These are safe to join: the escape is already complete, the next part doesn't
+# start with an octal digit, the backslash is escaped, or an interpolation sits
+# between the escape and the digit.
+"\123" "4"
+"\12" "8"
+"\1" "a"
+"a\\1" "2"
+"\1" f"{x}2"
+f"\1{x}" "2"
+"\1" f"{x}"
 ```
 
 ## Output
@@ -870,6 +893,29 @@ f"aaaaaaaaaaaaaaaa \
     "cccccccccccccc \
             ddddddddddddddddddd"  # comment 4
 )
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/28842.
+# Joining these parts would change the string's value: an octal escape at the
+# end of one part would absorb the octal digit the next part starts with, so
+# they must stay split.
+b"A\0" b"1\0"
+"\1" "2"
+"\12" "3"
+"\1" "" "2"
+f"\1" "2"
+f"{x}\1" "2"
+
+# These are safe to join: the escape is already complete, the next part doesn't
+# start with an octal digit, the backslash is escaped, or an interpolation sits
+# between the escape and the digit.
+"\1234"
+"\128"
+"\1a"
+"a\\12"
+f"\1{x}2"
+f"\1{x}2"
+f"\1{x}"
 ```
 
 
