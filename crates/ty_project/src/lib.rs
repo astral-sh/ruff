@@ -31,6 +31,7 @@ use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, PythonEnvironmentError};
 use ty_python_core::{ProgramFile, semantic_index};
@@ -546,13 +547,19 @@ impl Project {
         let check_start = ruff_db::Instant::now();
 
         let files: Vec<_> = (&files).into_iter().collect();
+        let workers = rayon::current_num_threads();
         // On incremental checks, the whole file may already have cached diagnostics.
-        let share_scopes = db.files().is_frozen() && rayon::current_num_threads() > 1;
+        let share_scopes = db.files().is_frozen() && workers > 1;
+        let unstarted = AtomicUsize::new(files.len());
 
         files
             .into_par_iter()
             .for_each_with_project_db(db, |db, file| {
                 db.unwind_if_revision_cancelled();
+
+                // Prefer whole files while there is enough work to keep the pool busy.
+                let share_scopes =
+                    share_scopes && unstarted.fetch_sub(1, Ordering::Relaxed) <= workers;
 
                 if db.uv_environments().is_initialization_pending(db, file) {
                     tracing::debug!(
@@ -1055,7 +1062,7 @@ fn infer_file_scopes(db: &dyn Db, program_file: ProgramFile<'_>) -> Result<(), D
     const MAX_BATCH_SIZE: usize = 32;
 
     let file = program_file.file(db);
-    let scopes = catch(
+    let Some(scopes) = catch(
         db,
         file,
         AssertUnwindSafe(|| {
@@ -1063,14 +1070,22 @@ fn infer_file_scopes(db: &dyn Db, program_file: ProgramFile<'_>) -> Result<(), D
             if Script::for_file(db, file).is_some_and(|script| !script.has_valid_settings(db))
                 || source_text(db, file).read_error().is_some()
             {
-                return &[][..];
+                return None;
             }
-            semantic_index(db, program_file).scope_ids_slice()
+            let scopes = semantic_index(db, program_file).scope_ids_slice();
+            let (module, nested) = scopes.split_at(1);
+            if nested.len() < 2 {
+                return None;
+            }
+            // Resolve module-level definitions before workers infer scopes that depend on them.
+            // Otherwise they can enter the same inference cycle from different sides.
+            ty_python_semantic::types::infer_scope_batch(db, module);
+            Some(nested)
         }),
-    )?;
-    if scopes.len() <= 1 {
+    )?
+    else {
         return Ok(());
-    }
+    };
 
     scopes
         .par_chunks(minimum_parallel_job_len(scopes.len(), MAX_BATCH_SIZE))
