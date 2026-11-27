@@ -3244,9 +3244,20 @@ def _(u: HasX | NoX) -> None:
     # Key "x" is missing from `NoX`, so specialization does not apply.
     reveal_type(u.get("x"))  # revealed: int | Unknown | None
 
-def union_get(u: HasX | OptX) -> None:
+def union_get(u: HasX | OptX, default: bytes) -> None:
     # `HasX.x` is required (returns `int`), `OptX.x` is not (returns `int | None`).
     reveal_type(u.get("x"))  # revealed: int | None
+    reveal_type(u.get("x", default))  # revealed: int | bytes
+
+def mixed_get(u: OptX | dict[str, bytes]) -> None:
+    reveal_type(u.get("x"))  # revealed: int | None | bytes
+
+class Wrapper:
+    def __init__(self, record: OptX):
+        self.get = record.pop
+
+def stored_method(wrapper: Wrapper) -> None:
+    reveal_type(wrapper.get("x"))  # revealed: int
 ```
 
 `pop()` also uses the field type as bidirectional context for the default argument:
@@ -3296,6 +3307,28 @@ class StrX(TypedDict):
 def _(u: IntX | StrX) -> None:
     # error: [invalid-argument-type]
     reveal_type(u.setdefault("x", 1))  # revealed: int | str
+```
+
+## `get()` with an overloaded method on another union member
+
+Both alternatives of the default are valid for `Row`. When checking `Other.get`, we expand the
+default so that each alternative can match a different overload.
+
+```py
+from typing import Protocol, TypedDict, overload
+
+class Row(TypedDict):
+    count: int
+    items: list[object]
+
+class Other(Protocol):
+    @overload
+    def get(self, key: str, default: list[int]) -> list[object]: ...
+    @overload
+    def get(self, key: str, default: int) -> list[object]: ...
+
+def get_items(row: Row | Other, flag: bool) -> list[object]:
+    return row.get("items", [1] if flag else 0)
 ```
 
 ## `get()` with literal union defaults

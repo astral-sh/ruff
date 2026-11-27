@@ -17,7 +17,8 @@ pub(crate) use self::static_literal::{
     expanded_class_base_entries,
 };
 pub(super) use self::typed_dict::{
-    DynamicTypedDictAnchor, DynamicTypedDictLiteral, synthesized_typed_dict_class_member,
+    DynamicTypedDictAnchor, DynamicTypedDictLiteral, TypedDictGetOverloads,
+    synthesized_typed_dict_class_member,
 };
 use super::dedicated::pydantic;
 use super::display;
