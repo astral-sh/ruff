@@ -1078,8 +1078,9 @@ impl<'a> ProjectFiles<'a> {
 
     /// Schedule one check per file, prioritizing larger files in large one-shot CLI runs.
     fn parallel_checks(&self, db: &dyn Db) -> impl ParallelIterator<Item = File> + use<> {
-        // Limit the cost of estimating file sizes and synchronizing workers to large projects.
-        const MIN_FILES_TO_PRIORITIZE: usize = 1_024;
+        // Smaller projects can pay the sorting cost with little benefit. Changing the
+        // order of checks can also affect inference in import cycles.
+        const MIN_FILES_TO_PRIORITIZE: usize = 2_048;
 
         let mut files: Vec<_> = self.into_iter().collect();
         if files.len() < MIN_FILES_TO_PRIORITIZE
@@ -1251,14 +1252,14 @@ mod tests {
         pool.install(|| {
             let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/test"));
             let mut db = TestDb::new(metadata);
-            db.write_files((0..1_024).map(|i| (format!("/test/module_{i}.py"), "")))?;
+            db.write_files((0..2_048).map(|i| (format!("/test/module_{i}.py"), "")))?;
             db.write_file("/test/large.py", "value = 42")?;
             ruff_db::Db::files(&db).freeze();
 
             let files = super::ProjectFiles::Indexed(db.project().files(&db));
             let expected: FxHashSet<_> = (&files).into_iter().collect();
             let checked: Vec<_> = files.parallel_checks(&db).collect();
-            assert_eq!(checked.len(), 1_025);
+            assert_eq!(checked.len(), 2_049);
             assert_eq!(checked.into_iter().collect::<FxHashSet<_>>(), expected);
             Ok(())
         })
