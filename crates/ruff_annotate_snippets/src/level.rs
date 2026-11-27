@@ -4,6 +4,7 @@ use alloc::borrow::Cow;
 
 use anstyle::Style;
 
+use crate::renderer::escape_label;
 use crate::renderer::stylesheet::Stylesheet;
 use crate::snippet::{ERROR_TXT, HELP_TXT, INFO_TXT, NOTE_TXT, WARNING_TXT};
 use crate::{Message, OptionCow, Title};
@@ -166,7 +167,7 @@ impl<'a> Level<'a> {
     #[doc = include_str!("../examples/custom_level.svg")]
     pub fn with_name(self, name: impl Into<OptionCow<'a>>) -> Level<'a> {
         Level {
-            name: Some(name.into().0),
+            name: Some(name.into().0.map(escape_label)),
             level: self.level,
         }
     }

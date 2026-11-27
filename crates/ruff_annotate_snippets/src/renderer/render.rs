@@ -538,7 +538,7 @@ fn format_origin(origin: &Origin<'_>, anonymized_line_numbers: bool) -> String {
 
     let mut buffer = String::new();
     if let Some(path) = &origin.path {
-        write!(&mut buffer, "{path}").unwrap();
+        push_escaped(&mut buffer, path);
     }
     if let Some(cell_index) = origin.cell_index {
         if !buffer.is_empty() {
@@ -2565,6 +2565,63 @@ impl DisplaySuggestion {
     }
 }
 
+/// Some terminals also recognize the C1 equivalents of ESC sequences.
+fn terminal_escape(ch: char) -> Option<&'static str> {
+    match ch {
+        '\u{001b}' => Some("␛"),
+        '\u{0080}'..='\u{009f}' => Some("�"),
+        _ => None,
+    }
+}
+
+/// In UTF-8, C1 controls share the lead byte 0xC2 with some printable characters.
+fn may_contain_escape(text: &str) -> bool {
+    // Accumulate the two comparisons separately so LLVM can vectorize the scan.
+    let mut esc = false;
+    let mut c1 = false;
+    for byte in text.bytes() {
+        esc |= byte == 0x1b;
+        c1 |= byte == 0xc2;
+    }
+    esc | c1
+}
+
+/// Escape labels before measuring them for layout.
+pub(crate) fn escape_label(label: Cow<'_, str>) -> Cow<'_, str> {
+    if !may_contain_escape(&label) {
+        return label;
+    }
+    let Some(start) = label.find(|ch| terminal_escape(ch).is_some()) else {
+        return label;
+    };
+
+    let mut escaped = String::with_capacity(label.len());
+    escaped.push_str(&label[..start]);
+    push_escaped_slow(&mut escaped, &label[start..]);
+    Cow::Owned(escaped)
+}
+
+/// Escape paths only for display, so file comparisons use the original paths.
+pub(super) fn push_escaped(output: &mut String, text: &str) {
+    if may_contain_escape(text) {
+        push_escaped_slow(output, text);
+    } else {
+        output.push_str(text);
+    }
+}
+
+fn push_escaped_slow(output: &mut String, text: &str) {
+    let mut start = 0;
+    for (i, ch) in text.char_indices() {
+        if let Some(visible) = terminal_escape(ch) {
+            output.push_str(&text[start..i]);
+            output.push_str(visible);
+            start = i + ch.len_utf8();
+        }
+    }
+    output.push_str(&text[start..]);
+}
+
 // We replace some characters so the CLI output is always consistent and underlines aligned.
 // Keep the following list in sync with `rustc_span::char_width`.
 const OUTPUT_REPLACEMENTS: &[(char, &str)] = &[
@@ -2597,7 +2654,6 @@ const OUTPUT_REPLACEMENTS: &[(char, &str)] = &[
     ('\u{0018}', "␘"),
     ('\u{0019}', "␙"),
     ('\u{001a}', "␚"),
-    ('\u{001b}', "␛"),
     ('\u{001c}', "␜"),
     ('\u{001d}', "␝"),
     ('\u{001e}', "␞"),
@@ -2616,11 +2672,11 @@ const OUTPUT_REPLACEMENTS: &[(char, &str)] = &[
 ];
 
 pub(crate) fn normalize_whitespace(s: &str) -> Cow<'_, str> {
-    // All non-ASCII characters in OUTPUT_REPLACEMENTS start with 0xE2 in UTF-8.
+    // In UTF-8, C1 controls start with 0xC2 and the non-ASCII table entries start with 0xE2.
     let mut may_need_replacement = false;
     for byte in s.bytes() {
         let control = byte.is_ascii_control() && byte != b'\n';
-        may_need_replacement |= control | (byte == 0xe2);
+        may_need_replacement |= control | (byte == 0xc2) | (byte == 0xe2);
     }
     if !may_need_replacement {
         return Cow::Borrowed(s);
@@ -2634,6 +2690,7 @@ pub(crate) fn normalize_whitespace(s: &str) -> Cow<'_, str> {
         }
         let replacement = match OUTPUT_REPLACEMENTS.binary_search_by_key(&ch, |(k, _)| *k) {
             Ok(index) => OUTPUT_REPLACEMENTS[index].1,
+            Err(_) if let Some(visible) = terminal_escape(ch) => visible,
             Err(_) => continue,
         };
         // Reserve space for the first replacement and the rest of the input.
@@ -2900,6 +2957,7 @@ mod test {
     fn printable_text_with_matching_lead_bytes_stays_borrowed() {
         let text = "© →";
         assert!(matches!(normalize_whitespace(text), Cow::Borrowed(_)));
+        assert!(matches!(super::escape_label(text.into()), Cow::Borrowed(_)));
     }
 
     fn format_replacements(replacements: Vec<(char, &str)>) -> String {

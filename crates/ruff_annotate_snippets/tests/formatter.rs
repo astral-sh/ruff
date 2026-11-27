@@ -6,6 +6,44 @@ use annotate_snippets::renderer::DecorStyle;
 use snapbox::{assert_data_eq, str};
 
 #[test]
+fn escape_terminal_controls_in_untrusted_text() {
+    let report = &[Level::ERROR
+        .with_name("level\u{001b}")
+        .primary_title("oops\u{009b}")
+        .id("id\u{001b}")
+        .element(
+            Snippet::source("x\u{009b}")
+                .path("café\u{001b}.rs")
+                .annotation(
+                    AnnotationKind::Primary
+                        .span(0..1)
+                        .label("label\u{001b}\u{009b}\nmore"),
+                ),
+        )];
+
+    let full = Renderer::plain().render(report);
+    assert!(full.contains("x�"));
+    for output in [full, Renderer::plain().short_message(true).render(report)] {
+        assert!(output.contains("level␛"));
+        assert!(output.contains("id␛"));
+        assert!(output.contains("oops�"));
+        assert!(output.contains("café␛.rs:1:1"), "{output:?}");
+        assert!(output.contains("label␛�\nmore"), "{output:?}");
+        assert!(!output.contains(['\u{001b}', '\u{009b}']));
+    }
+}
+
+#[cfg(debug_assertions)]
+#[test]
+#[should_panic(expected = "hyperlink URLs must not contain control characters")]
+fn id_url_with_control_character() {
+    Level::ERROR
+        .primary_title("oops")
+        .id("E1")
+        .id_url("https://example.org/\u{0007}");
+}
+
+#[test]
 fn test_i_29() {
     let input = &[Level::ERROR.primary_title("oops").element(
         Snippet::source("First line\r\nSecond oops line")

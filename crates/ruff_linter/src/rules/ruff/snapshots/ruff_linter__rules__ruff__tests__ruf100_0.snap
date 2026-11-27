@@ -229,8 +229,8 @@ F841 [*] Local variable `e` is assigned to but never used
    --> RUF100_0.py:108:5
     |
 106 |     # Invalid - nonexistent error code with multibyte character
-107 |     d = 1  # noqa: F841, E50
-108 |     e = 1  # noqa: E50
+107 |     d = 1  # �noqa: F841, E50
+108 |     e = 1  # �noqa: E50
     |     ^
 help: Remove assignment to unused variable `e`
     |

@@ -6,6 +6,7 @@ use alloc::{vec, vec::Vec};
 use core::ops::Range;
 
 use crate::Level;
+use crate::renderer::escape_label;
 use crate::renderer::source_map::{TrimmedPatch, as_substr};
 
 pub(crate) const ERROR_TXT: &str = "error";
@@ -191,7 +192,7 @@ impl<'a> Title<'a> {
     ///
     /// </div>
     pub fn id(mut self, id: impl Into<Cow<'a, str>>) -> Self {
-        self.id.get_or_insert(Id::default()).id = Some(id.into());
+        self.id.get_or_insert(Id::default()).id = Some(escape_label(id.into()));
         self
     }
 
@@ -199,11 +200,23 @@ impl<'a> Title<'a> {
     ///
     /// <div class="warning">
     ///
-    /// This is only relevant if `id` is present
+    /// This is only relevant if `id` is present.
+    ///
+    /// The renderer inserts the URL verbatim into a terminal hyperlink (OSC 8).
+    /// Only pass trusted URLs without control characters. Characters such as
+    /// BEL can terminate the hyperlink sequence.
+    ///
+    /// With debug assertions enabled, this method panics if the URL contains
+    /// a control character.
     ///
     /// </div>
     pub fn id_url(mut self, url: impl Into<Cow<'a, str>>) -> Self {
-        self.id.get_or_insert(Id::default()).url = Some(url.into());
+        let url = url.into();
+        debug_assert!(
+            !url.contains(char::is_control),
+            "hyperlink URLs must not contain control characters"
+        );
+        self.id.get_or_insert(Id::default()).url = Some(url);
         self
     }
 
@@ -376,7 +389,7 @@ impl<'a> Annotation<'a> {
     ///
     /// </div>
     pub fn label(mut self, label: impl Into<OptionCow<'a>>) -> Self {
-        self.label = label.into().0;
+        self.label = label.into().0.map(escape_label);
         self
     }
 
