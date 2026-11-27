@@ -8,7 +8,7 @@ use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_source_file::{LineEnding, LineRanges, find_newline};
 use ruff_text_size::Ranged;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Stylist<'a> {
     indentation: Indentation,
     quote: Quote,
@@ -59,6 +59,12 @@ enum LineEndingDetection<'a> {
         detected: OnceLock<LineEnding>,
     },
     Detected(LineEnding),
+}
+
+impl PartialEq for LineEndingDetection<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.get() == other.get()
+    }
 }
 
 impl LineEndingDetection<'_> {
@@ -185,7 +191,10 @@ mod tests {
         let stylist = {
             let source = String::from("def f():\r\n  return 'value'\r\n");
             let parsed = parse_module(&source).unwrap();
-            Stylist::from_tokens(parsed.tokens(), &source).into_owned()
+            let borrowed = Stylist::from_tokens(parsed.tokens(), &source);
+            let owned = borrowed.clone().into_owned();
+            assert_eq!(borrowed, owned);
+            owned
         };
 
         assert_eq!(stylist.indentation().as_str(), "  ");

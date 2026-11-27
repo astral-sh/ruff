@@ -3,18 +3,22 @@ use std::fmt::Write;
 
 use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
+use crate::fix_all_diagnostics;
 use crate::lint::{LintSource, RuleSelection};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
 use crate::types::{KnownClass, KnownInstanceType, TypeAndQualifiers, check_types};
 use ruff_db::Db as _;
+use ruff_db::cancellation::CancellationTokenSource;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
+use ruff_db::source::source_text;
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{
     assert_function_query_was_not_run, assert_function_query_was_not_run_by_name,
     assert_function_query_was_run, find_will_execute_event_by_name,
 };
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::PythonVersion;
 use salsa::Database as _;
 use salsa::plumbing::AsId;
@@ -360,6 +364,47 @@ fn not_literal_string() -> anyhow::Result<()> {
         ],
     );
 
+    Ok(())
+}
+
+/// Fixing a mismatched `TypeVar` name clears the diagnostic in one edit even when both
+/// the original and replacement literals are long enough to infer `LiteralString`. Since that
+/// type doesn't encode the exact string, ty infers `str` for the type variable's `__name__`.
+#[test]
+fn fix_mismatched_typevar_name_above_literal_size_limit() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let target = "T".repeat(TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE + 1);
+    let wrong_name = format!("{target}_");
+    let source = format!(
+        r#"from typing import TypeVar
+{target} = TypeVar("{wrong_name}")"#
+    );
+    db.write_file("src/main.py", &source)?;
+    let file = system_path_to_file(&db, "src/main.py")?;
+    let diagnostics = db.check_file(file);
+    assert_matches!(
+        diagnostics.as_slice(),
+        [diagnostic] if diagnostic.id().is_lint_named("mismatched-typevar-name")
+    );
+
+    let result = fix_all_diagnostics(
+        &mut db,
+        diagnostics,
+        Applicability::Safe,
+        &CancellationTokenSource::new().token(),
+    )
+    .unwrap();
+    assert_eq!(result.count, 1);
+    assert_eq!(
+        &*source_text(&db, file),
+        source.replace(&wrong_name, &target)
+    );
+    assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
+
+    let env = db.program_environment();
+    let typevar = global_symbol(&db, file, &target).place.expect_type();
+    let name_ty = typevar.member(&db, &env, "__name__").place.expect_type();
+    assert_eq!(name_ty, KnownClass::Str.to_instance(&db, &env));
     Ok(())
 }
 

@@ -25,6 +25,11 @@ from enum import Enum
 Color = Enum("Colour", "RED BLUE")
 ```
 
+## Fix safety
+
+This rule's autofix is always marked as unsafe because the runtime name may intentionally differ
+from the variable name.
+
 ## Rule history
 
 - v0.0.108: Split out from `mismatched-type-name`.

@@ -314,6 +314,21 @@ Keyword = namedtuple(typename="class", field_names="x", rename=True)
 match = namedtuple("match", "x")  # ok
 ```
 
+Python normalizes the fullwidth identifier `ｃｌａｓｓ` to `class`. Since `namedtuple` rejects `"class"`
+as a type name, ty reports the mismatch without suggesting a replacement.
+
+```py
+ｃｌａｓｓ = namedtuple("Record", [])  # snapshot: mismatched-namedtuple-name
+```
+
+```snapshot
+info[mismatched-namedtuple-name]: The name passed to `namedtuple` must match the variable it is assigned to
+  --> src/mdtest_snippet.py:12:20
+   |
+12 | ｃｌａｓｓ = namedtuple("Record", [])  # snapshot: mismatched-namedtuple-name
+   |                         ^^^^^^^^ Expected "class", got "Record"
+```
+
 ### Functional syntax with string annotations
 
 String annotations (forward references) are properly evaluated to types:

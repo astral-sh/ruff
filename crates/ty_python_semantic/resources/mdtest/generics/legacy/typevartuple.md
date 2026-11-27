@@ -76,6 +76,13 @@ warning[mismatched-typevartuple-name]: The name passed to `TypeVarTuple` must ma
   |
 6 | Ts2 = TypeVarTuple("Ts3")
   |                    ^^^^^ Expected "Ts2", got "Ts3"
+help: Use `"Ts2"` as the name
+  |
+5 | # snapshot: mismatched-typevartuple-name
+  - Ts2 = TypeVarTuple("Ts3")
+6 + Ts2 = TypeVarTuple("Ts2")
+7 |
+  |
 ```
 
 ### Name supplied at runtime

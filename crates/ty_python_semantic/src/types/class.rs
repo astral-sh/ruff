@@ -3412,41 +3412,19 @@ impl<'db> QualifiedClassName<'db> {
     /// Returns the components of the qualified name of this class, excluding this class itself.
     ///
     /// For example, calling this method on a class `C` in the module `a.b` would return
-    /// `["a", "b"]`. Calling this method on a class `D` inside the namespace of a method
+    /// `["a.b"]`. Calling this method on a class `D` inside the namespace of a method
     /// `m` inside the namespace of a class `C` in the module `a.b` would return
-    /// `["a", "b", "C", "<locals of function 'm'>"]`.
+    /// `["a.b", "C", "<locals of function 'm'>"]`.
     pub(super) fn components_excluding_self(&self) -> Vec<String> {
-        let (file, file_scope_id, skip_count) = match self.class {
-            ClassLiteral::Static(class) => {
-                let body_scope = class.body_scope(self.db);
-                // Skip the class body scope itself.
-                (
-                    body_scope.program_file(self.db),
-                    body_scope.file_scope_id(self.db),
-                    1,
-                )
-            }
-            ClassLiteral::Dynamic(class) => {
-                // Dynamic classes don't have a body scope; start from the enclosing scope.
-                let scope = class.scope(self.db);
-                (scope.program_file(self.db), scope.file_scope_id(self.db), 0)
-            }
-            ClassLiteral::DynamicNamedTuple(namedtuple) => {
-                // Dynamic namedtuples don't have a body scope; start from the enclosing scope.
-                let scope = namedtuple.scope(self.db);
-                (scope.program_file(self.db), scope.file_scope_id(self.db), 0)
-            }
-            ClassLiteral::DynamicTypedDict(typeddict) => {
-                let scope = typeddict.scope(self.db);
-                (scope.program_file(self.db), scope.file_scope_id(self.db), 0)
-            }
-            ClassLiteral::DynamicEnum(enum_lit) => {
-                let scope = enum_lit.scope(self.db);
-                (scope.program_file(self.db), scope.file_scope_id(self.db), 0)
-            }
+        let enclosing_scope = match self.class {
+            ClassLiteral::Static(class) => class.definition(self.db).scope_id(self.db),
+            ClassLiteral::Dynamic(class) => class.scope(self.db),
+            ClassLiteral::DynamicNamedTuple(namedtuple) => namedtuple.scope(self.db),
+            ClassLiteral::DynamicTypedDict(typeddict) => typeddict.scope(self.db),
+            ClassLiteral::DynamicEnum(enum_lit) => enum_lit.scope(self.db),
         };
 
-        display::qualified_name_components_from_scope(self.db, file, file_scope_id, skip_count)
+        display::qualified_name_components_from_scope(self.db, enclosing_scope)
     }
 }
 

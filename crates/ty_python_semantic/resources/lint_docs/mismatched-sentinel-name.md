@@ -35,3 +35,8 @@ MISSING = Sentinel("MISSING")
 class Container:
     UNSET = Sentinel("Container.UNSET")
 ```
+
+## Fix safety
+
+This rule's autofix is always marked as unsafe because the runtime name may intentionally differ
+from the variable name.

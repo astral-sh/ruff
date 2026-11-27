@@ -16,7 +16,7 @@ use ruff_db::PythonFile;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 
 use crate::types::Type;
-use crate::{Db, SemanticModel};
+use crate::{Db, SemanticModel, stylist};
 use ruff_db::source::{SourceText, source_text};
 use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
@@ -501,14 +501,6 @@ impl<'a> Importer<'a> {
             Some(AstImport { stmt, kind })
         })
     }
-}
-
-/// Detects source style once per file revision, shared by diagnostics and IDE features.
-#[salsa::tracked(returns(ref), no_eq)]
-fn stylist(db: &dyn Db, file: PythonFile<'_>) -> Stylist<'static> {
-    let parsed = parsed_module(db, file).load(db);
-    let source = source_text(db, file.file(db));
-    Stylist::from_tokens(parsed.tokens(), &source).into_owned()
 }
 
 #[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size)]

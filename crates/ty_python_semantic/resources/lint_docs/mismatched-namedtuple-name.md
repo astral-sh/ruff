@@ -28,6 +28,11 @@ Point = NamedTuple("Vector", [("x", int)])
 Pair = namedtuple("Coordinates", "x y")
 ```
 
+## Fix safety
+
+This rule's autofix is always marked as unsafe because the runtime name may intentionally differ
+from the variable name.
+
 ## See also
 
 `invalid-named-tuple` is emitted on namedtuples that will actually lead to exceptions being raised
