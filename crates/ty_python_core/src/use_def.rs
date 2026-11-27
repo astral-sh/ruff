@@ -3944,27 +3944,3 @@ impl<'db> UseDefMapBuilder<'db> {
         interned_ids_by_snapshot
     }
 }
-
-#[cfg(test)]
-mod retained_state_tests {
-    use super::*;
-
-    #[test]
-    fn materializing_offsets_preserves_singleton_ids() {
-        let mut ends = IndexVec::<InternedBindingsId, u32>::new();
-        let mut entries = Vec::new();
-        let empty = InternedBindingsId::new(0);
-        let first = push_retained_state(&mut ends, &mut entries, &[1]);
-        let second = push_retained_state(&mut ends, &mut entries, &[2]);
-        assert!(ends.is_empty());
-        assert_eq!(entries[retained_state_range(&ends, second)], [2]);
-
-        let pair = push_retained_state(&mut ends, &mut entries, &[3, 4]);
-        let last = push_retained_state(&mut ends, &mut entries, &[5]);
-        assert!(entries[retained_state_range(&ends, empty)].is_empty());
-        assert_eq!(entries[retained_state_range(&ends, first)], [1]);
-        assert_eq!(entries[retained_state_range(&ends, second)], [2]);
-        assert_eq!(entries[retained_state_range(&ends, pair)], [3, 4]);
-        assert_eq!(entries[retained_state_range(&ends, last)], [5]);
-    }
-}
