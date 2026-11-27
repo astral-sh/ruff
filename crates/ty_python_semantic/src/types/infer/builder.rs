@@ -9447,7 +9447,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Two things are different if it's the first comprehension:
             // (1) We must lookup the `ScopedExpressionId` of the iterable expression in the outer scope,
-            //     because that's the scope we visit it in in the semantic index builder
+            //     because that's the scope we visit it in the semantic index builder
             // (2) We must *not* call `self.extend()` on the result of the type inference,
             //     because `ScopedExpressionId`s are only meaningful within their own scope, so
             //     we'd add types for random wrong expressions in the current scope
