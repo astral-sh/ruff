@@ -1,0 +1,94 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+TC010 [*] Invalid string member in `X | Y`-style union type
+ --> <filename>:2:5
+  |
+2 | x1: "int # comment" | None = 1
+  |     ^^^^^^^^^^^^^^^
+3 | x2: ("int # comment") | None = 1
+4 | x3: "(int) # comment" | None = 1
+  |
+help: Remove quotes
+  |
+1 |
+  - x1: "int # comment" | None = 1
+2 + x1: (int # comment
+3 + ) | None = 1
+4 | x2: ("int # comment") | None = 1
+  |
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+ --> <filename>:3:6
+  |
+2 | x1: "int # comment" | None = 1
+3 | x2: ("int # comment") | None = 1
+  |      ^^^^^^^^^^^^^^^
+4 | x3: "(int) # comment" | None = 1
+5 | x4: "(int # comment\n)" | None = 1
+  |
+help: Remove quotes
+  |
+2 | x1: "int # comment" | None = 1
+  - x2: ("int # comment") | None = 1
+3 + x2: (int # comment
+4 + ) | None = 1
+5 | x3: "(int) # comment" | None = 1
+  |
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+ --> <filename>:4:5
+  |
+2 | x1: "int # comment" | None = 1
+3 | x2: ("int # comment") | None = 1
+4 | x3: "(int) # comment" | None = 1
+  |     ^^^^^^^^^^^^^^^^^
+5 | x4: "(int # comment\n)" | None = 1
+6 | x5: """int
+  |
+help: Remove quotes
+  |
+3 | x2: ("int # comment") | None = 1
+  - x3: "(int) # comment" | None = 1
+4 + x3: ((int) # comment
+5 + ) | None = 1
+6 | x4: "(int # comment\n)" | None = 1
+  |
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+ --> <filename>:5:5
+  |
+3 | x2: ("int # comment") | None = 1
+4 | x3: "(int) # comment" | None = 1
+5 | x4: "(int # comment\n)" | None = 1
+  |     ^^^^^^^^^^^^^^^^^^^
+6 | x5: """int
+7 | | str # comment""" | None = 1
+  |
+help: Remove quotes
+  |
+4 | x3: "(int) # comment" | None = 1
+  - x4: "(int # comment\n)" | None = 1
+5 + x4: ((int # comment
+6 + )) | None = 1
+7 | x5: """int
+  |
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+ --> <filename>:6:5
+  |
+4 |   x3: "(int) # comment" | None = 1
+5 |   x4: "(int # comment\n)" | None = 1
+6 |   x5: """int
+  |  _____^
+7 | | | str # comment""" | None = 1
+  | |__________________^
+help: Remove quotes
+  |
+5 | x4: "(int # comment\n)" | None = 1
+  - x5: """int
+  - | str # comment""" | None = 1
+6 + x5: (int
+7 + | str # comment
+8 + ) | None = 1
+  |

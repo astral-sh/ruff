@@ -1,0 +1,52 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+TC008 [*] Remove quotes from type alias
+ --> <filename>:4:11
+  |
+2 | from typing import Literal
+3 |
+4 | type X1 = "int # comment" | None
+  |           ^^^^^^^^^^^^^^^
+5 | type X2 = ("int # comment") | None
+6 | type X3 = "Literal['# not a comment']"
+  |
+help: Remove quotes
+  |
+3 |
+  - type X1 = "int # comment" | None
+4 + type X1 = (int # comment
+5 + ) | None
+6 | type X2 = ("int # comment") | None
+  |
+
+TC008 [*] Remove quotes from type alias
+ --> <filename>:5:12
+  |
+4 | type X1 = "int # comment" | None
+5 | type X2 = ("int # comment") | None
+  |            ^^^^^^^^^^^^^^^
+6 | type X3 = "Literal['# not a comment']"
+  |
+help: Remove quotes
+  |
+4 | type X1 = "int # comment" | None
+  - type X2 = ("int # comment") | None
+5 + type X2 = (int # comment
+6 + ) | None
+7 | type X3 = "Literal['# not a comment']"
+  |
+
+TC008 [*] Remove quotes from type alias
+ --> <filename>:6:11
+  |
+4 | type X1 = "int # comment" | None
+5 | type X2 = ("int # comment") | None
+6 | type X3 = "Literal['# not a comment']"
+  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Remove quotes
+  |
+5 | type X2 = ("int # comment") | None
+  - type X3 = "Literal['# not a comment']"
+6 + type X3 = Literal['# not a comment']
+  |
