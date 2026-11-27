@@ -972,7 +972,8 @@ pub(super) struct UseDefMapInterner {
     stub_layouts: FxHashMap<SmallVec<[bool; 8]>, StubParameterLayout>,
 }
 
-/// Binding and declaration tables for a function whose body contains only `pass` or `...`.
+/// Binding and declaration tables for a function whose body contains only an optional
+/// docstring and zero or more `pass` or `...` statements.
 /// Each distinct parameter binds its symbol once. An annotated parameter also declares it.
 /// These functions share a layout because the tables refer to definitions by scope-local index.
 ///
