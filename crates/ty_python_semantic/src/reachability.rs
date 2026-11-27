@@ -1862,9 +1862,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
                 definite_match_pattern_type_for_subject(db, env, predicate_kind, subject_ty)
             });
 
-            if subject_ty.is_equivalent_to(db, env, definitely_matched)
-                || subject_ty.is_subtype_of(db, env, definitely_matched)
-            {
+            if subject_ty.is_pure_redundant_with(db, env, definitely_matched) {
                 Truthiness::AlwaysTrue
             } else if subject_ty.is_disjoint_from(db, env, class_ty) {
                 Truthiness::AlwaysFalse
