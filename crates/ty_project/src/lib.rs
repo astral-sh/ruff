@@ -31,6 +31,7 @@ use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
+use std::time::Duration;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, PythonEnvironmentError};
 use ty_python_core::{ProgramFile, semantic_index};
 pub use ty_python_semantic::Db as SemanticDb;
@@ -567,12 +568,7 @@ impl Project {
                 let _entered = check_file_span.entered();
                 let program_file = db.program_file(file);
 
-                if share_scopes && let Err(diagnostic) = infer_file_scopes(db, program_file) {
-                    reporter.report_checked_file(db, file, std::slice::from_ref(&diagnostic));
-                    return;
-                }
-
-                match check_file_impl(db, program_file) {
+                match check_program_file(db, program_file, share_scopes) {
                     Ok(diagnostics) => {
                         reporter.report_checked_file(db, file, diagnostics);
 
@@ -595,8 +591,8 @@ impl Project {
                             parsed.clear();
                         }
                     }
-                    Err(io_error) => {
-                        reporter.report_checked_file(db, file, std::slice::from_ref(io_error));
+                    Err(diagnostic) => {
+                        reporter.report_checked_file(db, file, std::slice::from_ref(&diagnostic));
                     }
                 }
             });
@@ -915,9 +911,9 @@ fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
         return Vec::new();
     }
 
-    check_file_impl(db, db.program_file(file))
+    check_program_file(db, db.program_file(file), false)
         .map(<[Diagnostic]>::to_vec)
-        .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
+        .unwrap_or_else(|diagnostic| vec![diagnostic])
 }
 
 /// Returns whether semantic checking and semantic diagnostics should run for `file`.
@@ -1023,6 +1019,31 @@ pub enum ProjectReloadResult {
         /// Whether the indexed project files changed.
         files_changed: bool,
     },
+}
+
+/// Check a file and include inference outside the tracked query in the slow-file log.
+/// Only enable scope sharing when called outside any Salsa query.
+fn check_program_file<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+    share_scopes: bool,
+) -> Result<&'db [Diagnostic], Diagnostic> {
+    tracing::debug!("Checking file '{path}'", path = file.file(db).path(db));
+    let start = ruff_db::Instant::now();
+    if share_scopes {
+        infer_file_scopes(db, file)?;
+    }
+    let diagnostics = check_file_impl(db, file).map_err(Clone::clone)?;
+
+    let elapsed = start.elapsed();
+    if elapsed >= Duration::from_millis(100) {
+        tracing::info!(
+            "Checking file `{path}` took more than 100ms ({elapsed:?})",
+            path = file.file(db).path(db)
+        );
+    }
+
+    Ok(diagnostics)
 }
 
 /// Let idle workers infer scopes from a file another worker is checking.

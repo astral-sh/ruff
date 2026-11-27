@@ -8,13 +8,11 @@ use std::borrow::Cow;
 use std::cell::{Cell, OnceCell, RefCell};
 use std::iter;
 use std::rc::Rc;
-use std::time::Duration;
 
 use bitflags::bitflags;
 use call::{CallDunderError, CallError, CallErrorKind, OperatorResult};
 use context::InferContext;
 pub use context::ProgramEnvironment;
-use ruff_db::Instant;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, UnifiedFile};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -218,9 +216,6 @@ fn infer_independent_scope<'db>(
 pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
     let source_file = file.file(db);
     let _span = tracing::trace_span!("check_types", ?source_file).entered();
-    tracing::debug!("Checking file '{path}'", path = source_file.path(db));
-
-    let start = Instant::now();
 
     let index = semantic_index(db, file);
     let mut diagnostics = TypeCheckDiagnostics::default();
@@ -280,17 +275,7 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
             .map(|error| Diagnostic::invalid_syntax(source_file, error, error)),
     );
 
-    let diagnostics = check_suppressions(db, file.python_file(db), diagnostics);
-
-    let elapsed = start.elapsed();
-    if elapsed >= Duration::from_millis(100) {
-        tracing::info!(
-            "Checking file `{path}` took more than 100ms ({elapsed:?})",
-            path = source_file.path(db)
-        );
-    }
-
-    diagnostics
+    check_suppressions(db, file.python_file(db), diagnostics)
 }
 
 /// Infer the type of a binding.
