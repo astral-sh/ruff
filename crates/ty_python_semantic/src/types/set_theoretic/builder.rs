@@ -56,7 +56,7 @@ use crate::types::{
 };
 use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, ProgramEnvironment};
 use itertools::Itertools;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 /// The truthiness excluded by a single guard, e.g. `AlwaysFalsy` in `A & ~AlwaysFalsy`.
@@ -477,19 +477,15 @@ impl<'db> UnionElement<'db> {
         }
     }
 
-    /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
-    fn try_reduce(
+    /// Reduce a literal group against an incoming ordinary union member.
+    fn reduce_group(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         other_type: Type<'db>,
         cycle_recovery: bool,
         unpack_aliases: bool,
-    ) -> ReduceResult<'db> {
-        if let UnionElement::Type(existing) = self {
-            return ReduceResult::Type(*existing);
-        }
-
+    ) -> ReduceResult {
         if cycle_recovery {
             cold_path();
 
@@ -553,7 +549,7 @@ impl<'db> UnionElement<'db> {
         other_type: Type<'db>,
         kind: LiteralKind<'db>,
         literals: &FxOrderMap<L, bool>,
-    ) -> ReduceResult<'db> {
+    ) -> ReduceResult {
         let mut types = literals
             .iter()
             .map(|(&literal, &promotable)| Type::from(LiteralValueType::new(literal, promotable)));
@@ -610,7 +606,7 @@ impl<'db> UnionElement<'db> {
     }
 }
 
-enum ReduceResult<'db> {
+enum ReduceResult {
     /// Reduction of this `UnionElement` is complete; keep it in the union if the nested
     /// boolean is true, eliminate it from the union if false.
     KeepIf(bool),
@@ -620,9 +616,49 @@ enum ReduceResult<'db> {
     CollapseToObject,
     /// The new element is a subtype of an existing part of the `UnionElement`, ignore it.
     Ignore,
-    /// The given `Type` can stand-in for the entire `UnionElement` for further union
-    /// simplification checks.
-    Type(Type<'db>),
+}
+
+/// Index of fixed-length tuples by their first literal. Distinct tags rule out both
+/// directions of redundancy, as in the pairwise tuple check in [`UnionBuilder::push_type`].
+#[derive(Clone, Default)]
+struct TupleTagIndex<'db> {
+    by_tag: FxHashMap<LiteralValueTypeKind<'db>, SmallVec<[usize; 1]>>,
+    untagged: Vec<usize>,
+    indexed: usize,
+}
+
+impl<'db> TupleTagIndex<'db> {
+    // Small unions are cheaper to scan and need no allocation for the index.
+    const MIN_MEMBERS: usize = 16;
+
+    /// Use the value independently of promotability. `LiteralString` and enum
+    /// members with unknown aliases can overlap other values, so keep them unindexed.
+    fn tag(db: &'db dyn Db, ty: Type<'db>) -> Option<LiteralValueTypeKind<'db>> {
+        let tuple = ty.exact_tuple_instance_spec(db)?;
+        let first = tuple.as_fixed_length()?.elements_slice().first()?;
+        match first.as_literal_value_kind()? {
+            tag @ (LiteralValueTypeKind::String(_)
+            | LiteralValueTypeKind::Bytes(_)
+            | LiteralValueTypeKind::Int(_)
+            | LiteralValueTypeKind::Bool(_)) => Some(tag),
+            LiteralValueTypeKind::Enum(_) | LiteralValueTypeKind::LiteralString => None,
+        }
+    }
+
+    /// Include new members in insertion order. Moving or replacing a member
+    /// invalidates the index, so only the appended suffix needs classifying.
+    fn update(&mut self, db: &'db dyn Db, elements: &[UnionElement<'db>]) {
+        for (i, element) in elements.iter().enumerate().skip(self.indexed) {
+            if let UnionElement::Type(ty) = element
+                && let Some(tag) = Self::tag(db, *ty)
+            {
+                self.by_tag.entry(tag).or_default().push(i);
+            } else {
+                self.untagged.push(i);
+            }
+        }
+        self.indexed = elements.len();
+    }
 }
 
 /// Removals to apply if the incoming type is added to the union or merged with an
@@ -637,7 +673,11 @@ struct UnionReductions {
 impl UnionReductions {
     /// Apply all removals before restarting a merge, or insert `replacement` in
     /// the first vacated slot when no further comparisons are needed.
-    fn apply<'db>(self, elements: &mut Vec<UnionElement<'db>>, replacement: Option<Type<'db>>) {
+    fn apply<'db>(self, builder: &mut UnionBuilder<'db>, replacement: Option<Type<'db>>) {
+        if !self.to_remove.is_empty() {
+            builder.tuple_tags = None;
+        }
+        let elements = &mut builder.elements;
         // Filter groups before any swap can move them. A merge may restore a literal
         // that would otherwise complete an enum or push a group over its widening limit.
         for (index, keep) in self.literal_filters {
@@ -676,6 +716,7 @@ pub(crate) struct UnionBuilder<'db> {
     /// This is enabled when joining types in a `cycle_recovery` function. Because recovery cannot
     /// introduce a new cycle, relation-based union simplifications are skipped in this mode.
     cycle_recovery: bool,
+    tuple_tags: Option<Box<TupleTagIndex<'db>>>,
     recursively_defined: RecursivelyDefined,
 }
 
@@ -750,6 +791,7 @@ impl<'db> UnionBuilder<'db> {
             elements: vec![],
             unpack_aliases: true,
             cycle_recovery: false,
+            tuple_tags: None,
             recursively_defined: RecursivelyDefined::No,
         }
     }
@@ -779,8 +821,15 @@ impl<'db> UnionBuilder<'db> {
 
     /// Collapse the union to a single type: `object`.
     fn collapse_to_object(&mut self) {
+        self.tuple_tags = None;
         self.elements.clear();
         self.elements.push(UnionElement::Type(Type::object()));
+    }
+
+    /// Removing a member can move the last one into its slot.
+    fn swap_remove_member(&mut self, index: usize) {
+        self.tuple_tags = None;
+        self.elements.swap_remove(index);
     }
 
     fn widen_literal_types(&mut self, seen_aliases: &mut Vec<Type<'db>>) {
@@ -942,7 +991,7 @@ impl<'db> UnionBuilder<'db> {
                             ));
                         }
                         if let Some(index) = to_remove {
-                            self.elements.swap_remove(index);
+                            self.swap_remove_member(index);
                         }
                     }
                     // Same for bytes literals as for string literals, above.
@@ -1001,7 +1050,7 @@ impl<'db> UnionBuilder<'db> {
                                 )])));
                         }
                         if let Some(index) = to_remove {
-                            self.elements.swap_remove(index);
+                            self.swap_remove_member(index);
                         }
                     }
                     // And same for int literals as well.
@@ -1061,7 +1110,7 @@ impl<'db> UnionBuilder<'db> {
                                 )])));
                         }
                         if let Some(index) = to_remove {
-                            self.elements.swap_remove(index);
+                            self.swap_remove_member(index);
                         }
                     }
                     LiteralValueTypeKind::Enum(enum_member_to_add) => {
@@ -1155,7 +1204,7 @@ impl<'db> UnionBuilder<'db> {
                             });
                         }
                         if let Some(index) = to_remove {
-                            self.elements.swap_remove(index);
+                            self.swap_remove_member(index);
                         }
                     }
                     _ => self.push_type(ty, seen_aliases),
@@ -1278,32 +1327,50 @@ impl<'db> UnionBuilder<'db> {
         let mut ty_negated: Option<Type> = None;
         let mut reductions = UnionReductions::default();
 
-        for (i, element) in self.elements.iter().enumerate() {
-            let element_type = match element.try_reduce(
-                db,
-                &self.env,
-                ty,
-                self.cycle_recovery,
-                self.unpack_aliases,
-            ) {
-                ReduceResult::KeepIf(keep) => {
-                    if !keep {
-                        reductions.to_remove.push(i);
+        let mut tagged = if should_simplify_full
+            && self.elements.len() >= TupleTagIndex::MIN_MEMBERS
+            && let Some(tag) = TupleTagIndex::tag(db, ty)
+        {
+            let tags = self.tuple_tags.get_or_insert_with(Box::default);
+            tags.update(db, &self.elements);
+            let matching = tags.by_tag.get(&tag).map_or(&[][..], SmallVec::as_slice);
+            // Earlier members can absorb the incoming type or trigger a merge.
+            // Preserve the order of a full scan.
+            (matching.len() + tags.untagged.len() < tags.indexed)
+                .then(|| matching.iter().merge(&tags.untagged))
+        } else {
+            None
+        };
+        let mut all = self.elements.iter().enumerate();
+        while let Some((i, element)) = match &mut tagged {
+            Some(indices) => indices.next().map(|&i| (i, &self.elements[i])),
+            None => all.next(),
+        } {
+            let UnionElement::Type(element_type) = *element else {
+                match element.reduce_group(
+                    db,
+                    &self.env,
+                    ty,
+                    self.cycle_recovery,
+                    self.unpack_aliases,
+                ) {
+                    ReduceResult::KeepIf(keep) => {
+                        if !keep {
+                            reductions.to_remove.push(i);
+                        }
                     }
-                    continue;
+                    ReduceResult::RetainLiterals(keep) => {
+                        reductions.literal_filters.push((i, keep));
+                    }
+                    ReduceResult::CollapseToObject => {
+                        self.collapse_to_object();
+                        return;
+                    }
+                    ReduceResult::Ignore => {
+                        return;
+                    }
                 }
-                ReduceResult::RetainLiterals(keep) => {
-                    reductions.literal_filters.push((i, keep));
-                    continue;
-                }
-                ReduceResult::Type(ty) => ty,
-                ReduceResult::CollapseToObject => {
-                    self.collapse_to_object();
-                    return;
-                }
-                ReduceResult::Ignore => {
-                    return;
-                }
+                continue;
             };
 
             // Comparing `TypedDict`s for redundancy requires iterating over their fields, which is
@@ -1321,6 +1388,30 @@ impl<'db> UnionBuilder<'db> {
             }
 
             if Self::is_incomparable_for_union(db, ty, element_type) {
+                continue;
+            }
+
+            // If two fixed-length tuples have disjoint literals or distinct class objects
+            // at the same position, neither can subsume the other.
+            if should_simplify_full
+                && ty.is_nominal_instance()
+                && let Some(left) =
+                    incoming_tuple.get_or_insert_with(|| ty.exact_tuple_instance_spec(db))
+                && let Some(left) = left.as_fixed_length()
+                && let Some(right) = element_type.exact_tuple_instance_spec(db)
+                && let Some(right) = right.as_fixed_length()
+                && left
+                    .elements_slice()
+                    .iter()
+                    .zip(right.elements_slice())
+                    .any(|(a, b)| match (a, b) {
+                        (Type::LiteralValue(a), Type::LiteralValue(b)) => {
+                            a.is_disjoint_from(db, *b)
+                        }
+                        (Type::ClassLiteral(a), Type::ClassLiteral(b)) => a != b,
+                        _ => false,
+                    })
+            {
                 continue;
             }
 
@@ -1362,7 +1453,7 @@ impl<'db> UnionBuilder<'db> {
                     ty = merged_type;
                     continue;
                 }
-                reductions.apply(&mut self.elements, None);
+                reductions.apply(self, None);
                 // The merged type can also subsume earlier elements, such as `bool` when
                 // the truthy and falsy parts of `int` merge.
                 self.add_in_place_impl(merged_type, seen_aliases);
@@ -1383,28 +1474,6 @@ impl<'db> UnionBuilder<'db> {
                 if let (Type::NominalInstance(left), Type::NominalInstance(right)) =
                     (ty, element_type)
                     && left.has_unrelated_class(db, right)
-                {
-                    continue;
-                }
-
-                // If two fixed-length tuples have disjoint literals or distinct class objects
-                // at the same position, neither can subsume the other.
-                if let Some(left) =
-                    incoming_tuple.get_or_insert_with(|| ty.exact_tuple_instance_spec(db))
-                    && let Some(left) = left.as_fixed_length()
-                    && let Some(right) = element_type.exact_tuple_instance_spec(db)
-                    && let Some(right) = right.as_fixed_length()
-                    && left
-                        .elements_slice()
-                        .iter()
-                        .zip(right.elements_slice())
-                        .any(|(a, b)| match (a, b) {
-                            (Type::LiteralValue(a), Type::LiteralValue(b)) => {
-                                a.is_disjoint_from(db, *b)
-                            }
-                            (Type::ClassLiteral(a), Type::ClassLiteral(b)) => a != b,
-                            _ => false,
-                        })
                 {
                     continue;
                 }
@@ -1433,7 +1502,7 @@ impl<'db> UnionBuilder<'db> {
                 }
                 if let Some(merged) = merge_disjoint_exclusions(db, &self.env, ty, element_type) {
                     reductions.to_remove.push(i);
-                    reductions.apply(&mut self.elements, None);
+                    reductions.apply(self, None);
                     // The common part can also subsume elements we already visited.
                     self.add_in_place_impl(merged, seen_aliases);
                     return;
@@ -1462,7 +1531,7 @@ impl<'db> UnionBuilder<'db> {
                     })
                 };
                 if let Some(widened) = remove_covered_by(ty, element_type) {
-                    reductions.apply(&mut self.elements, None);
+                    reductions.apply(self, None);
                     // The covering element is unchanged. Recheck only the widened incoming
                     // type against earlier elements that it might now subsume.
                     self.add_in_place_impl(widened, seen_aliases);
@@ -1470,7 +1539,7 @@ impl<'db> UnionBuilder<'db> {
                 }
                 if let Some(widened) = remove_covered_by(element_type, ty) {
                     reductions.to_remove.push(i);
-                    reductions.apply(&mut self.elements, None);
+                    reductions.apply(self, None);
                     // The existing element changed, so recheck it against the whole union
                     // before adding the incoming covering type.
                     self.add_in_place_impl(widened, seen_aliases);
@@ -1514,7 +1583,7 @@ impl<'db> UnionBuilder<'db> {
             }
         }
 
-        reductions.apply(&mut self.elements, Some(ty));
+        reductions.apply(self, Some(ty));
     }
 
     pub(crate) fn build(self) -> Type<'db> {
@@ -2886,8 +2955,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
 mod tests {
     use super::{
         IntersectionBuilder, IntersectionPolarity, MAX_NON_RECURSIVE_UNION_LITERALS,
-        MAX_RECURSIVE_UNION_LITERALS, RecursivelyDefined, Type, UnionBuilder, UnionType,
-        simplify_intersection_pair, simplify_intersection_pair_impl,
+        MAX_RECURSIVE_UNION_LITERALS, RecursivelyDefined, TupleTagIndex, Type, UnionBuilder,
+        UnionType, simplify_intersection_pair, simplify_intersection_pair_impl,
     };
 
     use crate::db::tests::{TestDb, setup_db};
@@ -3080,6 +3149,33 @@ mod tests {
                 assert!(union.elements(db).contains(&right));
             }
         }
+    }
+
+    #[test]
+    fn tagged_tuples_compare_with_matching_and_overlapping_tags() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(&db, &env);
+        let tuple = |tag, payload| Type::heterogeneous_tuple(&db, &env, [tag, payload]);
+        let string_tag = |tag| Type::string_literal(&db, tag);
+        let mut builder = UnionBuilder::new(&db, &env).add(tuple(string_tag("a"), int));
+        for i in 0..TupleTagIndex::MIN_MEMBERS {
+            builder.add_in_place(tuple(Type::int_literal(i64::try_from(i).unwrap()), int));
+        }
+
+        // Replacing the first tuple with a wider one invalidates its old tag.
+        // LiteralString also covers the new tag "b".
+        let strings = tuple(Type::literal_string(), int);
+        builder.add_in_place(strings);
+        builder.add_in_place(tuple(string_tag("b"), int));
+
+        // Within the same tag, the wider payload subsumes the narrower one.
+        let zero = tuple(Type::int_literal(0), Type::object());
+        builder.add_in_place(zero);
+        let elements = builder.build().expect_union().elements(&db);
+        assert_eq!(elements.len(), TupleTagIndex::MIN_MEMBERS + 1);
+        assert_eq!(elements[0], strings);
+        assert_eq!(elements[1], zero);
     }
 
     #[test]
