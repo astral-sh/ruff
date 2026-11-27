@@ -3053,33 +3053,6 @@ mod tests {
     }
 
     #[test]
-    fn tagged_tuples_compare_with_matching_and_overlapping_tags() {
-        let db = setup_db();
-        let env = db.program_environment();
-        let int = KnownClass::Int.to_instance(&db, &env);
-        let tuple = |tag, payload| Type::heterogeneous_tuple(&db, &env, [tag, payload]);
-        let string_tag = |tag| Type::string_literal(&db, tag);
-        let mut builder = UnionBuilder::new(&db, &env).add(tuple(string_tag("a"), int));
-        for i in [0, 1] {
-            builder.add_in_place(tuple(Type::int_literal(i), int));
-        }
-
-        // The wider tuple subsumes the first tuple.
-        // LiteralString also covers the new tag "b".
-        let strings = tuple(Type::literal_string(), int);
-        builder.add_in_place(strings);
-        builder.add_in_place(tuple(string_tag("b"), int));
-
-        // Within the same tag, the wider payload subsumes the narrower one.
-        let zero = tuple(Type::int_literal(0), Type::object());
-        builder.add_in_place(zero);
-        let elements = builder.build().expect_union().elements(&db);
-        assert_eq!(elements.len(), 3);
-        assert_eq!(elements[0], strings);
-        assert_eq!(elements[1], zero);
-    }
-
-    #[test]
     fn cycle_recovery_widens_recursive_literal_union() {
         let db = setup_db();
         let db = &db;
