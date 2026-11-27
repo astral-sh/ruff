@@ -5,7 +5,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use smallvec::SmallVec;
 use std::borrow::Cow;
-use std::cell::{OnceCell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -547,6 +547,13 @@ struct DependentMaterialization<'db> {
     dependencies: Box<[MaterializationDependency<'db>]>,
 }
 
+#[derive(Clone, Copy)]
+struct SpecializedSelf<'db> {
+    original: BoundTypeVarInstance<'db>,
+    specialization: Specialization<'db>,
+    result: BoundTypeVarInstance<'db>,
+}
+
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
 /// Some recursive transformations visit the same type under more than one mapping mode within a
@@ -558,6 +565,8 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    /// A method's context, receiver, and return type often repeat the same `Self`.
+    specialized_self: Cell<Option<SpecializedSelf<'db>>>,
     /// Transforms argument hints in contravariant positions, such as callback inputs.
     /// If sibling inference leaves `T` unsolved, these positions can still use
     /// the full call's binding for `T`. The default transformer caches by type
@@ -582,6 +591,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             recursion_context: None,
             materialize_typevar_bounds_and_defaults: true,
             default: OnceCell::default(),
+            specialized_self: Cell::default(),
             flipped_argument_transformer: OnceCell::default(),
             top_materialization: OnceCell::default(),
             bottom_materialization: OnceCell::default(),
@@ -12003,11 +12013,11 @@ impl<'db> TypeMapping<'_, 'db> {
                 if specialization.specialize_self_domain() {
                     let kept = kept.filter_map(|bound_typevar| {
                         Type::TypeVar(bound_typevar)
-                            .apply_type_mapping(
+                            .apply_type_mapping_impl(
                                 db,
-                                env,
                                 &TypeMapping::ApplySpecialization(*specialization),
                                 TypeContext::default(),
+                                visitor,
                             )
                             .as_typevar()
                     });
