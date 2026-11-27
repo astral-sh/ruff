@@ -291,7 +291,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Box to avoid copying large builders when this index grows.
     use_def_maps: IndexVec<FileScopeId, Box<UseDefMapBuilder<'db>>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
-    star_import_definitions: FxHashMap<DefinitionNodeKey, Vec<Definition<'db>>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     unpacks_by_target: FxHashMap<ExpressionNodeKey, Unpack<'db>>,
     condition_flow_snapshots_by_node: FxHashMap<ExpressionNodeKey, ConditionFlowSnapshots>,
@@ -356,7 +355,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             use_def_maps: IndexVec::new(),
 
             scopes_by_node: FxHashMap::default(),
-            star_import_definitions: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
             unpacks_by_target: FxHashMap::default(),
             condition_flow_snapshots_by_node: FxHashMap::default(),
@@ -1535,13 +1533,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             // Loop headers are retrieved through the loop token.
             DefinitionNodeRef::LoopHeader(_) => {}
             DefinitionNodeRef::ImportStar(_) => {
-                self.star_import_definitions
-                    .entry(node.key())
-                    .or_default()
-                    .push(definition);
+                self.ast_ids
+                    .record_star_import_definition(node.key(), definition);
             }
             _ => {
-                let previous = self.ast_ids.record_definition(node.key(), definition);
+                let previous = self
+                    .ast_ids
+                    .record_single_definition(node.key(), definition);
                 debug_assert!(
                     previous.is_none(),
                     "Attempted to create multiple `Definition`s associated with AST node {definition_node:?}"
@@ -3362,7 +3360,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         assert_eq!(&self.current_assignments, &[]);
 
-        let ast_ids = self.ast_ids.finish(self.star_import_definitions);
+        let ast_ids = self.ast_ids.finish();
 
         let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
         semantic_syntax_errors.shrink_to_fit();
@@ -4157,11 +4155,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.record_exception_checkpoint();
 
                     if &alias.name == "*" {
-                        // Keep an entry even when the import is invalid, cannot be resolved,
-                        // or does not bind any names. Callers can still query the alias.
-                        self.star_import_definitions
-                            .entry(alias.into())
-                            .or_default();
+                        self.ast_ids.register_star_import(alias.into());
 
                         if found_star {
                             continue;

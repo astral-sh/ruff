@@ -53,6 +53,7 @@ pub struct PlaceUse {
 #[derive(Debug)]
 pub(super) struct AstIdsBuilder<'db> {
     definitions: IndexVec<NodeDefinitionId, Definition<'db>>,
+    star_import_definitions: FxHashMap<DefinitionNodeKey, Vec<Definition<'db>>>,
     root: Box<[NodeIds]>,
 }
 
@@ -62,7 +63,8 @@ fn root_index(node: ast::NodeIndex) -> usize {
 }
 
 impl<'db> AstIdsBuilder<'db> {
-    pub(super) fn record_definition(
+    /// Associates a node with a single definition, returning any previous definition.
+    pub(super) fn record_single_definition(
         &mut self,
         key: DefinitionNodeKey,
         definition: Definition<'db>,
@@ -75,6 +77,25 @@ impl<'db> AstIdsBuilder<'db> {
         None
     }
 
+    /// Keeps the alias queryable even if the wildcard import is invalid, cannot be
+    /// resolved, or binds no names.
+    pub(super) fn register_star_import(&mut self, key: DefinitionNodeKey) {
+        self.star_import_definitions.entry(key).or_default();
+    }
+
+    /// Records one name bound by a wildcard import. If the alias binds exactly one name,
+    /// [`Self::finish`] packs its definition alongside the regular definitions.
+    pub(super) fn record_star_import_definition(
+        &mut self,
+        key: DefinitionNodeKey,
+        definition: Definition<'db>,
+    ) {
+        self.star_import_definitions
+            .entry(key)
+            .or_default()
+            .push(definition);
+    }
+
     pub(super) fn definition(&self, key: DefinitionNodeKey) -> Option<&Definition<'db>> {
         let row = &self.root[root_index(key.index())];
         Some(&self.definitions[row.definition?])
@@ -83,6 +104,7 @@ impl<'db> AstIdsBuilder<'db> {
     pub(super) fn with_node_count(node_count: usize) -> Self {
         Self {
             definitions: IndexVec::new(),
+            star_import_definitions: FxHashMap::default(),
             root: vec![NodeIds::default(); node_count].into_boxed_slice(),
         }
     }
@@ -134,20 +156,18 @@ impl<'db> AstIdsBuilder<'db> {
 
     /// Packs definitions, use IDs and their lexical places in node-index order.
     /// The IDs themselves keep the order in which the flow builder visited uses in each scope.
-    pub(super) fn finish(
-        mut self,
-        star_imports: FxHashMap<DefinitionNodeKey, Vec<Definition<'db>>>,
-    ) -> AstIds<'db> {
-        let mut non_single = Vec::with_capacity(star_imports.len());
+    pub(super) fn finish(mut self) -> AstIds<'db> {
+        let star_imports = std::mem::take(&mut self.star_import_definitions);
+        let mut non_single_star_imports = Vec::with_capacity(star_imports.len());
         #[expect(
             clippy::iter_over_hash_type,
             reason = "each wildcard import is independently partitioned by definition count"
         )]
         for (key, definitions) in star_imports {
             if let [definition] = definitions.as_slice() {
-                self.record_definition(key, *definition);
+                self.record_single_definition(key, *definition);
             } else {
-                non_single.push((key, definitions.into_boxed_slice()));
+                non_single_star_imports.push((key, definitions.into_boxed_slice()));
             }
         }
 
@@ -192,7 +212,7 @@ impl<'db> AstIdsBuilder<'db> {
         AstIds {
             pages: pages.into_boxed_slice(),
             definitions: definitions.into_boxed_slice(),
-            non_single: FrozenMap::from_entries(non_single),
+            non_single_star_imports: FrozenMap::from_entries(non_single_star_imports),
             use_ids: use_ids.into(),
             places_plus_one: places_plus_one.into(),
             scopes: scopes.into_boxed_slice(),
@@ -204,6 +224,7 @@ impl<'db> AstIdsBuilder<'db> {
 const NODES_PER_PAGE: usize = u64::BITS as usize;
 
 /// Indexes definitions, uses and scope ranges for up to [`NODES_PER_PAGE`] root AST nodes.
+/// Keeping the masks and offsets as separate fields saves eight bytes of padding on x86-64.
 #[derive(Debug, get_size2::GetSize)]
 struct NodePage {
     /// Number of uses on earlier pages. This is the page's starting offset in
@@ -248,7 +269,7 @@ pub(crate) struct AstIds<'db> {
     pages: Box<[NodePage]>,
     definitions: Box<[Definition<'db>]>,
     /// Wildcard imports that bind zero or multiple names.
-    non_single: FrozenMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
+    non_single_star_imports: FrozenMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
     use_ids: PackedIds<ScopedUseId>,
     /// Symbol or member ordinals in the same order as `use_ids`. The expression determines
     /// which table to use. Keeping these in the AST index lets an edit change a read's place
@@ -278,7 +299,7 @@ impl<'db> AstIds<'db> {
     pub(super) fn definitions(&self, key: DefinitionNodeKey) -> Option<&[Definition<'db>]> {
         self.definition(key)
             .map(std::slice::from_ref)
-            .or_else(|| self.non_single.get(&key).map(AsRef::as_ref))
+            .or_else(|| self.non_single_star_imports.get(&key).map(AsRef::as_ref))
     }
 
     fn use_index(&self, node: ast::NodeIndex) -> Option<usize> {
@@ -478,7 +499,7 @@ mod tests {
         }
         builder.entry(384u32.into()).scope = Some(second);
 
-        let ids = builder.finish(FxHashMap::default());
+        let ids = builder.finish();
         assert_eq!(ids.scope_at(0u32.into()), None);
         assert_eq!(ids.scope_at(68u32.into()), None);
         assert_eq!(ids.scope_at(128u32.into()), Some(first));
@@ -495,7 +516,7 @@ mod tests {
             builder.entry(node.into()).use_id = Some(ScopedUseId::from_usize(use_id));
         }
 
-        let ids = builder.finish(FxHashMap::default());
+        let ids = builder.finish();
         let lookup = |node: u32| {
             ids.use_index(node.into())
                 .map(|index| ids.use_ids.get(index).as_u32())
