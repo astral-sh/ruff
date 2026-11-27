@@ -577,6 +577,16 @@ fn member_pattern_is_exhaustive<'pattern, 'db>(
     pattern: &'pattern PatternPredicateKind<'db>,
     cache: &mut PatternTypeCache<'pattern, 'db>,
 ) -> bool {
+    // Looking up `append` on `type[Any]` reports a definitely bound member even though `int`
+    // lacks it. To check that every possible subject has the attribute, require it to be
+    // definitely bound on the top materialization (`type` in this example).
+    let top_ty = instance_ty.top_materialization(db, env);
+    if top_ty != instance_ty && !top_ty.member(db, env, name).place.is_definitely_bound() {
+        return false;
+    }
+
+    // Check the subpattern against the original member type. Materializing the receiver can
+    // prevent us from resolving an overload of `__get__`.
     let place = instance_ty.member(db, env, name).place;
     place.is_definitely_bound()
         && place.raw_type().is_some_and(|member_ty| {
