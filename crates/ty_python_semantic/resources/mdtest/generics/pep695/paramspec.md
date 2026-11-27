@@ -2442,6 +2442,37 @@ callback.call()  # error: [missing-argument] "No argument provided for required 
 callback.call(1, 2)  # error: [too-many-positional-arguments]
 ```
 
+### An overloaded callable receiver expands one method overload
+
+The forwarded overload accepts either signature of `__call__`. The trailing overload still accepts
+its own arguments.
+
+```py
+from typing import Callable, overload
+
+class Callback:
+    @overload
+    def __call__(self, value: int, /) -> float: ...
+    @overload
+    def __call__(self, *, text: str) -> float: ...
+    def __call__(self, *args, **kwargs) -> float:
+        return 0.0
+
+    @overload
+    def call[**P, R](self: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R: ...
+    @overload
+    def call(self, reverse: bool, data: bytes) -> bytes: ...
+    def call(self, *args, **kwargs):
+        raise NotImplementedError
+
+callback = Callback()
+reveal_type(callback.call(1))  # revealed: float
+reveal_type(callback.call(text="a"))  # revealed: float
+reveal_type(callback.call(reverse=False, data=b""))  # revealed: bytes
+callback.call(text=1)  # error: [invalid-argument-type] "Expected `str`"
+callback.call(reverse=False, data=1)  # error: [invalid-argument-type] "Expected `bytes`"
+```
+
 ### Preserving method variables on callable receivers
 
 Binding a callable receiver preserves the method's other type variables for argument inference.
