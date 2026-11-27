@@ -4681,6 +4681,7 @@ dependencies = [
  "insta",
  "insta-cmd",
  "jiff",
+ "libc",
  "rayon",
  "regex",
  "ruff_command_line",
