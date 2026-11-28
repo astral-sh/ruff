@@ -3673,6 +3673,28 @@ def inspect(value: Growing[int]):
         reveal_type(value[0][0])  # revealed: int | Growing[list[list[int]]]
 ```
 
+### Comparing growing recursive aliases through unions
+
+Comparisons terminate when recursive steps increase the type arguments and the recursive reference
+is part of a union on either or both sides. We currently cannot prove these assignability relations.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Left = tuple[T, "Left[list[T]] | None"]
+Right = tuple[T, "Right[list[T]] | None"]
+NonOptional = tuple[T, "NonOptional[list[T]]"]
+
+def compare_optional(value: Left[int]) -> Right[int]:
+    # TODO: These aliases are equivalent.
+    return value  # error: [invalid-return-type]
+
+def compare_non_optional(value: NonOptional[int]) -> Right[int]:
+    # TODO: NonOptional[int] is a subtype of Right[int].
+    return value  # error: [invalid-return-type]
+```
+
 ### Projection through a recursive alias argument
 
 Projecting a generic member through a recursive alias keeps the recursive result closed:
