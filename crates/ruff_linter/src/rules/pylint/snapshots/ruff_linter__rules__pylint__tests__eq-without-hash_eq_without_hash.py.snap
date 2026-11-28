@@ -146,3 +146,29 @@ PLW1641 Object does not implement `__hash__` method
 103 |     if ...:
 104 |         ...
     |
+
+PLW1641 Object does not implement `__hash__` method
+   --> eq_without_hash.py:115:7
+    |
+115 | class ChainedEqNe:
+    |       ^^^^^^^^^^^
+116 |     __eq__ = __ne__ = op
+    |
+
+PLW1641 Object does not implement `__hash__` method
+   --> eq_without_hash.py:119:7
+    |
+119 | class CondChainedEq:
+    |       ^^^^^^^^^^^^^
+120 |     if ...:
+121 |         __eq__ = __ne__ = op
+    |
+
+PLW1641 Object does not implement `__hash__` method
+   --> eq_without_hash.py:124:7
+    |
+124 | class ChainedNonNameTarget:
+    |       ^^^^^^^^^^^^^^^^^^^^
+125 |     x = [0]
+126 |     x[0] = __eq__ = op
+    |
