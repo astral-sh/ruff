@@ -928,9 +928,13 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         let Self::Valid(diagram) = self else {
             return self;
         };
-        let node = diagram
-            .node
-            .negate(&mut build.builder.storage.borrow_mut(), build.budget);
+        let node = match diagram.node.node() {
+            Node::AlwaysTrue => Ok(ALWAYS_FALSE),
+            Node::AlwaysFalse => Ok(ALWAYS_TRUE),
+            Node::Interior(node) => {
+                node.negate(&mut build.builder.storage.borrow_mut(), build.budget)
+            }
+        };
         Self::from_result(build.builder, node.map(|node| (node, diagram.source_order)))
     }
 
@@ -3284,10 +3288,14 @@ impl NodeId {
         // At this point, we've consumed all of the iterator. The length of the accumulator will be
         // the same as the number of 1 bits in the length of the iterator. We do a final fold to
         // produce the overall result.
-        let mut storage = builder.storage.borrow_mut();
         accumulator.into_iter().try_fold(
             (zero, None),
             |(result_node, result_source_order), (node, source_order, _)| {
+                // As in the tree above, an identity without source order needs no arena.
+                if result_node == zero && result_source_order.is_none() {
+                    return Ok((node, source_order));
+                }
+                let mut storage = builder.storage.borrow_mut();
                 Ok((
                     combine(result_node, &mut storage, node, budget)?,
                     storage.ordered_source_order(result_source_order, source_order),
