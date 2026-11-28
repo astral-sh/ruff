@@ -159,7 +159,7 @@ pub struct ExpressionAstNodes {
 impl get_size2::GetSize for Expression<'_> {}
 
 impl<'db> Expression<'db> {
-    pub(crate) fn new<D: salsa::Database + ?Sized>(
+    pub fn new<D: salsa::Database + ?Sized>(
         db: &'db D,
         scope_id: ScopeId<'db>,
         node_ref: AstNodeRef<ast::Expr>,
@@ -182,9 +182,13 @@ impl<'db> Expression<'db> {
         &self.nodes(db).node_ref
     }
 
-    /// The immediately containing assignment, if this expression is its RHS.
+    /// An assignment statement, if this expression is immediately used as the rhs of that
+    /// assignment.
     ///
-    /// Inner subexpressions of an assigned expression do not have this set.
+    /// (Note that this is the _immediately_ containing assignment — if a complex expression is
+    /// assigned to some target, only the outermost expression node has this set. The inner
+    /// expressions are used to build up the assignment result, and are not "immediately assigned"
+    /// to the target, and so have `None` for this field.)
     pub fn assigned_to<D: salsa::Database + ?Sized>(
         self,
         db: &'db D,
