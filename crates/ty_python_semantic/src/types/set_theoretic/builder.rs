@@ -660,6 +660,79 @@ enum ReduceResult {
     Ignore,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
+enum UnionPairReduction<'db> {
+    Merged(Type<'db>),
+    WidenIncoming(Type<'db>),
+    WidenExisting(Type<'db>),
+    IncomingRedundant,
+    ExistingRedundant,
+    Neither,
+}
+
+/// Repeated union reductions usually check both directions. Memoize the ordered
+/// decision so a hit skips the reverse pair and any nested exclusion checks.
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "Salsa supplies None while the query is resolving a cycle"
+)]
+fn union_pair_reduction<'db>(db: &'db dyn Db, types: TypePair<'db>) -> UnionPairReduction<'db> {
+    fn compare<'db>(db: &'db dyn Db, types: TypePair<'db>) -> UnionPairReduction<'db> {
+        let env = ProgramEnvironment::from_program(types.program(db));
+        let incoming = types.first(db);
+        let existing = types.second(db);
+        if let Some(merged) = merge_disjoint_exclusions(db, &env, incoming, existing) {
+            return UnionPairReduction::Merged(merged);
+        }
+        let remove_covered_by = |intersection, covering: Type<'db>| {
+            // Fast path: strict subtyping already rejects a dynamic covering type for
+            // any nonempty exclusion. Avoid interning and querying those type pairs.
+            if covering.is_dynamic() {
+                return None;
+            }
+            remove_covered_exclusions(db, &env, intersection, |excluded| {
+                // An element that also excludes `E` cannot restore it. Check exact
+                // containment before interning a pair and evaluating its relation.
+                if let Type::Intersection(covering) = covering
+                    && covering.negative(db).contains(&excluded)
+                {
+                    return false;
+                }
+                // Strict subtyping covers every materialization of a gradual exclusion;
+                // assignability would not suffice.
+                !should_preserve_hashable_union(db, &env, excluded, covering)
+                    && exclusion_is_covered(
+                        db,
+                        TypePair::new(db, env.program(db), excluded, covering),
+                    )
+            })
+        };
+
+        if let Some(widened) = remove_covered_by(incoming, existing) {
+            return UnionPairReduction::WidenIncoming(widened);
+        }
+        if let Some(widened) = remove_covered_by(existing, incoming) {
+            return UnionPairReduction::WidenExisting(widened);
+        }
+        if incoming.is_redundant_with_key(db, &env, existing, Some(types)) {
+            UnionPairReduction::IncomingRedundant
+        } else if existing.is_redundant_with(db, &env, incoming) {
+            UnionPairReduction::ExistingRedundant
+        } else {
+            UnionPairReduction::Neither
+        }
+    }
+
+    // As with whole-union normalization, let the caller perform provisional
+    // comparisons so the two redundancy queries retain their cycle handling.
+    #[salsa::tracked(returns(copy), cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    fn cached<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Option<UnionPairReduction<'db>> {
+        Some(compare(db, types))
+    }
+
+    cached(db, types).unwrap_or_else(|| compare(db, types))
+}
+
 /// Removals to apply if the incoming type is added to the union or merged with an
 /// existing member. If a later comparison makes the incoming type redundant, we
 /// discard these decisions and leave the union intact.
@@ -1466,59 +1539,39 @@ impl<'db> UnionBuilder<'db> {
                 {
                     continue;
                 }
-                if let Some(merged) = merge_disjoint_exclusions(db, &self.env, ty, element_type) {
-                    reductions.to_remove.push(i);
-                    reductions.apply(self, None);
-                    // The common part can also subsume elements we already visited.
-                    self.add_in_place_impl(merged, seen_aliases);
-                    return;
-                }
-                let remove_covered_by = |intersection, covering: Type<'db>| {
-                    // Fast path: strict subtyping already rejects a dynamic covering type for
-                    // any nonempty exclusion. Avoid interning and querying those type pairs.
-                    if covering.is_dynamic() {
-                        return None;
+                match union_pair_reduction(
+                    db,
+                    TypePair::new(db, self.env.program(db), ty, element_type),
+                ) {
+                    UnionPairReduction::Merged(merged) => {
+                        reductions.to_remove.push(i);
+                        reductions.apply(self, None);
+                        // The common part can also subsume elements we already visited.
+                        self.add_in_place_impl(merged, seen_aliases);
+                        return;
                     }
-                    remove_covered_exclusions(db, &self.env, intersection, |excluded| {
-                        // An element that also excludes `E` cannot restore it. Check exact
-                        // containment before interning a pair and evaluating its relation.
-                        if let Type::Intersection(covering) = covering
-                            && covering.negative(db).contains(&excluded)
-                        {
-                            return false;
-                        }
-                        // Strict subtyping covers every materialization of a gradual exclusion;
-                        // assignability would not suffice.
-                        !should_preserve_hashable_union(db, &self.env, excluded, covering)
-                            && exclusion_is_covered(
-                                db,
-                                TypePair::new(db, self.env.program(db), excluded, covering),
-                            )
-                    })
-                };
-                if let Some(widened) = remove_covered_by(ty, element_type) {
-                    reductions.apply(self, None);
-                    // The covering element is unchanged. Recheck only the widened incoming
-                    // type against earlier elements that it might now subsume.
-                    self.add_in_place_impl(widened, seen_aliases);
-                    return;
-                }
-                if let Some(widened) = remove_covered_by(element_type, ty) {
-                    reductions.to_remove.push(i);
-                    reductions.apply(self, None);
-                    // The existing element changed, so recheck it against the whole union
-                    // before adding the incoming covering type.
-                    self.add_in_place_impl(widened, seen_aliases);
-                    self.add_in_place_impl(ty, seen_aliases);
-                    return;
-                }
-                if ty.is_redundant_with(db, &self.env, element_type) {
-                    return;
-                }
-
-                if element_type.is_redundant_with(db, &self.env, ty) {
-                    reductions.to_remove.push(i);
-                    continue;
+                    UnionPairReduction::WidenIncoming(widened) => {
+                        reductions.apply(self, None);
+                        // The covering element is unchanged. Recheck only the widened incoming
+                        // type against earlier elements that it might now subsume.
+                        self.add_in_place_impl(widened, seen_aliases);
+                        return;
+                    }
+                    UnionPairReduction::WidenExisting(widened) => {
+                        reductions.to_remove.push(i);
+                        reductions.apply(self, None);
+                        // The existing element changed, so recheck it against the whole union
+                        // before adding the incoming covering type.
+                        self.add_in_place_impl(widened, seen_aliases);
+                        self.add_in_place_impl(ty, seen_aliases);
+                        return;
+                    }
+                    UnionPairReduction::IncomingRedundant => return,
+                    UnionPairReduction::ExistingRedundant => {
+                        reductions.to_remove.push(i);
+                        continue;
+                    }
+                    UnionPairReduction::Neither => {}
                 }
 
                 if ty.negation_is_subtype_of_cached(db, &self.env, element_type, &mut ty_negated) {

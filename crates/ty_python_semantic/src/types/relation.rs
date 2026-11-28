@@ -1056,6 +1056,17 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         other: Type<'db>,
     ) -> bool {
+        self.is_redundant_with_key(db, env, other, None)
+    }
+
+    /// `pair`, if supplied, must be the ordered key for this program and these operands.
+    pub(super) fn is_redundant_with_key(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Type<'db>,
+        pair: Option<TypePair<'db>>,
+    ) -> bool {
         // Comparing inferred signatures can depend on the union being simplified. Preserve
         // failed redundancy checks during a cycle so changes to that union cannot make the
         // comparison alternate between true and false. Keeping an extra alternative is safe.
@@ -1093,8 +1104,8 @@ impl<'db> Type<'db> {
             return false;
         }
 
-        let program = env.program(db);
-        is_redundant_with_impl(db, TypePair::new(db, program, self, other))
+        let pair = pair.unwrap_or_else(|| TypePair::new(db, env.program(db), self, other));
+        is_redundant_with_impl(db, pair)
     }
 
     /// Return `true` if `self` is redundant with `other` under the pure redundancy relation.
