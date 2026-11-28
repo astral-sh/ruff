@@ -43,14 +43,49 @@ pub(super) struct LegacyTypeAliasDefinition<'db> {
     pub(super) is_implicit: bool,
 }
 
-/// Resolve a definition as a possible legacy type alias.
+/// A source assignment referenced in a type expression.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct TypeExpressionAssignment<'db> {
+    /// The assignment after following imports, before following any aliases.
+    pub(super) definition: Definition<'db>,
+    pub(super) alias: Option<LegacyTypeAliasDefinition<'db>>,
+}
+
+/// Resolve imports once for both alias inference and computed-value diagnostics.
 ///
-/// Resolve imports and implicit forwarding assignments to the underlying alias definition.
+/// Other definitions, such as classes, need neither check. During cycle recovery
+/// we have no alias yet, but can still check the original definition for a computed value.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, _, _, definition| Some(TypeExpressionAssignment { definition, alias: None }),
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(super) fn type_expression_assignment<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<TypeExpressionAssignment<'db>> {
+    let source = resolve_imported_definition(db, definition)?;
+    if !matches!(
+        source.kind(db),
+        DefinitionKind::Assignment(_) | DefinitionKind::AnnotatedAssignment(_)
+    ) {
+        return None;
+    }
+    // Classify the source in this query. Querying the source separately would
+    // change which assignment receives the diagnostic for a forwarding cycle.
+    Some(TypeExpressionAssignment {
+        definition: source,
+        alias: legacy_type_alias_definition(db, source),
+    })
+}
+
+/// Classify an assignment as a possible legacy type alias.
+///
+/// Resolve implicit forwarding assignments to the underlying alias definition.
 /// Return `None` in these cases:
 ///
-/// - An import cannot be resolved to a single definition.
-/// - The definition is not an eligible assignment: for example, a class definition, an
-///   unpacking assignment, an ordinary annotated variable, an unannotated assignment of a
+/// - The assignment is ineligible: for example, an unpacking assignment,
+///   an ordinary annotated variable, an unannotated assignment of a
 ///   string literal, or an assignment whose right-hand side is a call.
 /// - An implicit name or attribute assignment forwards a class, special form, type variable,
 ///   PEP 695 alias, or module. References such as `List = list` use their existing value type
@@ -58,15 +93,10 @@ pub(super) struct LegacyTypeAliasDefinition<'db> {
 ///
 /// Thus, `None` does not establish that a reference is invalid. Conversely, `Some` identifies
 /// a candidate whose right-hand side still needs to be validated by type-expression inference.
-///
-/// This query keeps callers independent of the defining file's AST.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-pub(super) fn legacy_type_alias_definition<'db>(
+fn legacy_type_alias_definition<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> Option<LegacyTypeAliasDefinition<'db>> {
-    let definition = resolve_imported_definition(db, definition)?;
-
     let module;
     let (value, annotation) = match definition.kind(db) {
         DefinitionKind::Assignment(assignment) if assignment.unpack().is_none() => {
@@ -117,7 +147,7 @@ pub(super) fn legacy_type_alias_definition<'db>(
             if target == definition {
                 return None;
             }
-            legacy_type_alias_definition(db, target)
+            type_expression_assignment(db, target)?.alias
         };
 
         // Resolve straightforward forwarding without inferring the runtime value, which
@@ -459,7 +489,8 @@ impl<'db> LegacyTypeVarCollector<'db> {
                 // its runtime value here can also re-enter parameter discovery before recursive
                 // aliases have stable generic contexts.
                 (definition != self.alias_definition
-                    && legacy_type_alias_definition(db, definition).is_none())
+                    && type_expression_assignment(db, definition)
+                        .is_none_or(|assignment| assignment.alias.is_none()))
                 .then(|| binding_type(db, definition))
             }
             ast::Expr::Attribute(attribute) => self

@@ -3927,3 +3927,24 @@ A = list["A | Not[A]"]
 def f(x: A):
     reveal_type(x[0])  # revealed: object
 ```
+
+### Implicit aliases forwarding to each other across modules
+
+Using the local alias in an annotation diagnoses the circular definition in that module.
+
+`left.py`:
+
+```py
+from right import B
+
+A = B  # error: [cyclic-type-alias-definition]
+x: A
+```
+
+`right.py`:
+
+```py
+from left import A
+
+B = A
+```

@@ -73,7 +73,6 @@ use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, se
 
 mod builder;
 mod legacy_type_alias;
-use legacy_type_alias::legacy_type_alias_definition;
 pub(super) use legacy_type_alias::legacy_type_alias_parameters;
 mod comparisons;
 mod expression_truthiness;
