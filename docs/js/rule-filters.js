@@ -141,7 +141,7 @@
     container.tabIndex = 0;
     form.hidden = false;
 
-    for (const toc of document.querySelectorAll(".md-nav--secondary")) {
+    for (const toc of document.querySelectorAll(".md-nav--secondary:not(.astral-quick-links)")) {
       toc.hidden = true;
       toc.parentElement.classList.add("rule-index-nav");
     }
