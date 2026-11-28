@@ -315,6 +315,69 @@ The rules for this behavior are as follows:
 
 Note that in these last two cases, the behavior of Ruff may differ depending on the working directory from which it is invoked.
 
+## Inline script metadata
+
+Python scripts can declare their Python version requirements and dependencies using
+[inline script metadata (PEP 723)](https://peps.python.org/pep-0723/). Ruff reads the
+script's Python version requirements and inline `[tool.ruff]` settings.
+
+!!! note "Preview"
+
+    Support for script settings is in [preview](preview.md). Pass `--preview` to enable it
+    for a single run. To enable it for your project, set `preview = true` under `[tool.ruff]`
+    in `pyproject.toml` or at the top level of `ruff.toml`. The `lint.preview` and
+    `format.preview` settings alone do not enable script support.
+
+Suppose your project targets Python 3.11, but one of your scripts uses the `type` statement
+introduced in Python 3.12.
+
+```python title="scripts/example.py"
+# /// script
+# requires-python = ">=3.12"
+# ///
+
+from typing import Literal
+
+type Color = Literal["red", "green", "blue"]
+```
+
+Ruff lints and formats this script for Python 3.12, the minimum version allowed by
+`requires-python = ">=3.12"`.
+
+```shell
+ruff check --preview scripts/example.py
+ruff format --preview scripts/example.py
+```
+
+### Configuring a script
+
+A script uses the [project's Ruff settings](#config-file-discovery) by default. For example,
+if your project sets `line-length = 100`, Ruff uses that line length for `scripts/example.py`.
+
+The [Python version Ruff infers](#inferring-the-python-version) from a script's
+`requires-python` takes precedence over the project's `target-version` and
+`per-file-target-version`.
+
+To share `scripts/example.py` with its own Ruff settings, add a [`[tool.ruff]`](settings.md)
+table to its inline metadata. The table uses the same syntax as in `pyproject.toml`.
+
+```python title="scripts/example.py"
+# /// script
+# requires-python = ">=3.12"
+#
+# [tool.ruff.format]
+# quote-style = "single"
+# ///
+
+from typing import Literal
+
+type Color = Literal['red', 'green', 'blue']
+```
+
+The inline table replaces the project's lint and format settings for the script,
+even if the table is empty. In this example, Ruff uses single quotes for string literals
+and the default line length of 88.
+
 ## Python file discovery
 
 When passed a path on the command-line, Ruff will automatically discover all Python files in that
