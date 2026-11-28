@@ -3628,12 +3628,14 @@ impl<'db> UseDefMapBuilder<'db> {
         // If the snapshot we are restoring is missing some places we've recorded since, we need
         // to fill them in so the place IDs continue to line up. Since they don't exist in the
         // snapshot, the correct state to fill them in with is "undefined".
-        let undefined = PendingPlaceState::new(
-            PlaceState::undefined(self.reachability),
-            self.pending_reachability.current,
-        );
-        self.symbol_states.resize(num_symbols, undefined.clone());
-        self.member_states.resize(num_members, undefined);
+        if self.symbol_states.len() != num_symbols || self.member_states.len() != num_members {
+            let undefined = PendingPlaceState::new(
+                PlaceState::undefined(self.reachability),
+                self.pending_reachability.current,
+            );
+            self.symbol_states.resize(num_symbols, undefined.clone());
+            self.member_states.resize(num_members, undefined);
+        }
         previous
     }
 
