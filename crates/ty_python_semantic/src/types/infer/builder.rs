@@ -6839,12 +6839,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         candidates: Option<&'bindings OverloadSet>,
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
-    ) -> Vec<Option<MatchingArgumentTypeContext<'db>>> {
+    ) -> SmallVec<[Option<MatchingArgumentTypeContext<'db>>; 2]> {
         let db = self.db();
         let env = self.program_environment();
 
         // Collect the set of candidate overloads and bindings.
-        let mut overloads_with_binding = Vec::new();
+        let mut overloads_with_binding = SmallVec::<[_; 1]>::new();
         let mut add_overload = |overload, binding| {
             overloads_with_binding.push((overload, binding, ArgumentContextCache::default()));
         };
