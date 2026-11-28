@@ -1114,6 +1114,51 @@ mod tests {
     }
 
     #[test]
+    fn serial_and_parallel_checks_collect_the_same_scope_diagnostics() -> anyhow::Result<()> {
+        let project = SystemPathBuf::from("/project");
+        let source = dedent(
+            r"
+            from typing import Callable
+
+            def first() -> int:
+                return last('wrong')
+
+            def last(x: int) -> int:
+                return str(x)
+
+            upper: Callable[[int], str] = lambda x: x.upper()
+            ",
+        );
+
+        for workers in [1, 2] {
+            let system = TestSystem::default();
+            system
+                .memory_file_system()
+                .write_file_all(project.join("main.py"), source.as_ref())?;
+            let metadata = ProjectMetadata::discover(&project, &system)?;
+            let mut db = ProjectDatabase::fallible(metadata, system)?;
+            db.freeze();
+
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(workers)
+                .stack_size(ruff_db::STACK_SIZE)
+                .build()?;
+            let diagnostics = pool.install(move || db.check());
+            let ids: Vec<_> = diagnostics.iter().map(|d| d.id().as_str()).collect();
+            assert_eq!(
+                ids,
+                [
+                    "invalid-argument-type",
+                    "invalid-explicit-return",
+                    "missing-attribute"
+                ]
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn search_root_registration() -> anyhow::Result<()> {
         let system = TestSystem::default();
         let project = SystemPathBuf::from("/project");

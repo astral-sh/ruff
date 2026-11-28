@@ -4,7 +4,7 @@
 )]
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::{OptionDiagnostic, ToProgramSettingsError};
-use crate::parallel::ParallelIteratorExt;
+use crate::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
 use crate::script::Script;
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 #[cfg(feature = "testing")]
@@ -15,11 +15,13 @@ use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use rayon::prelude::*;
+use ruff_db::Db as _;
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
 };
 use ruff_db::files::{File, system_path_to_directory, system_path_to_file};
 use ruff_db::parsed::parsed_module;
+use ruff_db::source::source_text;
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
@@ -29,8 +31,9 @@ use std::collections::{BTreeSet, hash_set};
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
-use ty_python_core::ProgramFile;
+use std::time::Duration;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, PythonEnvironmentError};
+use ty_python_core::{ProgramFile, semantic_index};
 pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::dependency::{DependencyMetadata, DependencyProjectKind};
 use ty_python_semantic::lint::RuleSelection;
@@ -538,6 +541,8 @@ impl Project {
         let check_start = ruff_db::Instant::now();
 
         let files: Vec<_> = (&files).into_iter().collect();
+        // On incremental checks, the whole file may already have cached diagnostics.
+        let share_scopes = db.files().is_frozen() && rayon::current_num_threads() > 1;
 
         files
             .into_par_iter()
@@ -558,7 +563,7 @@ impl Project {
                 let _entered = check_file_span.entered();
                 let program_file = db.program_file(file);
 
-                match check_file_impl(db, program_file) {
+                match check_program_file(db, program_file, share_scopes) {
                     Ok(diagnostics) => {
                         reporter.report_checked_file(db, file, diagnostics);
 
@@ -581,8 +586,8 @@ impl Project {
                             parsed.clear();
                         }
                     }
-                    Err(io_error) => {
-                        reporter.report_checked_file(db, file, std::slice::from_ref(io_error));
+                    Err(diagnostic) => {
+                        reporter.report_checked_file(db, file, std::slice::from_ref(&diagnostic));
                     }
                 }
             });
@@ -901,9 +906,9 @@ fn check_file(db: &dyn Db, file: File) -> Vec<Diagnostic> {
         return Vec::new();
     }
 
-    check_file_impl(db, db.program_file(file))
+    check_program_file(db, db.program_file(file), false)
         .map(<[Diagnostic]>::to_vec)
-        .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
+        .unwrap_or_else(|diagnostic| vec![diagnostic])
 }
 
 /// Returns whether semantic checking and semantic diagnostics should run for `file`.
@@ -1009,6 +1014,80 @@ pub enum ProjectReloadResult {
         /// Whether the indexed project files changed.
         files_changed: bool,
     },
+}
+
+/// Check a file and include inference outside the tracked query in the slow-file log.
+/// Only enable scope sharing when called outside any Salsa query.
+fn check_program_file<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+    share_scopes: bool,
+) -> Result<&'db [Diagnostic], Diagnostic> {
+    tracing::debug!("Checking file '{path}'", path = file.file(db).path(db));
+    let start = ruff_db::Instant::now();
+    if share_scopes {
+        infer_file_scopes(db, file)?;
+    }
+    let diagnostics = check_file_impl(db, file).map_err(Clone::clone)?;
+
+    let elapsed = start.elapsed();
+    if elapsed >= Duration::from_millis(100) {
+        tracing::info!(
+            "Checking file `{path}` took more than 100ms ({elapsed:?})",
+            path = file.file(db).path(db)
+        );
+    }
+
+    Ok(diagnostics)
+}
+
+/// Let idle workers infer scopes from a file another worker is checking.
+///
+/// This must run outside any Salsa query so Rayon can attach a different database for
+/// each job. The tracked file check then reads the cached results and collects diagnostics
+/// in the usual order.
+fn infer_file_scopes(db: &dyn Db, program_file: ProgramFile<'_>) -> Result<(), Diagnostic> {
+    const MAX_BATCH_SIZE: usize = 32;
+
+    let file = program_file.file(db);
+    let Some(scopes) = catch(
+        db,
+        file,
+        AssertUnwindSafe(|| {
+            // Leave invalid scripts and read errors for the regular file check to report.
+            if Script::for_file(db, file).is_some_and(|script| !script.has_valid_settings(db))
+                || source_text(db, file).read_error().is_some()
+            {
+                return None;
+            }
+            let scopes = semantic_index(db, program_file).scope_ids_slice();
+            let (module, nested) = scopes.split_at(1);
+            if nested.len() < 2 {
+                return None;
+            }
+            // Resolve module-level definitions before workers infer scopes that depend on them.
+            // Otherwise they can enter the same inference cycle from different sides.
+            ty_python_semantic::types::infer_scope_batch(db, module);
+            Some(nested)
+        }),
+    )?
+    else {
+        return Ok(());
+    };
+
+    scopes
+        .par_chunks(minimum_parallel_job_len(scopes.len(), MAX_BATCH_SIZE))
+        .map_with_db(db, |db, batch| {
+            // Capture a panic on the worker where it occurred, preserving its backtrace.
+            catch(
+                db,
+                file,
+                AssertUnwindSafe(|| {
+                    ty_python_semantic::types::infer_scope_batch(db, batch);
+                }),
+            )
+        })
+        .try_for_each(std::convert::identity)
 }
 
 #[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
