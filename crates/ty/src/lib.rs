@@ -210,10 +210,9 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         project.set_included_paths(&mut db, check_paths);
     }
 
-    // Disabling LRU only assumes that the database is short-lived; unlike freezing below, it does
-    // not require immutable inputs.
+    // Short-lived checks can skip eviction bookkeeping even when their inputs are mutable.
     if !watch {
-        ruff_db::disable_lru(&mut db);
+        ruff_db::disable_eviction(&mut db);
     }
 
     // The CLI never opens files, so this is safe even where the freeze below isn't
