@@ -1445,12 +1445,15 @@ impl<'db> UnionBuilder<'db> {
                 }
 
                 // Narrowing a union of classes can add the same exclusions to every
-                // alternative. Neither side can restore a shared exclusion. If each
-                // also requires a nominal bound the other lacks, neither subsumes the
-                // other and together they cannot cover `object`.
+                // alternative, e.g. `(A & ~AlwaysFalsy) | (B & ~AlwaysFalsy)` after
+                // `if x`. Neither side can restore a shared exclusion. If each requires
+                // a class unrelated to every positive bound of the other, neither
+                // subsumes the other and together they cannot cover `object`. Leave
+                // negated aliases to the relation checker because expanding them can
+                // introduce positive bounds (e.g. if the alias denotes a negation).
                 if let (Type::Intersection(left), Type::Intersection(right)) = (ty, element_type)
                     && left.negative(db) == right.negative(db)
-                    && left.iter_negative(db).all(Type::is_nominal_instance)
+                    && !left.iter_negative(db).any(Type::is_alias_like)
                     && has_unrelated_nominal_bound(db, left, right)
                     && has_unrelated_nominal_bound(db, right, left)
                 {
