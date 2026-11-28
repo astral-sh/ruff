@@ -1094,6 +1094,21 @@ fn benchmark_many_protocol_members_mismatch(criterion: &mut Criterion) {
     });
 }
 
+/// Literal-key groups should skip generic default inference for unrelated keys.
+fn benchmark_typed_dict_get_many_groups(criterion: &mut Criterion) {
+    let mut code =
+        "from typing import Literal, TypedDict\n\nclass Fields(TypedDict, total=False):\n"
+            .to_string();
+    for i in 0..200 {
+        writeln!(code, "    a{i}: Literal[{i}]\n    b{i}: Literal[{i}]").ok();
+    }
+    code.push_str("\ndef check(data: Fields):\n");
+    for i in 0..200 {
+        writeln!(code, "    data.get(\"a{i}\", None)").ok();
+    }
+    benchmark_micro_case(criterion, "ty_micro[typed_dict_get_many_groups]", &code);
+}
+
 /// Regression benchmarks for ty#4269: recursive protocol inference and assignment diagnostics.
 ///
 /// Explicit receiver annotations can repeatedly expand inherited recursive protocol members
@@ -3260,6 +3275,7 @@ criterion_group!(
     benchmark_string_literal_union_comparison,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
+    benchmark_typed_dict_get_many_groups,
     benchmark_inherited_recursive_protocol,
     benchmark_nested_generic_constructor_arguments,
     benchmark_generic_list_arguments,
