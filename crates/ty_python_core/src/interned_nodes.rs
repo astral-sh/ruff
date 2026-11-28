@@ -7,9 +7,11 @@
 use std::hash::{BuildHasher, Hash};
 use std::ops::Index;
 
+use bitvec::{order::Msb0, view::BitView};
 use hashbrown::{HashTable, hash_table::Entry};
 use ruff_index::{Idx, IndexVec};
 use rustc_hash::{FxBuildHasher, FxHashMap};
+use smallvec::SmallVec;
 
 use crate::rank::{CHUNK_SIZE, Chunk, RankBitBox, RankBitBoxVec};
 
@@ -23,8 +25,9 @@ use crate::rank::{CHUNK_SIZE, Chunk, RankBitBox, RankBitBoxVec};
 #[derive(Debug)]
 pub(crate) struct InternedNodes<I: Idx, N> {
     nodes: IndexVec<I, N>,
+    /// Empty until the graph is large enough to benefit from a reverse index.
     ids: HashTable<I>,
-    used: Vec<Chunk>,
+    used: SmallVec<[Chunk; 2]>,
 }
 
 impl<I: Idx, N> Default for InternedNodes<I, N> {
@@ -32,7 +35,7 @@ impl<I: Idx, N> Default for InternedNodes<I, N> {
         Self {
             nodes: IndexVec::default(),
             ids: HashTable::default(),
-            used: Vec::new(),
+            used: SmallVec::new(),
         }
     }
 }
@@ -65,13 +68,22 @@ impl<I: Idx, N> InternedNodes<I, N> {
     /// Returns the used nodes in ID order and a rank index if any nodes were removed.
     pub(crate) fn into_used_nodes(self) -> (Box<[N]>, Option<RankBitBox>) {
         drop(self.ids);
-        let mut used = RankBitBoxVec::from_vec(self.used);
-        used.truncate(self.nodes.len());
-
-        if used.first_zero().is_none() {
+        let len = self.nodes.len();
+        if self.used.as_slice().view_bits::<Msb0>()[..len]
+            .first_zero()
+            .is_none()
+        {
             return (self.nodes.raw.into_boxed_slice(), None);
         }
 
+        // Only compacted graphs retain the bitset. Allocate its exact size for
+        // inline words and transfer the existing buffer for larger graphs.
+        let mut used = if self.used.spilled() {
+            RankBitBoxVec::from_vec(self.used.into_vec())
+        } else {
+            RankBitBoxVec::from_slice(&self.used)
+        };
+        used.truncate(len);
         let nodes = self
             .nodes
             .into_iter()
@@ -84,6 +96,12 @@ impl<I: Idx, N> InternedNodes<I, N> {
 
 impl<I: Idx, N: Eq + Hash> InternedNodes<I, N> {
     pub(crate) fn find(&self, node: &N) -> Option<I> {
+        if self.ids.is_empty() {
+            return self
+                .nodes
+                .iter_enumerated()
+                .find_map(|(id, existing)| (existing == node).then_some(id));
+        }
         self.ids
             .find(FxBuildHasher.hash_one(node), |id| self.nodes[*id].eq(node))
             .copied()
@@ -91,6 +109,25 @@ impl<I: Idx, N: Eq + Hash> InternedNodes<I, N> {
 
     /// Returns the existing ID for an equal node, or inserts a new node.
     pub(crate) fn intern(&mut self, node: N) -> I {
+        if self.ids.is_empty() {
+            if let Some(id) = self.find(&node) {
+                return id;
+            }
+            let id = self.nodes.push(node);
+            if self.used.is_empty() {
+                self.used.push(0);
+            }
+            if self.nodes.len() == 8 {
+                self.ids = HashTable::with_capacity(self.nodes.len());
+                for (id, node) in self.nodes.iter_enumerated() {
+                    self.ids
+                        .insert_unique(FxBuildHasher.hash_one(node), id, |id| {
+                            FxBuildHasher.hash_one(&self.nodes[*id])
+                        });
+                }
+            }
+            return id;
+        }
         let nodes = &mut self.nodes;
         match self.ids.entry(
             FxBuildHasher.hash_one(&node),
