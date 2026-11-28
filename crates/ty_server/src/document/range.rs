@@ -4,7 +4,7 @@ use crate::system::file_to_uri;
 
 use lsp_types::Uri;
 use ruff_db::files::{File, FileRange, system_path_to_file, vendored_path_to_file};
-use ruff_db::source::{line_index, source_text};
+use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::SystemPathBuf;
 use ruff_source_file::LineIndex;
 use ruff_source_file::{OneIndexed, SourceLocation};
@@ -300,6 +300,55 @@ pub(crate) fn lsp_range_to_text_range(
         lsp_position_to_text_size(range.start, text, index, encoding),
         lsp_position_to_text_size(range.end, text, index, encoding),
     )
+}
+
+/// Converts ranges for a single LSP document, reusing the source text and line index.
+///
+/// The caller must know which document the ranges belong to. For notebooks, all
+/// ranges must be in the requested cell. Use [`ToRangeExt::to_lsp_range`] if you need the URI.
+pub(crate) struct LocalRangeConverter<'db> {
+    db: &'db dyn Db,
+    file: File,
+    encoding: PositionEncoding,
+    source: SourceText,
+    index: LineIndex,
+}
+
+impl<'db> LocalRangeConverter<'db> {
+    pub(crate) fn new(db: &'db dyn Db, file: File, encoding: PositionEncoding) -> Self {
+        Self {
+            db,
+            file,
+            encoding,
+            source: source_text(db, file),
+            index: line_index(db, file),
+        }
+    }
+
+    /// Converts file offsets to document-relative positions, checking for cancellation.
+    /// Returns `None` if the notebook cell can't be resolved.
+    pub(crate) fn convert(&self, range: TextRange) -> Option<lsp_types::Range> {
+        // Reusing the source and index skips the Salsa queries that let edits interrupt conversion.
+        self.db.unwind_if_revision_cancelled();
+
+        if self.source.as_notebook().is_some() {
+            let range = range.to_lsp_range(self.db, self.file, self.encoding)?;
+            return Some(range.local_range());
+        }
+
+        Some(text_range_to_lsp_range(
+            range,
+            &self.source,
+            &self.index,
+            self.encoding,
+        ))
+    }
+
+    /// Length of a line in the underlying file, in the client's position encoding.
+    pub(crate) fn file_line_len(&self, line: OneIndexed) -> usize {
+        self.index
+            .line_len(line, &self.source, self.encoding.into())
+    }
 }
 
 impl ToRangeExt for TextRange {
