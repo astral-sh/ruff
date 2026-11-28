@@ -1515,14 +1515,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Group the micro benchmarks by initial letter to balance wall time in both modes.
+          # Group benchmarks by initial letter to balance wall time. Simulation
+          # takes longer than memory profiling, so it uses twice as many shards.
           - name: micro-1
             target: ty
-            filter: 'ty_micro\[[m-r]'
+            filter: 'ty_micro\[[a-g]'
             mode: simulation
           - name: micro-2
             target: ty
-            filter: 'ty_micro\[[^m-r]'
+            filter: 'ty_micro\[[m-q]'
+            mode: simulation
+          - name: micro-3
+            target: ty
+            filter: 'ty_micro\[r'
+            mode: simulation
+          - name: micro-4
+            target: ty
+            filter: 'ty_micro\[[^a-gm-r]'
             mode: simulation
           - name: micro-1
             target: ty
@@ -1532,9 +1541,13 @@ jobs:
             target: ty
             filter: 'ty_micro\[[^m-r]'
             mode: memory
-          - name: constraint_set
+          - name: constraint_set-1
             target: ty_constraint_set
-            filter: micro
+            filter: 'ty_micro\[[a-l]'
+            mode: simulation
+          - name: constraint_set-2
+            target: ty_constraint_set
+            filter: 'ty_micro\[[^a-l]'
             mode: simulation
           - name: constraint_set
             target: ty_constraint_set

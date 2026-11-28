@@ -1716,6 +1716,13 @@ impl<'db> StaticClassLiteral<'db> {
 
         let namespace = self.class_namespace(db);
         let code_generator = namespace.generator;
+        if name == "__attrs_attrs__"
+            && let Some(ty) = attrs::field_metadata_type(db, env, self)
+        {
+            return Member {
+                inner: Place::declared(ty).with_qualifiers(TypeQualifiers::CLASS_VAR),
+            };
+        }
         if code_generator.is_some_and(CodeGeneratorKind::is_dataclass_like) {
             if name == "__dataclass_fields__" {
                 // Make this class look like a subclass of the `DataClassInstance` protocol
@@ -2029,7 +2036,7 @@ impl<'db> StaticClassLiteral<'db> {
                 pydantic::fields_with_raw_input_validators(db, self, names)
             });
             for (field_name, field) in fields {
-                let (init, mut default_ty, kw_only, alias, converter, strict) = match &field.kind {
+                let (init, mut default_ty, kw_only, alias, input_ty, strict) = match &field.kind {
                     FieldKind::NamedTuple { default_ty } => (
                         true,
                         *default_ty,
@@ -2043,14 +2050,14 @@ impl<'db> StaticClassLiteral<'db> {
                         default_ty,
                         kw_only,
                         alias,
-                        converter,
+                        converter_input_ty,
                         ..
                     } => (
                         *init,
                         *default_ty,
                         *kw_only,
                         alias.as_ref(),
-                        *converter,
+                        *converter_input_ty,
                         pydantic::ConfigBoolean::Unspecified,
                     ),
                     FieldKind::Pydantic {
@@ -2131,7 +2138,7 @@ impl<'db> StaticClassLiteral<'db> {
                     }
                 }
 
-                if let Some((converter_input_ty, _)) = converter {
+                if let Some(converter_input_ty) = input_ty {
                     field_ty = converter_input_ty;
                 }
 
@@ -2977,7 +2984,7 @@ impl<'db> StaticClassLiteral<'db> {
         let is_attrs = attrs::is_attrs_class(db, self);
         let mut kw_only_sentinel_field_seen = false;
         let mut field_declarations = Vec::new();
-        let mut decorated_defaults = attrs::DecoratedDefaults::new();
+        let mut field_decorators = attrs::FieldDecorators::default();
 
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
@@ -2989,7 +2996,7 @@ impl<'db> StaticClassLiteral<'db> {
             // us to generate a union of `__init__` methods.
             if !declarations.clone().contains_only_annotated_assignments(db) {
                 if is_attrs {
-                    decorated_defaults.collect_default_generator(db, declarations);
+                    field_decorators.collect(db, declarations);
                 }
                 continue;
             }
@@ -3056,7 +3063,7 @@ impl<'db> StaticClassLiteral<'db> {
                 let mut init = true;
                 let mut kw_only = None;
                 let mut alias = None;
-                let mut converter = None;
+                let mut converter_input_ty = None;
                 let mut strict = pydantic::ConfigBoolean::Unspecified;
                 let mut frozen = false;
                 if field_policy.is_pydantic() {
@@ -3075,15 +3082,23 @@ impl<'db> StaticClassLiteral<'db> {
                 } else if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) =
                     default_ty
                 {
-                    default_ty = field.default_type(db).or_else(|| {
-                        decorated_defaults
-                            .has_default(db, symbol_id.into(), field)
-                            .then_some(Type::unknown())
-                    });
+                    default_ty = field.default_type(db);
                     init = field.init(db);
                     kw_only = field.kw_only(db);
                     alias.clone_from(field.alias(db));
-                    converter = field.converter(db);
+                    converter_input_ty = field.converter(db).map(|(input, _)| input);
+                    if field.kind(db).is_attrs() {
+                        let place = symbol_id.into();
+                        if field_decorators.has_default(place) {
+                            default_ty.get_or_insert(Type::unknown());
+                        }
+                        // An explicit `converter=` runs before any decorated converters.
+                        converter_input_ty = converter_input_ty.or_else(|| {
+                            field_decorators
+                                .converter_input_type(db, place)
+                                .map(|ty| ty.apply_optional_specialization(db, specialization))
+                        });
+                    }
                 } else if field_policy.is_dataclass_like()
                     && result.is_qualifier_only()
                     && attr.qualifiers.contains(TypeQualifiers::FINAL)
@@ -3106,7 +3121,7 @@ impl<'db> StaticClassLiteral<'db> {
                         init,
                         kw_only,
                         alias,
-                        converter,
+                        converter_input_ty,
                     },
                     CodeGeneratorKind::Pydantic(_) => FieldKind::Pydantic {
                         default_ty,
@@ -3520,8 +3535,9 @@ impl<'db> StaticClassLiteral<'db> {
         )
     }
 
-    /// Returns the converter's input type (i.e., the type of its first positional parameter) for a
-    /// dataclass field, if the field has a converter function specified.
+    /// Returns the converter's input type, i.e. the type of its value parameter (typically the
+    /// first positional parameter), for a dataclass field, if the field has a converter function
+    /// specified.
     pub(super) fn converter_input_type_for_field(
         self,
         db: &'db dyn Db,
@@ -3534,8 +3550,11 @@ impl<'db> StaticClassLiteral<'db> {
         };
         let fields = self.fields(db, None, field_policy);
         let field = fields.get(name)?;
-        if let FieldKind::Dataclass { converter, .. } = field.kind {
-            converter.map(|(input_ty, _)| input_ty)
+        if let FieldKind::Dataclass {
+            converter_input_ty, ..
+        } = field.kind
+        {
+            converter_input_ty
         } else {
             None
         }

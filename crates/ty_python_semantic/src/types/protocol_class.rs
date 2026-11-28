@@ -254,6 +254,21 @@ impl<'db> ProtocolClass<'db> {
 
                 visit(name, candidate, specialization);
             }
+
+            // A synthesized class variable has no declaration in the protocol's class body.
+            if let Some(ty) = super::dedicated::attrs::protocol_metadata_type(db, parent) {
+                visit(
+                    &Name::new_static("__attrs_attrs__"),
+                    ProtocolMemberCandidate {
+                        ty,
+                        qualifiers: TypeQualifiers::CLASS_VAR,
+                        definition: None,
+                        self_binding_context: None,
+                        bound_on_class: BoundOnClass::No,
+                    },
+                    None,
+                );
+            }
         }
     }
 

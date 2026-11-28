@@ -199,6 +199,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_scope_body(&function.body);
 
         if let Some(returns) = function.returns.as_deref() {
+            // An implicit return already satisfies a literal None annotation, regardless
+            // of whether control flow reaches the end of the function.
+            let accepts_implicit_return = returns.is_none_literal_expr();
+            if accepts_implicit_return
+                && self.return_types_and_ranges.is_empty()
+                && !scope.is_generator_function(self.index)
+            {
+                return;
+            }
+
             let has_empty_body = self.return_types_and_ranges.is_empty()
                 && function_body_kind(db, env, function, |expr| self.expression_type(expr))
                     == FunctionBodyKind::Stub;
@@ -317,8 +327,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
 
-                    if is_end_of_scope_reachable(db, self.scope())
-                        && !Type::none(db, env).is_assignable_to(db, env, expected_return_ty)
+                    // We already know the generator's return type. If it accepts None,
+                    // there's no need to analyze control flow to check for an implicit return.
+                    if !Type::none(db, env).is_assignable_to(db, env, expected_return_ty)
+                        && is_end_of_scope_reachable(db, self.scope())
                     {
                         let no_return = self.return_types_and_ranges.is_empty();
                         report_implicit_return_type(
@@ -374,7 +386,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            if is_end_of_scope_reachable(db, self.scope())
+            if !accepts_implicit_return
+                && is_end_of_scope_reachable(db, self.scope())
                 && !Type::none(db, env).is_assignable_to(db, env, *public)
             {
                 let no_return = self.return_types_and_ranges.is_empty();

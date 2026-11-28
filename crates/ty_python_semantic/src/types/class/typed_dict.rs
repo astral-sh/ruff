@@ -965,8 +965,8 @@ impl<'db> DynamicTypedDictLiteral<'db> {
 
     pub(crate) fn items(self, db: &'db dyn Db) -> &'db TypedDictSchema<'db> {
         match self.anchor(db) {
-            DynamicTypedDictAnchor::Definition(definition) => {
-                deferred_functional_typed_dict_schema(db, *definition)
+            DynamicTypedDictAnchor::Definition(_) => {
+                deferred_functional_typed_dict_schema(db, self)
             }
             DynamicTypedDictAnchor::ScopeOffset { schema, .. } => schema,
         }
@@ -974,8 +974,8 @@ impl<'db> DynamicTypedDictLiteral<'db> {
 
     pub(crate) fn openness(self, db: &'db dyn Db) -> TypedDictOpenness<'db> {
         match self.anchor(db) {
-            DynamicTypedDictAnchor::Definition(definition) => {
-                deferred_functional_typed_dict_openness(db, *definition)
+            DynamicTypedDictAnchor::Definition(_) => {
+                deferred_functional_typed_dict_openness(db, self)
             }
             DynamicTypedDictAnchor::ScopeOffset { openness, .. } => *openness,
         }

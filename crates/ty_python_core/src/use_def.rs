@@ -252,7 +252,7 @@ use std::ops::Index;
 use std::rc::Rc;
 use std::sync::{Arc, LazyLock};
 
-use ruff_index::{FrozenIndexVec, Idx, IndexVec, newtype_index};
+use ruff_index::{FrozenIndexVec, Idx, IndexSlice, IndexVec, newtype_index};
 use ruff_python_ast::NodeIndex;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHasher};
@@ -353,8 +353,6 @@ struct PlaceStateInterner {
     undeclared_declarations_by_constraint:
         IndexVec<ScopedReachabilityConstraintId, Option<InternedDeclarationsId>>,
     // These values are extremely common, so avoid repeatedly hashing their small vectors.
-    empty_bindings: Option<InternedBindingsId>,
-    empty_declarations: Option<InternedDeclarationsId>,
     always_unbound_bindings: Option<InternedBindingsId>,
     always_undeclared_declarations: Option<InternedDeclarationsId>,
 }
@@ -367,8 +365,6 @@ impl PlaceStateInterner {
             interned_declarations: RetainedDeclarationsBuilder::with_capacity(declarations),
             interned_ids_by_declarations: hashbrown::HashTable::with_capacity(declaration_map),
             undeclared_declarations_by_constraint: IndexVec::new(),
-            empty_bindings: None,
-            empty_declarations: None,
             always_unbound_bindings: None,
             always_undeclared_declarations: None,
         }
@@ -377,9 +373,7 @@ impl PlaceStateInterner {
     fn intern_bindings(&mut self, bindings: &Bindings) -> InternedBindingsId {
         // Reachable places with no explicit bindings share an empty slice.
         if bindings.as_slice().is_empty() {
-            return *self
-                .empty_bindings
-                .get_or_insert_with(|| self.interned_bindings.push(bindings));
+            return InternedBindingsId::new(0);
         }
         if bindings.is_always_unbound() {
             if let Some(interned_id) = self.always_unbound_bindings {
@@ -418,9 +412,7 @@ impl PlaceStateInterner {
 
     fn intern_declarations(&mut self, declarations: &Declarations) -> InternedDeclarationsId {
         if declarations.as_slice().is_empty() {
-            return *self
-                .empty_declarations
-                .get_or_insert_with(|| self.interned_declarations.push(declarations));
+            return InternedDeclarationsId::new(0);
         }
         if declarations.is_always_undeclared() {
             if let Some(interned_id) = self.always_undeclared_declarations {
@@ -494,11 +486,48 @@ impl PlaceStateInterner {
     }
 }
 
+/// State zero is empty. While all other states are singletons, their IDs
+/// are also their exclusive end offsets, so no offset table is needed.
+fn push_retained_state<I: Idx, T: Clone>(
+    ends: &mut IndexVec<I, u32>,
+    entries: &mut Vec<T>,
+    state: &[T],
+) -> I {
+    debug_assert!(!state.is_empty());
+    let start = entries.len();
+    let capacity = entries.capacity();
+    entries.extend_from_slice(state);
+    let end =
+        u32::try_from(entries.len()).expect("Expected retained state length to fit into a u32");
+
+    if ends.is_empty() {
+        if state.len() == 1 {
+            return I::new(entries.len());
+        }
+        // Materialize the implicit offsets, preserving every existing state ID.
+        *ends = IndexVec::with_capacity(capacity.max(start + 2));
+        ends.extend(0..=u32::try_from(start).unwrap());
+    }
+    ends.push(end)
+}
+
+/// Returns the range for a state, using its ID as the end offset until a table exists.
+fn retained_state_range<I: Idx>(ends: &IndexSlice<I, u32>, index: I) -> std::ops::Range<usize> {
+    let id = index.index();
+    if id == 0 {
+        0..0
+    } else if ends.is_empty() {
+        id - 1..id
+    } else {
+        ends[I::new(id - 1)] as usize..ends[index] as usize
+    }
+}
+
 /// Compact, retained representation of the interned binding vectors for a scope.
 ///
 /// The builder needs a `SmallVec` and an optional unbound constraint while constructing each
 /// binding state. Neither is needed after the semantic index is built, so the retained map stores
-/// cumulative end offsets into one contiguous array instead.
+/// one contiguous array, with explicit end offsets only when needed.
 #[derive(Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 struct RetainedBindings {
     ends: FrozenIndexVec<InternedBindingsId, u32>,
@@ -513,28 +542,17 @@ struct RetainedBindingsBuilder {
 impl RetainedBindingsBuilder {
     fn with_capacity(bindings: usize) -> Self {
         Self {
-            ends: IndexVec::with_capacity(bindings),
+            ends: IndexVec::new(),
             live_bindings: Vec::with_capacity(bindings),
         }
     }
 
     fn push(&mut self, bindings: &Bindings) -> InternedBindingsId {
-        // Definition IDs are also 32-bit and a single scope cannot practically approach this
-        // limit. Keeping one cumulative end offset per state halves the retained range metadata.
-        self.live_bindings.extend_from_slice(bindings.as_slice());
-        let end = u32::try_from(self.live_bindings.len())
-            .expect("Expected live-bindings length to fit into a u32");
-        self.ends.push(end)
+        push_retained_state(&mut self.ends, &mut self.live_bindings, bindings.as_slice())
     }
 
     fn get(&self, index: InternedBindingsId) -> &[LiveBinding] {
-        let end = self.ends[index];
-        let start = if index.index() == 0 {
-            0
-        } else {
-            self.ends[InternedBindingsId::new(index.index() - 1)]
-        };
-        &self.live_bindings[start as usize..end as usize]
+        &self.live_bindings[retained_state_range(&self.ends, index)]
     }
 
     fn finish(
@@ -557,20 +575,14 @@ impl Index<InternedBindingsId> for RetainedBindings {
     type Output = [LiveBinding];
 
     fn index(&self, index: InternedBindingsId) -> &Self::Output {
-        let end = self.ends[index];
-        let start = if index.index() == 0 {
-            0
-        } else {
-            self.ends[InternedBindingsId::new(index.index() - 1)]
-        };
-        &self.live_bindings[start as usize..end as usize]
+        &self.live_bindings[retained_state_range(&self.ends, index)]
     }
 }
 
 /// Compact, retained representation of the interned declaration vectors for a scope.
 #[derive(Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 struct RetainedDeclarations {
-    /// The exclusive end of each state in `live_declarations`; its start is the previous end.
+    /// Explicit end offsets when some states have multiple declarations.
     ends: FrozenIndexVec<InternedDeclarationsId, u32>,
     live_declarations: Box<[LiveDeclaration]>,
 }
@@ -583,26 +595,21 @@ struct RetainedDeclarationsBuilder {
 impl RetainedDeclarationsBuilder {
     fn with_capacity(declarations: usize) -> Self {
         Self {
-            ends: IndexVec::with_capacity(declarations),
+            ends: IndexVec::new(),
             live_declarations: Vec::with_capacity(declarations),
         }
     }
 
     fn push(&mut self, declarations: &Declarations) -> InternedDeclarationsId {
-        self.live_declarations.extend(declarations.iter().cloned());
-        let end = u32::try_from(self.live_declarations.len())
-            .expect("Expected live-declarations length to fit into a u32");
-        self.ends.push(end)
+        push_retained_state(
+            &mut self.ends,
+            &mut self.live_declarations,
+            declarations.as_slice(),
+        )
     }
 
     fn get(&self, index: InternedDeclarationsId) -> &[LiveDeclaration] {
-        let end = self.ends[index];
-        let start = if index.index() == 0 {
-            0
-        } else {
-            self.ends[InternedDeclarationsId::new(index.index() - 1)]
-        };
-        &self.live_declarations[start as usize..end as usize]
+        &self.live_declarations[retained_state_range(&self.ends, index)]
     }
 
     fn finish(
@@ -623,13 +630,7 @@ impl Index<InternedDeclarationsId> for RetainedDeclarations {
     type Output = [LiveDeclaration];
 
     fn index(&self, index: InternedDeclarationsId) -> &Self::Output {
-        let end = self.ends[index];
-        let start = if index.index() == 0 {
-            0
-        } else {
-            self.ends[InternedDeclarationsId::new(index.index() - 1)]
-        };
-        &self.live_declarations[start as usize..end as usize]
+        &self.live_declarations[retained_state_range(&self.ends, index)]
     }
 }
 
@@ -750,6 +751,43 @@ static ALWAYS_UNBOUND_BINDINGS: LazyLock<Bindings> =
 static ALWAYS_UNDECLARED_DECLARATIONS: LazyLock<Declarations> =
     LazyLock::new(|| Declarations::undeclared(ScopedReachabilityConstraintId::ALWAYS_TRUE));
 
+/// Distinguishes bindings that need special handling during place resolution.
+///
+/// Recording this alongside usage avoids reading the tracked definition kind
+/// each time we resolve a binding, including from other files.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum BindingKind {
+    /// A binding that needs no special handling during lookup, such as `x` here.
+    ///
+    /// ```python
+    /// x = 1
+    /// ```
+    Default,
+    /// A binding for `d["key"]` synthesized from a dictionary literal.
+    ///
+    /// ```python
+    /// d = {"key": 1}
+    /// ```
+    DictKeyAssignment,
+    /// A binding that carries writes to `x` from one loop iteration to the next.
+    ///
+    /// ```python
+    /// x = 0
+    /// while x < 3:
+    ///     x += 1
+    /// ```
+    LoopHeader,
+    /// A binding in the enclosing scope that accounts for writes from a nested scope.
+    ///
+    /// ```python
+    /// x = 0
+    /// def update():
+    ///     global x
+    ///     x = 1
+    /// ```
+    NestedBindings,
+}
+
 /// One event in a scope's use-def history.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 enum DefinitionEntry<'db> {
@@ -757,8 +795,8 @@ enum DefinitionEntry<'db> {
     /// It participates in declaration lookup, but not in binding-usage analysis.
     DeclarationPart(Definition<'db>),
     /// A binding or standalone declaration with no recorded use.
-    Unused(Definition<'db>),
-    Used(Definition<'db>),
+    Unused(Definition<'db>, BindingKind),
+    Used(Definition<'db>, BindingKind),
     Undefined,
     Deleted,
 }
@@ -767,8 +805,8 @@ impl<'db> DefinitionEntry<'db> {
     fn state(self) -> DefinitionState<'db> {
         match self {
             Self::DeclarationPart(definition)
-            | Self::Unused(definition)
-            | Self::Used(definition) => DefinitionState::Defined(definition),
+            | Self::Unused(definition, _)
+            | Self::Used(definition, _) => DefinitionState::Defined(definition),
             Self::Undefined => DefinitionState::Undefined,
             Self::Deleted => DefinitionState::Deleted,
         }
@@ -935,7 +973,8 @@ pub(super) struct UseDefMapInterner {
     stub_layouts: FxHashMap<SmallVec<[bool; 8]>, StubParameterLayout>,
 }
 
-/// Binding and declaration tables for a function whose body contains only `pass` or `...`.
+/// Binding and declaration tables for a function whose body contains only an optional
+/// docstring and zero or more `pass` or `...` statements.
 /// Each distinct parameter binds its symbol once. An annotated parameter also declares it.
 /// These functions share a layout because the tables refer to definitions by scope-local index.
 ///
@@ -981,7 +1020,7 @@ impl StubParameterLayout {
             all_definitions: RetainedDefinitions {
                 states: parameters
                     .into_iter()
-                    .map(|p| DefinitionEntry::Unused(p.definition))
+                    .map(|p| DefinitionEntry::Unused(p.definition, BindingKind::Default))
                     .collect(),
             },
             constraint_tables: None,
@@ -1174,8 +1213,8 @@ impl<'db> UseDefMap<'db> {
         self.all_definitions
             .iter_enumerated()
             .filter_map(|(id, entry)| match entry {
-                DefinitionEntry::Unused(definition) => Some((id, definition, false)),
-                DefinitionEntry::Used(definition) => Some((id, definition, true)),
+                DefinitionEntry::Unused(definition, _) => Some((id, definition, false)),
+                DefinitionEntry::Used(definition, _) => Some((id, definition, true)),
                 DefinitionEntry::DeclarationPart(_)
                 | DefinitionEntry::Undefined
                 | DefinitionEntry::Deleted => None,
@@ -1633,6 +1672,26 @@ pub struct BindingWithConstraintsIterator<'map, 'db> {
 }
 
 impl<'map, 'db> BindingWithConstraintsIterator<'map, 'db> {
+    /// Returns the only remaining binding if there is exactly one.
+    pub fn as_single(&self) -> Option<BindingWithConstraints<'map, 'db>> {
+        let len = self.inner.len() + usize::from(self.initial_unbound.is_some());
+        if len == 1 { self.clone().next() } else { None }
+    }
+
+    /// Returns the sole definition if it has no reachability or narrowing constraints
+    /// and needs no special handling during lookup.
+    pub fn single_unconstrained_binding(&self) -> Option<Definition<'db>> {
+        let row = self.as_single()?;
+        if row.reachability_constraint != ScopedReachabilityConstraintId::ALWAYS_TRUE
+            || row.narrowing_constraint.constraint() != ScopedNarrowingConstraint::ALWAYS_TRUE
+        {
+            return None;
+        }
+
+        let definition = row.binding.definition()?;
+        (row.kind == BindingKind::Default).then_some(definition)
+    }
+
     pub const fn predicates(&self) -> &'map Predicates<'db> {
         &self.constraint_tables.predicates
     }
@@ -1654,6 +1713,7 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
             return Some(BindingWithConstraints {
                 binding: DefinitionState::Undefined,
                 binding_order: ScopedDefinitionId::UNBOUND,
+                kind: BindingKind::Default,
                 narrowing_constraint: NarrowingEvaluator {
                     constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
                     constraint_tables: self.constraint_tables,
@@ -1662,17 +1722,22 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
             });
         }
 
-        self.inner
-            .next()
-            .map(|live_binding| BindingWithConstraints {
-                binding: self.all_definitions.get(live_binding.binding()).state(),
+        self.inner.next().map(|live_binding| {
+            let entry = self.all_definitions.get(live_binding.binding());
+            BindingWithConstraints {
+                binding: entry.state(),
+                kind: match entry {
+                    DefinitionEntry::Unused(_, kind) | DefinitionEntry::Used(_, kind) => kind,
+                    _ => BindingKind::Default,
+                },
                 binding_order: live_binding.binding(),
                 narrowing_constraint: NarrowingEvaluator {
                     constraint: live_binding.narrowing_constraint(),
                     constraint_tables: self.constraint_tables,
                 },
                 reachability_constraint: live_binding.reachability_constraint(),
-            })
+            }
+        })
     }
 }
 
@@ -1682,6 +1747,7 @@ pub struct BindingWithConstraints<'map, 'db> {
     pub binding: DefinitionState<'db>,
     /// Stable binding order within the containing scope.
     pub binding_order: ScopedDefinitionId,
+    pub kind: BindingKind,
     pub narrowing_constraint: NarrowingEvaluator<'map, 'db>,
     pub reachability_constraint: ScopedReachabilityConstraintId,
 }
@@ -2029,17 +2095,17 @@ impl PendingReachability {
         }
     }
 
-    fn materialize_reachability<'a>(
+    fn materialize_reachability(
         &self,
-        pending: &'a mut PendingPlaceState,
+        pending: &mut PendingPlaceState,
         target: PendingReachabilityId,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) -> &'a mut PlaceState {
-        let state = Rc::make_mut(&mut pending.state);
+    ) {
         if pending.reachability == target {
-            return state;
+            return;
         }
 
+        let state = Rc::make_mut(&mut pending.state);
         let previous = pending.reachability;
         pending.reachability = target;
         let target_event = &self.constraints[target];
@@ -2049,7 +2115,7 @@ impl PendingReachability {
             self.constraints[previous].scope_reachability,
             target_event.scope_reachability,
         ) {
-            return state;
+            return;
         }
 
         let mut unapplied = SmallVec::<[ScopedReachabilityConstraintId; 4]>::new();
@@ -2068,7 +2134,6 @@ impl PendingReachability {
         for constraint in unapplied.into_iter().rev() {
             state.record_reachability_constraint(reachability_constraints, constraint);
         }
-        state
     }
 
     /// Returns the materialized place state for immutable access.
@@ -2698,9 +2763,10 @@ impl<'db> UseDefMapBuilder<'db> {
         previous_definitions: PreviousDefinitions,
         can_be_shadowed: FutureDefinitions,
         imported_qualifier_action: ImportedQualifierAction,
+        kind: BindingKind,
     ) {
         let pending = self.pending_reachability.current;
-        let def_id = self.push_definition(DefinitionEntry::Unused(binding));
+        let def_id = self.push_definition(DefinitionEntry::Unused(binding, kind));
         let place_state =
             pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
         let place_state = self.pending_reachability.materialize(
@@ -3116,7 +3182,8 @@ impl<'db> UseDefMapBuilder<'db> {
         place: ScopedPlaceId,
         declaration: Definition<'db>,
     ) {
-        let def_id = self.push_definition(DefinitionEntry::Unused(declaration));
+        let def_id =
+            self.push_definition(DefinitionEntry::Unused(declaration, BindingKind::Default));
         let pending = self.pending_reachability.current;
         let place_state =
             pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
@@ -3165,7 +3232,7 @@ impl<'db> UseDefMapBuilder<'db> {
         // We don't need to store prior state for a definition that is both a declaration and a
         // binding.
         let entry = if part.is_binding() {
-            DefinitionEntry::Unused(definition)
+            DefinitionEntry::Unused(definition, BindingKind::Default)
         } else {
             DefinitionEntry::DeclarationPart(definition)
         };
@@ -3484,8 +3551,8 @@ impl<'db> UseDefMapBuilder<'db> {
 
     fn mark_definition_used(&mut self, definition_id: ScopedDefinitionId) {
         let entry = &mut self.all_definitions[definition_id];
-        if let DefinitionEntry::Unused(definition) = *entry {
-            *entry = DefinitionEntry::Used(definition);
+        if let DefinitionEntry::Unused(definition, kind) = *entry {
+            *entry = DefinitionEntry::Used(definition, kind);
         }
     }
 
@@ -3561,12 +3628,14 @@ impl<'db> UseDefMapBuilder<'db> {
         // If the snapshot we are restoring is missing some places we've recorded since, we need
         // to fill them in so the place IDs continue to line up. Since they don't exist in the
         // snapshot, the correct state to fill them in with is "undefined".
-        let undefined = PendingPlaceState::new(
-            PlaceState::undefined(self.reachability),
-            self.pending_reachability.current,
-        );
-        self.symbol_states.resize(num_symbols, undefined.clone());
-        self.member_states.resize(num_members, undefined);
+        if self.symbol_states.len() != num_symbols || self.member_states.len() != num_members {
+            let undefined = PendingPlaceState::new(
+                PlaceState::undefined(self.reachability),
+                self.pending_reachability.current,
+            );
+            self.symbol_states.resize(num_symbols, undefined.clone());
+            self.member_states.resize(num_members, undefined);
+        }
         previous
     }
 
@@ -3656,6 +3725,7 @@ impl<'db> UseDefMapBuilder<'db> {
                     PreviousDefinitions::AreShadowed,
                     FutureDefinitions::ShadowThisOne,
                     ImportedQualifierAction::Preserve,
+                    BindingKind::Default,
                 );
             }
         }

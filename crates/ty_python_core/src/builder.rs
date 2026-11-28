@@ -33,12 +33,12 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef, BindingsOwner,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionKind,
-    DefinitionNodeKey, DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef,
-    ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
-    ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
-    LambdaParameterDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
-    MatchPatternDefinitionNodeRef, NestedBindingExecution, NestedBindingsDefinitionKind,
-    ParameterDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    DefinitionNodeKey, DefinitionNodeRef, DictKeyAssignmentNodeRef, ExceptHandlerDefinitionNodeRef,
+    ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
+    ImportFromSubmoduleDefinitionNodeRef, LambdaParameterDefinitionNodeRef,
+    LoopHeaderDefinitionNodeRef, LoopStmtRef, MatchPatternDefinitionNodeRef,
+    NestedBindingExecution, NestedBindingsDefinitionKind, ParameterDefinitionNodeRef,
+    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::expression::{Expression, ExpressionContext, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
@@ -67,13 +67,13 @@ use crate::statement::StatementInner;
 use crate::symbol::{ScopedSymbolId, Symbol};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
-    EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, ImportedQualifierAction, LiveBinding,
-    LiveBindingStatus, PreviousDefinitions, ScopedDefinitionId, ScopedEnclosingSnapshotId,
-    StubParameter, UseDefMapBuilder, UseDefMapInterner,
+    BindingKind, EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, ImportedQualifierAction,
+    LiveBinding, LiveBindingStatus, PreviousDefinitions, ScopedDefinitionId,
+    ScopedEnclosingSnapshotId, StubParameter, UseDefMapBuilder, UseDefMapInterner,
 };
 use crate::{
-    AncestorsIter, DefinitionsByNode, EvaluationMode, LoopHeader, LoopHeaderId,
-    NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex,
+    AncestorsIter, EvaluationMode, LoopHeader, LoopHeaderId, NarrowingAliasPredicate,
+    PossiblyNarrowedPlaces, SemanticIndex,
 };
 use crate::{Db, Statement, StatementNodeKey};
 
@@ -278,7 +278,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     resolver_environment: ResolverEnvironment<'db>,
     python_version: PythonVersion,
     source_text: OnceCell<SourceText>,
-    semantic_checker: SemanticSyntaxChecker,
+    /// Present when the file is checked for diagnostics.
+    semantic_checker: Option<SemanticSyntaxChecker>,
     /// Whether the current statement is inside a `try` statement, including its `except`, `else`,
     /// and `finally` suites. Used for semantic syntax checks independently of handler activity.
     in_try_statement: bool,
@@ -287,11 +288,10 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes: IndexVec<FileScopeId, Scope>,
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
     place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
-    ast_ids: AstIdsBuilder,
+    ast_ids: AstIdsBuilder<'db>,
     // Box to avoid copying large builders when this index grows.
     use_def_maps: IndexVec<FileScopeId, Box<UseDefMapBuilder<'db>>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
-    definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     unpacks_by_target: FxHashMap<ExpressionNodeKey, Unpack<'db>>,
     condition_flow_snapshots_by_node: FxHashMap<ExpressionNodeKey, ConditionFlowSnapshots>,
@@ -333,10 +333,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         file: ProgramFile<'db>,
         module_ref: &'ast ParsedModuleRef,
     ) -> Self {
+        let source_file = file.file(db);
         let mut builder = Self {
             db,
             file,
-            source_type: file.file(db).source_type(db),
+            source_type: source_file.source_type(db),
             module: module_ref,
             scope_stack: Vec::new(),
             current_assignments: Vec::new(),
@@ -356,7 +357,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             use_def_maps: IndexVec::new(),
 
             scopes_by_node: FxHashMap::default(),
-            definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
             unpacks_by_target: FxHashMap::default(),
             condition_flow_snapshots_by_node: FxHashMap::default(),
@@ -377,7 +377,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             resolver_environment: file.resolver_environment(db),
             python_version: file.python_version(db),
             source_text: OnceCell::new(),
-            semantic_checker: SemanticSyntaxChecker::default(),
+            semantic_checker: db
+                .should_check_file(source_file)
+                .then(SemanticSyntaxChecker::default),
             in_try_statement: false,
             semantic_syntax_errors: RefCell::default(),
             narrowing_aliases: NarrowingAliases::default(),
@@ -415,18 +417,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn expect_single_definition(
-        &self,
-        definition_key: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy,
-    ) -> Definition<'db> {
-        let definitions = &self.definitions_by_node[&definition_key.into()];
-        debug_assert_eq!(
-            definitions.len(),
-            1,
-            "Expected exactly one definition to be associated with AST node {definition_key:?} but found {}",
-            definitions.len()
-        );
-        definitions[0]
+    fn expect_single_definition(&self, key: impl Into<DefinitionNodeKey>) -> Definition<'db> {
+        *self
+            .ast_ids
+            .definition(key.into())
+            .expect("missing definition")
     }
 
     /// See [`SemanticIndex::visible_ancestor_scopes`].
@@ -1509,10 +1504,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn add_entry_for_definition_key(&mut self, key: DefinitionNodeKey) -> &mut Definitions<'db> {
-        self.definitions_by_node.entry(key).or_default()
-    }
-
     /// Add a [`Definition`] associated with the `definition_node` AST node.
     ///
     /// ## Panics
@@ -1536,12 +1527,29 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         place: ScopedPlaceId,
         definition_node: impl Into<DefinitionNodeRef<'ast, 'db>> + std::fmt::Debug + Copy,
     ) -> Definition<'db> {
-        let (definition, num_definitions) =
-            self.create_additional_definition(place, definition_node);
-        debug_assert_eq!(
-            num_definitions, 1,
-            "Attempted to create multiple `Definition`s associated with AST node {definition_node:?}"
-        );
+        let node = definition_node.into();
+        let kind = node.into_owned(self.module);
+        let is_reexported = kind.is_reexported();
+        let definition =
+            Definition::new(self.db, self.current_scope_id(), place, kind, is_reexported);
+
+        match node {
+            // Loop headers are retrieved through the loop token.
+            DefinitionNodeRef::LoopHeader(_) => {}
+            DefinitionNodeRef::ImportStar(_) => {
+                self.ast_ids
+                    .record_star_import_definition(node.key(), definition);
+            }
+            _ => {
+                let previous = self
+                    .ast_ids
+                    .record_single_definition(node.key(), definition);
+                debug_assert!(
+                    previous.is_none(),
+                    "Attempted to create multiple `Definition`s associated with AST node {definition_node:?}"
+                );
+            }
+        }
         definition
     }
 
@@ -1562,54 +1570,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn delete_binding(&mut self, place: ScopedPlaceId) {
         self.current_use_def_map_mut().delete_binding(place);
-    }
-
-    /// Push a new [`Definition`] onto the list of definitions
-    /// associated with the `definition_node` AST node.
-    ///
-    /// Most AST nodes can only be associated with at most one [`Definition`]. Generally prefer
-    /// `add_definition` above, which enforces that. This method should currently only be used with
-    /// `*` imports and loop headers.
-    fn push_additional_definition(
-        &mut self,
-        place: ScopedPlaceId,
-        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
-    ) {
-        let (definition, _) = self.create_additional_definition(place, definition_node);
-        self.record_definition(place, definition, None);
-    }
-
-    /// Create a [`Definition`] without recording it in control flow.
-    ///
-    /// Returns the new definition and the number of definitions now associated with its AST
-    /// node. Loop headers are not stored by AST node, so their count is zero. Prefer
-    /// [`Self::create_definition`] when the node must have exactly one definition.
-    fn create_additional_definition(
-        &mut self,
-        place: ScopedPlaceId,
-        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
-    ) -> (Definition<'db>, usize) {
-        let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
-
-        // Note `definition_node` is guaranteed to be a child of `self.module`
-        let kind = definition_node.into_owned(self.module);
-        let is_loop_header = kind.is_loop_header();
-        let is_reexported = kind.is_reexported();
-
-        let definition: Definition<'db> =
-            Definition::new(self.db, self.current_scope_id(), place, kind, is_reexported);
-
-        let num_definitions = if is_loop_header {
-            // Loop headers are internal use-def definitions. They are retrieved through the loop
-            // token rather than by their AST node.
-            0
-        } else {
-            let definitions = self.add_entry_for_definition_key(definition_node.key());
-            definitions.push(definition);
-            definitions.len()
-        };
-
-        (definition, num_definitions)
     }
 
     /// Records an already-created definition in the current scope.
@@ -1648,6 +1608,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     _ => ImportedQualifierAction::Preserve,
                 };
+                let binding_kind = match kind {
+                    DefinitionKind::LoopHeader(_) => BindingKind::LoopHeader,
+                    DefinitionKind::NestedBindings(_) => BindingKind::NestedBindings,
+                    DefinitionKind::DictKeyAssignment(_) => BindingKind::DictKeyAssignment,
+                    _ => BindingKind::Default,
+                };
                 let previous = previous_definitions.unwrap_or(if kind.is_loop_header() {
                     PreviousDefinitions::AreKept
                 } else {
@@ -1660,6 +1626,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         previous,
                         FutureDefinitions::ShadowThisOne,
                         imported_qualifier_action,
+                        binding_kind,
                     );
                 });
             }
@@ -1876,7 +1843,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     loop_header_id,
                 };
                 // Note that `DefinitionKind::LoopHeader` doesn't shadow prior bindings.
-                self.push_additional_definition(place_id, loop_header_ref);
+                self.add_definition(place_id, loop_header_ref);
             }
         }
         let loop_min_definition_id = self.current_use_def_map_mut().next_definition_id();
@@ -1991,6 +1958,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 PreviousDefinitions::AreKept,
                 FutureDefinitions::DontShadowThisOne,
                 ImportedQualifierAction::Preserve,
+                BindingKind::NestedBindings,
             );
         }
     }
@@ -2333,6 +2301,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// `lambda` needs its own entry. This field is temporary visitor state; only the recorded
     /// expression node IDs are retained in the semantic index.
     fn visit_boolean_test(&mut self, test: &'ast ast::Expr, context: ExpressionContext) {
+        if self.semantic_checker.is_none() {
+            self.visit_expr_with_context(test, context);
+            return;
+        }
+
         let scope = self.current_scope();
         let previous = self.active_boolean_test_scope.replace(scope);
         if previous != Some(scope) {
@@ -2900,10 +2873,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         match pattern {
             ast::Pattern::MatchAs(pattern) => {
                 if let Some(name) = &pattern.name
-                    && let Some(definition) = self
-                        .definitions_by_node
-                        .get(&name.into())
-                        .and_then(|definitions| definitions.first())
+                    && let Some(definition) = self.ast_ids.definition(name.into())
                 {
                     let use_def = self.current_use_def_map();
                     bindings.extend(use_def.symbol_binding_definition_ids(symbol).filter(
@@ -3214,7 +3184,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.flow_restore(included_path)
     }
 
-    fn declare_parameters(&mut self, parameters: &'ast ast::Parameters, is_stub_body: bool) {
+    fn declare_parameters(&mut self, parameters: &'ast ast::Parameters, parameter_only: bool) {
         let nodes = parameters
             .iter_non_variadic_params()
             .map(ParameterDefinitionNodeRef::Parameter)
@@ -3230,7 +3200,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .as_deref()
                     .map(ParameterDefinitionNodeRef::VariadicKeywordParameter),
             );
-        if is_stub_body {
+        if parameter_only {
             let parameters = nodes
                 .map(|node| self.declare_stub_parameter(node))
                 .collect();
@@ -3359,24 +3329,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         ScopeKind::Comprehension
                     );
                 }
-                // The first iterator of the comprehension is evaluated in the outer scope, while all subsequent
-                // nodes are evaluated in the inner scope.
-                // SAFETY: The current scope is the comprehension, and the comprehension scope must have a parent scope.
-                let value_file_scope =
-                    if let Unpackable::Comprehension { first: true, .. } = unpackable {
-                        self.scope_stack
-                            .iter()
-                            .rev()
-                            .nth(1)
-                            .expect("The comprehension scope must have a parent scope")
-                            .file_scope_id
-                    } else {
-                        self.current_scope()
-                    };
                 let unpack = Unpack::new(
                     self.db,
                     self.file,
-                    value_file_scope,
                     self.current_scope(),
                     // Note `target` belongs to the `self.module` tree
                     AstNodeRef::new(self.module, target),
@@ -3461,7 +3416,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         SemanticIndex {
             place_tables,
             scopes: self.scopes.into(),
-            definitions_by_node: DefinitionsByNode::from_map(self.definitions_by_node),
             expressions_by_node: self.expressions_by_node,
             unpacks_by_target: FrozenMap::from(self.unpacks_by_target),
             statements_by_node: self.statements_by_node,
@@ -3488,9 +3442,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
-        let mut checker = std::mem::take(&mut self.semantic_checker);
-        f(&mut checker, self);
-        self.semantic_checker = checker;
+        if let Some(checker) = &mut self.semantic_checker {
+            let mut checker = std::mem::take(checker);
+            f(&mut checker, self);
+            self.semantic_checker = Some(checker);
+        }
     }
 
     fn source_text(&self) -> &SourceText {
@@ -3965,7 +3921,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
 
-                        builder.declare_parameters(parameters, ast::helpers::is_stub_body(body));
+                        // A leading docstring does not change any bindings. Still visit
+                        // it below to record its scope and statement range.
+                        let rest = ast::helpers::body_without_leading_docstring(body);
+                        let parameter_only = (!body.is_empty() && rest.is_empty())
+                            || ast::helpers::is_stub_body(rest);
+                        builder.declare_parameters(parameters, parameter_only);
 
                         let mut first_parameter_name = parameters
                             .iter_non_variadic_params()
@@ -4205,19 +4166,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.record_exception_checkpoint();
 
                     if &alias.name == "*" {
-                        // The following line maintains the invariant that every AST node that
-                        // implements `Into<DefinitionNodeKey>` must have an entry in the
-                        // `definitions_by_node` map. Maintaining this invariant ensures that
-                        // `SemanticIndex::definitions` can always look up the definitions for a
-                        // given AST node without panicking.
-                        //
-                        // The reason why maintaining this invariant requires special handling here
-                        // is that some `Alias` nodes may be associated with 0 definitions:
-                        // - If the import statement has invalid syntax: multiple `*` names in the `names` list
-                        //   (e.g. `from foo import *, bar, *`)
-                        // - If the `*` import refers to a module that has 0 exported names.
-                        // - If the module being imported from cannot be resolved.
-                        self.add_entry_for_definition_key(alias.into());
+                        self.ast_ids.register_star_import(alias.into());
 
                         if found_star {
                             continue;
@@ -4292,7 +4241,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 );
                             self.current_use_def_map_mut().reachability = definition_reachability;
 
-                            self.push_additional_definition(symbol_id.into(), node_ref);
+                            self.add_definition(symbol_id.into(), node_ref);
 
                             self.current_use_def_map_mut()
                                 .record_and_negate_star_import_reachability_constraint(
@@ -5985,7 +5934,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             return;
         }
 
-        if self.db.should_check_file(self.file.file(self.db)) {
+        if self.semantic_checker.is_some() {
             self.semantic_syntax_errors.borrow_mut().push(error);
         }
     }

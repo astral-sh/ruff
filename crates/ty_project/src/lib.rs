@@ -185,13 +185,8 @@ pub struct CollectReporter(std::sync::Mutex<Vec<Diagnostic>>);
 
 impl CollectReporter {
     pub fn into_sorted(self, db: &dyn Db) -> Vec<Diagnostic> {
-        let mut diagnostics = self.0.into_inner().unwrap();
         let resolver: &dyn ruff_db::Db = db;
-        diagnostics.sort_by(|left, right| {
-            left.rendering_sort_key(&resolver)
-                .cmp(&right.rendering_sort_key(&resolver))
-        });
-        diagnostics
+        ruff_db::diagnostic::sort_project_diagnostics(self.0.into_inner().unwrap(), &resolver)
     }
 }
 
@@ -1201,9 +1196,11 @@ mod tests {
     use crate::db::testing::TestDb;
     use crate::{IncludeResult, ProjectMetadata};
     use ruff_db::files::system_path_to_file;
+    use ruff_db::parsed::parsed_module;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
+    use ty_python_core::semantic_index;
     use ty_python_semantic::Db as _;
     use ty_python_semantic::types::check_types;
 
@@ -1266,6 +1263,36 @@ mod tests {
         project.set_force_exclude(&mut db, true);
         project.reload_files(&mut db);
         assert!(!project.files(&db).contains(file));
+        Ok(())
+    }
+
+    #[test]
+    fn opening_a_dependency_enables_diagnostic_indexing() -> anyhow::Result<()> {
+        let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/project"));
+        let mut db = TestDb::new(metadata);
+        let path = "/deps/library.py";
+        db.write_file(path, "if (value := 1):\n    return\n")?;
+        let file = system_path_to_file(&db, path)?;
+        let module = parsed_module(&db, db.program_file(file).python_file(&db)).load(&db);
+        let condition = &module.syntax().body[0].as_if_stmt().unwrap().test;
+
+        let check_index = |db: &TestDb, checked: bool| {
+            let index = semantic_index(db, db.program_file(file));
+            assert!(
+                index
+                    .try_definition(condition.as_named_expr().unwrap())
+                    .is_some()
+            );
+            assert_eq!(index.is_boolean_test_root(condition), checked);
+            assert_eq!(index.semantic_syntax_errors().len(), usize::from(checked));
+        };
+
+        let project = db.project();
+        check_index(&db, false);
+        project.open_file(&mut db, file);
+        check_index(&db, true);
+        project.close_file(&mut db, file);
+        check_index(&db, false);
         Ok(())
     }
 

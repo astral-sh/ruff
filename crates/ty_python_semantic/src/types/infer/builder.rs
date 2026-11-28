@@ -1331,11 +1331,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "Inferring deferred types should not add more deferred definitions"
         );
 
-        if self.db().should_check_file(self.file()) {
+        if self.context.should_check_file() {
             let mut seen_overloaded_places = FxHashSet::default();
             let mut seen_public_functions = FxHashSet::default();
 
+            let mut has_final_declaration = false;
             for (&definition, ty_and_quals) in &self.declarations {
+                // A bare `Final` declaration has a qualifier but no inner type.
+                has_final_declaration |= ty_and_quals.qualifiers().contains(TypeQualifiers::FINAL);
                 let Some(ty) = ty_and_quals.inner_type() else {
                     continue;
                 };
@@ -1417,7 +1420,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
 
-            post_inference::final_variable::check_final_without_value(&self.context, self.index);
+            if has_final_declaration {
+                post_inference::final_variable::check_final_without_value(
+                    &self.context,
+                    self.index,
+                );
+            }
         }
     }
 
@@ -8757,10 +8765,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Consecutive elements often contribute the same lower bound after literal promotion.
         // Track keys and values separately for dictionaries.
         let mut previous_evidence = [None; N];
+        let mut previous_literal = [None; N];
         for (elts_index, elts) in elts.iter().enumerate() {
             // An unpacking expression for a dictionary.
             if let &[None, Some(value_expr)] = elts.as_slice() {
                 previous_evidence = [None; N];
+                previous_literal = [None; N];
                 let unpack_ty = infer_elt_expression(self, (1, value_expr, tcx));
 
                 let Some((unpacked_key_ty, unpacked_value_ty)) =
@@ -8840,6 +8850,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .unwrap_or_else(|| {
                         infer_elt_expression(self, (i, elt, tcx.with_expected_type(elt_tcx)))
                     });
+
+                // Without an element context, consecutive promotable literals of the same
+                // builtin class contribute the same bound and tuple-size promotion constraint.
+                let literal_class = match inferred_elt_ty {
+                    Type::LiteralValue(literal)
+                        if elt_tcx.is_none()
+                            && literal.is_promotable()
+                            && !elt.is_starred_expr() =>
+                    {
+                        literal.kind().known_class()
+                    }
+                    _ => None,
+                };
+                if literal_class.is_some() && previous_literal[i] == literal_class {
+                    continue;
+                }
+                previous_literal[i] = literal_class;
 
                 // Simplify the inference based on a non-covariant declared type.
                 let covered_by_context = elt_tcx.is_some_and(|elt_tcx| {
@@ -9420,7 +9447,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Two things are different if it's the first comprehension:
             // (1) We must lookup the `ScopedExpressionId` of the iterable expression in the outer scope,
-            //     because that's the scope we visit it in in the semantic index builder
+            //     because that's the scope we visit it in the semantic index builder
             // (2) We must *not* call `self.extend()` on the result of the type inference,
             //     because `ScopedExpressionId`s are only meaningful within their own scope, so
             //     we'd add types for random wrong expressions in the current scope
@@ -11441,6 +11468,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.db(),
             self.program_environment(),
             self.index,
+            self.program_file(),
             self.scope(),
             source_place.place(),
             mode,

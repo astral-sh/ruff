@@ -167,7 +167,7 @@ impl ParsedModule {
     /// when the returned guard is dropped.
     ///
     /// This is intended for use in language server operations that scan all of
-    /// the files in a workspace, thereby often exceeding the LRU cache for parsed
+    /// the files in a workspace, often exceeding the cache capacity for parsed
     /// modules. Clearing ASTs proactively helps mitigate unpredictable pauses
     /// that would otherwise occur on the next database update, but it can also
     /// reduce the efficiency of our cache, so we should replace this with a more

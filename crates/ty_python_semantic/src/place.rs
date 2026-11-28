@@ -29,9 +29,10 @@ use ty_python_core::reachability_constraints::{
 };
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
-    BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis, DeclarationSources,
-    DeclarationWithConstraint, DeclarationsIterator, ImportedFinalCandidatesIterator, ProgramFile,
-    Truthiness, global_scope, place_table, use_def_map,
+    BindingKind, BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
+    DeclarationSources, DeclarationWithConstraint, DeclarationsIterator,
+    ImportedFinalCandidatesIterator, ProgramFile, Truthiness, global_scope, place_table,
+    use_def_map,
 };
 
 pub(crate) use implicit_globals::{
@@ -857,21 +858,15 @@ pub(crate) fn has_bound_prefix<'db>(
     bindings: BindingWithConstraintsIterator<'_, 'db>,
     cache: Option<&ReachabilityEvaluationCache<'db>>,
 ) -> bool {
-    let mut rows = bindings.clone();
-    if let Some(row) = rows.next()
-        && rows.next().is_none()
-    {
+    if let Some(row) = bindings.as_single() {
         match row.binding {
             DefinitionState::Undefined => return false,
-            DefinitionState::Defined(definition) => {
-                let kind = definition.kind(db);
-                if kind.is_user_visible() && !matches!(kind, DefinitionKind::DictKeyAssignment(_)) {
-                    // With no unbound or deleted alternative, even an unreachable binding gives
-                    // a defined place of type Never. Either way the outer prefix is shadowed.
-                    return true;
-                }
+            DefinitionState::Defined(_) if row.kind == BindingKind::Default => {
+                // With no unbound or deleted alternative, even an unreachable binding gives
+                // a defined place of type Never. Either way the outer prefix is shadowed.
+                return true;
             }
-            DefinitionState::Deleted => {}
+            DefinitionState::Defined(_) | DefinitionState::Deleted => {}
         }
     }
     !place_from_bindings_impl(db, env, bindings, RequiresExplicitReExport::No, cache)
@@ -1466,6 +1461,22 @@ pub(crate) fn place_by_id<'db>(
                 }
             }
 
+            // Module-level globals can be mutated externally, and strict application of the
+            // gradual guarantee would suggest that if not annotated, all such external mutations
+            // should be valid. However, external modifications (or modifications through `global`
+            // statements) that would require a different public type are relatively rare. From a
+            // practical perspective, we get a better user experience by trusting the inferred type
+            // by default, and only requiring annotation for the rare case.
+            if inferred.is_undefined() || scope.file_scope_id(db).is_global() {
+                return inferred.with_qualifiers(qualifiers);
+            }
+
+            // Private scopes cannot be modified externally. We also trust undeclared places
+            // in stubs and expose their raw type.
+            if scope.scope(db).visibility().is_private() || scope.file(db).is_stub(db) {
+                return inferred.with_qualifiers(qualifiers);
+            }
+
             // `__slots__` is a symbol with special behavior in Python's runtime. It can be
             // modified externally, but those changes do not take effect. We therefore issue
             // a diagnostic if we see it being modified externally. In type inference, we
@@ -1482,26 +1493,7 @@ pub(crate) fn place_by_id<'db>(
                 )
             });
 
-            // Module-level globals can be mutated externally, and strict application of the
-            // gradual guarantee would suggest that if not annotated, all such external mutations
-            // should be valid. However, external modifications (or modifications through `global`
-            // statements) that would require a different public type are relatively rare. From a
-            // practical perspective, we get a better user experience by trusting the inferred type
-            // by default, and only requiring annotation for the rare case.
-            let is_module_global = scope.node(db).scope_kind().is_module();
-
-            // If the visibility of the scope is private (like for a function scope), we also keep
-            // the raw type, because the symbol cannot be modified externally.
-            let scope_has_private_visibility = scope.scope(db).visibility().is_private();
-
-            // We generally trust undeclared places in stubs and expose the raw type.
-            let in_stub_file = scope.file(db).is_stub(db);
-
-            if !(is_considered_non_modifiable
-                || is_module_global
-                || scope_has_private_visibility
-                || in_stub_file)
-            {
+            if !is_considered_non_modifiable {
                 // Public inferred types should expose a promoted view rather than their raw
                 // inferred literal form. The adjustment is applied lazily when converting to
                 // `LookupResult` via `into_lookup_result`.
@@ -1848,6 +1840,15 @@ fn place_from_bindings_impl<'db>(
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
 ) -> PlaceWithDefinition<'db> {
+    if !requires_explicit_reexport.is_yes()
+        && let Some(binding) = bindings_with_constraints.single_unconstrained_binding()
+    {
+        return PlaceWithDefinition {
+            place: Place::bound(binding_type(db, binding)).with_definition(binding),
+            first_definition: Some(binding),
+        };
+    }
+
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
     let boundness_analysis = bindings_with_constraints.boundness_analysis();
@@ -1891,13 +1892,15 @@ fn place_from_bindings_impl<'db>(
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
              binding,
+             kind,
              narrowing_constraint,
              reachability_constraint,
              ..
          }| {
             let binding = match binding {
                 DefinitionState::Defined(binding)
-                    if is_discarded_dict_key_assignment(db, binding) =>
+                    if kind == BindingKind::DictKeyAssignment
+                        && is_discarded_dict_key_assignment(db, binding) =>
                 {
                     // This synthesized `d[key] = value` binding was derived from an assignment such
                     // as `d = {key: value}`. If the RHS is not known to be stored unchanged, discard
@@ -1991,8 +1994,7 @@ fn place_from_bindings_impl<'db>(
             // We need to "look through" loop header definitions to do boundness analysis. The
             // actual type is computed by `infer_loop_header_definition` via `binding_type` below,
             // like all other bindings, so that it can participate in fixpoint iteration.
-            let binding_kind = binding.kind(db);
-            if binding_kind.is_loop_header() {
+            if kind == BindingKind::LoopHeader {
                 let loop_header = loop_header_reachability(db, binding);
                 deleted_reachability = deleted_reachability.or(loop_header.deleted_reachability);
                 // If all the bindings in the loop are in statically false branches, it might be
@@ -2002,7 +2004,7 @@ fn place_from_bindings_impl<'db>(
                 if loop_header.reachable_bindings.is_empty() {
                     return None;
                 }
-            } else if matches!(binding_kind, DefinitionKind::NestedBindings(_)) {
+            } else if kind == BindingKind::NestedBindings {
                 // Nested bindings definitions similar to loop header definitions, synthetic
                 // bindings with special shadowing behavior. They can also coexist with `UNBOUND`.
             } else {

@@ -879,6 +879,14 @@ level = "expect"
 reason = "command environment methods mirror the standard library Command API"
 
 [[override]]
+lint = "hawk::unnecessary_public"
+crate = "ty_python_core"
+item = "expression::Expression::<'db>::new"
+kind = "inherent_method"
+level = "expect"
+reason = "preserve the public constructor that Salsa generated for Expression"
+
+[[override]]
 lint = "hawk::dead_public"
 crate = "ty_python_core"
 item = "expression::Expression::<'db>::program"
