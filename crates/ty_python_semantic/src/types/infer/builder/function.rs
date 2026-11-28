@@ -1477,9 +1477,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
 
-        let parameter_type = signature.parameters().as_slice()[index as usize].annotated_type();
-        (!parameter_type.has_provisional_marker(db, self.program_environment()))
-            .then_some(parameter_type)
+        let parameter = &signature.parameters().as_slice()[index as usize];
+        let ty = parameter.annotated_type();
+        let env = self.program_environment();
+        if parameter.has_default() {
+            let pending = Type::Dynamic(DynamicType::UnknownLambdaParameter);
+            // The call can depend on this lambda. A cycle marker says nothing
+            // about the parameter's type.
+            if ty.is_recursive_divergent() {
+                return Some(pending);
+            }
+
+            // Other arguments can constrain the parameter even while its own
+            // contribution is unknown. Keep the uncertainty too, since the
+            // known part of the union may come from the default itself.
+            if let Type::Union(union) = ty
+                && union.elements(db).contains(&pending)
+                && union
+                    .elements(db)
+                    .iter()
+                    .all(|t| *t == pending || !t.has_provisional_marker(db, env))
+            {
+                return Some(ty);
+            }
+        }
+        (!ty.has_provisional_marker(db, env)).then_some(ty)
     }
 
     pub(super) fn check_type_observations(
@@ -1557,6 +1579,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             env,
             std::iter::once(actual_ty).chain(parameter_types.map(|(ty, _)| ty)),
         );
+        let actual_ty = actual_ty.without_recursive_bound();
         let asserted_ty = asserted_ty.project_type_form(db, env);
         if actual_ty.is_equivalent_to(db, env, asserted_ty) {
             return;

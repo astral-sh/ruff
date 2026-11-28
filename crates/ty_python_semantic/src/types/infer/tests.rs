@@ -1212,6 +1212,175 @@ fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definit
 }
 
 #[test]
+fn importing_a_collection_with_a_recursive_element_type() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_files([
+        (
+            "/src/dependency.py",
+            "from __future__ import annotations\nitems: list[T] = [1]\nT = type(items[0]) if items else str",
+        ),
+        (
+            "/src/main.py",
+            "from dependency import items\nvalue: int = items[0]",
+        ),
+    ])?;
+    assert_file_diagnostics(
+        &db,
+        "/src/main.py",
+        &["Object of type `Unknown | str` is not assignable to `int`"],
+    );
+    Ok(())
+}
+
+#[test]
+fn importing_a_collection_preserves_context_for_other_lambdas() -> anyhow::Result<()> {
+    for names in ["items, callback", "callback, items"] {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/dependency.py",
+            r#"
+            from typing import Callable, TypeVar
+
+            T = TypeVar("T")
+            def tagged(f: Callable[[T], T], arg: T) -> Callable[[T], T]:
+                return f
+
+            value = 17
+            items: list[int] = [(lambda n=value: n)()]
+            callback = tagged(lambda x=value: x, value)
+            "#,
+        )?;
+        db.write_file(
+            "/src/main.py",
+            format!("from dependency import {names}\nfrom typing import reveal_type\nreveal_type(callback(1))"),
+        )?;
+        assert_revealed_type(&db, "/src/main.py", "Unknown | int");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_callable_context_can_constrain_a_lambda_independently_of_its_default() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/dependency.py",
+        r#"
+        from typing import Callable, Generic, TypeVar
+
+        T = TypeVar("T")
+        class Bag(Generic[T]): pass
+        def held(f: Callable[[T], T], owner: Bag[T]) -> Callable[[T], T]:
+            return f
+
+        owner: Bag[int] = Bag()
+        callback = held(lambda x="unused": x, owner)
+        def tagged(f: Callable[[T], T], arg: T) -> Callable[[T], T]:
+            return f
+
+        other = tagged(lambda x="unused": x, 42)
+        "#,
+    )?;
+    db.write_file(
+        "/src/main.py",
+        "from dependency import callback, other\nfrom typing import reveal_type\n\
+         value: int = other(42)\nreveal_type(callback(42))",
+    )?;
+    assert_revealed_type(&db, "/src/main.py", "int");
+    Ok(())
+}
+
+#[test]
+fn a_recursive_return_annotation_does_not_make_a_call_terminal() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/dependency.py",
+        r#"
+        from __future__ import annotations
+
+        def f() -> Y: return 0
+        def g() -> Y: return 0
+        items: list[object] = [f()]
+        Y = type(g())
+        "#,
+    )?;
+    db.write_file(
+        "/src/main.py",
+        "from dependency import items, g\nfrom typing import Never, assert_type\n\
+         assert_type(g(), Never)\ng()\nvalue: int = 'wrong'",
+    )?;
+    assert_file_diagnostics(
+        &db,
+        "/src/main.py",
+        &[
+            "Argument does not have asserted type `Never`",
+            "Object of type `Literal[\"wrong\"]` is not assignable to `int`",
+        ],
+    );
+    Ok(())
+}
+
+#[test]
+fn reading_a_collection_declaration_skips_its_initializer() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_files([
+        (
+            "/src/main.py",
+            "from dependency import items\nfrom typing import reveal_type\nreveal_type(items)",
+        ),
+        ("/src/dependency.py", "items: list[int] = ['wrong']"),
+    ])?;
+
+    let dependency = system_path_to_file(&db, "/src/dependency.py")?;
+    // TestDb checks both files. Exercise the declaration query used when the
+    // dependency is outside the checked files, then check the dependency too.
+    db.clear_salsa_events();
+    let items = first_public_binding(&db, dependency, "items");
+    assert!(annotated_global_declaration(&db, items).is_some());
+    let events = db.take_salsa_events();
+    let items = first_public_binding(&db, dependency, "items");
+    assert_function_query_was_not_run(&db, infer_definition_types, items, &events);
+    assert_revealed_type(&db, "/src/main.py", "list[int]");
+
+    let diagnostics = check_types(&db, program_file(&db, dependency));
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].id(),
+        DiagnosticId::lint("invalid-assignment")
+    );
+
+    db.write_file("/src/dependency.py", "items: list[int] = [1, 2]")?;
+    db.clear_salsa_events();
+    assert_revealed_type(&db, "/src/main.py", "list[int]");
+    let events = db.take_salsa_events();
+    let main = system_path_to_file(&db, "/src/main.py")?;
+    let import = first_public_binding(&db, main, "items");
+    assert_function_query_was_not_run(&db, infer_definition_types, import, &events);
+    assert_file_diagnostics(&db, "/src/dependency.py", &[]);
+
+    db.write_file("/src/dependency.py", "items: list[str] = []")?;
+    assert_revealed_type(&db, "/src/main.py", "list[str]");
+    Ok(())
+}
+
+#[test]
+fn importing_value_dependent_declarations_still_infers_the_initializer() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_files([
+        (
+            "/src/dependency.py",
+            "from typing import Final, TypeAlias as TA\nItems: TA = list[int]\nsize: Final = 3",
+        ),
+        (
+            "/src/main.py",
+            "from dependency import Items, size\nfrom typing import assert_type, Literal\n\
+             def f(items: Items):\n    assert_type(items, list[int])\n    assert_type(size, Literal[3])",
+        ),
+    ])?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    Ok(())
+}
+
+#[test]
 fn star_import_infers_unused_bindings_on_demand() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_files([

@@ -282,6 +282,39 @@ pub(crate) fn infer_definition_types<'db>(
         .finish_definition(definition)
 }
 
+/// Infer the public type of an initialized, annotated global without checking its value.
+/// PEP 613 aliases and bare qualifiers still need full definition inference.
+#[salsa::tracked(
+    returns(copy),
+    cycle_result=|_, _, _| None,
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(super) fn annotated_global_declaration<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<DeclaredType<'db>> {
+    let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) else {
+        unreachable!("Expected an annotated global");
+    };
+    let module = parsed_module(db, definition.python_file(db)).load(db);
+    let env = ProgramEnvironment::from_definition(definition);
+    // Looking up an annotation can itself depend on the type of the binding.
+    // Keep full definition inference for those cycles. Only project an explicit
+    // collection annotation whose outer type matches the literal initializer.
+    assignment.annotation(&module).as_subscript_expr()?;
+    let class = match assignment.value(&module)? {
+        ast::Expr::List(_) => KnownClass::List,
+        ast::Expr::Dict(_) => KnownClass::Dict,
+        ast::Expr::Set(_) => KnownClass::Set,
+        _ => return None,
+    };
+    let declared = TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+        .finish_annotated_global_declaration(assignment)?;
+    let ty = declared.inner_type()?;
+    // A dynamic element type can be provisional even when the outer type is known.
+    (ty.is_instance_of(db, class) && ty.is_fully_static(db, &env)).then_some(declared)
+}
+
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.
 ///
 /// For example, inference synthesizes an `x["a"] = "bad"` binding for:

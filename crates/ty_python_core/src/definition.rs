@@ -46,7 +46,7 @@ pub struct Definition<'db> {
     #[returns(copy)]
     pub scope_id: ScopeId<'db>,
 
-    /// The place ID and re-export state of the definition.
+    /// The place ID and lookup flags of the definition.
     #[returns(copy)]
     place_info: DefinitionPlace,
 
@@ -69,10 +69,14 @@ impl<'db> Definition<'db> {
         kind: DefinitionKind<'db>,
         is_reexported: bool,
     ) -> Self {
+        let is_annotated_collection = matches!(
+            &kind, DefinitionKind::AnnotatedAssignment(assignment) if assignment.is_collection
+        ) && scope_id.file_scope_id(db).is_global();
+
         Self::new_internal(
             db,
             scope_id,
-            DefinitionPlace::new(place, is_reexported),
+            DefinitionPlace::new(place, is_reexported, is_annotated_collection),
             kind,
         )
     }
@@ -107,6 +111,17 @@ impl<'db> Definition<'db> {
 
     pub fn is_reexported(self, db: &'db dyn Db) -> bool {
         self.place_info(db).is_reexported()
+    }
+
+    /// Whether this global has a subscripted annotation and a collection literal initializer.
+    ///
+    /// This is part of the definition's identity so importers can select a declaration
+    /// query without depending on the syntax of the defining file.
+    pub fn is_annotated_collection(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self.place_info(db),
+            DefinitionPlace::AnnotatedCollection { .. }
+        )
     }
 
     /// Whether a bundled stub defines this value under a guard folded during indexing.
@@ -213,11 +228,10 @@ impl<'db> Definition<'db> {
     }
 }
 
-/// The identity of the place defined by a [`Definition`] and whether it is re-exported.
+/// The identity of the place defined by a [`Definition`] and flags used during lookup.
 ///
-/// Keeping the re-export state in the enum lets it share the place ID's otherwise-unused
-/// representation space. Storing it as a separate field on [`Definition`] would add padding to
-/// every tracked definition.
+/// Keeping the flags in the enum lets them share the place ID's otherwise-unused
+/// representation space without adding padding to every tracked definition.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub enum DefinitionPlace {
     Symbol {
@@ -228,11 +242,19 @@ pub enum DefinitionPlace {
         id: ScopedMemberId,
         is_reexported: bool,
     },
+    /// A symbol whose declared type may be available without inferring its initializer.
+    AnnotatedCollection {
+        id: ScopedSymbolId,
+        is_reexported: bool,
+    },
 }
 
 impl DefinitionPlace {
-    fn new(place: ScopedPlaceId, is_reexported: bool) -> Self {
+    fn new(place: ScopedPlaceId, is_reexported: bool, is_annotated_collection: bool) -> Self {
         match place {
+            ScopedPlaceId::Symbol(id) if is_annotated_collection => {
+                Self::AnnotatedCollection { id, is_reexported }
+            }
             ScopedPlaceId::Symbol(id) => Self::Symbol { id, is_reexported },
             ScopedPlaceId::Member(id) => Self::Member { id, is_reexported },
         }
@@ -240,16 +262,18 @@ impl DefinitionPlace {
 
     fn place(self) -> ScopedPlaceId {
         match self {
-            Self::Symbol { id, .. } => ScopedPlaceId::Symbol(id),
+            Self::Symbol { id, .. } | Self::AnnotatedCollection { id, .. } => {
+                ScopedPlaceId::Symbol(id)
+            }
             Self::Member { id, .. } => ScopedPlaceId::Member(id),
         }
     }
 
     fn is_reexported(self) -> bool {
         match self {
-            Self::Symbol { is_reexported, .. } | Self::Member { is_reexported, .. } => {
-                is_reexported
-            }
+            Self::Symbol { is_reexported, .. }
+            | Self::AnnotatedCollection { is_reexported, .. }
+            | Self::Member { is_reexported, .. } => is_reexported,
         }
     }
 }
@@ -708,6 +732,11 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }) => DefinitionKind::AnnotatedAssignment(AnnotatedAssignmentDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
                 has_value: node.value.is_some(),
+                is_collection: node.annotation.is_subscript_expr()
+                    && matches!(
+                        node.value.as_deref(),
+                        Some(ast::Expr::List(_) | ast::Expr::Dict(_) | ast::Expr::Set(_))
+                    ),
             }),
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
@@ -1502,6 +1531,7 @@ impl<'db> AssignmentDefinitionKind<'db> {
 pub struct AnnotatedAssignmentDefinitionKind {
     node: AstNodeRef<ast::StmtAnnAssign>,
     has_value: bool,
+    is_collection: bool,
 }
 
 impl AnnotatedAssignmentDefinitionKind {

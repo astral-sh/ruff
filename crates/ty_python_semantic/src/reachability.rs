@@ -1989,7 +1989,10 @@ pub(crate) fn is_non_terminal_call<'db>(
     let mut any_overload_is_generic = false;
 
     for overload in callables.signatures(db) {
-        let returns_never = overload.return_ty.is_equivalent_to(db, env, Type::Never);
+        let returns_never = overload
+            .return_ty
+            .without_recursive_bound()
+            .is_equivalent_to(db, env, Type::Never);
         no_overloads_return_never &= !returns_never;
         all_overloads_return_never &= returns_never;
         any_overload_is_generic |= overload.return_ty.has_typevar(db, env);
@@ -1997,7 +2000,11 @@ pub(crate) fn is_non_terminal_call<'db>(
 
     if no_overloads_return_never && !any_overload_is_generic && !is_await {
         Truthiness::AlwaysTrue
-    } else if all_overloads_return_never || call_type().is_equivalent_to(db, env, Type::Never) {
+    } else if all_overloads_return_never
+        || call_type()
+            .without_recursive_bound()
+            .is_equivalent_to(db, env, Type::Never)
+    {
         Truthiness::AlwaysFalse
     } else {
         Truthiness::AlwaysTrue
