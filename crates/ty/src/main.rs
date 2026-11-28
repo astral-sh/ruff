@@ -1,6 +1,9 @@
 use colored::Colorize;
 use std::io;
-use ty::{ExitStatus, run};
+use ty::ExitStatus;
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+mod huge_pages;
 
 #[cfg(all(
     not(target_os = "macos"),
@@ -19,7 +22,12 @@ use ty::{ExitStatus, run};
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 fn main() -> ExitStatus {
-    run().unwrap_or_else(|error| {
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    let result = ty::run_with_check_setup(huge_pages::enable);
+    #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
+    let result = ty::run();
+
+    result.unwrap_or_else(|error| {
         use io::Write;
 
         // Exit "gracefully" on broken pipe errors.
