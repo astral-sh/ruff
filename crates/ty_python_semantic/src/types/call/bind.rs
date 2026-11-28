@@ -22,7 +22,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
-use smallvec::{SmallVec, smallvec, smallvec_inline};
+use smallvec::{SmallVec, smallvec_inline};
 
 use ty_python_core::scope::ScopeId;
 
@@ -8921,7 +8921,67 @@ pub struct MatchedParameter<'db> {
     provenance: InvalidArgumentTypeProvenance<'db>,
 }
 
+/// A direct positional match contains only the parameter index. Share these
+/// immutable matches across calls, overloads and binding snapshots.
+#[derive(Clone, get_size2::GetSize, salsa::SalsaValue)]
+enum ArgumentMatches<'db> {
+    Positional(usize),
+    Owned(Box<[MatchedArgument<'db>]>),
+}
+
+impl<'db> ArgumentMatches<'db> {
+    const POSITIONAL_MATCHES: &'db [MatchedArgument<'db>] = &[
+        MatchedArgument::positional(0),
+        MatchedArgument::positional(1),
+        MatchedArgument::positional(2),
+        MatchedArgument::positional(3),
+        MatchedArgument::positional(4),
+        MatchedArgument::positional(5),
+        MatchedArgument::positional(6),
+        MatchedArgument::positional(7),
+    ];
+
+    /// Reuses the shared prefix up to eight arguments, with an owned slice for longer calls.
+    fn positional(count: usize) -> Self {
+        if count <= Self::POSITIONAL_MATCHES.len() {
+            Self::Positional(count)
+        } else {
+            Self::Owned((0..count).map(MatchedArgument::positional).collect())
+        }
+    }
+}
+
+impl fmt::Debug for ArgumentMatches<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self[..].fmt(f)
+    }
+}
+
+impl<'db> std::ops::Deref for ArgumentMatches<'db> {
+    type Target = [MatchedArgument<'db>];
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Positional(count) => &Self::POSITIONAL_MATCHES[..*count],
+            Self::Owned(matches) => matches,
+        }
+    }
+}
+
 impl<'db> MatchedArgument<'db> {
+    /// Matches one positional argument to the parameter at the same index.
+    const fn positional(index: usize) -> Self {
+        Self {
+            parameters: SmallVec::from_const([MatchedParameter {
+                index,
+                argument_type: None,
+                expected_type: None,
+                provenance: InvalidArgumentTypeProvenance::Argument,
+            }]),
+            matched: true,
+        }
+    }
+
     /// Returns an iterator over the matched parameters.
     fn iter(&self) -> impl Iterator<Item = MatchedParameter<'db>> + '_ {
         self.parameters.iter().copied()
@@ -9299,7 +9359,7 @@ pub(crate) struct Binding<'db> {
 
     /// Information about which parameter(s) each argument was matched with, in argument source
     /// order.
-    argument_matches: Box<[MatchedArgument<'db>]>,
+    argument_matches: ArgumentMatches<'db>,
 
     /// Whether an argument that supplies an indeterminate number of positional or keyword
     /// arguments is mapped to a variadic parameter (`*args` or `**kwargs`).
@@ -9409,7 +9469,7 @@ impl<'db> Binding<'db> {
             inference: None,
             ignored_declared_constraints: false,
             is_partial_application: false,
-            argument_matches: Box::from([]),
+            argument_matches: ArgumentMatches::Positional(0),
             variadic_argument_matched_to_variadic_parameter: false,
             parameter_tys: Box::from([]),
             errors: vec![],
@@ -10099,17 +10159,7 @@ impl<'db> Binding<'db> {
             return false;
         }
 
-        self.argument_matches = (0..count)
-            .map(|index| MatchedArgument {
-                parameters: smallvec![MatchedParameter {
-                    index,
-                    argument_type: None,
-                    expected_type: None,
-                    provenance: InvalidArgumentTypeProvenance::Argument,
-                }],
-                matched: true,
-            })
-            .collect();
+        self.argument_matches = ArgumentMatches::positional(count);
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.variadic_argument_matched_to_variadic_parameter = false;
         true
@@ -10157,7 +10207,7 @@ impl<'db> Binding<'db> {
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;
-        self.argument_matches = matcher.finish(db, env);
+        self.argument_matches = ArgumentMatches::Owned(matcher.finish(db, env));
     }
 
     /// A disjoint literal argument rules out an overload regardless of how its type variables
@@ -10389,7 +10439,7 @@ impl<'db> Binding<'db> {
         let parameters = self.signature.parameters().as_slice();
         let mut partial_application = PartialApplication::new(parameters.len());
 
-        for (argument, argument_matches) in arguments.iter().zip(&self.argument_matches) {
+        for (argument, argument_matches) in arguments.iter().zip(self.argument_matches.iter()) {
             match argument.kind() {
                 Argument::Positional | Argument::Synthetic | Argument::Variadic => {
                     for matched_parameter in argument_matches.iter() {
@@ -10499,7 +10549,7 @@ impl<'db> Binding<'db> {
     ) -> impl Iterator<Item = (Argument<'a>, Type<'db>)> + 'a {
         call_arguments
             .iter()
-            .zip(&self.argument_matches)
+            .zip(self.argument_matches.iter())
             .filter(move |(_, argument_matches)| {
                 argument_matches
                     .parameters
@@ -10629,7 +10679,7 @@ impl<'db> Binding<'db> {
         self.inferable_typevars = TypeVarSet::None;
         self.inference = None;
         self.ignored_declared_constraints = false;
-        self.argument_matches = Box::from([]);
+        self.argument_matches = ArgumentMatches::Positional(0);
         self.parameter_tys = Box::from([]);
         self.errors.clear();
     }
@@ -10641,7 +10691,7 @@ struct BindingSnapshot<'db> {
     inferable_typevars: TypeVarSet<'db>,
     inference: Option<TypeVarInference<'db>>,
     ignored_declared_constraints: bool,
-    argument_matches: Box<[MatchedArgument<'db>]>,
+    argument_matches: ArgumentMatches<'db>,
     parameter_tys: Box<[Option<Type<'db>>]>,
     errors: Vec<BindingError<'db>>,
 }
