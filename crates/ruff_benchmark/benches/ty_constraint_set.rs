@@ -1180,6 +1180,31 @@ fn benchmark_recursive_alias_product(criterion: &mut Criterion) {
     });
 }
 
+/// The lower bound for `T` contains a fixed `U` followed by a nested alias.
+/// Expanding every occurrence of the alias argument would visit `int` 8^8 times.
+fn benchmark_fixed_typevar_with_nested_alias(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+        type Octet[T] = tuple[T, T, T, T, T, T, T, T]
+        type Block[T] = Octet[Octet[T]]
+
+        def identity[T](x: T) -> T:
+            return x
+
+        def first[U](x: tuple[U, Block[Block[Block[Block[int]]]]]) -> U:
+            return identity(x)[0]
+    "#;
+
+    criterion.bench_function("ty_micro[fixed_typevar_with_nested_alias]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Repeated unions share source-order subtrees even after the TDD stops growing. Persisting each
 /// result must not expand those shared subtrees into exponentially many copies.
 fn benchmark_shared_source_order_compaction(criterion: &mut Criterion) {
@@ -1234,6 +1259,7 @@ criterion_group!(
     benchmark_paramspec_capture_many_overloads,
     benchmark_overloaded_protocol_receivers,
     benchmark_recursive_alias_product,
+    benchmark_fixed_typevar_with_nested_alias,
     benchmark_shared_source_order_compaction,
 );
 criterion_main!(constraint_set);

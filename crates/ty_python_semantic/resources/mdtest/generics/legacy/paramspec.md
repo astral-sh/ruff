@@ -2632,6 +2632,31 @@ def decorate_with(fn: Callable[P, R], decorator: Callable[[Callable[P, R]], X]) 
 reveal_type(decorate_with(empty, passthrough))  # revealed: [T]() -> list[T]
 ```
 
+### Inferring a parameter list from a decorator's return type
+
+The identity decorator returns `len` unchanged. Matching `len` against `Callable[P, int]` determines
+`P` and overrides its `[int]` default.
+
+```py
+from typing import Callable, TypeVar
+from typing_extensions import ParamSpec
+
+F = TypeVar("F")
+P = ParamSpec("P", default=[int])
+T = TypeVar("T")
+
+def decorate(decorator: Callable[[F], Callable[P, int]], fn: F) -> Callable[P, int]:
+    return decorator(fn)
+
+def identity(x: T) -> T:
+    return x
+
+wrapped = decorate(identity, len)
+reveal_type(wrapped)  # revealed: (obj: Sized, /) -> int
+wrapped("hello")  # ok
+wrapped(42)  # error: [invalid-argument-type]
+```
+
 ### A transform that returns a generic callback
 
 `accept` requires the result of `replace` to be usable as its input. Comparing the two signatures
@@ -2736,6 +2761,32 @@ def bounded(fixed: BoundedS) -> None:
         return value, fixed
 
     forward(make, 1)  # ok
+```
+
+### Specializing a captured variable from another callback
+
+`run_bool` passes a `bool` to `box`. Both constraints on `T` accept that argument, so we choose the
+narrower one and infer `list[bool]` for `R`.
+
+```py
+from collections.abc import Callable
+from typing import ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T", bool, int)
+S = TypeVar("S")
+
+def apply(fn: Callable[P, R], run: Callable[[Callable[P, R]], R]) -> R:
+    return run(fn)
+
+def box(x: T, /) -> list[T]:
+    return [x]
+
+def run_bool(fn: Callable[[bool], S]) -> S:
+    return fn(True)
+
+reveal_type(apply(box, run_bool))  # revealed: list[bool]
 ```
 
 ### Specializing a captured variable to satisfy a return bound
