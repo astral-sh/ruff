@@ -823,7 +823,7 @@ impl<'a> Generator<'a> {
                 self.unparse_expr(cls, precedence::MAX);
                 self.p("(");
                 let mut first = true;
-                for pattern_or_keyword in arguments.iter_source_order() {
+                for pattern_or_keyword in &arguments.items {
                     self.p_delim(&mut first, ", ");
                     match pattern_or_keyword {
                         PatternOrKeyword::Pattern(pattern) => self.unparse_pattern(pattern),
@@ -1690,6 +1690,12 @@ mod tests {
                 $contents.replace('\n', LineEnding::default().as_str())
             );
         };
+    }
+
+    #[test]
+    fn class_pattern_arguments() {
+        let source = "match value:\n    case shape.Point(Empty(), y=other):\n        pass";
+        assert_round_trip!(source);
     }
 
     #[test]
