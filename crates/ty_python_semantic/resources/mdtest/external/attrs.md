@@ -423,6 +423,47 @@ reveal_type(User.__init__)  # revealed: (self: User, /, age: bytes) -> None
 reveal_type(User(b"36").age)  # revealed: int
 ```
 
+## Field converter with a validator
+
+The converter's input type determines the initializer parameter even when a validator is present.
+
+```py
+from __future__ import annotations
+
+from typing import Any
+from attrs import Attribute, define, field
+
+def to_float(value: float | None) -> float:
+    return 0.0 if value is None else value
+
+def validate(instance: Any, attribute: Attribute[Any], value: Any) -> None: ...
+
+@define
+class Item:
+    value: float = field(default=0.0, converter=to_float, validator=validate)
+
+reveal_type(Item(None).value)  # revealed: float
+Item()  # ok
+Item("invalid")  # error: [invalid-argument-type]
+```
+
+Field options still determine which arguments the initializer accepts.
+
+```py
+@define
+class KeywordItem:
+    value: float = field(default=0.0, converter=to_float, validator=validate, kw_only=True, alias="number")
+
+reveal_type(KeywordItem(number=None).value)  # revealed: float
+KeywordItem()  # ok
+KeywordItem(None)  # error: [too-many-positional-arguments]
+KeywordItem(value=None)  # error: [unknown-argument]
+
+@define
+class InvalidDefault:
+    value: float = field(default="invalid", converter=to_float, validator=validate)  # error: [invalid-assignment]
+```
+
 ## Custom initialization
 
 With `init=False`, attrs generates an `__attrs_init__` method that a custom `__init__` can call to
