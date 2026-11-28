@@ -12,13 +12,12 @@
 from __future__ import annotations
 
 import re
+import tomllib
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from subprocess import check_output
 from typing import Any
-
-import tomllib
 
 # Types that require `crate::`. We can slowly remove these types as we move them to generate scripts.
 types_requiring_crate_prefix = {

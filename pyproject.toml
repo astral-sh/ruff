@@ -251,6 +251,10 @@ docstring-adder = { git = "https://github.com/astral-sh/docstring-adder.git" }
 ecosystem-analyzer = { git = "https://github.com/astral-sh/ecosystem-analyzer" }
 
 [tool.ruff]
+# Enable script metadata and lint preview while keeping formatting and analysis stable.
+preview = true
+format.preview = false
+analyze.preview = false
 target-version = "py38"
 extend-exclude = [
     "crates/ty_vendored/vendor/",
@@ -262,7 +266,6 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-preview = true
 select = [
     # Categories
     "correctness",
@@ -381,9 +384,7 @@ required-imports = ["from __future__ import annotations"]
 combine-as-imports = true
 
 [tool.ruff.per-file-target-version]
-"crates/ty_python_semantic/mdtest.py" = "py310"
 "crates/ty_vendored/ty_extensions/*.pyi" = "py312"
-"scripts/*.py" = "py312"
 
 [tool.ty.project-manager]
 script = "uv"
