@@ -8923,7 +8923,7 @@ pub struct MatchedParameter<'db> {
 
 /// A direct positional match contains only the parameter index. Share these
 /// immutable matches across calls, overloads and binding snapshots.
-#[derive(Clone, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(get_size2::GetSize, salsa::SalsaValue)]
 enum ArgumentMatches<'db> {
     Positional(usize),
     Owned(Box<[MatchedArgument<'db>]>),
@@ -8947,6 +8947,23 @@ impl<'db> ArgumentMatches<'db> {
             Self::Positional(count)
         } else {
             Self::Owned((0..count).map(MatchedArgument::positional).collect())
+        }
+    }
+}
+
+impl Clone for ArgumentMatches<'_> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Positional(count) => Self::Positional(*count),
+            Self::Owned(matches) => Self::Owned(matches.clone()),
+        }
+    }
+
+    fn clone_from(&mut self, source: &Self) {
+        match (self, source) {
+            // Reuse the allocation when updating a snapshot with the same number of arguments.
+            (Self::Owned(target), Self::Owned(source)) => target.clone_from(source),
+            (target, source) => *target = source.clone(),
         }
     }
 }
@@ -12441,6 +12458,18 @@ mod tests {
     use crate::place::global_symbol;
     use crate::types::constraints::resolution::SolutionType::Resolved;
     use crate::types::generics::TypeVarInferenceSolutions;
+
+    #[test]
+    fn clone_from_reuses_owned_argument_matches() {
+        let mut target = ArgumentMatches::Owned(Box::new([MatchedArgument::positional(0)]));
+        let source = ArgumentMatches::Owned(Box::new([MatchedArgument::positional(1)]));
+        let allocation = target.as_ptr();
+
+        target.clone_from(&source);
+
+        assert_eq!(target.as_ptr(), allocation);
+        assert_eq!(target[0].parameters[0].index, 1);
+    }
 
     fn call_inference<'db>(
         db: &'db TestDb,
