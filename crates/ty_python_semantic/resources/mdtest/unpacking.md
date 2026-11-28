@@ -1410,6 +1410,148 @@ for a, b in ((1, 2), (3, 4)):
     reveal_type(b)  # revealed: Literal[2, 4]
 ```
 
+### Large list literals
+
+Large display iterations widen inferred literals before combining their element types. This also
+limits the cost of destructuring many distinct tuple elements.
+
+```py
+# fmt: off
+for a, b in [
+    (0, 0), (1, 1), (2, 2), (3, 3), (4, 4),
+    (5, 5), (6, 6), (7, 7), (8, 8), (9, 9),
+    (10, 10), (11, 11), (12, 12), (13, 13), (14, 14),
+    (15, 15), (16, 16), (17, 17), (18, 18), (19, 19),
+    (20, 20), (21, 21), (22, 22), (23, 23), (24, 24),
+    (25, 25), (26, 26), (27, 27), (28, 28), (29, 29),
+    (30, 30), (31, 31), (32, 32), (33, 33), (34, 34),
+    (35, 35), (36, 36), (37, 37), (38, 38), (39, 39),
+    (40, 40), (41, 41), (42, 42), (43, 43), (44, 44),
+    (45, 45), (46, 46), (47, 47), (48, 48), (49, 49),
+    (50, 50), (51, 51), (52, 52), (53, 53), (54, 54),
+    (55, 55), (56, 56), (57, 57), (58, 58), (59, 59),
+    (60, 60), (61, 61), (62, 62), (63, 63), (64, 64),
+]:
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int
+# fmt: on
+```
+
+### Fixed tuples from names and calls
+
+Stored fixed tuples and function results retain their inferred element types.
+
+```py
+from typing import Literal, assert_type
+
+Pairs = tuple[tuple[Literal[1], Literal[2]], tuple[Literal[3], Literal[4]]]
+
+def pairs() -> Pairs:
+    return ((1, 2), (3, 4))
+
+values: Pairs = pairs()
+for first, second in values:
+    assert_type(first, Literal[1, 3])
+    assert_type(second, Literal[2, 4])
+
+for first, second in pairs():
+    assert_type(first, Literal[1, 3])
+    assert_type(second, Literal[2, 4])
+```
+
+### Large tuple literals with a single target
+
+The same promotion budget applies when a loop has a single target.
+
+```py
+# fmt: off
+for value in (
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+    20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+    30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+    40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+    50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
+    60, 61, 62, 63, 64,
+):
+    reveal_type(value)  # revealed: int
+# fmt: on
+```
+
+### List literals
+
+Unpacking a list literal preserves literal element types.
+
+```py
+for a, b in [(1, "a"), ("b", 2)]:
+    reveal_type(a)  # revealed: Literal[1, "b"]
+    reveal_type(b)  # revealed: Literal["a", 2]
+```
+
+### Empty list literals
+
+```py
+for a, b in []:
+    reveal_type(a)  # revealed: Never
+    reveal_type(b)  # revealed: Never
+```
+
+### List literals with fixed-length starred elements
+
+```py
+for a, b in [(1, 2), *((3, 4),)]:
+    reveal_type(a)  # revealed: Literal[1, 3]
+    reveal_type(b)  # revealed: Literal[2, 4]
+```
+
+### List literals with variable-length starred elements
+
+```py
+def _(pairs: list[tuple[int, str]]):
+    for a, b in [(1, "a"), *pairs]:
+        reveal_type(a)  # revealed: int
+        reveal_type(b)  # revealed: str
+```
+
+### Stored lists
+
+Literal element types are widened when the list is assigned to a variable.
+
+```py
+pairs = [(1, 2)]
+for a, b in pairs:
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int
+```
+
+### List literals containing mutable elements
+
+Nested lists retain their widened element types.
+
+```py
+for values, tag in [([1], 2)]:
+    values.append(3)  # ok
+    reveal_type(values)  # revealed: list[int]
+```
+
+### List literals with starred targets
+
+```py
+for first, *rest in [(1, 2), (3, 4)]:
+    reveal_type(first)  # revealed: Literal[1, 3]
+    rest.append(5)  # ok
+    reveal_type(rest)  # revealed: list[int]
+```
+
+### Asynchronous iteration over list literals
+
+```py
+async def _():
+    # error: [not-iterable]
+    async for a, b in [(1, 2)]:
+        pass
+```
+
 ### Mixed literal values (1)
 
 ```py
@@ -1613,6 +1755,16 @@ def _(arg: tuple[tuple[int, int, int], tuple[int, str, bytes], tuple[int, int, s
 # error: [invalid-assignment] "Not enough values to unpack: Expected 2"
 # revealed: tuple[Unknown | Literal[3, 5], Unknown | Literal["a", "b"]]
 [reveal_type((a, b)) for a, b in (1, 2, (3, "a"), 4, (5, "b"), "c")]
+```
+
+### List literals
+
+```py
+from typing import Literal
+
+def consume(a: Literal[1, 3], b: Literal[2, 4]) -> None: ...
+
+[consume(a, b) for a, b in [(1, 2), (3, 4)]]  # ok
 ```
 
 ### Custom iterator (1)

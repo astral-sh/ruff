@@ -1,5 +1,7 @@
 use crate::Db;
 use crate::ProgramEnvironment;
+use crate::types::dict::dict_literal_key_value_types;
+use crate::types::unpacker::{literal_sequence_needs_promotion, sequence_elts};
 use crate::types::{
     AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
     LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext, TypeVarBoundOrConstraints,
@@ -139,46 +141,110 @@ pub(crate) fn extract_fixed_length_iterable_element_types<'db>(
     iterable: &ast::Expr,
     mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
 ) -> Option<Box<[Type<'db>]>> {
-    fn extend_fixed_length_iterable<'db>(
+    let sequence = try_iterate_expression(db, env, iterable, &mut expression_type, |provider| {
+        provider(iterable)
+    })
+    .ok()
+    .flatten()?;
+    let elements = sequence.as_fixed_length()?;
+    Some(elements.all_elements().to_vec().into_boxed_slice())
+}
+
+// Keep the ordinary type lazy: deferred declaration metadata can inspect literal children
+// without inferring their container, and loop callers retain their authoritative inferred type.
+fn try_iterate_expression<'db, F>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    iterable: &ast::Expr,
+    expression_type: &mut F,
+    ordinary_type: impl FnOnce(&mut F) -> Type<'db>,
+) -> Result<Option<Cow<'db, TupleSpec<'db>>>, IterationError<'db>>
+where
+    F: FnMut(&ast::Expr) -> Type<'db>,
+{
+    fn fixed_literal_sequence<'db>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        iterable: &ast::Expr,
+        elements: &[ast::Expr],
         expression_type: &mut impl FnMut(&ast::Expr) -> Type<'db>,
-        element_types: &mut Vec<Type<'db>>,
-    ) -> Option<()> {
-        let elements = match iterable {
-            ast::Expr::List(list) => Some(&list.elts),
-            ast::Expr::Tuple(tuple) => Some(&tuple.elts),
-            _ => None,
-        };
-
-        if let Some(elements) = elements {
-            for element in elements {
-                if let ast::Expr::Starred(starred) = element {
-                    extend_fixed_length_iterable(
-                        db,
-                        env,
-                        starred.value.as_ref(),
-                        expression_type,
-                        element_types,
-                    )?;
+    ) -> Option<TupleSpec<'db>> {
+        let mut sequence = TupleSpecBuilder::with_capacity(elements.len());
+        for element in elements {
+            if let ast::Expr::Starred(starred) = element {
+                let value = starred.value.as_ref();
+                let unpacked = if let Some(elements) = sequence_elts(value) {
+                    Cow::Owned(fixed_literal_sequence(db, env, elements, expression_type)?)
                 } else {
-                    element_types.push(expression_type(element));
-                }
+                    expression_type(value).try_iterate(db, env).ok()?
+                };
+                unpacked.as_fixed_length()?;
+                sequence = sequence.concat(db, env, &unpacked);
+            } else {
+                sequence.push(expression_type(element));
             }
-            return Some(());
         }
-
-        let iterable_type = expression_type(iterable);
-        let spec = iterable_type.try_iterate(db, env).ok()?;
-        let tuple = spec.as_fixed_length()?;
-        element_types.extend(tuple.all_elements().iter().copied());
-        Some(())
+        Some(sequence.build())
     }
 
-    let mut element_types = Vec::new();
-    extend_fixed_length_iterable(db, env, iterable, &mut expression_type, &mut element_types)?;
-    Some(element_types.into_boxed_slice())
+    let Some(elements) = sequence_elts(iterable) else {
+        return ordinary_type(expression_type)
+            .try_iterate(db, env)
+            .map(Some);
+    };
+    Ok(fixed_literal_sequence(db, env, elements, expression_type).map(Cow::Owned))
+}
+
+/// Return the element type of an already-inferred iterable expression.
+pub(super) fn iterable_element_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    iterable_type: Type<'db>,
+    iterable: &ast::Expr,
+    mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+    mode: EvaluationMode,
+) -> Result<Type<'db>, IterationError<'db>> {
+    if mode.is_async() {
+        return iterable_type
+            .try_iterate_with_mode(db, env, mode)
+            .map(|tuple| tuple.homogeneous_element_type(db, env));
+    }
+    if let ast::Expr::Dict(dict) = iterable
+        && let Some((keys, _values)) =
+            dict_literal_key_value_types(db, env, dict, &mut expression_type)
+    {
+        return Ok(keys);
+    }
+
+    let literal_elements = sequence_elts(iterable);
+    let extracted =
+        try_iterate_expression(db, env, iterable, &mut expression_type, |_| iterable_type)?;
+    // Failed or variable-length literal expansions use the inferred container type. Inference
+    // already reported starred-expression errors, and an empty list keeps its ordinary recovery.
+    let extracted = extracted.filter(|sequence| {
+        literal_elements.is_none()
+            || sequence
+                .as_fixed_length()
+                .is_some_and(|elements| !elements.all_elements().is_empty())
+    });
+    let sequence = match extracted {
+        Some(sequence) => sequence,
+        None => iterable_type.try_iterate(db, env)?,
+    };
+    if let Some(elements) = sequence.as_fixed_length()
+        && !elements.all_elements().is_empty()
+    {
+        // Promote before constructing unions of distinct literal tuples, which the generic
+        // literal-union caps do not cover. Lists and tuples use the same sequence limit.
+        let promote = literal_elements.is_some_and(literal_sequence_needs_promotion);
+        return Ok(UnionType::from_elements_leave_aliases(
+            db,
+            env,
+            elements
+                .iter_all_elements()
+                .map(|ty| if promote { ty.promote(db, env) } else { ty }),
+        ));
+    }
+    Ok(sequence.homogeneous_element_type(db, env))
 }
 
 impl<'db> Type<'db> {
@@ -237,7 +303,7 @@ impl<'db> Type<'db> {
         self.try_iterate_with_mode(db, env, EvaluationMode::Sync)
     }
 
-    pub(super) fn try_iterate_with_mode(
+    fn try_iterate_with_mode(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
