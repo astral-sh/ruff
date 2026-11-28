@@ -268,7 +268,7 @@ class BrokenProcessPool(BrokenExecutor):
 
 class ProcessPoolExecutor(Executor):
     _mp_context: BaseContext | None
-    _initializer: Callable[..., None] | None
+    _initializer: Callable[..., object] | None
     _initargs: tuple[Any, ...]
     _executor_manager_thread: _ThreadWakeup
     _processes: MutableMapping[int, Process]

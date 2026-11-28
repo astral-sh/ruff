@@ -1,129 +1,129 @@
 # typeshed
 
 [![Tests](https://github.com/python/typeshed/actions/workflows/tests.yml/badge.svg)](https://github.com/python/typeshed/actions/workflows/tests.yml)
-[![Chat at https://gitter.im/python/typing](https://badges.gitter.im/python/typing.svg)](https://gitter.im/python/typing?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Pull Requests Welcome](https://img.shields.io/badge/pull%20requests-welcome-brightgreen.svg)](https://github.com/python/typeshed/blob/main/CONTRIBUTING.md)
 
 ## About
 
-Typeshed contains external type annotations for the Python standard library
-and Python builtins, as well as third-party packages that are contributed by
-people external to those projects.
+Typeshed contains type annotations for the Python builtins and the Python
+standard library, as well as type stubs for third-party packages. Type
+annotations can be used for static analysis, type checking, type inference, and
+autocompletion.
 
-This data can, e.g., be used for static analysis, type checking, type inference,
-and autocompletion.
+Typeshed supports Python versions 3.10 to 3.15.
 
-For information on how to use typeshed, read below.  Information for
-contributors can be found in [CONTRIBUTING.md](CONTRIBUTING.md).  **Please read
-it before submitting pull requests; do not report issues with annotations to
-the project the stubs are for, but instead report them here to typeshed.**
+## Using with Type Checkers
 
-Further documentation on stub files, typeshed, and Python's typing system in
-general, can also be found at https://typing.readthedocs.io/en/latest/.
+All major type checkers and language servers bundle the standard library stubs.
+Type stubs for third-party packages can be installed from
+[PyPI](https://pypi.org/). A typeshed stub package for a library `x` is usually
+called `types-x`. For example, if you are using `html5lib`, you can install the
+type stubs using
 
-Typeshed supports Python versions 3.10 to 3.14.
-
-## Using
-
-If you're just using a type checker (e.g. [mypy](https://github.com/python/mypy/),
-[pyright](https://github.com/microsoft/pyright), or PyCharm's built-in type
-checker), as opposed to
-developing it, you don't need to interact with the typeshed repo at
-all: a copy of the standard library part of typeshed is bundled with type checkers.
-And type stubs for third-party packages and modules you are using can
-be installed from PyPI. For example, if you are using `html5lib` and `requests`,
-you can install the type stubs using
-
-```bash
-$ pip install types-html5lib types-requests
+```shell
+pip install types-html5lib
 ```
 
-These PyPI packages follow [the typing spec standards](https://typing.python.org/en/latest/spec/distributing.html)
-and are automatically released (up to once a day) by
-[typeshed internal machinery](https://github.com/typeshed-internal/stub_uploader).
+Type checkers will pick up the types from these stub packages when installed.
+For more details, see the documentation for your type checker.
 
-Type checkers should be able to use these stub packages when installed. For more
-details, see the documentation for your type checker.
+See the [stubs/ directory](stubs) for a list of all currently available
+third-party stub packages.
 
-### Package versioning for third-party stubs
+**Note:** Not all packages on PyPI whose name starts with `types-` originate
+from typeshed. Be careful when installing packages from unknown authors!
 
-Version numbers of third-party stub packages consist of at least four parts.
-All parts of the stub version, except for the last part, correspond to the
-version of the runtime package being stubbed. For example, if the `types-foo`
-package has version `1.2.0.20240309`, this guarantees that the `types-foo` package
-contains stubs targeted against `foo==1.2.*` and tested against the latest
-version of `foo` matching that specifier. In this example, the final element
-of the version number (20240309) indicates that the stub package was pushed on
-March 9, 2024.
+### Package Versioning for Third-Party Stubs
 
-At typeshed, we try to keep breaking changes to a minimum. However, due to the
-nature of stubs, any version bump can introduce changes that might make your
-code fail to type check.
+The version numbers of typeshed stub packages consist of the target version
+number of the runtime package being stubbed, plus a release date. For example,
+if the `types-foo` package has version `1.2.0.20240309`, it contains stubs
+targeting `foo==1.2.0` and was released on March 9th, 2024.
 
-There are several strategies available for specifying the version of a stubs
+At typeshed, we try to keep breaking changes to a minimum. However, any version
+bump can introduce changes that might make your code fail to type check.
+
+There are several strategies available for specifying the version of a stub
 package you're using, each with its own tradeoffs:
 
 1. Use the same bounds that you use for the package being stubbed. For example,
-   if you use `requests>=2.30.0,<2.32`, you can use
-   `types-requests>=2.30.0,<2.32`. This ensures that the stubs are compatible
-   with the package you are using, but it carries a small risk of breaking
-   type checking due to changes in the stubs.
+   if you use `foo>=2.30.0,<2.32`, you can use `types-foo>=2.30.0,<2.32`. This
+   ensures that the stubs are compatible with the package you are using, but it
+   carries a small risk of breaking type checking due to changes in the stubs.
 
-   Another risk of this strategy is that stubs often lag behind
-   the package that is being stubbed. You might want to force the package being stubbed
-   to a certain minimum version because it fixes a critical bug, but if
-   correspondingly updated stubs have not been released, your type
-   checking results may not be fully accurate.
+   Another risk of this strategy is that stubs often lag behind the package
+   that is being stubbed. You might need a minimum version of the package for a
+   critical bug fix, but if updated stubs haven't been released yet, type
+   checking results may not be accurate.
+
 2. Pin the stubs to a known good version and update the pin from time to time
-   (either manually, or using a tool such as dependabot or renovate).
+   (either manually, or using a tool such as
+   [Dependabot](https://github.com/dependabot) or
+   [Renovate](https://docs.renovatebot.com/)).
 
    For example, if you use `types-requests==2.31.0.1`, you can have confidence
    that upgrading dependencies will not break type checking. However, you will
    miss out on improvements in the stubs that could potentially improve type
-   checking until you update the pin. This strategy also has the risk that the
-   stubs you are using might become incompatible with the package being stubbed.
-3. Don't pin the stubs. This is the option that demands the least work from
-   you when it comes to updating version pins, and has the advantage that you
-   will automatically benefit from improved stubs whenever a new version of the
-   stubs package is released. However, it carries the risk that the stubs
-   become incompatible with the package being stubbed.
+   checking until you update the pin. You will also need to manually sync the
+   version of the runtime and stub packages whenever you update them.
+
+3. Don't pin the stubs. This is the easiest option, and you will automatically
+   benefit from improved stubs whenever a new version is released. However, it
+   carries the risk that the stubs become incompatible with the package being
+   stubbed.
 
    For example, if a new major version of the package is released, there's a
-   chance the stubs might be updated to reflect the new version of the runtime
-   package before you update the package being stubbed.
+   chance the stubs might be updated and reflect a version of the runtime
+   package that is incompatible with the version you have installed.
 
 You can also switch between the different strategies as needed. For example,
-you could default to strategy (1), but fall back to strategy (2) when
-a problem arises that can't easily be fixed.
+you could default to strategy (1), but fall back to strategy (2) when a stubs
+update breaks type checking and you can't fix it quickly.
 
-### The `_typeshed` package
+### Third-Party Stub Removal
 
-typeshed includes a package `_typeshed` as part of the standard library.
-This package and its submodules contain utility types, but are not
-available at runtime. For more information about how to use this package,
-[see the `stdlib/_typeshed` directory](https://github.com/python/typeshed/tree/main/stdlib/_typeshed).
+Third-party stubs are removed from typeshed when the runtime package either
+adds type information or becomes unsupported. The last released stub package
+for a removed stub notes this in its description.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#third-party-library-removal-policy) for
+further information.
+
+### The `_typeshed` Package
+
+Typeshed's standard library stubs include a package `_typeshed` with utility
+types useful for all type checker users. It's only available during type
+checking, so imports from it must be guarded with `if TYPE_CHECKING:` at
+runtime. For more information about how to use this package, see the
+[documentation](https://github.com/python/typeshed/tree/main/stdlib/_typeshed/README.md).
+
+## Contributing and Reporting Bugs
+
+Information for contributors can be found in
+[CONTRIBUTING.md](CONTRIBUTING.md). **Please read it before submitting pull
+requests.**
+
+If you think a stub is incorrect or incomplete, we want to hear from you!
+Please report problems with our stubs using
+[GitHub issues](https://github.com/python/typeshed/issues). The tracker is also
+the right place to start discussions about other topics concerning the project.
+
+**Please report issues with stubs to typeshed, not to the project being
+stubbed.**
 
 ## Discussion
 
-If you've run into behavior in the type checker that suggests the type
-stubs for a given library are incorrect or incomplete,
-we want to hear from you!
-
-Our main forum for discussion is the project's [GitHub issue
-tracker](https://github.com/python/typeshed/issues).  This is the right
-place to start a discussion of any of the above or most any other
-topic concerning the project.
-
-If you have general questions about typing with Python, or you need
-a review of your type annotations or stubs outside of typeshed, head over to
-[our discussion forum](https://github.com/python/typing/discussions).
-For less formal discussion, try the typing chat room on
-[gitter.im](https://gitter.im/python/typing).  Some typeshed maintainers
-are almost always present; feel free to find us there, and we're happy
-to chat.  Substantive technical discussion will be directed to the
-issue tracker.
+If you have general questions about typing with Python, or you need a review of
+your type annotations or stubs outside of typeshed, head over to
+[the "Typing" category](https://discuss.python.org/c/typing/32) of
+[discuss.python.org](https://discuss.python.org/) or
+[our discussion forum](https://github.com/python/typing/discussions) here on
+GitHub.
 
 ## Further Documentation
 
 See [docs/README.md](./docs/README.md) for an overview of all documentation
 available for typeshed.
+
+Further documentation on stub files, typeshed, and Python's typing system in
+general, can also be found at [typing.python.org](https://typing.python.org/).

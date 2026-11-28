@@ -13,7 +13,7 @@ nanj: Final[complex]
 tau: Final[float]
 
 _F: TypeAlias = SupportsFloat | SupportsIndex
-_C: TypeAlias = SupportsFloat | SupportsComplex | SupportsIndex | complex
+_C: TypeAlias = SupportsComplex | SupportsFloat | SupportsIndex | complex | float | int
 
 def acos(z: _C, /) -> complex:
     """Return the arc cosine of z."""

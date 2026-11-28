@@ -103,6 +103,8 @@ if sys.platform != "win32" and sys.platform != "darwin" and sys.platform != "lin
     SO_SETFIB: Final[int]
 if sys.platform == "linux" and sys.version_info >= (3, 13):
     SO_BINDTOIFINDEX: Final[int]
+if sys.platform == "linux" and sys.version_info >= (3, 15):
+    SO_PASSRIGHTS: Final[int]
 
 SOMAXCONN: Final[int]
 

@@ -8,7 +8,7 @@ from multiprocessing import popen_fork, popen_forkserver, popen_spawn_posix, pop
 from multiprocessing.managers import SyncManager
 from multiprocessing.pool import Pool as _Pool
 from multiprocessing.process import BaseProcess
-from multiprocessing.sharedctypes import Synchronized, SynchronizedArray, SynchronizedString
+from multiprocessing.sharedctypes import Synchronized, SynchronizedArray, SynchronizedBase, SynchronizedString
 from typing import Any, ClassVar, Literal, TypeAlias, TypeVar, overload
 
 if sys.platform != "win32":
@@ -136,9 +136,9 @@ class BaseContext:
     ) -> Synchronized[_T]:
         """Returns a synchronized shared object"""
     @overload
-    def Value(self, typecode_or_type: type[_CT], *args: Any, lock: Literal[False]) -> Synchronized[_CT]: ...
+    def Value(self, typecode_or_type: type[_CT], *args: Any, lock: Literal[False]) -> _CT: ...
     @overload
-    def Value(self, typecode_or_type: type[_CT], *args: Any, lock: Literal[True] | _LockLike = True) -> Synchronized[_CT]: ...
+    def Value(self, typecode_or_type: type[_CT], *args: Any, lock: Literal[True] | _LockLike = True) -> SynchronizedBase[_CT]: ...
     @overload
     def Value(self, typecode_or_type: str, *args: Any, lock: Literal[True] | _LockLike = True) -> Synchronized[Any]: ...
     @overload
@@ -146,8 +146,8 @@ class BaseContext:
 
     @overload
     def Array(
-        self, typecode_or_type: type[_SimpleCData[_T]], size_or_initializer: int | Sequence[Any], *, lock: Literal[False]
-    ) -> SynchronizedArray[_T]:
+        self, typecode_or_type: type[_CT], size_or_initializer: int | Sequence[Any], *, lock: Literal[False]
+    ) -> ctypes.Array[_CT]:
         """Returns a synchronized shared array"""
     @overload
     def Array(
@@ -254,7 +254,11 @@ class DefaultContext(BaseContext):
     else:
         def __init__(self, context: BaseContext) -> None: ...
 
-    def get_start_method(self, allow_none: bool = False) -> str: ...
+    @overload
+    def get_start_method(self, allow_none: Literal[False] = False) -> str: ...
+    @overload
+    def get_start_method(self, allow_none: bool) -> str | None: ...
+
     def get_all_start_methods(self) -> list[str]:
         """Returns a list of the supported start methods, default first."""
 

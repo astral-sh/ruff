@@ -112,7 +112,7 @@ class ThreadPoolExecutor(Executor):
         _create_worker_context: Callable[[], WorkerContext]
         _resolve_work_item_task: _ResolveTaskFunc
     else:
-        _initializer: Callable[..., None] | None
+        _initializer: Callable[..., object] | None
         _initargs: tuple[Any, ...]
     _work_queue: queue.SimpleQueue[_WorkItem[Any]]
 

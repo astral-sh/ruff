@@ -37,9 +37,13 @@ from _typeshed import (
     SupportsLenAndGetItem,
     SupportsNext,
     SupportsRAdd,
+    SupportsRAnd,
     SupportsRDivMod,
     SupportsRichComparison,
     SupportsRichComparisonT,
+    SupportsROr,
+    SupportsRSub,
+    SupportsRXor,
     SupportsWrite,
 )
 from collections.abc import Awaitable, Callable, Hashable, Iterable, Iterator, MutableSet, Set as AbstractSet, Sized
@@ -90,7 +94,9 @@ _T_contra = TypeVar("_T_contra", contravariant=True)
 _R_co = TypeVar("_R_co", covariant=True)
 _KT = TypeVar("_KT")
 _VT = TypeVar("_VT")
+_VT_co = TypeVar("_VT_co", covariant=True)
 _S = TypeVar("_S")
+_R = TypeVar("_R")
 _T1 = TypeVar("_T1")
 _T2 = TypeVar("_T2")
 _T3 = TypeVar("_T3")
@@ -109,6 +115,11 @@ _StopT_co = TypeVar("_StopT_co", covariant=True, default=_StartT_co)  # slice[A]
 #   the default (start|stop) is chosen to cater to the most common case of int/index slices.
 # FIXME: https://github.com/python/typing/issues/213 (replace step=start|stop with step=start&stop)
 _StepT_co = TypeVar("_StepT_co", covariant=True, default=_StartT_co | _StopT_co)  # slice[A,B] -> slice[A, B, A|B]
+
+if sys.version_info >= (3, 15):
+    _TypeNamespace: TypeAlias = dict[str, Any] | frozendict[str, Any]
+else:
+    _TypeNamespace: TypeAlias = dict[str, Any]
 
 @disjoint_base
 class object:
@@ -273,13 +284,13 @@ class type:
     @overload
     def __init__(self, o: object, /) -> None: ...
     @overload
-    def __init__(self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None: ...
+    def __init__(self, name: str, bases: tuple[type, ...], dict: _TypeNamespace, /, **kwds: Any) -> None: ...
 
     @overload
     def __new__(cls, o: object, /) -> type: ...
     @overload
     def __new__(
-        cls: type[_typeshed.Self], name: str, bases: tuple[type, ...], namespace: dict[str, Any], /, **kwds: Any
+        cls: type[_typeshed.Self], name: str, bases: tuple[type, ...], namespace: _TypeNamespace, /, **kwds: Any
     ) -> _typeshed.Self: ...
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
@@ -829,7 +840,7 @@ class float:
 
     if sys.version_info >= (3, 14):
         @classmethod
-        def from_number(cls, number: float | SupportsIndex | SupportsFloat, /) -> Self:
+        def from_number(cls, number: SupportsIndex | SupportsFloat, /) -> Self:
             """Convert real number to a floating-point number."""
 
 @disjoint_base
@@ -850,7 +861,7 @@ class complex:
         imag: complex | SupportsFloat | SupportsIndex = 0,
     ) -> Self: ...
     @overload
-    def __new__(cls, real: str | SupportsComplex | SupportsFloat | SupportsIndex | complex) -> Self: ...
+    def __new__(cls, real: str | SupportsComplex | SupportsFloat | SupportsIndex | complex | float | int) -> Self: ...
 
     @property
     def real(self) -> float:
@@ -863,34 +874,34 @@ class complex:
     def conjugate(self) -> complex:
         """Return the complex conjugate of its argument. (3-4j).conjugate() == 3+4j."""
 
-    def __add__(self, value: complex, /) -> complex:
+    def __add__(self, value: complex | float | int, /) -> complex:
         """Return self+value."""
 
-    def __sub__(self, value: complex, /) -> complex:
+    def __sub__(self, value: complex | float | int, /) -> complex:
         """Return self-value."""
 
-    def __mul__(self, value: complex, /) -> complex:
+    def __mul__(self, value: complex | float | int, /) -> complex:
         """Return self*value."""
 
-    def __pow__(self, value: complex, mod: None = None, /) -> complex:
+    def __pow__(self, value: complex | float | int, mod: None = None, /) -> complex:
         """Return pow(self, value, mod)."""
 
-    def __truediv__(self, value: complex, /) -> complex:
+    def __truediv__(self, value: complex | float | int, /) -> complex:
         """Return self/value."""
 
-    def __radd__(self, value: complex, /) -> complex:
+    def __radd__(self, value: complex | float | int, /) -> complex:
         """Return value+self."""
 
-    def __rsub__(self, value: complex, /) -> complex:
+    def __rsub__(self, value: complex | float | int, /) -> complex:
         """Return value-self."""
 
-    def __rmul__(self, value: complex, /) -> complex:
+    def __rmul__(self, value: complex | float | int, /) -> complex:
         """Return value*self."""
 
-    def __rpow__(self, value: complex, mod: None = None, /) -> complex:
+    def __rpow__(self, value: complex | float | int, mod: None = None, /) -> complex:
         """Return pow(value, self, mod)."""
 
-    def __rtruediv__(self, value: complex, /) -> complex:
+    def __rtruediv__(self, value: complex | float | int, /) -> complex:
         """Return value/self."""
 
     def __eq__(self, value: object, /) -> bool: ...
@@ -917,7 +928,7 @@ class complex:
 
     if sys.version_info >= (3, 14):
         @classmethod
-        def from_number(cls, number: complex | SupportsComplex | SupportsFloat | SupportsIndex, /) -> Self:
+        def from_number(cls, number: SupportsComplex | SupportsFloat | SupportsIndex, /) -> Self:
             """Convert number to a complex floating-point number."""
 
 @type_check_only
@@ -3236,7 +3247,7 @@ class dict(MutableMapping[_KT, _VT]):
 
 if sys.version_info >= (3, 15):
     @disjoint_base
-    class frozendict(Mapping[_KT, _VT]):
+    class frozendict(Mapping[_KT, _VT_co]):
         """frozendict() -> new empty immutable dictionary
         frozendict(mapping) -> new immutable dictionary initialized from a mapping
             object's (key, value) pairs
@@ -3266,7 +3277,7 @@ if sys.version_info >= (3, 15):
             cls: type[frozendict[str, _VT]], iterable: Iterable[tuple[str, _VT]], /, **kwargs: _VT
         ) -> frozendict[str, _VT]: ...
 
-        def copy(self) -> frozendict[_KT, _VT]:
+        def copy(self) -> frozendict[_KT, _VT_co]:
             """Return a shallow copy of the frozendict."""
 
         @overload
@@ -3278,26 +3289,26 @@ if sys.version_info >= (3, 15):
         def fromkeys(cls, iterable: Iterable[_T], value: _S, /) -> frozendict[_T, _S]: ...
 
         @overload  # type: ignore[override]
-        def get(self, key: _KT, default: None = None, /) -> _VT | None:
+        def get(self, key: _KT, default: None = None, /) -> _VT_co | None:
             """Return the value for key if key is in the dictionary, else default."""
         @overload
-        def get(self, key: _KT, default: _VT, /) -> _VT: ...
+        def get(self, key: _KT, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter  # pyrefly: ignore [invalid-variance]
         @overload
-        def get(self, key: _KT, default: _T, /) -> _VT | _T: ...
+        def get(self, key: _KT, default: _T, /) -> _VT_co | _T: ...
 
-        def keys(self) -> dict_keys[_KT, _VT]:
+        def keys(self) -> dict_keys[_KT, _VT_co]:
             """Return a set-like object providing a view on the dict's keys."""
 
-        def values(self) -> dict_values[_KT, _VT]:
+        def values(self) -> dict_values[_KT, _VT_co]:
             """Return an object providing a view on the dict's values."""
 
-        def items(self) -> dict_items[_KT, _VT]:
+        def items(self) -> dict_items[_KT, _VT_co]:
             """Return a set-like object providing a view on the dict's items."""
 
         def __len__(self) -> int:
             """Return len(self)."""
 
-        def __getitem__(self, key: _KT, /) -> _VT:
+        def __getitem__(self, key: _KT, /) -> _VT_co:
             """Return self[key]."""
 
         def __reversed__(self) -> Iterator[_KT]:
@@ -3306,18 +3317,20 @@ if sys.version_info >= (3, 15):
         def __iter__(self) -> Iterator[_KT]:
             """Implement iter(self)."""
 
+        def __eq__(self, value: object, /) -> bool: ...
+        def __ne__(self, value: object, /) -> bool: ...
         def __hash__(self) -> int: ...
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """frozendicts are generic over two types, signifying (respectively) the types of the frozendict's keys and values"""
 
-        def __or__(self, value: dict[_T1, _T2] | frozendict[_T1, _T2], /) -> frozendict[_KT | _T1, _VT | _T2]:
+        def __or__(self, value: dict[_T1, _T2] | frozendict[_T1, _T2], /) -> frozendict[_KT | _T1, _VT_co | _T2]:
             """Return self|value."""
 
         @overload
-        def __ror__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]:
+        def __ror__(self, value: dict[_T1, _T2], /) -> dict[_KT | _T1, _VT_co | _T2]:
             """Return value|self."""
         @overload
-        def __ror__(self, value: frozendict[_T1, _T2], /) -> frozendict[_KT | _T1, _VT | _T2]: ...
+        def __ror__(self, value: frozendict[_T1, _T2], /) -> frozendict[_KT | _T1, _VT_co | _T2]: ...
 
 @disjoint_base
 class set(MutableSet[_T]):
@@ -3392,37 +3405,46 @@ class set(MutableSet[_T]):
     def __iter__(self) -> Iterator[_T]:
         """Implement iter(self)."""
 
-    def __and__(self, value: AbstractSet[object], /) -> set[_T]:
+    def __and__(self, value: set[Any] | frozenset[Any], /) -> set[_T]:  # type: ignore[override]
         """Return self&value."""
 
-    def __iand__(self, value: AbstractSet[object], /) -> Self:
+    @overload  # type: ignore[misc]
+    def __iand__(self, value: set[Any] | frozenset[Any], /) -> Self:
         """Return self&=value."""
-
     @overload
+    def __iand__(self, value: SupportsRAnd[set[_T], _R], /) -> _R: ...
+
+    @overload  # type: ignore[override]
     def __rand__(self, value: set[_S], /) -> set[_S]:
         """Return value&self."""
     @overload
     def __rand__(self, value: frozenset[_S], /) -> frozenset[_S]: ...
 
-    def __or__(self, value: AbstractSet[_S], /) -> set[_T | _S]:
+    def __or__(self, value: set[_S] | frozenset[_S], /) -> set[_T | _S]:  # type: ignore[override]
         """Return self|value."""
 
-    def __ior__(self, value: AbstractSet[_T], /) -> Self:  # type: ignore[override,misc]
+    @overload  # type: ignore[override,misc]
+    def __ior__(self, value: set[_T] | frozenset[_T], /) -> Self:
         """Return self|=value."""
-
     @overload
+    def __ior__(self, value: SupportsROr[set[_T], _R], /) -> _R: ...
+
+    @overload  # type: ignore[override]
     def __ror__(self, value: set[_S], /) -> set[_T | _S]:
         """Return value|self."""
     @overload
     def __ror__(self, value: frozenset[_S], /) -> frozenset[_T | _S]: ...
 
-    def __sub__(self, value: AbstractSet[object], /) -> set[_T]:
+    def __sub__(self, value: set[Any] | frozenset[Any], /) -> set[_T]:  # type: ignore[override]
         """Return self-value."""
 
-    def __isub__(self, value: AbstractSet[object], /) -> Self:
+    @overload  # type: ignore[misc]
+    def __isub__(self, value: set[Any] | frozenset[Any], /) -> Self:
         """Return self-=value."""
-
     @overload
+    def __isub__(self, value: SupportsRSub[set[_T], _R], /) -> _R: ...
+
+    @overload  # type: ignore[override]
     def __rsub__(self, value: set[_S], /) -> set[_S]:
         """Return value-self."""
     @overload
@@ -3431,8 +3453,11 @@ class set(MutableSet[_T]):
     def __xor__(self, value: set[_S] | frozenset[_S], /) -> set[_T | _S]:  # type: ignore[override]
         """Return self^value."""
 
-    def __ixor__(self, value: AbstractSet[_T], /) -> Self:  # type: ignore[override,misc]
+    @overload  # type: ignore[override,misc]
+    def __ixor__(self, value: set[_T] | frozenset[_T], /) -> Self:
         """Return self^=value."""
+    @overload
+    def __ixor__(self, value: SupportsRXor[set[_T], _R], /) -> _R: ...
 
     @overload  # type: ignore[override]
     def __rxor__(self, value: set[_S], /) -> set[_T | _S]:
@@ -3491,28 +3516,30 @@ class frozenset(AbstractSet[_T_co]):
     def __iter__(self) -> Iterator[_T_co]:
         """Implement iter(self)."""
 
-    def __and__(self, value: AbstractSet[object], /) -> frozenset[_T_co]:
+    # The binary operators only support set and frozenset. For other operands,
+    # Python falls back to the operand's reflected method.
+    def __and__(self, value: set[Any] | frozenset[Any], /) -> frozenset[_T_co]:  # type: ignore[override]
         """Return self&value."""
 
-    @overload
+    @overload  # type: ignore[override]
     def __rand__(self, value: set[_S], /) -> set[_S]:
         """Return value&self."""
     @overload
     def __rand__(self, value: frozenset[_S], /) -> frozenset[_S]: ...
 
-    def __or__(self, value: AbstractSet[_S], /) -> frozenset[_T_co | _S]:
+    def __or__(self, value: set[_S] | frozenset[_S], /) -> frozenset[_T_co | _S]:  # type: ignore[override]
         """Return self|value."""
 
-    @overload
+    @overload  # type: ignore[override]
     def __ror__(self, value: set[_S], /) -> set[_T_co | _S]:
         """Return value|self."""
     @overload
     def __ror__(self, value: frozenset[_S], /) -> frozenset[_T_co | _S]: ...
 
-    def __sub__(self, value: AbstractSet[object], /) -> frozenset[_T_co]:
+    def __sub__(self, value: set[Any] | frozenset[Any], /) -> frozenset[_T_co]:  # type: ignore[override]
         """Return self-value."""
 
-    @overload
+    @overload  # type: ignore[override]
     def __rsub__(self, value: set[_S], /) -> set[_S]:
         """Return value-self."""
     @overload
@@ -3662,6 +3689,9 @@ class property:
         fdel: Callable[[Any], None] | None = None,
         doc: str | None = None,
     ) -> None: ...
+    def __set_name__(self, owner: type, name: str, /) -> None:
+        """Method to set name of a property."""
+
     def getter(self, fget: Callable[[Any], Any], /) -> property:
         """Descriptor to obtain a copy of the property with a different getter."""
 
@@ -4692,9 +4722,9 @@ def pow(base: float, exp: int, mod: None = None) -> float: ...
 # return type must be Any (same as complex base, complex exp),
 # as `float | complex` causes too many false-positive errors
 @overload
-def pow(base: float, exp: complex | _SupportsSomeKindOfPow, mod: None = None) -> Any: ...
+def pow(base: float, exp: complex | float | int | _SupportsSomeKindOfPow, mod: None = None) -> Any: ...
 @overload
-def pow(base: complex, exp: complex | _SupportsSomeKindOfPow, mod: None = None) -> complex: ...
+def pow(base: complex, exp: complex | float | int | _SupportsSomeKindOfPow, mod: None = None) -> complex: ...
 @overload
 def pow(base: _SupportsPow2[_E_contra, _T_co], exp: _E_contra, mod: None = None) -> _T_co: ...  # type: ignore[overload-overlap]
 @overload
@@ -4702,7 +4732,7 @@ def pow(base: _SupportsPow3NoneOnly[_E_contra, _T_co], exp: _E_contra, mod: None
 @overload
 def pow(base: _SupportsPow3[_E_contra, _M_contra, _T_co], exp: _E_contra, mod: _M_contra) -> _T_co: ...
 @overload
-def pow(base: _SupportsSomeKindOfPow, exp: float, mod: None = None) -> Any: ...
+def pow(base: _SupportsSomeKindOfPow, exp: float | int, mod: None = None) -> Any: ...
 @overload
 def pow(base: _SupportsSomeKindOfPow, exp: complex, mod: None = None) -> complex: ...
 
@@ -4928,7 +4958,7 @@ if sys.version_info >= (3, 15):
         locals: Mapping[str, object] | None = None,
         fromlist: Sequence[str] | None = (),
         level: int = 0,
-    ) -> Any:
+    ) -> types.LazyImportType:
         """Lazily imports a module.
 
         Returns either the module to be imported or a imp.lazy_module object

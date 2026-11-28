@@ -12,10 +12,8 @@ from _typeshed import (
     ReadableBuffer,
     SupportsAdd,
     SupportsGetItem,
-    SupportsMod,
     SupportsMul,
     SupportsRAdd,
-    SupportsRMod,
     SupportsRMul,
     SupportsRSub,
     SupportsSub,
@@ -33,27 +31,34 @@ _K = TypeVar("_K")
 _V = TypeVar("_V")
 _P = ParamSpec("_P")
 
-# The following protocols return "Any" instead of bool, since the comparison
-# operators can be overloaded to return an arbitrary object. For example,
-# the numpy.array comparison dunders return another numpy.array.
+# The ordering functions in `operator` return the comparison result without testing its truth value.
+# The ordering protocols in `_typeshed` require `SupportsBool`, so we use local protocols
+# whose methods can return any object.
+@type_check_only
+class _SupportsDunderLT(Protocol[_T_contra]):
+    def __lt__(self, other: _T_contra, /) -> object: ...
 
 @type_check_only
-class _SupportsDunderLT(Protocol):
-    def __lt__(self, other: Any, /) -> Any: ...
+class _SupportsDunderGT(Protocol[_T_contra]):
+    def __gt__(self, other: _T_contra, /) -> object: ...
 
 @type_check_only
-class _SupportsDunderGT(Protocol):
-    def __gt__(self, other: Any, /) -> Any: ...
+class _SupportsDunderLE(Protocol[_T_contra]):
+    def __le__(self, other: _T_contra, /) -> object: ...
 
 @type_check_only
-class _SupportsDunderLE(Protocol):
-    def __le__(self, other: Any, /) -> Any: ...
+class _SupportsDunderGE(Protocol[_T_contra]):
+    def __ge__(self, other: _T_contra, /) -> object: ...
 
-@type_check_only
-class _SupportsDunderGE(Protocol):
-    def __ge__(self, other: Any, /) -> Any: ...
+_SupportsComparisonWith: TypeAlias = _SupportsDunderLT[_T] | _SupportsDunderGT[_T] | _SupportsDunderLE[_T] | _SupportsDunderGE[_T]
+_SupportsComparison: TypeAlias = _SupportsComparisonWith[Any]
 
-_SupportsComparison: TypeAlias = _SupportsDunderLE | _SupportsDunderGE | _SupportsDunderGT | _SupportsDunderLT
+# _T is the argument type accepted by the other operand's ordering method.
+# _SupportsComparison preserves the rule that any two operands with
+# ordering methods are accepted. For example, if x.__lt__ has separate int and
+# str overloads and y is int | str, neither overload accepts the whole union.
+# The fallback accepts lt(x, y) because int and str each define an ordering method.
+_ComparisonOperand: TypeAlias = _T | _SupportsComparison
 
 @type_check_only
 class _SupportsInversion(Protocol[_T_co]):
@@ -67,24 +72,176 @@ class _SupportsNeg(Protocol[_T_co]):
 class _SupportsPos(Protocol[_T_co]):
     def __pos__(self) -> _T_co: ...
 
-# All four comparison functions must have the same signature, or we get false-positive errors
-def lt(a: _SupportsComparison, b: _SupportsComparison, /) -> Any:
+@type_check_only
+class _SupportsAnd(Protocol[_T_contra, _T_co]):
+    def __and__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsRAnd(Protocol[_T_contra, _T_co]):
+    def __rand__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsLShift(Protocol[_T_contra, _T_co]):
+    def __lshift__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsRLShift(Protocol[_T_contra, _T_co]):
+    def __rlshift__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsRShift(Protocol[_T_contra, _T_co]):
+    def __rshift__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsRRShift(Protocol[_T_contra, _T_co]):
+    def __rrshift__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsTrueDiv(Protocol[_T_contra, _T_co]):
+    def __truediv__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsRTrueDiv(Protocol[_T_contra, _T_co]):
+    def __rtruediv__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsFloorDiv(Protocol[_T_contra, _T_co]):
+    def __floordiv__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsRFloorDiv(Protocol[_T_contra, _T_co]):
+    def __rfloordiv__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsMod(Protocol[_T_contra, _T_co]):
+    def __mod__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsRMod(Protocol[_T_contra, _T_co]):
+    def __rmod__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsMatMul(Protocol[_T_contra, _T_co]):
+    def __matmul__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsRMatMul(Protocol[_T_contra, _T_co]):
+    def __rmatmul__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsOr(Protocol[_T_contra, _T_co]):
+    def __or__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsROr(Protocol[_T_contra, _T_co]):
+    def __ror__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsPow(Protocol[_T_contra, _T_co]):
+    def __pow__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsRPow(Protocol[_T_contra, _T_co]):
+    def __rpow__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsXOr(Protocol[_T_contra, _T_co]):
+    def __xor__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsRXOr(Protocol[_T_contra, _T_co]):
+    def __rxor__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsIAdd(Protocol[_T_contra, _T_co]):
+    def __iadd__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsIAnd(Protocol[_T_contra, _T_co]):
+    def __iand__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsILShift(Protocol[_T_contra, _T_co]):
+    def __ilshift__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsIMod(Protocol[_T_contra, _T_co]):
+    def __imod__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsIMul(Protocol[_T_contra, _T_co]):
+    def __imul__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsIMatMul(Protocol[_T_contra, _T_co]):
+    def __imatmul__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsIOr(Protocol[_T_contra, _T_co]):
+    def __ior__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsIPow(Protocol[_T_contra, _T_co]):
+    def __ipow__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsIRShift(Protocol[_T_contra, _T_co]):
+    def __irshift__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsISub(Protocol[_T_contra, _T_co]):
+    def __isub__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsITrueDiv(Protocol[_T_contra, _T_co]):
+    def __itruediv__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsIXOr(Protocol[_T_contra, _T_co]):
+    def __ixor__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsIFloorDiv(Protocol[_T_contra, _T_co]):
+    def __ifloordiv__(self, other: _T_contra, /) -> _T_co: ...
+
+@type_check_only
+class _SupportsIConcat(Protocol[_T_contra, _T_co]):
+    def __iadd__(self, value: _T_contra, /) -> _T_co: ...
+    def __getitem__(self, key: Any) -> Any: ...  # method needs only exist
+
+# Either operand can implement the comparison. Keep the four ordering functions' signatures
+# identical so mypy infers a common callable type when they are stored in a dictionary (see check_operator.py).
+@overload
+def lt(a: _SupportsComparisonWith[_T], b: _ComparisonOperand[_T], /) -> Any:
     """Same as a < b."""
+@overload
+def lt(a: _ComparisonOperand[_T], b: _SupportsComparisonWith[_T], /) -> Any: ...
 
-def le(a: _SupportsComparison, b: _SupportsComparison, /) -> Any:
+@overload
+def le(a: _SupportsComparisonWith[_T], b: _ComparisonOperand[_T], /) -> Any:
     """Same as a <= b."""
+@overload
+def le(a: _ComparisonOperand[_T], b: _SupportsComparisonWith[_T], /) -> Any: ...
 
-def eq(a: object, b: object, /) -> Any:
+# Equality accepts any operands. Using Any lets mypy infer a callable value type for
+# ops = {"<": lt, "==": eq}, so ops[symbol](a, b) type-checks.
+def eq(a: Any, b: Any, /) -> Any:
     """Same as a == b."""
 
-def ne(a: object, b: object, /) -> Any:
+def ne(a: Any, b: Any, /) -> Any:
     """Same as a != b."""
 
-def ge(a: _SupportsComparison, b: _SupportsComparison, /) -> Any:
+@overload
+def ge(a: _SupportsComparisonWith[_T], b: _ComparisonOperand[_T], /) -> Any:
     """Same as a >= b."""
+@overload
+def ge(a: _ComparisonOperand[_T], b: _SupportsComparisonWith[_T], /) -> Any: ...
 
-def gt(a: _SupportsComparison, b: _SupportsComparison, /) -> Any:
+@overload
+def gt(a: _SupportsComparisonWith[_T], b: _ComparisonOperand[_T], /) -> Any:
     """Same as a > b."""
+@overload
+def gt(a: _ComparisonOperand[_T], b: _SupportsComparisonWith[_T], /) -> Any: ...
 
 def not_(a: object, /) -> bool:
     """Same as not a."""
@@ -107,11 +264,17 @@ def add(a: SupportsAdd[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
 @overload
 def add(a: _T_contra, b: SupportsRAdd[_T_contra, _T_co], /) -> _T_co: ...
 
-def and_(a, b, /):
+@overload
+def and_(a: _SupportsAnd[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a & b."""
+@overload
+def and_(a: _T_contra, b: _SupportsRAnd[_T_contra, _T_co], /) -> _T_co: ...
 
-def floordiv(a, b, /):
+@overload
+def floordiv(a: _SupportsFloorDiv[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a // b."""
+@overload
+def floordiv(a: _T_contra, b: _SupportsRFloorDiv[_T_contra, _T_co], /) -> _T_co: ...
 
 def index(a: SupportsIndex, /) -> int:
     """Same as a.__index__()"""
@@ -122,14 +285,17 @@ def inv(a: _SupportsInversion[_T_co], /) -> _T_co:
 def invert(a: _SupportsInversion[_T_co], /) -> _T_co:
     """Same as ~a."""
 
-def lshift(a, b, /):
+@overload
+def lshift(a: _SupportsLShift[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a << b."""
+@overload
+def lshift(a: _T_contra, b: _SupportsRLShift[_T_contra, _T_co], /) -> _T_co: ...
 
 @overload
-def mod(a: SupportsMod[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
+def mod(a: _SupportsMod[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a % b."""
 @overload
-def mod(a: _T_contra, b: SupportsRMod[_T_contra, _T_co], /) -> _T_co: ...
+def mod(a: _T_contra, b: _SupportsRMod[_T_contra, _T_co], /) -> _T_co: ...
 
 @overload
 def mul(a: SupportsMul[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
@@ -137,23 +303,35 @@ def mul(a: SupportsMul[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
 @overload
 def mul(a: _T_contra, b: SupportsRMul[_T_contra, _T_co], /) -> _T_co: ...
 
-def matmul(a, b, /):
+@overload
+def matmul(a: _SupportsMatMul[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a @ b."""
+@overload
+def matmul(a: _T_contra, b: _SupportsRMatMul[_T_contra, _T_co], /) -> _T_co: ...
 
 def neg(a: _SupportsNeg[_T_co], /) -> _T_co:
     """Same as -a."""
 
-def or_(a, b, /):
+@overload
+def or_(a: _SupportsOr[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a | b."""
+@overload
+def or_(a: _T_contra, b: _SupportsROr[_T_contra, _T_co], /) -> _T_co: ...
 
 def pos(a: _SupportsPos[_T_co], /) -> _T_co:
     """Same as +a."""
 
-def pow(a, b, /):
+@overload
+def pow(a: _SupportsPow[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a ** b."""
+@overload
+def pow(a: _T_contra, b: _SupportsRPow[_T_contra, _T_co], /) -> _T_co: ...
 
-def rshift(a, b, /):
+@overload
+def rshift(a: _SupportsRShift[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a >> b."""
+@overload
+def rshift(a: _T_contra, b: _SupportsRRShift[_T_contra, _T_co], /) -> _T_co: ...
 
 @overload
 def sub(a: SupportsSub[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
@@ -161,11 +339,17 @@ def sub(a: SupportsSub[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
 @overload
 def sub(a: _T_contra, b: SupportsRSub[_T_contra, _T_co], /) -> _T_co: ...
 
-def truediv(a, b, /):
+@overload
+def truediv(a: _SupportsTrueDiv[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a / b."""
+@overload
+def truediv(a: _T_contra, b: _SupportsRTrueDiv[_T_contra, _T_co], /) -> _T_co: ...
 
-def xor(a, b, /):
+@overload
+def xor(a: _SupportsXOr[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a ^ b."""
+@overload
+def xor(a: _T_contra, b: _SupportsRXOr[_T_contra, _T_co], /) -> _T_co: ...
 
 def concat(a: Sequence[_T], b: Sequence[_T], /) -> Sequence[_T]:
     """Same as a + b, for a and b sequences."""
@@ -211,47 +395,112 @@ def length_hint(obj: object, default: int = 0, /) -> int:
     The result will be an integer >= 0.
     """
 
-def iadd(a, b, /):
+@overload
+def iadd(a: _SupportsIAdd[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a += b."""
+@overload
+def iadd(a: SupportsAdd[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
+@overload
+def iadd(a: _T_contra, b: SupportsRAdd[_T_contra, _T_co], /) -> _T_co: ...
 
-def iand(a, b, /):
+@overload
+def iand(a: _SupportsIAnd[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a &= b."""
+@overload
+def iand(a: _SupportsAnd[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
+@overload
+def iand(a: _T_contra, b: _SupportsRAnd[_T_contra, _T_co], /) -> _T_co: ...
 
-def iconcat(a, b, /):
+def iconcat(a: _SupportsIConcat[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a += b, for a and b sequences."""
 
-def ifloordiv(a, b, /):
+@overload
+def ifloordiv(a: _SupportsIFloorDiv[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a //= b."""
+@overload
+def ifloordiv(a: _SupportsFloorDiv[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
+@overload
+def ifloordiv(a: _T_contra, b: _SupportsRFloorDiv[_T_contra, _T_co], /) -> _T_co: ...
 
-def ilshift(a, b, /):
+@overload
+def ilshift(a: _SupportsILShift[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a <<= b."""
+@overload
+def ilshift(a: _SupportsLShift[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
+@overload
+def ilshift(a: _T_contra, b: _SupportsRLShift[_T_contra, _T_co], /) -> _T_co: ...
 
-def imod(a, b, /):
+@overload
+def imod(a: _SupportsIMod[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a %= b."""
+@overload
+def imod(a: _SupportsMod[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
+@overload
+def imod(a: _T_contra, b: _SupportsRMod[_T_contra, _T_co], /) -> _T_co: ...
 
-def imul(a, b, /):
+@overload
+def imul(a: _SupportsIMul[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a *= b."""
+@overload
+def imul(a: SupportsMul[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
+@overload
+def imul(a: _T_contra, b: SupportsRMul[_T_contra, _T_co], /) -> _T_co: ...
 
-def imatmul(a, b, /):
+@overload
+def imatmul(a: _SupportsIMatMul[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a @= b."""
+@overload
+def imatmul(a: _SupportsMatMul[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
+@overload
+def imatmul(a: _T_contra, b: _SupportsRMatMul[_T_contra, _T_co], /) -> _T_co: ...
 
-def ior(a, b, /):
+@overload
+def ior(a: _SupportsIOr[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a |= b."""
+@overload
+def ior(a: _SupportsOr[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
+@overload
+def ior(a: _T_contra, b: _SupportsROr[_T_contra, _T_co], /) -> _T_co: ...
 
-def ipow(a, b, /):
+@overload
+def ipow(a: _SupportsIPow[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a **= b."""
+@overload
+def ipow(a: _SupportsPow[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
+@overload
+def ipow(a: _T_contra, b: _SupportsRPow[_T_contra, _T_co], /) -> _T_co: ...
 
-def irshift(a, b, /):
+@overload
+def irshift(a: _SupportsIRShift[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a >>= b."""
+@overload
+def irshift(a: _SupportsRShift[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
+@overload
+def irshift(a: _T_contra, b: _SupportsRRShift[_T_contra, _T_co], /) -> _T_co: ...
 
-def isub(a, b, /):
+@overload
+def isub(a: _SupportsISub[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a -= b."""
+@overload
+def isub(a: SupportsSub[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
+@overload
+def isub(a: _T_contra, b: SupportsRSub[_T_contra, _T_co], /) -> _T_co: ...
 
-def itruediv(a, b, /):
+@overload
+def itruediv(a: _SupportsITrueDiv[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a /= b."""
+@overload
+def itruediv(a: _SupportsTrueDiv[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
+@overload
+def itruediv(a: _T_contra, b: _SupportsRTrueDiv[_T_contra, _T_co], /) -> _T_co: ...
 
-def ixor(a, b, /):
+@overload
+def ixor(a: _SupportsIXOr[_T_contra, _T_co], b: _T_contra, /) -> _T_co:
     """Same as a ^= b."""
+@overload
+def ixor(a: _SupportsXOr[_T_contra, _T_co], b: _T_contra, /) -> _T_co: ...
+@overload
+def ixor(a: _T_contra, b: _SupportsRXOr[_T_contra, _T_co], /) -> _T_co: ...
 
 if sys.version_info >= (3, 11):
     def call(obj: Callable[_P, _R], /, *args: _P.args, **kwargs: _P.kwargs) -> _R:

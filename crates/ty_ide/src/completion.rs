@@ -5112,7 +5112,7 @@ Meta.<CURSOR>
                 __getattribute__ :: def __getattribute__(self, name: str, /) -> Any
                 __getstate__ :: def __getstate__(self) -> object
                 __hash__ :: def __hash__(self) -> int
-                __init__ :: Overload[(self, o: object, /) -> None, (self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None]
+                __init__ :: Overload[(self, o: object, /) -> None, (self, name: str, bases: tuple[type, ...], dict: dict[str, Any] | frozendict[str, Any], /, **kwds: Any) -> None]
                 __init_subclass__ :: bound method <class 'Meta'>.__init_subclass__() -> None
                 __instancecheck__ :: def __instancecheck__(self, instance: Any, /) -> bool
                 __itemsize__ :: int

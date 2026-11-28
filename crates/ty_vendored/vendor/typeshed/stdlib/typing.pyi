@@ -25,7 +25,18 @@ import collections  # ruff: ignore[unused-import]  # pyright: ignore[reportUnuse
 import sys
 import typing_extensions
 from _collections_abc import dict_items, dict_keys, dict_values
-from _typeshed import IdentityFunction, ReadableBuffer, SupportsGetItem, SupportsGetItemViewable, SupportsKeysAndGetItem, Viewable
+from _typeshed import (
+    IdentityFunction,
+    ReadableBuffer,
+    SupportsGetItem,
+    SupportsGetItemViewable,
+    SupportsKeysAndGetItem,
+    SupportsRAnd,
+    SupportsROr,
+    SupportsRSub,
+    SupportsRXor,
+    Viewable,
+)
 from abc import ABCMeta, abstractmethod
 from re import Match as Match, Pattern as Pattern
 from types import (
@@ -1090,6 +1101,7 @@ _FT = TypeVar("_FT", bound=Callable[..., Any] | type)
 
 # These type variables are used by the container types.
 _S = TypeVar("_S")
+_R = TypeVar("_R")
 _KT = TypeVar("_KT")  # Key type.
 _VT = TypeVar("_VT")  # Value type.
 _T_co = TypeVar("_T_co", covariant=True)  # Any type covariant containers.
@@ -1755,11 +1767,20 @@ class AbstractSet(Collection[_T_co]):
     def __lt__(self, other: AbstractSet[Any], /) -> bool: ...
     def __gt__(self, other: AbstractSet[Any], /) -> bool: ...
     def __ge__(self, other: AbstractSet[Any], /) -> bool: ...
+    # These annotations describe what all implementations support, including
+    # set and frozenset, which don't use the mixin methods. While the mixin
+    # methods accept any iterable, set and frozenset only accept set and
+    # frozenset. The forward methods still accept any AbstractSet, because
+    # if one operand doesn't support the other, Python falls back to the
+    # other operand's reflected method, which always returns an AbstractSet.
     def __and__(self, other: AbstractSet[Any], /) -> AbstractSet[_T_co]: ...
     def __or__(self, other: AbstractSet[_T], /) -> AbstractSet[_T_co | _T]: ...
     def __sub__(self, other: AbstractSet[Any], /) -> AbstractSet[_T_co]: ...
     def __xor__(self, other: AbstractSet[_T], /) -> AbstractSet[_T_co | _T]: ...
-    def __rxor__(self, other: Iterable[_T], /) -> AbstractSet[_T_co | _T]: ...
+    def __rand__(self, other: AbstractSet[_T], /) -> AbstractSet[_T]: ...
+    def __ror__(self, other: AbstractSet[_T], /) -> AbstractSet[_T_co | _T]: ...
+    def __rsub__(self, other: AbstractSet[_T], /) -> AbstractSet[_T]: ...
+    def __rxor__(self, other: AbstractSet[_T], /) -> AbstractSet[_T_co | _T]: ...
     def __eq__(self, other: object, /) -> bool: ...
     def isdisjoint(self, other: Iterable[Any], /) -> bool:
         """Return True if two sets have a null intersection."""
@@ -1794,10 +1815,31 @@ class MutableSet(AbstractSet[_T]):
     def remove(self, value: _T, /) -> None:
         """Remove an element. If not a member, raise a KeyError."""
 
-    def __ior__(self, it: AbstractSet[_T], /) -> typing_extensions.Self: ...  # type: ignore[override,misc]
-    def __iand__(self, it: AbstractSet[Any], /) -> typing_extensions.Self: ...
-    def __ixor__(self, it: AbstractSet[_T], /) -> typing_extensions.Self: ...  # type: ignore[override,misc]
-    def __isub__(self, it: AbstractSet[Any], /) -> typing_extensions.Self: ...
+    # These annotations describe what all implementations support, including
+    # set, which doesn't use the mixin methods. While the mixin methods accept
+    # any iterable and always modify the set in place, set only does so for
+    # set and frozenset arguments. For other arguments, Python falls back to
+    # the argument's reflected method and rebinds the target to its result,
+    # which might not even be a mutable set.
+    @overload  # type: ignore[override,misc]
+    def __ior__(self, it: set[_T] | frozenset[_T], /) -> typing_extensions.Self: ...
+    @overload
+    def __ior__(self, it: SupportsROr[MutableSet[_T], _R], /) -> typing_extensions.Self | _R: ...
+
+    @overload  # type: ignore[misc]
+    def __iand__(self, it: set[Any] | frozenset[Any], /) -> typing_extensions.Self: ...
+    @overload
+    def __iand__(self, it: SupportsRAnd[MutableSet[_T], _R], /) -> typing_extensions.Self | _R: ...
+
+    @overload  # type: ignore[override,misc]
+    def __ixor__(self, it: set[_T] | frozenset[_T], /) -> typing_extensions.Self: ...
+    @overload
+    def __ixor__(self, it: SupportsRXor[MutableSet[_T], _R], /) -> typing_extensions.Self | _R: ...
+
+    @overload  # type: ignore[misc]
+    def __isub__(self, it: set[Any] | frozenset[Any], /) -> typing_extensions.Self: ...
+    @overload
+    def __isub__(self, it: SupportsRSub[MutableSet[_T], _R], /) -> typing_extensions.Self | _R: ...
 
 class MappingView(Sized):
     __slots__ = ("_mapping",)
