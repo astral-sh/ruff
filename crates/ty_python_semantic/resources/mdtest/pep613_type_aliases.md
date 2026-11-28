@@ -132,6 +132,9 @@ See also the generic aliases in [`implicit_type_aliases.md`](./implicit_type_ali
 
 ### Basic
 
+Each alias binds its own `T`, which ty displays as `T@MyList` or `T@ListOrSet`. Specializing an
+alias substitutes the supplied type for every occurrence of `T`.
+
 ```py
 from typing import TypeAlias, TypeVar
 
@@ -140,8 +143,8 @@ T = TypeVar("T")
 MyList: TypeAlias = list[T]
 ListOrSet: TypeAlias = list[T] | set[T]
 
-reveal_type(MyList)  # revealed: <class 'list[T]'>
-reveal_type(ListOrSet)  # revealed: <types.UnionType special-form 'list[T] | set[T]'>
+reveal_type(MyList)  # revealed: <class 'list[T@MyList]'>
+reveal_type(ListOrSet)  # revealed: <types.UnionType special-form 'list[T@ListOrSet] | set[T@ListOrSet]'>
 
 def _(list_of_int: MyList[int], list_or_set_of_str: ListOrSet[str]):
     reveal_type(list_of_int)  # revealed: list[int]
