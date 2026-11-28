@@ -5,6 +5,7 @@ use anyhow::{Context, Result};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::{self, Tokens, parenthesized_range};
+use ruff_python_ast::whitespace::trailing_comment_start_offset;
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Parameters, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -60,6 +61,24 @@ pub(crate) fn delete_stmt(
             let range = locator.full_lines_range(stmt.range());
             Edit::range_deletion(range)
         }
+    }
+}
+
+/// Generate an [`Edit`] to delete a [`Stmt`], while preserving any comment that trails it on the
+/// same line.
+///
+/// For example, given `...  # comment`, only the `...  ` is deleted, leaving the comment (and the
+/// indentation that precedes it) in place.
+pub(crate) fn delete_stmt_preserving_trailing_comment(
+    stmt: &Stmt,
+    parent: Option<&Stmt>,
+    locator: &Locator,
+    indexer: &Indexer,
+) -> Edit {
+    if let Some(offset) = trailing_comment_start_offset(stmt, locator.contents()) {
+        Edit::range_deletion(stmt.range().add_end(offset))
+    } else {
+        delete_stmt(stmt, parent, locator, indexer)
     }
 }
 
