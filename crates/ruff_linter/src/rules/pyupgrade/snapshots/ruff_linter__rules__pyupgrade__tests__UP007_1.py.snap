@@ -311,26 +311,51 @@ help: Convert to `X | Y`
 92 |     print(param)
    |
 
-UP007 [*] Use `X | Y` for type annotations
-   --> UP007_1.py:151:31
+UP007 Use `X | Y` for type annotations
+   --> UP007_1.py:161:12
     |
-149 |       from typing import Literal, TypeAlias
-150 |
-151 |       LongLiterals: TypeAlias = Union[
+160 | # Implicit type aliases are still flagged, even nested ones.
+161 | IntOrStr = Union[int, str]
+    |            ^^^^^^^^^^^^^^^
+162 | ListOfIntOrStr = list[Union[int, str]]
+    |
+help: Convert to `X | Y`
+
+UP007 [*] Use `X | Y` for type annotations
+   --> UP007_1.py:162:23
+    |
+160 | # Implicit type aliases are still flagged, even nested ones.
+161 | IntOrStr = Union[int, str]
+162 | ListOfIntOrStr = list[Union[int, str]]
+    |                       ^^^^^^^^^^^^^^^
+help: Convert to `X | Y`
+    |
+161 | IntOrStr = Union[int, str]
+    - ListOfIntOrStr = list[Union[int, str]]
+162 + ListOfIntOrStr = list[int | str]
+163 |
+    |
+
+UP007 [*] Use `X | Y` for type annotations
+   --> UP007_1.py:178:31
+    |
+176 |       from typing import Literal, TypeAlias
+177 |
+178 |       LongLiterals: TypeAlias = Union[
     |  _______________________________^
-152 | |         Literal["LongLiteralNumberOne"]
-153 | |         | Literal["LongLiteralNumberTwo"]
-154 | |         | Literal["LongLiteralNumberThree"]
-155 | |     ]
+179 | |         Literal["LongLiteralNumberOne"]
+180 | |         | Literal["LongLiteralNumberTwo"]
+181 | |         | Literal["LongLiteralNumberThree"]
+182 | |     ]
     | |_____^
 help: Convert to `X | Y`
     |
-150 |
+177 |
     -     LongLiterals: TypeAlias = Union[
     -         Literal["LongLiteralNumberOne"]
-151 +     LongLiterals: TypeAlias = (Literal["LongLiteralNumberOne"]
-152 |         | Literal["LongLiteralNumberTwo"]
+178 +     LongLiterals: TypeAlias = (Literal["LongLiteralNumberOne"]
+179 |         | Literal["LongLiteralNumberTwo"]
     -         | Literal["LongLiteralNumberThree"]
     -     ]
-153 +         | Literal["LongLiteralNumberThree"])
+180 +         | Literal["LongLiteralNumberThree"])
     |
