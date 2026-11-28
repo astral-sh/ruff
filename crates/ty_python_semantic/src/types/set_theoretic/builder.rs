@@ -455,6 +455,11 @@ impl<'db> Type<'db> {
             // A protocol can distinguish enum members by `name`, integers by `numerator`,
             // and strings and bytes by `__len__`.
             (Type::ProtocolInstance(_), _) => true,
+            // A sequence's element type can distinguish strings by their characters
+            // and bytes by their integer values.
+            (Type::NominalInstance(instance), LiteralKind::String | LiteralKind::Bytes) => {
+                instance.has_known_class(db, KnownClass::Sequence)
+            }
             // A recursive type or an alias nested in an intersection can hide a protocol
             // or a literal of this kind.
             (ty, _) if ty.is_alias_like() => true,
