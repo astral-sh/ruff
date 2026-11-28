@@ -13022,8 +13022,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             scope,
             types: DefinitionTypes::from_parts(
                 definition,
-                bindings.into_vec(),
-                declarations.into_vec(),
+                bindings.into_entries(),
+                declarations.into_entries(),
             ),
             extra,
         }
@@ -13862,13 +13862,11 @@ impl StringPartsCollector {
     }
 }
 
-/// Map based on a `Vec`. It doesn't enforce
-/// uniqueness on insertion. Instead, it relies on the caller
-/// that elements are unique. For example, the way we visit definitions
-/// in the `TypeInference` builder already implicitly guarantees that each definition
-/// is only visited once.
+/// Holds bindings or declarations in insertion order. The caller supplies unique keys.
+/// Most definition regions have at most one entry of each kind. Keeping it inline
+/// avoids a temporary allocation before moving it into [`DefinitionTypes`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct VecMap<K, V>(Vec<(K, V)>);
+struct VecMap<K, V>(SmallVec<[(K, V); 1]>);
 
 impl<K, V> VecMap<K, V> {
     #[inline]
@@ -13891,7 +13889,7 @@ impl<K, V> VecMap<K, V> {
         self.0.into_boxed_slice()
     }
 
-    fn into_vec(self) -> Vec<(K, V)> {
+    fn into_entries(self) -> SmallVec<[(K, V); 1]> {
         self.0
     }
 }
@@ -13925,7 +13923,7 @@ where
 
 impl<K, V> Default for VecMap<K, V> {
     fn default() -> Self {
-        Self(Vec::default())
+        Self(SmallVec::new())
     }
 }
 
