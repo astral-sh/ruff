@@ -542,6 +542,9 @@ type MaterializationEquivalenceVisitor<'db> =
 
 type MaterializationDependency<'db> = (Type<'db>, MaterializationKind);
 
+type FresheningCache<'db> =
+    CycleDetector<'db, ApplyTypeMappingTag, Type<'db>, Option<(Type<'db>, bool)>, 3>;
+
 struct DependentMaterialization<'db> {
     result: Type<'db>,
     dependencies: Box<[MaterializationDependency<'db>]>,
@@ -572,6 +575,8 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     /// the full call's binding for `T`. The default transformer caches by type
     /// alone, so reusing it could give both positions the same substitution.
     flipped_argument_transformer: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    freshening: OnceCell<Box<FresheningCache<'db>>>,
+    freshening_expanded_alias: Cell<bool>,
     top_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     bottom_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     top_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -593,6 +598,8 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             default: OnceCell::default(),
             specialized_self: Cell::default(),
             flipped_argument_transformer: OnceCell::default(),
+            freshening: OnceCell::default(),
+            freshening_expanded_alias: Cell::default(),
             top_materialization: OnceCell::default(),
             bottom_materialization: OnceCell::default(),
             top_specialization_materialization: OnceCell::default(),
@@ -622,6 +629,16 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             .get_or_init(|| Rc::new(CycleDetector::new(true)))
     }
 
+    /// Keep track of whether this part of a freshening exposed an alias body.
+    /// An enclosing union may need to simplify even when the alias was inside a tuple.
+    fn track_alias_expansion<T>(&self, f: impl FnOnce() -> T) -> (T, bool) {
+        let previous = self.freshening_expanded_alias.replace(false);
+        let result = f();
+        let expanded = self.freshening_expanded_alias.get();
+        self.freshening_expanded_alias.set(previous || expanded);
+        (result, expanded)
+    }
+
     fn visit(
         &self,
         db: &'db dyn Db,
@@ -629,6 +646,20 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         type_mapping: &TypeMapping<'_, 'db>,
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
+        if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. }) {
+            // Cache the expansion flag with the type so reusing a mapped operand has
+            // the same effect on its enclosing union or intersection as visiting it.
+            let cache = self.freshening.get_or_init(Box::default);
+            let Some((mapped, expanded)) =
+                cache.visit(db, ty, || Some(self.track_alias_expansion(func)))
+            else {
+                return ty;
+            };
+            if expanded {
+                self.freshening_expanded_alias.set(true);
+            }
+            return mapped;
+        }
         let type_transformer = match type_mapping {
             TypeMapping::ApplySpecialization(ApplySpecialization::ArgumentHint {
                 flipped: true,
@@ -12104,6 +12135,12 @@ impl<'db> TypeMapping<'_, 'db> {
     /// nor semantic operations may run on the intermediate types.
     const fn is_structural(&self) -> bool {
         matches!(self, TypeMapping::ApplyRecursiveSubstitution(_))
+    }
+
+    /// Renaming bound type variables preserves the relationships among union and intersection
+    /// elements. Rechecking them can re-enter the signature comparison that is freshening them.
+    const fn can_preserve_set_structure(&self) -> bool {
+        self.is_structural() || matches!(self, TypeMapping::FreshenBoundTypeVars { .. })
     }
 }
 
