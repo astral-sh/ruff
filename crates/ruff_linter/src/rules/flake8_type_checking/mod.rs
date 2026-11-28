@@ -718,4 +718,41 @@ mod tests {
         );
         assert_diagnostics!(snapshot, diagnostics);
     }
+
+    #[test]
+    fn github_issue_30956() {
+        let contents = r#"
+x1: "int # comment" | None = 1
+x2: ("int # comment") | None = 1
+x3: "(int) # comment" | None = 1
+x4: "(int # comment\n)" | None = 1
+x5: """int
+| str # comment""" | None = 1
+"#;
+        let diagnostics = test_snippet(
+            contents,
+            &settings::LinterSettings::for_rule(Rule::RuntimeStringUnion)
+                .with_target_version(PythonVersion::PY313)
+                .with_preview_mode(),
+        );
+        assert_diagnostics!(diagnostics);
+    }
+
+    #[test]
+    fn github_issue_30956_tc008() {
+        let contents = r#"
+from typing import Literal
+
+type X1 = "int # comment" | None
+type X2 = ("int # comment") | None
+type X3 = "Literal['# not a comment']"
+"#;
+        let diagnostics = test_snippet(
+            contents,
+            &settings::LinterSettings::for_rule(Rule::QuotedTypeAlias)
+                .with_target_version(PythonVersion::PY313)
+                .with_preview_mode(),
+        );
+        assert_diagnostics!(diagnostics);
+    }
 }

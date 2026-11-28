@@ -3,7 +3,7 @@ use std::cmp::Reverse;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
-use ruff_python_ast::token::parenthesized_range;
+use ruff_python_ast::token::{TokenKind, parenthesized_range};
 use ruff_python_ast::visitor::transformer::{Transformer, walk_expr};
 use ruff_python_ast::{
     self as ast, Decorator, Expr, ExprContext, Operator, PythonVersion, StringLiteralFlags,
@@ -416,35 +416,68 @@ pub(crate) fn quote_type_expression(
 
 /// Safely remove quotes from a type expression.
 ///
-/// This function handles edge cases like multiline strings correctly
-/// by checking for and potentially adding missing parentheses.
+/// This function handles edge cases like multiline strings and comments correctly
+/// by checking for and potentially adding missing parentheses (and a trailing
+/// newline when the annotation ends with a comment).
 pub(crate) fn unquote_annotation_string(
     expr: &Expr,
     annotation_expr: &ast::ExprStringLiteral,
     checker: &Checker,
 ) -> Edit {
     let fix_string = annotation_expr.value.to_string();
+    let tokens = checker.tokens();
 
-    let fix_string = if (fix_string.contains('\n') || fix_string.contains('\r'))
-        && parenthesized_range(
-            // Check for parentheses outside the string ("""...""")
-            annotation_expr.into(),
-            checker.semantic().current_statement().into(),
-            checker.source_tokens(),
-        )
-        .is_none()
-        && parenthesized_range(
-            // Check for parentheses inside the string """(...)"""
-            expr.into(),
-            annotation_expr.into(),
-            checker.tokens(),
-        )
-        .is_none()
-    {
-        format!("({fix_string})")
-    } else {
-        fix_string
-    };
+    let has_comment = tokens
+        .iter()
+        .any(|token| token.kind() == TokenKind::Comment);
+    let ends_with_comment = !fix_string.ends_with(['\n', '\r'])
+        && tokens
+            .iter()
+            .rev()
+            .find(|token| !matches!(token.kind(), TokenKind::EndOfFile | TokenKind::Newline))
+            .is_some_and(|token| token.kind() == TokenKind::Comment);
+
+    let has_newline = fix_string.contains('\n') || fix_string.contains('\r');
+
+    let is_outer_parenthesized = parenthesized_range(
+        // Check for parentheses outside the string ("""...""")
+        annotation_expr.into(),
+        checker.semantic().current_statement().into(),
+        checker.source_tokens(),
+    )
+    .is_some();
+
+    let is_inner_parenthesized = parenthesized_range(
+        // Check for parentheses inside the string """(...)"""
+        expr.into(),
+        annotation_expr.into(),
+        tokens,
+    )
+    .is_some_and(|paren_range| {
+        // Ensure no comments or newlines exist outside the inner parentheses,
+        // e.g., `"(int) # comment"` still needs outer parentheses.
+        tokens.iter().all(|token| {
+            matches!(token.kind(), TokenKind::EndOfFile)
+                || (token.kind() == TokenKind::Newline && token.range().is_empty())
+                || paren_range.contains_range(token.range())
+        })
+    });
+
+    let line_ending = checker.stylist().line_ending().as_str();
+
+    let fix_string =
+        if (has_newline || has_comment) && !is_outer_parenthesized && !is_inner_parenthesized {
+            if ends_with_comment {
+                format!("({fix_string}{line_ending})")
+            } else {
+                format!("({fix_string})")
+            }
+        } else if ends_with_comment {
+            format!("{fix_string}{line_ending}")
+        } else {
+            fix_string
+        };
+
     Edit::range_replacement(fix_string, annotation_expr.range())
 }
 
