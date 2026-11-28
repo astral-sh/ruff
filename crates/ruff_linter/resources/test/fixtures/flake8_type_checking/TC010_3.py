@@ -28,3 +28,10 @@ OldT = TypeVar("OldT", ("Foo"  # TC010 (unsafe fix)
 
 x: """int |
 str""" | None  # TC010 (tricky multiline string case)
+
+# Escaped newlines: https://github.com/astral-sh/ruff/issues/30957
+x: """\nint # comment\n""" | None  # TC010
+
+# Trailing comments
+x: """\nint # comment""" | None  # TC010
+x: "int # comment" | None  # TC010

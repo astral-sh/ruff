@@ -70,3 +70,11 @@ type Q = """(int
 
 r: TypeAlias = """int | None"""
 type R = """int | None"""
+
+# Escaped newlines: https://github.com/astral-sh/ruff/issues/30957
+s: TypeAlias = """\nint # comment\n"""
+type S = """\nint # comment\n"""
+
+# Trailing comments
+t: TypeAlias = """\nint # comment"""
+type T = "int # comment"

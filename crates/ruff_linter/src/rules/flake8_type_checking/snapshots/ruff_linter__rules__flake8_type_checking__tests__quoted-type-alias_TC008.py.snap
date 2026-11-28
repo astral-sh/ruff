@@ -518,9 +518,84 @@ TC008 [*] Remove quotes from type alias
 71 | r: TypeAlias = """int | None"""
 72 | type R = """int | None"""
    |          ^^^^^^^^^^^^^^^^
+73 |
+74 | # Escaped newlines: https://github.com/astral-sh/ruff/issues/30957
+   |
 help: Remove quotes
    |
 71 | r: TypeAlias = """int | None"""
    - type R = """int | None"""
 72 + type R = int | None
+73 |
+   |
+
+TC008 [*] Remove quotes from type alias
+  --> TC008.py:75:16
+   |
+74 | # Escaped newlines: https://github.com/astral-sh/ruff/issues/30957
+75 | s: TypeAlias = """\nint # comment\n"""
+   |                ^^^^^^^^^^^^^^^^^^^^^^^
+76 | type S = """\nint # comment\n"""
+   |
+help: Remove quotes
+   |
+74 | # Escaped newlines: https://github.com/astral-sh/ruff/issues/30957
+   - s: TypeAlias = """\nint # comment\n"""
+75 + s: TypeAlias = (
+76 + int # comment
+77 + )
+78 | type S = """\nint # comment\n"""
+   |
+
+TC008 [*] Remove quotes from type alias
+  --> TC008.py:76:10
+   |
+74 | # Escaped newlines: https://github.com/astral-sh/ruff/issues/30957
+75 | s: TypeAlias = """\nint # comment\n"""
+76 | type S = """\nint # comment\n"""
+   |          ^^^^^^^^^^^^^^^^^^^^^^^
+77 |
+78 | # Trailing comments
+   |
+help: Remove quotes
+   |
+75 | s: TypeAlias = """\nint # comment\n"""
+   - type S = """\nint # comment\n"""
+76 + type S = (
+77 + int # comment
+78 + )
+79 |
+   |
+
+TC008 [*] Remove quotes from type alias
+  --> TC008.py:79:16
+   |
+78 | # Trailing comments
+79 | t: TypeAlias = """\nint # comment"""
+   |                ^^^^^^^^^^^^^^^^^^^^^
+80 | type T = "int # comment"
+   |
+help: Remove quotes
+   |
+78 | # Trailing comments
+   - t: TypeAlias = """\nint # comment"""
+79 + t: TypeAlias = (
+80 + int # comment
+81 + )
+82 | type T = "int # comment"
+   |
+
+TC008 [*] Remove quotes from type alias
+  --> TC008.py:80:10
+   |
+78 | # Trailing comments
+79 | t: TypeAlias = """\nint # comment"""
+80 | type T = "int # comment"
+   |          ^^^^^^^^^^^^^^^
+help: Remove quotes
+   |
+79 | t: TypeAlias = """\nint # comment"""
+   - type T = "int # comment"
+80 + type T = (int # comment
+81 + )
    |

@@ -6,8 +6,8 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 +linter.preview = enabled
 
 --- Summary ---
-Removed: 8
-Added: 8
+Removed: 11
+Added: 11
 
 --- Removed ---
 TC010 Invalid string member in `X | Y`-style union type
@@ -101,6 +101,42 @@ TC010 Invalid string member in `X | Y`-style union type
    |  ____^
 30 | | str""" | None  # TC010 (tricky multiline string case)
    | |______^
+31 |
+32 |   # Escaped newlines: https://github.com/astral-sh/ruff/issues/30957
+   |
+help: Remove quotes
+
+
+TC010 Invalid string member in `X | Y`-style union type
+  --> TC010_3.py:33:4
+   |
+32 | # Escaped newlines: https://github.com/astral-sh/ruff/issues/30957
+33 | x: """\nint # comment\n""" | None  # TC010
+   |    ^^^^^^^^^^^^^^^^^^^^^^^
+34 |
+35 | # Trailing comments
+   |
+help: Remove quotes
+
+
+TC010 Invalid string member in `X | Y`-style union type
+  --> TC010_3.py:36:4
+   |
+35 | # Trailing comments
+36 | x: """\nint # comment""" | None  # TC010
+   |    ^^^^^^^^^^^^^^^^^^^^^
+37 | x: "int # comment" | None  # TC010
+   |
+help: Remove quotes
+
+
+TC010 Invalid string member in `X | Y`-style union type
+  --> TC010_3.py:37:4
+   |
+35 | # Trailing comments
+36 | x: """\nint # comment""" | None  # TC010
+37 | x: "int # comment" | None  # TC010
+   |    ^^^^^^^^^^^^^^^
 help: Remove quotes
 
 
@@ -243,6 +279,9 @@ TC010 [*] Invalid string member in `X | Y`-style union type
    |  ____^
 30 | | str""" | None  # TC010 (tricky multiline string case)
    | |______^
+31 |
+32 |   # Escaped newlines: https://github.com/astral-sh/ruff/issues/30957
+   |
 help: Remove quotes
    |
 28 |
@@ -250,4 +289,60 @@ help: Remove quotes
    - str""" | None  # TC010 (tricky multiline string case)
 29 + x: (int |
 30 + str) | None  # TC010 (tricky multiline string case)
+31 |
+   |
+
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_3.py:33:4
+   |
+32 | # Escaped newlines: https://github.com/astral-sh/ruff/issues/30957
+33 | x: """\nint # comment\n""" | None  # TC010
+   |    ^^^^^^^^^^^^^^^^^^^^^^^
+34 |
+35 | # Trailing comments
+   |
+help: Remove quotes
+   |
+32 | # Escaped newlines: https://github.com/astral-sh/ruff/issues/30957
+   - x: """\nint # comment\n""" | None  # TC010
+33 + x: (
+34 + int # comment
+35 + ) | None  # TC010
+36 |
+   |
+
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_3.py:36:4
+   |
+35 | # Trailing comments
+36 | x: """\nint # comment""" | None  # TC010
+   |    ^^^^^^^^^^^^^^^^^^^^^
+37 | x: "int # comment" | None  # TC010
+   |
+help: Remove quotes
+   |
+35 | # Trailing comments
+   - x: """\nint # comment""" | None  # TC010
+36 + x: (
+37 + int # comment
+38 + ) | None  # TC010
+39 | x: "int # comment" | None  # TC010
+   |
+
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_3.py:37:4
+   |
+35 | # Trailing comments
+36 | x: """\nint # comment""" | None  # TC010
+37 | x: "int # comment" | None  # TC010
+   |    ^^^^^^^^^^^^^^^
+help: Remove quotes
+   |
+36 | x: """\nint # comment""" | None  # TC010
+   - x: "int # comment" | None  # TC010
+37 + x: (int # comment
+38 + ) | None  # TC010
    |
