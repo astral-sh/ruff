@@ -73,6 +73,11 @@ pub(crate) fn request_without_timeout(
             "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request" | "stream"
             | "Client" | "AsyncClient",
         ] => "httpx",
+        [
+            "httpx2",
+            "get" | "options" | "head" | "post" | "put" | "patch" | "delete" | "request" | "stream"
+            | "Client" | "AsyncClient",
+        ] => "httpx2",
         _ => return,
     };
 
