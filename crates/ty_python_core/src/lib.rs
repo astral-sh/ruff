@@ -1632,7 +1632,10 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             for statement in &function.body {
                 reference.record_range_reachability(statement.range(), guarded);
             }
-            assert_eq!(index.use_def_map(scope), &reference.finish());
+            assert_eq!(
+                index.use_def_map(scope),
+                &reference.finish(&mut crate::use_def::UseDefMapInterner::default())
+            );
         }
     }
 
@@ -1671,7 +1674,10 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                     );
                 }
             }
-            assert_eq!(use_def, &reference.finish());
+            assert_eq!(
+                use_def,
+                &reference.finish(&mut crate::use_def::UseDefMapInterner::default())
+            );
             for parameter in &function.parameters {
                 let definition = index.expect_single_definition(parameter);
                 let symbol = table.symbol_id(parameter.name()).unwrap();

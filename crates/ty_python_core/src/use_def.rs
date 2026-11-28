@@ -534,6 +534,7 @@ struct RetainedBindings {
     live_bindings: Box<[LiveBinding]>,
 }
 
+#[derive(Hash)]
 struct RetainedBindingsBuilder {
     ends: IndexVec<InternedBindingsId, u32>,
     live_bindings: Vec<LiveBinding>,
@@ -559,15 +560,23 @@ impl RetainedBindingsBuilder {
         self,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) -> RetainedBindings {
+        interner: &mut UseDefMapInterner,
+    ) -> Arc<RetainedBindings> {
         for binding in &self.live_bindings {
             reachability_constraints.mark_used(binding.reachability_constraint());
             narrowing_constraints.mark_used(binding.narrowing_constraint());
         }
-        RetainedBindings {
-            ends: self.ends.into(),
-            live_bindings: self.live_bindings.into_boxed_slice(),
-        }
+        UseDefMapInterner::intern_table(
+            &mut interner.bindings,
+            self,
+            |existing, builder| {
+                *existing.ends == *builder.ends && *existing.live_bindings == *builder.live_bindings
+            },
+            |builder| RetainedBindings {
+                ends: builder.ends.into(),
+                live_bindings: builder.live_bindings.into_boxed_slice(),
+            },
+        )
     }
 }
 
@@ -587,6 +596,7 @@ struct RetainedDeclarations {
     live_declarations: Box<[LiveDeclaration]>,
 }
 
+#[derive(Hash)]
 struct RetainedDeclarationsBuilder {
     ends: IndexVec<InternedDeclarationsId, u32>,
     live_declarations: Vec<LiveDeclaration>,
@@ -615,14 +625,23 @@ impl RetainedDeclarationsBuilder {
     fn finish(
         self,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) -> RetainedDeclarations {
+        interner: &mut UseDefMapInterner,
+    ) -> Arc<RetainedDeclarations> {
         for declaration in &self.live_declarations {
             reachability_constraints.mark_used(declaration.reachability_constraint);
         }
-        RetainedDeclarations {
-            ends: self.ends.into(),
-            live_declarations: self.live_declarations.into_boxed_slice(),
-        }
+        UseDefMapInterner::intern_table(
+            &mut interner.declarations,
+            self,
+            |existing, builder| {
+                *existing.ends == *builder.ends
+                    && *existing.live_declarations == *builder.live_declarations
+            },
+            |builder| RetainedDeclarations {
+                ends: builder.ends.into(),
+                live_declarations: builder.live_declarations.into_boxed_slice(),
+            },
+        )
     }
 }
 
@@ -1043,7 +1062,7 @@ impl UseDefMapInterner {
         mut builder: Box<UseDefMapBuilder<'db>>,
     ) -> Arc<UseDefMap<'db>> {
         let Some(parameters) = builder.stub_parameters.take() else {
-            return self.intern(builder.finish());
+            return Arc::new(builder.finish(self));
         };
         let shape = StubParameterLayout::key(&parameters);
         if let Some(layout) = shape
@@ -1056,7 +1075,7 @@ impl UseDefMapInterner {
         }
 
         builder.record_stub_parameters(parameters);
-        let map = self.intern(builder.finish());
+        let map = Arc::new(builder.finish(self));
         if let Some(shape) = shape {
             self.stub_layouts.insert(
                 shape,
@@ -1070,26 +1089,23 @@ impl UseDefMapInterner {
         map
     }
 
-    fn intern<'db>(&mut self, mut map: UseDefMap<'db>) -> Arc<UseDefMap<'db>> {
-        map.interned_bindings = Self::intern_table(&mut self.bindings, map.interned_bindings);
-        map.interned_declarations =
-            Self::intern_table(&mut self.declarations, map.interned_declarations);
-        Arc::new(map)
-    }
-
-    /// Hash each scope's table once, even when the interner grows.
-    fn intern_table<T: Eq + std::hash::Hash>(
+    /// Freeze the table only when it cannot share storage with an earlier scope.
+    /// Cache the hash so growing the interner never rehashes the tables.
+    fn intern_table<T, B: std::hash::Hash>(
         values: &mut hashbrown::HashTable<(u64, Arc<T>)>,
-        value: Arc<T>,
+        builder: B,
+        matches: impl Fn(&T, &B) -> bool,
+        freeze: impl FnOnce(B) -> T,
     ) -> Arc<T> {
-        let hash = FxBuildHasher.hash_one(value.as_ref());
+        let hash = FxBuildHasher.hash_one(&builder);
         match values.entry(
             hash,
-            |(stored_hash, existing)| *stored_hash == hash && *existing == value,
+            |(stored_hash, existing)| *stored_hash == hash && matches(existing, &builder),
             |(stored_hash, _)| *stored_hash,
         ) {
             Entry::Occupied(entry) => Arc::clone(&entry.get().1),
             Entry::Vacant(entry) => {
+                let value = Arc::new(freeze(builder));
                 entry.insert((hash, Arc::clone(&value)));
                 value
             }
@@ -3730,7 +3746,7 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    pub(super) fn finish(mut self: Box<Self>) -> UseDefMap<'db> {
+    pub(super) fn finish(mut self: Box<Self>, interner: &mut UseDefMapInterner) -> UseDefMap<'db> {
         let reachability = ScopeReachability::new(self.range_reachability, self.reachability);
         let pending = self.pending_reachability.current;
         for state in self
@@ -3829,9 +3845,10 @@ impl<'db> UseDefMapBuilder<'db> {
         let interned_bindings = interned_bindings.finish(
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
+            interner,
         );
         let interned_declarations =
-            interned_declarations.finish(&mut self.reachability_constraints);
+            interned_declarations.finish(&mut self.reachability_constraints, interner);
         for bindings in self.multi_bindings_by_use.values_mut().flatten() {
             bindings.finish(
                 &mut self.narrowing_constraints,
@@ -3891,10 +3908,10 @@ impl<'db> UseDefMapBuilder<'db> {
         UseDefMap {
             all_definitions,
             constraint_tables,
-            interned_bindings: Arc::new(interned_bindings),
-            interned_declarations: Arc::new(interned_declarations),
-            symbol_states,
+            interned_bindings,
+            interned_declarations,
             definitions_by_definition,
+            symbol_states,
             extra,
             reachability,
         }
