@@ -469,52 +469,98 @@ def f(name: str) -> None:
 
 ### Functional syntax with tuple variable fields
 
-When fields are passed via a tuple variable, we cannot extract the literal field names and types
-from the inferred tuple type. We instead emit a diagnostic:
+When fields are passed via a tuple variable, we can extract the literal field names and types from
+the inferred tuple type:
 
 ```py
 from typing import NamedTuple
-from ty_extensions import static_assert
-from ty_extensions._internal import is_subtype_of, reveal_mro
+from ty_extensions._internal import reveal_mro
 
 fields = (("host", str), ("port", int))
-# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
 Url = NamedTuple("Url", fields)
 
 url = Url("localhost", 8080)
-reveal_type(url.host)  # revealed: Any
-reveal_type(url.port)  # revealed: Any
+reveal_type(url.host)  # revealed: str
+reveal_type(url.port)  # revealed: int
+Url("localhost", "8080")  # error: [invalid-argument-type]
 
-generic_fields = (("items", list[int]), ("mapping", dict[str, bool]))
-# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
-Container = NamedTuple("Container", generic_fields)
-container = Container([1, 2, 3], {"a": True})
-reveal_type(container.items)  # revealed: Any
-reveal_type(container.mapping)  # revealed: Any
-
-# revealed: (<class 'Url'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'Url'>, <class 'tuple[str, int]'>, <class 'Sequence[str | int]'>, <class 'Reversible[str | int]'>, <class 'Collection[str | int]'>, <class 'Iterable[str | int]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Url)
 
+host, port = url
+reveal_type(host)  # revealed: str
+reveal_type(port)  # revealed: int
+
+(only_one,) = url  # error: [invalid-assignment]
+a, b, c = url  # error: [invalid-assignment]
+
+reveal_type(url[0])  # revealed: str
+reveal_type(url[1])  # revealed: int
+
+# error: [index-out-of-bounds]
+reveal_type(url[2])  # revealed: Unknown
+```
+
+The same tuple variable can hold a different set of fields at a later call:
+
+```py
+fields = (("items", list[int]), ("mapping", dict[str, bool]))
+Container = NamedTuple("Container", fields)
+container = Container([1, 2, 3], {"a": True})
+reveal_type(container.items)  # revealed: list[int]
+reveal_type(container.mapping)  # revealed: dict[str, bool]
+```
+
+### Functional syntax with type aliases describing the fields
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, NamedTuple
+from ty_extensions._internal import TypeOf
+
+type FieldName = Literal["count"]
+type Field = tuple[FieldName, TypeOf[int]]
+type Fields = tuple[Field]
+
+def f(fields: Fields):
+    Record = NamedTuple("Record", fields)
+    reveal_type(Record(count=1).count)  # revealed: int
+```
+
+An alias for a literal field name also works in an inline field list:
+
+```py
+def g(name: FieldName):
+    Record = NamedTuple("Record", [(name, int)])
+    reveal_type(Record(count=1).count)  # revealed: int
+```
+
+### Functional syntax with invalid fields in a tuple variable
+
+```py
+from typing import NamedTuple
+
 invalid_fields = (("x", 42),)  # 42 is not a valid type
-# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
+# error: [invalid-named-tuple] "Cannot determine the type of field `x` from `Literal[42]`"
 InvalidNT = NamedTuple("InvalidNT", invalid_fields)
 reveal_type(InvalidNT)  # revealed: <class 'InvalidNT'>
 
-host, port = url
-reveal_type(host)  # revealed: Unknown
-reveal_type(port)  # revealed: Unknown
+duplicate_fields = (("x", int), ("x", str))
+# error: [invalid-named-tuple] "Duplicate field name `x` in `NamedTuple()`"
+Duplicate = NamedTuple("Duplicate", duplicate_fields)
+```
 
-# fails at runtime but we can't detect that
-(only_one,) = url
+As in an ordinary annotation, a variable holding a string cannot stand in for a type:
 
-# will error at runtime, but we can't detect that
-a, b, c = url
-
-reveal_type(url[0])  # revealed: Unknown
-reveal_type(url[1])  # revealed: Unknown
-
-# will error at runtime, but we can't detect that
-reveal_type(url[2])  # revealed: Unknown
+```py
+NAME = "int"
+fields = (("x", NAME),)
+# error: [invalid-named-tuple] "Cannot determine the type of field `x` from `Literal["int"]`"
+Indirect = NamedTuple("Indirect", fields)
 ```
 
 ### Functional syntax with Final variable field names
@@ -555,7 +601,7 @@ def get_fields() -> tuple[tuple[str, type[int]], *tuple[tuple[str, type[str]], .
     return (("x", int), ("y", str))
 
 fields = get_fields()
-# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
+# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a list literal or a fixed-length tuple"
 NT = NamedTuple("NT", fields)
 
 # Fields are unknown, so attribute access returns Any and MRO has Unknown tuple.
@@ -681,7 +727,7 @@ from typing_extensions import Self
 
 fields = [("host", str), ("port", int)]
 
-# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
+# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a list literal or a fixed-length tuple"
 class Url(NamedTuple("Url", fields)):
     def with_port(self, port: int) -> Self:
         # Fields are unknown, so attribute access returns Any.
@@ -983,7 +1029,7 @@ Bad4 = NamedTuple("Bad4", [("x", int)], defaults=[0])
 Bad5 = NamedTuple("Bad5", [("x", int)], foobarbaz=42)
 
 # Invalid type for `fields` (not an iterable)
-# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a literal list or tuple"
+# error: [invalid-named-tuple] "Invalid argument to parameter `fields` of `NamedTuple()`: `fields` must be a list literal or a fixed-length tuple"
 Bad6 = NamedTuple("Bad6", 12345)
 reveal_type(Bad6)  # revealed: <class 'Bad6'>
 

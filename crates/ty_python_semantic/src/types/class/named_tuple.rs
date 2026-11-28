@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::ProgramEnvironment;
 use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast::{PythonVersion, name::Name};
@@ -13,9 +15,10 @@ use crate::{
         TypeMapping,
         class::{DynamicClassHeaderAnchor, DynamicClassScopeOffset, dynamic_class_header_range},
         definition_expression_type,
+        infer::InferenceFlags,
         member::Member,
         mro::Mro,
-        tuple::TupleType,
+        tuple::{FixedLengthTuple, TupleSpec, TupleType},
     },
 };
 use ty_python_core::{definition::Definition, scope::ScopeId};
@@ -464,7 +467,8 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                 .expect("Expected `NamedTuple` definition r.h.s. to be a call expression");
             match definition_expression_type(db, definition, &node.arguments.args[1]) {
                 Type::KnownInstance(KnownInstanceType::NamedTupleSpec(spec)) => spec,
-                _ => NamedTupleSpec::unknown(db),
+                ty => NamedTupleSpec::from_fields_type(db, definition.scope(db), ty)
+                    .unwrap_or_else(|_| NamedTupleSpec::unknown(db)),
             }
         }
 
@@ -585,6 +589,56 @@ pub struct NamedTupleSpec<'db> {
 }
 
 impl<'db> NamedTupleSpec<'db> {
+    /// Recover the field declarations from the value type of an indirect `fields` argument.
+    pub(in crate::types) fn from_fields_type(
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        ty: Type<'db>,
+    ) -> Result<Self, Cow<'static, str>> {
+        let env = ProgramEnvironment::from_scope(scope);
+        let tuple = ty.resolve_type_alias(db).tuple_instance_spec(db, &env);
+        let Some(TupleSpec::Fixed(pairs)) = tuple.as_deref() else {
+            return Err(Cow::Borrowed(
+                "`fields` must be a list literal or a fixed-length tuple",
+            ));
+        };
+
+        let mut fields = Vec::with_capacity(pairs.all_elements().len());
+        for pair in pairs.all_elements() {
+            let pair = pair.resolve_type_alias(db).tuple_instance_spec(db, &env);
+            let elements = pair.as_deref().and_then(TupleSpec::as_fixed_length);
+            let Some([name, value]) = elements.map(FixedLengthTuple::all_elements) else {
+                return Err(Cow::Borrowed(
+                    "Expected a `(name, type)` pair for each field",
+                ));
+            };
+            let name = name
+                .resolve_type_alias(db)
+                .as_string_literal()
+                .ok_or("Expected a string literal for each field name")?
+                .value(db);
+
+            let ty = value
+                .default_specialize(db, &env)
+                .in_type_expression(db, scope, None, InferenceFlags::empty())
+                .map_err(|_| {
+                    format!(
+                        "Cannot determine the type of field `{name}` from `{}`",
+                        value.display(db, &env)
+                    )
+                })?;
+
+            fields.push(NamedTupleField {
+                name: Name::new(name),
+                ty,
+                default: None,
+                definition: None,
+            });
+        }
+
+        Ok(Self::known(db, fields.into_boxed_slice()))
+    }
+
     /// Create a [`NamedTupleSpec`] with the given fields.
     pub(crate) fn known(db: &'db dyn Db, fields: Box<[NamedTupleField<'db>]>) -> Self {
         Self::new(db, fields, true)
