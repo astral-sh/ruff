@@ -97,7 +97,25 @@ impl<'a> Importer<'a> {
         node: ast::AnyNodeRef<'_>,
         at: TextSize,
     ) -> MembersInScope<'a> {
-        MembersInScope::new(self.db, self.file, self.parsed, node, at)
+        MembersInScope::new(self.db, self.file, self.parsed, node, at, None)
+    }
+
+    /// Resolve only the names that can conflict with an import of `member` from `module`.
+    /// Unlike completions, an inlay hint already knows which names it needs.
+    pub fn members_for_import(
+        &self,
+        node: ast::AnyNodeRef<'_>,
+        module: &str,
+        member: &str,
+    ) -> MembersInScope<'a> {
+        MembersInScope::new(
+            self.db,
+            self.file,
+            self.parsed,
+            node,
+            node.start(),
+            Some(&[module, member]),
+        )
     }
 
     /// Builds a best-effort import action for this module, usually for an IDE completion.
@@ -557,10 +575,11 @@ impl<'ast> MembersInScope<'ast> {
         parsed: &'ast ParsedModuleRef,
         node: ast::AnyNodeRef<'_>,
         at: TextSize,
+        names: Option<&[&str]>,
     ) -> MembersInScope<'ast> {
         let model = SemanticModel::new(db, file);
         let map = model
-            .members_in_scope_at(node)
+            .members_in_scope_at(node, names)
             .into_iter()
             .map(|(name, memberdef)| {
                 let def = memberdef.first_reachable_definition;

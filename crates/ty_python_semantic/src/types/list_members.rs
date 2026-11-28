@@ -7,7 +7,7 @@
 
 use std::cmp::Ordering;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
@@ -85,19 +85,30 @@ pub(crate) fn all_end_of_scope_members<'db>(
         ))
 }
 
-/// Iterate over all declarations and bindings that are reachable anywhere
-/// in the given scope.
-pub(crate) fn all_reachable_members<'db>(
+/// Iterate over reachable declarations and bindings, optionally for just the given names.
+pub(crate) fn reachable_members<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
-) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
+    names: Option<&[&str]>,
+) -> impl Iterator<Item = MemberWithDefinition<'db>> {
     let env = ProgramEnvironment::from_scope(scope_id);
 
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
-    use_def_map
-        .all_reachable_symbols()
+    let symbols = match names {
+        Some(names) => Either::Left(names.iter().filter_map(move |name| {
+            let id = table.symbol_id(name)?;
+            Some((
+                id,
+                use_def_map.reachable_symbol_declarations(id),
+                use_def_map.reachable_symbol_bindings(id),
+            ))
+        })),
+        None => Either::Right(use_def_map.all_reachable_symbols()),
+    };
+
+    symbols
         .flat_map(move |(symbol_id, declarations, bindings)| {
             let symbol = table.symbol(symbol_id);
 
