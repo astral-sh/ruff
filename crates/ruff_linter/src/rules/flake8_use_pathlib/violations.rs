@@ -169,6 +169,8 @@ impl Violation for PyPath {
 /// ## Example
 ///
 /// ```python
+/// import os
+///
 /// p = "."
 /// for d in os.listdir(p):
 ///     ...
@@ -183,6 +185,8 @@ impl Violation for PyPath {
 /// Use instead:
 ///
 /// ```python
+/// from pathlib import Path
+///
 /// p = Path(".")
 /// for d in p.iterdir():
 ///     ...
@@ -190,7 +194,7 @@ impl Violation for PyPath {
 /// if any(p.iterdir()):
 ///     ...
 ///
-/// if (p / "file").exists():
+/// if any(entry.name == "file" for entry in p.iterdir()):
 ///     ...
 /// ```
 ///

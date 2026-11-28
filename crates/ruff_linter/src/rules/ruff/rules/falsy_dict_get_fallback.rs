@@ -17,14 +17,16 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// ## Example
 ///
 /// ```python
-/// if dict.get(key, False):
+/// options = {"verbose": True}
+/// if options.get("verbose", False):
 ///     ...
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
-/// if dict.get(key):
+/// options = {"verbose": True}
+/// if options.get("verbose"):
 ///     ...
 /// ```
 ///
