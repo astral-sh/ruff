@@ -21,6 +21,29 @@ def _(u1: int | int | str, u2: int | str | int) -> None:
     reveal_type(u2)  # revealed: int | str
 ```
 
+## Unions of class objects
+
+Class objects remain distinct even when one class inherits from another. References to the same
+class collapse, while `type[Base]` subsumes the `Base` class literal. Mixed unions retain ordinary
+instance types alongside class objects in either order.
+
+```py
+class Base: ...
+class Derived(Base): ...
+
+Alias = Base
+
+def _(first: bool, second: bool, base_type: type[Base], number: int) -> None:
+    reveal_type(Base if first else Derived)  # revealed: <class 'Base'> | <class 'Derived'>
+    reveal_type(Base if first else Alias)  # revealed: <class 'Base'>
+    reveal_type(Base if first else base_type)  # revealed: type[Base]
+
+    int_first = (number if first else Base) if second else Derived
+    class_first = (Base if first else number) if second else Derived
+    reveal_type(int_first)  # revealed: int | <class 'Base'> | <class 'Derived'>
+    reveal_type(class_first)  # revealed: <class 'Base'> | int | <class 'Derived'>
+```
+
 ## `Never` is removed
 
 `Never` is an empty set, a type with no inhabitants. Its presence in a union is always redundant,
