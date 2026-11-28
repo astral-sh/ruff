@@ -1101,7 +1101,7 @@ impl<'db> Type<'db> {
     ///
     /// Unlike [`Self::is_redundant_with`], this does not apply shortcuts intended for simplifying
     /// unions.
-    pub(super) fn is_pure_redundant_with(
+    pub(crate) fn is_pure_redundant_with(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
