@@ -90,7 +90,7 @@ impl<'db> Field<'db> {
                     !definition_expression_type(db, definition, &choices.value).is_none(db)
                 });
         field.metadata.null = call.arguments.find_keyword("null").is_some_and(|null| {
-            definition_expression_type(db, definition, &null.value) == Type::bool_literal(true)
+            definition_expression_type(db, definition, &null.value).as_bool_literal() == Some(true)
         });
         field.metadata.to_field = call
             .arguments
@@ -289,7 +289,7 @@ fn primary_key_member<'db>(
         }
         if let Some(field) = own_primary_key(db, base) {
             return (name == "pk").then(|| {
-                foreign_key_id_type(db, env, field, specialization)
+                foreign_key_id_type(db, env, base, field, specialization)
                     .unwrap_or_else(|| field.ty.apply_optional_specialization(db, specialization))
             });
         }
@@ -337,13 +337,14 @@ fn foreign_key_id_member<'db>(
     let field = own_model_fields(db, class)
         .iter()
         .find(|field| field.name == field_name)?;
-    foreign_key_id_type(db, env, field, specialization)
+    foreign_key_id_type(db, env, class, field, specialization)
 }
 
 /// Return a relation field's stored ID type, used by both `<field>_id` and `pk`.
 fn foreign_key_id_type<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
+    class: StaticClassLiteral<'db>,
     field: &Field<'db>,
     specialization: Option<Specialization<'db>>,
 ) -> Option<Type<'db>> {
@@ -356,16 +357,17 @@ fn foreign_key_id_type<'db>(
         return None;
     }
 
-    // django-types represents a foreign key declared with `null=True` as
-    // `ForeignKey[Author | None]`, so its `related_model` attribute has type
-    // `type[Author | None]`. Remove `None` from the instance type before looking up `pk`
-    // (or `to_field`) on `Author`. If `null=True`, add `None` to the
-    // resulting ID type: for example, an integer primary key becomes `int | None`.
+    // Read the descriptor on an instance to recover the concrete related model.
+    // Look up the target on the non-None part and preserve nullability on the ID.
+    let instance = Type::instance(
+        db,
+        env,
+        class.apply_optional_specialization(db, specialization),
+    );
     let related_model = field_ty
-        .member(db, env, "related_model")
-        .place
-        .ignore_possibly_undefined()?
-        .to_instance_approximation(db, env)?
+        .try_call_dunder_get(db, env, Some(instance), instance.to_meta_type(db, env))
+        .ok()??
+        .return_type
         .filter_union(db, env, |ty| !ty.is_none(db));
     let target_name = field.metadata.to_field.as_deref().unwrap_or("pk");
     let id_ty = related_model

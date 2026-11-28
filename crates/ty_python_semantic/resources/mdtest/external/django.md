@@ -1,6 +1,6 @@
 # Django
 
-Django support in ty currently relies on the stubs from [django-types]:
+Django support in ty currently relies on the stubs from [django-stubs]:
 
 ```toml
 [environment]
@@ -8,7 +8,7 @@ python-version = "3.13"
 python-platform = "linux"
 
 [project]
-dependencies = ["django-types==0.24.0"]
+dependencies = ["django-stubs @ git+https://github.com/UnknownPlatypus/django-stubs.git@a538bec5a906bcef35238da97e06167a1219adf7"]
 ```
 
 ## Basic model
@@ -51,8 +51,7 @@ Attribute assignments are checked against the field's *input* type:
 book.title = "The Restaurant at the End of the Universe"
 book.pages = 208
 
-# TODO: django-types should allow ISO-formatted date strings as input.
-book.published = "1980-10-12"  # error: [invalid-assignment]
+book.published = "1980-10-12"
 
 book.pages = models.F("pages") + 1
 
@@ -589,4 +588,4 @@ def _(book1: Book1, book2: Book2):
     reveal_type(book2.title)  # revealed: str
 ```
 
-[django-types]: https://github.com/sbdchd/django-types
+[django-stubs]: https://github.com/typeddjango/django-stubs
