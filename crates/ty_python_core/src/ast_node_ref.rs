@@ -78,9 +78,9 @@ where
         Self {
             index,
             #[cfg(debug_assertions)]
-            file: module_ref.module().file(),
+            file: module_ref.file(),
             #[cfg(debug_assertions)]
-            python_version: module_ref.module().python_version(),
+            python_version: module_ref.python_version(),
             #[cfg(debug_assertions)]
             kind: AnyNodeRef::from(node).kind(),
             #[cfg(debug_assertions)]
@@ -97,10 +97,7 @@ where
     pub fn node<'ast>(&self, module_ref: &'ast ParsedModuleRef) -> &'ast T {
         #[cfg(debug_assertions)]
         assert_eq!(
-            (
-                module_ref.module().file(),
-                module_ref.module().python_version()
-            ),
+            (module_ref.file(), module_ref.python_version()),
             (self.file, self.python_version),
             "an `AstNodeRef` cannot be used with a module parsed for a different file or Python version"
         );

@@ -121,7 +121,7 @@ fn get_call_expr<'ast>(
     offset: TextSize,
 ) -> Option<(&'ast ast::ExprCall, usize)> {
     let root_node: AnyNodeRef = parsed.syntax().into();
-    let source = source_text(db, parsed.module().file());
+    let source = source_text(db, parsed.file());
     let line_range = source.line_range(offset);
     let line = &source[line_range];
     let line_end = line_range.start() + TextSize::of(line.trim_whitespace_end());
