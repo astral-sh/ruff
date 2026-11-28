@@ -3210,6 +3210,117 @@ class AnnotatedChild(Annotated):
     class Inner(metaclass=StrSetter): ...  # error: [incompatible-mutable-override]
 ```
 
+## Nested configuration classes in factory_boy
+
+factory_boy's metaclass removes `Meta` and `Params` from the class namespace. Each factory can
+define its own configuration without inheriting from its parent's configuration classes. The
+`types-factory-boy` stubs declare the metaclass as generic.
+
+```toml
+[environment]
+extra-paths = ["/packages"]
+```
+
+`/packages/factory/base.pyi`:
+
+```pyi
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class FactoryMetaClass(Generic[T], type): ...
+
+class Factory(metaclass=FactoryMetaClass):
+    class Meta: ...
+```
+
+```py
+from factory.base import Factory
+
+class Base(Factory):
+    class Meta:  # ok
+        abstract = True
+
+    class Params: ...
+    class Inner: ...
+
+class Child(Base):
+    class Meta:  # ok
+        model = dict
+
+    class Params: ...  # ok
+    class Inner: ...  # error: [incompatible-attribute-override]
+
+Base.Meta  # error: [missing-attribute]
+Child.Params  # error: [missing-attribute]
+```
+
+The configuration class is visible in the class body. A method can later assign an instance
+attribute with the same name.
+
+`instance.py`:
+
+```py
+from factory.base import Factory
+
+class Example(Factory):
+    class Meta:
+        model = dict
+
+    model = Meta.model
+
+    def __init__(self):
+        self.Meta: int = 1
+
+def f(factory: Example):
+    reveal_type(factory.Meta)  # revealed: int
+```
+
+## Subclasses of factory_boy's metaclass
+
+In factory_boy itself, `FactoryMetaClass` is non-generic. Subclasses inherit its `__new__` method.
+
+```toml
+[environment]
+extra-paths = ["/packages"]
+```
+
+`/packages/factory/base.py`:
+
+```py
+class FactoryMetaClass(type): ...
+class Factory(metaclass=FactoryMetaClass): ...
+```
+
+```py
+from factory.base import Factory, FactoryMetaClass
+
+class CustomMeta(FactoryMetaClass): ...
+
+class Base(Factory, metaclass=CustomMeta):
+    class Meta: ...
+
+class Child(Base):
+    class Meta: ...  # ok
+
+Child.Meta  # error: [missing-attribute]
+```
+
+## Nested `Meta` overrides with an unrelated metaclass
+
+A metaclass that happens to share a name with factory_boy's metaclass leaves `Meta` accessible on
+the parent.
+
+```py
+class FactoryMetaClass(type): ...
+
+class Parent(metaclass=FactoryMetaClass):
+    class Meta: ...
+
+class Unrelated(Parent):
+    class Meta: ...  # error: [incompatible-attribute-override]
+```
+
 ## Annotated attributes with class defaults
 
 A class-body default does not erase an annotation's contract. Both the default and a later instance
