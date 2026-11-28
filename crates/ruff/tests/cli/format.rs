@@ -106,6 +106,65 @@ fn default_files() -> Result<()> {
     Ok(())
 }
 
+#[cfg(unix)]
+#[test]
+fn discovery_cache_matches_fresh_walk_after_edits() -> Result<()> {
+    let test = CliTest::with_files([
+        ("add/pkg/a.py", "x = 1\n"),
+        ("delete/pkg/a.py", "x=1\n"),
+        ("delete/pkg/b.py", "y = 2\n"),
+        ("rename/pkg/a.py", "x=1\n"),
+        ("replace/pkg/a.py", "x = 1\n"),
+    ])?;
+
+    let check = |root: &str, expected: &str| -> Result<()> {
+        let mut cmd = test.command();
+        cmd.args(["format", "--check", "--isolated", "--no-respect-gitignore"])
+            .args(["-v", root]);
+        let flag = "RUFF_EXPERIMENTAL_FORMAT_DISCOVERY_CACHE";
+        let cached = cmd.env(flag, "1").output()?;
+        let log = String::from_utf8(cached.stderr)?;
+        assert!(log.contains(expected), "{root}: expected {expected}\n{log}");
+
+        let fresh = cmd.env_remove(flag).arg("--no-cache").output()?;
+        assert!(matches!(fresh.status.code(), Some(0 | 1)), "{fresh:?}");
+        assert_eq!(cached.status, fresh.status, "{root}");
+        assert_eq!(
+            String::from_utf8(cached.stdout)?,
+            String::from_utf8(fresh.stdout)?,
+            "{root}"
+        );
+        Ok(())
+    };
+
+    // Give each directory mutation its own snapshot so we only have to wait once
+    // for the directory timestamps to predate the walk by more than two seconds.
+    std::thread::sleep(std::time::Duration::from_millis(2100));
+    let hit = "Format discovery cache hit";
+    let miss = "Format discovery cache miss";
+    for root in ["add", "delete", "rename", "replace"] {
+        check(root, miss)?;
+        check(root, hit)?;
+    }
+
+    test.write_file("add/pkg/a.py", "x=1\n")?;
+    check("add", hit)?;
+    test.write_file("add/pkg/b.py", "y=2\n")?;
+    check("add", miss)?;
+
+    fs::remove_file(test.root().join("delete/pkg/a.py"))?;
+    check("delete", miss)?;
+
+    let dir = test.root().join("rename/pkg");
+    fs::rename(dir.join("a.py"), dir.join("b.py"))?;
+    check("rename", miss)?;
+
+    let dir = test.root().join("replace/pkg");
+    fs::write(dir.join("temp"), "x=1\n")?;
+    fs::rename(dir.join("temp"), dir.join("a.py"))?;
+    check("replace", miss)
+}
+
 #[test]
 fn format_warn_stdin_filename_with_files() -> Result<()> {
     let test = CliTest::new()?;
