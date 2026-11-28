@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use crate::types::cyclic::{CycleDetector, HasIdentity, TypeIdentity};
 use crate::types::generics::Specialization;
+use crate::types::known_instance::{FieldInstance, KnownInstanceType};
 use crate::types::tuple::{TupleSpec, TupleType, VariableSegment};
 use crate::types::visitor::any_over_type;
 use crate::types::{
@@ -64,6 +65,10 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
             return unknown;
         }
 
+        if let Some(field) = self.merge_attrs_field_defaults(types) {
+            return field;
+        }
+
         // Compare all candidates together: equivalent types can have different structures, so
         // replacing an equivalent pair with one representative before considering other
         // candidates can make the result depend on overload order.
@@ -102,6 +107,52 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
 
     fn merge_column(&self, types: impl Iterator<Item = Type<'db>>) -> Type<'db> {
         self.merge(&types.collect::<Vec<_>>())
+    }
+
+    /// Preserve the field metadata when attrs overloads differ only in the modeled default type.
+    fn merge_attrs_field_defaults(&self, types: &[Type<'db>]) -> Option<Type<'db>> {
+        let db = self.db;
+        let (Type::KnownInstance(KnownInstanceType::Field(first)), rest) = types.split_first()?
+        else {
+            return None;
+        };
+        if rest.is_empty() || !first.kind(db).is_attrs() {
+            return None;
+        }
+        let converter = first.converter(db)?;
+        let mut defaults = Vec::with_capacity(types.len());
+        defaults.push(first.default_type(db)?);
+
+        for ty in rest {
+            let Type::KnownInstance(KnownInstanceType::Field(field)) = ty else {
+                return None;
+            };
+            if field.kind(db) != first.kind(db)
+                || field.init(db) != first.init(db)
+                || field.kw_only(db) != first.kw_only(db)
+                || field.alias(db) != first.alias(db)
+                || field.converter(db) != Some(converter)
+                || field.strict(db) != first.strict(db)
+                || field.frozen(db) != first.frozen(db)
+            {
+                return None;
+            }
+            defaults.push(field.default_type(db)?);
+        }
+
+        Some(self.visitor.visit(db, ReturnTypes(types.into()), || {
+            Type::KnownInstance(KnownInstanceType::Field(FieldInstance::new(
+                db,
+                first.kind(db),
+                Some(self.merge(&defaults)),
+                first.init(db),
+                first.kw_only(db),
+                first.alias(db),
+                Some(converter),
+                first.strict(db),
+                first.frozen(db),
+            )))
+        }))
     }
 
     fn merge_structure(&self, types: &[Type<'db>]) -> Option<Type<'db>> {
