@@ -1,7 +1,47 @@
 use anyhow::Result;
+use lsp_types::{Position, Range};
 use ruff_db::system::SystemPath;
 
 use crate::TestServerBuilder;
+
+#[test]
+fn import_component_ranges_use_the_source_spelling() -> Result<()> {
+    let file = SystemPath::new("src/main.py");
+    let source = "import cafe\u{301}\nfrom cafe\u{301} . menu import special\n";
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file("src/café/__init__.py", "")?
+        .with_file("src/café/menu.py", "special = 1\n")?
+        .with_file(file, source)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+    server.open_text_document(file, source, 1);
+
+    let tokens = server
+        .semantic_tokens_full_request(&server.file_uri(file))
+        .expect("expected semantic tokens for the imports");
+    let namespaces: Vec<_> = tokens
+        .data
+        .iter()
+        .filter(|token| token.token_type == ty_ide::SemanticTokenType::Namespace as u32)
+        .map(|token| (token.delta_line, token.delta_start, token.length))
+        .collect();
+    assert_eq!(namespaces, [(0, 7, 5), (1, 5, 5), (0, 8, 4)]);
+
+    for (line, start, end) in [(0, 7, 12), (1, 13, 17)] {
+        let hover = server
+            .hover_request(file, Position::new(line, start + 1))
+            .expect("expected hover for the imported module");
+        assert_eq!(
+            hover.range,
+            Some(Range::new(
+                Position::new(line, start),
+                Position::new(line, end)
+            ))
+        );
+    }
+    Ok(())
+}
 
 #[test]
 fn script_metadata_is_highlighted_as_toml() -> Result<()> {

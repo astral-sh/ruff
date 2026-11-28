@@ -1104,23 +1104,15 @@ impl GotoTarget<'_> {
                             }
 
                             // Is the offset in the module name part?
-                            if alias.name.range.contains_inclusive(offset) {
-                                let full_name = alias.name.as_str();
-
-                                if let Some((component_index, component_range)) =
-                                    find_module_component(
-                                        full_name,
-                                        alias.name.range.start(),
-                                        offset,
-                                    )
-                                {
-                                    return Some(GotoTarget::ImportModuleComponent {
-                                        module_name: full_name.to_string(),
-                                        level: 0,
-                                        component_index,
-                                        component_range,
-                                    });
-                                }
+                            if let Some((component_index, component_range)) =
+                                find_module_component(&alias.name, tokens, offset)
+                            {
+                                return Some(GotoTarget::ImportModuleComponent {
+                                    module_name: alias.name.to_string(),
+                                    level: 0,
+                                    component_index,
+                                    component_range,
+                                });
                             }
 
                             None
@@ -1147,18 +1139,16 @@ impl GotoTarget<'_> {
                 }
                 Some(AnyNodeRef::StmtImportFrom(from)) => {
                     // Handle offset within module name in from import statements
-                    if let Some(module_expr) = &from.module {
-                        let full_module_name = module_expr.to_string();
-                        if let Some((component_index, component_range)) =
-                            find_module_component(&full_module_name, module_expr.start(), offset)
-                        {
-                            return Some(GotoTarget::ImportModuleComponent {
-                                module_name: full_module_name,
-                                level: from.level,
-                                component_index,
-                                component_range,
-                            });
-                        }
+                    if let Some(module) = &from.module
+                        && let Some((component_index, component_range)) =
+                            find_module_component(module, tokens, offset)
+                    {
+                        return Some(GotoTarget::ImportModuleComponent {
+                            module_name: module.to_string(),
+                            level: from.level,
+                            component_index,
+                            component_range,
+                        });
                     }
 
                     None
@@ -1491,35 +1481,16 @@ fn definitions_for_module<'db>(
     Some(vec![ResolvedDefinition::Module(file)])
 }
 
-/// Helper function to extract module component information from a dotted module name
+/// Finds the import component at the cursor, including its right boundary.
 fn find_module_component(
-    full_module_name: &str,
-    module_start: TextSize,
+    module: &ast::Identifier,
+    tokens: &Tokens,
     offset: TextSize,
 ) -> Option<(usize, TextRange)> {
-    let pos_in_module = offset - module_start;
-    let pos_in_module = pos_in_module.to_usize();
-
-    // Split the module name into components and find which one contains the offset
-    let mut current_pos = 0;
-    for (i, component) in full_module_name.split('.').enumerate() {
-        let component_start = current_pos;
-        let component_end = current_pos + component.len();
-
-        // Check if the offset is within this component or at its right boundary
-        if pos_in_module >= component_start && pos_in_module <= component_end {
-            let component_range = TextRange::new(
-                module_start + TextSize::from(u32::try_from(component_start).ok()?),
-                module_start + TextSize::from(u32::try_from(component_end).ok()?),
-            );
-            return Some((i, component_range));
-        }
-
-        // Move past this component and the dot
-        current_pos = component_end + 1; // +1 for the dot
-    }
-
-    None
+    module
+        .component_ranges(tokens)
+        .enumerate()
+        .find(|(_, range)| range.contains_inclusive(offset))
 }
 
 /// Helper to get the module name up to the given component index
