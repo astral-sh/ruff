@@ -401,15 +401,18 @@ When we intersect literals with `Any`, distinct values still give distinct alter
 from typing import Any, Literal
 from typing_extensions import LiteralString
 from ty_extensions import Intersection
+from ty_extensions._internal import TypeOf
 
 def _(
     distinct: Intersection[Any, Literal["a"]] | Intersection[Literal["b"], Any],
     same: Intersection[Literal["a"], Any] | Intersection[Any, Literal["a"]],
+    same_class: Intersection[Any, TypeOf[int]] | Intersection[TypeOf[int], Any],
     broader: Intersection[Literal["a"], Any] | Intersection[Any, LiteralString],
     mixed: Intersection[Any, LiteralString] | Intersection[Any, Literal[1]],
 ):
     reveal_type(distinct)  # revealed: (Any & Literal["a"]) | (Literal["b"] & Any)
     reveal_type(same)  # revealed: Literal["a"] & Any
+    reveal_type(same_class)  # revealed: Any & <class 'int'>
     reveal_type(broader)  # revealed: Any & LiteralString
     reveal_type(mixed)  # revealed: (Any & LiteralString) | (Any & Literal[1])
 ```

@@ -1206,8 +1206,7 @@ impl<'db> UnionBuilder<'db> {
     /// and that their union cannot cover `object`. The caller must handle equal types first.
     /// A `false` result leaves the decision to the general relation checks.
     ///
-    /// Distinct class and module literals identify different objects. Applying the same truthiness
-    /// guard to two class literals preserves that distinction.
+    /// Distinct class and module literals identify different objects.
     ///
     /// Bound methods expose the underlying function as `__func__`, so distinct function
     /// literals keep their methods distinct even when the signatures are identical. Similarly,
@@ -1242,26 +1241,6 @@ impl<'db> UnionBuilder<'db> {
                 .has_incomparable_parameters(right.signatures(db)),
             (Type::ClassLiteral(_), Type::ClassLiteral(_))
             | (Type::ModuleLiteral(_), Type::ModuleLiteral(_)) => true,
-            // Distributing `Any & Literal["a", "b"]` produces one intersection per
-            // value. Each intersection is still bounded by its literal.
-            (Type::Intersection(left), Type::Intersection(right))
-                if let Some(left) = left.gradual_literal(db)
-                    && let Some(right) = right.gradual_literal(db) =>
-            {
-                left.is_disjoint_from(db, right)
-            }
-            (Type::Intersection(left), Type::Intersection(right)) => {
-                let class_guard = |ty: IntersectionType<'db>| {
-                    let Ok(Type::ClassLiteral(_)) = ty.iter_positive(db).exactly_one() else {
-                        return None;
-                    };
-                    match ty.iter_negative(db).exactly_one() {
-                        Ok(guard @ (Type::AlwaysTruthy | Type::AlwaysFalsy)) => Some(guard),
-                        _ => None,
-                    }
-                };
-                class_guard(left).is_some_and(|guard| class_guard(right) == Some(guard))
-            }
             (Type::Dynamic(_), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::Dynamic(_))
                 if !instance.is_object() =>
@@ -1307,6 +1286,7 @@ impl<'db> UnionBuilder<'db> {
         // unpacking them.
         let should_simplify_full = !ty.is_alias_like() && !self.cycle_recovery;
 
+        let mut incoming_literal = None;
         let mut incoming_tuple = None;
         let mut ty_negated: Option<Type> = None;
         let mut reductions = UnionReductions::default();
@@ -1351,6 +1331,24 @@ impl<'db> UnionBuilder<'db> {
 
             if ty == element_type {
                 return;
+            }
+
+            // For redundancy, a positive element must satisfy the other arm's literal bound.
+            // A dynamic type like `Any` cannot do so, and neither can a disjoint literal.
+            // The literal bounds also prevent the two arms from covering `object`.
+            // Require identical exclusions so neither arm can restore what the other excludes.
+            if let (Type::Intersection(left), Type::Intersection(right)) = (ty, element_type)
+                && let Some((a, left_exclusions)) =
+                    *incoming_literal.get_or_insert_with(|| left.literal_bound_and_exclusions(db))
+                && let Some((b, right_exclusions)) = right.literal_bound_and_exclusions(db)
+                && left_exclusions == right_exclusions
+                && match (a, b) {
+                    (Type::LiteralValue(a), Type::LiteralValue(b)) => a.is_disjoint_from(db, b),
+                    // At least one bound is a class object.
+                    _ => a != b,
+                }
+            {
+                continue;
             }
 
             if Self::is_incomparable_for_union(db, ty, element_type) {

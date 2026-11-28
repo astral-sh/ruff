@@ -11,7 +11,7 @@ use crate::place::{
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
 use crate::types::{
-    ApplyTypeMappingVisitor, InstanceProjection, LiteralValueType, PromotionKind, PromotionMode,
+    ApplyTypeMappingVisitor, InstanceProjection, PromotionKind, PromotionMode,
     RecursiveTypeNormalizer, Type, TypeContext, TypeMapping, TypePair, TypeQualifiers,
 };
 use crate::types::{TypeVarBoundOrConstraints, visitor};
@@ -1150,18 +1150,26 @@ impl<'db> IntersectionType<'db> {
         builder.build()
     }
 
-    /// Return the literal if this intersection consists of a dynamic type and a literal,
-    /// as in `Any & Literal["a"]`.
-    fn gradual_literal(self, db: &'db dyn Db) -> Option<LiteralValueType<'db>> {
-        match self.iter_positive(db).collect_tuple()? {
-            (Type::Dynamic(_), Type::LiteralValue(literal))
-            | (Type::LiteralValue(literal), Type::Dynamic(_))
-                if self.negative(db).is_empty() =>
-            {
-                Some(literal)
-            }
-            _ => None,
+    /// Return the literal and exclusions of an intersection like `Any & <class 'A'> & ~AlwaysFalsy`.
+    /// The literal must be the only positive element other than dynamic types.
+    fn literal_bound_and_exclusions(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(Type<'db>, &'db NegativeIntersectionElements<'db>)> {
+        let Ok(literal @ (Type::ClassLiteral(_) | Type::LiteralValue(_))) = self
+            .iter_positive(db)
+            .filter(|ty| !ty.is_non_divergent_dynamic())
+            .exactly_one()
+        else {
+            return None;
+        };
+
+        // Expanding a negated alias can introduce other positive elements.
+        let exclusions = self.negative(db);
+        if exclusions.iter().copied().any(Type::is_alias_like) {
+            return None;
         }
+        Some((literal, exclusions))
     }
 
     /// Return the compact enum-complement view of this intersection, if it has one.
