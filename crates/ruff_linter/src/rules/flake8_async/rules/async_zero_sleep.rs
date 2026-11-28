@@ -35,8 +35,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     await trio.lowlevel.checkpoint()
 /// ```
 /// ## Fix safety
-/// This rule's fix is marked as unsafe if there's comments in the
-/// `trio.sleep(0)` expression, as comments may be removed.
+/// This rule's fix is marked as unsafe if there are comments in the
+/// `trio.sleep(0)` expression, as comments may be removed, or if the original
+/// import originates from a local scope, as adding a top-level import could
+/// cause runtime errors if the dependency is optional.
 ///
 /// For example, the fix would be marked as unsafe in the following case:
 /// ```python
@@ -127,12 +129,25 @@ pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
             return;
         }
 
+        // `anyio.lowlevel` is a submodule, so we need `import anyio.lowlevel`
+        // rather than `from anyio import lowlevel`.
+        let full_module_name = format!("{module}.lowlevel");
+
+        let is_unsafe = checker.comment_ranges().intersects(call.range())
+            || (checker.semantic().is_local_binding(call.func.as_ref())
+                && checker
+                    .semantic()
+                    .resolve_qualified_import_name(&full_module_name, "checkpoint")
+                    .is_none());
+
+        let applicability = if is_unsafe {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
         let mut diagnostic = checker.report_diagnostic(AsyncZeroSleep { module }, call.range());
         diagnostic.try_set_fix(|| {
-            // `anyio.lowlevel` is a submodule, so we need `import anyio.lowlevel`
-            // rather than `from anyio import lowlevel`.
-            let full_module_name = format!("{module}.lowlevel");
-
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import(&full_module_name, "checkpoint"),
                 call.func.start(),
@@ -145,11 +160,7 @@ pub(crate) fn async_zero_sleep(checker: &Checker, call: &ExprCall) {
             Ok(Fix::applicable_edits(
                 import_edit,
                 [reference_edit, arg_edit],
-                if checker.comment_ranges().intersects(call.range()) {
-                    Applicability::Unsafe
-                } else {
-                    Applicability::Safe
-                },
+                applicability,
             ))
         });
     }
