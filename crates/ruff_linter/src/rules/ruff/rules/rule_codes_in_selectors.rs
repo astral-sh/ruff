@@ -9,7 +9,7 @@ use crate::codes::Category;
 
 /// ## What it does
 ///
-/// Checks for any configuration files that use rule codes as selectors.
+/// Checks Ruff configuration files and inline script metadata for rule codes used as selectors.
 ///
 /// ## Why is this bad?
 ///

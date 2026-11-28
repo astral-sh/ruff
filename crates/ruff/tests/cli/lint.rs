@@ -6355,3 +6355,60 @@ fn fix_redirected_selectors_with_rule_names() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn script_rule_selectors() -> Result<()> {
+    let test = CliTest::with_file(
+        "script.py",
+        r#"
+            # /// script
+            # [tool.ruff.lint]
+            # extend-select = ["renamed-rule", "rule-codes-in-selectors"]
+            # select = ["TCH", "F401"]
+            # ///
+            print("hello")
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        test.check_command()
+            .args(["--preview", "script.py"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:5:14: renamed-rule: [*] Rule selector `TCH` redirects to `TC` in `lint.select`
+    script.py:5:21: rule-codes-in-selectors: [*] Rule code used instead of name in `lint.select`
+    Found 2 errors.
+    [*] 2 fixable with `--fix`.
+
+    ----- stderr -----
+    "
+    );
+
+    assert_cmd_snapshot!(
+        test.check_command()
+            .args(["--preview", "--diff", "script.py"]),
+        @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    --- script.py
+    +++ script.py
+    @@ -2,6 +2,6 @@
+     # /// script
+     # [tool.ruff.lint]
+     # extend-select = ["renamed-rule", "rule-codes-in-selectors"]
+    -# select = ["TCH", "F401"]
+    +# select = ["TC", "unused-import"]
+     # ///
+     print("hello")
+
+    Would fix 2 errors.
+
+    ----- stderr -----
+    "#
+    );
+
+    Ok(())
+}
