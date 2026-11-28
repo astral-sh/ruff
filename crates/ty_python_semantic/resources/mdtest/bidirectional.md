@@ -1737,17 +1737,26 @@ If the inferred solution does not satisfy the declared constraints, a narrower o
 be chosen:
 
 ```py
-def takes_callable[T](callback: Callable[[T], None]) -> Covariant[T]:
+from collections.abc import Iterable, Mapping
+
+def make_mapping[K, V](default: V, factory: Callable[[K], V]) -> Mapping[K, V]:
     raise NotImplementedError
 
-def accepts_object(_: object) -> None: ...
+def _(accepts_object: Callable[[object], None], a: int | None, values: list[int], i: int):
+    # revealed: Mapping[int, None]
+    x1: Iterable[int] = reveal_type(make_mapping(None, accepts_object))
 
-# revealed: Covariant[int]
-x1: Covariant[int] = reveal_type(takes_callable(accepts_object))
-
-def _(a: int | None):
     # revealed: (int | None | str, /) -> bool
-    x1: Callable[[str], bool] = reveal_type(make_callable(a))
+    x2: Callable[[str], bool] = reveal_type(make_callable(a))
+
+    # revealed: (list[Any] | None, /) -> bool
+    x3: Callable[[list[Any] | None], bool] = reveal_type(make_callable(values))
+
+    # revealed: list[list[Any] | None]
+    x4: list[list[Any] | None] = reveal_type(f(values))
+
+    # revealed: Mapping[str, int | str]
+    x5: Mapping[str, object] = reveal_type(make_mapping(i, identity))
 ```
 
 ## Declared type preference sees through subtyping
@@ -2130,10 +2139,10 @@ As well as to a union nested behind a type alias.
 type EitherList = list[int | str] | list[int | None]
 
 x1: EitherList = list((None, None))
-reveal_type(x1)  # revealed: list[None | int]
+reveal_type(x1)  # revealed: list[int | None]
 
 x2: EitherList = list(("1", "2", "3"))
-reveal_type(x2)  # revealed: list[str | int]
+reveal_type(x2)  # revealed: list[int | str]
 
 type SelfOp[T] = Mapping[Literal["$eq", "$ne"], T]
 type ListOp[T] = Mapping[Literal["$in", "$nin"], Sequence[T]]
