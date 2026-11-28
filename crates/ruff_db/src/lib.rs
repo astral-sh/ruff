@@ -64,12 +64,12 @@ pub fn set_program_version(version: String) -> Result<(), String> {
     VERSION.set(version)
 }
 
-/// Disables LRU bookkeeping for all queries defined by this crate.
+/// Disables eviction bookkeeping for all queries defined by this crate.
 ///
 /// This is useful for short-lived database users that don't need to evict query results across
 /// revisions.
-pub fn disable_lru(db: &mut dyn Db) {
-    parsed::disable_lru(db);
+pub fn disable_eviction(db: &mut dyn Db) {
+    parsed::disable_eviction(db);
 }
 
 /// Most basic database that gives access to files, the host system, source code, and parsed AST.
