@@ -1,6 +1,7 @@
 mod analysis_options;
 mod baseline;
 mod config_option;
+mod coverage;
 mod exit_code;
 mod file_selection;
 mod fixes;

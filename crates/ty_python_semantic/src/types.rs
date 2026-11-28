@@ -191,7 +191,7 @@ mod typevar;
 mod union_type_instance;
 mod unpacker;
 mod variance;
-mod visitor;
+pub(crate) mod visitor;
 
 mod definition;
 pub(crate) mod definition_resolution;
@@ -2882,7 +2882,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    const fn is_dynamic(&self) -> bool {
+    pub(crate) const fn is_dynamic(&self) -> bool {
         matches!(
             self,
             Type::Dynamic(_)
@@ -2943,7 +2943,7 @@ impl<'db> Type<'db> {
     }
 
     /// If the type is a specialized instance of the given `KnownClass`, returns the specialization.
-    fn known_specialization(
+    pub(crate) fn known_specialization(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
