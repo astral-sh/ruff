@@ -7,9 +7,10 @@ use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOri
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, DescriptorSetterDomain,
     ExplicitAttributeWriteRequirement, FallbackAttributeWriteRequirement,
-    InstanceAttributeWriteMember, ProtocolMemberWriteRequirement, attribute_setattr_member,
-    attribute_write_requirement, descriptor_setter_domain, instance_attribute_write_is_blocked,
-    instance_setattr_dispatch, property_setter_returns_never,
+    InstanceAttributeWriteMember, ProtocolMemberWriteRequirement, SetAttrWriteRequirement,
+    attribute_setattr_member, attribute_write_requirement, descriptor_setter_domain,
+    instance_attribute_write_is_blocked, instance_setattr_dispatch, property_setter_returns_never,
+    setattr_write_requirement,
 };
 use crate::types::call::{Bindings, CallArguments, CallDiagnosticOverride, CallError};
 use crate::types::class::FrozenDataclassDispatch;
@@ -593,6 +594,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             &setattr_result,
             frozen_dataclass_dispatch,
         );
+        let setattr_requirement = setattr_write_requirement(db, env, &setattr_result);
 
         if assignment_blocked {
             if emit_diagnostics {
@@ -675,10 +677,12 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 value_ty,
                 emit_diagnostics,
             ),
-            InstanceAttributeWriteMember::SetAttr => match setattr_result {
-                Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
-                Err(CallDunderError::CallError(kind, bindings, _)) => {
-                    if emit_diagnostics {
+            InstanceAttributeWriteMember::SetAttr => match setattr_requirement {
+                SetAttrWriteRequirement::Callable(_) => true,
+                SetAttrWriteRequirement::Invalid => {
+                    if emit_diagnostics
+                        && let Err(CallDunderError::CallError(kind, bindings, _)) = setattr_result
+                    {
                         self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr {
                             value_ty,
                             failure: CallError(kind, bindings),
@@ -686,7 +690,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     }
                     false
                 }
-                Err(CallDunderError::MethodNotAvailable)
+                SetAttrWriteRequirement::Missing
                     if matches!(
                         frozen_dataclass_dispatch,
                         Some(FrozenDataclassDispatch::Delegate(_))
@@ -694,7 +698,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 {
                     true
                 }
-                Err(CallDunderError::MethodNotAvailable) => {
+                SetAttrWriteRequirement::Missing => {
                     if emit_diagnostics {
                         self.report(AssignmentAttributeWriteDiagnostic::Unresolved {
                             with_period: false,
@@ -702,6 +706,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     }
                     false
                 }
+                SetAttrWriteRequirement::Terminal => false,
             },
         }
     }
@@ -749,11 +754,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 let setattr_member = attribute_setattr_member(db, env, object_ty, None, None);
                 let (setattr_result, value_ty) =
                     self.infer_and_try_call_setattr(setattr_member, emit_diagnostics);
-                let setattr_returns_never = match &setattr_result {
-                    Ok(bindings) => bindings.return_type(db, env).is_never(),
-                    Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
-                };
-                if setattr_returns_never {
+                let setattr_requirement = setattr_write_requirement(db, env, &setattr_result);
+                if matches!(setattr_requirement, SetAttrWriteRequirement::Terminal) {
                     if emit_diagnostics {
                         self.report(AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
                             member_exists: false,
@@ -763,10 +765,13 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     return false;
                 }
 
-                match setattr_result {
-                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
-                    Err(CallDunderError::CallError(kind, bindings, _)) => {
-                        if emit_diagnostics {
+                match setattr_requirement {
+                    SetAttrWriteRequirement::Callable(_) => true,
+                    SetAttrWriteRequirement::Invalid => {
+                        if emit_diagnostics
+                            && let Err(CallDunderError::CallError(kind, bindings, _)) =
+                                setattr_result
+                        {
                             self.report(AssignmentAttributeWriteDiagnostic::BadSetAttr {
                                 value_ty,
                                 failure: CallError(kind, bindings),
@@ -774,7 +779,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                         }
                         false
                     }
-                    Err(CallDunderError::MethodNotAvailable) => {
+                    SetAttrWriteRequirement::Missing => {
                         if emit_diagnostics {
                             self.report(if *has_instance_attribute {
                                 AssignmentAttributeWriteDiagnostic::CannotAssignToInstanceAttribute
@@ -784,6 +789,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                         }
                         false
                     }
+                    SetAttrWriteRequirement::Terminal => false,
                 }
             }
         }
