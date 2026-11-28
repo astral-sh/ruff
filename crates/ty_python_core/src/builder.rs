@@ -1,4 +1,4 @@
-use std::cell::{OnceCell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::hash::BuildHasher;
 use std::sync::Arc;
 
@@ -278,7 +278,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     resolver_environment: ResolverEnvironment<'db>,
     python_version: PythonVersion,
     source_text: OnceCell<SourceText>,
-    semantic_checker: SemanticSyntaxChecker,
+    semantic_checker: Cell<SemanticSyntaxChecker>,
     /// Whether the current statement is inside a `try` statement, including its `except`, `else`,
     /// and `finally` suites. Used for semantic syntax checks independently of handler activity.
     in_try_statement: bool,
@@ -375,7 +375,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             resolver_environment: file.resolver_environment(db),
             python_version: file.python_version(db),
             source_text: OnceCell::new(),
-            semantic_checker: SemanticSyntaxChecker::default(),
+            semantic_checker: Cell::default(),
             in_try_statement: false,
             semantic_syntax_errors: RefCell::default(),
             narrowing_aliases: NarrowingAliases::default(),
@@ -3432,10 +3432,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
-        let mut checker = std::mem::take(&mut self.semantic_checker);
+    fn with_semantic_checker(&self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
+        let mut checker = self.semantic_checker.take();
         f(&mut checker, self);
-        self.semantic_checker = checker;
+        self.semantic_checker.set(checker);
     }
 
     fn source_text(&self) -> &SourceText {
