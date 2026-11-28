@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::{ResolvedReference, Scope};
+use ruff_python_semantic::{ResolvedReference, Scope, ScopeId};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -55,7 +55,7 @@ impl Violation for GlobalVariableNotAssigned {
 }
 
 /// PLW0602
-pub(crate) fn global_variable_not_assigned(checker: &Checker, scope: &Scope) {
+pub(crate) fn global_variable_not_assigned(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
     for (name, binding_id) in scope.bindings() {
         let binding = checker.semantic().binding(binding_id);
         // If the binding is a `global`, then it's a top-level `global` that was never
@@ -74,6 +74,21 @@ pub(crate) fn global_variable_not_assigned(checker: &Checker, scope: &Scope) {
                 .map(|id| checker.semantic().reference(*id))
                 .all(ResolvedReference::is_load)
             {
+                // If the name is read, and an enclosing function binds it too, the `global`
+                // is what makes the read refer to the global variable rather than the
+                // enclosing function's local, as in:
+                // ```python
+                // def outer():
+                //     DEBUG = False
+                //
+                //     def inner():
+                //         global DEBUG
+                //         print(DEBUG)
+                // ```
+                if binding.is_used() && is_shadowed_by_enclosing_scope(checker, scope_id, name) {
+                    continue;
+                }
+
                 checker.report_diagnostic(
                     GlobalVariableNotAssigned {
                         name: (*name).to_string(),
@@ -83,4 +98,27 @@ pub(crate) fn global_variable_not_assigned(checker: &Checker, scope: &Scope) {
             }
         }
     }
+}
+
+/// Returns `true` if, without the `global` declaration, a read of `name` in the given scope would
+/// resolve to a binding in an enclosing scope rather than in the global scope.
+fn is_shadowed_by_enclosing_scope(checker: &Checker, scope_id: ScopeId, name: &str) -> bool {
+    let semantic = checker.semantic();
+    semantic
+        .scopes
+        .ancestors(scope_id)
+        .skip(1)
+        // Names bound in a class scope aren't visible from the scopes nested within it.
+        .filter(|scope| !scope.kind.is_class())
+        .take_while(|scope| !scope.kind.is_module())
+        .find(|scope| scope.has(name))
+        // The nearest enclosing scope that mentions the name decides: if it declares the name
+        // `global`, the name already refers to the global scope, so the inner `global` is
+        // redundant. A `global` applies to the whole scope, so it's still at the start of the
+        // binding chain after later assignments or deletions.
+        .is_some_and(|scope| {
+            !scope
+                .get_all(name)
+                .any(|binding_id| semantic.binding(binding_id).kind.is_global())
+        })
 }
