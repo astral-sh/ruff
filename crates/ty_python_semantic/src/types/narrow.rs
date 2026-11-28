@@ -798,22 +798,27 @@ impl<'db> Conjunctions<'db> {
         self
     }
 
-    fn evaluate_constraint_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    fn evaluate_constraint_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
         if self.conjuncts.len() == 1 {
             return self.conjuncts[0].ty();
         }
 
         // Collapse shared union arms before distributing the next constraint over them.
-        self.conjuncts
-            .into_iter()
-            .fold(Type::object(), |accumulated, conjunct| match conjunct {
+        self.conjuncts.iter().copied().fold(
+            Type::object(),
+            |accumulated, conjunct| match conjunct {
                 NarrowingOperation::Intersection(ty) => {
                     IntersectionType::from_two_elements(db, env, accumulated, ty)
                 }
                 NarrowingOperation::GenericFiltering(ty) => {
                     filter_generic_narrowing_constraint(db, env, accumulated, ty)
                 }
-            })
+            },
+        )
     }
 }
 
@@ -1132,6 +1137,45 @@ struct CombinedNarrowingConstraint<'db> {
     replacement_disjuncts: SmallVec<[Conjunctions<'db>; 1]>,
 }
 
+/// Successive reads under the same guard often evaluate the same conjunctions,
+/// including the type before narrowing. Memoize their complete ordered inputs
+/// to avoid interning every intermediate intersection and union comparison.
+#[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
+struct NarrowingInput<'db> {
+    #[returns(copy)]
+    program: crate::Program<'db>,
+    #[returns(deref)]
+    constraint: Box<CombinedNarrowingConstraint<'db>>,
+}
+
+impl<'db> NarrowingInput<'db> {
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa supplies None during cycle recovery"
+    )]
+    fn evaluate(self, db: &'db dyn Db) -> Type<'db> {
+        fn evaluate<'db>(db: &'db dyn Db, input: NarrowingInput<'db>) -> Type<'db> {
+            let env = ProgramEnvironment::from_program(input.program(db));
+            let combined = input.constraint(db);
+            let types: SmallVec<[_; 2]> = combined
+                .replacement_disjuncts
+                .iter()
+                .chain(&combined.intersection_disjuncts)
+                .map(|conjunctions| conjunctions.evaluate_constraint_type(db, &env))
+                .collect();
+            UnionType::normalize_place_types(db, &env, &types)
+        }
+
+        // Let the underlying relations recover cycles in the original caller.
+        #[salsa::tracked(returns(copy), cycle_result=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn cached<'db>(db: &'db dyn Db, input: NarrowingInput<'db>) -> Option<Type<'db>> {
+            Some(evaluate(db, input))
+        }
+
+        cached(db, self).unwrap_or_else(|| evaluate(db, self))
+    }
+}
+
 impl<'db> NarrowingConstraint<'db> {
     /// Create an "intersection" constraint: the previous type will be
     /// intersected with this constraint
@@ -1325,13 +1369,7 @@ impl<'db> NarrowingConstraint<'db> {
             }
             NarrowingConstraintKind::Empty => Type::Never,
             NarrowingConstraintKind::Combined(combined) => {
-                let types: SmallVec<[_; 2]> = combined
-                    .replacement_disjuncts
-                    .into_iter()
-                    .chain(combined.intersection_disjuncts)
-                    .map(|conjunctions| conjunctions.evaluate_constraint_type(db, env))
-                    .collect();
-                UnionType::normalize_place_types(db, env, &types)
+                NarrowingInput::new(db, env.program(db), combined).evaluate(db)
             }
         }
     }
