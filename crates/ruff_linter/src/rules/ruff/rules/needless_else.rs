@@ -10,6 +10,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -61,7 +62,10 @@ pub(crate) fn needless_else(checker: &Checker, stmt: AnyNodeWithOrElse) {
         return;
     };
 
-    if else_contains_comments(stmt, else_range, checker) {
+    // Emit suppressed diagnostics so `RUF100` can mark the `noqa` directive as used.
+    if !checker.rule_is_ignored(Rule::NeedlessElse, else_range.start())
+        && else_contains_comments(stmt, else_range, checker)
+    {
         return;
     }
 
