@@ -51,6 +51,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
+use smallvec::SmallVec;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
 use crate::types::context::InferContextResult;
@@ -1262,8 +1263,8 @@ struct OtherDefinitionTypes<'db> {
 impl<'db> DefinitionTypes<'db> {
     fn from_parts(
         owner: Definition<'db>,
-        bindings: Vec<DefinitionBinding<'db>>,
-        declarations: Vec<DefinitionDeclaration<'db>>,
+        bindings: SmallVec<[DefinitionBinding<'db>; 1]>,
+        declarations: SmallVec<[DefinitionDeclaration<'db>; 1]>,
     ) -> Self {
         match (&*bindings, &*declarations) {
             ([], []) => Self::Empty,
