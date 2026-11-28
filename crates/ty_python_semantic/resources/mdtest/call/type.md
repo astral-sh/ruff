@@ -1,5 +1,10 @@
 # Calls to `type()`
 
+```toml
+[rules]
+mismatched-dynamic-type-name = "ignore"
+```
+
 ## Single-argument form
 
 A single-argument call to `type()` returns an object that has the argument's meta-type.
@@ -219,6 +224,41 @@ class Base: ...
 base_name = "DerivedClass"
 DerivedClass = type(base_name, (Base,), {})
 reveal_type(DerivedClass)  # revealed: <class 'DerivedClass'>
+```
+
+## Mismatched class names
+
+```toml
+[rules]
+mismatched-dynamic-type-name = "warn"
+```
+
+When enabled, `mismatched-dynamic-type-name` checks the runtime name of a class assigned directly to
+a variable. The one-argument form of `type()` looks up an existing class.
+
+```py
+name = "Record"
+
+# snapshot: mismatched-dynamic-type-name
+Entry: type = type(name, (), {})
+
+record_type = type(Entry())  # ok
+alias = Entry  # ok
+Public = Internal = type("Internal", (), {})  # ok
+```
+
+```snapshot
+warning[mismatched-dynamic-type-name]: The name passed to `type` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:4:20
+  |
+4 | Entry: type = type(name, (), {})
+  |                    ^^^^ Expected "Entry", got "Record"
+```
+
+```py
+from builtins import type as make_type
+
+Point = make_type("Vector", (), {})  # error: [mismatched-dynamic-type-name]
 ```
 
 ## Distinct class types
