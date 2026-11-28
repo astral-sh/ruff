@@ -4,8 +4,8 @@ use std::borrow::Cow;
 
 use anyhow::{Result, bail};
 use libcst_native::{
-    Codegen, CodegenState, Expression, Import, ImportFrom, ImportNames, LazyImport, LazyImportFrom,
-    NameOrAttribute, ParenthesizableWhitespace, SmallStatement, Statement,
+    Codegen, CodegenState, Expression, Import, ImportAlias, ImportFrom, ImportNames, LazyImport,
+    LazyImportFrom, NameOrAttribute, ParenthesizableWhitespace, SmallStatement, Statement,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec};
@@ -50,15 +50,98 @@ pub(crate) fn remove_imports<'a>(
         Stmt::ImportFrom(import) => &import.names,
         _ => bail!("Expected import statement"),
     };
-    let mut member_names = member_names.peekable();
+    let member_names: Vec<&str> = member_names.collect();
     // Deleting the only named import leaves no formatting to preserve.
     if let [alias] = names.as_slice()
         && alias.name.as_str() != "*"
-        && member_names.peek().copied() == Some(alias.name.as_str())
+        && member_names.first().copied() == Some(alias.name.as_str())
     {
         return Ok(None);
     }
 
+    // Remove any imports that are specified in the `imports` iterator (but, e.g., if the name is
+    // provided once, only remove the first occurrence).
+    let mut counts =
+        member_names
+            .iter()
+            .fold(FxHashMap::<&str, usize>::default(), |mut map, name| {
+                map.entry(*name).and_modify(|c| *c += 1).or_insert(1);
+                map
+            });
+
+    remove_import_aliases(
+        stmt,
+        locator,
+        stylist,
+        || {
+            let mut found_star = false;
+            for member in &member_names {
+                if *member == "*" {
+                    found_star = true;
+                } else {
+                    bail!("Expected \"*\" for unused import (got: \"{member}\")");
+                }
+            }
+            if !found_star {
+                bail!("Expected \'*\' for unused import");
+            }
+            Ok(())
+        },
+        |_, alias| {
+            let name = qualified_name_from_name_or_attribute(&alias.name);
+            if let Some(count) = counts.get_mut(name.as_str()).filter(|count| **count > 0) {
+                *count -= 1;
+                true
+            } else {
+                false
+            }
+        },
+    )
+}
+
+/// Given an import statement, remove the imports at the given positions in its list of names.
+///
+/// Unlike [`remove_imports`], this identifies each import by its position rather than by its
+/// name, so it removes the right one when a statement imports the same name more than once
+/// (e.g., `from os.path import join, join as path_join`).
+///
+/// Returns `Ok(None)` if the statement is empty after removing the imports.
+pub(crate) fn remove_imports_at(
+    positions: &[usize],
+    stmt: &Stmt,
+    locator: &Locator,
+    stylist: &Stylist,
+) -> Result<Option<String>> {
+    let names = match stmt {
+        Stmt::Import(import) => &import.names,
+        Stmt::ImportFrom(import) => &import.names,
+        _ => bail!("Expected import statement"),
+    };
+    // Deleting every import leaves no formatting to preserve.
+    if (0..names.len()).all(|position| positions.contains(&position)) {
+        return Ok(None);
+    }
+
+    remove_import_aliases(
+        stmt,
+        locator,
+        stylist,
+        || bail!("Expected a `from ... import *` statement to be removed entirely"),
+        |position, _| positions.contains(&position),
+    )
+}
+
+/// Remove the aliases for which `should_remove` returns `true` from an import statement.
+///
+/// `on_star` is called for a `from ... import *` statement, which is deleted entirely if it
+/// returns `Ok`.
+fn remove_import_aliases(
+    stmt: &Stmt,
+    locator: &Locator,
+    stylist: &Stylist,
+    on_star: impl FnOnce() -> Result<()>,
+    mut should_remove: impl FnMut(usize, &ImportAlias<'_>) -> bool,
+) -> Result<Option<String>> {
     let module_text = locator.slice(stmt);
     let mut tree = match_statement(module_text)?;
 
@@ -80,17 +163,7 @@ pub(crate) fn remove_imports<'a>(
             } else if let ImportNames::Star(..) = names {
                 // Special-case: if the import is a `from ... import *`, then we delete the
                 // entire statement.
-                let mut found_star = false;
-                for member in member_names {
-                    if member == "*" {
-                        found_star = true;
-                    } else {
-                        bail!("Expected \"*\" for unused import (got: \"{member}\")");
-                    }
-                }
-                if !found_star {
-                    bail!("Expected \'*\' for unused import");
-                }
+                on_star()?;
                 return Ok(None);
             } else {
                 bail!("Expected: ImportNames::Aliases | ImportNames::Star");
@@ -102,20 +175,11 @@ pub(crate) fn remove_imports<'a>(
     // Preserve the trailing comma (or not) from the last entry.
     let trailing_comma = aliases.last().and_then(|alias| alias.comma.clone());
 
-    // Remove any imports that are specified in the `imports` iterator (but, e.g., if the name is
-    // provided once, only remove the first occurrence).
-    let mut counts = member_names.fold(FxHashMap::<&str, usize>::default(), |mut map, name| {
-        map.entry(name).and_modify(|c| *c += 1).or_insert(1);
-        map
-    });
+    let mut position = 0;
     aliases.retain(|alias| {
-        let name = qualified_name_from_name_or_attribute(&alias.name);
-        if let Some(count) = counts.get_mut(name.as_str()).filter(|count| **count > 0) {
-            *count -= 1;
-            false
-        } else {
-            true
-        }
+        let keep = !should_remove(position, alias);
+        position += 1;
+        keep
     });
 
     // But avoid destroying any trailing comments.
