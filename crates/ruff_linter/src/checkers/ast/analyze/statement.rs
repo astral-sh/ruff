@@ -927,6 +927,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::ImportSelf) {
                 pylint::rules::import_from_self(
                     checker,
+                    stmt,
                     level,
                     module,
                     names,
