@@ -308,6 +308,22 @@ fn uses_legacy_inference<'db>(db: &'db dyn Db, generic_context: GenericContext<'
         .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db))
 }
 
+fn typevar_identity_for_inference<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<BoundTypeVarIdentity<'db>> {
+    let Type::TypeVar(variable) = ty else {
+        return None;
+    };
+    let identity = variable.identity(db);
+    // Signatures expose `P.args` and `P.kwargs`, which contribute to the same binding as `P`.
+    Some(if identity.is_paramspec(db) {
+        identity.without_paramspec_attr(db)
+    } else {
+        identity
+    })
+}
+
 /// A single callable item within the union/intersection structure.
 /// Either a regular callable, or a constructor callable.
 #[derive(Debug, Clone, get_size2::GetSize, salsa::SalsaValue)]
@@ -6964,9 +6980,19 @@ impl<'db> CallInference<'_, 'db> {
             SolutionType::Unresolved(_) => None,
         };
         let generic_context = inference.generic_context(db);
-        // TODO: Account for parameter-list and variadic-tuple bindings when refining returns.
+        // TODO: Account for variadic-tuple bindings when refining returns. For `ParamSpec`,
+        // support non-callable returns and account for shared state in nested returns such as
+        // `Callable[P, Callable[P, R]]`.
         // In particular, `Callable[P, R]` can capture state linking its inputs and output.
-        if uses_legacy_inference(db, generic_context) {
+        if generic_context
+            .variables(db)
+            .any(|variable| variable.is_typevartuple(db))
+        {
+            return (specialize_return_ty(merged_specialization), false);
+        }
+        if generic_context_has_paramspec(db, generic_context)
+            && !matches!(self.return_ty.resolve_type_alias(db), Type::Callable(_))
+        {
             return (specialize_return_ty(merged_specialization), false);
         }
         // An unresolved dependency does not make an alternative invalid. Keep the merged fallback
@@ -6985,7 +7011,7 @@ impl<'db> CallInference<'_, 'db> {
             .enumerate()
             .filter(|(_, variable)| {
                 any_over_type_expanding_aliases(db, env, self.return_ty, |ty| {
-                    matches!(ty, Type::TypeVar(return_variable) if return_variable.identity(db) == variable.identity(db))
+                    typevar_identity_for_inference(db, ty) == Some(variable.identity(db))
                 })
             })
             .collect();
@@ -7103,12 +7129,10 @@ impl<'db> CallInference<'_, 'db> {
         let env = self.env;
 
         let mentions_inferable = |ty| {
-            any_over_type_expanding_aliases(
-                db,
-                env,
-                ty,
-                |nested| matches!(nested, Type::TypeVar(variable) if variable.is_inferable(db, self.inferable_typevars)),
-            )
+            any_over_type_expanding_aliases(db, env, ty, |nested| {
+                typevar_identity_for_inference(db, nested)
+                    .is_some_and(|identity| identity.is_inferable(db, self.inferable_typevars))
+            })
         };
         let relations: Vec<_> = self
             .argument_relations()
@@ -7209,17 +7233,24 @@ impl<'db> CallInference<'_, 'db> {
                     .variance_of(db, env, variable.identity(db))
                     .evaluate(db),
             );
-            variance == TypeVarVariance::Invariant
-                // Whole-union comparisons are more conservative than tuple decomposition,
-                // so compatibility with one alternative is not transitive. Check every
-                // pair, falling back conservatively if the quadratic work exceeds budget.
-                || types.array_combinations().any(|[left, right]| {
-                    let Some(remaining) = remaining_comparisons.checked_sub(1) else {
-                        return true;
-                    };
-                    remaining_comparisons = remaining;
-                    self.has_invariant_return_difference(left, right, &invariant_visitor)
-                })
+            if variance == TypeVarVariance::Invariant {
+                return true;
+            }
+            // ParamSpec bindings use callable types to represent parameter lists. The pairwise
+            // check would treat those callables as potentially stateful.
+            if variable.is_paramspec(db) {
+                return false;
+            }
+            // Whole-union comparisons are more conservative than tuple decomposition,
+            // so compatibility with one alternative is not transitive. Check every
+            // pair, falling back conservatively if the quadratic work exceeds budget.
+            types.array_combinations().any(|[left, right]| {
+                let Some(remaining) = remaining_comparisons.checked_sub(1) else {
+                    return true;
+                };
+                remaining_comparisons = remaining;
+                self.has_invariant_return_difference(left, right, &invariant_visitor)
+            })
         });
 
         if has_invariant_difference {
