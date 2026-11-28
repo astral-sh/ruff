@@ -36,6 +36,11 @@ pub use stub_mapping::map_stub_definition;
 pub use unreachable_code::{UnreachableKind, UnreachableRange, unreachable_ranges};
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
 
+/// Returns `true` if this type is an enum class with known members.
+pub fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    crate::types::enums::is_enum_class(db, ty)
+}
+
 static CLASS_MATCHER: LazyLock<NameMatcher<'static>> =
     LazyLock::new(|| NameMatcher::keyword("class"));
 
