@@ -123,11 +123,11 @@ impl RuffSettings {
                 let fallback = find_fallback_target_version(root);
                 if let Some(fallback) = fallback {
                     tracing::debug!(
-                        "Derived `target-version` from found `requires-python` for fallback configuration: {fallback:?}"
+                        "Derived `target-version` from found `requires-python` for fallback configuration: {fallback}"
                     );
                 }
 
-                Self::with_editor_settings(Arc::clone(transformer), root, fallback.map(Into::into))
+                Self::with_editor_settings(Arc::clone(transformer), root, fallback)
             })
     }
 

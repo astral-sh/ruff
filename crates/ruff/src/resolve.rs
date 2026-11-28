@@ -9,8 +9,6 @@ use ruff_workspace::resolver::{
     ConfigurationOrigin, Project, PyprojectDiscoveryStrategy, RootProject, resolve_root_settings,
 };
 
-use ruff_python_ast as ast;
-
 use crate::args::ConfigArguments;
 
 /// Resolve the relevant settings strategy and defaults for the current
@@ -107,9 +105,9 @@ pub fn resolve(
         // specified, and that is what we look for in this step.
         let fallback = find_fallback_target_version(stdin_filename.unwrap_or(&cwd));
         if let Some(version) = fallback {
-            debug!("Derived `target-version` from found `requires-python`: {version:?}");
+            debug!("Derived `target-version` from found `requires-python`: {version}");
         }
-        configuration.target_version = fallback.map(ast::PythonVersion::from);
+        configuration.target_version = fallback;
     }
     Ok(RootProject {
         strategy: PyprojectDiscoveryStrategy::Hierarchical,

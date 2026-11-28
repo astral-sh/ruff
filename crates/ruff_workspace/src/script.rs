@@ -25,7 +25,7 @@ use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use ruff_source_file::{SourceFile, SourceFileBuilder};
 
 use crate::Settings;
-use crate::configuration::Configuration;
+use crate::configuration::{Configuration, clamp_target_version};
 use crate::options::Options;
 use crate::pyproject::{Tools, check_required_version, get_minimum_supported_version};
 use crate::resolver::{
@@ -170,10 +170,21 @@ pub fn script(
 
     let config_error = |err| ScriptSettingsError::configuration(path, &err);
     let resolve = |configuration, root: &Path| {
-        overrides
-            .transform(configuration)
-            .into_settings(root)
-            .map_err(config_error)
+        let mut configuration = overrides.transform(configuration);
+        // The script's `requires-python` replaces the project's target version, so setting
+        // `target-version` in the project configuration wouldn't silence the warning about an
+        // unsupported version. Clamp it here, after a `--target-version` override is applied,
+        // so the warning points to the script instead.
+        configuration.target_version = configuration.target_version.map(|version| {
+            clamp_target_version(
+                version,
+                &format!(
+                    "the `[tool.ruff]` table of the script metadata in `{path}`",
+                    path = path.unwrap_or(Path::new("-")).display()
+                ),
+            )
+        });
+        configuration.into_settings(root).map_err(config_error)
     };
 
     let mut config_path = None;
@@ -187,9 +198,11 @@ pub fn script(
             inline_configuration(options, path, &root, requires_python).map_err(config_error)?;
         config_path = path.map(fs::normalize_path);
         Some(resolve(configuration, &root)?)
-    } else if let Some(version) = requires_python.and_then(get_minimum_supported_version) {
+    } else if let Some(version) = requires_python.and_then(|requires_python| {
+        get_minimum_supported_version(requires_python, path.unwrap_or(Path::new("-")))
+    }) {
         let mut configuration = project.configuration.clone();
-        configuration.target_version = Some(version.into());
+        configuration.target_version = Some(version);
         // The script's requirement replaces the project's per-file targets too.
         configuration.per_file_target_version = Some(Vec::new());
         Some(resolve(
@@ -262,9 +275,11 @@ fn inline_configuration(
     let mut configuration = Configuration::from_options(options, path, root)?;
 
     if configuration.target_version.is_none()
-        && let Some(version) = requires_python.and_then(get_minimum_supported_version)
+        && let Some(version) = requires_python.and_then(|requires_python| {
+            get_minimum_supported_version(requires_python, path.unwrap_or(Path::new("-")))
+        })
     {
-        configuration.target_version = Some(version.into());
+        configuration.target_version = Some(version);
     }
 
     if configuration.target_version.is_some() {
