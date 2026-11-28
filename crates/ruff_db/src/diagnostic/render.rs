@@ -2482,6 +2482,27 @@ watermelon
     }
 
     #[test]
+    fn project_diagnostics_follow_rendering_order() {
+        let mut env = TestEnvironment::new();
+        env.add("fruits", FRUITS);
+        env.add("animals", ANIMALS);
+        let mut diagnostics = vec![
+            env.err().primary("fruits", "1", "1", "first").build(),
+            env.err().primary("animals", "2", "2", "").build(),
+            Diagnostic::new(DiagnosticId::Io, Severity::Hint, "Missing directory"),
+            env.err().primary("fruits", "1", "1", "second").build(),
+            env.err().primary("animals", "1", "1", "").build(),
+        ];
+
+        let sorted = crate::diagnostic::sort_project_diagnostics(diagnostics.clone(), &env.db);
+        diagnostics.sort_by(|a, b| {
+            a.rendering_sort_key(&env.db)
+                .cmp(&b.rendering_sort_key(&env.db))
+        });
+        assert_eq!(sorted, diagnostics);
+    }
+
+    #[test]
     fn diagnostics_with_equal_locations_sort_by_concise_message() {
         let mut env = TestEnvironment::new();
         env.add("fruits", FRUITS);

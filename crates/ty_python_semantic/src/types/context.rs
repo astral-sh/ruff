@@ -1,4 +1,9 @@
-use std::{cell::Cell, fmt, hint::cold_path, marker::PhantomData};
+use std::{
+    cell::{Cell, OnceCell},
+    fmt,
+    hint::cold_path,
+    marker::PhantomData,
+};
 
 use drop_bomb::DebugDropBomb;
 use ruff_db::PythonFile;
@@ -157,6 +162,8 @@ pub(crate) struct InferContext<'db, 'ast> {
     has_invalid_type_form: Cell<bool>,
     has_failed_call: Cell<bool>,
     diagnostic_mode: DiagnosticMode,
+    check_file: OnceCell<bool>,
+    no_type_check_ancestor: OnceCell<bool>,
     /// This field tracks various flags that control how type inference should behave in the current context.
     pub(crate) inference_flags: InferenceFlags,
     bomb: DebugDropBomb,
@@ -186,6 +193,8 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             has_invalid_type_form: Cell::new(false),
             has_failed_call: Cell::new(false),
             diagnostic_mode: DiagnosticMode::Normal,
+            check_file: OnceCell::new(),
+            no_type_check_ancestor: OnceCell::new(),
             inference_flags: InferenceFlags::empty(),
             bomb: DebugDropBomb::new(
                 "`InferContext` needs to be explicitly consumed by calling `::finish` to prevent accidental loss of diagnostics.",
@@ -265,10 +274,16 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         }
     }
 
+    pub(super) fn should_check_file(&self) -> bool {
+        *self
+            .check_file
+            .get_or_init(|| self.db().should_check_file(self.file))
+    }
+
     /// Whether diagnostics inferred separately for a referenced alias should be collected.
     pub(super) fn should_collect_diagnostics(&self) -> bool {
         self.diagnostic_mode == DiagnosticMode::Normal
-            && self.db().should_check_file(self.file())
+            && self.should_check_file()
             && !self.is_in_no_type_check()
     }
 
@@ -390,6 +405,12 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             return true;
         }
 
+        *self
+            .no_type_check_ancestor
+            .get_or_init(|| self.has_no_type_check_ancestor())
+    }
+
+    fn has_no_type_check_ancestor(&self) -> bool {
         // Accessing the semantic index here is fine because
         // the index belongs to the same file as for which we emit the diagnostic.
         let index = semantic_index(self.db(), self.program_file);
@@ -703,7 +724,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         //   returns a rule selector for a given file that respects the package's settings,
         //   any global pragma comments in the file, and any per-file-ignores.
 
-        if !ctx.db().should_check_file(ctx.file) {
+        if !ctx.should_check_file() {
             return None;
         }
         // Skip over diagnostics if the rule
@@ -820,7 +841,7 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
             return None;
         }
 
-        if !ctx.db().should_check_file(ctx.file) {
+        if !ctx.should_check_file() {
             return None;
         }
         Some(DiagnosticGuardBuilder { ctx, id, severity })

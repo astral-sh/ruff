@@ -403,7 +403,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         ];
 
         !self.in_string_annotation()
-            && self.db().should_check_file(self.file())
+            && self.context.should_check_file()
             && !self.file().is_stub(self.db())
             && RELEVANT_RULES
                 .iter()
@@ -536,13 +536,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// [`ConditionKind::ContainsWalrus`], such as `assert (value := "foo")`, remain eligible for
     /// `redundant-condition-strict`.
     pub(super) fn check_suite_for_redundant_conditions(&self, suite: &[ast::Stmt]) {
-        if !self.should_check_redundant_conditions() {
-            return;
-        }
-
+        // Only resolve lint settings and enclosing decorators for suites with conditions.
+        let enabled = std::cell::LazyCell::new(|| self.should_check_redundant_conditions());
         for (i, statement) in suite.iter().enumerate() {
             match statement {
                 ast::Stmt::If(if_stmt) => {
+                    if !*enabled {
+                        return;
+                    }
                     let ast::StmtIf {
                         test,
                         body,
@@ -586,6 +587,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
                 ast::Stmt::Assert(assert_statement) => {
+                    if !*enabled {
+                        return;
+                    }
                     let boolean_test =
                         self.boolean_test(&assert_statement.test, ExpressionContext::Condition);
                     for condition in self
@@ -601,6 +605,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
                 ast::Stmt::While(while_statement) => {
+                    if !*enabled {
+                        return;
+                    }
                     let boolean_test =
                         self.boolean_test(&while_statement.test, ExpressionContext::Condition);
                     for condition in self
@@ -617,6 +624,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
                 ast::Stmt::Match(match_statement) => {
+                    if !*enabled {
+                        return;
+                    }
                     for (case_index, case) in match_statement.cases.iter().enumerate() {
                         let Some(guard) = case.guard.as_deref() else {
                             continue;

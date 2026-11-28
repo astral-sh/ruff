@@ -24,7 +24,7 @@ pub use crate::statement::{Statement, StatementNodeKey};
 use ast_ids::AstIds;
 pub use ast_ids::ExpressionNodeKey;
 use builder::SemanticIndexBuilder;
-use definition::{Definition, DefinitionNodeKey, Definitions};
+use definition::{Definition, DefinitionNodeKey};
 use expression::Expression;
 use member::ScopedMemberId;
 use narrowing_constraints::ScopedNarrowingConstraint;
@@ -34,7 +34,7 @@ pub use scope::FileScopeId;
 use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness};
 use symbol::ScopedSymbolId;
 pub use use_def::{
-    ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
+    ApplicableConstraints, BindingKind, BindingWithConstraints, BindingWithConstraintsIterator,
     BindingsSnapshotId, DeclarationSources, DeclarationWithConstraint, DeclarationsIterator,
     ImportedFinalCandidate, ImportedFinalCandidatesIterator, LiveBinding, LoopHeaderId,
     NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, UseDefMap,
@@ -279,47 +279,6 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
     NoLongerInEagerContext,
 }
 
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-struct DefinitionsByNode<'db> {
-    single: FrozenMap<DefinitionNodeKey, Definition<'db>>,
-    non_single: FrozenMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
-}
-
-impl<'db> DefinitionsByNode<'db> {
-    fn from_map(definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>) -> Self {
-        let single_count = definitions_by_node
-            .values()
-            .filter(|definitions| definitions.len() == 1)
-            .count();
-        let mut single = Vec::with_capacity(single_count);
-        let mut non_single = Vec::with_capacity(definitions_by_node.len() - single_count);
-
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "each node is independently partitioned by definition count"
-        )]
-        for (key, definitions) in definitions_by_node {
-            if definitions.len() == 1 {
-                single.push((key, definitions[0]));
-            } else {
-                non_single.push((key, definitions.into_boxed_slice()));
-            }
-        }
-
-        Self {
-            single: FrozenMap::from_entries(single),
-            non_single: FrozenMap::from_entries(non_single),
-        }
-    }
-
-    fn get(&self, key: DefinitionNodeKey) -> Option<&[Definition<'db>]> {
-        self.single
-            .get(&key)
-            .map(std::slice::from_ref)
-            .or_else(|| self.non_single.get(&key).map(AsRef::as_ref))
-    }
-}
-
 /// The place tables and use-def maps for all scopes in a file.
 #[derive(Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SemanticIndex<'db> {
@@ -328,9 +287,6 @@ pub struct SemanticIndex<'db> {
 
     /// List of all scopes in this file.
     scopes: FrozenIndexVec<FileScopeId, Scope>,
-
-    /// Map from a node creating a definition to its definition.
-    definitions_by_node: DefinitionsByNode<'db>,
 
     /// Map from a standalone expression to its [`Expression`] ingredient.
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
@@ -359,11 +315,11 @@ pub struct SemanticIndex<'db> {
     /// Use-def map for each scope in this file.
     use_def_maps: FrozenIndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
 
-    /// Lexical scopes and scope-local use IDs recorded at source occurrences.
+    /// Definitions, lexical scopes and scope-local use IDs recorded at source occurrences.
     ///
     /// Note: We should not depend on this map when analysing other files or
     /// changing a file invalidates all dependents.
-    ast_ids: AstIds,
+    ast_ids: AstIds<'db>,
 
     /// The set of modules that are imported anywhere within this file.
     imported_modules: FrozenSet<ModuleName>,
@@ -458,7 +414,7 @@ impl<'db> SemanticIndex<'db> {
     }
 
     #[track_caller]
-    fn ast_ids(&self) -> &AstIds {
+    fn ast_ids(&self) -> &AstIds<'db> {
         &self.ast_ids
     }
 
@@ -656,7 +612,7 @@ impl<'db> SemanticIndex<'db> {
         })
     }
 
-    /// Return `true` if `expression` is an outermost "boolean test".
+    /// Return `true` if `expression` is an outermost "boolean test" in a file checked for diagnostics.
     ///
     /// A boolean test is an expression that Python tests for truthiness, such as an `if`
     /// condition or the operand of a `not` expression. ty's `redundant-condition` and
@@ -726,8 +682,8 @@ impl<'db> SemanticIndex<'db> {
     /// if the definitions are created by a wildcard (`*`) import.
     #[track_caller]
     pub fn definitions(&self, definition_key: impl Into<DefinitionNodeKey>) -> &[Definition<'db>] {
-        self.definitions_by_node
-            .get(definition_key.into())
+        self.ast_ids
+            .definitions(definition_key.into())
             .expect("definition should be present in the semantic index")
     }
 
@@ -737,7 +693,7 @@ impl<'db> SemanticIndex<'db> {
         definition_node: ast::AnyNodeRef<'_>,
     ) -> Option<&[Definition<'db>]> {
         let definition_key = DefinitionNodeKey::from_node_ref(definition_node);
-        self.definitions_by_node.get(definition_key)
+        self.ast_ids.definitions(definition_key)
     }
 
     /// Returns the [`definition::Definition`] salsa ingredient for `definition_key`.
@@ -770,10 +726,7 @@ impl<'db> SemanticIndex<'db> {
         &self,
         definition_key: impl Into<DefinitionNodeKey>,
     ) -> Option<Definition<'db>> {
-        self.definitions_by_node
-            .single
-            .get(&definition_key.into())
-            .copied()
+        self.ast_ids.definition(definition_key.into()).copied()
     }
 
     /// Returns the [`Expression`] ingredient for an expression node.
@@ -1211,6 +1164,7 @@ mod tests {
     use ruff_db::{
         files::{File, system_path_to_file},
         parsed::ParsedModuleRef,
+        system::DbWithWritableSystem as _,
     };
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
@@ -1271,6 +1225,30 @@ mod tests {
 
     fn program_file(db: &TestDb, file: File) -> ProgramFile<'_> {
         db.program().program_file(db, file)
+    }
+
+    #[test]
+    fn singleton_star_import_interleaved_with_regular_definitions() {
+        // The star import enters the singleton table last, after definitions on later pages.
+        let source = format!("x = 0\nfrom library import *\n{}", "x += 1\n".repeat(64));
+        let db = TestDbBuilder::new()
+            .with_file("/src/test.py", source.as_str())
+            .with_file("/src/library.py", "a = 1")
+            .build()
+            .unwrap();
+        let file = program_file(&db, system_path_to_file(&db, "/src/test.py").unwrap());
+        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, file.python_file(&db)).load(&db);
+        let alias = &module.suite()[1].as_import_from_stmt().unwrap().names[0];
+        let definition = index.try_definition(alias).unwrap();
+        assert_eq!(definition.kind(&db).target_range(&module), alias.range);
+        for stmt in &module.suite()[2..] {
+            let ast::Stmt::AugAssign(assignment) = stmt else {
+                panic!("expected augmented assignment");
+            };
+            let definition = index.try_definition(assignment).unwrap();
+            assert_eq!(definition.kind(&db).full_range(&module), assignment.range);
+        }
     }
 
     fn names(table: &PlaceTable) -> Vec<String> {
@@ -1631,10 +1609,38 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
     }
 
     #[test]
+    fn stub_layouts_preserve_type_checking_ranges() {
+        let TestCase { db, file } = test_case(
+            "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    def f(): 'doc'; pass; ...\n    def g(): ...; pass\ndef h(): 'doc'",
+        );
+        let file = program_file(&db, file);
+        let index = semantic_index(&db, file);
+        let module = parsed_module(&db, file.python_file(&db)).load(&db);
+        let ast::Stmt::If(block) = &module.suite()[1] else {
+            panic!("expected a TYPE_CHECKING block");
+        };
+        for (stmt, guarded) in [
+            (&block.body[0], true),
+            (&block.body[1], true),
+            (&module.suite()[2], false),
+        ] {
+            let ast::Stmt::FunctionDef(function) = stmt else {
+                panic!("expected a function");
+            };
+            let scope = index.node_scope(NodeWithScopeRef::Function(function));
+            let mut reference = Box::new(UseDefMapBuilder::new(ScopeKind::Function));
+            for statement in &function.body {
+                reference.record_range_reachability(statement.range(), guarded);
+            }
+            assert_eq!(index.use_def_map(scope), &reference.finish());
+        }
+    }
+
+    #[test]
     fn stub_parameter_bindings_belong_to_their_own_function() {
         let TestCase { db, file } = test_case(
             "def first(a, /, *rest: int, b: str, **options): ...\n\
-             def second(c, /, *values: float, d: bytes, **kwargs): pass",
+             def second(c, /, *values: float, d: bytes, **kwargs): 'doc'; pass",
         );
         let file = program_file(&db, file);
         let index = semantic_index(&db, file);
@@ -1661,6 +1667,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                         PreviousDefinitions::AreShadowed,
                         FutureDefinitions::ShadowThisOne,
                         ImportedQualifierAction::Preserve,
+                        BindingKind::Default,
                     );
                 }
             }
@@ -1742,6 +1749,27 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                 parameter: ParameterDefinitionNodeKind::VariadicKeywordParameter(_)
             })
         );
+    }
+
+    #[test]
+    fn wildcard_import_definitions_track_export_count() {
+        let mut db = TestDbBuilder::new()
+            .with_file("/src/test.py", "from library import *")
+            .with_file("/src/library.py", "")
+            .build()
+            .unwrap();
+        let importer = system_path_to_file(&db, "/src/test.py").unwrap();
+
+        for (source, count) in [("", 0), ("a = 1", 1), ("a = 1\nb = 2", 2), ("b = 2", 1)] {
+            db.write_file("/src/library.py", source).unwrap();
+            let file = program_file(&db, importer);
+            let module = parsed_module(&db, file.python_file(&db)).load(&db);
+            let index = semantic_index(&db, file);
+            let alias = &module.suite()[0].as_import_from_stmt().unwrap().names[0];
+
+            assert_eq!(index.definitions(alias).len(), count);
+            assert_eq!(index.try_definition(alias).is_some(), count == 1);
+        }
     }
 
     /// Test case to validate that the comprehension scope is correctly identified and that the target

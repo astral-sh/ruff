@@ -296,6 +296,21 @@ impl<'db> BoundMethodType<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Option<CallableTypes<'db>> {
+        // The bound callable is always regular. For a Python function, bind its
+        // signature directly to avoid interning a temporary unbound callable.
+        if let Some(function) = self.function(db) {
+            let signatures = function.signature(db).bind_method_receiver(
+                db,
+                env,
+                receiver_type,
+                typing_self_type,
+            );
+            return Some(CallableTypes::one(CallableType::new(
+                db,
+                signatures,
+                CallableTypeKind::Regular,
+            )));
+        }
         self.func(db)
             .try_upcast_to_callable(db, env)
             .map(|callables| {

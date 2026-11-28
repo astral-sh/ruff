@@ -637,10 +637,13 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// scopes evaluate calls on demand because their reverse call chains are already bounded.
 fn analyze_non_terminal_calls_up_to_predicate<'db>(
     db: &'db dyn Db,
+    scope: ScopeId<'db>,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     root: InteriorNode,
 ) {
-    if predicates.len() <= NON_TERMINAL_CALL_CHUNK_SIZE {
+    if predicates.len() <= NON_TERMINAL_CALL_CHUNK_SIZE
+        || root.atom().index() + 1 < NON_TERMINAL_CALL_CHUNK_SIZE
+    {
         return;
     }
 
@@ -656,7 +659,6 @@ fn analyze_non_terminal_calls_up_to_predicate<'db>(
         // the condition itself needs earlier calls, their own reachability walks warm them.
         return;
     }
-    let scope = predicate_scope(db, &predicates[root_predicate]);
     let call_predicates = non_terminal_call_predicates(db, scope);
     if call_predicates.len() <= NON_TERMINAL_CALL_CHUNK_SIZE {
         return;
@@ -748,19 +750,29 @@ fn analyze_non_terminal_call_range<'db>(
 /// retain the direct evaluation path without creating either cached index.
 fn evaluate_reachability_constraint<'db>(
     db: &'db dyn Db,
-    scope: ScopeId<'db>,
+    constraints: &ReachabilityConstraints,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     id: ScopedReachabilityConstraintId,
-    predicate_cache: Option<&TruthinessCache>,
+    cache: Option<&ReachabilityEvaluationCache<'db>>,
 ) -> Truthiness {
     if let Some(reachability) = terminal_reachability(id) {
         return reachability;
     }
 
-    let use_def = use_def_map(db, scope);
-    let constraints = use_def.reachability_constraints();
-    let predicates = use_def.predicates();
     let root = constraints.get_interior_node(id);
-    analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
+    // The primary graph belongs to the scope that created the cache. Only look up
+    // the scope from the predicate when evaluating a different graph.
+    let (scope, predicate_cache) = match cache {
+        Some(cache) if cache.primary_constraints == std::ptr::from_ref(constraints).addr() => {
+            debug_assert_eq!(
+                cache.primary_scope,
+                predicate_scope(db, &predicates[root.atom()])
+            );
+            (cache.primary_scope, Some(&cache.primary_predicates))
+        }
+        _ => (predicate_scope(db, &predicates[root.atom()]), None),
+    };
+    analyze_non_terminal_calls_up_to_predicate(db, scope, predicates, root);
 
     evaluate_reachability_path(
         db,
@@ -797,7 +809,7 @@ fn evaluate_finally_continuation<'db>(
     scope: ScopeId<'db>,
     continuation: ScopedReachabilityConstraintId,
 ) -> Truthiness {
-    evaluate_reachability_constraint(db, scope, continuation, None)
+    evaluate_reachability(db, use_def_map(db, scope), continuation)
 }
 
 fn terminal_reachability(id: ScopedReachabilityConstraintId) -> Option<Truthiness> {
@@ -999,22 +1011,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
-        if let Some(reachability) = terminal_reachability(id) {
-            return reachability;
-        }
-
-        let root = self.get_interior_node(id);
-        analyze_non_terminal_calls_up_to_predicate(db, predicates, root);
-        let scope = predicate_scope(db, &predicates[root.atom()]);
-        evaluate_reachability_path(
-            db,
-            scope,
-            self,
-            PredicateEvaluator::uncached(predicates),
-            id,
-            INITIAL_CHECKPOINT_MASK,
-        )
-        .resolve(db, scope)
+        evaluate_reachability_constraint(db, self, predicates, id, None)
     }
 }
 
@@ -2258,11 +2255,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             return result;
         }
 
-        let predicate = predicates[constraints.get_interior_node(id).atom()];
-        let scope = predicate_scope(db, &predicate);
-        let predicate_cache = (scope == self.primary_scope && graph == self.primary_constraints)
-            .then_some(&self.primary_predicates);
-        let result = evaluate_reachability_constraint(db, scope, id, predicate_cache);
+        let result = evaluate_reachability_constraint(db, constraints, predicates, id, Some(self));
         self.entries.borrow_mut().insert(key, result);
         result
     }
@@ -2457,6 +2450,22 @@ class TargetB:
 
     #[test]
     fn non_terminal_call_range_invalidates_when_callable_changes() -> anyhow::Result<()> {
+        fn end_reachability<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Truthiness {
+            let use_def = use_def_map(db, scope);
+            let constraints = use_def.reachability_constraints();
+            let predicates = use_def.predicates();
+            let end = use_def.end_of_scope_reachability();
+            let uncached = evaluate_reachability_constraint(db, constraints, predicates, end, None);
+            let cached = ReachabilityEvaluationCache::new(scope, constraints).evaluate(
+                db,
+                constraints,
+                predicates,
+                end,
+            );
+            assert_eq!(cached, uncached);
+            uncached
+        }
+
         let mut db = setup_db();
         // Only the first call depends on the edited module. Place it in a complete call
         // range and a cached reachability segment when evaluating the end of the scope.
@@ -2478,16 +2487,7 @@ class TargetB:
         {
             let program_file = ProgramFile::new(&db, file, db.program_environment().program(&db));
             let scope = function_scope.to_scope_id(&db, program_file);
-            let use_def = use_def_map(&db, scope);
-            assert!(
-                evaluate_reachability_constraint(
-                    &db,
-                    scope,
-                    use_def.end_of_scope_reachability(),
-                    None
-                )
-                .may_be_true()
-            );
+            assert!(end_reachability(&db, scope).may_be_true());
         }
 
         db.write_file(
@@ -2497,11 +2497,7 @@ class TargetB:
 
         let program_file = ProgramFile::new(&db, file, db.program_environment().program(&db));
         let scope = function_scope.to_scope_id(&db, program_file);
-        let use_def = use_def_map(&db, scope);
-        assert!(
-            evaluate_reachability_constraint(&db, scope, use_def.end_of_scope_reachability(), None)
-                .is_always_false()
-        );
+        assert!(end_reachability(&db, scope).is_always_false());
         Ok(())
     }
 

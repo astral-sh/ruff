@@ -96,6 +96,25 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
 }
 
 #[test]
+fn final_without_value_tracks_imported_qualifier() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file("src/qual.py", "from builtins import int as Q")?;
+    db.write_file("src/main.py", "from qual import Q\nx: Q")?;
+    assert_file_diagnostics(&db, "src/main.py", &[]);
+
+    db.write_file("src/qual.py", "from typing import Final as Q")?;
+    assert_file_diagnostics(
+        &db,
+        "src/main.py",
+        &["`Final` symbol `x` is not assigned a value"],
+    );
+
+    db.write_file("src/qual.py", "from builtins import int as Q")?;
+    assert_file_diagnostics(&db, "src/main.py", &[]);
+    Ok(())
+}
+
+#[test]
 fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     let mut db = TestDbBuilder::new()
         .with_python_version(PythonVersion::PY311)
@@ -234,6 +253,41 @@ fn expected_types_are_collected_only_for_open_files() -> anyhow::Result<()> {
     assert!(!has_expected_type(false)?);
     assert!(has_expected_type(true)?);
 
+    Ok(())
+}
+
+#[test]
+fn functional_class_fields_track_edits_to_their_definitions() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from typing import reveal_type
+        from fields import Record, Row
+
+        def read(record: Record, row: Row):
+            reveal_type((record["field"], row.field))
+        "#,
+    )?;
+
+    for value_type in ["int", "str"] {
+        db.write_dedented(
+            "/src/fields.py",
+            &format!(
+                r#"
+                from typing import NamedTuple, TypedDict
+
+                Record = TypedDict("Record", {{"field": {value_type}}})
+                Row = NamedTuple("Row", [("field", {value_type})])
+                "#
+            ),
+        )?;
+        assert_revealed_type(
+            &db,
+            "/src/main.py",
+            &format!("tuple[{value_type}, {value_type}]"),
+        );
+    }
     Ok(())
 }
 
@@ -1184,17 +1238,30 @@ fn star_import_infers_unused_bindings_on_demand() -> anyhow::Result<()> {
 }
 
 #[test]
-fn changing_a_name_use_keeps_an_imported_declaration_cached() -> anyhow::Result<()> {
+fn changing_a_name_use_keeps_imported_places_cached() -> anyhow::Result<()> {
+    for (binding, expected) in [("x: int = 1", "int"), ("x = 1", "Literal[1]")] {
+        assert_imported_place_stays_cached(binding, expected)?;
+    }
+    Ok(())
+}
+
+fn assert_imported_place_stays_cached(binding: &str, expected: &str) -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_files([
         ("/src/main.py", "from dependency import x"),
-        ("/src/dependency.py", "x: int = 1\nlist\ndict\nlist"),
+        (
+            "/src/dependency.py",
+            &format!("{binding}\nlist\ndict\nlist"),
+        ),
     ])?;
 
     let main = system_path_to_file(&db, "/src/main.py")?;
     let assert_imported_type = |db: &TestDb| {
         let ty = global_symbol(db, main, "x").place.expect_type();
-        assert_eq!(ty.display(db, &db.program_environment()).to_string(), "int");
+        assert_eq!(
+            ty.display(db, &db.program_environment()).to_string(),
+            expected
+        );
     };
     let query_name = "place_by_id";
     db.clear_salsa_events();
@@ -1205,7 +1272,7 @@ fn changing_a_name_use_keeps_an_imported_declaration_cached() -> anyhow::Result<
         "Expected the first lookup to run {query_name}"
     );
 
-    db.write_file("/src/dependency.py", "x: int = 1\nlist\ndict\ndict")?;
+    db.write_file("/src/dependency.py", format!("{binding}\nlist\ndict\ndict"))?;
     db.clear_salsa_events();
     assert_imported_type(&db);
     let events = db.take_salsa_events();
@@ -1226,6 +1293,52 @@ fn project_builtins_follow_file_creation_and_removal() -> anyhow::Result<()> {
     assert_file_diagnostics(&db, main, &[]);
     db.remove_file(builtins)?;
     assert_file_diagnostics(&db, main, missing);
+    Ok(())
+}
+
+#[test]
+fn editing_synthetic_bindings_updates_importers() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file("/src/main.py", "from dependency import value")?;
+    let main = system_path_to_file(&db, "/src/main.py")?;
+    for (source, expected) in [
+        ("value = 1", "Literal[1]"),
+        ("value = 1\nfor i in [1, 2]:\n    value += i", "int"),
+        ("value = 1", "Literal[1]"),
+        (
+            "value = 1\ndef update():\n    global value\n    value = 2",
+            "Literal[1, 2]",
+        ),
+        (
+            "value = 1\ndef update():\n    global value\n    value = 3",
+            "Literal[1, 3]",
+        ),
+        ("value = 1", "Literal[1]"),
+    ] {
+        db.write_file("/src/dependency.py", source)?;
+        let ty = global_symbol(&db, main, "value").place.expect_type();
+        assert_eq!(
+            ty.display(&db, &db.program_environment()).to_string(),
+            expected
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn editing_a_deletion_in_a_loop_updates_boundness() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let path = "/src/main.py";
+    let binding = "value = 1\nwhile True:\n    value = 2\n    break\nvalue";
+    db.write_file(path, binding)?;
+    assert_file_diagnostics(&db, path, &[]);
+    db.write_file(
+        path,
+        "value = 1\nwhile True:\n    del value\n    break\nvalue",
+    )?;
+    assert_file_diagnostics(&db, path, &["Name `value` used when not defined"]);
+    db.write_file(path, binding)?;
+    assert_file_diagnostics(&db, path, &[]);
     Ok(())
 }
 

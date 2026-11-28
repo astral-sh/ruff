@@ -365,6 +365,16 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
     visitor: &impl TypeVisitor<'db>,
     recursion_guard: &TypeCollector<'db>,
 ) {
+    // An ordinary nominal instance visits only its class. Class literals have no children,
+    // and generic aliases have their own recursion guard. Exact tuples visit their elements
+    // directly, so they still need the guard on the instance.
+    if let Type::NominalInstance(instance) = ty
+        && !instance.is_exact_tuple()
+    {
+        visitor.visit_nominal_instance_type(db, instance);
+        return;
+    }
+
     match TypeKind::from(ty) {
         TypeKind::Atomic => {}
         TypeKind::NonAtomic(non_atomic_type) => {
@@ -1037,15 +1047,6 @@ where
                     }
                     return;
                 }
-            }
-            // An ordinary nominal instance visits only its class. Class literals have no
-            // children, and generic aliases have their own recursion guard. An exact tuple
-            // visits its elements directly, so it still needs the guard on the instance.
-            if let Type::NominalInstance(instance) = ty
-                && !instance.is_exact_tuple()
-            {
-                walk_nominal_instance_type(db, instance, self);
-                return;
             }
             walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }

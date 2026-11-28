@@ -299,6 +299,24 @@ def f(cond: bool) -> int:
         return 2
 ```
 
+With a literal `None` annotation, ty permits an implicit return and still checks the body, explicit
+returns, and generator annotations.
+
+```py
+def ordinary(flag: bool) -> None:
+    if flag:
+        return 1  # error: [invalid-explicit-return]
+
+def implicit() -> None:
+    x: str = 1  # error: [invalid-assignment]
+
+def generator() -> None:  # error: [invalid-generator-return-type]
+    yield
+
+async def async_generator() -> None:  # error: [invalid-generator-return-type]
+    yield
+```
+
 ## Invalid return type
 
 <!-- snapshot-diagnostics -->

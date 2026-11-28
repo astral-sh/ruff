@@ -10,7 +10,7 @@ use rustc_hash::FxHashMap;
 use crate::interned_nodes::{BinaryConstraintCache, ConstraintId, InternedNodes};
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
 use crate::predicate::ScopedPredicateId;
-use crate::rank::{RankBitBox, RankBitBoxVec};
+use crate::rank::RankBitBox;
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
 /// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the
@@ -185,7 +185,6 @@ impl ReachabilityConstraints {
 #[derive(Debug, Default)]
 pub struct ReachabilityConstraintsBuilder {
     interiors: InternedNodes<ScopedReachabilityConstraintId, InteriorNode>,
-    interior_used: RankBitBoxVec,
     not_cache: FxHashMap<ScopedReachabilityConstraintId, ScopedReachabilityConstraintId>,
     and_cache: BinaryConstraintCache<ScopedReachabilityConstraintId>,
     or_cache: BinaryConstraintCache<ScopedReachabilityConstraintId>,
@@ -197,24 +196,22 @@ impl ReachabilityConstraintsBuilder {
         self.interiors.len() >= MAX_INTERIOR_NODES
     }
 
-    pub(crate) fn build(self) -> ReachabilityConstraints {
-        if self.interior_used.first_zero().is_none() {
-            ReachabilityConstraints {
-                used_interiors: self.interiors.into_nodes_boxed_slice(),
-                used_indices: None,
+    pub(crate) fn build(mut self) -> ReachabilityConstraints {
+        // Children are interned before their parent. Visiting parents in reverse ID order
+        // propagates the retained roots to every descendant before compaction.
+        for index in (0..self.interiors.len()).rev() {
+            let id = ScopedReachabilityConstraintId::new(index);
+            if self.interiors.is_used(id) {
+                let node = self.interiors[id];
+                self.mark_used(node.if_true);
+                self.mark_used(node.if_ambiguous);
+                self.mark_used(node.if_false);
             }
-        } else {
-            let used_interiors = self
-                .interiors
-                .into_node_iterator()
-                .zip(&self.interior_used)
-                .filter_map(|(interior, used)| used.then_some(interior))
-                .collect();
-            let used_indices = RankBitBox::from_bits(self.interior_used);
-            ReachabilityConstraints {
-                used_interiors,
-                used_indices: Some(used_indices),
-            }
+        }
+        let (used_interiors, used_indices) = self.interiors.into_used_nodes();
+        ReachabilityConstraints {
+            used_interiors,
+            used_indices,
         }
     }
 
@@ -222,12 +219,8 @@ impl ReachabilityConstraintsBuilder {
     /// only calculated for intermediate values, and which don't need to be included in the final
     /// built result.
     pub(crate) fn mark_used(&mut self, node: ScopedReachabilityConstraintId) {
-        if !node.is_terminal() && !self.interior_used[node.index()] {
-            self.interior_used.set(node.index(), true);
-            let node = self.interiors[node];
-            self.mark_used(node.if_true);
-            self.mark_used(node.if_ambiguous);
-            self.mark_used(node.if_false);
+        if !node.is_terminal() {
+            self.interiors.mark_used(node);
         }
     }
 
@@ -350,11 +343,7 @@ impl ReachabilityConstraintsBuilder {
             return node.if_true;
         }
 
-        let (id, inserted) = self.interiors.intern(node);
-        if inserted {
-            self.interior_used.push(false);
-        }
-        id
+        self.interiors.intern(node)
     }
 
     /// Adds a new reachability constraint that checks a single [`super::predicate::Predicate`].
@@ -581,5 +570,41 @@ impl ReachabilityConstraintsBuilder {
         });
         self.and_cache.insert(a, b, result);
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compaction_retains_descendants_in_all_three_branches() {
+        let mut builder = ReachabilityConstraintsBuilder::default();
+        let [unused, a, b, c, d] =
+            [0, 1, 2, 3, 4].map(|i| builder.add_atom(ScopedPredicateId::new(i)));
+        // Put the parent and its children in different words of the used-node bitset.
+        for i in 7..7 + crate::rank::CHUNK_SIZE {
+            builder.add_atom(ScopedPredicateId::new(i));
+        }
+        let branch = builder.add_interior(InteriorNode {
+            atom: ScopedPredicateId::new(5),
+            if_true: a,
+            if_ambiguous: b,
+            if_false: c,
+        });
+        let root = builder.add_interior(InteriorNode {
+            atom: ScopedPredicateId::new(6),
+            if_true: d,
+            if_ambiguous: branch,
+            if_false: a,
+        });
+        let retained = [a, b, c, d, branch, root];
+        let expected = retained.map(|id| builder.interiors[id]);
+        builder.mark_used(root);
+
+        let graph = builder.build();
+        assert_eq!(graph.used_interiors.len(), retained.len());
+        assert_eq!(retained.map(|id| graph.get_interior_node(id)), expected);
+        assert!(!graph.used_indices.unwrap().get_bit(unused.index()).unwrap());
     }
 }

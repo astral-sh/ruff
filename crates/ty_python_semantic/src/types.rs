@@ -5,7 +5,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use smallvec::SmallVec;
 use std::borrow::Cow;
-use std::cell::{OnceCell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -547,6 +547,13 @@ struct DependentMaterialization<'db> {
     dependencies: Box<[MaterializationDependency<'db>]>,
 }
 
+#[derive(Clone, Copy)]
+struct SpecializedSelf<'db> {
+    original: BoundTypeVarInstance<'db>,
+    specialization: Specialization<'db>,
+    result: BoundTypeVarInstance<'db>,
+}
+
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
 /// Some recursive transformations visit the same type under more than one mapping mode within a
@@ -558,6 +565,8 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    /// A method's context, receiver, and return type often repeat the same `Self`.
+    specialized_self: Cell<Option<SpecializedSelf<'db>>>,
     /// Transforms argument hints in contravariant positions, such as callback inputs.
     /// If sibling inference leaves `T` unsolved, these positions can still use
     /// the full call's binding for `T`. The default transformer caches by type
@@ -582,6 +591,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             recursion_context: None,
             materialize_typevar_bounds_and_defaults: true,
             default: OnceCell::default(),
+            specialized_self: Cell::default(),
             flipped_argument_transformer: OnceCell::default(),
             top_materialization: OnceCell::default(),
             bottom_materialization: OnceCell::default(),
@@ -6878,9 +6888,10 @@ impl<'db> Type<'db> {
                     ty.map_or_default(Place::bound).into()
                 }
 
-                // attrs defines the methods `validator` and `default` on field instances.
+                // attrs defines the methods `validator`, `default`, and `converter` on field instances.
                 Type::KnownInstance(KnownInstanceType::Field(field))
-                    if matches!(name_str, "validator" | "default") && field.kind(db).is_attrs() =>
+                    if matches!(name_str, "validator" | "default" | "converter")
+                        && field.kind(db).is_attrs() =>
                 {
                     Place::bound(dedicated::attrs::generic_identity_function(db, env)).into()
                 }
@@ -7409,7 +7420,9 @@ impl<'db> Type<'db> {
                 } else {
                     // Solve exact receiver constraints before checking the other arguments, but
                     // retain the receiver itself for call inference and receiver diagnostics.
-                    let overloads = signature.overloads.iter().flat_map(|overload| {
+                    let mut binding =
+                        CallableBinding::with_capacity(self, signature.overloads.len());
+                    for overload in &signature.overloads {
                         if overload.has_receiver_determined_method_typevar(db, env)
                             && let Some(specialized) = overload.specialize_for_bound_receiver(
                                 db,
@@ -7418,19 +7431,19 @@ impl<'db> Type<'db> {
                                 bound_method.typing_self_type(db),
                             )
                         {
-                            specialized.overloads
-                        } else if let Some(specialized) =
-                            overload.with_unused_self_upper_bound(db, env)
-                        {
-                            smallvec_inline![specialized]
+                            for specialized in specialized.overloads {
+                                binding.push_overload(specialized);
+                            }
                         } else {
-                            smallvec_inline![overload.clone()]
+                            binding.push_overload(
+                                overload
+                                    .with_unused_self_upper_bound(db, env)
+                                    .unwrap_or_else(|| overload.clone()),
+                            );
                         }
-                    });
+                    }
 
-                    CallableBinding::from_overloads(self, overloads)
-                        .with_bound_type(self_instance)
-                        .into()
+                    binding.with_bound_type(self_instance).into()
                 }
             }
 
@@ -12002,11 +12015,11 @@ impl<'db> TypeMapping<'_, 'db> {
                 if specialization.specialize_self_domain() {
                     let kept = kept.filter_map(|bound_typevar| {
                         Type::TypeVar(bound_typevar)
-                            .apply_type_mapping(
+                            .apply_type_mapping_impl(
                                 db,
-                                env,
                                 &TypeMapping::ApplySpecialization(*specialization),
                                 TypeContext::default(),
+                                visitor,
                             )
                             .as_typevar()
                     });
