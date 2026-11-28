@@ -2,12 +2,10 @@ use std::borrow::Cow;
 
 use lsp_types::DocumentSymbolRequest;
 use lsp_types::{DocumentSymbol, DocumentSymbolParams, Uri};
-use ruff_db::files::File;
 use ty_ide::{HierarchicalSymbols, SymbolId, SymbolInfo, document_symbols};
 use ty_project::{ProjectDatabase, SemanticDb as _};
 
-use crate::Db;
-use crate::document::{PositionEncoding, ToRangeExt};
+use crate::document::LocalRanges;
 use crate::server::api::symbols::{convert_symbol_kind, convert_to_lsp_symbol_information};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
@@ -54,18 +52,12 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
         }
 
         if supports_hierarchical {
+            let ranges = LocalRanges::new(db, file, snapshot.encoding());
             let symbols = symbols.to_hierarchical();
             let lsp_symbols = symbols
                 .iter()
                 .filter_map(|(id, symbol)| {
-                    convert_to_lsp_document_symbol(
-                        db,
-                        file,
-                        &symbols,
-                        id,
-                        symbol,
-                        snapshot.encoding(),
-                    )
+                    convert_to_lsp_document_symbol(&ranges, &symbols, id, symbol)
                 })
                 .collect();
 
@@ -91,12 +83,10 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
 impl RetriableRequestHandler for DocumentSymbolRequestHandler {}
 
 fn convert_to_lsp_document_symbol(
-    db: &dyn Db,
-    file: File,
+    ranges: &LocalRanges<'_>,
     symbols: &HierarchicalSymbols,
     id: SymbolId,
     symbol: SymbolInfo<'_>,
-    encoding: PositionEncoding,
 ) -> Option<DocumentSymbol> {
     let symbol_kind = convert_symbol_kind(symbol.kind);
 
@@ -107,19 +97,13 @@ fn convert_to_lsp_document_symbol(
         tags: None,
         #[allow(deprecated)]
         deprecated: None,
-        range: symbol
-            .full_range
-            .to_lsp_range(db, file, encoding)?
-            .local_range(),
-        selection_range: symbol
-            .name_range
-            .to_lsp_range(db, file, encoding)?
-            .local_range(),
+        range: ranges.convert(symbol.full_range)?,
+        selection_range: ranges.convert(symbol.name_range)?,
         children: Some(
             symbols
                 .children(id)
                 .filter_map(|(child_id, child)| {
-                    convert_to_lsp_document_symbol(db, file, symbols, child_id, child, encoding)
+                    convert_to_lsp_document_symbol(ranges, symbols, child_id, child)
                 })
                 .collect(),
         ),

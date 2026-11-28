@@ -4,7 +4,7 @@ use crate::system::file_to_uri;
 
 use lsp_types::Uri;
 use ruff_db::files::{File, FileRange, system_path_to_file, vendored_path_to_file};
-use ruff_db::source::{line_index, source_text};
+use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::SystemPathBuf;
 use ruff_source_file::LineIndex;
 use ruff_source_file::{OneIndexed, SourceLocation};
@@ -300,6 +300,48 @@ pub(crate) fn lsp_range_to_text_range(
         lsp_position_to_text_size(range.start, text, index, encoding),
         lsp_position_to_text_size(range.end, text, index, encoding),
     )
+}
+
+/// Converts many ranges in one document without looking up its source, line index, and
+/// URI for each range. Only use this for responses that do not need a location.
+pub(crate) struct LocalRanges<'db> {
+    db: &'db dyn Db,
+    file: File,
+    source: SourceText,
+    index: LineIndex,
+    encoding: PositionEncoding,
+}
+
+impl<'db> LocalRanges<'db> {
+    pub(crate) fn new(db: &'db dyn Db, file: File, encoding: PositionEncoding) -> Self {
+        Self {
+            db,
+            file,
+            source: source_text(db, file),
+            index: line_index(db, file),
+            encoding,
+        }
+    }
+
+    /// Convert a source range to document-relative coordinates.
+    pub(crate) fn convert(&self, range: TextRange) -> Option<lsp_types::Range> {
+        // Notebook offsets refer to the concatenated source, not the individual cell.
+        if self.source.as_notebook().is_some() {
+            return Some(
+                range
+                    .to_lsp_range(self.db, self.file, self.encoding)?
+                    .local_range(),
+            );
+        }
+
+        self.db.unwind_if_revision_cancelled();
+        Some(text_range_to_lsp_range(
+            range,
+            &self.source,
+            &self.index,
+            self.encoding,
+        ))
+    }
 }
 
 impl ToRangeExt for TextRange {
