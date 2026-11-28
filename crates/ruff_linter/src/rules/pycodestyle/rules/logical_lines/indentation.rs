@@ -98,6 +98,9 @@ impl Violation for IndentationWithInvalidMultipleComment {
     }
 }
 
+/// ## Removed
+/// The Python parser reports missing indentation as a syntax error.
+///
 /// ## What it does
 /// Checks for indented blocks that are lacking indentation.
 ///
@@ -119,7 +122,7 @@ impl Violation for IndentationWithInvalidMultipleComment {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269", category = Category::Pedantic)]
+#[violation_metadata(removed_since = "NEXT_RUFF_VERSION", category = Category::Pedantic)]
 pub(crate) struct NoIndentedBlock;
 
 impl Violation for NoIndentedBlock {
@@ -162,6 +165,9 @@ impl Violation for NoIndentedBlockComment {
     }
 }
 
+/// ## Removed
+/// The Python parser reports unexpected indentation as a syntax error.
+///
 /// ## What it does
 /// Checks for unexpected indentation.
 ///
@@ -182,7 +188,7 @@ impl Violation for NoIndentedBlockComment {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#indentation
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269", category = Category::Pedantic)]
+#[violation_metadata(removed_since = "NEXT_RUFF_VERSION", category = Category::Pedantic)]
 pub(crate) struct UnexpectedIndentation;
 
 impl Violation for UnexpectedIndentation {
@@ -265,7 +271,7 @@ impl Violation for OverIndented {
     }
 }
 
-/// E111, E112, E113, E114, E115, E116, E117
+/// E111, E114, E115, E116, E117
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn indentation(
     logical_line: &LogicalLine,
@@ -298,19 +304,13 @@ pub(crate) fn indentation(
         .and_then(|prev_logical_line| prev_logical_line.tokens_trimmed().last())
         .is_some_and(|t| t.kind() == TokenKind::Colon);
 
-    if indent_expect && indent_level <= prev_indent_level.unwrap_or(0) {
-        if logical_line.is_comment_only() {
+    if logical_line.is_comment_only() {
+        if indent_expect && indent_level <= prev_indent_level.unwrap_or(0) {
             context.report_diagnostic_if_enabled(NoIndentedBlockComment, range);
-        } else {
-            context.report_diagnostic_if_enabled(NoIndentedBlock, range);
-        }
-    } else if !indent_expect
-        && prev_indent_level.is_some_and(|prev_indent_level| indent_level > prev_indent_level)
-    {
-        if logical_line.is_comment_only() {
+        } else if !indent_expect
+            && prev_indent_level.is_some_and(|prev_indent_level| indent_level > prev_indent_level)
+        {
             context.report_diagnostic_if_enabled(UnexpectedIndentationComment, range);
-        } else {
-            context.report_diagnostic_if_enabled(UnexpectedIndentation, range);
         }
     }
     if indent_expect {

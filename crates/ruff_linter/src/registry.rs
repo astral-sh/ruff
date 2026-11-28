@@ -349,7 +349,6 @@ impl Rule {
             | Rule::MultipleSpacesAfterOperator
             | Rule::MultipleSpacesBeforeKeyword
             | Rule::MultipleSpacesBeforeOperator
-            | Rule::NoIndentedBlock
             | Rule::NoIndentedBlockComment
             | Rule::NoSpaceAfterBlockComment
             | Rule::NoSpaceAfterInlineComment
@@ -361,7 +360,6 @@ impl Rule {
             | Rule::TabBeforeKeyword
             | Rule::TabBeforeOperator
             | Rule::TooFewSpacesBeforeInlineComment
-            | Rule::UnexpectedIndentation
             | Rule::UnexpectedIndentationComment
             | Rule::UnexpectedSpacesAroundArgumentOrParameterEquals
             | Rule::WhitespaceAfterOpenBracket

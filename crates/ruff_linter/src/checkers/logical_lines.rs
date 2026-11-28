@@ -90,8 +90,6 @@ pub(crate) fn check_logical_lines(
     let enforce_redundant_backslash = context.is_rule_enabled(Rule::RedundantBackslash);
     let enforce_indentation = context.any_rule_enabled(&[
         Rule::IndentationWithInvalidMultiple,
-        Rule::NoIndentedBlock,
-        Rule::UnexpectedIndentation,
         Rule::IndentationWithInvalidMultipleComment,
         Rule::NoIndentedBlockComment,
         Rule::UnexpectedIndentationComment,
