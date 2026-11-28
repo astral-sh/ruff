@@ -773,7 +773,8 @@ impl<'db> TypeAliasType<'db> {
     ) -> Type<'db> {
         let ty = Type::TypeAlias(self);
         match type_mapping {
-            TypeMapping::ApplyRecursiveSubstitution(_) => {
+            TypeMapping::ApplyRecursiveSubstitution(_)
+            | TypeMapping::WidenRecursiveInference(_) => {
                 Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
             }
             TypeMapping::ApplySpecialization(ApplySpecialization::Single(
@@ -863,7 +864,7 @@ impl<'db> TypeAliasType<'db> {
     }
 
     /// Rewrite stored arguments without evaluating the alias's definition or defaults.
-    fn map_stored_specialization(
+    pub(super) fn map_stored_specialization(
         self,
         db: &'db dyn Db,
         mapping: &TypeMapping<'_, 'db>,
