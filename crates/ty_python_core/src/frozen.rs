@@ -74,7 +74,11 @@ impl<K, V> From<std::collections::BTreeMap<K, V>> for FrozenMap<K, V> {
 
 impl<K: Ord, V, S> From<std::collections::HashMap<K, V, S>> for FrozenMap<K, V> {
     fn from(map: std::collections::HashMap<K, V, S>) -> Self {
-        Self::from_entries(map.into_iter().collect())
+        // Collecting a small hash table can over-allocate, requiring a second
+        // allocation when the entries are boxed.
+        let mut entries = Vec::with_capacity(map.len());
+        entries.extend(map);
+        Self::from_entries(entries)
     }
 }
 
@@ -270,7 +274,8 @@ pub struct FrozenSet<K>(Box<[K]>);
 
 impl<K: Ord, S> From<std::collections::HashSet<K, S>> for FrozenSet<K> {
     fn from(set: std::collections::HashSet<K, S>) -> Self {
-        let mut entries = set.into_iter().collect::<Vec<_>>();
+        let mut entries = Vec::with_capacity(set.len());
+        entries.extend(set);
         entries.sort_unstable();
         Self(entries.into_boxed_slice())
     }
