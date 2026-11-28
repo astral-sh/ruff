@@ -2659,9 +2659,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             | ast::Pattern::MatchOr(ast::PatternMatchOr { patterns, .. }) => {
                 patterns.iter().any(Self::pattern_has_bindings)
             }
-            ast::Pattern::MatchMapping(pattern) => {
-                pattern.rest.is_some() || pattern.patterns.iter().any(Self::pattern_has_bindings)
-            }
+            ast::Pattern::MatchMapping(pattern) => pattern.items.iter().any(|item| match item {
+                ast::MappingPatternItem::Entry { pattern, .. } => {
+                    Self::pattern_has_bindings(pattern)
+                }
+                ast::MappingPatternItem::Rest(_) => true,
+            }),
             ast::Pattern::MatchClass(pattern) => pattern
                 .arguments
                 .patterns
@@ -2733,18 +2736,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 })
             }
             ast::Pattern::MatchMapping(pattern) => {
+                let mut entries = Vec::new();
+                let mut rest = None;
+                for item in &pattern.items {
+                    match item {
+                        ast::MappingPatternItem::Entry { key, pattern } => {
+                            entries.push(MappingPatternEntryPredicateKind {
+                                key: self.add_standalone_expression(key),
+                                pattern: self.predicate_kind(pattern),
+                            });
+                        }
+                        ast::MappingPatternItem::Rest(name) => rest = Some(name),
+                    }
+                }
+
                 // Retain keyed entries for subject-aware exhaustiveness analysis.
                 PatternPredicateKind::Mapping(MappingPatternPredicateKind {
-                    entries: pattern
-                        .keys
-                        .iter()
-                        .zip(&pattern.patterns)
-                        .map(|(key, pattern)| MappingPatternEntryPredicateKind {
-                            key: self.add_standalone_expression(key),
-                            pattern: self.predicate_kind(pattern),
-                        })
-                        .collect(),
-                    rest: pattern.rest.as_ref().map(|name| name.id.clone()),
+                    entries: entries.into_boxed_slice(),
+                    rest: rest.map(|name| name.id.clone()),
                 })
             }
             ast::Pattern::MatchSequence(pattern) => {
@@ -5723,33 +5732,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             return;
         }
 
-        if let ast::Pattern::MatchStar(ast::PatternMatchStar {
-            name: Some(name),
-            range: _,
-            node_index: _,
-        }) = pattern
-        {
-            let symbol = self.add_symbol(name.id().clone());
-            let state = self.current_match_case.as_ref().unwrap();
-            self.add_definition(
-                symbol.into(),
-                MatchPatternDefinitionNodeRef {
-                    pattern: state.pattern,
-                    identifier: name,
-                    predicate: state.predicate,
-                },
-            );
-        }
-
         walk_pattern(self, pattern);
 
-        if let ast::Pattern::MatchAs(ast::PatternMatchAs {
-            name: Some(name), ..
-        })
-        | ast::Pattern::MatchMapping(ast::PatternMatchMapping {
-            rest: Some(name), ..
-        }) = pattern
-        {
+        if let Some(name) = pattern.capture_name() {
             let symbol = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
