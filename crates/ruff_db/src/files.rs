@@ -93,8 +93,13 @@ impl Files {
         self.inner.frozen.store(true, Ordering::Relaxed);
     }
 
+    /// Whether inputs on newly discovered files are frozen.
+    pub fn is_frozen(&self) -> bool {
+        self.inner.frozen.load(Ordering::Relaxed)
+    }
+
     fn input_durability(&self, default: Durability) -> Durability {
-        if self.inner.frozen.load(Ordering::Relaxed) {
+        if self.is_frozen() {
             Durability::NEVER_CHANGE
         } else {
             default
