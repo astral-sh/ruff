@@ -40,3 +40,44 @@ import builtins
 
 dict.fromkeys([])
 builtins.dict.fromkeys([])
+
+## Banned instance methods on annotated receivers (preview) ##
+
+from pathlib import Path
+from typing import Annotated
+
+import pytest
+
+
+def remove(path: Path) -> None:
+    path.unlink()  # TID251 in preview
+    Path.unlink(path)
+
+
+def test_example(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("os.getcwd", lambda: "/")  # TID251 in preview
+    pytest.MonkeyPatch.setattr(monkeypatch, "os.getcwd", lambda: "/")
+
+
+def remove_annotated(path: Annotated[Path, "meta"]) -> None:
+    path.unlink()  # TID251 in preview
+
+
+def remove_assigned() -> None:
+    target: Path = Path("file.txt")
+    target.unlink()  # TID251 in preview
+
+
+# Unannotated receivers are not flagged.
+def remove_unannotated(path) -> None:
+    path.unlink()
+
+
+# Receivers annotated with an unrelated type are not flagged.
+def remove_other(path: str) -> None:
+    path.unlink()
+
+
+# Non-banned methods on annotated receivers are not flagged.
+def read(path: Path) -> None:
+    path.read_text()

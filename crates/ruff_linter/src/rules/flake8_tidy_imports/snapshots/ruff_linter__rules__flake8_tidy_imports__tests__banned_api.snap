@@ -138,3 +138,19 @@ TID251 `.dict.fromkeys` is banned: Use a dict comprehension instead.
    | ^^^^^^^^^^^^^
 42 | builtins.dict.fromkeys([])
    |
+
+TID251 `pathlib.Path.unlink` is banned: Use the project cleanup helper.
+  --> TID251.py:54:5
+   |
+52 | def remove(path: Path) -> None:
+53 |     path.unlink()  # TID251 in preview
+54 |     Path.unlink(path)
+   |     ^^^^^^^^^^^
+
+TID251 `pytest.MonkeyPatch.setattr` is banned: Avoid patching attributes in tests.
+  --> TID251.py:59:5
+   |
+57 | def test_example(monkeypatch: pytest.MonkeyPatch) -> None:
+58 |     monkeypatch.setattr("os.getcwd", lambda: "/")  # TID251 in preview
+59 |     pytest.MonkeyPatch.setattr(monkeypatch, "os.getcwd", lambda: "/")
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
