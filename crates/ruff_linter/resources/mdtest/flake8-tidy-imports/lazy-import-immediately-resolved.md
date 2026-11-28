@@ -100,6 +100,145 @@ error[TID255]: Lazy import `json` is resolved immediately
   | ^^^^
 ```
 
+### Eager siblings of lazy submodules
+
+Importing a lazy submodule does not make an already imported parent or sibling lazy.
+
+```py
+__lazy_modules__ = {"pkg.a"}
+import pkg.b
+import pkg.a
+
+class C(pkg.b.B): ...  # ok
+class D(pkg.a.A): ...  # error: [lazy-import-immediately-resolved]
+parent = pkg  # ok
+```
+
+### Eager siblings imported after lazy submodules
+
+An eager sibling import resolves the parent, but leaves the lazy submodule deferred.
+
+```py
+__lazy_modules__ = {"pkg.a"}
+import pkg.a
+import pkg.b
+
+class C(pkg.b.B): ...  # ok
+class D(pkg.a.A): ...  # error: [lazy-import-immediately-resolved]
+parent = pkg  # ok
+```
+
+### Eager parents of lazy submodules
+
+```py
+__lazy_modules__ = {"pkg.a"}
+import pkg
+import pkg.a
+
+parent = pkg  # ok
+value = pkg.a.A  # error: [lazy-import-immediately-resolved]
+```
+
+### Nested lazy submodules
+
+An eager import can resolve several parent packages without resolving a lazy sibling.
+
+```py
+__lazy_modules__ = {"pkg.sub.a"}
+import pkg.sub.b
+import pkg.sub.a
+
+parent = pkg.sub  # ok
+value = pkg.sub.b.B  # ok
+lazy_value = pkg.sub.a.A  # error: [lazy-import-immediately-resolved]
+```
+
+### Explicit lazy submodules
+
+```py
+import pkg.b
+lazy import pkg.a
+
+value = pkg.b.B  # ok
+lazy_value = pkg.a.A  # error: [lazy-import-immediately-resolved]
+```
+
+### Aliased lazy submodules
+
+An alias binds the lazy submodule itself, independently of its parent package.
+
+```py
+__lazy_modules__ = {"pkg.a"}
+import pkg.b
+import pkg.a as a
+
+value = pkg.b.B  # ok
+lazy_value = a.A  # error: [lazy-import-immediately-resolved]
+```
+
+### Lazy submodules without eager parents
+
+Loading the parent name resolves the parent package when no eager import has loaded it.
+
+```py
+__lazy_modules__ = {"pkg.a"}
+import pkg.a
+
+parent = pkg  # error: [lazy-import-immediately-resolved]
+value = pkg.a.A  # error: [lazy-import-immediately-resolved]
+```
+
+### Rebound parent names
+
+Rebinding the parent name disconnects it from earlier lazy submodule imports.
+
+```py
+__lazy_modules__ = {"pkg.a"}
+import pkg.a
+
+pkg = object()
+value = pkg.a  # ok
+```
+
+### Replaced lazy attributes
+
+Assigning or deleting a lazy submodule attribute does not load its previous value.
+
+```py
+__lazy_modules__ = {"pkg.a", "pkg.b"}
+import pkg
+import pkg.a
+import pkg.b
+
+pkg.a = object()  # ok
+del pkg.b  # ok
+```
+
+### Eagerly imported lazy submodules
+
+An eager import loads the same submodule even if another import marks it lazy.
+
+```py
+lazy import pkg.a
+import pkg.a
+
+value = pkg.a.A  # ok
+```
+
+### Reassigned declarations with submodules
+
+The declaration at the time of the import determines the submodule's laziness.
+
+```py
+__lazy_modules__ = {"pkg.a"}
+import pkg.a
+import pkg.b
+
+__lazy_modules__ = []
+value = pkg.b.B  # ok
+lazy_value = pkg.a.A  # error: [lazy-import-immediately-resolved]
+```
+
 ### Reassigned declarations
 
 Clearing the declaration does not make an earlier import eager.
