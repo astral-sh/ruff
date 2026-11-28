@@ -1,0 +1,65 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/ipython_help_parenthesized_name.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..61,
+        body: [
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    node_index: NodeIndex(None),
+                    range: 38..41,
+                    kind: Help,
+                    value: "x",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    node_index: NodeIndex(None),
+                    range: 42..49,
+                    kind: Help,
+                    value: "x[0]",
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    node_index: NodeIndex(None),
+                    range: 50..60,
+                    kind: Help2,
+                    value: "x.attr",
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: {"mode": "ipython"}
+2 | (x)?
+  |    ^ Syntax Error: Help end escape command cannot be applied on a parenthesized expression
+3 | (x)[0]?
+4 | (x).attr??
+  |
+
+
+  |
+1 | # parse_options: {"mode": "ipython"}
+2 | (x)?
+3 | (x)[0]?
+  |       ^ Syntax Error: Help end escape command cannot be applied on a parenthesized expression
+4 | (x).attr??
+  |
+
+
+  |
+2 | (x)?
+3 | (x)[0]?
+4 | (x).attr??
+  |         ^^ Syntax Error: Help end escape command cannot be applied on a parenthesized expression

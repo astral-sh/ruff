@@ -1,0 +1,173 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/partially_parenthesized_unpacking_operand.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..40,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 0..13,
+                    value: Dict(
+                        ExprDict {
+                            node_index: NodeIndex(None),
+                            range: 0..13,
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: BoolOp(
+                                        ExprBoolOp {
+                                            node_index: NodeIndex(None),
+                                            range: 3..12,
+                                            op: Or,
+                                            values: [
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 4..5,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Dict(
+                                                    ExprDict {
+                                                        node_index: NodeIndex(None),
+                                                        range: 10..12,
+                                                        items: [],
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 14..25,
+                    value: Dict(
+                        ExprDict {
+                            node_index: NodeIndex(None),
+                            range: 14..25,
+                            items: [
+                                DictItem {
+                                    key: None,
+                                    value: Compare(
+                                        ExprCompare {
+                                            node_index: NodeIndex(None),
+                                            range: 17..24,
+                                            ops: [
+                                                Lt,
+                                            ],
+                                            operands: [
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 18..19,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 23..24,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 26..39,
+                    value: Tuple(
+                        ExprTuple {
+                            node_index: NodeIndex(None),
+                            range: 26..39,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        node_index: NodeIndex(None),
+                                        range: 27..37,
+                                        value: BoolOp(
+                                            ExprBoolOp {
+                                                node_index: NodeIndex(None),
+                                                range: 28..37,
+                                                op: Or,
+                                                values: [
+                                                    Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 29..30,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    Tuple(
+                                                        ExprTuple {
+                                                            node_index: NodeIndex(None),
+                                                            range: 35..37,
+                                                            elts: [],
+                                                            ctx: Load,
+                                                            parenthesized: true,
+                                                        },
+                                                    ),
+                                                ],
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | {**(x) or {}}
+  |    ^^^^^^^^^ Syntax Error: Boolean expression cannot be used here
+2 | {**(x) < y}
+3 | (*(x) or (),)
+  |
+
+
+  |
+1 | {**(x) or {}}
+2 | {**(x) < y}
+  |    ^^^^^^^ Syntax Error: Comparison expression cannot be used here
+3 | (*(x) or (),)
+  |
+
+
+  |
+1 | {**(x) or {}}
+2 | {**(x) < y}
+3 | (*(x) or (),)
+  |   ^^^^^^^^^ Syntax Error: Boolean expression cannot be used here

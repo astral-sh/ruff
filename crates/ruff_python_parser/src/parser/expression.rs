@@ -294,7 +294,17 @@ impl<'src> Parser<'src> {
                 break;
             }
 
-            left.expr = match operator {
+            // test_ok parenthesized_unpacking_operand
+            // {**(x or {})}
+            // {**(x < y)}
+            // (*(x or ()),)
+
+            // test_err partially_parenthesized_unpacking_operand
+            // {**(x) or {}}
+            // {**(x) < y}
+            // (*(x) or (),)
+
+            left = match operator {
                 BinaryLikeOperator::Boolean(bool_op) => {
                     Expr::BoolOp(self.parse_boolean_expression(left.expr, start, bool_op, context))
                 }
@@ -314,7 +324,8 @@ impl<'src> Parser<'src> {
                         node_index: AtomicNodeIndex::NONE,
                     })
                 }
-            };
+            }
+            .into();
         }
 
         left
@@ -681,6 +692,7 @@ impl<'src> Parser<'src> {
                 }
                 _ => break,
             };
+            is_parenthesized = false;
         }
 
         ParsedExpr {
@@ -3037,6 +3049,7 @@ pub(super) enum ArgumentsContext {
 #[derive(Debug)]
 pub(super) struct ParsedExpr {
     pub(super) expr: Expr,
+    /// Whether grouping parentheses enclose the entire expression.
     pub(super) is_parenthesized: bool,
 }
 

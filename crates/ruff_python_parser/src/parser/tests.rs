@@ -86,6 +86,19 @@ fn nfkc_normalizes_dotted_names() {
 }
 
 #[test]
+fn postfix_operations_clear_parenthesized_flag() {
+    let is_parenthesized = |source| {
+        let mut parser = super::Parser::new(source, ParseOptions::from(Mode::Expression));
+        let parsed = parser.parse_conditional_expression_or_higher();
+        parsed.is_parenthesized
+    };
+
+    assert!(!is_parenthesized("(x).attr"));
+    assert!(!is_parenthesized("(x)[0]"));
+    assert!(!is_parenthesized("(x)()"));
+}
+
+#[test]
 fn number_values() {
     let cases = [
         ("1E400", Number::Float(f64::INFINITY)),

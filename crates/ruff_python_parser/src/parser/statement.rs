@@ -378,7 +378,10 @@ impl<'src> Parser<'src> {
                     ))
                 } else if self.options.mode == Mode::Ipython && self.at(TokenKind::Question) {
                     Stmt::IpyEscapeCommand(
-                        self.parse_ipython_help_end_escape_command_statement(&parsed_expr),
+                        self.parse_ipython_help_end_escape_command_statement(
+                            &parsed_expr.expr,
+                            token,
+                        ),
                     )
                 } else {
                     Stmt::Expr(ast::StmtExpr {
@@ -1132,7 +1135,8 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `?` token.
     fn parse_ipython_help_end_escape_command_statement(
         &mut self,
-        parsed_expr: &ParsedExpr,
+        expr: &Expr,
+        first_token: TokenKind,
     ) -> ast::StmtIpyEscapeCommand {
         // We are permissive than the original implementation because we would allow whitespace
         // between the expression and the suffix while the IPython implementation doesn't allow it.
@@ -1193,7 +1197,13 @@ impl<'src> Parser<'src> {
             IpyEscapeKind::Help
         };
 
-        if parsed_expr.is_parenthesized {
+        // test_err ipython_help_parenthesized_name
+        // # parse_options: {"mode": "ipython"}
+        // (x)?
+        // (x)[0]?
+        // (x).attr??
+
+        if first_token == TokenKind::Lpar {
             let token_range = self.node_range(start);
             self.add_error(
                 ParseErrorType::OtherError(
@@ -1214,12 +1224,12 @@ impl<'src> Parser<'src> {
         }
 
         let mut value = String::new();
-        unparse_expr(self, &parsed_expr.expr, &mut value);
+        unparse_expr(self, expr, &mut value);
 
         ast::StmtIpyEscapeCommand {
             value: value.into_boxed_str(),
             kind,
-            range: self.node_range(parsed_expr.start()),
+            range: self.node_range(expr.start()),
             node_index: AtomicNodeIndex::NONE,
         }
     }
