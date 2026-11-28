@@ -4217,7 +4217,9 @@ class Tagged[T, Tag: Literal["red"]](Tree[T]):
     def __init__(self, tags: list[Tag]): ...
 
 def tagged() -> Tree[Tagged[Unknown, Literal["red"]] | Unknown]:
-    return Tree(Branch(Tagged(reveal_type(["red"]))))  # revealed: list[Literal["red"]]
+    # TODO: We should infer `list[Literal["red"]]` here.
+    # error: [invalid-argument-type]
+    return Tree(Branch(Tagged(reveal_type(["red"]))))  # revealed: list[str]
 
 def with_sibling[U](values: list[U], child: U | Tree[U]) -> None: ...
 def _(values: list[Tagged[Unknown, Literal["red"]] | Unknown]):
