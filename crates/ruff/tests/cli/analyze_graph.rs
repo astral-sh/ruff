@@ -150,6 +150,103 @@ fn type_checking_imports_from_config() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Each file resolves imports against the `src` of its own configuration.
+#[test]
+fn nested_config_src() -> anyhow::Result<()> {
+    let test = AnalyzeTest::with_files([
+        ("app/ruff.toml", r#"src = ["src"]"#),
+        ("app/src/app/__init__.py", ""),
+        ("app/src/app/main.py", "import utils"),
+        ("app/src/utils/__init__.py", ""),
+        ("lib/ruff.toml", r#"src = ["src"]"#),
+        ("lib/src/lib/__init__.py", "import utils"),
+        ("lib/src/utils/__init__.py", ""),
+    ])?;
+
+    assert_cmd_snapshot!(test.command(), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    {
+      "app/src/app/__init__.py": [],
+      "app/src/app/main.py": [
+        "app/src/utils/__init__.py"
+      ],
+      "app/src/utils/__init__.py": [],
+      "lib/src/lib/__init__.py": [
+        "lib/src/utils/__init__.py"
+      ],
+      "lib/src/utils/__init__.py": []
+    }
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
+/// A relative import resolves from a directory without an `__init__.py` inside a package.
+#[test]
+fn relative_import_in_namespace_directory() -> anyhow::Result<()> {
+    let test = AnalyzeTest::with_files([
+        ("ruff/__init__.py", ""),
+        ("ruff/a.py", ""),
+        ("ruff/sub/b.py", "from .. import a"),
+    ])?;
+
+    assert_cmd_snapshot!(test.command(), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    {
+      "ruff/__init__.py": [],
+      "ruff/a.py": [],
+      "ruff/sub/b.py": [
+        "ruff/a.py"
+      ]
+    }
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
+/// A file resolves a name from the package roots that contain it before falling back to other
+/// package roots.
+#[test]
+fn ancestor_package_root_first() -> anyhow::Result<()> {
+    let test = AnalyzeTest::with_files([
+        ("app/main.py", "import utils"),
+        ("app/utils/__init__.py", ""),
+        ("lib/helpers/__init__.py", "import utils\nimport shared"),
+        ("lib/utils/__init__.py", ""),
+        ("other/shared/__init__.py", ""),
+    ])?;
+
+    assert_cmd_snapshot!(test.command(), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    {
+      "app/main.py": [
+        "app/utils/__init__.py"
+      ],
+      "app/utils/__init__.py": [],
+      "lib/helpers/__init__.py": [
+        "lib/utils/__init__.py",
+        "other/shared/__init__.py"
+      ],
+      "lib/utils/__init__.py": [],
+      "other/shared/__init__.py": []
+    }
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
 struct AnalyzeTest {
     cli_test: CliTest,
 }

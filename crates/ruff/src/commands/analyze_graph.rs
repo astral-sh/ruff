@@ -2,7 +2,8 @@ use crate::args::{AnalyzeGraphArgs, ConfigArguments};
 use crate::resolve::resolve;
 use crate::{ExitStatus, resolve_default_files};
 use anyhow::Result;
-use indexmap::IndexSet;
+use indexmap::map::Entry;
+use indexmap::{IndexMap, IndexSet};
 use log::{debug, warn};
 use path_absolutize::CWD;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
@@ -15,6 +16,7 @@ use ruff_linter::{warn_user, warn_user_once};
 use ruff_python_ast::SourceType;
 use ruff_workspace::resolver::{ResolvedFile, match_exclusion, project_files_in_path};
 use rustc_hash::{FxBuildHasher, FxHashMap};
+use std::collections::BTreeSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -71,42 +73,80 @@ pub(crate) fn analyze_graph(
         })
         .collect::<FxHashMap<_, _>>();
 
-    // Create a database from the source roots, combining configured `src` paths with detected
-    // package roots. Configured paths are added first so they take precedence, and duplicates
-    // are removed.
-    let mut src_roots: IndexSet<SystemPathBuf, FxBuildHasher> = IndexSet::default();
+    // Every file falls back to the configured `src` paths and all detected package roots, sorted so
+    // that the order doesn't depend on the order of the input files.
+    let package_root_parents: BTreeSet<SystemPathBuf> = package_roots
+        .values()
+        .filter_map(|package| package.as_deref())
+        .filter_map(|path| path.parent())
+        .filter_map(|path| SystemPathBuf::from_path_buf(path.to_path_buf()).ok())
+        .collect();
+    let fallback_roots: BTreeSet<SystemPathBuf> = root_project
+        .project
+        .settings
+        .linter
+        .src
+        .iter()
+        .filter(|path| path.is_dir())
+        .filter_map(|path| SystemPathBuf::from_path_buf(path.clone()).ok())
+        .chain(package_root_parents.iter().cloned())
+        .collect();
 
-    // Add configured `src` paths first (for precedence), filtering to only include existing
-    // directories.
-    src_roots.extend(
-        root_project
-            .project
-            .settings
+    // Search the roots of each directory first: the `src` paths of its project, then the
+    // detected package roots that contain it, deepest first. Directories with the same roots
+    // share their search paths.
+    let system = OsSystem::default();
+    let db = ModuleDb::new(system.clone());
+    let venv_path = args
+        .python
+        .and_then(|python| SystemPathBuf::from_path_buf(python).ok());
+    let mut search_paths_by_roots = IndexMap::<_, _, FxBuildHasher>::default();
+    let mut search_paths_by_directory = FxHashMap::default();
+    for path in paths.iter().flatten().map(ResolvedFile::path) {
+        let Some(directory) = path.parent() else {
+            continue;
+        };
+        if search_paths_by_directory.contains_key(directory) {
+            continue;
+        }
+
+        let roots: Vec<SystemPathBuf> = resolver
+            .resolve(path)
             .linter
             .src
             .iter()
             .filter(|path| path.is_dir())
-            .filter_map(|path| SystemPathBuf::from_path_buf(path.clone()).ok()),
+            .filter_map(|path| SystemPathBuf::from_path_buf(path.clone()).ok())
+            .chain(
+                directory
+                    .ancestors()
+                    .filter_map(SystemPath::from_std_path)
+                    .filter(|ancestor| package_root_parents.contains(*ancestor))
+                    .map(SystemPath::to_path_buf),
+            )
+            .collect::<IndexSet<_, FxBuildHasher>>()
+            .into_iter()
+            .collect();
+        let index = match search_paths_by_roots.entry(roots) {
+            Entry::Occupied(entry) => entry.index(),
+            Entry::Vacant(entry) => {
+                let search_paths = resolve_search_paths(
+                    &system,
+                    entry.key().iter().chain(&fallback_roots).cloned().collect(),
+                    venv_path.clone(),
+                )?;
+                search_paths.try_register_static_roots(&db);
+                let index = entry.index();
+                entry.insert(search_paths);
+                index
+            }
+        };
+        search_paths_by_directory.insert(directory.to_path_buf(), index);
+    }
+    debug!(
+        "Resolved {} distinct search path orders",
+        search_paths_by_roots.len()
     );
-
-    // Add detected package roots.
-    src_roots.extend(
-        package_roots
-            .values()
-            .filter_map(|package| package.as_deref())
-            .filter_map(|path| path.parent())
-            .filter_map(|path| SystemPathBuf::from_path_buf(path.to_path_buf()).ok()),
-    );
-
-    let system = OsSystem::default();
-    let search_paths = resolve_search_paths(
-        &system,
-        src_roots.into_iter().collect(),
-        args.python
-            .and_then(|python| SystemPathBuf::from_path_buf(python).ok()),
-    )?;
-    let db = ModuleDb::new(system);
-    search_paths.try_register_static_roots(&db);
 
     let imports = {
         // Create a cache for resolved globs.
@@ -116,7 +156,8 @@ pub(crate) fn analyze_graph(
         let result = Arc::new(Mutex::new(Vec::new()));
         let inner_result = Arc::clone(&result);
         let db = db.clone();
-        let search_paths = &search_paths;
+        let search_paths_by_roots = &search_paths_by_roots;
+        let search_paths_by_directory = &search_paths_by_directory;
 
         rayon::scope(move |scope| {
             for resolved_file in paths {
@@ -125,10 +166,6 @@ pub(crate) fn analyze_graph(
                 };
 
                 let path = resolved_file.path();
-                let package = path
-                    .parent()
-                    .and_then(|parent| package_roots.get(parent))
-                    .and_then(Clone::clone);
 
                 // Resolve the per-file settings.
                 let settings = resolver.resolve(path);
@@ -137,6 +174,13 @@ pub(crate) fn analyze_graph(
                 let type_checking_imports = settings.analyze.type_checking_imports;
                 let python_version = settings.analyze.target_version;
                 let source_type = settings.analyze.extension.get_source_type(path);
+                let Some(search_paths) = path
+                    .parent()
+                    .and_then(|directory| search_paths_by_directory.get(directory))
+                    .map(|index| &search_paths_by_roots[*index])
+                else {
+                    continue;
+                };
 
                 // Skip excluded files.
                 if (settings.file_resolver.force_exclude || !resolved_file.is_root())
@@ -150,10 +194,6 @@ pub(crate) fn analyze_graph(
                 }
 
                 // Convert to system paths.
-                let Ok(package) = package.map(SystemPathBuf::from_path_buf).transpose() else {
-                    warn!("Failed to convert package to system path");
-                    continue;
-                };
                 let Ok(path) = SystemPathBuf::from_path_buf(resolved_file.into_path()) else {
                     warn!("Failed to convert path to system path");
                     continue;
@@ -185,7 +225,6 @@ pub(crate) fn analyze_graph(
                         environment,
                         &source_kind,
                         &path,
-                        package.as_deref(),
                         string_imports,
                         type_checking_imports,
                     )
