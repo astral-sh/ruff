@@ -18,6 +18,7 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
+use rayon::prelude::{ParallelIterator, ParallelSlice};
 use ruff_command_line::TerminalColor;
 use ruff_db::cancellation::{Canceled, CancellationToken, CancellationTokenSource};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity};
@@ -30,8 +31,9 @@ use ruff_ranged_value::RangedValue;
 use salsa::Database;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
-use ty_project::metadata::options::ProjectManager;
+use ty_project::metadata::options::{OutputFormat, ProjectManager};
 use ty_project::metadata::settings::TerminalSettings;
+use ty_project::parallel::ParallelIteratorExt;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{
     ChangeResult, CollectReporter, Db, Project, ScriptEnvironmentAvailability, UseUv,
@@ -691,26 +693,7 @@ impl MainLoop {
             diagnostics => {
                 let diagnostics_count = diagnostics.len();
 
-                let stdout = self.printer.stream_for_details().lock();
-
-                // Only render diagnostics if they're going to be displayed, since doing
-                // so is expensive.
-                if stdout.is_enabled() {
-                    let mut stdout = BufWriter::new(stdout);
-                    let display_config = DisplayDiagnosticConfig::new("ty")
-                        .color(colored::control::SHOULD_COLORIZE.should_colorize())
-                        .with_cancellation_token(Some(self.cancellation_token.clone()))
-                        .context(0);
-
-                    write!(
-                        stdout,
-                        "{}",
-                        terminal_settings
-                            .output_format
-                            .display(db, &display_config, diagnostics)
-                    )?;
-                    stdout.flush()?;
-                }
+                self.write_report(db, terminal_settings.output_format, diagnostics)?;
 
                 if !self.cancellation_token.is_cancelled() && is_human_readable {
                     if let Some(fixed) = fixed_diagnostics {
@@ -733,6 +716,63 @@ impl MainLoop {
             }
         }
 
+        Ok(())
+    }
+
+    /// Render the sorted diagnostics, leaving the summary to the caller.
+    fn write_report(
+        &self,
+        db: &ProjectDatabase,
+        format: OutputFormat,
+        diagnostics: &[Diagnostic],
+    ) -> io::Result<()> {
+        let stdout = self.printer.stream_for_details();
+        if !stdout.is_enabled() {
+            return Ok(());
+        }
+
+        let config = DisplayDiagnosticConfig::new("ty")
+            .color(colored::control::SHOULD_COLORIZE.should_colorize())
+            .with_cancellation_token(Some(self.cancellation_token.clone()))
+            .context(0);
+
+        // Full and concise reports concatenate independently rendered diagnostics.
+        // Keep structured reports intact and avoid scheduling overhead for small reports.
+        if !matches!(format, OutputFormat::Full | OutputFormat::Concise)
+            || diagnostics.len() < 256
+            || rayon::current_num_threads() == 1
+        {
+            let mut stdout = BufWriter::new(stdout.lock());
+            write!(stdout, "{}", format.display(db, &config, diagnostics))?;
+            return stdout.flush();
+        }
+
+        // Bound the number of diagnostics buffered at once. Collecting the chunks in
+        // input order lets the main thread write them without interleaving output.
+        let batch_size = if matches!(format, OutputFormat::Concise) {
+            4096
+        } else {
+            1024
+        };
+        for batch in diagnostics.chunks(batch_size) {
+            let rendered: Vec<String> = batch
+                .par_chunks(32)
+                .map_with_db(db, |db, chunk| {
+                    format.display(db, &config, chunk).to_string()
+                })
+                .collect();
+
+            let mut stdout = self.printer.stream_for_details().lock();
+            for chunk in rendered {
+                // A batch canceled during rendering may have gaps between chunks.
+                // Stop here too if cancellation arrived while writing to a slow pipe.
+                if self.cancellation_token.is_cancelled() {
+                    return Ok(());
+                }
+                stdout.write_all(chunk.as_bytes())?;
+            }
+            stdout.flush()?;
+        }
         Ok(())
     }
 }

@@ -97,6 +97,30 @@ fn test_quiet_output() -> anyhow::Result<()> {
 }
 
 #[test]
+fn parallel_diagnostics_match_serial_output() -> anyhow::Result<()> {
+    // Cross a batch boundary and leave a partial chunk at the end.
+    let case = CliTest::with_file("a.py", &"print(missing)\n".repeat(513))?;
+    case.write_file("b.py", &"print(other)\n".repeat(514))?;
+
+    for format in ["concise", "full"] {
+        let render = |threads: &str| {
+            case.command()
+                .env(ty_static::EnvVars::TY_MAX_PARALLELISM, threads)
+                .args(["--output-format", format])
+                .output()
+        };
+        let serial = render("1")?;
+        let parallel = render("4")?;
+        assert_eq!(serial.status.code(), Some(1));
+        assert_eq!(parallel.status, serial.status);
+        assert!(serial.stdout.ends_with(b"Found 1027 diagnostics\n"));
+        assert_eq!(parallel.stdout, serial.stdout);
+        assert_eq!(parallel.stderr, serial.stderr);
+    }
+    Ok(())
+}
+
+#[test]
 fn test_output_format_env() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "test.py",
