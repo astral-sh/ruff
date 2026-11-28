@@ -435,8 +435,8 @@ pub(super) fn attribute_write_requirement<'db>(
         Type::TypeVar(typevar) => {
             // Normal member lookup combines raw member types. Resolve each receiver separately
             // so writable instance storage is not mistaken for a descriptor alternative.
-            match typevar.typevar(db).bound_or_constraints(db, env) {
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) if bound != object_ty => {
+            match typevar.require_bound_or_constraints(db, env) {
+                TypeVarBoundOrConstraints::UpperBound(bound) if bound != object_ty => {
                     attribute_write_requirement(
                         db,
                         env,
@@ -445,14 +445,16 @@ pub(super) fn attribute_write_requirement<'db>(
                         Some(receiver.unwrap_or(object_ty)),
                     )
                 }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
                     AttributeWriteRequirement::All {
                         object_ty,
                         element_tys: constraints.elements(db),
                         receiver: Some(receiver.unwrap_or(object_ty)),
                     }
                 }
-                _ => member_attribute_write_requirement(db, env, object_ty, attribute, receiver),
+                TypeVarBoundOrConstraints::UpperBound(_) => {
+                    member_attribute_write_requirement(db, env, object_ty, attribute, receiver)
+                }
             }
         }
 
@@ -674,6 +676,20 @@ fn instance_attribute_write_requirement<'db>(
     receiver: Option<Type<'db>>,
     members: Option<&AssignmentAttributeMembers<'db>>,
 ) -> AttributeWriteRequirement<'db> {
+    // Class-member lookup through `type[object]` (normalized to `type`) falls back to `object`.
+    // This does not guarantee writable storage, even though typeshed annotates metadata such as
+    // `__module__` as ordinary instance attributes. Data descriptors, such as the `__class__`
+    // property, have their own write contracts and are checked below.
+    if matches!(
+        object_ty.to_meta_type(db, env),
+        Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type)
+    ) && let Place::Defined(DefinedPlace { ty, .. }) =
+        object_ty.class_member(db, env, attribute).place
+        && ty.is_definitely_non_data_descriptor(db, env)
+    {
+        return AttributeWriteRequirement::CannotAssign;
+    }
+
     let instance = |member| AttributeWriteRequirement::Instance {
         object_ty,
         receiver,
@@ -688,9 +704,15 @@ fn instance_attribute_write_requirement<'db>(
             receiver_fallback,
         }) => (member, receiver_fallback),
         Some(&AssignmentAttributeMembers::ReceiverMember(member)) => {
-            return instance(InstanceAttributeWriteMember::Instance(
-                fallback_requirement(member),
-            ));
+            // A nominal metaclass instance is still evaluated as an instance of its metaclass
+            // (including `ClassVar` and `__setattr__` restrictions), but this member belongs to
+            // the represented class's MRO. Its methods remain unbound when replaced.
+            let fallback = if object_ty.is_metaclass_instance(db, env) {
+                class_fallback_write_requirement(db, env, object_ty, Type::object(), member)
+            } else {
+                fallback_requirement(member)
+            };
+            return instance(InstanceAttributeWriteMember::Instance(fallback));
         }
         None => return instance(InstanceAttributeWriteMember::SetAttr),
     };
@@ -1204,7 +1226,23 @@ fn class_object_assignment_members<'db>(
     if !matches!(
         object_ty,
         Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..)
-    ) {
+    ) && !object_ty.is_metaclass_instance(db, env)
+    {
+        return None;
+    }
+
+    // A metaclass's instance declarations describe storage on the class object. Preserve those
+    // contracts (for example, `type.__dict__` is a final mapping proxy) instead of replacing them
+    // with the less precise declarations inherited from `object` by the represented class.
+    if object_ty.is_metaclass_instance(db, env)
+        && (type_member
+            .qualifiers
+            .intersects(TypeQualifiers::FINAL | TypeQualifiers::CLASS_VAR)
+            || !object_ty
+                .instance_member(db, env, attribute)
+                .place
+                .is_undefined())
+    {
         return None;
     }
 

@@ -22,9 +22,9 @@ use crate::{
     lint::{LintId, LintMetadata},
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
-        ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass, MemberLookupPolicy,
-        Parameter, Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
-        UnionType,
+        ClassBase, ClassLiteral, ClassType, InstanceFallbackShadowsNonDataDescriptor,
+        IntersectionType, KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature,
+        StaticClassLiteral, Type, TypeContext, TypeQualifiers, UnionType,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind, MethodDecorator},
         constraints::ConstraintSetBuilder,
@@ -1435,7 +1435,26 @@ fn lookup_override_member<'db>(
             MemberLookupPolicy::NO_INSTANCE_FALLBACK,
         )
     } else {
-        Type::instance(db, env, class).member(db, env, name)
+        let instance = Type::instance(db, env, class);
+        if !instance.is_metaclass_instance(db, env) {
+            return instance.member(db, env, name);
+        }
+
+        // A metaclass override preserves its own instance contract. Ordinary lookup on one of
+        // its class-object instances can instead find a method in the represented class's MRO:
+        // for example, `cls.__setattr__` can expose `object.__setattr__` rather than the
+        // metaclass setter whose override is being checked here.
+        Type::resolve_descriptor_access(
+            db,
+            env,
+            instance.class_member(db, env, name),
+            instance,
+            instance.instance_member(db, env, name).into(),
+            InstanceFallbackShadowsNonDataDescriptor::No,
+        )
+        .unwrap_or_else(|error| error.fallback_member(db))
+        .member(db)
+        .map_type(|ty| ty.bind_self_typevars(db, env, instance))
     }
 }
 
