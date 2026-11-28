@@ -486,16 +486,6 @@ def minimize_failure(
             print(f"Could not minimize seed {seed}: {e}", file=sys.stderr, flush=True)
     except MinimizationTimedOut:
         minimization_timed_out = True
-    # An input whose execution time is close to the timeout may time out during
-    # the minimizer's initial check but finish when the same source is rechecked.
-    # `pysource-minimize` currently raises a plain `ValueError` in this case, so
-    # catch it to preserve the original finding. This also catches unrelated
-    # `ValueError`s. Remove this handler once a release containing the fix in
-    # https://github.com/15r10nk/pysource-minimize/pull/50 is the minimum
-    # supported `pysource-minimize` version.
-    except ValueError as e:
-        if not args.quiet:
-            print(f"Could not minimize seed {seed}: {e}", file=sys.stderr, flush=True)
     else:
         bug = dataclasses.replace(bug, source=minimized, minimization_succeeded=True)
 
