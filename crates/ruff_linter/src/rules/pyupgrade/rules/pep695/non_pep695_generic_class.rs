@@ -1,21 +1,25 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{ExprSubscript, StmtClassDef};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
+use crate::preview::is_non_pep695_generic_class_protocol_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 use super::{
-    DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, find_generic, in_nested_context,
+    DisplayTypeVars, GenericBase, TypeVarReferenceVisitor, check_type_vars, find_generic_class,
+    in_nested_context,
 };
 
 /// ## What it does
 ///
-/// Checks for use of standalone type variables and parameter specifications in generic classes.
+/// Checks for use of standalone type variables and parameter specifications in certain generic
+/// classes, such as `Generic[...]`; and in [preview], also `Protocol[...]`.
 ///
 /// ## Why is this bad?
 ///
@@ -28,6 +32,9 @@ use super::{
 /// use.
 ///
 /// ## Known problems
+///
+/// The rule does not check for any Generic classes outside of `Generic[...]`, such as `Mapping[...]`
+/// or any other Generic class annotated with type parameters.
 ///
 /// The rule currently skips generic classes nested inside of other functions or classes. It also
 /// skips type parameters with the `default` argument introduced in [PEP 696] and implemented in
@@ -63,6 +70,29 @@ use super::{
 /// ```python
 /// class GenericClass[T]:
 ///     var: T
+/// ```
+///
+/// For a `Protocol[...]` base, the type parameters move to the class, and the class keeps
+/// `Protocol` as a base so that it remains a protocol:
+///
+/// ```python
+/// from typing import Protocol, TypeVar
+///
+/// T = TypeVar("T")
+///
+///
+/// class GenericProtocol(Protocol[T]):
+///     def method(self) -> T: ...
+/// ```
+///
+/// Use instead:
+///
+/// ```python
+/// from typing import Protocol
+///
+///
+/// class GenericProtocol[T](Protocol):
+///     def method(self) -> T: ...
 /// ```
 ///
 /// In cases where you've intentionally defined a reusable `TypeVar` to share
@@ -113,7 +143,8 @@ use super::{
 /// This rule will correctly handle classes with multiple base classes, as long as the single
 /// `Generic` base class is at the end of the argument list, as checked by
 /// [`generic-not-last-base-class`][PYI059]. If a `Generic` base class is
-/// found outside of the last position, a diagnostic is emitted without a suggested fix.
+/// found outside of the last position, a diagnostic is emitted without a suggested fix. The same
+/// applies to a `Protocol[...]` base class.
 ///
 /// This rule only applies to generic classes and does not include generic functions. See
 /// [`non-pep695-generic-function`][UP047] for the function version.
@@ -129,12 +160,14 @@ use super::{
 /// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function/
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 /// [fail]: https://github.com/python/mypy/issues/18507
+/// [preview]: https://docs.astral.sh/ruff/preview/
 /// [source of confusion]: https://peps.python.org/pep-0695/#points-of-confusion
 /// [type alias]: https://docs.python.org/3/reference/simple_stmts.html#type-aliases
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.12.0", category = Category::Complexity)]
 pub(crate) struct NonPEP695GenericClass {
     name: String,
+    base: &'static str,
 }
 
 impl Violation for NonPEP695GenericClass {
@@ -142,8 +175,8 @@ impl Violation for NonPEP695GenericClass {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonPEP695GenericClass { name } = self;
-        format!("Generic class `{name}` uses `Generic` subclass instead of type parameters")
+        let NonPEP695GenericClass { name, base } = self;
+        format!("Generic class `{name}` uses `{base}` subclass instead of type parameters")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -180,8 +213,12 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
         return;
     };
 
-    let Some((generic_idx, generic_expr @ ExprSubscript { slice, range, .. })) =
-        find_generic(arguments, checker.semantic())
+    let Some((generic_idx, generic_expr @ ExprSubscript { slice, range, .. }, kind)) =
+        find_generic_class(
+            arguments,
+            checker.semantic(),
+            is_non_pep695_generic_class_protocol_enabled(checker.settings()),
+        )
     else {
         return;
     };
@@ -189,6 +226,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
     let mut diagnostic = checker.report_diagnostic(
         NonPEP695GenericClass {
             name: name.to_string(),
+            base: kind.as_str(),
         },
         *range,
     );
@@ -199,8 +237,12 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
     // cause more complication for us to handle stubs specially, and probably isn't worth the
     // bother. we still offer a diagnostic here but not a fix
     //
-    // because `find_generic` also finds the *first* Generic argument, this has the additional
-    // benefit of bailing out with a diagnostic if multiple Generic arguments are present
+    // The same applies to `Protocol[...]`: a class like `class C(Protocol[T], OtherProtocol)`
+    // fails at runtime because it can't create a consistent method resolution order.
+    //
+    // because `find_generic_class` also finds the *first* `Generic` or `Protocol` argument, this
+    // has the additional benefit of bailing out with a diagnostic if multiple such arguments are
+    // present
     if generic_idx != arguments.args.len() - 1 {
         return;
     }
@@ -245,13 +287,26 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
         };
 
         diagnostic.try_set_fix(|| {
-            let removal_edit = remove_argument(
-                generic_expr,
-                arguments,
-                Parentheses::Remove,
-                checker.source(),
-                checker.tokens(),
-            )?;
+            let removal_edit = match kind {
+                GenericBase::Generic => remove_argument(
+                    generic_expr,
+                    arguments,
+                    Parentheses::Remove,
+                    checker.source(),
+                    checker.tokens(),
+                )?,
+                // Keep the `Protocol` base and only delete the subscript. The deletion starts
+                // after any parentheses around the value, so that `(Protocol)[T]` becomes
+                // `(Protocol)`.
+                GenericBase::Protocol => {
+                    let value = &*generic_expr.value;
+                    let value_end =
+                        parenthesized_range(value.into(), generic_expr.into(), checker.tokens())
+                            .unwrap_or(value.range())
+                            .end();
+                    Edit::range_deletion(TextRange::new(value_end, generic_expr.end()))
+                }
+            };
             Ok(Fix::unsafe_edits(
                 Edit::insertion(type_params.to_string(), name.end()),
                 [removal_edit],
