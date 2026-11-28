@@ -73,6 +73,11 @@ impl ModuleImports {
         self.0.extend(paths);
     }
 
+    /// Consume the imports and iterate over their paths.
+    pub fn into_paths(self) -> impl Iterator<Item = SystemPathBuf> {
+        self.0.into_iter()
+    }
+
     /// Returns `true` if the module imports are empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()

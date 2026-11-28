@@ -10,10 +10,11 @@ use ruff_graph::{
     Direction, ImportMap, ModuleDb, ModuleImports, ResolverEnvironment, resolve_search_paths,
 };
 use ruff_linter::package::PackageRoot;
+use ruff_linter::packaging::is_package;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{warn_user, warn_user_once};
 use ruff_python_ast::SourceType;
-use ruff_workspace::resolver::{ResolvedFile, match_exclusion, project_files_in_path};
+use ruff_workspace::resolver::{ResolvedFile, Resolver, match_exclusion, project_files_in_path};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -108,7 +109,7 @@ pub(crate) fn analyze_graph(
     let db = ModuleDb::new(system);
     search_paths.try_register_static_roots(&db);
 
-    let imports = {
+    let mut imports = {
         // Create a cache for resolved globs.
         let glob_resolver = Arc::new(Mutex::new(GlobResolver::default()));
 
@@ -116,6 +117,8 @@ pub(crate) fn analyze_graph(
         let result = Arc::new(Mutex::new(Vec::new()));
         let inner_result = Arc::clone(&result);
         let db = db.clone();
+        let resolver = &resolver;
+        let root = root.as_path();
         let search_paths = &search_paths;
 
         rayon::scope(move |scope| {
@@ -161,7 +164,6 @@ pub(crate) fn analyze_graph(
 
                 let db = db.clone();
                 let glob_resolver = glob_resolver.clone();
-                let root = root.clone();
                 let result = inner_result.clone();
                 scope.spawn(move |_| {
                     // Extract source code (handles both .py and .ipynb files)
@@ -202,12 +204,16 @@ pub(crate) fn analyze_graph(
                         imports.extend(glob_resolver.resolve(root, globs));
                     }
 
-                    // Convert the path (and imports) to be relative to the working directory.
-                    let path = path
-                        .strip_prefix(&root)
-                        .map(SystemPath::to_path_buf)
-                        .unwrap_or(path);
-                    let imports = imports.relative_to(&root);
+                    let (path, imports) = if args.package {
+                        // Package detection needs absolute paths.
+                        (path, imports)
+                    } else {
+                        let path = path
+                            .strip_prefix(root)
+                            .map(SystemPath::to_path_buf)
+                            .unwrap_or(path);
+                        (path, imports.relative_to(root))
+                    };
 
                     result.lock().unwrap().push((path, imports));
                 });
@@ -217,6 +223,10 @@ pub(crate) fn analyze_graph(
         // Collect the results.
         Arc::into_inner(result).unwrap().into_inner()?
     };
+
+    if args.package {
+        group_by_package(&mut imports, &resolver, &root);
+    }
 
     // Generate the import map.
     let import_map = match args.direction {
@@ -234,6 +244,51 @@ pub(crate) fn analyze_graph(
     std::mem::forget(db);
 
     Ok(ExitStatus::Success)
+}
+
+/// Coalesce file nodes into their enclosing packages before building the import map.
+fn group_by_package(
+    imports: &mut Vec<(SystemPathBuf, ModuleImports)>,
+    resolver: &Resolver<'_>,
+    root: &SystemPath,
+) {
+    let mut package_cache = FxHashMap::default();
+    let mut packages = FxHashMap::<_, ModuleImports>::default();
+    for (path, imports) in imports.drain(..) {
+        let package = package_or_file(&path, resolver, &mut package_cache);
+        let dependencies = imports.into_paths().filter_map(|dependency| {
+            let dependency = package_or_file(&dependency, resolver, &mut package_cache);
+            (dependency != package).then(|| relative_graph_path(dependency, root).to_path_buf())
+        });
+        packages
+            .entry(relative_graph_path(package, root).to_path_buf())
+            .or_default()
+            .extend(dependencies);
+    }
+    imports.extend(packages);
+}
+
+fn package_or_file<'a>(
+    path: &'a SystemPath,
+    resolver: &Resolver<'_>,
+    cache: &mut FxHashMap<SystemPathBuf, bool>,
+) -> &'a SystemPath {
+    path.parent()
+        .filter(|directory| {
+            *cache.entry(directory.to_path_buf()).or_insert_with(|| {
+                let settings = resolver.resolve(path.as_std_path());
+                is_package(directory.as_std_path(), &settings.linter.namespace_packages)
+            })
+        })
+        .unwrap_or(path)
+}
+
+fn relative_graph_path<'a>(path: &'a SystemPath, root: &SystemPath) -> &'a SystemPath {
+    if path == root {
+        SystemPath::new(".")
+    } else {
+        path.strip_prefix(root).unwrap_or(path)
+    }
 }
 
 /// A resolver for glob sets.
