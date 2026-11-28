@@ -3159,6 +3159,32 @@ def nested_sequence_pattern_is_exhaustive(
             assert_never(value)
 ```
 
+A class pattern that tests for `append` matches only some values of type `type[Any]`. For example,
+`f(list)` returns `1`, and `f(int)` falls through and returns `None`.
+
+```py
+def f(x: type[Any]) -> int:  # error: [invalid-implicit-return]
+    match x:
+        case object(append=_):
+            return 1
+
+f(int)
+```
+
+ty infers `Any` for the captured `append` when the pattern succeeds. On failure, `x` still has type
+`type[Any]`. Since `type` defines `__name__`, the second case is exhaustive.
+
+```py
+def capture(x: type[Any]) -> int:
+    match x:
+        case object(append=append):
+            reveal_type(append)  # revealed: Any
+            return 1
+        case object(__name__=_):
+            reveal_type(x)  # revealed: type[Any]
+            return 0
+```
+
 ## Sequence exhaustiveness
 
 Sequence patterns also contribute to negative narrowing and exhaustiveness. Exact tuple shapes can
