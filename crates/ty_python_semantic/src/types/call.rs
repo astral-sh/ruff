@@ -30,13 +30,200 @@ impl<'db> OperatorResult<'db> {
         env: &ProgramEnvironment<'db>,
         bindings: &Bindings<'db>,
     ) -> Self {
+        Self::from_bindings_and_return_type(db, bindings, bindings.return_type(db, env))
+    }
+
+    fn from_bindings_and_return_type(
+        db: &'db dyn Db,
+        bindings: &Bindings<'db>,
+        return_type: Type<'db>,
+    ) -> Self {
         Self {
-            return_type: bindings.return_type(db, env),
+            return_type,
             deprecated_functions: bindings
                 .deprecated_functions(db)
                 .map(|(_, function)| function)
                 .collect(),
         }
+    }
+}
+
+/// The methods called by a binary operation and its result after `NotImplemented` fallback.
+///
+/// Method bindings retain their original return types for IDE navigation. Arithmetic syntax
+/// uses a separate result after `NotImplemented` fallback.
+pub(crate) struct BinaryOperatorCall<'db> {
+    pub(super) bindings: Bindings<'db>,
+    pub(super) return_type: Type<'db>,
+}
+
+impl<'db> BinaryOperatorCall<'db> {
+    fn union(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, other: Self) -> Self {
+        let Self {
+            bindings: left,
+            return_type: left_type,
+        } = self;
+        let Self {
+            bindings: right,
+            return_type: right_type,
+        } = other;
+        let callable_type =
+            UnionType::from_two_elements(db, env, left.callable_type(), right.callable_type());
+        Self {
+            bindings: Bindings::from_union(callable_type, [left, right]),
+            return_type: UnionType::from_two_elements(db, env, left_type, right_type),
+        }
+    }
+
+    pub(super) fn into_result(self, db: &'db dyn Db) -> OperatorResult<'db> {
+        let Self {
+            bindings,
+            return_type,
+        } = self;
+        OperatorResult::from_bindings_and_return_type(db, &bindings, return_type)
+    }
+}
+
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Boxing adds an allocation to each successful call"
+)]
+enum OperatorCallOutcome<'db> {
+    Called {
+        call: BinaryOperatorCall<'db>,
+        /// The method can return `NotImplemented` or may not be defined at runtime.
+        may_fall_through: bool,
+    },
+    Unavailable,
+    Blocked,
+}
+
+impl<'db> OperatorCallOutcome<'db> {
+    fn into_error(self, db: &'db dyn Db) -> CallBinOpError<'db> {
+        match self {
+            Self::Called {
+                call,
+                may_fall_through: _,
+            } => CallBinOpError::from_call(db, call),
+            Self::Unavailable => CallBinOpError::default(),
+            Self::Blocked => CallBinOpError::default(),
+        }
+    }
+}
+
+fn operator_call_outcome<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    call: Result<Bindings<'db>, CallDunderError<'db>>,
+) -> OperatorCallOutcome<'db> {
+    let (bindings, possibly_unbound) = match call {
+        Ok(bindings) => (bindings, false),
+        Err(error) => match error {
+            CallDunderError::PossiblyUnbound {
+                bindings,
+                unbound_on: _,
+            } => (*bindings, true),
+            CallDunderError::MethodNotAvailable => return OperatorCallOutcome::Unavailable,
+            CallDunderError::CallError(kind, _, _) => match kind {
+                // Calling a non-callable method can raise before reflection, even if other
+                // possible method types are callable.
+                CallErrorKind::NotCallable => return OperatorCallOutcome::Blocked,
+                CallErrorKind::PossiblyNotCallable => return OperatorCallOutcome::Blocked,
+                // Keep parameter-based fallback for the existing annotation convention.
+                CallErrorKind::BindingError => return OperatorCallOutcome::Unavailable,
+            },
+        },
+    };
+    let (return_type, may_decline) = bindings.return_type(db, env).split_not_implemented(db, env);
+    OperatorCallOutcome::Called {
+        call: BinaryOperatorCall {
+            bindings,
+            return_type,
+        },
+        may_fall_through: may_decline || possibly_unbound,
+    }
+}
+
+fn resolve_ordered_operator_calls<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    first: OperatorCallOutcome<'db>,
+    fallback: impl FnOnce() -> OperatorCallOutcome<'db>,
+) -> Result<BinaryOperatorCall<'db>, CallBinOpError<'db>> {
+    let first = match first {
+        OperatorCallOutcome::Called {
+            call,
+            may_fall_through,
+        } => {
+            if !may_fall_through {
+                return Ok(call);
+            }
+            Some(call)
+        }
+        OperatorCallOutcome::Unavailable => None,
+        OperatorCallOutcome::Blocked => return Err(CallBinOpError::default()),
+    };
+    match fallback() {
+        OperatorCallOutcome::Called {
+            call: second,
+            may_fall_through,
+        } => {
+            let call = match first {
+                Some(first) => first.union(db, env, second),
+                None => second,
+            };
+            if may_fall_through {
+                Err(CallBinOpError::from_call(db, call))
+            } else {
+                Ok(call)
+            }
+        }
+        OperatorCallOutcome::Unavailable => Err(match first {
+            Some(call) => CallBinOpError::from_call(db, call),
+            None => CallBinOpError::default(),
+        }),
+        OperatorCallOutcome::Blocked => Err(match first {
+            Some(call) => CallBinOpError::from_call(db, call),
+            None => CallBinOpError::default(),
+        }),
+    }
+}
+
+fn resolve_possible_operator_calls<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    first: OperatorCallOutcome<'db>,
+    second: OperatorCallOutcome<'db>,
+) -> Result<BinaryOperatorCall<'db>, CallBinOpError<'db>> {
+    let (call, may_fall_through) = match first {
+        OperatorCallOutcome::Blocked => return Err(second.into_error(db)),
+        OperatorCallOutcome::Unavailable => match second {
+            OperatorCallOutcome::Called {
+                call,
+                may_fall_through,
+            } => (call, may_fall_through),
+            OperatorCallOutcome::Unavailable => return Err(CallBinOpError::default()),
+            OperatorCallOutcome::Blocked => return Err(CallBinOpError::default()),
+        },
+        OperatorCallOutcome::Called {
+            call: first,
+            may_fall_through: first_declines,
+        } => match second {
+            OperatorCallOutcome::Called {
+                call: second,
+                may_fall_through: second_declines,
+            } => (
+                first.union(db, env, second),
+                first_declines && second_declines,
+            ),
+            OperatorCallOutcome::Unavailable => (first, first_declines),
+            OperatorCallOutcome::Blocked => return Err(CallBinOpError::from_call(db, first)),
+        },
+    };
+    if may_fall_through {
+        Err(CallBinOpError::from_call(db, call))
+    } else {
+        Ok(call)
     }
 }
 
@@ -148,6 +335,30 @@ fn reflected_method_priority<'db>(
 }
 
 impl<'db> Type<'db> {
+    /// Separate operator result values from a request to try another method.
+    pub(super) fn split_not_implemented(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> (Self, bool) {
+        let expanded = self.expand_top_level_aliases(db, env);
+        let completing = match expanded {
+            Type::Union(union) => union.filter(db, |ty| !ty.is_notimplemented(db)),
+            ty => {
+                if ty.is_notimplemented(db) {
+                    Type::Never
+                } else {
+                    ty
+                }
+            }
+        };
+        if completing == expanded {
+            (self, false)
+        } else {
+            (completing, true)
+        }
+    }
+
     /// Return the result of dispatching a rich comparison method between two operands.
     ///
     /// A strict subclass on the right takes precedence over the normal method on the left.
@@ -214,26 +425,25 @@ impl<'db> Type<'db> {
 
     /// Memoize the return type and deprecations from binary dunder resolution, without retaining
     /// the full call bindings or repeating overload selection at each expression.
-    /// Returns `None` if resolution fails; callers remain responsible for call-site diagnostics.
+    /// Failed resolution retains called-method metadata;
+    /// callers remain responsible for call-site diagnostics.
     pub(crate) fn try_call_bin_op_result(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
-    ) -> Option<&'db OperatorResult<'db>> {
-        #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    ) -> Result<&'db OperatorResult<'db>, &'db CallBinOpError<'db>> {
+        #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _, _, _, _| Err(CallBinOpError::default()), heap_size=ruff_memory_usage::heap_size)]
         fn try_call_bin_op_result_impl<'db>(
             db: &'db dyn Db,
             program: Program<'db>,
             left_ty: Type<'db>,
             op: ast::Operator,
             right_ty: Type<'db>,
-        ) -> Option<OperatorResult<'db>> {
+        ) -> Result<OperatorResult<'db>, CallBinOpError<'db>> {
             let env = &ProgramEnvironment::from_program(program);
-            Type::try_call_bin_op(db, env, left_ty, op, right_ty)
-                .ok()
-                .map(|bindings| OperatorResult::from_bindings(db, env, &bindings))
+            Type::try_call_bin_op(db, env, left_ty, op, right_ty).map(|call| call.into_result(db))
         }
 
         try_call_bin_op_result_impl(db, env.program(db), left_ty, op, right_ty).as_ref()
@@ -245,7 +455,7 @@ impl<'db> Type<'db> {
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
-    ) -> Result<Bindings<'db>, CallBinOpError> {
+    ) -> Result<BinaryOperatorCall<'db>, CallBinOpError<'db>> {
         Self::try_call_bin_op_with_policy(
             db,
             env,
@@ -263,107 +473,61 @@ impl<'db> Type<'db> {
         op: ast::Operator,
         right_ty: Type<'db>,
         policy: MemberLookupPolicy,
-    ) -> Result<Bindings<'db>, CallBinOpError> {
-        // We either want to call lhs.__op__ or rhs.__rop__. The full decision tree from
-        // the Python spec [1] is:
-        //
-        //   - If rhs is a (proper) subclass of lhs, and it provides a different
-        //     implementation of __rop__, use that.
-        //   - Otherwise, if lhs implements __op__, use that.
-        //   - Otherwise, if lhs and rhs are different types, and rhs implements __rop__,
-        //     use that.
-        //
-        // [1] https://docs.python.org/3/reference/datamodel.html#object.__radd__
-
-        // Runtime classes determine reflected priority, but static operand types may only
-        // establish that priority conditionally.
+    ) -> Result<BinaryOperatorCall<'db>, CallBinOpError<'db>> {
+        // A different reflected implementation on a proper subclass is tried first.
+        // A method that returns NotImplemented lets the next method run; parameter
+        // binding failures retain their existing fallback behavior.
+        let call_dunder = |receiver: Type<'db>, argument: Type<'db>, name| {
+            operator_call_outcome(
+                db,
+                env,
+                receiver.try_call_dunder_with_policy(
+                    db,
+                    env,
+                    name,
+                    &mut CallArguments::positional([argument]),
+                    TypeContext::default(),
+                    policy,
+                ),
+            )
+        };
+        let call_left = || call_dunder(left_ty, right_ty, op.dunder());
+        let call_right = || {
+            if left_ty == right_ty {
+                return OperatorCallOutcome::Unavailable;
+            }
+            // Different specializations can still have the same exact runtime class.
+            let same_runtime_class = has_exact_runtime_class(db, env, left_ty)
+                && has_exact_runtime_class(db, env, right_ty)
+                && operator_dispatch_class(db, env, left_ty)
+                    .zip(operator_dispatch_class(db, env, right_ty))
+                    .is_some_and(|(left, right)| left.class_literal(db) == right.class_literal(db));
+            if same_runtime_class {
+                OperatorCallOutcome::Unavailable
+            } else {
+                call_dunder(right_ty, left_ty, op.reflected_dunder())
+            }
+        };
         let reflected_priority = reflected_method_priority(db, env, left_ty, right_ty);
-
-        let left_class = left_ty.to_meta_type(db, env);
-        let right_class = right_ty.to_meta_type(db, env);
         if reflected_priority != ReflectedMethodPriority::Never {
             let reflected_dunder = op.reflected_dunder();
+            let left_class = left_ty.to_meta_type(db, env);
+            let right_class = right_ty.to_meta_type(db, env);
             let rhs_reflected = right_class.member(db, env, reflected_dunder).place;
-            // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
-            // Bindings together
             if !rhs_reflected.is_undefined()
                 && !rhs_reflected.is_equal_ignoring_provenance(
                     left_class.member(db, env, reflected_dunder).place,
                 )
             {
-                let call_on_right_instance = right_ty.try_call_dunder_with_policy(
-                    db,
-                    env,
-                    reflected_dunder,
-                    &mut CallArguments::positional([left_ty]),
-                    TypeContext::default(),
-                    policy,
-                );
-
                 if reflected_priority == ReflectedMethodPriority::Definitely {
-                    return Ok(call_on_right_instance.or_else(|_| {
-                        left_ty.try_call_dunder_with_policy(
-                            db,
-                            env,
-                            op.dunder(),
-                            &mut CallArguments::positional([right_ty]),
-                            TypeContext::default(),
-                            policy,
-                        )
-                    })?);
+                    return resolve_ordered_operator_calls(db, env, call_right(), call_left);
                 }
-
-                let call_on_left_instance = left_ty.try_call_dunder_with_policy(
-                    db,
-                    env,
-                    op.dunder(),
-                    &mut CallArguments::positional([right_ty]),
-                    TypeContext::default(),
-                    policy,
-                );
-
-                return match (call_on_right_instance, call_on_left_instance) {
-                    (Ok(right_bindings), Ok(left_bindings)) => {
-                        let callable_type = UnionType::from_two_elements(
-                            db,
-                            env,
-                            right_bindings.callable_type(),
-                            left_bindings.callable_type(),
-                        );
-                        Ok(Bindings::from_union(
-                            callable_type,
-                            [right_bindings, left_bindings],
-                        ))
-                    }
-                    (Ok(bindings), Err(_)) | (Err(_), Ok(bindings)) => Ok(bindings),
-                    (Err(_), Err(error)) => Err(error.into()),
-                };
+                // Either method may have runtime priority. Both are evaluated once; if
+                // either always completes, neither ordering can exhaust both methods.
+                return resolve_possible_operator_calls(db, env, call_right(), call_left());
             }
         }
-
-        let call_on_left_instance = left_ty.try_call_dunder_with_policy(
-            db,
-            env,
-            op.dunder(),
-            &mut CallArguments::positional([right_ty]),
-            TypeContext::default(),
-            policy,
-        );
-
-        call_on_left_instance.or_else(|_| {
-            if left_ty == right_ty {
-                Err(CallBinOpError::NotSupported)
-            } else {
-                Ok(right_ty.try_call_dunder_with_policy(
-                    db,
-                    env,
-                    op.reflected_dunder(),
-                    &mut CallArguments::positional([left_ty]),
-                    TypeContext::default(),
-                    policy,
-                )?)
-            }
-        })
+        resolve_ordered_operator_calls(db, env, call_left(), call_right)
     }
 }
 
@@ -541,23 +705,17 @@ impl<'db> CallDunderError<'db> {
     }
 }
 
-#[derive(Debug)]
-pub(crate) enum CallBinOpError {
-    /// The dunder attribute exists but it can't be called with the given arguments.
-    ///
-    /// This includes non-callable dunder attributes that are possibly unbound.
-    CallError,
-
-    NotSupported,
+/// Called-method metadata retained when a binary operation is unsupported.
+#[derive(Clone, Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct CallBinOpError<'db> {
+    /// Includes methods that were called but returned only `NotImplemented`.
+    pub(super) deprecated_functions: Box<[OverloadLiteral<'db>]>,
 }
 
-impl From<CallDunderError<'_>> for CallBinOpError {
-    fn from(value: CallDunderError<'_>) -> Self {
-        match value {
-            CallDunderError::CallError(_, _, _) => Self::CallError,
-            CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound { .. } => {
-                CallBinOpError::NotSupported
-            }
+impl<'db> CallBinOpError<'db> {
+    fn from_call(db: &'db dyn Db, call: BinaryOperatorCall<'db>) -> Self {
+        Self {
+            deprecated_functions: call.into_result(db).deprecated_functions,
         }
     }
 }

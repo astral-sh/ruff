@@ -1425,9 +1425,10 @@ pub fn definitions_for_bin_op<'db>(
     let left_ty = binary_op.left.inferred_type(model)?;
     let right_ty = binary_op.right.inferred_type(model)?;
     let env = &model.program_environment();
-    let Ok(bindings) = Type::try_call_bin_op(db, env, left_ty, binary_op.op, right_ty) else {
+    let Ok(call) = Type::try_call_bin_op(db, env, left_ty, binary_op.op, right_ty) else {
         return None;
     };
+    let bindings = call.bindings;
 
     let callable_type = promote_for_self(db, env, bindings.callable_type());
 

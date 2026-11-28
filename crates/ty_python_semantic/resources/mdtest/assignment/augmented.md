@@ -58,6 +58,69 @@ x += "Hello"
 reveal_type(x)  # revealed: int
 ```
 
+## In-place operations returning `NotImplemented`
+
+Returning `NotImplemented` requests ordinary binary dispatch, including the reflected method. The
+sentinel is never assigned to the target; other in-place return alternatives are retained.
+
+```toml
+[analysis]
+return-type-inference = "always"
+```
+
+```py
+from types import NotImplementedType
+from typing import final
+
+InPlaceResult = int | NotImplementedType
+
+@final
+class Left:
+    def __iadd__(self, other: object):
+        return NotImplemented
+
+    def __add__(self, other: int) -> str:
+        return "added"
+
+class Right:
+    def __radd__(self, other: object) -> bytes:
+        return b"reflected"
+
+left = Left()
+left += 1
+reveal_type(left)  # revealed: str
+
+left = Left()
+left += Right()
+reveal_type(left)  # revealed: bytes
+
+left = Left()
+left += "unsupported"  # error: [unsupported-operator]
+
+class Mixed:
+    def __iadd__(self, other: int) -> InPlaceResult:
+        return NotImplemented
+
+    def __add__(self, other: int) -> str:
+        return "added"
+
+mixed = Mixed()
+mixed += 1
+reveal_type(mixed)  # revealed: int | str
+
+@final
+class Declines:
+    def __iadd__(self, other: object) -> NotImplementedType:
+        return NotImplemented
+
+    def __add__(self, other: object):
+        return NotImplemented
+
+both = Declines()
+both += Right()
+reveal_type(both)  # revealed: bytes
+```
+
 ## Unsupported types
 
 ```py

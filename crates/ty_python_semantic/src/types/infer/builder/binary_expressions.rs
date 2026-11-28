@@ -3,7 +3,7 @@ use compact_str::CompactString;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use super::TypeInferenceBuilder;
-use crate::types::call::CallArguments;
+use crate::types::call::{CallArguments, CallBinOpError, OperatorResult};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
@@ -85,6 +85,24 @@ pub(super) struct BinaryInferenceState<'db> {
 }
 
 impl<'db> BinaryInferenceState<'db> {
+    fn record_operator_result(
+        &mut self,
+        result: Result<&OperatorResult<'db>, &CallBinOpError<'db>>,
+    ) -> Option<Type<'db>> {
+        match result {
+            Ok(result) => {
+                self.deprecated_functions
+                    .extend(&result.deprecated_functions);
+                Some(result.return_type)
+            }
+            Err(error) => {
+                self.deprecated_functions
+                    .extend(&error.deprecated_functions);
+                None
+            }
+        }
+    }
+
     fn tuple_alternative_count(db: &'db dyn Db, ty: Type<'db>) -> usize {
         match ty {
             Type::Union(union) => union
@@ -461,11 +479,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             left_ty,
             op,
             right_ty,
-        )?;
-        state
-            .deprecated_functions
-            .extend(&result.deprecated_functions);
-        Some(result.return_type)
+        );
+        state.record_operator_result(result)
     }
 
     /// Infer the result type and collect deprecated methods for the enclosing operation.
@@ -1153,23 +1168,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 _,
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..),
                 ast::Operator::BitOr,
-            ) => Type::try_call_bin_op_with_policy(
-                db,
-                env,
-                left_ty,
-                ast::Operator::BitOr,
-                right_ty,
-                MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-            )
-            .ok()
-            .map(|binding| {
-                state.deprecated_functions.extend(
-                    binding
-                        .deprecated_functions(db)
-                        .map(|(_, function)| function),
-                );
-                binding.return_type(db, env)
-            }),
+            ) => {
+                let result = Type::try_call_bin_op_with_policy(
+                    db,
+                    env,
+                    left_ty,
+                    ast::Operator::BitOr,
+                    right_ty,
+                    MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                )
+                .map(|call| call.into_result(db));
+                state.record_operator_result(result.as_ref())
+            }
 
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.

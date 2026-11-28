@@ -5367,43 +5367,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &mut |builder, (_, _, tcx)| infer_value_ty(builder, tcx),
                     TypeContext::default(),
                 );
-                match call {
-                    Ok(outcome) => {
-                        state.deprecated_functions.extend(
-                            outcome
-                                .deprecated_functions(db)
-                                .map(|(_, function)| function),
-                        );
-                        Ok(outcome.return_type(db, env))
-                    }
+                let (outcome, possibly_unbound) = match call {
+                    Ok(outcome) => (outcome, false),
                     Err(CallDunderError::MethodNotAvailable) => {
                         let value_ty = infer_value_ty(self, TypeContext::default());
-                        binary_return_ty(self, value_ty, state)
+                        return binary_return_ty(self, value_ty, state);
                     }
                     Err(CallDunderError::PossiblyUnbound {
-                        bindings: outcome, ..
-                    }) => {
-                        state.deprecated_functions.extend(
-                            outcome
-                                .deprecated_functions(db)
-                                .map(|(_, function)| function),
-                        );
-                        let value_ty = outcome.type_for_argument(&call_arguments, 0);
-                        match binary_return_ty(self, value_ty, state) {
-                            Ok(binary_ty) => Ok(UnionType::from_two_elements(
-                                db,
-                                env,
-                                outcome.return_type(db, env),
-                                binary_ty,
-                            )),
-                            Err(recovery_ty) => Err(UnionType::from_two_elements(
-                                db,
-                                env,
-                                outcome.return_type(db, env),
-                                recovery_ty,
-                            )),
-                        }
-                    }
+                        bindings: outcome,
+                        unbound_on: _,
+                    }) => (*outcome, true),
                     Err(CallDunderError::CallError(_, bindings, _)) => {
                         let value_ty = bindings.type_for_argument(&call_arguments, 0);
                         report_unsupported_augmented_assignment(
@@ -5412,8 +5385,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             target_type,
                             value_ty,
                         );
-                        Err(bindings.return_type(db, env))
+                        let (return_type, may_decline) =
+                            bindings.return_type(db, env).split_not_implemented(db, env);
+                        return Err(if may_decline {
+                            UnionType::from_two_elements(db, env, return_type, Type::unknown())
+                        } else {
+                            return_type
+                        });
                     }
+                };
+                state.deprecated_functions.extend(
+                    outcome
+                        .deprecated_functions(db)
+                        .map(|(_, function)| function),
+                );
+
+                let (assigned_ty, may_decline) =
+                    outcome.return_type(db, env).split_not_implemented(db, env);
+                if !possibly_unbound && !may_decline {
+                    return Ok(assigned_ty);
+                }
+
+                let value_ty = outcome.type_for_argument(&call_arguments, 0);
+                match binary_return_ty(self, value_ty, state) {
+                    Ok(binary_ty) => Ok(UnionType::from_two_elements(
+                        db,
+                        env,
+                        assigned_ty,
+                        binary_ty,
+                    )),
+                    Err(recovery_ty) => Err(UnionType::from_two_elements(
+                        db,
+                        env,
+                        assigned_ty,
+                        recovery_ty,
+                    )),
                 }
             }
         }
