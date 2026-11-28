@@ -21,6 +21,7 @@ use crate::{
     Db, FxIndexMap, FxIndexSet, Program, ProgramEnvironment,
     lint::{LintId, LintMetadata},
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
+    reachability::binding_reachability,
     types::{
         ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass, MemberLookupPolicy,
         Parameter, Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
@@ -89,7 +90,28 @@ pub(super) fn check_class<'db>(
     }
 
     let scope = class.body_scope(db);
-    let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
+    let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope)
+        .filter_map(|mut member| {
+            // A synthetic nested write can be the first binding even when the class
+            // also defines this name. Use a reachable class-body binding in that case.
+            if matches!(
+                member.first_reachable_definition.kind(db),
+                DefinitionKind::NestedBindings(_)
+            ) {
+                let symbol = place_table(db, scope).symbol_id(&member.member.name)?;
+                let use_def = use_def_map(db, scope);
+                member.first_reachable_definition = use_def
+                    .end_of_scope_symbol_bindings(symbol)
+                    .find_map(|binding| {
+                        let definition = binding.binding.definition()?;
+                        (!matches!(definition.kind(db), DefinitionKind::NestedBindings(_))
+                            && !binding_reachability(db, use_def, &binding).is_always_false())
+                        .then_some(definition)
+                    })?;
+            }
+            Some(member)
+        })
+        .collect();
     let class_specialized = class.identity_specialization(db);
     if configuration.check_liskov_violations() && !inconsistent_generic_bases {
         check_inherited_conflicts(
@@ -823,7 +845,13 @@ fn check_class_declaration<'db>(
                 && let Some(bad_definition) = use_def_map(db, class_scope)
                     .reachable_bindings(ScopedPlaceId::Symbol(symbol_id))
                     .filter_map(|binding| binding.binding.definition())
-                    .find(|def| !matches!(def.kind(db), DefinitionKind::AnnotatedAssignment(_)))
+                    .find(|def| {
+                        !matches!(
+                            def.kind(db),
+                            DefinitionKind::AnnotatedAssignment(_)
+                                | DefinitionKind::NestedBindings(_)
+                        )
+                    })
                 && let Some(builder) = context.report_lint(
                     &INVALID_NAMED_TUPLE,
                     bad_definition.focus_range(db, context.module()),

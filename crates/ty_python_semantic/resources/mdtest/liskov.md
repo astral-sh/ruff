@@ -4403,6 +4403,57 @@ error[incompatible-property-override]: Invalid override of attribute `value`
 info: Attribute `value` is not included in `__slots__`, and the class has no instance dictionary
 ```
 
+## Property override with a same-name global write
+
+A write to a global from inside a setter does not declare another class member.
+
+```py
+value: str | None = None
+
+class Base:
+    value: str
+
+class Child(Base):
+    @property
+    def value(self) -> str | None:
+        return value
+
+    @value.setter
+    def value(self, new_value: str | None) -> None:  # error: [incompatible-property-override]
+        global value  # ok
+        value = new_value
+```
+
+## Class overrides after a same-name global write
+
+A nested write to a global does not hide an override declared in the class body.
+
+```py
+from typing import Final, NamedTuple
+
+value = 0
+_fields = ()
+
+class Base:
+    value: Final = 42
+
+class Child(Base):
+    def write(self) -> None:
+        global value
+        value = 1
+
+    value = 42  # error: [override-of-final-variable]
+
+class Record(NamedTuple):
+    item: int
+
+    def write(self) -> None:
+        global _fields
+        _fields = ()
+
+    _fields = ()  # error: [invalid-named-tuple]
+```
+
 ## Descriptor overrides without instance storage
 
 An instance attribute replacing a writable descriptor must preserve its write contract. Without a
