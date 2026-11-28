@@ -51,6 +51,7 @@ pub(crate) struct TypeVar<'a> {
     pub(crate) restriction: Option<TypeVarRestriction<'a>>,
     pub(crate) kind: TypeParamKind,
     pub(crate) default: Option<&'a Expr>,
+    pub(crate) has_unpacked_keywords: bool,
 }
 
 /// Wrapper for formatting a sequence of [`TypeVar`]s for use as a generic type parameter (e.g. `[T,
@@ -153,6 +154,7 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
             restriction,
             kind,
             default,
+            ..
         }: &'a TypeVar<'a>,
     ) -> Self {
         let default = default.map(|expr| Box::new(expr.clone()));
@@ -238,6 +240,7 @@ impl<'a> From<&'a TypeParam> for TypeVar<'a> {
             kind,
             restriction,
             default: param.default(),
+            has_unpacked_keywords: false,
         }
     }
 }
@@ -275,6 +278,7 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
                 restriction: Some(TypeVarRestriction::AnyStr),
                 kind: TypeParamKind::TypeVar,
                 default: None,
+                has_unpacked_keywords: false,
             });
             return;
         }
@@ -313,6 +317,7 @@ pub(crate) fn expr_name_to_type_var<'a>(
                 restriction: None,
                 kind: TypeParamKind::TypeVar,
                 default: None,
+                has_unpacked_keywords: false,
             });
         }
         Expr::Call(ExprCall {
@@ -328,11 +333,14 @@ pub(crate) fn expr_name_to_type_var<'a>(
                 return None;
             };
 
-            if arguments
+            let positional_name = arguments
                 .args
                 .first()
-                .is_some_and(Expr::is_string_literal_expr)
-            {
+                .is_some_and(Expr::is_string_literal_expr);
+            let keyword_name = arguments
+                .find_keyword("name")
+                .is_some_and(|keyword| keyword.value.is_string_literal_expr());
+            if positional_name || keyword_name {
                 // `default` was added in PEP 696 and Python 3.13. We now support converting
                 // TypeVars with defaults to PEP 695 type parameters.
                 //
@@ -349,12 +357,15 @@ pub(crate) fn expr_name_to_type_var<'a>(
                 let default = arguments
                     .find_keyword("default")
                     .map(|default| &default.value);
+                let constraints: Vec<_> = if positional_name {
+                    arguments.args.iter().skip(1).collect()
+                } else {
+                    arguments.args.iter().collect()
+                };
                 let restriction = if let Some(bound) = arguments.find_keyword("bound") {
                     Some(TypeVarRestriction::Bound(&bound.value))
-                } else if arguments.args.len() > 1 {
-                    Some(TypeVarRestriction::Constraint(
-                        arguments.args.iter().skip(1).collect(),
-                    ))
+                } else if !constraints.is_empty() {
+                    Some(TypeVarRestriction::Constraint(constraints))
                 } else {
                     None
                 };
@@ -364,6 +375,10 @@ pub(crate) fn expr_name_to_type_var<'a>(
                     restriction,
                     kind,
                     default,
+                    has_unpacked_keywords: arguments
+                        .keywords
+                        .iter()
+                        .any(|keyword| keyword.arg.is_none()),
                 });
             }
         }
