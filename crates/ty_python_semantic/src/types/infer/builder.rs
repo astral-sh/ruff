@@ -331,7 +331,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Most inference regions never evaluate reachability, so allocate the cache lazily. Speculative
     /// builders share an initialized cache with their parent so repeated place lookups performed
     /// during multi-inference can reuse predicate truthiness computed by the parent builder.
-    reachability_cache: OnceCell<Rc<ReachabilityEvaluationCache<'db>>>,
+    reachability_cache: OnceCell<ReachabilityEvaluationCache<'db>>,
 
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
     /// Only populated for expressions that have non-empty qualifiers.
@@ -657,19 +657,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn reachability_cache(&self) -> &ReachabilityEvaluationCache<'db> {
-        self.reachability_cache
-            .get_or_init(|| {
-                let scope = self.scope();
-                let reachability_constraints = self
-                    .index
-                    .use_def_map(scope.file_scope_id(self.db()))
-                    .reachability_constraints();
-                Rc::new(ReachabilityEvaluationCache::new(
-                    scope,
-                    reachability_constraints,
-                ))
-            })
-            .as_ref()
+        self.reachability_cache.get_or_init(|| {
+            let scope = self.scope();
+            let reachability_constraints = self
+                .index
+                .use_def_map(scope.file_scope_id(self.db()))
+                .reachability_constraints();
+            ReachabilityEvaluationCache::new(scope, reachability_constraints)
+        })
     }
 
     fn discard_dict_key_assignments_for(&mut self, definition: Definition<'db>) {

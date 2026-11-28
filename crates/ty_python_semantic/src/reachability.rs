@@ -194,7 +194,8 @@
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
 use crate::ProgramEnvironment;
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
+use std::rc::Rc;
 
 use crate::{
     Db,
@@ -768,7 +769,10 @@ fn evaluate_reachability_constraint<'db>(
                 cache.primary_scope,
                 predicate_scope(db, &predicates[root.atom()])
             );
-            (cache.primary_scope, Some(&cache.primary_predicates))
+            (
+                cache.primary_scope,
+                Some(&cache.storage().primary_predicates),
+            )
         }
         _ => (predicate_scope(db, &predicates[root.atom()]), None),
     };
@@ -1239,7 +1243,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     ) -> Self {
         self.predicates.cache = cache
             .filter(|cache| cache.primary_constraints == std::ptr::from_ref(constraints).addr())
-            .map(|cache| &cache.primary_predicates);
+            .map(|cache| &cache.storage().primary_predicates);
         self
     }
 
@@ -2211,6 +2215,24 @@ impl TruthinessCache {
 pub(crate) struct ReachabilityEvaluationCache<'db> {
     primary_scope: ScopeId<'db>,
     primary_constraints: usize,
+    /// Terminal constraints need no storage. Allocate it when caching a result or sharing
+    /// the cache with a speculative builder.
+    storage: OnceCell<Rc<ReachabilityStorage>>,
+}
+
+impl Clone for ReachabilityEvaluationCache<'_> {
+    fn clone(&self) -> Self {
+        // Even if neither builder has evaluated a non-trivial constraint yet,
+        // they must share subsequent predicate evaluations.
+        Self {
+            storage: OnceCell::from(Rc::clone(self.storage())),
+            ..*self
+        }
+    }
+}
+
+#[derive(Default)]
+struct ReachabilityStorage {
     primary_predicates: TruthinessCache,
     entries: RefCell<FxHashMap<(usize, ScopedReachabilityConstraintId), Truthiness>>,
 }
@@ -2227,9 +2249,12 @@ impl<'db> ReachabilityEvaluationCache<'db> {
         Self {
             primary_scope,
             primary_constraints: std::ptr::from_ref(primary_constraints).addr(),
-            primary_predicates: TruthinessCache::default(),
-            entries: RefCell::new(FxHashMap::default()),
+            storage: OnceCell::new(),
         }
+    }
+
+    fn storage(&self) -> &Rc<ReachabilityStorage> {
+        self.storage.get_or_init(Rc::default)
     }
 
     /// Evaluates `id`, reusing a cached result when possible.
@@ -2251,12 +2276,13 @@ impl<'db> ReachabilityEvaluationCache<'db> {
 
         let graph = std::ptr::from_ref(constraints).addr();
         let key = (graph, id);
-        if let Some(result) = self.entries.borrow().get(&key).copied() {
+        let storage = self.storage();
+        if let Some(result) = storage.entries.borrow().get(&key).copied() {
             return result;
         }
 
         let result = evaluate_reachability_constraint(db, constraints, predicates, id, Some(self));
-        self.entries.borrow_mut().insert(key, result);
+        storage.entries.borrow_mut().insert(key, result);
         result
     }
 }
