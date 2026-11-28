@@ -368,6 +368,7 @@ fn normalize_enum_complement_unions<'db>(
             }
             for name in enum_class_literal
                 .member_names(db)
+                .iter()
                 .filter(|name| shared_excluded_names.contains(*name))
             {
                 builder.add_negative_in_place(Type::enum_literal(EnumLiteralType::new(
@@ -2306,6 +2307,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
             if enum_class_literal
                 .member_names(db)
+                .iter()
                 .all(|name| excluded_names.contains(name))
             {
                 return true;

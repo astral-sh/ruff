@@ -669,7 +669,7 @@ impl<'db> EnumValueSet<'db> {
             return None;
         }
         let (name, promotable) = match &self.members {
-            EnumValueSetMembers::All => (self.enum_class.member_names(db).next()?, true),
+            EnumValueSetMembers::All => (self.enum_class.member_names(db).first()?, true),
             EnumValueSetMembers::One { name, promotable } => (*name, *promotable),
             EnumValueSetMembers::Included(members) => {
                 let (name, promotable) = members.first()?;
@@ -678,6 +678,7 @@ impl<'db> EnumValueSet<'db> {
             EnumValueSetMembers::AllExcept(complement) => (
                 self.enum_class
                     .member_names(db)
+                    .iter()
                     .find(|name| !complement.excluded_names(db).contains(*name))?,
                 true,
             ),
@@ -1135,9 +1136,9 @@ fn enum_class_key_profile<'db>(
         operator,
     );
     let members: Box<[(Name, Option<LiteralValueTypeKind<'db>>)]> = enum_class
-        .members(db)
+        .member_names(db)
         .iter()
-        .map(|(name, _)| {
+        .map(|name| {
             (
                 name.clone(),
                 semantics.and_then(|semantics| {
