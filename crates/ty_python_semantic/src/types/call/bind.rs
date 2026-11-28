@@ -1307,8 +1307,8 @@ impl<'db> Bindings<'db> {
     /// Synthesizes the precise `functools.partial(...)` type for the already-matched bindings.
     ///
     /// Wrapped unions and intersections keep their original callable structure by partially
-    /// applying each callable item independently. Expanding a bound keyword can also produce a
-    /// union, since a later call must work for every value the partial could store.
+    /// applying each callable item independently. Argument expansion can also produce a union
+    /// for partials with bound keywords, since an override must work for every stored case.
     fn functools_partial_type<'a>(
         &self,
         db: &'db dyn Db,
@@ -3931,14 +3931,16 @@ impl<'db> CallableBinding<'db> {
         })
     }
 
-    /// The argument lists for the different values of a stored keyword.
+    /// Successful expanded argument lists for a partial with bound keywords.
+    ///
+    /// Even when only positional arguments expand, each case can allow different overrides.
     fn partial_keyword_cases(&self) -> Option<&[ExpandedCallEvaluation<'db>]> {
         let OverloadCallResult::ArgumentTypeExpansion(expanded) =
             self.overload_call_result.as_ref()?
         else {
             return None;
         };
-        expanded.expanded_partial_keyword.then_some(&expanded.cases)
+        expanded.has_partial_keywords.then_some(&expanded.cases)
     }
 
     /// Reduces the compatible overloads and reports invalid bound arguments to the outer partial.
@@ -3953,17 +3955,13 @@ impl<'db> CallableBinding<'db> {
             return None;
         }
 
-        let mut selected_overload_indexes: SmallVec<[usize; 1]> = self
-            .overloads
-            .iter()
-            .positions(|overload| {
-                !overload
-                    .errors
-                    .iter()
-                    .any(BindingError::is_relevant_for_partial_application)
-            })
-            .collect();
-        if selected_overload_indexes.is_empty() {
+        let compatible = |overload: &Binding<'db>| {
+            !overload
+                .errors
+                .iter()
+                .any(BindingError::is_relevant_for_partial_application)
+        };
+        if !self.overloads.iter().any(compatible) {
             let source_overload_index = self
                 .best_failing_overload_index(FailingOverloadSelection::ReportableForPartial)
                 .unwrap_or(0);
@@ -3982,35 +3980,49 @@ impl<'db> CallableBinding<'db> {
             if self.overloads().len() > 1 {
                 return None;
             }
-
-            selected_overload_indexes.push(source_overload_index);
         }
 
+        let cases = self.partial_keyword_cases();
         let signature_arguments = bound_call_arguments.with_self(self.bound_type);
-        let signatures: SmallVec<[(usize, Signature<'db>); 1]> = selected_overload_indexes
-            .into_iter()
-            .map(|index| {
-                let overload = &self.overloads()[index];
-                // TODO: Preserve intersected parameter lists when synthesizing partial signatures.
-                if let Some((_, paramspec)) =
-                    overload.signature.parameters().as_paramspec_with_prefix()
-                    && let Some(value) = overload
+        let mut signatures = SmallVec::<[(usize, Signature<'db>, bool); 1]>::new();
+        for (index, overload) in self.overloads.iter().enumerate() {
+            let mut signature =
+                overload.partially_applied_signature(db, env, signature_arguments.as_ref());
+            // Expanded calls check overrides against each case's own binding errors below.
+            if cases.is_none() && self.overloads.len() > 1 && !compatible(overload) {
+                let Some(required) = require_keyword_overrides(
+                    db,
+                    bound_call_arguments,
+                    signature,
+                    &overload.errors,
+                ) else {
+                    continue;
+                };
+                signature = required;
+            }
+
+            // TODO: Preserve intersected parameter lists when synthesizing partial signatures.
+            let has_intersected_paramspec = overload
+                .signature
+                .parameters()
+                .as_paramspec_with_prefix()
+                .and_then(|(_, paramspec)| {
+                    overload
                         .merged_specialization(db)
                         .and_then(|specialization| specialization.get(db, paramspec))
-                    && matches!(
+                })
+                .is_some_and(|value| {
+                    matches!(
                         value.as_paramspec_value(db),
                         Some(ParamSpecValue::Intersection(_))
                     )
-                {
-                    return None;
-                }
-                Some((
-                    index,
-                    overload.partially_applied_signature(db, env, signature_arguments.as_ref()),
-                ))
-            })
-            .collect::<Option<_>>()?;
-        if let Some(cases) = self.partial_keyword_cases() {
+                });
+            if cases.is_none() && has_intersected_paramspec {
+                return None;
+            }
+            signatures.push((index, signature, has_intersected_paramspec));
+        }
+        if let Some(cases) = cases {
             return cases
                 .iter()
                 .map(|case| case.partial_callable(db, &signatures, bound_call_arguments))
@@ -4019,7 +4031,7 @@ impl<'db> CallableBinding<'db> {
 
         CallableType::from_partial_overloads(
             db,
-            signatures.into_iter().map(|(_, signature)| signature),
+            signatures.into_iter().map(|(_, signature, _)| signature),
         )
         .map(|callable| smallvec_inline![callable])
     }
@@ -4390,16 +4402,9 @@ impl<'db> CallableBinding<'db> {
                 // cannot compensate for a different argument list with no matches.
                 self.overload_call_result = Some(OverloadCallResult::ArgumentTypeExpansion(
                     Box::new(ExpandedOverloadCall {
-                        expanded_partial_keyword: self.is_partial_application()
-                            && expanded_argument_lists.first().is_some_and(|expanded| {
-                                call_arguments.iter().zip(expanded.iter()).any(
-                                    |(original, value)| {
-                                        matches!(
-                                            original.kind(),
-                                            Argument::Keyword(_) | Argument::Keywords
-                                        ) && original != value
-                                    },
-                                )
+                        has_partial_keywords: self.is_partial_application()
+                            && call_arguments.iter().any(|argument| {
+                                matches!(argument.kind(), Argument::Keyword(_) | Argument::Keywords)
                             }),
                         return_type: UnionType::from_elements(
                             db,
@@ -5197,8 +5202,8 @@ enum OverloadCallResult<'db> {
 /// The combined return type and selected overloads from successful argument expansion.
 #[derive(Debug, Clone, get_size2::GetSize, salsa::SalsaValue)]
 struct ExpandedOverloadCall<'db> {
-    /// At least one of the keywords stored by a partial was expanded into alternatives.
-    expanded_partial_keyword: bool,
+    /// The call constructs a partial with at least one bound keyword.
+    has_partial_keywords: bool,
     return_type: Type<'db>,
     cases: Box<[ExpandedCallEvaluation<'db>]>,
 }
@@ -5219,29 +5224,46 @@ impl<'db> ExpandedCallEvaluation<'db> {
     fn partial_callable(
         &self,
         db: &'db dyn Db,
-        signatures: &[(usize, Signature<'db>)],
+        signatures: &[(usize, Signature<'db>, bool)],
         arguments: &CallArguments<'_, 'db>,
     ) -> Option<CallableType<'db>> {
         let snapshots = &self.snapshot.matching_overloads;
-        CallableType::from_partial_overloads(
-            db,
-            signatures.iter().filter_map(|(index, signature)| {
-                let position = snapshots
-                    .binary_search_by_key(index, |(index, _)| *index)
-                    .ok()?;
-                let (_, snapshot) = &snapshots[position];
-                snapshot
-                    .errors
-                    .iter()
-                    .filter(|error| error.is_relevant_for_partial_application())
-                    .try_fold(signature.clone(), |reduced, error| {
-                        let (name, expected) =
-                            error.partial_keyword_override(db, arguments, signature)?;
-                        reduced.requiring_keyword(name, expected)
-                    })
-            }),
-        )
+        let mut reduced = SmallVec::<[Signature<'db>; 1]>::new();
+        for (index, signature, has_intersected_paramspec) in signatures {
+            let Ok(position) = snapshots.binary_search_by_key(index, |(index, _)| *index) else {
+                continue;
+            };
+            let (_, snapshot) = &snapshots[position];
+            let Some(signature) =
+                require_keyword_overrides(db, arguments, signature.clone(), &snapshot.errors)
+            else {
+                continue;
+            };
+            if *has_intersected_paramspec {
+                return None;
+            }
+            reduced.push(signature);
+        }
+        CallableType::from_partial_overloads(db, reduced)
     }
+}
+
+/// Keep an otherwise incompatible overload only if explicit keyword overrides
+/// at call time can repair every invalid bound argument.
+fn require_keyword_overrides<'db>(
+    db: &'db dyn Db,
+    arguments: &CallArguments<'_, 'db>,
+    mut signature: Signature<'db>,
+    errors: &[BindingError<'db>],
+) -> Option<Signature<'db>> {
+    for error in errors
+        .iter()
+        .filter(|error| error.is_relevant_for_partial_application())
+    {
+        let (name, expected) = error.partial_keyword_override(db, arguments, &signature)?;
+        signature = signature.requiring_keyword(name, expected)?;
+    }
+    Some(signature)
 }
 
 #[derive(Debug)]
