@@ -53,7 +53,6 @@
 
 use itertools::{EitherOrBoth, Itertools};
 use ruff_index::newtype_index;
-use smallvec::{SmallVec, smallvec};
 
 use crate::ReachabilityConstraintsBuilder;
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
@@ -78,17 +77,81 @@ impl ScopedDefinitionId {
     }
 }
 
+/// A place usually has one live definition, even after merging branches that only
+/// change its constraints. Keep that value inline to make branch snapshots cheap.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize)]
+enum LiveDefinitions<T> {
+    #[default]
+    Empty,
+    Pair([T; 2]),
+    Single(T),
+    // Always contains at least three definitions so equality is independent of history.
+    Multiple(Vec<T>),
+}
+
+impl<T: Copy> LiveDefinitions<T> {
+    fn as_slice(&self) -> &[T] {
+        match self {
+            Self::Empty => &[],
+            Self::Single(value) => std::slice::from_ref(value),
+            Self::Pair(values) => values,
+            Self::Multiple(values) => values,
+        }
+    }
+
+    fn as_mut_slice(&mut self) -> &mut [T] {
+        match self {
+            Self::Empty => &mut [],
+            Self::Single(value) => std::slice::from_mut(value),
+            Self::Pair(values) => values,
+            Self::Multiple(values) => values,
+        }
+    }
+
+    fn push(&mut self, value: T) {
+        match self {
+            Self::Empty => *self = Self::Single(value),
+            Self::Single(first) => *self = Self::Pair([*first, value]),
+            Self::Pair([a, b]) => *self = Self::Multiple(vec![*a, *b, value]),
+            Self::Multiple(values) => values.push(value),
+        }
+    }
+
+    fn retain(&mut self, keep: impl Fn(&T) -> bool) {
+        match self {
+            Self::Single(value) if !keep(value) => *self = Self::Empty,
+            Self::Pair([a, b]) => match (keep(a), keep(b)) {
+                (true, true) => {}
+                (true, false) => *self = Self::Single(*a),
+                (false, true) => *self = Self::Single(*b),
+                (false, false) => *self = Self::Empty,
+            },
+            Self::Multiple(values) => {
+                values.retain(keep);
+                match values.as_slice() {
+                    [] => *self = Self::Empty,
+                    [value] => *self = Self::Single(*value),
+                    [a, b] => *self = Self::Pair([*a, *b]),
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 /// Merges two lists sorted by definition ID, combining constraints for shared definitions.
-fn merge_definitions<T: Clone>(
-    left: &mut SmallVec<[T; 2]>,
+fn merge_definitions<T: Copy>(
+    left: &mut LiveDefinitions<T>,
     right: &[T],
     id: impl Fn(&T) -> ScopedDefinitionId,
     mut combine: impl FnMut(&mut T, &T),
 ) {
     // Branches often change only the constraints on a place. When the
     // definitions line up, keep the existing list and update it in place.
-    if left.len() == right.len() && left.iter().zip(right).all(|(a, b)| id(a) == id(b)) {
-        for (a, b) in left.iter_mut().zip(right) {
+    let current = left.as_mut_slice();
+    if current.len() == right.len() && current.iter().zip(right).all(|(a, b)| id(a) == id(b)) {
+        for (a, b) in current.iter_mut().zip(right) {
             combine(a, b);
         }
         return;
@@ -96,8 +159,10 @@ fn merge_definitions<T: Clone>(
 
     let previous = std::mem::take(left);
     for pair in previous
-        .into_iter()
-        .merge_join_by(right.iter().cloned(), |a, b| id(a).cmp(&id(b)))
+        .as_slice()
+        .iter()
+        .copied()
+        .merge_join_by(right.iter().copied(), |a, b| id(a).cmp(&id(b)))
     {
         left.push(match pair {
             EitherOrBoth::Both(mut a, b) => {
@@ -114,11 +179,11 @@ fn merge_definitions<T: Clone>(
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) struct Declarations {
     /// A list of live declarations for this place, sorted by their `ScopedDefinitionId`.
-    live_declarations: SmallVec<[LiveDeclaration; 2]>,
+    live_declarations: LiveDefinitions<LiveDeclaration>,
 }
 
 /// One of the live declarations for a single place at some point in control flow.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) struct LiveDeclaration {
     declaration: PackedDeclarationId,
     pub(super) reachability_constraint: ScopedReachabilityConstraintId,
@@ -171,11 +236,11 @@ impl LiveDeclaration {
         }
     }
 
-    pub(super) const fn declaration(&self) -> ScopedDefinitionId {
+    pub(super) const fn declaration(self) -> ScopedDefinitionId {
         self.declaration.definition()
     }
 
-    pub(super) const fn is_imported_qualifier(&self) -> bool {
+    pub(super) const fn is_imported_qualifier(self) -> bool {
         self.declaration.is_imported_qualifier()
     }
 }
@@ -230,7 +295,7 @@ impl Declarations {
         let initial_declaration =
             LiveDeclaration::new(ScopedDefinitionId::UNBOUND, reachability_constraint, false);
         Self {
-            live_declarations: smallvec![initial_declaration],
+            live_declarations: LiveDefinitions::Single(initial_declaration),
         }
     }
 
@@ -243,7 +308,7 @@ impl Declarations {
     ) {
         if previous_definitions.are_shadowed() {
             // A real declaration replaces all earlier declarations, including imported qualifiers.
-            self.live_declarations.clear();
+            self.live_declarations = LiveDefinitions::Empty;
         }
         self.live_declarations.push(LiveDeclaration::new(
             declaration,
@@ -284,21 +349,21 @@ impl Declarations {
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
         constraint: ScopedReachabilityConstraintId,
     ) {
-        for declaration in &mut self.live_declarations {
+        for declaration in self.live_declarations.as_mut_slice() {
             declaration.reachability_constraint = reachability_constraints
                 .add_and_constraint(declaration.reachability_constraint, constraint);
         }
     }
 
     pub(super) fn as_slice(&self) -> &[LiveDeclaration] {
-        &self.live_declarations
+        self.live_declarations.as_slice()
     }
 
     fn merge(&mut self, b: &Self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
         merge_definitions(
             &mut self.live_declarations,
-            &b.live_declarations,
-            LiveDeclaration::declaration,
+            b.live_declarations.as_slice(),
+            |d| d.declaration(),
             |a, b| {
                 debug_assert_eq!(a.is_imported_qualifier(), b.is_imported_qualifier());
                 a.reachability_constraint = reachability_constraints
@@ -329,7 +394,7 @@ pub(super) struct Bindings {
     /// "unbound" binding.
     unbound_narrowing_constraint: Option<ScopedNarrowingConstraint>,
     /// A list of live bindings for this place, sorted by their `ScopedDefinitionId`
-    live_bindings: SmallVec<[LiveBinding; 2]>,
+    live_bindings: LiveDefinitions<LiveBinding>,
 }
 
 impl Bindings {
@@ -346,7 +411,7 @@ impl Bindings {
 
     pub(super) fn unbound_narrowing_constraint(&self) -> ScopedNarrowingConstraint {
         self.unbound_narrowing_constraint
-            .unwrap_or(self.live_bindings[0].narrowing_constraint)
+            .unwrap_or(self.live_bindings.as_slice()[0].narrowing_constraint)
     }
 
     pub(super) fn finish(
@@ -354,8 +419,10 @@ impl Bindings {
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
-        self.live_bindings.shrink_to_fit();
-        for binding in &self.live_bindings {
+        if let LiveDefinitions::Multiple(bindings) = &mut self.live_bindings {
+            bindings.shrink_to_fit();
+        }
+        for binding in self.live_bindings.as_slice() {
             reachability_constraints.mark_used(binding.reachability_constraint);
             narrowing_constraints.mark_used(binding.narrowing_constraint);
         }
@@ -453,7 +520,7 @@ impl Bindings {
         );
         Self {
             unbound_narrowing_constraint: None,
-            live_bindings: smallvec![initial_binding],
+            live_bindings: LiveDefinitions::Single(initial_binding),
         }
     }
 
@@ -471,7 +538,7 @@ impl Bindings {
         // now replace it, record the narrowing constraints on it:
         if is_class_scope
             && is_place_name
-            && let Some(binding) = self.live_bindings.first()
+            && let Some(binding) = self.live_bindings.as_slice().first()
             && binding.binding().is_unbound()
         {
             self.unbound_narrowing_constraint = Some(binding.narrowing_constraint);
@@ -496,7 +563,7 @@ impl Bindings {
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         constraint: ScopedNarrowingConstraint,
     ) {
-        for binding in &mut self.live_bindings {
+        for binding in self.live_bindings.as_mut_slice() {
             binding.narrowing_constraint =
                 narrowing_constraints.add_and_constraint(binding.narrowing_constraint, constraint);
         }
@@ -508,7 +575,7 @@ impl Bindings {
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
         constraint: ScopedReachabilityConstraintId,
     ) {
-        for binding in &mut self.live_bindings {
+        for binding in self.live_bindings.as_mut_slice() {
             binding.reachability_constraint = reachability_constraints
                 .add_and_constraint(binding.reachability_constraint, constraint);
         }
@@ -516,11 +583,11 @@ impl Bindings {
 
     /// Iterate over currently live bindings for this place
     pub(super) fn iter(&self) -> LiveBindingsIterator<'_> {
-        self.live_bindings.iter()
+        self.live_bindings.as_slice().iter()
     }
 
     pub(super) fn as_slice(&self) -> &[LiveBinding] {
-        &self.live_bindings
+        self.live_bindings.as_slice()
     }
 
     pub(super) fn merge(
@@ -536,7 +603,7 @@ impl Bindings {
 
         merge_definitions(
             &mut self.live_bindings,
-            &b.live_bindings,
+            b.live_bindings.as_slice(),
             LiveBinding::binding,
             |a, b| {
                 debug_assert_eq!(a.can_be_shadowed(), b.can_be_shadowed());
@@ -603,7 +670,7 @@ impl PlaceState {
         constraint: ScopedNarrowingConstraint,
         bindings_at_use: &Bindings,
     ) {
-        for binding in &mut self.bindings.live_bindings {
+        for binding in self.bindings.live_bindings.as_mut_slice() {
             if bindings_at_use
                 .iter()
                 .any(|binding_at_use| binding_at_use.binding() == binding.binding())
@@ -619,7 +686,7 @@ impl PlaceState {
         &mut self,
         mut apply: impl FnMut(ScopedNarrowingConstraint) -> ScopedNarrowingConstraint,
     ) {
-        for binding in &mut self.bindings.live_bindings {
+        for binding in self.bindings.live_bindings.as_mut_slice() {
             binding.narrowing_constraint = apply(binding.narrowing_constraint);
         }
     }
@@ -631,7 +698,7 @@ impl PlaceState {
         constraint: ScopedNarrowingConstraint,
         bindings: &[ScopedDefinitionId],
     ) {
-        for binding in &mut self.bindings.live_bindings {
+        for binding in self.bindings.live_bindings.as_mut_slice() {
             if bindings.contains(&binding.binding()) {
                 binding.narrowing_constraint = narrowing_constraints
                     .add_and_constraint(binding.narrowing_constraint, constraint);
@@ -700,8 +767,8 @@ impl PlaceState {
         previous: ScopedReachabilityConstraintId,
         next: ScopedReachabilityConstraintId,
     ) -> bool {
-        let bindings = &mut self.bindings.live_bindings;
-        let declarations = &mut self.declarations.live_declarations;
+        let bindings = self.bindings.live_bindings.as_mut_slice();
+        let declarations = self.declarations.live_declarations.as_mut_slice();
         if bindings
             .iter()
             .any(|b| b.reachability_constraint != previous)
@@ -766,8 +833,8 @@ impl PlaceState {
         narrowing: &mut NarrowingConstraintsBuilder,
         reachability: &mut ReachabilityConstraintsBuilder,
     ) -> SingletonConstraints {
-        let a = &self.bindings.live_bindings[0];
-        let b = &other.bindings.live_bindings[0];
+        let a = &self.bindings.live_bindings.as_slice()[0];
+        let b = &other.bindings.live_bindings.as_slice()[0];
         let merged = SingletonConstraints {
             narrowing: narrowing.add_or_constraint(a.narrowing_constraint, b.narrowing_constraint),
             reachability: reachability
@@ -779,10 +846,11 @@ impl PlaceState {
 
     /// Apply a merged result to a matching singleton, preserving this place's definition IDs.
     pub(super) fn set_singleton_constraints(&mut self, constraints: SingletonConstraints) {
-        let binding = &mut self.bindings.live_bindings[0];
+        let binding = &mut self.bindings.live_bindings.as_mut_slice()[0];
         binding.narrowing_constraint = constraints.narrowing;
         binding.reachability_constraint = constraints.reachability;
-        self.declarations.live_declarations[0].reachability_constraint = constraints.reachability;
+        self.declarations.live_declarations.as_mut_slice()[0].reachability_constraint =
+            constraints.reachability;
     }
 
     pub(super) fn bindings(&self) -> &Bindings {
@@ -1193,5 +1261,25 @@ mod tests {
         );
 
         assert_declarations(&sym, &["undeclared", "1"]);
+    }
+
+    #[test]
+    fn live_definitions_keep_canonical_representation_after_shadowing() {
+        for len in 0..5 {
+            let mut all = LiveDefinitions::default();
+            for id in 0..len {
+                all.push(id);
+            }
+            for mask in 0..(1 << len) {
+                let keep = |id: &i32| mask & (1 << id) != 0;
+                let mut expected = LiveDefinitions::default();
+                for id in (0..len).filter(keep) {
+                    expected.push(id);
+                }
+                let mut actual = all.clone();
+                actual.retain(keep);
+                assert_eq!(actual, expected);
+            }
+        }
     }
 }
