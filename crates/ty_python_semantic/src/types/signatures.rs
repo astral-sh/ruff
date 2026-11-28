@@ -3088,6 +3088,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let mut checker = self.with_inferable_typevars(inferable);
+        // A generic source is a subtype of a non-generic target if a single specialization
+        // satisfies both the contravariant parameter checks and the covariant return check.
+        let specialize_source = self.relation.is_subtyping()
+            && source_inferable != TypeVarSet::None
+            && target_inferable == TypeVarSet::None;
+        if specialize_source && self.typevar_evaluation == TypeVarEvaluation::Eager {
+            checker.typevar_evaluation = TypeVarEvaluation::Lazy;
+        }
         // Preserve receiver typevar constraints until the complete signature relation is solved.
         if [source, target].iter().any(|signature| {
             signature
@@ -3159,6 +3167,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         .and(db, self.constraints, check_parameters_and_return)
                 })
         });
+
+        // Include the declared domain before projecting out each local variable. For example,
+        // eliminating `T: int` from `U ≤ T` should leave `U ≤ int` for the caller.
+        let when = if specialize_source {
+            when.with_declared_domains(db, env, source_inferable, inferable)
+        } else {
+            when
+        };
 
         // But the caller does not need to consider those extra typevars. Whatever constraint set
         // we produce, we reduce it back down to the inferable set that the caller asked about.
