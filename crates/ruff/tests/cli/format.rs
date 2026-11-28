@@ -10,6 +10,40 @@ use insta_cmd::assert_cmd_snapshot;
 use super::CliTest;
 
 #[test]
+fn uncached_check_pipeline_matches_collected_output() -> Result<()> {
+    let test = CliTest::with_files([
+        ("nested/changed.py", "x=1\n"),
+        ("nested/invalid.py", "def f(:\n"),
+        ("nested/ignored.py", "contents =    2\n"),
+    ])?;
+    for index in 0..40 {
+        test.write_file(format!("nested/{index}.py"), "x = 1\n")?;
+    }
+
+    let run = |pipeline| {
+        test.format_command()
+            .args([
+                "--check",
+                "--isolated",
+                "--config",
+                "format.exclude = ['ignored.py']",
+                ".",
+            ])
+            .env("RAYON_NUM_THREADS", "4")
+            .env("RUFF_EXPERIMENTAL_FORMAT_CHECK_PIPELINE", pipeline)
+            .output()
+    };
+    let collected = run("0")?;
+    let streamed = run("1")?;
+    assert_eq!(collected.status.code(), Some(2));
+    assert_eq!(collected.status, streamed.status);
+    assert_eq!(collected.stdout, streamed.stdout);
+    assert_eq!(collected.stderr, streamed.stderr);
+
+    Ok(())
+}
+
+#[test]
 fn default_options() -> Result<()> {
     let test = CliTest::new()?;
     assert_cmd_snapshot!(test.format_command()
