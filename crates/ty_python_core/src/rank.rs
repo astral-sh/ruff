@@ -27,6 +27,7 @@ use get_size2::GetSize;
 pub struct RankBitBox {
     #[get_size(size_fn = bit_box_size)]
     bits: RankBitBoxStorage,
+    /// Ranks at the start of each chunk after the first, whose rank is always zero.
     chunk_ranks: Box<[u32]>,
 }
 
@@ -51,13 +52,14 @@ impl RankBitBox {
     }
 
     pub fn from_bits(bits: RankBitBoxVec) -> Self {
-        let chunk_ranks = bits
-            .as_raw_slice()
+        let chunks = bits.as_raw_slice();
+        let mut rank = 0;
+        let chunk_ranks = chunks
             .iter()
-            .scan(0u32, |rank, chunk| {
-                let result = *rank;
-                *rank += chunk.count_ones();
-                Some(result)
+            .take(chunks.len().saturating_sub(1))
+            .map(|chunk| {
+                rank += chunk.count_ones();
+                rank
             })
             .collect();
         let bits = bits.into();
@@ -89,16 +91,17 @@ impl RankBitBox {
     pub fn rank(&self, index: usize) -> u32 {
         let chunk_index = index / CHUNK_SIZE;
         let index_within_chunk = index % CHUNK_SIZE;
-        let chunk_rank = self.chunk_ranks[chunk_index];
-        if index_within_chunk == 0 {
-            return chunk_rank;
-        }
+        let chunk_rank = if chunk_index == 0 {
+            0
+        } else {
+            self.chunk_ranks[chunk_index - 1]
+        };
 
         // To calculate the rank within the bit's chunk, we zero out the requested bit and every
         // bit to the right, then count the number of 1s remaining (i.e., to the left of the
         // requested bit).
         let chunk = self.bits.as_raw_slice()[chunk_index];
-        let chunk_mask = Chunk::MAX << (CHUNK_SIZE - index_within_chunk);
+        let chunk_mask = !(Chunk::MAX >> index_within_chunk);
         let rank_within_chunk = (chunk & chunk_mask).count_ones();
         chunk_rank + rank_within_chunk
     }
@@ -120,7 +123,21 @@ mod tests {
 
         assert_eq!(
             bits.get_heap_size(),
-            chunk_count * (size_of::<Chunk>() + size_of::<u32>())
+            chunk_count * size_of::<Chunk>() + (chunk_count - 1) * size_of::<u32>()
         );
+    }
+
+    #[test]
+    fn ranks_across_chunks() {
+        for len in [0, 1, CHUNK_SIZE, CHUNK_SIZE + 1, 3 * CHUNK_SIZE] {
+            let mut bits = RankBitBox::bits_with_capacity(len);
+            for i in (0..len).step_by(3) {
+                bits.set(i, true);
+            }
+            let bits = RankBitBox::from_bits(bits);
+            for i in 0..len {
+                assert_eq!(bits.rank(i) as usize, i.div_ceil(3));
+            }
+        }
     }
 }
