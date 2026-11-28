@@ -2617,6 +2617,75 @@ mod tests {
     }
 
     #[test]
+    fn shadowed_by_for_in_nested_branch() {
+        // Test that a for loop variable nested in a branch still shadows an
+        // import from an enclosing branch.
+        flakes(
+            r"
+        import fu
+        fu.bar()
+        if fu.baz:
+            for fu in ():
+                pass
+        ",
+            &[Rule::ImportShadowedByLoopVar],
+        );
+        flakes(
+            r"
+        import fu
+        fu.bar()
+        def f(xs, c):
+            if c:
+                for fu in xs:
+                    pass
+        ",
+            &[Rule::ImportShadowedByLoopVar],
+        );
+        flakes(
+            r"
+        import os
+        if os.name:
+            import fu
+            fu.bar()
+            if fu.baz:
+                for fu in ():
+                    pass
+        ",
+            &[Rule::ImportShadowedByLoopVar],
+        );
+        // The import can also be the more deeply nested of the two bindings.
+        flakes(
+            r"
+        import os
+        if os.name:
+            import fu
+            fu.bar()
+        for fu in ():
+            pass
+        ",
+            &[Rule::ImportShadowedByLoopVar],
+        );
+    }
+
+    #[test]
+    fn shadowed_by_for_in_different_branch() {
+        // Test that a for loop variable doesn't shadow an import in a
+        // different branch of the same `if` statement.
+        flakes(
+            r"
+        import os
+        if os.name:
+            import fu
+            fu.bar()
+        else:
+            for fu in ():
+                pass
+        ",
+            &[],
+        );
+    }
+
+    #[test]
     fn used_in_return() {
         flakes(
             r"

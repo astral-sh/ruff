@@ -18,3 +18,13 @@ F402 Import `path` from line 2 shadowed by loop variable
   |     ^^^^
 9 |     pass
   |
+
+F402 Import `sep` from line 11 shadowed by loop variable
+  --> F402.py:16:13
+   |
+14 | def f(xs, c):
+15 |     if c:
+16 |         for sep in xs:
+   |             ^^^
+17 |             pass
+   |
