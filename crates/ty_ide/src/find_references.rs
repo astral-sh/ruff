@@ -726,6 +726,26 @@ cls = MyClass
     }
 
     #[test]
+    fn normalized_name_in_nested_string_annotation() {
+        let test = cursor_test(
+            r#"
+            class <CURSOR>C: ...
+            value: "list['𝒞']"
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 2 references
+         --> main.py:2:7
+          |
+        2 | class C: ...
+          |       -
+        3 | value: "list['𝒞']"
+          |               -
+        "#);
+    }
+
+    #[test]
     fn references_string_annotation_without_declaration() {
         let test = cursor_test(
             r#"
