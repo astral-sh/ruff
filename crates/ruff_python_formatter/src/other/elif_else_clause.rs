@@ -20,6 +20,8 @@ impl FormatNodeRule<ElifElseClause> for FormatElifElseClause {
                 // For stability, we can't insert an empty line if we don't know if the outer suite
                 // also does.
                 last_suite_in_statement: true,
+                stub_overload_group: false,
+                next_branch_in_stub_group: false,
             },
         )
     }

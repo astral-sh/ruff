@@ -1,8 +1,8 @@
 use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::WithItem;
 
-use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize, parenthesized};
+use crate::expression::{FormatUnpackingTarget, maybe_parenthesize_expression};
 use crate::prelude::*;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -162,7 +162,7 @@ impl FormatNodeRule<WithItem> for FormatWithItem {
             write!(f, [space(), token("as"), space()])?;
 
             if trailing_as_comments.is_empty() {
-                write!(f, [optional_vars.format()])?;
+                write!(f, [FormatUnpackingTarget(optional_vars)])?;
             } else {
                 write!(
                     f,

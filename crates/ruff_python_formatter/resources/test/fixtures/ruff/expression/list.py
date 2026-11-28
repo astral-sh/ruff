@@ -51,6 +51,26 @@ c1 = [ # trailing open bracket
     third
 ]  # outer comment
 
+# Redundant parentheses around lists are removed in preview.
+([])
+foo(([1, 2]))
+([item for item in items])
+([1, 2])[0]
+(([1, 2],))
+
+# Parentheses carrying comments keep those comments outside the list.
+(
+    # before the list
+    [1, 2]
+)
+(
+    [1, 2]
+    # after the list
+)
+foo((  # before the list
+    [1, 2]
+))
+
 [  # inner comment
     # own-line comment
     (  # end-of-line comment

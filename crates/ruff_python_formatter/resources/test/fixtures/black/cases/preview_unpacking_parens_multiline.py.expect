@@ -1,0 +1,24 @@
+# Splitting on an element's redundant parentheses must not make them stick.
+first, second = (
+    third_target_with_a_very_very_very_long_name_xxxxxxxxxxxxxxxxxxxxx,
+    d,
+) = (
+    1,
+    2,
+)
+
+first, second = 1, 2
+
+for first, second in points:
+    pass
+
+# Parentheses holding a comment are kept.
+(
+    # comment
+    first
+), second = (1, 2)
+
+# User-written multiline parentheses around a starred or annotated target.
+[*rest, last] = values
+
+(annotated): int = 1

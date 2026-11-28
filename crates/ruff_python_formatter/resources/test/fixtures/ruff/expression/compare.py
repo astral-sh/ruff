@@ -123,6 +123,19 @@ c = (
     # 6
 )
 
+# Normalize operands before choosing line breaks, including nested comparisons.
+assert (
+    (call_with_a_long_name(first_argument, second_argument, third_argument))
+    == (expected_result_with_a_long_name)
+    and (other.attribute) != (None)
+)
+assert ((a + b)) == ((c - d))
+assert (not a) == b
+assert (a < b) == (c < d)
+assert (value := compute()) == (expected)
+assert ("first part of a long implicitly concatenated string "
+        "second part of a long implicitly concatenated string") == (expected)
+
 # Implicit strings and comments
 
 assert (

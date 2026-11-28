@@ -198,16 +198,17 @@ response = await sync_to_async(
 ```diff
 --- Stable
 +++ Preview
-@@ -62,9 +62,9 @@
+@@ -62,9 +62,10 @@
      1
  }.unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
  
 -ct_match = ([]).unicodedata.normalize("NFKC", s1).casefold() == (
 -    []
 -).unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
-+ct_match = ([]).unicodedata.normalize(
-+    "NFKC", s1
-+).casefold() == ([]).unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
++ct_match = (
++    [].unicodedata.normalize("NFKC", s1).casefold()
++    == [].unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
++)
  
  return await self.http_client.fetch(
      f"http://127.0.0.1:{self.port}{path}",

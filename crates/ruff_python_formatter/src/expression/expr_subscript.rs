@@ -2,12 +2,13 @@ use ruff_formatter::{FormatRuleWithOptions, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprSubscript};
 
-use crate::expression::CallChainLayout;
 use crate::expression::expr_tuple::TupleParentheses;
 use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, Parentheses, parenthesized,
+    NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize, parenthesized,
 };
+use crate::expression::{CallChainLayout, maybe_parenthesize_expression};
 use crate::prelude::*;
+use crate::preview::is_remove_redundant_subscript_parentheses_enabled;
 
 #[derive(Default)]
 pub struct FormatExprSubscript {
@@ -59,7 +60,23 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
 
             let format_slice = format_with(|f: &mut PyFormatter| {
                 if let Expr::Tuple(tuple) = slice.as_ref() {
-                    write!(f, [tuple.format().with_options(TupleParentheses::Preserve)])
+                    // Starred subscript indices require Python 3.11, while a
+                    // walrus inside a tuple still needs its enclosing parentheses.
+                    let parentheses =
+                        if is_remove_redundant_subscript_parentheses_enabled(f.context())
+                            && !comments.has_dangling(tuple)
+                            && !tuple
+                                .elts
+                                .iter()
+                                .any(|element| matches!(element, Expr::Starred(_) | Expr::Named(_)))
+                        {
+                            TupleParentheses::Subscript
+                        } else {
+                            TupleParentheses::Preserve
+                        };
+                    write!(f, [tuple.format().with_options(parentheses)])
+                } else if is_remove_redundant_subscript_parentheses_enabled(f.context()) {
+                    maybe_parenthesize_expression(slice, item, Parenthesize::IfRequired).fmt(f)
                 } else {
                     write!(f, [slice.format()])
                 }

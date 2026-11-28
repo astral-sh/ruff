@@ -6,9 +6,13 @@ len(a for b in c)
 # parens around generator expression required
 sum((a for b in c), start=0)
 
-# black keeps these atm, but intends to remove them in the future:
-# https://github.com/psf/black/issues/2943
+# Parentheses around a sole generator argument are removed in preview.
 f((1 for _ in a))
+
+[((item for item in items)), fallback]
+consume((item for item in items),)
+consume((item for item in items), fallback)
+consume(generator=((item for item in items)))
 
 # make sure source parenthesis detection isn't fooled by these
 f((1) for _ in (a))
@@ -22,8 +26,7 @@ bases = tuple(
 )
 
 
-# black keeps these atm, but intends to remove them in the future:
-# https://github.com/psf/black/issues/2943
+# Parentheses carrying comments are retained.
 len(
     ( # leading
     a for b in c

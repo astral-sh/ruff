@@ -1,0 +1,117 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/unpacking.py
+---
+## Input
+```python
+# Nested targets retain their unpacking structure.
+((first), ((second), (third,))) = values
+[(first), ((second), (third))] = values
+((first), *(rest)) = values
+for ((first), [(second), (third)]) in values:
+    pass
+[(first, second) for ((first), (second)) in values]
+with context() as ((first), (second)):
+    pass
+del (first), ((second), (third))
+
+# A parenthesized annotated name is not a simple annotation target.
+name: int
+(name): int
+((name)): int = value
+(obj.attribute): int = value
+(obj[index]): int = value
+
+# Comments and trailing commas can still require parentheses.
+(
+    # Comment attached to the first target.
+    first
+), (second) = values
+(first, second,) = values
+(first,) = values
+first, ((second), (third)) = values
+```
+
+## Output
+```python
+# Nested targets retain their unpacking structure.
+((first), ((second), (third,))) = values
+[(first), ((second), (third))] = values
+((first), *(rest)) = values
+for (first), [(second), (third)] in values:
+    pass
+[(first, second) for ((first), (second)) in values]
+with context() as ((first), (second)):
+    pass
+del (first), ((second), (third))
+
+# A parenthesized annotated name is not a simple annotation target.
+name: int
+(name): int
+(name): int = value
+(obj.attribute): int = value
+(obj[index]): int = value
+
+# Comments and trailing commas can still require parentheses.
+(
+    (
+        # Comment attached to the first target.
+        first
+    ),
+    (second),
+) = values
+(
+    first,
+    second,
+) = values
+(first,) = values
+first, ((second), (third)) = values
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,13 +1,13 @@
+ # Nested targets retain their unpacking structure.
+-((first), ((second), (third,))) = values
+-[(first), ((second), (third))] = values
+-((first), *(rest)) = values
+-for (first), [(second), (third)] in values:
++first, (second, (third,)) = values
++[first, (second, third)] = values
++first, *rest = values
++for first, [second, third] in values:
+     pass
+-[(first, second) for ((first), (second)) in values]
+-with context() as ((first), (second)):
++[(first, second) for (first, second) in values]
++with context() as (first, second):
+     pass
+-del (first), ((second), (third))
++del first, (second, third)
+ 
+ # A parenthesized annotated name is not a simple annotation target.
+ name: int
+@@ -18,15 +18,12 @@
+ 
+ # Comments and trailing commas can still require parentheses.
+ (
+-    (
+-        # Comment attached to the first target.
+-        first
+-    ),
+-    (second),
+-) = values
++    # Comment attached to the first target.
++    first
++), second = values
+ (
+     first,
+     second,
+ ) = values
+ (first,) = values
+-first, ((second), (third)) = values
++first, (second, third) = values
+```

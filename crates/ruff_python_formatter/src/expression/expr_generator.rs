@@ -17,6 +17,9 @@ pub enum GeneratorExpParentheses {
     /// all(x for y in z)`
     /// ```
     Preserve,
+
+    /// Omit parentheses for a sole call argument without comments or a trailing comma.
+    Never,
 }
 
 impl FormatRuleWithOptions<ExprGenerator, PyFormatContext<'_>> for FormatExprGenerator {
@@ -52,9 +55,9 @@ impl FormatNodeRule<ExprGenerator> for FormatExprGenerator {
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
 
-        if self.parentheses == GeneratorExpParentheses::Preserve
-            && dangling.is_empty()
-            && !is_parenthesized
+        if dangling.is_empty()
+            && (self.parentheses == GeneratorExpParentheses::Never
+                || (self.parentheses == GeneratorExpParentheses::Preserve && !is_parenthesized))
         {
             write!(
                 f,

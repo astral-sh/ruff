@@ -4,6 +4,7 @@ use ruff_python_ast::ExprStarred;
 
 use crate::comments::dangling_comments;
 
+use crate::expression::FormatUnpackingTarget;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 
@@ -22,7 +23,14 @@ impl FormatNodeRule<ExprStarred> for FormatExprStarred {
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
 
-        write!(f, [token("*"), dangling_comments(dangling), value.format()])
+        write!(
+            f,
+            [
+                token("*"),
+                dangling_comments(dangling),
+                FormatUnpackingTarget(value)
+            ]
+        )
     }
 }
 

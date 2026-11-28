@@ -473,3 +473,25 @@ type A[
     VeryLongTypeNameThatShouldBreakFirstToTheRightBeforeSplitngtinthatExceedsTheWidth
 ] = str
 ```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -25,11 +25,9 @@
+ 
+ 
+ # Preserve parentheses around the first target
+-(
+-    req["ticket"]["steps"]["step"][0]["tasks"]["task"]["fields"]["field"][
+-        "access_request"
+-    ]["destinations"]["destination"][0]["ip_address"]
+-) = dst
++req["ticket"]["steps"]["step"][0]["tasks"]["task"]["fields"]["field"]["access_request"][
++    "destinations"
++]["destination"][0]["ip_address"] = dst
+ 
+ # Augmented assignment
+ req["ticket"]["steps"]["step"][0]["tasks"]["task"]["fields"]["field"][
+```

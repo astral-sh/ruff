@@ -1,11 +1,16 @@
 use ruff_formatter::{Buffer, FormatResult, format_args, write};
+use ruff_python_ast::token::parentheses_iterator;
 use ruff_python_ast::{Comprehension, Expr};
 use ruff_python_trivia::{SimpleTokenKind, find_only_token_in_range};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments};
+use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_tuple::TupleParentheses;
+use crate::expression::parentheses::{Parentheses, Parenthesize};
+use crate::expression::{FormatUnpackingTarget, maybe_parenthesize_expression};
 use crate::prelude::*;
+use crate::preview::is_wrap_comprehension_in_enabled;
 
 #[derive(Default)]
 pub struct FormatComprehension;
@@ -34,9 +39,22 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
                 //     )
                 // ]
                 // ```
-                let will_be_parenthesized = self.preserve_parentheses
+                let mut will_be_parenthesized = self.preserve_parentheses
                     && f.context()
                         .is_expression_parenthesized(self.expression.into());
+
+                if will_be_parenthesized
+                    && is_wrap_comprehension_in_enabled(f.context())
+                    && let Some(first) = f.context().comments().leading(self.expression).first()
+                    && let Some(parentheses) =
+                        parentheses_iterator(self.expression.into(), None, f.context().tokens())
+                            .last()
+                    && first.start() < parentheses.start()
+                {
+                    // A comment before the opening parenthesis stays outside it
+                    // and therefore needs a line break after the keyword.
+                    will_be_parenthesized = false;
+                }
 
                 if has_leading_comments && !will_be_parenthesized {
                     soft_line_break_or_space().fmt(f)
@@ -99,14 +117,89 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
                 in_spacer,
                 leading_comments(before_in_comments),
                 token("in"),
-                trailing_comments(trailing_in_comments),
-                Spacer {
-                    expression: iter,
-                    preserve_parentheses: true
-                },
-                iter.format(),
             ]
         )?;
+
+        if is_wrap_comprehension_in_enabled(f.context()) {
+            if trailing_in_comments
+                .iter()
+                .any(|comment| comment.line_position().is_own_line())
+            {
+                let (end_of_line, own_line) = trailing_in_comments.split_at(
+                    trailing_in_comments
+                        .partition_point(|comment| comment.line_position().is_end_of_line()),
+                );
+                write!(
+                    f,
+                    [
+                        trailing_comments(end_of_line),
+                        hard_line_break(),
+                        leading_comments(own_line),
+                        iter.format()
+                    ]
+                )?;
+            } else if !trailing_in_comments.is_empty() || comments.contains_comments(iter.into()) {
+                write!(
+                    f,
+                    [
+                        trailing_comments(trailing_in_comments),
+                        Spacer {
+                            expression: iter,
+                            preserve_parentheses: true
+                        },
+                        iter.format()
+                    ]
+                )?;
+            } else {
+                space().fmt(f)?;
+                if matches!(
+                    iter,
+                    Expr::If(_)
+                        | Expr::Lambda(_)
+                        | Expr::Yield(_)
+                        | Expr::YieldFrom(_)
+                        | Expr::Named(_)
+                ) {
+                    // Without parentheses, trailing clauses can become part of a
+                    // lambda body or be parsed as a conditional expression.
+                    iter.format().with_options(Parentheses::Always).fmt(f)?;
+                } else if f.context().is_expression_parenthesized(iter.into())
+                    && matches!(iter, Expr::BinOp(_) | Expr::BoolOp(_) | Expr::Compare(_))
+                {
+                    iter.format().fmt(f)?;
+                } else {
+                    // The comprehension's brackets permit line breaks, but a long
+                    // iterable can fit better when it has its own parentheses.
+                    // Only try this once the comprehension itself has expanded;
+                    // a best-fit boundary must not hide an iterable's line breaks
+                    // from the enclosing comprehension.
+                    let wrapped = format_with(|f| {
+                        let mut f = WithNodeLevel::new(NodeLevel::Expression(None), f);
+                        maybe_parenthesize_expression(iter, item, Parenthesize::IfBreaks)
+                            .fmt(&mut f)
+                    });
+                    write!(
+                        f,
+                        [
+                            if_group_fits_on_line(&iter.format().with_options(Parentheses::Never)),
+                            if_group_breaks(&wrapped),
+                        ]
+                    )?;
+                }
+            }
+        } else {
+            write!(
+                f,
+                [
+                    trailing_comments(trailing_in_comments),
+                    Spacer {
+                        expression: iter,
+                        preserve_parentheses: true
+                    },
+                    iter.format()
+                ]
+            )?;
+        }
 
         if !ifs.is_empty() {
             let joined = format_with(|f| {
@@ -158,7 +251,7 @@ impl Format<PyFormatContext<'_>> for ExprTupleWithoutParentheses<'_> {
                 .format()
                 .with_options(TupleParentheses::Never)
                 .fmt(f),
-            other => other.format().fmt(f),
+            other => FormatUnpackingTarget(other).fmt(f),
         }
     }
 }

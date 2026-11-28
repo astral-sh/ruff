@@ -1,0 +1,115 @@
+# Simple top-level expressions
+(x)
+(1)
+(None)
+(...)
+("hello")
+(b"hello")
+(f"hello {x}")
+([])
+({})
+({1, 2})
+(a + b)
+(x.y)
+(x[0])
+(x())
+
+# Nested redundant parentheses
+((x))
+(((x)))
+((1 + 2))
+
+# Semicolon-separated statements
+(x); (y)
+(1); (2); (3)
+
+# Inside blocks
+def func():
+    (x)
+    (1)
+    (yield)
+    (yield 42)
+    (yield from x)
+    ((yield 42))
+
+if True:
+    (x)
+
+# Function call arguments must retain parentheses around yield
+f((yield 42))
+
+# Single-line ternary, lambda, await
+(a if b else c)
+(lambda x: x)
+(await x)
+
+# Walrus assignment expressions must retain statement-level parentheses
+(x := 1)
+((x := 1))
+
+# Tuples must retain parentheses
+()
+(())
+(x,)
+((x,))
+(a, b)
+((a, b))
+
+# Generator expressions must retain parentheses at statement level
+(x for x in y)
+((x for x in y))
+
+# Implicit string concatenation
+("a" "b")
+(f"{a}" "b")
+(("a" "b"))
+
+# Standalone comment inside parentheses preserves parentheses
+(
+    # comment
+    x
+)
+
+# Inline comments become trailing comments when collapsed onto one line
+(  # comment
+    x
+)
+(x  # comment
+)
+(  # comment
+    1 + 2
+)
+
+# Comments outside parentheses
+# leading comment
+(x)
+(x)  # trailing comment
+
+# Multiline ternary split across lines retains parentheses
+(
+    long_ternary_condition_or_value_one
+    if long_ternary_condition_two
+    else long_ternary_alternative_value_three
+)
+
+# Multiline implicitly concatenated string retains parentheses
+(
+    "this is a very long string that will not fit on a single line by itself 1111111"
+    "and this is the second part of the long string that also takes up space 2222222"
+)
+
+# Long expressions split with visible parentheses
+(
+    long_variable_name_one
+    + long_variable_name_two
+    + long_variable_name_three
+    + long_variable_name_four
+)
+
+# Long expressions with comment retain parentheses
+(  # comment
+    long_variable_name_one
+    + long_variable_name_two
+    + long_variable_name_three
+    + long_variable_name_four
+)
