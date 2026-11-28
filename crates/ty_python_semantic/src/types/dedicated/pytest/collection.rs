@@ -463,21 +463,22 @@ fn has_unittest_test_methods<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> 
         })
 }
 
+/// Returns whether `file_name` matches pytest's default test file patterns, `test_*.py` and
+/// `*_test.py`.
+pub fn is_default_pytest_test_file_name(file_name: &str) -> bool {
+    file_name
+        .strip_suffix(".py")
+        .is_some_and(|stem| stem.starts_with("test_") || stem.ends_with("_test"))
+}
+
 fn is_default_pytest_test_file(db: &dyn Db, file: ProgramFile<'_>) -> bool {
-    let Some(file_name) = file
+    let has_test_file_name = file
         .file(db)
         .path(db)
         .as_system_path()
         .and_then(|path| path.file_name())
-    else {
-        return false;
-    };
-
-    let Some(stem) = file_name.strip_suffix(".py") else {
-        return false;
-    };
-
-    if !(stem.starts_with("test_") || stem.ends_with("_test")) {
+        .is_some_and(is_default_pytest_test_file_name);
+    if !has_test_file_name {
         return false;
     }
 
