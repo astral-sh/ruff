@@ -18,6 +18,9 @@ use ty::{ExitStatus, run};
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+mod macos_allocator;
+
 fn main() -> ExitStatus {
     run().unwrap_or_else(|error| {
         use io::Write;
